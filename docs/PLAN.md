@@ -6,6 +6,19 @@ Acordado el 11 de noviembre de 2026. El estado técnico y los pendientes están 
 
 Un juego web online de halterofilia de calidad de producción. Terminado cuando alguien que no conoce el juego abre el link en su teléfono, compite contra otra persona y ve el resultado en la tabla, sin errores y sin que nada de lo visual lo saque de la experiencia.
 
+## Alcance del juego (definido por el usuario el 11-nov)
+
+Una **final del mundo con tres pesistas**. El usuario juega para que su pesista gane.
+
+- Tres levantadores ficticios (los dos actuales más uno nuevo), cada uno con su biotipo.
+- Arranque y dos tiempos con cualquiera de los tres enviones (tijera, power, squat).
+- Los intentos pueden salir bien, ser nulos o fallar, con animaciones propias de cada fallo.
+- **Pelear el levantamiento:** el usuario aprieta una tecla (o toca) para que el pesista haga más esfuerzo y no falle; el resultado depende de eso y del timing.
+- Festejos después de un intento válido.
+- **Ayudantes que cargan la barra** entre intentos cuando cambia el peso.
+- Cierre con **podio, entrega de medallas y foto de los tres juntos**.
+- Los gráficos más reales que se puedan lograr en web.
+
 Dirección de arte: **realismo estilizado**, no fotorrealismo. La referencia de nivel es un buen juego deportivo de consola de la generación anterior corriendo en el navegador.
 
 ## Dónde corre cada cosa
@@ -26,12 +39,12 @@ En el Mac alquilado se puede paralelizar, pero midiendo: empezar con dos proceso
 | # | Etapa | Dónde | Terminada cuando |
 |---|---|---|---|
 | 0 | Preparación | Mac alquilado y cloud | `tools/setup.sh` corre en el Mac alquilado y `./build.sh` da 0 cuadros con superposición en los dos; la sesión cloud abre el repo |
-| 1 | Juego mínimo jugable | Cloud | Un arranque y un dos tiempos jugables de punta a punta con toques o teclado: tres intentos, elección de kilos, luces de jueces, válido o nulo y total. Escritorio y teléfono sin errores de consola. La prueba automática juega una partida completa |
+| 1 | Juego mínimo jugable | Cloud | Una final de tres pesistas jugable de punta a punta con toques o teclado: orden de salida por kilos, tres intentos por levantamiento, elección de kilos, mecánica de timing y de «pelear el levantamiento», luces de jueces, válido o nulo, total y clasificación. Los dos rivales los maneja el juego. Escritorio y teléfono sin errores de consola. La prueba automática juega una partida completa |
 | 2 | Dirección de arte | Mac alquilado + GPU | Imagen objetivo elegida por el usuario. Lista fija de planos capturados en el visor. Comparación de ventura con brazos arriba en tres versiones (malla actual, malla generada por imagen a 3D, variante de proporciones) contra el objetivo. **El usuario decide cuál sigue, o si se compra o encarga la malla** |
-| 3 | Atletas definitivos | Mac alquilado + GPU | Los dos atletas con el look elegido pasan la lista de planos sin los defectos de hoy (pliegue de axila, rodillera, borde de barba, halo blanco). `./build.sh` en 0. Cada GLB pesa 4 MB o menos. **El usuario aprueba las capturas** |
-| 4 | Movimiento y fallos | Mac alquilado + GPU | Cada fase comparada contra su cuadro de video en `docs/ref/`; la tabla de HANDOFF pasa de «coherente» a «comparada». Reservas de ritmo corregidas (subidas, segundo tirón, dip). Al menos tres fallos animados que también dan 0 en el chequeo |
+| 3 | Atletas definitivos | Mac alquilado + GPU | Los tres atletas (el tercero es nuevo y ficticio) con el look elegido pasan la lista de planos sin los defectos de hoy (pliegue de axila, rodillera, borde de barba, halo blanco). `./build.sh` en 0 para los tres. Cada GLB pesa 4 MB o menos. Dos ayudantes de pista con malla más simple. **El usuario aprueba las capturas** |
+| 4 | Movimiento y fallos | Mac alquilado + GPU | Cada fase comparada contra su cuadro de video en `docs/ref/`; la tabla de HANDOFF pasa de «coherente» a «comparada». Reservas de ritmo corregidas (subidas, segundo tirón, dip). Fallos animados (barra adelante, barra atrás, envión que no bloquea, intento peleado que sale y que no sale), festejos y ayudantes cargando la barra, todos en 0 en el chequeo |
 | 5 | Online | Cloud | Cuentas, competencia por turnos y tabla de posiciones en una URL pública. El servidor recalcula el resultado y rechaza uno falsificado. Dos personas en dispositivos distintos completan una competencia |
-| 6 | Pulido y lanzamiento | Ambos | 60 fps en calidad media en una laptop común y 30 estables en un teléfono de gama media. Carga inicial de 10 MB o menos. Audio de público y locutor. Ayudantes que cambian discos y podio, si entran |
+| 6 | Pulido y lanzamiento | Ambos | 60 fps en calidad media en una laptop común y 30 estables en un teléfono de gama media. Carga inicial de 10 MB o menos. Audio de público y locutor. Podio, entrega de medallas y foto de los tres |
 
 Las etapas 1 y 2 corren en paralelo. La 3 depende de la decisión de la 2. La 4 necesita los videos de referencia. La 5 solo necesita la 1.
 
@@ -41,7 +54,7 @@ Las etapas 1 y 2 corren en paralelo. La 3 depende de la decisión de la 2. La 4 
 2. Todo se compara contra una imagen objetivo elegida, no contra la palabra «fotorrealista».
 3. El arte se evalúa en el visor con una lista fija de planos, no en renders de Blender con otra luz.
 4. Piel con subsuperficie, ojos con córnea y sombra de párpado, barba con tarjetas de pelo.
-5. Huesos auxiliares para hombro, axila y rodilla, movidos por cálculo en el visor. **Pendiente de aprobación del usuario:** rompe la regla de esqueleto único de AGENTS.md.
+5. Huesos auxiliares para hombro, axila y rodilla, movidos por cálculo en el visor. **Aprobado por el usuario el 11-nov** («si aporta al realismo, mejor»); AGENTS.md ya lo refleja.
 6. Punto de control con capturas antes de cada etapa cara.
 7. Presupuesto de triángulos y de milisegundos por cuadro fijado desde el principio.
 8. Video de referencia para el ritmo.
@@ -56,13 +69,11 @@ Las etapas 1 y 2 corren en paralelo. La 3 depende de la decisión de la 2. La 4 
 
 ## Lo que depende del usuario
 
-- Crear el Mac mini en Scaleway (cuenta, pago, clave SSH), instalar Claude Code e iniciar sesión.
-- Crear la cuenta del proveedor de GPU cuando la etapa 2 lo pida.
+- Iniciar sesión y pagar en Scaleway y en el proveedor de GPU. La operación (crear la máquina, configurarla por SSH, correr los builds) la hace el agente desde la sesión local del usuario, que queda como orquestadora sin correr nada pesado.
 - Autorizar GitHub en claude.ai/code para la sesión cloud.
 - Subir dos o tres videos en cámara lenta a `docs/ref/`.
 - Cuenta y login de Higgsfield.
 - Elegir la imagen objetivo y aprobar las capturas de las etapas 2 y 3.
-- Aprobar o no los huesos auxiliares.
 
 ## Mensajes de arranque
 

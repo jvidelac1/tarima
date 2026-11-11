@@ -6,7 +6,7 @@ Leé primero `HANDOFF.md`: tiene el estado, los problemas conocidos y los próxi
 
 - **No ajustar poses a ojo.** Todo cambio en `blender/poses.py` se valida con `check()` (cero cuadros `BAD`) y con las hojas de control `out/<nombre>/sheet_<seg>_side.png` y `sheet_<seg>_front.png`. No aflojar `check()` ni excluir muestras para llegar a cero. Agregá la vista que necesites en `WANT`.
 - **Las poses son reglas, no rotaciones.** Si una fase se ve mal en un biotipo, corregí la regla o el parámetro de la fase; no hardcodees un valor por personaje.
-- **Un solo esqueleto.** 52 huesos con nombres Mixamo más `Bar`. No cambiar la pose de reposo ni los nombres: el visor y las animaciones dependen de eso.
+- **Un solo esqueleto animado.** 52 huesos con nombres Mixamo más `Bar`; no cambiar sus nombres: el visor y las animaciones dependen de eso. Se permiten huesos auxiliares de deformación con prefijo `aux_` (hombro, axila, rodilla): no llevan claves de animación y los mueve el visor por cálculo.
 - **Personajes ficticios.** Nada de nombres, caras ni marcas de atletas reales.
 - **La referencia manda.** Si hay cuadros de video para una fase, la pose se compara contra ellos antes de darla por buena. Lo que no tenga referencia se anota como estimación en `HANDOFF.md`.
 
