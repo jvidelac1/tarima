@@ -40,8 +40,9 @@
 //     camera_angle_x), cuatro KSampler con semilla fija, PrimitiveBoolean "Boolean (Switch to Trellis2)", salida por Save3DAdvanced.
 //     La plantilla multivista parte de UNA lámina de cuatro vistas (LoadImage -> ImageCropV2 -> RemoveBackground -> ImageCropToMask);
 //     para darle cuatro renders sueltos hay que agregar cuatro LoadImage, enlazarlos a front/left/back/right y quitar la lámina.
+//   - La conversión con el frontend (window.comfyAPI.app.app, loadGraphData y graphToPrompt) funciona con las tres plantillas:
+//     aplana los subgrafos con ids "170:169" y conserva `_meta.title`, que es el nombre visible del nodo ("Load Image", "Steps"...).
 // SUPUESTO (sin verificar: falta correr un flujo con modelos):
-//   - que `app.graphToPrompt()` aplane los subgrafos con ids "170:169" y conserve `_meta.title` (de eso dependen los selectores con @);
 //   - en qué clave de /history deja Save3DAdvanced el GLB (se toma cualquier lista con `filename`; si no aparece, se busca el archivo
 //     por su prefijo en la carpeta output/ del servidor, que está en esta misma máquina);
 //   - que las entradas front/left/back/right acepten la IMAGE de LoadImage tal cual (fondo negro, sin pasar por ImageCropToMask);
@@ -84,11 +85,17 @@ function elegir(flujo, sel) {
   const m = /^(.*?)(?:#(\d+))?$/.exec(sel), todos = ids(flujo).filter(i => flujo[i].class_type === m[1]);
   return m[2] ? todos.slice(+m[2] - 1, +m[2]) : todos;
 }
+// "<nodo>.<entrada>": hay entradas con punto en el nombre (format.bit_depth, sign_mode.fill) y títulos con punto, así que se
+// prueba cada punto de izquierda a derecha y vale el primero cuya parte izquierda nombra algún nodo.
+function partir(flujo, clave) {
+  for (let k = clave.indexOf('.'); k > 0; k = clave.indexOf('.', k + 1)) { const ns = elegir(flujo, clave.slice(0, k)); if (ns.length) return { ns, ent: clave.slice(k + 1) }; }
+  return { ns: [], ent: null };
+}
 function fijar(flujo, clave, valor) {
   const opc = clave.endsWith('?'); if (opc) clave = clave.slice(0, -1);
-  const k = clave.lastIndexOf('.'); if (k < 1) fallar(`Selector sin entrada: "${clave}" (formato "<nodo>.<entrada>")`);
-  const sel = clave.slice(0, k), ent = clave.slice(k + 1), ns = elegir(flujo, sel);
-  if (!ns.length) { if (opc) return []; fallar(`Ningún nodo coincide con "${sel}". Clases del flujo: ${clases(flujo)}`); }
+  if (clave.indexOf('.') < 1) fallar(`Selector sin entrada: "${clave}" (formato "<nodo>.<entrada>")`);
+  const { ns, ent } = partir(flujo, clave);
+  if (!ns.length) { if (opc) return []; fallar(`Ningún nodo coincide con "${clave}". Clases del flujo: ${clases(flujo)}`); }
   for (const i of ns) {
     if (!Object.hasOwn(flujo[i].inputs, ent)) console.log(`AVISO ${i} (${flujo[i].class_type}) no tenía la entrada "${ent}"; tiene: ${Object.keys(flujo[i].inputs).join(', ')}. Se agrega igual.`);
     flujo[i].inputs[ent] = valor;
@@ -183,15 +190,21 @@ async function convertir({ plantilla, flujo }) {
     const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
     page.on('pageerror', e => console.log('[pageerror] ' + e.message.slice(0, 300)));
     await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 120000 });
-    // SUPUESTO: el frontend deja la aplicación en window.app (o window.comfyAPI.app.app) con graph, loadGraphData y graphToPrompt.
-    await page.waitForFunction(() => { const a = window.app || window.comfyAPI?.app?.app; return !!(a && a.graph && a.loadGraphData && a.graphToPrompt); }, null, { timeout: 180000 });
+    // VERIFICADO (frontend 1.58.5): la aplicación está en window.comfyAPI.app.app; window.app ya no existe.
+    await page.waitForFunction(() => { const a = window.comfyAPI?.app?.app || window.app; return !!(a && a.graph && a.loadGraphData && a.graphToPrompt); }, null, { timeout: 180000 });
+    // Al arrancar, el frontend carga solo su flujo por defecto unos 2 s después: si la plantilla se carga antes, la pisa.
+    // Se espera a que la cantidad de nodos del grafo deje de cambiar (3 lecturas iguales, o 20 s).
+    for (let k = 0, prev = -1, iguales = 0; k < 40 && iguales < 3; k++) { await page.waitForTimeout(500); const n = await page.evaluate(() => (window.comfyAPI?.app?.app || window.app).graph.nodes.length); iguales = n === prev && n > 0 ? iguales + 1 : 0; prev = n; }
     const r = await page.evaluate(async ({ plantilla, wf }) => {
-      const app = window.app || window.comfyAPI.app.app;
+      const app = window.comfyAPI?.app?.app || window.app, pausa = ms => new Promise(ok => setTimeout(ok, ms));
       if (!wf) { const res = await fetch(`/templates/${plantilla}.json`); if (!res.ok) return { error: `GET /templates/${plantilla}.json -> HTTP ${res.status}` }; wf = await res.json(); }
-      // SUPUESTO: firma loadGraphData(flujo, limpiar, restaurarVista, workflow, opciones); los avisos de nodos o modelos faltantes no tienen que bloquear.
+      // SUPUESTO: firma loadGraphData(flujo, limpiar, restaurarVista, workflow, opciones); funcionó así con las tres plantillas del plan.
       await app.loadGraphData(wf, true, false, null, { showMissingNodesDialog: false, showMissingModelsDialog: false });
-      await new Promise(ok => setTimeout(ok, 1500));
+      await pausa(1000);
+      const esperados = wf.nodes.map(n => String(n.id)).sort().join(','), cargados = () => app.graph.nodes.map(n => String(n.id)).sort().join(',');
+      if (cargados() !== esperados) return { error: `el grafo cargado no es el pedido (${app.graph.nodes.length} nodos en vez de ${wf.nodes.length})` };
       const p = await app.graphToPrompt(), tipos = window.LiteGraph?.registered_node_types;
+      if (cargados() !== esperados) return { error: 'el frontend cambió el grafo mientras se convertía' };
       const faltan = tipos ? [...new Set(Object.values(p.output).map(n => n.class_type).filter(t => !tipos[t]))] : [];
       return { output: p.output, faltan };
     }, { plantilla, wf });
