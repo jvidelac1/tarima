@@ -19,6 +19,9 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
   #escena{flex:0 0 60%}
   #zona{display:flex;flex:1;align-items:center;justify-content:center;padding-bottom:var(--sb);background:radial-gradient(ellipse at 50% 0,#101a44 0,#05081a 75%);border-top:2px solid var(--line);font-family:var(--display);font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);touch-action:none}
   #zona.on{background:radial-gradient(ellipse at 50% 0,#17307a 0,#081033 75%);color:var(--ink)}
+  /* los paneles usan toda la pantalla: el botón táctil no hace falta mientras hay un panel abierto */
+  #capa{position:fixed;inset:0;padding-bottom:calc(8px + var(--sb));z-index:5}
+  .panel{max-height:100%}
 }
 #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:20px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);pointer-events:none;background:radial-gradient(ellipse at center,#0a1030 0,#03050c 70%)}
 #tv{position:absolute;inset:0;pointer-events:none;font-family:var(--display);text-transform:uppercase}
