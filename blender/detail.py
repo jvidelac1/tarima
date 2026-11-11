@@ -142,12 +142,12 @@ def piel(b):
     return short,W,dom,body
 def mascara(S,short,W,body,co_rest):
     """Peso 0..1 de la zona del relieve: suma de pesos de los huesos de MASK_BONES (borde suave donde otro hueso pasa a dominar), solo piel
-    y tela del cuerpo, y fuera de la franja del cinturón."""
+    y tela del cuerpo. La franja del cinturón se saca solo de la parte del tronco: en reposo los antebrazos cuelgan a esa misma altura."""
     import geo
-    j=[i for i,n in enumerate(short) if n in MASK_BONES]; w=geo.sm(.3,.7,W[:,j].sum(1)/np.maximum(W.sum(1),1e-9))*body
+    tot=np.maximum(W.sum(1),1e-9); tr=W[:,[i for i,n in enumerate(short) if n in ('Spine1','Spine2')]].sum(1)/tot; br=W[:,[i for i,n in enumerate(short) if n in MASK_BONES and n not in ('Spine1','Spine2')]].sum(1)/tot
     if S.STY.get('belt'):
-        zc=geo.head(S.rig,'LeftUpLeg')[2]+geo.BELT_Z*S.K; hw=(.051+.012)*S.K; w=w*geo.sm(hw,hw+.03*S.K,np.abs(co_rest[:,2]-zc))
-    return w
+        zc=geo.head(S.rig,'LeftUpLeg')[2]+geo.BELT_Z*S.K; hw=(.051+.012)*S.K; tr=tr*geo.sm(hw,hw+.03*S.K,np.abs(co_rest[:,2]-zc))
+    return geo.sm(.3,.7,br+tr)*body
 def por_grupo(dom,val,sel=None):
     """Mediana y percentiles (mm) de 'val' por hueso dominante, izquierda y derecha juntas."""
     out={}
@@ -167,14 +167,16 @@ def icp_sim(bvh,P0,M,its,trim=.8):
     return M,float(np.median(cercanos(bvh,ap(M,P0))[2]))
 def icp_plano(bvh,P0,M,its=40):
     """Refinado punto a plano con escala (Gauss-Newton de 7 incógnitas) y pesos de Tukey: manda la mayoría que coincide; lo que difiere de
-    verdad (relieve nuevo, tapas del corte del busto, pelo) casi no pesa y no arrastra la escala."""
-    for _ in range(its):
-        P=ap(M,P0); Q,N,D=cercanos(bvh,P); r=((P-Q)*N).sum(1); c=4.685*max(1.4826*float(np.median(np.abs(r))),5e-4)
-        w=np.where(np.abs(r)<c,(1-(r/c)**2)**2,0.)*(D<max(5*float(np.median(D)),.004))
-        if w.sum()<10: break
-        cen=(P*w[:,None]).sum(0)/w.sum(); X=P-cen; A=np.concatenate([np.cross(X,N),N,(X*N).sum(1)[:,None]],1); Aw=A*w[:,None]
-        x=np.linalg.solve(A.T@Aw+1e-12*np.eye(7),-Aw.T@r); R=rodrigues(x[:3]); s=1+x[6]; Mi=M4(s,R,cen+x[3:6]-s*R@cen); M=Mi@M
-        if np.linalg.norm(x[:3])<2e-6 and np.linalg.norm(x[3:6])<2e-6 and abs(x[6])<2e-6: break
+    verdad (relieve nuevo, tapas del corte del busto, pelo) casi no pesa y no arrastra la escala. Dos pasadas: corte amplio (4,685 sigmas
+    robustas) hasta converger y después corte a 3 sigmas, que deja afuera del todo una zona entera que cambió unos milímetros."""
+    for kc in (4.685,3.0):
+        for _ in range(its):
+            P=ap(M,P0); Q,N,D=cercanos(bvh,P); r=((P-Q)*N).sum(1); c=kc*max(1.4826*float(np.median(np.abs(r))),5e-4)
+            w=np.where(np.abs(r)<c,(1-(r/c)**2)**2,0.)*(D<max(5*float(np.median(D)),.004))
+            if w.sum()<10: break
+            cen=(P*w[:,None]).sum(0)/w.sum(); X=P-cen; A=np.concatenate([np.cross(X,N),N,(X*N).sum(1)[:,None]],1); Aw=A*w[:,None]
+            x=np.linalg.solve(A.T@Aw+1e-12*np.eye(7),-Aw.T@r); R=rodrigues(x[:3]); s=1+x[6]; Mi=M4(s,R,cen+x[3:6]-s*R@cen); M=Mi@M
+            if np.linalg.norm(x[:3])<2e-6 and np.linalg.norm(x[3:6])<2e-6 and abs(x[6])<2e-6: break
     return M
 def alinear(co_t,tri_t,co_s,tri_s,hipz,ejes=False,semilla=7):
     """Similitud que lleva la malla generada (s) sobre la nuestra (t), y un resumen con el error.
@@ -294,7 +296,9 @@ def cmd_heat(a):
     S=abrir(a.nombre,a.pose); b=S.b; me=b.data; co,no,tri=malla_eval(b); short,W,dom,body=piel(b); N=len(co)
     rest=np.empty(N*3); me.vertices.foreach_get('co',rest); rest=rest.reshape(N,3)
     bvh,info,_=_medir(S,a,co,tri); print('HEAT',a.nombre,a.pose,'alineación:',linea(info),flush=True)
-    idx=np.nonzero(body)[0]; Q,_,D=cercanos(bvh,co[idx],a.limite*S.K); e=np.where(np.isfinite(D),np.sign(((Q-co[idx])*no[idx]).sum(1))*D,np.nan)
+    idx=np.nonzero(body)[0]; Q,_,D=cercanos(bvh,co[idx],a.limite*S.K); pr=((Q-co[idx])*no[idx]).sum(1)
+    ok=np.isfinite(D)&((D<.002)|(np.abs(pr)>.5*D))     # si el punto más cercano queda de costado es el borde de la malla generada (el corte del busto), no su superficie
+    e=np.where(ok,np.sign(pr)*D,np.nan)
     stats=por_grupo(dom[idx],e); out=a.out or os.path.join(ROOT,'out','arte','gen',f'error_{a.pose}.png'); base=os.path.splitext(out)[0]; os.makedirs(os.path.dirname(os.path.abspath(out)),exist_ok=True)
     np.savez_compressed(base+'.npz',idx=idx.astype(np.int32),co_pose=co[idx].astype(np.float32),co_rest=rest[idx].astype(np.float32),no_pose=no[idx].astype(np.float32),e=e.astype(np.float32))
     json.dump(dict(nombre=a.nombre,pose=a.pose,cuadro=S.cuadro,entrada=a.glb,rango_mm=a.rango*1000,limite_mm=a.limite*S.K*1000,con_dato=float(np.isfinite(e).mean()),por_hueso=stats,alineacion=info,
