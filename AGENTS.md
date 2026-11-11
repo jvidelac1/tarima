@@ -1,0 +1,31 @@
+# AGENTS.md
+
+Leé primero `HANDOFF.md`: tiene el estado, los problemas conocidos y los próximos pasos.
+
+## Reglas de trabajo en este repo
+
+- **No ajustar poses a ojo.** Todo cambio en `blender/poses.py` se valida con `check()` (cero cuadros `BAD`) y con un render de control en `out/<nombre>/diag.png`. Agregá la vista que necesites en `WANT`.
+- **Las poses son reglas, no rotaciones.** Si una fase se ve mal en un biotipo, corregí la regla o el parámetro de la fase; no hardcodees un valor por personaje.
+- **Un solo esqueleto.** 52 huesos con nombres Mixamo más `Bar`. No cambiar la pose de reposo ni los nombres: el visor y las animaciones dependen de eso.
+- **Personajes ficticios.** Nada de nombres, caras ni marcas de atletas reales.
+- **La referencia manda.** Si hay cuadros de video para una fase, la pose se compara contra ellos antes de darla por buena. Lo que no tenga referencia se anota como estimación en `HANDOFF.md`.
+
+## Comandos
+
+```bash
+FAST=1 ./build.sh ventura      # iteración rápida sobre un personaje
+./build.sh                     # los dos, con hoja de poses de costado
+cd web && python3 -m http.server 8000
+```
+
+Líneas a mirar en la salida del build:
+
+- `POSE ...` una por fase, con torso, barra, cadera y las tres holguras en cm.
+- `rack ...` posición de barra, codo y muñeca que encontró la búsqueda del rack.
+- `CHK ... cuadros con superposición: N` y debajo las líneas `BAD`.
+
+## Convenciones del código de Blender
+
+- Ejes de Blender: X lateral (izquierda del personaje en +X), -Y es el frente, Z arriba.
+- Unidades en metros. `K` escala las constantes pensadas para 1,69 m a la estatura del personaje.
+- `poses.py` se ejecuta con `exec` dentro de `finish.py` y usa sus variables (`b`, `rig`, `K`, `NAME`, `STY`, `OUT`).

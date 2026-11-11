@@ -1,0 +1,480 @@
+{
+ "ventura": {
+  "h": 1.7,
+  "seg": {
+   "femur": 0.39362909398116414,
+   "tibia": 0.41606029117646104,
+   "arm": 0.5203007165819655,
+   "torso": 0.48408108949661255
+  },
+  "sub": 6,
+  "segs": {
+   "clean": {
+    "start": 0.0,
+    "poses": [
+     {
+      "n": "Parado",
+      "lean": 1,
+      "bz": 0.225,
+      "hip": 0.894
+     },
+     {
+      "n": "Salida",
+      "lean": 51.2,
+      "bz": 0.226,
+      "hip": 0.547
+     },
+     {
+      "n": "Primer tirón",
+      "lean": 51.7,
+      "bz": 0.519,
+      "hip": 0.838
+     },
+     {
+      "n": "Segundo tirón",
+      "lean": 6,
+      "bz": 0.721,
+      "hip": 0.843
+     },
+     {
+      "n": "Triple extensión",
+      "lean": -8,
+      "bz": 0.909,
+      "hip": 0.943
+     },
+     {
+      "n": "Bajada",
+      "lean": 9,
+      "bz": 0.999,
+      "hip": 0.542
+     },
+     {
+      "n": "Recepción",
+      "lean": 9.5,
+      "bz": 0.824,
+      "hip": 0.276
+     },
+     {
+      "n": "Recuperación",
+      "lean": -2,
+      "bz": 1.454,
+      "hip": 0.886
+     }
+    ]
+   },
+   "split": {
+    "start": 8.0,
+    "poses": [
+     {
+      "n": "Recuperación",
+      "lean": -2,
+      "bz": 1.454,
+      "hip": 0.886
+     },
+     {
+      "n": "Envión · Dip",
+      "lean": -1,
+      "bz": 1.415,
+      "hip": 0.847
+     },
+     {
+      "n": "Envión · Empuje",
+      "lean": -4,
+      "bz": 1.715,
+      "hip": 0.932
+     },
+     {
+      "n": "Envión · Tijera",
+      "lean": 0,
+      "bz": 1.828,
+      "hip": 0.683
+     },
+     {
+      "n": "Envión · Recuperación",
+      "lean": 1,
+      "bz": 1.959,
+      "hip": 0.814
+     },
+     {
+      "n": "Envión · Final",
+      "lean": 1,
+      "bz": 2.036,
+      "hip": 0.891
+     }
+    ]
+   },
+   "power": {
+    "start": 14.0,
+    "poses": [
+     {
+      "n": "Recuperación",
+      "lean": -2,
+      "bz": 1.454,
+      "hip": 0.886
+     },
+     {
+      "n": "Envión · Dip",
+      "lean": -1,
+      "bz": 1.415,
+      "hip": 0.847
+     },
+     {
+      "n": "Envión · Empuje",
+      "lean": -4,
+      "bz": 1.715,
+      "hip": 0.932
+     },
+     {
+      "n": "Power jerk · Recepción",
+      "lean": 10.4,
+      "bz": 1.929,
+      "hip": 0.791
+     },
+     {
+      "n": "Envión · Final",
+      "lean": 1,
+      "bz": 2.025,
+      "hip": 0.88
+     }
+    ]
+   },
+   "squat": {
+    "start": 19.0,
+    "poses": [
+     {
+      "n": "Recuperación",
+      "lean": -2,
+      "bz": 1.454,
+      "hip": 0.886
+     },
+     {
+      "n": "Envión · Dip",
+      "lean": -1,
+      "bz": 1.415,
+      "hip": 0.847
+     },
+     {
+      "n": "Envión · Empuje",
+      "lean": -4,
+      "bz": 1.715,
+      "hip": 0.932
+     },
+     {
+      "n": "Squat jerk · Recepción",
+      "lean": 17.1,
+      "bz": 1.353,
+      "hip": 0.223
+     },
+     {
+      "n": "Squat jerk · Recuperación",
+      "lean": 16.7,
+      "bz": 1.885,
+      "hip": 0.762
+     },
+     {
+      "n": "Envión · Final",
+      "lean": 1,
+      "bz": 2.029,
+      "hip": 0.883
+     }
+    ]
+   },
+   "snatch": {
+    "start": 25.0,
+    "poses": [
+     {
+      "n": "Parado",
+      "lean": 1,
+      "bz": 0.225,
+      "hip": 0.894
+     },
+     {
+      "n": "Salida",
+      "lean": 56.5,
+      "bz": 0.23,
+      "hip": 0.477
+     },
+     {
+      "n": "Primer tirón",
+      "lean": 63.2,
+      "bz": 0.521,
+      "hip": 0.812
+     },
+     {
+      "n": "Segundo tirón",
+      "lean": 6,
+      "bz": 0.819,
+      "hip": 0.843
+     },
+     {
+      "n": "Triple extensión",
+      "lean": -8,
+      "bz": 1.016,
+      "hip": 0.943
+     },
+     {
+      "n": "Bajada",
+      "lean": 9,
+      "bz": 1.087,
+      "hip": 0.529
+     },
+     {
+      "n": "Recepción",
+      "lean": 18.5,
+      "bz": 1.277,
+      "hip": 0.259
+     },
+     {
+      "n": "Recuperación",
+      "lean": 1,
+      "bz": 1.931,
+      "hip": 0.885
+     }
+    ]
+   }
+  },
+  "grip": {
+   "clean": 0.5276624918443321,
+   "snatch": 1.054
+  }
+ },
+ "brenner": {
+  "h": 1.83,
+  "seg": {
+   "femur": 0.4793249085374728,
+   "tibia": 0.4555423712408111,
+   "arm": 0.608444623117218,
+   "torso": 0.4747588634490967
+  },
+  "sub": 6,
+  "segs": {
+   "clean": {
+    "start": 0.0,
+    "poses": [
+     {
+      "n": "Parado",
+      "lean": 1,
+      "bz": 0.225,
+      "hip": 1.023
+     },
+     {
+      "n": "Salida",
+      "lean": 59.9,
+      "bz": 0.226,
+      "hip": 0.704
+     },
+     {
+      "n": "Primer tirón",
+      "lean": 51.7,
+      "bz": 0.564,
+      "hip": 0.983
+     },
+     {
+      "n": "Segundo tirón",
+      "lean": 6,
+      "bz": 0.746,
+      "hip": 0.962
+     },
+     {
+      "n": "Triple extensión",
+      "lean": -8,
+      "bz": 0.936,
+      "hip": 1.076
+     },
+     {
+      "n": "Bajada",
+      "lean": 9,
+      "bz": 1.046,
+      "hip": 0.602
+     },
+     {
+      "n": "Recepción",
+      "lean": 15.6,
+      "bz": 0.795,
+      "hip": 0.28
+     },
+     {
+      "n": "Recuperación",
+      "lean": -2,
+      "bz": 1.576,
+      "hip": 1.015
+     }
+    ]
+   },
+   "split": {
+    "start": 8.0,
+    "poses": [
+     {
+      "n": "Recuperación",
+      "lean": -2,
+      "bz": 1.576,
+      "hip": 1.015
+     },
+     {
+      "n": "Envión · Dip",
+      "lean": -1,
+      "bz": 1.53,
+      "hip": 0.97
+     },
+     {
+      "n": "Envión · Empuje",
+      "lean": -4,
+      "bz": 1.86,
+      "hip": 1.064
+     },
+     {
+      "n": "Envión · Tijera",
+      "lean": 0,
+      "bz": 2.027,
+      "hip": 0.795
+     },
+     {
+      "n": "Envión · Recuperación",
+      "lean": 1,
+      "bz": 2.168,
+      "hip": 0.936
+     },
+     {
+      "n": "Envión · Final",
+      "lean": 1,
+      "bz": 2.252,
+      "hip": 1.02
+     }
+    ]
+   },
+   "power": {
+    "start": 14.0,
+    "poses": [
+     {
+      "n": "Recuperación",
+      "lean": -2,
+      "bz": 1.576,
+      "hip": 1.015
+     },
+     {
+      "n": "Envión · Dip",
+      "lean": -1,
+      "bz": 1.53,
+      "hip": 0.97
+     },
+     {
+      "n": "Envión · Empuje",
+      "lean": -4,
+      "bz": 1.86,
+      "hip": 1.064
+     },
+     {
+      "n": "Power jerk · Recepción",
+      "lean": 13.5,
+      "bz": 2.122,
+      "hip": 0.904
+     },
+     {
+      "n": "Envión · Final",
+      "lean": 1,
+      "bz": 2.241,
+      "hip": 1.01
+     }
+    ]
+   },
+   "squat": {
+    "start": 19.0,
+    "poses": [
+     {
+      "n": "Recuperación",
+      "lean": -2,
+      "bz": 1.576,
+      "hip": 1.015
+     },
+     {
+      "n": "Envión · Dip",
+      "lean": -1,
+      "bz": 1.53,
+      "hip": 0.97
+     },
+     {
+      "n": "Envión · Empuje",
+      "lean": -4,
+      "bz": 1.86,
+      "hip": 1.064
+     },
+     {
+      "n": "Squat jerk · Recepción",
+      "lean": 22.3,
+      "bz": 1.419,
+      "hip": 0.219
+     },
+     {
+      "n": "Squat jerk · Recuperación",
+      "lean": 21.3,
+      "bz": 2.061,
+      "hip": 0.868
+     },
+     {
+      "n": "Envión · Final",
+      "lean": 1,
+      "bz": 2.245,
+      "hip": 1.013
+     }
+    ]
+   },
+   "snatch": {
+    "start": 25.0,
+    "poses": [
+     {
+      "n": "Parado",
+      "lean": 1,
+      "bz": 0.225,
+      "hip": 1.023
+     },
+     {
+      "n": "Salida",
+      "lean": 68.6,
+      "bz": 0.23,
+      "hip": 0.662
+     },
+     {
+      "n": "Primer tirón",
+      "lean": 64.3,
+      "bz": 0.566,
+      "hip": 0.964
+     },
+     {
+      "n": "Segundo tirón",
+      "lean": 6,
+      "bz": 0.843,
+      "hip": 0.962
+     },
+     {
+      "n": "Triple extensión",
+      "lean": -8,
+      "bz": 1.043,
+      "hip": 1.076
+     },
+     {
+      "n": "Bajada",
+      "lean": 9,
+      "bz": 1.139,
+      "hip": 0.585
+     },
+     {
+      "n": "Recepción",
+      "lean": 24.4,
+      "bz": 1.341,
+      "hip": 0.26
+     },
+     {
+      "n": "Recuperación",
+      "lean": 1,
+      "bz": 2.147,
+      "hip": 1.014
+     }
+    ]
+   }
+  },
+  "grip": {
+   "clean": 0.5602983598993174,
+   "snatch": 1.1346
+  }
+ }
+}
