@@ -8,6 +8,8 @@
 // movimiento, luminancia, cambio de calidad, gobernador (escalones de calidad y resolución), costo por pase y por etapa, fps, carga
 // lenta, carrera de carga y layout móvil.
 // Uso: npm install && node tools/check_viewer.mjs [--quality=alta|media|baja] [--headed] [--only=ventura]
+//      CHROME_PATH y TARIMA_ANGLE eligen navegador y backend de WebGL (tools/browser.mjs). En Linux sin GPU dibuja por software
+//      (SwiftShader): se verifica todo menos los fps y el tiempo de cambio de calidad, que quedan como aviso.
 //      [--min-fps=N] falla si los fps a DPR 1 quedan por debajo   [--strict] falla si el build no cumple el contrato 2
 import http from 'node:http';
 import fs from 'node:fs';
@@ -15,6 +17,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import { chromium } from 'playwright-core';
+import { launchOptions, isSoftware } from './browser.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WEB = path.join(ROOT, 'web'), OUT = path.join(ROOT, 'out', 'viewer');
@@ -23,7 +26,6 @@ const QUALITY = arg('quality') || 'alta', ONLY = arg('only'), HEADED = process.a
 // Sin --min-fps la prueba exige igual un piso (alta 45, media 55, baja 58), salvo que la máquina esté saturada: ahí la medición no
 // vale y se informa como no concluyente. Con --min-fps=N se exige siempre.
 const FPS_FLOOR = { alta: 45, media: 55, baja: 58 }, loadNow = () => os.loadavg()[0] / os.cpus().length;
-const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.txt': 'text/plain' };
 
 const server = http.createServer((req, res) => {
@@ -37,7 +39,8 @@ fs.mkdirSync(OUT, { recursive: true });
 if (!ONLY) for (const f of fs.readdirSync(OUT)) if (f.endsWith('.png')) fs.rmSync(path.join(OUT, f));      // las capturas de una corrida anterior (otro GLB, otras fases) no se mezclan con las nuevas
 
 const problems = [], warnings = [], notes = [];
-const LAUNCH = { executablePath: CHROME, headless: !HEADED, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-webgl', '--hide-scrollbars', '--mute-audio'] };
+const LAUNCH = launchOptions({ headed: HEADED });      // ruta de Chrome y backend de WebGL según la plataforma (tools/browser.mjs)
+let SOFT = false;      // WebGL por software (SwiftShader en un Linux sin GPU): la prueba vale para lógica, consola, 404 y capturas; fps y tiempos no se exigen
 const browser = await chromium.launch(LAUNCH);
 const extra = [];      // navegadores aparte para medir rendimiento (ver más abajo)
 const watch = page => {
@@ -72,7 +75,8 @@ try {
   const ok = await page.evaluate(() => window.TARIMA.ready);
   if (!ok) throw new Error('el visor no terminó de iniciar');
   const info = await T(() => { const gl = TARIMA.renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info'); return { three: TARIMA.renderer.constructor.name, gpu: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : '?', q: TARIMA.state.qName }; });
-  console.log(`GPU: ${info.gpu} · calidad ${info.q}`);
+  SOFT = isSoftware(info.gpu);
+  console.log(`GPU: ${info.gpu} · calidad ${info.q}${SOFT ? ' · RENDER POR SOFTWARE: no se exigen fps ni tiempos de cambio de calidad' : ''}`);
 
   const combos = [{ lift: 's', tag: 'arranque' }, { lift: 'c', jerk: 'split', tag: 'dostiempos-tijera' }, { lift: 'c', jerk: 'power', tag: 'dostiempos-power' }, { lift: 'c', jerk: 'squat', tag: 'dostiempos-squat' }];
   for (const who of ['ventura', 'brenner'].filter(w => !ONLY || w === ONLY)) {
@@ -239,7 +243,7 @@ try {
   // el cambio de calidad no reconstruye entorno ni barra: mismos objetos, y tarda poco
   const sw = await T(() => { const A = TARIMA, ar = A.arena, bb = A.barbell, ms = []; for (const q of ['baja', 'alta', 'media', 'baja', 'media', 'alta']) { A.setQuality(q); ms.push(Math.round(A.state.qSwitchMs)); } return { ms, same: ar === A.arena && bb === A.barbell, imp: !!A.arena.impostors, crowd: A.arena.crowd.visible }; });
   if (!sw.same || !sw.imp || !sw.crowd) problems.push(`cambio de calidad: reconstruyó el entorno o no alternó público/tribuna horneada (${JSON.stringify(sw)})`);
-  if (Math.max(...sw.ms.slice(1)) > 1200) problems.push(`cambio de calidad lento: ${sw.ms} ms`);
+  if (Math.max(...sw.ms.slice(1)) > 1200) (SOFT ? notes : problems).push(`cambio de calidad lento: ${sw.ms} ms${SOFT ? ' (render por software: no concluyente)' : ''}`);
   console.log(`ok cambio de calidad: detenido (barra en las manos) y en reproducción (llega la decisión); sin reconstruir entorno, ${sw.ms.join(' / ')} ms por cambio (carga del sistema ${loadNow().toFixed(1)} por núcleo)`);
   // gobernador: lógica pura con fps simulados
   const gv = await T(() => { const A = TARIMA, g = A.gov, S = A.state, keep = { step: S.step, refresh: g.refresh }, out = {}, key = i => i === null ? null : A.stepKey(i), at = k => A.STEPS.findIndex((_, i) => A.stepKey(i) === k);
@@ -278,10 +282,10 @@ try {
       for (let r = 0; r < 3; r++) { const o = await A.profilePasses(24, true); if (!o) return null; for (const k in o.min) m[k] = Math.min(m[k] ?? Infinity, o.min[k]); const w = await A.profilePasses(24, true, true); frame = Math.min(frame, w.min.escena); }
       return { m, frame }; });
     if (pp) { prof[q].frame = pp.frame; console.log(`etapas ${q} (ms de GPU, mínimo por etapa): ` + Object.entries(pp.m).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(' · ') + ` · cuadro entero ${pp.frame.toFixed(1)}`); } }
-  const ld = fps0.ld, floor = MIN_FPS || FPS_FLOOR[QUALITY] || 45, busy = !MIN_FPS && ld > 1.0;      // carga al momento de medir (antes de que la prueba la suba)
-  console.log(`fps (${QUALITY}, DPR 1, ${f1.w}x${f1.h}, navegador nuevo, antes del resto de la prueba): ${f1p.fps.toFixed(0)} reproduciendo 4 s, ${f1.fps.toFixed(0)} en pausa (piso ${floor}; carga del sistema ${ld.toFixed(1)} por núcleo${busy ? ': MÁQUINA SATURADA, medición no concluyente, el piso no se exige' : ''})`);
+  const ld = fps0.ld, floor = MIN_FPS || FPS_FLOOR[QUALITY] || 45, busy = !MIN_FPS && ld > 1.0, soft = !MIN_FPS && SOFT;      // carga al momento de medir (antes de que la prueba la suba); por software los fps no hablan del visor
+  console.log(`fps (${QUALITY}, DPR 1, ${f1.w}x${f1.h}, navegador nuevo, antes del resto de la prueba): ${f1p.fps.toFixed(0)} reproduciendo 4 s, ${f1.fps.toFixed(0)} en pausa (piso ${floor}; carga del sistema ${ld.toFixed(1)} por núcleo${soft ? ': RENDER POR SOFTWARE, medición no concluyente, el piso no se exige' : busy ? ': MÁQUINA SATURADA, medición no concluyente, el piso no se exige' : ''})`);
   if (mem) console.log(`memoria de GPU estimada (${QUALITY}, un atleta): ${mem.total} MB (atleta ${mem.atletas}, entorno y barra ${mem.texturas}, post ${mem.post}, sombras ${mem.sombras})`);
-  if (Math.min(f1.fps, f1p.fps) < floor) { if (busy) notes.push(`VISOR: fps sin demostrar: ${f1.fps.toFixed(0)} en pausa y ${f1p.fps.toFixed(0)} reproduciendo en ${QUALITY} con la máquina saturada (carga ${ld.toFixed(1)} por núcleo; el cuadro cuesta ${prof[QUALITY]?.frame?.toFixed(1) ?? '?'} ms de GPU como mínimo, ${prof[QUALITY]?.frame ? Math.round(1000 / prof[QUALITY].frame) : '?'} cuadros por segundo de techo). Repetir con la máquina libre: node tools/check_viewer.mjs --min-fps=${floor}, o medir solo el costo con node tools/check_viewer_perf.mjs`); else problems.push(`fps ${Math.min(f1.fps, f1p.fps).toFixed(0)} < ${floor} en ${QUALITY}`); }
+  if (Math.min(f1.fps, f1p.fps) < floor) { if (soft) notes.push(`VISOR: fps sin medir: ${f1.fps.toFixed(0)} en pausa y ${f1p.fps.toFixed(0)} reproduciendo en ${QUALITY} con WebGL por software (sin GPU). Los fps se miden en una máquina con GPU: node tools/check_viewer.mjs --min-fps=${floor}`); else if (busy) notes.push(`VISOR: fps sin demostrar: ${f1.fps.toFixed(0)} en pausa y ${f1p.fps.toFixed(0)} reproduciendo en ${QUALITY} con la máquina saturada (carga ${ld.toFixed(1)} por núcleo; el cuadro cuesta ${prof[QUALITY]?.frame?.toFixed(1) ?? '?'} ms de GPU como mínimo, ${prof[QUALITY]?.frame ? Math.round(1000 / prof[QUALITY].frame) : '?'} cuadros por segundo de techo). Repetir con la máquina libre: node tools/check_viewer.mjs --min-fps=${floor}, o medir solo el costo con node tools/check_viewer_perf.mjs`); else problems.push(`fps ${Math.min(f1.fps, f1p.fps).toFixed(0)} < ${floor} en ${QUALITY}`); }
 
   await pb.close();
 

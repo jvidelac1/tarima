@@ -4,7 +4,7 @@
 // Las rondas se repiten hasta que el mínimo deja de bajar (dos rondas seguidas sin mejorar un 4 %), con tope --max-rounds.
 // Uso: node tools/check_viewer_perf.mjs [--q=alta,media,baja] [--rounds=3] [--max-rounds=10] [--reps=30] [--web=<carpeta>] [--web2=<otra carpeta, para comparar>] [--who=ventura]
 //      [--size=1600x900] [--dpr=1] [--json=salida.json] [--shot=prefijo]   (el lienzo de 1600x900 queda en 1600x817)
-import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path'; import os from 'node:os'; import { fileURLToPath } from 'node:url'; import { chromium } from 'playwright-core';
+import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path'; import os from 'node:os'; import { fileURLToPath } from 'node:url'; import { chromium } from 'playwright-core'; import { launchOptions } from './browser.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const arg = (k, d) => { const a = process.argv.find(a => a.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3) : d; };
 const WEBS = [path.resolve(arg('web', path.join(ROOT, 'web'))), ...(arg('web2') ? [path.resolve(arg('web2'))] : [])], QS = arg('q', 'alta,media,baja').split(','), ROUNDS = +arg('rounds', 3), MAXR = +arg('max-rounds', 10), REPS = +arg('reps', 30), WHO = arg('who', 'ventura');
@@ -13,7 +13,7 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 const serve = WEB => new Promise(done => { const server = http.createServer((req, res) => { const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname), f = path.join(WEB, rel.endsWith('/') ? rel + 'index.html' : rel);
   if (!fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); res.end(); return; } res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'Cache-Control': 'no-store' }); fs.createReadStream(f).pipe(res); }); server.listen(0, '127.0.0.1', () => done(server)); });
 const servers = await Promise.all(WEBS.map(serve));
-const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--hide-scrollbars', '--mute-audio'] });
+const browser = await chromium.launch(launchOptions());
 const load = () => os.loadavg()[0] / os.cpus().length, label = w => path.relative(ROOT, w).startsWith('..') ? path.basename(w) : (path.relative(ROOT, w) || '.'), issues = [];
 const results = WEBS.map(w => ({ web: label(w), load0: +load().toFixed(1), q: {} }));
 // Con dos carpetas (--web2, p. ej. una copia de antes del cambio) las rondas se alternan entre las dos páginas, así las dos
@@ -52,7 +52,7 @@ await browser.close();
 // fps: en esta máquina una página que dibuja sin parar se frena sola a los 6 a 9 s (también una página de control sin
 // three.js), así que se cuentan los cuadros de los primeros segundos de reproducción en un navegador recién abierto.
 for (const q of QS) for (let i = 0; i < WEBS.length; i++) {
-  const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--hide-scrollbars', '--mute-audio'] });
+  const b = await chromium.launch(launchOptions());
   const page = await b.newPage({ viewport: { width: VW, height: VH }, deviceScaleFactor: DPR });
   await page.goto(`http://127.0.0.1:${servers[i].address().port}/?auto=0&q=${q}&who=${WHO}`); await page.evaluate(() => window.TARIMA.ready);
   const r = await page.evaluate(() => new Promise(res => { TARIMA.play(false); let n = 0, n1 = 0; const t0 = performance.now(); const f = () => { const t = performance.now() - t0; n++; if (t < 1500) n1++; t < 3000 ? requestAnimationFrame(f) : res([n / 3, n1 / 1.5]); }; requestAnimationFrame(f); }));
