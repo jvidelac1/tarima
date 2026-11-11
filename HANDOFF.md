@@ -4,7 +4,7 @@ Estado al 11 de noviembre de 2026. Este documento es para retomar el trabajo, co
 
 ## Qué es
 
-Juego web de halterofilia. La prioridad es el equilibrio entre calidad visual y veracidad del movimiento. Hoy existe el visor (reproduce un arranque y un dos tiempos con tres enviones, para dos levantadores ficticios); **todavía no hay gameplay**.
+Juego web de halterofilia. La prioridad es el equilibrio entre calidad visual y veracidad del movimiento. Hoy existen el visor (reproduce un arranque y un dos tiempos con tres enviones, para dos levantadores ficticios) y, en la rama `gameplay`, **la etapa 1 del juego: una final de tres pesistas jugable de punta a punta** (`web/juego.html`; ver «Juego (etapa 1)» más abajo).
 
 Repo: https://github.com/jvidelac1/tarima (rama de trabajo `pasada-visual`).
 
@@ -15,6 +15,7 @@ Repo: https://github.com/jvidelac1/tarima (rama de trabajo `pasada-visual`).
 FAST=1 ./build.sh ventura       # sin hojas de poses
 .venv/bin/python blender/pose_only.py ventura   # solo poses sobre out/ventura/s3b.blend (iteración rápida)
 node tools/check_viewer.mjs     # prueba automática del visor (consola, 404, fps, capturas en out/viewer/)
+node tools/sim_test.mjs && node tools/check_game.mjs   # pruebas del juego (núcleo y partida completa por script)
 cd web && python3 -m http.server 8000
 ```
 
@@ -175,6 +176,76 @@ Resumen: Ventura 18 ok, 26 ok con reservas, 1 mal. Brenner 22 ok, 23 ok con rese
 - Halo de puntos blancos alrededor de la barra, las manos y el borde de los discos (ruido de profundidad de campo u oclusión).
 - El visor muestreaba la animación un cuadro antes de cada clave; corregido el 11-nov en `web/js/athlete.js` (muestrea desde el primer tiempo de clave).
 - Archivos de trabajo para limpiar: `blender/ctl.py`, `blender/ctl2.py` (superados por `ctl3.py`), `tools/check_viewer_shot.mjs`, `tools/check_viewer_vendor.mjs`, `tools/check_viewer_perf.mjs`.
+
+## Juego (etapa 1, rama `gameplay`)
+
+Hecho en la sesión cloud, sin GPU: se probó lógica, determinismo y consola con partidas completas jugadas por script. **Nadie lo jugó a mano todavía y no se midió en ningún teléfono**: ritmo, sensación y rendimiento quedan sin validar. El diseño está en [docs/JUEGO.md](docs/JUEGO.md); acá va lo que existe y en qué se aparta.
+
+```bash
+cd web && python3 -m http.server 8000      # el juego: http://localhost:8000/juego.html · el visor: /index.html
+node tools/sim_test.mjs                    # núcleo, sin navegador (2 s): pureza, referencias, vivo contra recalculado, 1000 partidas, adulterados
+node tools/balance.mjs --rivales           # informe de balance: válidos por intensidad y perfil, y rivales por nivel
+node tools/check_game.mjs                  # partida completa por teclado y por toques con el reloj inyectado, más un intento en tiempo real
+node tools/build_sim_data.mjs [--check]    # reescribe web/data/sim.json desde poses.json (o compara contra el publicado)
+```
+
+Parámetros de `juego.html`: `?semilla=N` (primera partida reproducible), `?q=movil|baja|media|alta`, `?ritmo=completa`, `?dibujo=0` (no dibuja el 3D; lo usa la prueba).
+
+| Pieza | Dónde | Estado |
+|---|---|---|
+| Núcleo (función pura de los eventos, solo enteros) | `web/js/sim/`: `fixed`, `rules`, `data`, `attempt`, `ai`, `match`, `replay` | Completo para la etapa 1. Botón único entero: tensión, tirón, explosión, recepción, pelea, traba, apoyo firme, chicharra y amague; tres enviones; todos los fallos y nulos de la sección 5 |
+| Datos | `web/data/sim.json` (temporada 1) | Anclas en ms leídas de `tt` por segmento y nombre de fase; fichas de los tres. Coinciden con los tiempos de JUEGO.md |
+| Competencia | `match.js`, `ai.js` | Orden por kilos, declaración automática, cambios (dos por intento, llamado desplazado), reloj 0:30 y 0:45, jueces con umbral propio, total, desempate, sin marca, Resto, forma del día, guion, La cuenta, etiquetas, tres niveles |
+| Presentación | `web/juego.html`, `web/css/juego.css`, `web/js/game/` | Inicio, metrónomo de atraso, tres prácticas, presentación, panel único del llamado, ayudas pegadas a la barra, luces de a una, repetición de lo dibujado con traza, tablero, intervalo, podio 2D, revancha. Final exprés y completa |
+| Pruebas | `tools/sim_test.mjs`, `tools/balance.mjs`, `tools/check_game.mjs` | En verde en la sesión cloud (Chromium con SwiftShader) |
+
+**Archivos compartidos con el visor**: cada cambio es una opción que el visor no usa. `cameras.js` (`interactive: false`), `arena.js` (una luz en `null` queda apagada), `athlete.js` (`setClothFlat`: tela de color plano sobre la máscara; cambia la clave de caché del shader de piel) y `trace.js` (`buildPoints` y `setCount`). No se tocaron `blender/`, `web/models/`, `web/data/poses.json`, `web/js/config.js`, `web/js/main.js` ni `tools/check_viewer.mjs`.
+
+**La prueba del visor en la sesión cloud no llega a verde, ni antes ni después de estos cambios**: pide una GPU (ANGLE Metal) y pisos de fps. Con `CHROME_PATH` apuntando al Chromium de la sesión corre por software y se corta igual en la rama base (`pasada-visual`) que en `gameplay`; ver el detalle en el pull request. **Hay que correrla en el Mac** antes de fusionar.
+
+### En qué se aparta de docs/JUEGO.md
+
+- **`web/js/stage.js` no se extrajo de `main.js`.** El juego arma su escenario en `web/js/game/stage.js` con los mismos módulos; el visor queda intacto. Motivo: sin GPU no se puede verificar un refactor del visor. Tampoco se tocaron `timeline.js`, `barbell.js` ni `hud.js` (la secuencia, la aceleración desde la posición dibujada y la gráfica del juego viven en `game/`).
+- **Registro de partida**: cada llamado de una persona lleva además `conf` (ms del Confirmar), porque de ahí sale cuándo empieza la tensión. `int` viaja siempre en 0.
+- **El temblor de la cargada se arrastra al envión.** Sin eso, machacar la subida de la cargada no costaba nada y daba 96 % de válidos al 100 %.
+- **Balance retocado con el informe** (las metas mandan): se quitó la rebaja de 0,08 de exigencia del arranque; cada cm de altura perdida suma 0,03 de exigencia (era 0,06) con tope 0,25 (era 0,40); la recepción a destiempo suma hasta 0,15 (era 0,25); el envión es 10 % más angosto (era 20 %). Los valores están en `rules.js`.
+- **«Fuera de la franja» para el Resto** cuenta la aguja por debajo, o por encima solo si hubo un toque reciente: si no, un intento liviano que sale solo pagaba pelea.
+- **La pelea tiene un máximo de 12 s** (después se pierde): garantiza que todo intento termina.
+- **Nivel Amistoso**: además de errores de 55 ms, los rivales abren y declaran 3,5 % más abajo. Con las aperturas normales quedaban sin marca en más de la mitad de las finales.
+- **Los rivales no usan el squat**: con el balance de hoy no tiene premio (ver abajo).
+- **Cambios de kilos del jugador**: confirmar el panel con otro peso cuenta como cambio. No hay botón aparte para cambiar sin confirmar.
+- **Interrupciones** (pestaña oculta, toque cancelado): los contactos se levantan y nada más. No está la política de repetir el intento ni la pausa del reloj.
+- **Calentamiento**: metrónomo y tres prácticas (dos livianas y una pesada con exigencia de 98 %). La práctica pesada no fuerza la traba de codos. Las prácticas llevan un reloj de 25 s para que nadie quede trabado.
+- **Sin retratos en el podio**: el podio 2D usa bandera y nombre para los tres. El primer plano de cara del llamado se usa con Ventura y Brenner, no con Marangi (comparte la cara de Brenner).
+- **Cambio de carga**: corte a la cenital con cartel; los discos no se deslizan.
+- **Tope de 30 cuadros fuera del intento propio e imagen congelada detrás de los paneles**: hechos. El escalón «móvil» existe (`game/perf.js`) y es el que se elige con puntero táctil; **sin medir**.
+- El tablero 3D de la arena sigue diciendo «TARIMA OPEN» (sale de `config.js`, que no se toca); la gráfica del juego dice «Mundial Tarima 2026».
+
+### Informe de balance (11-nov, 200 intentos por casilla; `node tools/balance.mjs --rivales`)
+
+Porcentaje de válidos · meta. Jugadores simulados con error típico de 25, 40 y 60 ms.
+
+| Intensidad | Arranque: experto / hábil / casual | Dos tiempos con tijera | Dos tiempos con squat |
+|---|---|---|---|
+| 90 % | 100·99 / 99·97 / 72·85 | 100·99 / 99·97 / 75·85 | 100·99 / 94·97 / 44·85 |
+| 95 % | 100·97 / 91·90 / 45·60 | 100·97 / 91·90 / 45·60 | 100·97 / 76·90 / 16·60 |
+| 100 % | 97·85 / 59·60 / 15·25 | 99·85 / 63·60 / 16·25 | 92·85 / 24·60 / 2·25 |
+| 103 % | 63·50 / 11·30 / 3·5 | 69·50 / 14·30 / 1·5 | 22·50 / 2·30 / 0·5 |
+| 106 % | 0·10 / 0·3 / 0·1 | 0·10 / 0·3 / 0·1 | 0·10 / 0·3 / 0·1 |
+
+- Machacador (7 toques por segundo): 0 a 3 % hasta el 100 % y 10 a 13 % al 103 % (meta: menos de 30 %). Metrónomo con el mejor ritmo fijo: 35 % de promedio (meta: menos de 50 %).
+- Rivales, 200 finales por nivel: Amistoso 56 % de válidos y 14 % sin marca; Normal 76 % (meta 55 a 70 %) y 3 % sin marca; Difícil 97 %. Los totales varían más de 20 kg entre finales.
+- **Lo que no cumple**: el casual queda 10 a 15 puntos debajo de la meta al 90 y 95 %; el 106 % es imposible para todos; **el squat es peor que la tijera a toda intensidad** (su premio de 6 cm de altura nunca es el factor limitante); los rivales fallan menos que la meta en Normal y casi nunca en Difícil; Ventura manejado por el juego saca 2 a 5 kg menos de total que los otros dos; el Resto termina cerca de 40 en Normal, más bajo de lo que sugiere JUEGO.md.
+- El jugador «casual» del informe pelea con un control tosco (error de 0,09 de esfuerzo): una persona real puede pelear mejor o peor. Estos números ordenan el ajuste; no reemplazan jugarlo.
+
+### Pendientes del juego
+
+- **Jugarlo a mano**, en escritorio y en un teléfono real, antes de tocar más números. Medir una partida entera en el teléfono (`JUEGO.perf.resumen()` da mínimo y mediana de cuadros por tramo).
+- Segunda vuelta de balance: squat, 106 %, casual al 90 y 95 %, Ventura rival y gasto de Resto.
+- Extraer `stage.js` del visor y verificarlo con GPU; política de interrupciones; simular el resto de la final cuando el jugador queda sin marca; botón de pausa (está en la página, oculto).
+- Códigos de país: ARX y NVK siguen en la gráfica y en las mallas hasta la etapa 3; Pelagia usa PEL. Búsqueda uno por uno antes de publicar (JUEGO.md, sección 6.1).
+- Marangi es el modelo de Brenner con la tela de color plano (`#7a1626`). **No se revisó en captura si el relieve de «BRENNER» se lee**: mirarlo con GPU; si se lee, limitarlo a planos laterales.
+- Todo lo de la etapa 4 (fallos, festejos, ayudantes y bajadas animados) hoy es corte y texto, como define la sección 11.2.
 
 ## Contratos entre Blender y el visor
 

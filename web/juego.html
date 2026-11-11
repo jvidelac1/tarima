@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="color-scheme" content="dark">
+<title>Tarima · Mundial Tarima 2026</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/juego.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/addons/" } }
+</script>
+</head>
+<body>
+<div id="escena">
+  <canvas id="gl" aria-label="Transmisión 3D del levantamiento"></canvas>
+  <canvas id="ayudas" aria-hidden="true"></canvas>
+  <div id="tv">
+    <div class="bug"><b id="ev-titulo">Mundial Tarima 2026</b><span id="ev-sub">Final · 90 kg</span></div>
+    <div class="relojbox"><div class="luces" id="luces" aria-label="Decisión de los jueces"><i></i><i></i><i></i></div><div class="reloj" id="reloj">0:30</div></div>
+    <div class="etiqueta" id="etiqueta" hidden></div>
+    <div class="cartel" id="cartel" hidden></div>
+    <div class="veredicto" id="veredicto" hidden></div>
+    <div class="rival" id="rival" hidden></div>
+    <div class="zocalo" id="zocalo" hidden>
+      <div class="bandera" id="z-bandera"></div>
+      <div class="quien"><div class="l1"><span id="z-codigo"></span><span id="z-dorsal"></span></div><div class="nombre" id="z-nombre"></div></div>
+      <div class="lev"><div id="z-lev"></div><div id="z-intento"></div></div>
+      <div class="kg"><b id="z-kg">0</b><span>kg</span></div>
+    </div>
+    <button id="pausa" hidden aria-label="Pausa">II</button>
+  </div>
+  <div id="capa"></div>
+  <div id="msg">Cargando…</div>
+</div>
+<div id="zona" aria-label="Botón del juego"><span id="zona-txt">Tocá acá</span></div>
+<script type="module" src="js/game/main.js"></script>
+</body>
+</html>

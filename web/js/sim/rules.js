@@ -1,0 +1,111 @@
+// Reglamento y balance (docs/JUEGO.md, secciones 3 a 7). Todo en enteros:
+//   tiempo en ms · intensidad en diezmilésimas (10000 = 100 %) · esfuerzo, exigencia y calidad en milésimas ·
+//   altura y desvío de la barra en mm · Resto en décimas de punto · kilos enteros · techos en gramos.
+// Los valores son los iniciales del documento de diseño; el informe de balance (tools/balance.mjs) es la herramienta para ajustarlos.
+import { idiv, rdiv, lerpi, clampi } from './fixed.js';
+
+export const VERSION = '1.0';
+
+/** Tabla de la sección 3.2: intensidad → ventana perfecta, velocidad del tirón, exigencia de la subida y altura sobrante. */
+const T_I = [8000, 9000, 9500, 10000, 10300, 10600];
+const T_PERF = [70, 52, 44, 35, 30, 30], T_VEL = [1000, 930, 890, 850, 830, 800], T_EXI = [200, 420, 540, 660, 750, 840], T_ALT = [100, 55, 33, 10, -4, -17];
+function tabla(I, col, extrapola) {
+  const n = T_I.length;
+  if (I <= T_I[0]) return col[0];
+  if (I >= T_I[n - 1]) return extrapola ? lerpi(I, T_I[n - 2], T_I[n - 1], col[n - 2], col[n - 1]) : col[n - 1];
+  let k = 0; while (I > T_I[k + 1]) k++;
+  return lerpi(I, T_I[k], T_I[k + 1], col[k], col[k + 1]);
+}
+export const velTiron = I => tabla(I, T_VEL, false);
+export const exigenciaTabla = I => clampi(tabla(I, T_EXI, true), 0, 1400);
+export const alturaTabla = I => tabla(I, T_ALT, true);
+
+/** Piso de ventanas: la fila del 103 %. */
+export const PISO = { p: 30, g: 66, l: 146 };
+/** Multiplicador por gesto (milésimas): recepción del arranque 15 % más angosta; todo el envión 20 % más angosto. */
+export const MULT_MOV = { s_exp: 1000, s_rec: 850, c_exp: 1000, c_rec: 1000, j_exp: 900, j_rec: 900 };
+export const multTecnica = tec => 1000 + 100 * (tec - 7);
+export const multTemple = tem => 1000 + 80 * (tem - 7);
+
+/**
+ * Ventanas de un gesto. Devuelve {p, g, l} en ms y `recorte`: los mm de altura que cuesta lo que el piso no dejó achicar
+ * (1 cm por cada 10 % de ventana).
+ * @param {number} I intensidad  @param {string} mov clave de MULT_MOV  @param {{tec:number, temple?:number, primera?:boolean}} o
+ */
+export function ventanas(I, mov, o) {
+  let m = MULT_MOV[mov] * multTecnica(o.tec);                       // millonésimas
+  if (o.temple) m = idiv(m * multTemple(o.temple), 1000);
+  const base = tabla(I, T_PERF, false), pr = idiv(base * m, 1000000);
+  const p = pr < PISO.p ? PISO.p : pr, recorte = pr < PISO.p ? idiv((PISO.p - pr) * 100, PISO.p) : 0;
+  const g = Math.max(PISO.g, rdiv(p * 22, 10));
+  let l = Math.max(PISO.l, g + 80);
+  if (o.primera) l = idiv(l * 13, 10);
+  return { p, g, l, recorte };
+}
+/** Calidad de un gesto (milésimas): 1000 dentro de la ventana perfecta, 0 en el límite. */
+export const calidad = (e, w) => { const a = Math.abs(e); return a <= w.p ? 1000 : a >= w.l ? 0 : lerpi(a, w.p, w.l, 1000, 0); };
+/** Palabra del gesto para la gráfica. */
+export const palabra = (e, w) => { const a = Math.abs(e); return a <= w.p ? 'perfecto' : a <= w.g ? 'bien' : e < 0 ? 'temprano' : 'tarde'; };
+/** Altura (mm) que da la explosión: perfecta +30, borde de buena −40, límite −100. */
+export function alturaExplosion(e, w) { const a = Math.abs(e); return a <= w.p ? 30 : a <= w.g ? lerpi(a, w.p, w.g, 30, -40) : lerpi(Math.min(a, w.l), w.g, w.l, -40, -100); }
+/** Desvío (mm, positivo adelante): soltar temprano 0,6 mm por ms fuera de la perfecta; tarde 0,4 mm por ms hacia atrás. */
+export function desvioExplosion(e, w) { const a = Math.abs(e) - w.p; return a <= 0 ? 0 : e < 0 ? idiv(a * 6, 10) : -idiv(a * 4, 10); }
+
+/** Anillo de tensión: período de respiración (ms) y calidad del apretar. */
+export const periodoAnillo = I => lerpi(clampi(I, 8000, 10000), 8000, 10000, 1600, 1300);
+export const TENSION = { perfecta: 90, buena: 220, mm: { perfecta: 10, buena: 0, floja: -20 } };
+/** Distancia (ms) de x (desde que arrancó el anillo) al lleno más cercano. Los llenos caen en per, 2·per, 3·per… */
+export function errorAnillo(x, per) { if (x < per) return per - x; const r = x % per; return r < per - r ? r : per - r; }
+export const gradoTension = d => (d < TENSION.perfecta ? 'perfecta' : d < TENSION.buena ? 'buena' : 'floja');
+
+export const ACOMODO_MS = 1200;
+export const ALTURA_MIN = -60;           // por debajo: tirón sin altura
+/** Topes de desvío (mm) por movimiento. */
+export const TOPE_DESVIO = { s: 60, c: 80, split: 80, power: 60, squat: 40 };
+/** Ajustes de altura (mm) por envión: el power necesita 4 cm más; el squat, 6 menos. */
+export const ALTURA_ENVION = { split: 0, power: -40, squat: 60 };
+export const NO_DOMINA = { altura: -20, desvio: -10 };
+export const EXI_ARRANQUE = 0;
+/** Lo que los errores suman a la exigencia de la subida (milésimas): por mm de altura perdida (con tope), por mm de desvío sobre 20 y por recepción a destiempo. */
+export const EXI_ERROR = { porMm: 3, tope: 250, porDesvio: 2, recepcion: 150 };
+
+/** Pelea (sección 4). Pasos de 1/120 s; avance, aporte y temblor en millonésimas. */
+export const PELEA = {
+  hz: 120, propio: 450, porGarra: 20, toque: 100000, mitadMs: 140, nadaMs: 90, precarga: 80000, precargaCal: 120,
+  rebote: 200, graciaReboteMs: 300, subir: 4, topeSubir: 800000, hundir: 12, estancaDe: 300000, estancaA: 550000, estanca: 100,
+  franja: 100, roja: 920, temblorExceso: 6, temblorRoja: 300000, recienteMs: 400, temblorBaja: 250000, desvioLibre: 20, temblorDesvio: 3000,
+  aguanteMs: 4000, aguanteCae: 100, graciaMs: 500, hundidoMs: 400, maxMs: 12000, agujaPasos: 24,
+};
+export const esfuerzoPropio = garra => PELEA.propio + PELEA.porGarra * (garra - 6);
+/** Traba de codos (sección 4.1). */
+export const TRABA = { ini: 900000, iniLimite: 700000, menos: 200, pierde: 300000 };
+/** Fijación y chicharra. */
+export const FIJA = { firmeMs: 300, plazoMs: 2000, sueltaChicaMs: 120, chMin: 700, chMax: 1500, bajaSolaMs: 3000 };
+export const HOMBROS = { ignoraMs: 450, maxMs: 8000, amagueMs: 300 };
+/** Jueces: umbrales de la sección 5.3. */
+export const JUEZ = { traba1: 350, traba2: 700, temblor1: 500000, temblor2: 750000 };
+
+/** Reloj del llamado (ms) y cierre de cambios. */
+export const RELOJ = { normal: 30000, seguido: 45000, cambiosHasta: 15000 };
+
+/** Resto (décimas de punto). */
+export const RESTO = { ini: 1000, base: { s: 60, c: 80 }, sobre95: 10, toque: 5, fueraSeg: 30, topePelea: 150, nulo: 80, envion: { split: 0, power: -60, squat: 40 }, ajeno: 50, seguido: 10, intervalo: 150, tocado: 850 };
+export const multFondo = fondo => 1400 - 50 * fondo;     // milésimas
+/** Techo del momento (g): el del día menos 1 % por cada 20 puntos de Resto perdidos. */
+export const techoMomento = (techoG, resto) => idiv(techoG * (20000 - (RESTO.ini - resto)), 20000);
+export const intensidad = (kg, techoG) => idiv(kg * 1000 * 10000, techoG);
+
+/** Marco ficticio (sección 6.1). */
+export const EVENTO = { titulo: 'Mundial Tarima 2026', sesion: 'Final · 90 kg', records: { s: 179, c: 214, t: 388 } };
+export const APERTURA = { min: 880, max: 970 };            // milésimas del techo de ficha
+export const PLAN = [4, 3];                                  // saltos del plan del entrenador para el jugador
+/** Niveles: error típico de tiempo (ms) y de pelea (milésimas) de los rivales, kilos de forma y cuánto más abajo abren y declaran (milésimas del techo). */
+export const NIVELES = { amistoso: { sd: 55, pelea: 90, forma: 0, abre: -35 }, normal: { sd: 36, pelea: 60, forma: 0, abre: 0 }, dificil: { sd: 27, pelea: 40, forma: 1, abre: 0 } };
+export const KG_MAX = 260;
+
+/** Causas con su texto. Las de fallo y las de nulo (secciones 5.2 y 5.3). */
+export const CAUSAS = {
+  anticipado: 'Tirón anticipado', sin_altura: 'Tirón sin altura', adelante: 'Barra adelante', atras: 'Barra atrás', fondo: 'La pierde en el fondo',
+  aplastado: 'Aplastado', codos: 'Ceden los codos', temblor: 'Pierde la barra arriba', devuelve: 'Devuelve la barra',
+  codos_blandos: 'Codos blandos', tiembla: 'Llega temblando', antes: 'Suelta antes de la chicharra', sin_apoyo: 'No fija la barra', reloj: 'Se acabó el reloj',
+};

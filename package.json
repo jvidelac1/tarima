@@ -2,11 +2,15 @@
   "name": "tarima",
   "private": true,
   "type": "module",
-  "description": "Visor web de halterofilia (three.js vendorizado en web/vendor, sin paso de build).",
+  "description": "Juego web de halterofilia: visor y juego (three.js vendorizado en web/vendor, sin paso de build).",
   "scripts": {
     "serve": "python3 -m http.server 8000 --directory web",
     "vendor": "node tools/check_viewer_vendor.mjs",
-    "check": "node tools/check_viewer.mjs"
+    "check": "node tools/check_viewer.mjs",
+    "sim": "node tools/build_sim_data.mjs",
+    "test:sim": "node tools/sim_test.mjs",
+    "balance": "node tools/balance.mjs --rivales",
+    "check:juego": "node tools/check_game.mjs"
   },
   "devDependencies": {
     "@fontsource/saira": "^5.0.0",

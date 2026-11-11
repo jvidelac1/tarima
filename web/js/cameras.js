@@ -29,7 +29,8 @@ export const SHOTS = [
 ];
 
 export class CameraRig {
-  constructor(canvas, { reduceMotion = false } = {}) {
+  /** `interactive: false` (el juego): no registra arrastre ni rueda; ahí el lienzo es el botón y mantener apretado no debe orbitar. */
+  constructor(canvas, { reduceMotion = false, interactive = true } = {}) {
     this.camera = new THREE.PerspectiveCamera(25, 1, .25, 120);
     this.canvas = canvas; this.reduceMotion = reduceMotion; this.index = 0; this.time = 0;
     this.az = CAMERAS[0].az; this.el = CAMERAS[0].el; this.zoom = 1; this.azT = this.az; this.elT = this.el; this.zoomT = 1;
@@ -41,6 +42,7 @@ export class CameraRig {
     this._move = e => { if (!drag) return; this.manual = true; this.azT = drag.az - (e.clientX - drag.x) * .008; this.elT = clamp(drag.el + (e.clientY - drag.y) * .005, -.12, 1.15); };
     this._up = () => { drag = null; canvas.style.cursor = 'grab'; };
     this._wheel = e => { e.preventDefault(); this.zoomT = clamp(this.zoomT * Math.exp(e.deltaY * .001), .55, 1.35); };
+    this.interactive = interactive; if (!interactive) return;
     canvas.addEventListener('pointerdown', this._down); canvas.addEventListener('pointermove', this._move);
     canvas.addEventListener('pointerup', this._up); canvas.addEventListener('pointercancel', this._up); canvas.addEventListener('wheel', this._wheel, { passive: false });
   }
@@ -111,6 +113,7 @@ export class CameraRig {
     this.focusDistance = cam.position.distanceTo(this.subject);
   }
   dispose() {
+    if (!this.interactive) return;
     const c = this.canvas; c.removeEventListener('pointerdown', this._down); c.removeEventListener('pointermove', this._move);
     c.removeEventListener('pointerup', this._up); c.removeEventListener('pointercancel', this._up); c.removeEventListener('wheel', this._wheel);
   }
