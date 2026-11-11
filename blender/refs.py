@@ -9,7 +9,8 @@ Luz de estudio suave: entorno uniforme más una clave grande desde arriba y adel
 iluminada igual; no hay sombras duras ni piso).
 Salida: out/arte/refs/<nombre>_<pose>_<encuadre>_<vista>.png y cams.json (cámaras, encuadres y medidas de control).
 Líneas a mirar:
-  REF   una por imagen: caja de la silueta medida en el PNG (alfa >= 0,5), caja prevista proyectando los vértices, margen al borde.
+  REF   una por imagen: caja de la silueta medida en el PNG (alfa >= 0,5), caja prevista proyectando los vértices, margen al borde
+        y % de píxeles opacos con algún canal quemado.
   REFS  una por juego: alto de la silueta en las cuatro vistas, diferencia máxima, margen mínimo y simetría de la máscara de frente.
 Variables: REFS_OUT (carpeta de salida), REFS_POSES=rest,fin (claves de ctl3.PH o rest), REFS_FRAMES=full,bust, REFS_RES=1024,
 REFS_SAMPLES=32, REFS_BELT=1 (deja el cinturón en bust), REFS_WORLD y REFS_KEY (intensidad del entorno y vatios de la clave),
@@ -75,10 +76,11 @@ def project(P,c,d,az,res):
     f,r=axes(az); q=P-c; z=d-q@f; k=res/2/math.tan(math.radians(FOV/2)); u=res/2+k*(q@r)/z; v=res/2-k*q[:,2]/z
     return [float(u.min()),float(v.min()),float(u.max()),float(v.max())]
 def measure(path):
-    """Máscara (alfa >= 0,5) del PNG: caja en píxeles (x0,y0,x1,y1, inclusive), margen mínimo al borde y la máscara."""
+    """Máscara (alfa >= 0,5) del PNG: caja en píxeles (x0,y0,x1,y1, inclusive), margen mínimo al borde, la máscara y el % de píxeles
+    opacos con algún canal quemado (>= 254 de 255)."""
     from PIL import Image
-    M=np.asarray(Image.open(path).convert('RGBA'))[:,:,3]>=128; ys=np.nonzero(M.any(1))[0]; xs=np.nonzero(M.any(0))[0]; h,w=M.shape
-    box=[int(xs[0]),int(ys[0]),int(xs[-1]),int(ys[-1])]; return box,int(min(box[0],box[1],w-1-box[2],h-1-box[3])),M
+    I=np.asarray(Image.open(path).convert('RGBA')); M=I[:,:,3]>=128; ys=np.nonzero(M.any(1))[0]; xs=np.nonzero(M.any(0))[0]; h,w=M.shape; op=I[:,:,3]==255
+    box=[int(xs[0]),int(ys[0]),int(xs[-1]),int(ys[-1])]; return box,int(min(box[0],box[1],w-1-box[2],h-1-box[3])),M,float((I[:,:,:3][op].max(1)>=254).mean()*100)
 def symmetry(M):
     """Simetría izquierda-derecha de la máscara respecto de la columna central, en % del área: píxeles que no coinciden con el
     espejo (cada diferencia se cuenta de los dos lados) y diferencia de área entre las dos mitades."""
@@ -128,16 +130,16 @@ if __name__=='__main__':
                 f,_=axes(az); cam.location=Vector(c+f*d); cam.rotation_euler=Vector(-f).to_track_quat('-Z','Y').to_euler()
                 kl=Vector(c+f*KEY_AT[0]+np.array([0,0,KEY_AT[1]])); key.location=kl; key.rotation_euler=(Vector(c)-kl).to_track_quat('-Z','Y').to_euler()
                 fn=f'{NAME}_{tag}_{vw}.png'; sc.render.filepath=DST+fn; t1=time.time(); bpy.ops.render.render(write_still=True); n+=1
-                bpy.context.view_layer.update(); box,mg,Ms[vw]=measure(DST+fn); pre=project(P,c,d,az,RES)
+                bpy.context.view_layer.update(); box,mg,Ms[vw],clip=measure(DST+fn); pre=project(P,c,d,az,RES)
                 V[vw]=dict(file=fn,az_deg=az,location=[float(x) for x in cam.location],matrix_world=[[float(x) for x in r] for r in cam.matrix_world],
-                           caja_px=box,alto_px=box[3]-box[1]+1,ancho_px=box[2]-box[0]+1,margen_px=mg,caja_prevista_px=[round(x,2) for x in pre])
-                print(f'REF {fn}: caja x {box[0]}..{box[2]} y {box[1]}..{box[3]} · {box[2]-box[0]+1} x {box[3]-box[1]+1} px · prevista x {pre[0]:.1f}..{pre[2]:.1f} y {pre[1]:.1f}..{pre[3]:.1f} · margen {mg} px · {time.time()-t1:.1f} s',flush=True)
+                           caja_px=box,alto_px=box[3]-box[1]+1,ancho_px=box[2]-box[0]+1,margen_px=mg,caja_prevista_px=[round(x,2) for x in pre],quemado_pct=round(clip,2))
+                print(f'REF {fn}: caja x {box[0]}..{box[2]} y {box[1]}..{box[3]} · {box[2]-box[0]+1} x {box[3]-box[1]+1} px · prevista x {pre[0]:.1f}..{pre[2]:.1f} y {pre[1]:.1f}..{pre[3]:.1f} · margen {mg} px · quemado {clip:.1f} % · {time.time()-t1:.1f} s',flush=True)
             hs=[V[v]['alto_px'] for v,_ in VIEWS]; sx,sa=symmetry(Ms['front']) if 'front' in Ms else (None,None)
             md=dict(alto_px=hs,dif_alto_px=max(hs)-min(hs),alto_previsto_px=[round(V[v]['caja_prevista_px'][3]-V[v]['caja_prevista_px'][1],2) for v,_ in VIEWS],
-                    margen_min_px=min(V[v]['margen_px'] for v,_ in VIEWS),sim_frente_espejo_pct=sx,sim_frente_area_pct=sa)
+                    margen_min_px=min(V[v]['margen_px'] for v,_ in VIEWS),quemado_max_pct=max(V[v]['quemado_pct'] for v,_ in VIEWS),sim_frente_espejo_pct=sx,sim_frente_area_pct=sa)
             E['juegos'][tag]=dict(pose=pose,encuadre=fr,mira=[float(x) for x in c],distancia_m=d,caja_m=[[float(x) for x in lo],[float(x) for x in hi]],
                                   corte_z_m=zc if fr=='bust' else None,correctivos=sk,vistas=V,medidas=md)
             print(f'REFS {NAME} {tag}: alto de silueta {hs} px (frente, izquierda, atrás, derecha) · diferencia máxima {md["dif_alto_px"]} px · previsto {md["alto_previsto_px"]} · '
-                  f'margen mínimo {md["margen_min_px"]} px · simetría de frente: {sx:.2f} % fuera del espejo, {sa:.2f} % de diferencia de área entre mitades',flush=True)
+                  f'margen mínimo {md["margen_min_px"]} px · quemado máx {md["quemado_max_pct"]:.1f} % · simetría de frente: {sx:.2f} % fuera del espejo, {sa:.2f} % de diferencia de área entre mitades',flush=True)
     json.dump(CAMS,open(cj,'w',encoding='utf-8'),ensure_ascii=False,indent=1)
     print(f'REFS {NAME}: {n} imágenes en {time.time()-T0:.0f} s · {cj}')
