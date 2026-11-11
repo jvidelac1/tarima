@@ -305,12 +305,11 @@ def cmd_heat(a):
                    signo='positivo: la malla generada queda por fuera de la nuestra (nos falta volumen)'),open(base+'.json','w',encoding='utf-8'),ensure_ascii=False,indent=1)
     for g,v in stats.items(): print(f"HEAT   {g:9s} n={v['n']:6d} mediana {v['mediana']:+.2f} mm (p5 {v['p5']:+.2f}, p95 {v['p95']:+.2f})")
     # render: emisión con el color por vértice, cámara ortográfica, cuatro vistas
-    # El color va en un atributo vectorial por vértice leído con el nodo Attribute: con un atributo de color FLOAT_COLOR por vértice
-    # Cycles (bpy 5.2.3) devolvió negro en el render, tanto con el nodo Color Attribute como con Attribute.
-    col=np.tile(np.array([.05,.05,.055,1.]),(N,1)); col[idx]=_color(e,a.rango); at=me.attributes.new('heat','FLOAT_VECTOR','POINT'); at.data.foreach_set('vector',col[:,:3].ravel()); me.update()
+    # El atributo NO se puede llamar 'heat': es un nombre reservado de Cycles (atributo estándar de volúmenes) y en una malla da negro.
+    col=np.tile(np.array([.05,.05,.055,1.]),(N,1)); col[idx]=_color(e,a.rango); at=me.attributes.new('err_mm','FLOAT_VECTOR','POINT'); at.data.foreach_set('vector',col[:,:3].ravel()); me.update()
     mat=bpy.data.materials.new('heat'); mat.use_nodes=True; nt=mat.node_tree
     for n in list(nt.nodes): nt.nodes.remove(n)
-    o=nt.nodes.new('ShaderNodeOutputMaterial'); em=nt.nodes.new('ShaderNodeEmission'); vc=nt.nodes.new('ShaderNodeAttribute'); vc.attribute_name='heat'
+    o=nt.nodes.new('ShaderNodeOutputMaterial'); em=nt.nodes.new('ShaderNodeEmission'); vc=nt.nodes.new('ShaderNodeAttribute'); vc.attribute_name='err_mm'
     nt.links.new(vc.outputs['Color'],em.inputs['Color']); nt.links.new(em.outputs[0],o.inputs['Surface'])
     for i in range(len(me.materials)): me.materials[i]=mat
     sc=S.sc
