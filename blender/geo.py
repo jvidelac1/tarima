@@ -52,6 +52,10 @@ def smooth_weights(b,rig,K):
         ia,ish=names.index(PRE+side+'Arm'),names.index(PRE+side+'Shoulder')
         cap=sm(.075*K,.0,np.abs(t))*sm(.10*K,.05*K,rad)*(co[:,2]>a[2]-.02*K)*sm(-.02*K,.03*K,(co[:,0]-a[0])*sgn+.03*K)   # casquete superior del hombro
         mv=W[:,ia]*cap*.35; W[:,ia]-=mv; W[:,ish]+=mv
+        # trapecio: la franja superior entre cuello y acromion sube con la clavícula (Shoulder) en vez de quedarse con el tórax (Spine2)
+        i2=names.index(PRE+'Spine2'); n_=head(rig,'Neck'); xr=(co[:,0]*sgn-.045*K)/max(a[0]*sgn-.045*K,1e-6)
+        tr=sm(.0,.35,xr)*sm(1.15,.85,xr)*sm(a[2]-.005*K,a[2]+.045*K,co[:,2])*sm(n_[2]+.06*K,n_[2]+.02*K,co[:,2]); touched|=tr>.02
+        mv=W[:,i2]*tr*.45; W[:,i2]-=mv; W[:,ish]+=mv
     W/=np.maximum(W.sum(1,keepdims=True),1e-9)
     rows=np.nonzero(touched&(np.abs(W-W0).max(1)>1e-4))[0]; wset(b,names,W,rows); print('SKIN pesos suavizados en',len(rows),'vértices de',N)
 def subdivide(b,levels=1):
@@ -59,6 +63,52 @@ def subdivide(b,levels=1):
     m=b.modifiers.new('sub','SUBSURF'); m.levels=levels; m.subdivision_type='CATMULL_CLARK'; m.uv_smooth='NONE'; m.boundary_smooth='PRESERVE_CORNERS'
     bpy.ops.object.modifier_move_to_index(modifier='sub',index=0); bpy.ops.object.modifier_apply(modifier='sub')
     for p in b.data.polygons: p.use_smooth=True
+ANAT_GEO=(1.15,.5)   # fracción del relieve muscular de tex.anatomy que va a la malla: (masas anchas, surcos). El resto del surco lo pone el normal map
+def anatomy(b,rig,K):
+    """Desplaza la malla subdividida sobre la normal con el relieve muscular por reglas (deltoides, bíceps, tríceps, antebrazo, pectoral, trapecio, dorsal, cuádriceps, gemelos).
+    Misma definición que el normal map (tex.anatomy). No toca cabeza, manos ni pies."""
+    import tex
+    co=coords(b); N=len(co); me=b.data; no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3)
+    J={x.name[len(PRE):]:np.array(x.head_local) for x in rig.data.bones if x.name.startswith(PRE)}
+    B,F,_=tex.anatomy(co,no,J,K); names,W=wget(b); keep=1-sum(W[:,j] for j,n in enumerate(names) if any(k in n for k in ('Head','Hand','Foot','Toe')))
+    d=(B*ANAT_GEO[0]+F*ANAT_GEO[1])*np.clip(keep,0,1); me.vertices.foreach_set('co',(co+no*d[:,None]).ravel()); me.update()
+    print(f'ANAT desplazamiento de malla: máx +{d.max()*1000:.1f} / {d.min()*1000:.1f} mm, {int((np.abs(d)>5e-4).sum())} vértices')
+SIMPLIFY=1.0   # fracción de caras que se conserva en las zonas simplificables. 1 = no simplificar (por defecto; TARIMA_SIMP=0.32 lo activa).
+# Queda apagado: esas zonas son solo el 9 % de las caras del cuerpo (la cabeza es el 37 % y las manos el 28 %), se ahorran ~6 mil triángulos,
+# y al cambiar la densidad de vértices del muslo cambia el radio por percentil que mide poses.py (muslo 10,2 -> 8,9 cm en brenner): afloja check() sin querer.
+def _hairlen(b,OUT):
+    """Largo de pelo por vértice (m), leído de hair_len.png con el UV del cuerpo (255 = 20 mm)."""
+    from PIL import Image
+    L=np.asarray(Image.open(OUT+'hair_len.png').convert('L')).astype(float)/255*.02; Rr=L.shape[0]; me=b.data; N=len(me.vertices); uvl=me.uv_layers.active.data
+    lu=np.empty(len(me.loops)*2); uvl.foreach_get('uv',lu); lu=lu.reshape(-1,2); lv=np.empty(len(me.loops),int); me.loops.foreach_get('vertex_index',lv); vu=np.zeros((N,2)); vu[lv]=lu
+    return L[np.clip(((1-vu[:,1])*Rr).astype(int),0,Rr-1),np.clip((vu[:,0]*Rr).astype(int),0,Rr-1)]
+def simplify(b,rig,BJ,K,OUT,keep=None):
+    """Presupuesto de triángulos: la subdivisión se deshace (Decimate por colapso, con UV y pesos interpolados) solo donde no aporta silueta:
+    cuero cabelludo tapado por el pelo (las capas de pelo salen después de esta malla, así que también bajan) y tronco, muslo y pierna
+    lejos de las articulaciones y de los bordes de prenda. Cara, orejas, manos, hombros, brazos, cadera y rodillas quedan con la subdivisión completa."""
+    keep=SIMPLIFY if keep is None else keep
+    if keep>=1: return
+    names,W=wget(b); co=coords(b); N=len(co); dom=np.array([n[len(PRE):] for n in names])[W.argmax(1)]; z=co[:,2]
+    ok=np.isin(dom,['Hips','Spine','Spine1','Spine2','LeftUpLeg','RightUpLeg','LeftLeg','RightLeg'])&(z<head(rig,'LeftArm')[2]-.11*K)
+    for side in ('Left','Right'):
+        for bone,r in (('Arm',.26),('Leg',.14),('UpLeg',.11),('Foot',.10)): ok&=np.linalg.norm(co-head(rig,side+bone),axis=1)>r*K
+    for ze in (BJ['ank'][2]+.132,BJ['hemz']): ok&=np.abs(z-ze)>.02
+    sg=b.vertex_groups.get('scalp')
+    if sg is not None:
+        ln=_hairlen(b,OUT); sw=np.zeros(N)
+        for v in b.data.vertices:
+            for g in v.groups:
+                if g.group==sg.index: sw[v.index]=g.weight
+        sc=(sw>.5)&(z>head(rig,'Head')[2]+.09*K)
+        if sc.any(): ok|=sc&(ln>.62*np.percentile(ln[sc],95))
+    vg=b.vertex_groups.new(name='_simp'); vg.add([int(i) for i in np.nonzero(ok)[0]],1.0,'REPLACE')
+    nf=len(b.data.polygons); inr=sum(1 for p in b.data.polygons if all(ok[v] for v in p.vertices)); t0=sum(len(p.vertices)-2 for p in b.data.polygons)
+    bpy.context.view_layer.objects.active=b; bpy.ops.object.select_all(action='DESELECT'); b.select_set(True)
+    m=b.modifiers.new('_dec','DECIMATE'); m.decimate_type='COLLAPSE'; m.ratio=1-(inr/nf)*(1-keep); m.vertex_group='_simp'; m.vertex_group_factor=1000; m.use_symmetry=True; m.symmetry_axis='X'; m.use_collapse_triangulate=False
+    bpy.ops.object.modifier_move_to_index(modifier='_dec',index=0); bpy.ops.object.modifier_apply(modifier='_dec')
+    vg=b.vertex_groups['_simp']; gi=vg.index; out=sum(1 for v in b.data.vertices if not any(g.group==gi and g.weight>.5 for g in v.groups)); b.vertex_groups.remove(vg)
+    for p in b.data.polygons: p.use_smooth=True
+    print(f'SIMP zonas simplificadas: {inr} de {nf} caras; triángulos {t0} -> {sum(len(p.vertices)-2 for p in b.data.polygons)}; vértices fuera de zona {N-int(ok.sum())} -> {out}')
 def garments(b,rig,BJ,K):
     """Volumen de prendas sobre la malla ya subdividida. Mismos límites que la textura de finish.py."""
     names,W=wget(b); dom=np.array([n[len(PRE):] for n in names])[W.argmax(1)]; co=coords(b); me=b.data; N=len(co)
@@ -116,8 +166,8 @@ mir=lambda q:(q[0],q[1],-q[2],-q[3])
 HINGE={'knee':(('UpLeg','Leg','Foot'),(60,140)),'elbow':(('Arm','ForeArm','Hand'),(60,140)),'wrist':(('ForeArm','Hand','HandMiddle1'),(35,85))}   # huesos y rango de flexión (grados)
 # Escultura por reglas del hombro con el brazo arriba (se suma al Corrective Smooth en la pose de referencia, en espacio posado).
 # Cada término: (nombre, centro o segmento en el marco del brazo [a lo largo del brazo, lateral, frente] en m para 1,69 m, radio, empuje sobre la normal)
-ARMUP_SCULPT=dict(delt=((.030,-.035,.0),None,.062,.014),trap=((-.005,-.085,-.015),None,.055,.014),pit=((-.075,.030,.005),None,.040,-.014),
-                  lat=((-.035,.030,-.050),(-.200,.015,-.050),.028,.008),pec=((-.035,.010,.050),(-.130,-.045,.070),.028,.007))
+ARMUP_SCULPT=dict(delt=((.030,-.035,.0),None,.062,.018),deltA=((.050,-.005,.040),None,.040,.007),trap=((-.005,-.085,-.015),None,.058,.017),pit=((-.075,.030,.005),None,.040,-.026),
+                  lat=((-.035,.034,-.050),(-.210,.015,-.050),.027,.018),pec=((-.035,.014,.050),(-.135,-.045,.072),.024,.016),tri=((.085,.040,-.020),(.200,.036,-.022),.028,.006))
 def armup_sculpt(rig,K,co):
     pb=rig.pose.bones; J=lambda n:np.array(pb[PRE+n].matrix.translation)
     def f(P,Nn):
@@ -133,11 +183,12 @@ def armup_sculpt(rig,K,co):
                 D+=Nn*(w*sd*amp*K)[:,None]
         return D
     return f
+ARMUP_RANGE=(45,130)   # grados. Contrato 6 (cambio propuesto: antes 60–150; el arranque quedaba con peso 0,37). El visor tiene que usar el mismo par
 def armup_weight(rig,side):
-    """Contrato 6: smoothstep(60°,150°) del ángulo entre la dirección del brazo y su reposo, en el marco de Spine2."""
+    """Contrato 6: smoothstep(ARMUP_RANGE) del ángulo entre la dirección del brazo y su reposo, en el marco de Spine2."""
     pb=rig.pose.bones; s2=pb[PRE+'Spine2']; d=s2.matrix.to_3x3().inverted()@(pb[PRE+side+'ForeArm'].matrix.translation-pb[PRE+side+'Arm'].matrix.translation)
     r=s2.bone.matrix_local.to_3x3().inverted()@(rig.data.bones[PRE+side+'ForeArm'].head_local-rig.data.bones[PRE+side+'Arm'].head_local)
-    return float(sm(math.radians(60),math.radians(150),d.angle(r)))
+    return float(sm(math.radians(ARMUP_RANGE[0]),math.radians(ARMUP_RANGE[1]),d.angle(r)))
 def correctives(b,rig,K):
     co=coords(b); pb=rig.pose.bones; H=lambda n:head(rig,n); sides=((1,'Left'),(-1,'Right')); keys={}
     def region(c,r,sgn,c2=None):
@@ -186,7 +237,7 @@ def correctives(b,rig,K):
         for nm,bone in (('f',side+'ForeArm'),('a',side+'Arm'),('l','LeftShoulder'),('r','RightShoulder'),('n','Neck'),('s','Spine2')):
             for ax in 'XYZ': vars_[nm+ax.lower()]=(bone,ax)
         dot=lambda c1,p,q:f'{c1:.3f}*('+'+'.join(f'(f{c}-a{c})*({p}{c}-{q}{c})' for c in 'xyz')+')'
-        _driver(b,rig,'corr_armUp_'+side[0],vars_,f'smoothstep(1.0472,2.618,acos(clamp({dot(al,"l","r")}+{dot(be,"n","s")}+{dot(ga,"l","s")},-1,1)))')
+        _driver(b,rig,'corr_armUp_'+side[0],vars_,f'smoothstep({math.radians(ARMUP_RANGE[0]):.4f},{math.radians(ARMUP_RANGE[1]):.4f},acos(clamp({dot(al,"l","r")}+{dot(be,"n","s")}+{dot(ga,"l","s")},-1,1)))')
         for nm,((p0,p1,p2),(lo,hi)) in HINGE.items():
             if nm not in GAIN: continue
             l1=np.linalg.norm(H(side+p1)-H(side+p0)); l2=np.linalg.norm(H(side+p2)-H(side+p1)); vars_={}
@@ -196,13 +247,13 @@ def correctives(b,rig,K):
             _driver(b,rig,f'corr_{nm}_{side[0]}',vars_,f'smoothstep({math.radians(lo):.4f},{math.radians(hi):.4f},acos(clamp(({dt})/{l1*l2:.5f},-1,1)))')
     bpy.context.view_layer.update()
 # ---------- pelo con volumen (capas) y pestañas (tarjetas) ----------
-def hair_shells(b,OUT,mat,layers=6,size=.024):
+HAIR_LAYERS=4   # capas de pelo (antes 6): cada capa es una pasada con alfa sobre toda la cabeza; con 4 el volumen se mantiene y baja un tercio el costo
+def hair_shells(b,OUT,mat,layers=None,size=.024):
     """Capas concéntricas sobre cuero cabelludo, barba y cejas. El largo por vértice sale de hair_len.png (tex.py, 255 = 20 mm);
     el UV es una proyección por caja que repite el mosaico hair.png cada 'size' m. Las capas van de adentro hacia afuera (orden de dibujo con alfa)."""
     from PIL import Image
-    L=np.asarray(Image.open(OUT+'hair_len.png').convert('L')).astype(float)/255*.02; Rr=L.shape[0]; me=b.data; N=len(me.vertices); uvl=me.uv_layers.active.data
-    lu=np.empty(len(me.loops)*2); uvl.foreach_get('uv',lu); lu=lu.reshape(-1,2); lv=np.empty(len(me.loops),int); me.loops.foreach_get('vertex_index',lv); vu=np.zeros((N,2)); vu[lv]=lu
-    ln=L[np.clip(((1-vu[:,1])*Rr).astype(int),0,Rr-1),np.clip((vu[:,0]*Rr).astype(int),0,Rr-1)]; co=coords(b); no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3)
+    layers=layers or HAIR_LAYERS
+    me=b.data; N=len(me.vertices); ln=_hairlen(b,OUT); co=coords(b); no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3)
     ln*=(co[:,2]>head(rig_of(b),'Neck')[2]-.02)
     E=np.empty(len(me.edges)*2,int); me.edges.foreach_get('vertices',E); E=E.reshape(-1,2); deg=np.maximum(np.bincount(E.ravel(),minlength=N),1)
     for _ in range(3):      # el largo decae suave hacia el borde: sin escalón en el nacimiento

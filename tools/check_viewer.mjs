@@ -5,7 +5,7 @@
 // máscara, normales de detalle, morphs corr_armUp y corr_knee), tt real por muestra, velocidad de barra, encuadre en las
 // cinco cámaras, continuidad de la barra (unión cargada → envión incluida), barra quieta antes del despegue, dedos sobre
 // la barra, primeros planos (cara, torso, rack, manos, brazos arriba, zapatillas) de los dos personajes, desenfoque de
-// movimiento, luminancia, cambio de calidad, gobernador (escalones de calidad y resolución), costo por pase, fps, carga
+// movimiento, luminancia, cambio de calidad, gobernador (escalones de calidad y resolución), costo por pase y por etapa, fps, carga
 // lenta, carrera de carga y layout móvil.
 // Uso: npm install && node tools/check_viewer.mjs [--quality=alta|media|baja] [--headed] [--only=ventura]
 //      [--min-fps=N] falla si los fps a DPR 1 quedan por debajo   [--strict] falla si el build no cumple el contrato 2
@@ -20,9 +20,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WEB = path.join(ROOT, 'web'), OUT = path.join(ROOT, 'out', 'viewer');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const QUALITY = arg('quality') || 'alta', ONLY = arg('only'), HEADED = process.argv.includes('--headed'), STRICT = process.argv.includes('--strict'), MIN_FPS = +(arg('min-fps') || 0);
-// Sin --min-fps la prueba exige igual un piso (alta 45, media 50), salvo que la máquina esté saturada: ahí la medición no
+// Sin --min-fps la prueba exige igual un piso (alta 45, media 55, baja 58), salvo que la máquina esté saturada: ahí la medición no
 // vale y se informa como no concluyente. Con --min-fps=N se exige siempre.
-const FPS_FLOOR = { alta: 45, media: 50, baja: 55 }, loadNow = () => os.loadavg()[0] / os.cpus().length;
+const FPS_FLOOR = { alta: 45, media: 55, baja: 58 }, loadNow = () => os.loadavg()[0] / os.cpus().length;
 const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.txt': 'text/plain' };
 
@@ -37,7 +37,9 @@ fs.mkdirSync(OUT, { recursive: true });
 if (!ONLY) for (const f of fs.readdirSync(OUT)) if (f.endsWith('.png')) fs.rmSync(path.join(OUT, f));      // las capturas de una corrida anterior (otro GLB, otras fases) no se mezclan con las nuevas
 
 const problems = [], warnings = [], notes = [];
-const browser = await chromium.launch({ executablePath: CHROME, headless: !HEADED, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-webgl', '--hide-scrollbars', '--mute-audio'] });
+const LAUNCH = { executablePath: CHROME, headless: !HEADED, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-webgl', '--hide-scrollbars', '--mute-audio'] };
+const browser = await chromium.launch(LAUNCH);
+const extra = [];      // navegadores aparte para medir rendimiento (ver más abajo)
 const watch = page => {
   page.on('console', m => { const t = m.type(); if (t === 'error') problems.push(`console.error: ${m.text()}`); else if (t === 'warning') warnings.push(m.text()); });
   page.on('pageerror', e => problems.push(`pageerror: ${e.message}`));
@@ -45,6 +47,19 @@ const watch = page => {
   page.on('response', r => { if (r.status() >= 400) problems.push(`HTTP ${r.status()}: ${r.url()}`); });
   page.on('request', r => { if (!r.url().startsWith(base) && !r.url().startsWith('data:') && !r.url().startsWith('blob:')) problems.push(`pedido externo: ${r.url()}`); });
 };
+const fpsOf = (pg, ms = 3000) => pg.evaluate(ms => new Promise(res => { let n = 0; const t0 = performance.now(); const f = () => { n++; performance.now() - t0 < ms ? requestAnimationFrame(f) : res({ fps: n / (ms / 1000), w: TARIMA.renderer.domElement.width, h: TARIMA.renderer.domElement.height, blur: TARIMA.post.maxBlur }); }; requestAnimationFrame(f); }), ms);
+// fps: se miden ANTES que nada, en un navegador recién abierto. La propia prueba (capturas, perfiles, varios navegadores) sube
+// la carga de la máquina a varias unidades por núcleo, y medidos al final los fps hablaban de la prueba y no del visor.
+// Reproduce el dos tiempos 4 s (parado, salida, tirones y recepción: sombras y desenfoque de movimiento en cada cuadro).
+const fps0 = await (async () => {
+  const b0 = await chromium.launch(LAUNCH); extra.push(b0);
+  try {
+    const pg = await b0.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 1 }); watch(pg);
+    await pg.goto(`${base}?q=${QUALITY}&auto=0`, { waitUntil: 'load' }); if (!await pg.evaluate(() => window.TARIMA.ready)) return null;
+    const ld = loadNow(); await pg.evaluate(() => TARIMA.play(false)); const f1p = await fpsOf(pg, 4000); await pg.evaluate(() => TARIMA.seekPhase(1)); const f1 = await fpsOf(pg, 2000);
+    return { f1p, f1, ld };
+  } catch (e) { problems.push(`medición de fps: ${e.message}`); return null; } finally { await b0.close().catch(() => null); }
+})();
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 1 });
 watch(page);
 
@@ -141,10 +156,10 @@ try {
       const pre0 = await T(() => { const A = TARIMA, tl = A.state.tl, b = A.barbell, dt = 1 / 120; A.manualClock(true); A.play(false); A.step(0); const p0 = b.group.position.clone(); let move = 0, gap = 0, lift = 0;   // step(0): posa en t=0 antes de tomar la referencia
         const bone = p0.clone(), a = A.state.athletes[A.state.who];
         while (A.state.t < tl.liftT - dt) { A.step(dt); move = Math.max(move, b.group.position.distanceTo(p0)); lift = Math.max(lift, b.group.position.y + b.q - b.plateR); a.barWorld(bone); gap = Math.max(gap, bone.distanceTo(b.group.position)); }
-        A.manualClock(false); A.seekTime(0); return { move, gap, lift, liftT: tl.liftT, drift: tl.preLiftDrift || 0 }; });
+        A.manualClock(false); A.seekTime(0); return { move, gap, lift, liftT: tl.liftT, drift: tl.preLiftDrift || 0, float: tl.preLiftFloat || 0 }; });
       if (!(pre0.liftT > 0)) problems.push(`${pre}: no hay fase de salida reconocible para fijar la barra al piso`);
       else if (pre0.move > .001 || pre0.lift > .001) problems.push(`${pre}: la barra se mueve antes del primer tirón (${(pre0.move * 1000).toFixed(1)} mm, discos a ${(pre0.lift * 1000).toFixed(1)} mm del piso)`);
-      if (pre0.drift > .008) notes.push(`POSES: ${pre}: el hueso Bar se mueve ${(pre0.drift * 1000).toFixed(0)} mm entre 'Parado' y 'Salida' (la barra cargada debería quedar quieta en el piso); el visor la fija a la tarima y las manos quedan hasta ${(pre0.gap * 1000).toFixed(0)} mm del eje mientras tanto`);
+      if (pre0.drift > .002 || Math.abs(pre0.float) > .003) notes.push(`POSES: ${pre}: antes del despegue el hueso Bar se mueve ${(pre0.drift * 1000).toFixed(1)} mm (de 'Parado' a 'Salida' la barra cargada debería quedar quieta) y en la salida su centro queda ${(pre0.float * 1000).toFixed(1)} mm por encima del apoyo real (radio de disco 225 mm sobre la tarima); el visor la fija a la tarima y las manos quedan hasta ${(pre0.gap * 1000).toFixed(0)} mm del eje mientras tanto`);
       // agarre: distancia de la última articulación de cada dedo (índice a meñique) al eje de la barra, por fase. Con la
       // mano cerrada sobre una barra de 14 mm de radio no debería pasar de unos 45 mm.
       const grip = await T(() => { const A = TARIMA, tl = A.state.tl, a = A.state.athletes[A.state.who], b = A.barbell.group.position, out = [], v = b.clone();
@@ -242,23 +257,39 @@ try {
     S.step = keep.step; g.refresh = keep.refresh; g.reset(); out.refresh = keep.refresh; return out; });
   const gvOk = gv.cap30 === 'alta@0.8' && gv.slowMedia === 'media@0.8' && gv.slowMore === 'baja' && gv.upFromBaja === 'media@0.8' && gv.playHold === null && gv.playBad === 'alta@0.8' && gv.noUpPlaying === null && gv.coarse === null && gv.backoff[0] === 'media@0.8' && gv.backoff[1] === null && gv.backoff[2] === 'media';
   if (!gvOk) problems.push(`gobernador: ${JSON.stringify(gv)}`); else console.log(`ok gobernador: mide contra el refresco (${gv.refresh} Hz detectados), baja primero resolución y después calidad, sube con espera tras un fallo, no cambia en reproducción salvo cuadro inusable, no pasa a alta en táctil`);
-  await page.selectOption('#quality', QUALITY); await page.waitForTimeout(500);
+  await page.close();
+  // ---- rendimiento: en un navegador recién abierto, con un solo atleta y en los primeros segundos. Medido el 11/11/2026 en
+  // esta máquina: cualquier página que dibuja sin parar (también una de control con seis pases triviales, sin three.js)
+  // pasa a los 6 a 9 segundos de ~10 ms a ~90 ms de GPU por cuadro y no vuelve. No depende del visor. Por eso los fps se
+  // toman apenas carga la página y el costo por etapa se mide con el bucle de dibujo detenido (mínimo de varias tandas). ----
+  const pb = await chromium.launch(LAUNCH); extra.push(pb);
+  const perf = await pb.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 1 }); watch(perf);
+  await perf.addInitScript(() => { const raf = window.requestAnimationFrame.bind(window), held = []; window.__paused = false; window.requestAnimationFrame = cb => window.__paused ? (held.push(cb), 0) : raf(cb); window.__pause = on => { window.__paused = on; if (!on) held.splice(0).forEach(cb => raf(cb)); }; });
+  await perf.goto(`${base}?q=${QUALITY}&auto=0`, { waitUntil: 'load' }); await perf.evaluate(() => window.TARIMA.ready);
+  if (!fps0) throw new Error('no se pudieron medir los fps al comienzo');
+  const { f1p, f1 } = fps0; await perf.evaluate(() => { TARIMA.seekPhase(1); window.__pause(true); });
+  const mem = await perf.evaluate(() => TARIMA.gpuMemory?.());
   const prof = {};
   // costo por pase (ms por cuadro, mejor de 3 tandas con la GPU forzada): cada columna apaga una cosa más
-  for (const q of [...new Set([QUALITY, 'media', 'baja'])]) { const pf = await page.evaluate(async q => { TARIMA.setQuality(q); TARIMA.cam(0); TARIMA.seekPhase(Math.max(1, TARIMA.phaseIndex('^Primer tirón'))); TARIMA.step(0); await TARIMA.profile(2); return TARIMA.profile(8); }, q); prof[q] = pf;
-    console.log(`perfil ${q} ${pf.gpu ? '(tiempo de GPU)' : '(reloj de pared)'} ${pf.w}x${pf.h} (${pf.calls} draw calls, ${Math.round(pf.tris / 1000)} mil triángulos): ` + Object.entries(pf).filter(([k]) => /^(completo|sin_)/.test(k)).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(' → ') + ' ms'); }
-  await T(() => 0); await page.selectOption('#quality', QUALITY); await page.waitForTimeout(800);
-  const fpsOf = pg => pg.evaluate(() => new Promise(res => { let n = 0; const t0 = performance.now(); const f = () => { n++; performance.now() - t0 < 3000 ? requestAnimationFrame(f) : res({ fps: n / 3, w: TARIMA.renderer.domElement.width, h: TARIMA.renderer.domElement.height, blur: TARIMA.post.maxBlur }); }; requestAnimationFrame(f); }));
-  const f1 = await fpsOf(page);
-  const ld = loadNow(), floor = MIN_FPS || FPS_FLOOR[QUALITY] || 45, busy = !MIN_FPS && ld > 1.0;
-  console.log(`fps (${QUALITY}, DPR 1, ${f1.w}x${f1.h}): ${f1.fps.toFixed(0)} (piso ${floor}; carga del sistema ${ld.toFixed(1)} por núcleo${busy ? ': MÁQUINA SATURADA, medición no concluyente, el piso no se exige' : ''})`);
-  if (f1.fps < floor) { if (busy) notes.push(`fps sin demostrar: ${f1.fps.toFixed(0)} en ${QUALITY} con la máquina saturada (carga ${ld.toFixed(1)} por núcleo). Repetir con la máquina libre: node tools/check_viewer.mjs --min-fps=${floor}`); else problems.push(`fps ${f1.fps.toFixed(0)} < ${floor} en ${QUALITY}`); }
-  await page.close();
+  for (const q of [...new Set([QUALITY, 'media', 'baja'])]) { const pf = await perf.evaluate(async q => { TARIMA.setQuality(q); TARIMA.cam(0); TARIMA.seekPhase(Math.max(1, TARIMA.phaseIndex('^Primer tirón'))); TARIMA.step(0); await TARIMA.profile(2); return TARIMA.profile(8); }, q); prof[q] = pf;
+    console.log(`perfil ${q} ${pf.gpu ? '(tiempo de GPU)' : '(reloj de pared)'} ${pf.w}x${pf.h} (${pf.calls} draw calls, ${Math.round(pf.tris / 1000)} mil triángulos): ` + Object.entries(pf).filter(([k]) => /^(completo|sin_)/.test(k)).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(' → ') + ' ms'); 
+    // tiempo de GPU por etapa: mínimo de 3 tandas de 24 cuadros (el mínimo es lo que menos depende de la carga de la máquina)
+    const pp = await perf.evaluate(async () => { const A = TARIMA, m = {}; let frame = Infinity; if (!A.profilePasses) return null;
+      for (let r = 0; r < 3; r++) { const o = await A.profilePasses(24, true); if (!o) return null; for (const k in o.min) m[k] = Math.min(m[k] ?? Infinity, o.min[k]); const w = await A.profilePasses(24, true, true); frame = Math.min(frame, w.min.escena); }
+      return { m, frame }; });
+    if (pp) { prof[q].frame = pp.frame; console.log(`etapas ${q} (ms de GPU, mínimo por etapa): ` + Object.entries(pp.m).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(' · ') + ` · cuadro entero ${pp.frame.toFixed(1)}`); } }
+  const ld = fps0.ld, floor = MIN_FPS || FPS_FLOOR[QUALITY] || 45, busy = !MIN_FPS && ld > 1.0;      // carga al momento de medir (antes de que la prueba la suba)
+  console.log(`fps (${QUALITY}, DPR 1, ${f1.w}x${f1.h}, navegador nuevo, antes del resto de la prueba): ${f1p.fps.toFixed(0)} reproduciendo 4 s, ${f1.fps.toFixed(0)} en pausa (piso ${floor}; carga del sistema ${ld.toFixed(1)} por núcleo${busy ? ': MÁQUINA SATURADA, medición no concluyente, el piso no se exige' : ''})`);
+  if (mem) console.log(`memoria de GPU estimada (${QUALITY}, un atleta): ${mem.total} MB (atleta ${mem.atletas}, entorno y barra ${mem.texturas}, post ${mem.post}, sombras ${mem.sombras})`);
+  if (Math.min(f1.fps, f1p.fps) < floor) { if (busy) notes.push(`VISOR: fps sin demostrar: ${f1.fps.toFixed(0)} en pausa y ${f1p.fps.toFixed(0)} reproduciendo en ${QUALITY} con la máquina saturada (carga ${ld.toFixed(1)} por núcleo; el cuadro cuesta ${prof[QUALITY]?.frame?.toFixed(1) ?? '?'} ms de GPU como mínimo, ${prof[QUALITY]?.frame ? Math.round(1000 / prof[QUALITY].frame) : '?'} cuadros por segundo de techo). Repetir con la máquina libre: node tools/check_viewer.mjs --min-fps=${floor}, o medir solo el costo con node tools/check_viewer_perf.mjs`); else problems.push(`fps ${Math.min(f1.fps, f1p.fps).toFixed(0)} < ${floor} en ${QUALITY}`); }
+
+  await pb.close();
 
   // ---- DPR 2 (pantalla retina): tope de píxeles y fps ----
-  const hi = await browser.newPage({ viewport: { width: 1440, height: 810 }, deviceScaleFactor: 2 }); watch(hi);
+  const hb = await chromium.launch(LAUNCH); extra.push(hb);
+  const hi = await hb.newPage({ viewport: { width: 1440, height: 810 }, deviceScaleFactor: 2 }); watch(hi);
   await hi.goto(`${base}?q=${QUALITY}&auto=0`, { waitUntil: 'load' }); await hi.evaluate(() => window.TARIMA.ready);
-  const f2 = await fpsOf(hi); console.log(`fps (${QUALITY}, DPR 2, ${f2.w}x${f2.h}, desenfoque máx ${f2.blur?.toFixed(0) ?? '-'} px): ${f2.fps.toFixed(0)}`);
+  const f2 = await fpsOf(hi, 2500); console.log(`fps (${QUALITY}, DPR 2, ${f2.w}x${f2.h}, desenfoque máx ${f2.blur?.toFixed(0) ?? '-'} px): ${f2.fps.toFixed(0)}`);
   await hi.evaluate(() => { TARIMA.cam(0); TARIMA.seekPhase(TARIMA.state.tl.nPhases - 1); }); await hi.waitForTimeout(400);
   await hi.screenshot({ path: path.join(OUT, 'dpr2-final-34.png'), timeout: 120000 }); shots.push('out/viewer/dpr2-final-34.png');
   // modo auto real (sin auto=0): arranca en la calidad detectada y el gobernador puede reconstruir la escena en plena
@@ -269,7 +300,7 @@ try {
   await hi.waitForFunction(() => !!TARIMA.arena.decision, null, { timeout: 8000 }).catch(() => problems.push('modo auto: no llegó la decisión'));
   const au = await hi.evaluate(() => { const A = TARIMA; return { q: A.state.qName, sel: A.state.qSel, fps: A.state.fps, hz: A.gov.refresh, log: A.gov.log, bar: A.barbell.group.position.y, bone: A.state.athletes[A.state.who].barBone.getWorldPosition(A.barbell.group.position.clone()).y }; });
   if (au.sel !== 'auto' || Math.abs(au.bar - au.bone) > 1e-3) problems.push(`modo auto: ${JSON.stringify(au)}`); else console.log(`ok modo auto: arrancó en ${q0}, terminó en ${au.q} (${au.fps ? au.fps.toFixed(0) + ' fps en la última ventana' : 'sin medición'}; refresco ${au.hz} Hz; cambios: ${au.log.length ? au.log.map(l => `${l.from}→${l.to} a ${l.fps} fps${l.playing ? ' en reproducción' : ''}`).join(', ') : 'ninguno'})`);
-  await hi.close();
+  await hb.close();
 
   // ---- clics durante la carga: con el GLB demorado, la consola está bloqueada y ningún manejador revienta ----
   const slow = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 }); watch(slow);
@@ -311,7 +342,7 @@ try {
   }
   await mob.close();
 } catch (e) { problems.push(`excepción de la prueba: ${e.message}`); }
-finally { await browser.close(); server.close(); }
+finally { for (const b of extra) await b.close().catch(() => null); await browser.close(); server.close(); }
 
 if (notes.length) { console.log(`\navisos para otras pistas (${notes.length}):`); [...new Set(notes)].forEach(n => console.log('  ' + n)); }
 if (warnings.length) { console.log(`\nadvertencias de consola (${warnings.length}):`); [...new Set(warnings)].forEach(w => console.log('  ' + w)); problems.push(`${warnings.length} advertencias de consola`); }

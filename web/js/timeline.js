@@ -4,7 +4,7 @@ import { Pchip, clamp } from './util.js';
 import { DUR, DUR_DEFAULT, RACK_HOLD, PLATE_R } from './config.js';
 
 /** La barra se da por apoyada mientras el hueso Bar no suba más que esto sobre el radio del disco (m). */
-const LIFT_EPS = .012;
+const LIFT_EPS = .012, LIFT_RISE = .002;
 
 // Fases que empiezan y terminan casi en reposo: sin `tt` del build, las muestras se reparten con aceleración y frenado
 // (inversa de smoothstep) en vez de una rampa de velocidad constante.
@@ -75,12 +75,17 @@ export class Timeline {
     // El despegue se lee de los datos (último nudo con el hueso Bar todavía a la altura del disco apoyado), no del nombre
     // ni del número de las fases.
     {
-      let kL = -1; const y0 = by[0]; if (y0 < PLATE_R + .04) while (kL + 1 < by.length && Math.abs(by[kL + 1] - y0) < LIFT_EPS) kL++;
+      // (último nudo en que la barra todavía no subió LIFT_RISE sobre su mínimo: con un umbral más ancho el despegue caía un
+      // nudo adentro del primer tirón y las manos subían unos 9 mm antes que la barra)
+      let kL = -1, lo = by[0]; const y0 = by[0];
+      if (y0 < PLATE_R + .04) while (kL + 1 < by.length && Math.abs(by[kL + 1] - y0) < LIFT_EPS && by[kL + 1] <= lo + LIFT_RISE) { kL++; lo = Math.min(lo, by[kL]); }
       if (kL >= by.length - 1) kL = -1;
       const kF = Math.min(by.length - 1, kL + Math.max(2, Math.ceil(sub / 2)));
       if (kL > 0 && kF > kL) {
         this.liftT = knotT[kL]; this.liftFadeT = knotT[kF]; this._liftDy = PLATE_R - by[kL]; this._liftZ = bz[kL];
-        this.preLiftDrift = Math.max(...by.slice(0, kL + 1).map(y => Math.abs(y - PLATE_R)), ...bz.slice(0, kL + 1).map(z => Math.abs(z - bz[kL])));   // cuánto se mueve el hueso antes del despegue (m)
+        // cuánto se mueve el hueso antes del despegue (m) y a qué altura queda sobre el apoyo real en ese momento (m)
+        this.preLiftDrift = Math.max(...by.slice(0, kL + 1).map(y => Math.abs(y - by[kL])), ...bz.slice(0, kL + 1).map(z => Math.abs(z - bz[kL])));
+        this.preLiftFloat = by[kL] - PLATE_R;
         for (let k = 0; k <= kL; k++) { by[k] = PLATE_R; bz[k] = this._liftZ; }
         for (let k = kL + 1; k < kF; k++) by[k] = Math.max(PLATE_R, by[k] + this._liftDy * this._liftFade(knotT[k]));
       }

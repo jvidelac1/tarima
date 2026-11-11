@@ -31,12 +31,16 @@ export class Lighting {
     const set = (l, size, radius, focus) => {
       const on = size > 0; if (l.castShadow !== on) l.castShadow = on;
       if (!on) { l.shadow.map?.dispose(); l.shadow.map = null; return; }
-      const sh = l.shadow; sh.camera.near = 6; sh.camera.far = 17; sh.focus = focus; sh.bias = -.0004; sh.normalBias = .004; sh.radius = radius; sh.blurSamples = 8;
+      // `radius` llega en texeles de un mapa de 1536 (4 = penumbra de un par de centímetros) y se pasa a texeles del mapa real,
+      // así la penumbra mide lo mismo en la tarima con cualquier tamaño. Las muestras del desenfoque quedan a un texel o menos.
+      const sh = l.shadow; sh.camera.near = 6; sh.camera.far = 17; sh.focus = focus; sh.bias = -.0004; sh.normalBias = .004; sh.radius = radius * size / 1536; sh.blurSamples = Math.max(4, Math.min(8, Math.ceil(2 * sh.radius) + 1));
       if (sh.mapSize.x !== size) { sh.mapSize.set(size, size); sh.map?.dispose(); sh.map = null; sh.mapPass?.dispose(); sh.mapPass = null; }
     };
     // El frustum de sombra se cierra sobre lo único que proyecta sombras que importan (atleta y barra: unos 1,9 m alrededor
     // del blanco), no sobre todo el cono de luz: la misma densidad de texel con un mapa de menos de la mitad de píxeles.
-    set(this.key, q.shadow, q.shadow >= 1536 ? 4 : 3, .64); set(this.key2, q.shadow2, 3, .62);
+    // El desenfoque VSM recorre el mapa entero dos veces por luz en cada cuadro con movimiento: con la penumbra fija en
+    // centímetros, un mapa de 1024 da la misma sombra que uno de 1536 con menos de la mitad de los píxeles (ver config.js).
+    set(this.key, q.shadow, q.shadowR ?? 4, .64); set(this.key2, q.shadow2, q.shadow2R ?? 6, .62);
   }
 
   /** Hornea el entorno PMREM desde la escena real, a la altura de la barra, ocultando lo que no debe reflejarse. */

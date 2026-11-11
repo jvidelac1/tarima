@@ -241,10 +241,10 @@ export class Arena {
     for (let i = 0; i < 8; i++) { const x = -4.55 + i * 1.3; if (Math.abs(x) > 2) glint(x, STAGE_Y + .42, -4.92, '#ffcf9a', .9, .05); }
 
     // tablero y reloj a los costados de la pantalla (texturas dinámicas)
-    this.boardCanvas = makeCanvas(512, 640); this.boardTex = canvasTexture(this.boardCanvas, { aniso: 4 });
+    this.boardCanvas = makeCanvas(512, 640); this.boardTex = canvasTexture(this.boardCanvas, { aniso: 4, keep: true });
     const board = add(new THREE.Mesh(new THREE.PlaneGeometry(1.7, 2.1), new THREE.MeshBasicMaterial({ map: this.boardTex, color: hdr('#ffffff', .8) })), ''); board.position.set(-6.25, 1.45, -4.9); board.rotation.y = .32;
     const bfm = add(new THREE.Mesh(new THREE.BoxGeometry(1.85, 2.25, .12), frameMat), 'r'); bfm.position.set(-6.27, 1.45, -4.97); bfm.rotation.y = .32;
-    this.clockCanvas = makeCanvas(512, 400); this.clockTex = canvasTexture(this.clockCanvas, { aniso: 4 });
+    this.clockCanvas = makeCanvas(512, 400); this.clockTex = canvasTexture(this.clockCanvas, { aniso: 4, keep: true });
     const clock = add(new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.33), new THREE.MeshBasicMaterial({ map: this.clockTex, color: hdr('#ffffff', .9) })), ''); clock.position.set(6.25, 1.75, -4.9); clock.rotation.y = -.32;
     const cf = add(new THREE.Mesh(new THREE.BoxGeometry(1.85, 1.48, .12), frameMat), 'r'); cf.position.set(6.27, 1.75, -4.97); cf.rotation.y = -.32;
     for (const x of [-6.27, 6.27]) add(new THREE.Mesh(new THREE.CylinderGeometry(.05, .07, 1.2, 10), frameMat), 'rc').position.set(x, STAGE_Y + .45, -4.99);

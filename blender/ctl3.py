@@ -1,7 +1,8 @@
 """Renders de control de deformación (pista PERSONAJE, ronda de corrección): hombros, axila, rodilla, muñeca, cinturón, cara.
   python blender/ctl3.py dump <nombre>                       guarda en ctl3poses.json las poses de fases reales (acción 'Poses' de s4.blend)
   python blender/ctl3.py <nombre> <tag> <fase:vista,vista;fase:vista...> [recorr]
-Fases: over (arranque arriba, de pie), ohs (recepción del arranque), split (tijera), rack (cargada de pie), rsq (recepción de la cargada), start (salida), rest.
+Fases (ver PH): over (arranque arriba, de pie), ohs (recepción del arranque), giro, split (tijera), fin, push, rack (cargada de pie), rsq (fondo de la cargada), pull, start (salida), stand, rest.
+CTL_SRC=<carpeta de build> lee s3b.blend/s4.blend/poses.json de otro build (p. ej. out/) y escribe igual en TARIMA_OUT.
 'recorr' recalcula los morphs correctivos con el geo.py actual antes de renderizar (iteración rápida sin correr finish.py).
   python blender/ctl3.py nconv                               prueba la convención del normal map (+Y) con un bulto sintético
 TARIMA_NOCORR=1 renderiza con los morphs en 0 (antes/después). Salida: <TARIMA_OUT>/<nombre>/ctl/<tag>_<fase>_<vista>.png"""
@@ -9,7 +10,14 @@ import bpy, os, sys, json, math
 HERE=os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0,HERE); from common import render, out_dir
 from mathutils import Vector, Matrix
 PRE='mixamorig:'
-FR=dict(over=1231,ohs=1201,split=451,rack=301,rsq=271,start=31)
+# fase -> (secuencia, nombre de la pose). El cuadro sale de poses.json (1 + 30·(inicio de la secuencia + índice de la pose)): no se desfasa si poses.py suma fases.
+PH=dict(over=('snatch','Recuperación'),ohs=('snatch','Recepción'),giro=('snatch','Giro'),split=('split','Envión · Tijera'),fin=('split','Envión · Final'),push=('split','Envión · Empuje'),
+        rack=('clean','Recuperación'),rsq=('clean','Amortiguación'),pull=('clean','Tirón de brazos'),start=('clean','Salida'),stand=('clean','Parado'))
+def frames(src):
+    J=json.load(open(src+'poses.json',encoding='utf-8'))['segs']; F={}
+    for k,(seg,nm) in PH.items():
+        i=[q['n'] for q in J[seg]['poses']].index(nm); F[k]=1+30*(int(J[seg]['start'])+i)
+    return F
 V=dict(shF=('LeftArm',(0,0,.0),(.35,-.93,.1),1.0,85,(640,640)),shB=('LeftArm',(0,0,.0),(.3,.93,.2),1.0,85,(640,640)),axi=('LeftArm',(0,0,-.03),(.75,-.55,-.35),.9,85,(640,640)),
        upF=('Spine2',(0,0,.12),(.0,-1,.05),1.9,85,(760,760)),upB=('Spine2',(0,0,.12),(.0,1,.1),1.9,85,(760,760)),upQ=('Spine2',(0,0,.12),(.6,-.8,.1),1.9,85,(760,760)),
        gro=('Hips',(0,-.1,-.02),(.25,-.95,.15),1.5,85,(760,640)),kneS=('LeftLeg',(0,0,.05),(1,-.25,.1),1.3,85,(640,640)),kneF=('LeftLeg',(0,0,.05),(.15,-1,.1),1.3,85,(640,640)),
@@ -18,11 +26,14 @@ V=dict(shF=('LeftArm',(0,0,.0),(.35,-.93,.1),1.0,85,(640,640)),shB=('LeftArm',(0
        face=('Head',(0,-.05,.09),(.3,-.95,.02),.80,100,(640,760)),faceS=('Head',(0,-.04,.08),(1,-.25,.0),.85,100,(640,760)),faceF=('Head',(0,-.05,.09),(0,-1,.0),.80,100,(640,760)),
        eye=('Head',(.03,-.1,.085),(.1,-1,.0),.22,110,(640,420)),torso=('Spine2',(0,0,.0),(.25,-.95,.05),1.45,85,(680,760)),back=('Spine2',(0,0,.0),(-.3,.95,.1),1.5,85,(680,760)),
        waist=('Spine',(0,0,.03),(.2,-.97,.05),.9,90,(680,560)),thigh=('LeftUpLeg',(0,0,-.15),(.3,-.95,.1),.8,90,(640,640)),elbow=('LeftForeArm',(0,0,0),(.4,.9,.1),.6,90,(640,640)),
+       armU=('LeftForeArm',(0,0,-.06),(.35,-.93,.05),1.25,85,(640,860)),armB=('LeftForeArm',(0,0,-.06),(.45,.88,.1),1.25,85,(640,860)),armS=('LeftForeArm',(0,0,-.06),(1,-.1,.0),1.25,85,(640,860)),
+       armR=('LeftArm',(.05,0,-.14),(.55,-.83,.05),1.15,85,(640,860)),legF=('LeftLeg',(0,0,.18),(.3,-.95,.1),1.6,85,(640,860)),shoeL=('LeftToeBase',(0,.08,.02),(1,-.12,.12),.62,90,(760,520)),shoeM=('LeftToeBase',(0,.08,.02),(-1,-.12,.12),.62,90,(760,520)),
        knee=('LeftLeg',(0,0,.0),(.45,-.88,.08),.80,90,(640,720)),shoe=('LeftToeBase',(0,.06,.03),(.7,-.68,.30),.62,90,(720,560)))
 if __name__=='__main__':
     if sys.argv[1]=='dump':
-        NAME=sys.argv[2]; OUT=out_dir(NAME); bpy.ops.wm.open_mainfile(filepath=OUT+'s4.blend'); rig=bpy.data.objects['Human.rig']; sc=bpy.context.scene; D={}
-        for k,f in FR.items():
+        NAME=sys.argv[2]; OUT=out_dir(NAME); SRC=os.path.join(os.environ['CTL_SRC'],NAME)+os.sep if os.environ.get('CTL_SRC') else OUT   # CTL_SRC: carpeta de build de donde leer s4.blend y poses.json
+        bpy.ops.wm.open_mainfile(filepath=SRC+'s4.blend'); rig=bpy.data.objects['Human.rig']; sc=bpy.context.scene; D={}
+        for k,f in frames(SRC).items():
             sc.frame_set(f); bpy.context.view_layer.update(); D[k]={p.name:[list(r) for r in p.matrix_basis] for p in rig.pose.bones}
         json.dump(D,open(OUT+'ctl3poses.json','w')); print('ok',list(D)); sys.exit()
     if sys.argv[1]=='nconv':
@@ -44,7 +55,7 @@ if __name__=='__main__':
             print(f'NCONV luz desde {name}: lado hacia la luz {hi:.3f}, lado opuesto {lw:.3f} ->','relieve (correcto)' if hi>lw else 'hundido (INVERTIDO)')
         sys.exit()
     NAME,TAG,JOBS=sys.argv[1],sys.argv[2],sys.argv[3]; OUT=out_dir(NAME); CT=OUT+'ctl'+os.sep; os.makedirs(CT,exist_ok=True)
-    bpy.ops.wm.open_mainfile(filepath=OUT+'s3b.blend'); rig=bpy.data.objects['Human.rig']; b=bpy.data.objects['Human']; pb=rig.pose.bones; sc=bpy.context.scene
+    bpy.ops.wm.open_mainfile(filepath=(os.path.join(os.environ['CTL_SRC'],NAME)+os.sep if os.environ.get('CTL_SRC') else OUT)+'s3b.blend'); rig=bpy.data.objects['Human.rig']; b=bpy.data.objects['Human']; pb=rig.pose.bones; sc=bpy.context.scene
     D=json.load(open(OUT+'ctl3poses.json'))
     if 'recorr' in sys.argv[4:]:
         import geo; from style import STYLES

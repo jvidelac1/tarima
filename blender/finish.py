@@ -75,7 +75,9 @@ import geo, shoes
 parts=[]; lash_o=geo.lashes(b,alphamat('Lashes',OUT+'lash.png',.5,True))
 if lash_o: parts.append(lash_o)
 if not os.environ.get('TARIMA_NOSKIN'): geo.smooth_weights(b,rig,K)
-geo.subdivide(b); geo.garments(b,rig,BJ,K); me=b.data
+geo.subdivide(b)
+if not os.environ.get('TARIMA_NOANAT'): geo.anatomy(b,rig,K)
+geo.garments(b,rig,BJ,K); geo.simplify(b,rig,BJ,K,OUT,float(os.environ['TARIMA_SIMP']) if os.environ.get('TARIMA_SIMP') else None); me=b.data
 if not os.environ.get('TARIMA_NOHAIR'): parts.append(geo.hair_shells(b,OUT,alphamat('Hair',OUT+'hair.png',.42)))
 def newobj(name,bm_,mats,group):
     m=bpy.data.meshes.new(name); bm_.to_mesh(m); bm_.free(); o=bpy.data.objects.new(name,m); bpy.context.scene.collection.objects.link(o)

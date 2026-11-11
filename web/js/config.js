@@ -47,14 +47,26 @@ export const RACK_HOLD = .9;
 
 // mblur: muestras del desenfoque de movimiento de barra y discos (0 o ausente = apagado).
 // dofSamples: muestras fijas del desenfoque (a media resolución). El DPR de alta queda en 1,5 hasta medir en más equipos.
+// msaa: muestras de la escena. Alta usa 2 porque además pasa SMAA (el borde queda igual que con 4 y el destino más grande
+// del cuadro pesa la mitad); media y baja no tienen SMAA y van con 4. tex: lado máximo de las texturas del personaje.
+// shadow / shadow2: lado del mapa de sombra de la clave y del relleno (0 = sin sombra). shadowR / shadow2R: penumbra en texeles
+// de un mapa de 1536 (por defecto 4 y 6; lighting.js la pasa al tamaño real). Alta bajó de 1536+768 a 1024+512 con la misma
+// penumbra: el desenfoque VSM de los dos mapas costaba ~3 ms de GPU por cuadro en reproducción (medido el 11/11/2026).
 // Nada de esto obliga a reconstruir geometría ni texturas: el entorno y la barra se arman una vez (main.js).
 export const QUALITY = {
-  alta: { label: 'Alta', dpr: 1.5, maxPixels: 2304 * 1296, msaa: 4, shadow: 1536, shadow2: 768, ao: 1, aoScale: .5, aoSamples: 12, dof: 1, dofSamples: 36, bloom: true, smaa: true, mblur: 12, crowd: 1, beams: true, aniso: 16, tex: 2048 },
-  media: { label: 'Media', dpr: 1.25, maxPixels: 1920 * 1080, msaa: 4, shadow: 1024, shadow2: 0, ao: 1, aoScale: .5, dof: 1, dofSamples: 24, bloom: true, smaa: false, mblur: 8, crowd: .7, beams: true, aniso: 8, tex: 2048 },
+  alta: { label: 'Alta', dpr: 1.5, maxPixels: 2304 * 1296, msaa: 2, shadow: 1024, shadow2: 512, ao: 1, aoScale: .5, aoSamples: 12, dof: 1, dofSamples: 36, bloom: true, smaa: true, mblur: 12, crowd: 1, beams: true, aniso: 16, tex: 2048 },
+  media: { label: 'Media', dpr: 1.25, maxPixels: 1920 * 1080, msaa: 4, shadow: 1024, shadowR: 4.5, shadow2: 0, ao: 1, aoScale: .5, dof: 1, dofSamples: 24, bloom: true, smaa: false, mblur: 8, crowd: .7, beams: true, aniso: 8, tex: 2048 },
   // baja: sin AO, DoF ni bloom, pero conserva lo barato del look: tone mapping, corrección de color y viñeta en el pase
   // final, niebla, haces, discos de bokeh dibujados como sprites y tribuna horneada ya desenfocada. MSAA y DPR hasta 2.
-  baja: { label: 'Baja', dpr: 2, maxPixels: 1280 * 800, msaa: 4, shadow: 1024, shadow2: 0, ao: 0, aoScale: .5, dof: 0, dofSamples: 0, bloom: false, smaa: false, crowd: .4, beams: true, aniso: 4, tex: 1024 },
+  baja: { label: 'Baja', dpr: 2, maxPixels: 1280 * 800, msaa: 4, shadow: 1024, shadowR: 4.5, shadow2: 0, ao: 0, aoScale: .5, dof: 0, dofSamples: 0, bloom: false, smaa: false, crowd: .4, beams: true, aniso: 4, tex: 1024 },
 };
+
+/**
+ * Morphs correctivos (contrato 6): ángulo en grados en que cada uno va de 0 a 1 (smoothstep). Es el único lugar donde está
+ * el rango por defecto; un personaje puede traer el suyo en poses.json: `"corr": { "armUp": [45, 130], "knee": [60, 140] }`.
+ * armUp: ángulo del brazo respecto de su dirección de reposo, en el marco de Spine2. knee: flexión de rodilla (0 = recta).
+ */
+export const CORR = { armUp: [45, 130], knee: [60, 140] };
 
 /** Calidad de arranque del modo auto: conservadora. El gobernador de main.js sube a alta solo si sobra margen. */
 export function detectQuality() {

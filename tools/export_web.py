@@ -117,14 +117,22 @@ def summary(path):
     tn=[n for me in J.get('meshes',[]) for n in me.get('extras',{}).get('targetNames',[])]
     np_=[sum(1 for p in me['primitives'] if 'targets' in p) for me in J.get('meshes',[])]
     return ' '.join(out)+(' | morphs '+','.join(dict.fromkeys(tn))+f' en {sum(np_)} primitiva(s)' if tn else '')+f' | mallas {[len(me["primitives"]) for me in J.get("meshes",[])]}'
+def corr_ranges():
+    """Rangos (grados) de los morphs correctivos tal como los usa el driver de Blender: se leen de blender/geo.py (ARMUP_RANGE y HINGE['knee'])
+    y van a poses.json como "corr" por personaje; web/js/athlete.js los toma de ahí (config.js solo tiene el valor por defecto)."""
+    import re
+    s=open(os.path.join(ROOT,'blender','geo.py'),encoding='utf-8').read()
+    a=re.search(r'^ARMUP_RANGE=\((\d+),(\d+)\)',s,re.M); k=re.search(r"'knee':\(\([^)]*\),\((\d+),(\d+)\)\)",s)
+    if not (a and k): raise SystemExit('No encuentro ARMUP_RANGE o HINGE[knee] en blender/geo.py')
+    return dict(armUp=[int(a.group(1)),int(a.group(2))],knee=[int(k.group(1)),int(k.group(2))])
 if __name__=='__main__':
-    names=sys.argv[1:] or ['ventura','brenner']; data={}
+    names=sys.argv[1:] or ['ventura','brenner']; data={}; CORR=corr_ranges(); print('CORR',CORR)
     os.makedirs(os.path.join(WEB,'models'),exist_ok=True); os.makedirs(os.path.join(WEB,'data'),exist_ok=True)
     dst=os.path.join(WEB,'data','poses.json')
     if os.path.exists(dst): data=json.load(open(dst,encoding='utf-8'))
     for n in names:
         j=json.load(open(os.path.join(OUTR,n,'poses.json'),encoding='utf-8'))
-        data[n]=dict(h=j['h'],seg=j['seg'],sub=j['sub'],segs=j['segs'],grip=j['grip'])
+        data[n]=dict(h=j['h'],seg=j['seg'],sub=j['sub'],segs=j['segs'],grip=j['grip'],corr=CORR)
         g=os.path.join(WEB,'models',n+'.glb'); done=repack(os.path.join(OUTR,n,n+'.glb'),g,os.path.join(OUTR,n))
         sp=done.pop('_split',0); print(f'GLB {n}: {os.path.getsize(g)/1e6:.2f} MB; texturas '+', '.join(f'{k} {s}px {b/1e6:.2f}MB' for k,(s,b) in done.items())+f'; {sp} primitivas sin morphs')
         print(f'MAT {n}: '+summary(g))

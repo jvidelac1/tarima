@@ -69,13 +69,15 @@ export class Hud {
   }
   setClock(s) { const v = Math.max(0, Math.ceil(s)), txt = `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`; if (txt !== this._clock) $('clock').textContent = this._clock = txt; }
   /** Actualiza fase y lecturas. r: {name,index,lean,hip}, barCm, vel (m/s), p (posición de fase), peak (m/s), t (s reales). */
-  update(r, barCm, vel, p, peak = 0, t = 0) {
+  /** `live`: en reproducción los números se reescriben a lo sumo 15 veces por segundo (a 60 no se leen y cada cambio obliga a re-maquetar el panel). */
+  update(r, barCm, vel, p, peak = 0, t = 0, live = false) {
     if (r.index !== this._phaseIdx) {
       this._phaseIdx = r.index; $('phase').textContent = r.name;
       [...$('ticks').children].forEach((el, i) => el.classList.toggle('on', i <= r.index));
     }
     const html = `<div>Torso<b>${fmt(r.lean)}<small>°</small></b></div><div>Cadera<b>${fmt(r.hip * 100)}<small>cm</small></b></div><div>Barra<b>${fmt(barCm)}<small>cm</small></b></div><div>Velocidad<b>${fmt(vel, 2)}<small>m/s</small></b></div><div>Vel. máx<b>${fmt(peak, 2)}<small>m/s</small></b></div><div>Tiempo<b>${fmt(t, 2)}<small>s</small></b></div>`;
-    if (html !== this._nums) $('nums').innerHTML = this._nums = html;
+    const now = performance.now();
+    if (html !== this._nums && (!live || now - (this._numsT || 0) > 66)) { $('nums').innerHTML = this._nums = html; this._numsT = now; }
     $('scrub').value = p;
   }
   dispose() { removeEventListener('keydown', this._key); }

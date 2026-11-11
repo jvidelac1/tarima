@@ -13,6 +13,7 @@ const ADDONS = [
   'postprocessing/GTAOPass.js',
   'postprocessing/UnrealBloomPass.js',
   'postprocessing/SMAAPass.js',
+  'libs/meshopt_simplifier.module.js',      // nivel de detalle del atleta al cargar (athlete.js)
 ];
 
 fs.rmSync(DST, { recursive: true, force: true });

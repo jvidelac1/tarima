@@ -23,11 +23,11 @@ def build(name,probe=False):
         TS.load_target(b,os.path.join(T,p+'.target.gz'),weight=w)
     def pm(base,w): tg(base+('-incr' if w>0 else '-decr'),abs(w))
     for s in 'lr':
-        tg(f'legs/{s}-upperleg-muscle-incr',1.0); tg(f'legs/{s}-lowerleg-muscle-incr',.5)
-        tg(f'arms/{s}-upperarm-shoulder-muscle-incr',.8); tg(f'arms/{s}-upperarm-muscle-incr',.6); tg(f'arms/{s}-lowerarm-muscle-incr',.6)
+        tg(f'legs/{s}-upperleg-muscle-incr',1.0); tg(f'legs/{s}-lowerleg-muscle-incr',.6)
+        tg(f'arms/{s}-upperarm-shoulder-muscle-incr',1.0); tg(f'arms/{s}-upperarm-muscle-incr',.85); tg(f'arms/{s}-lowerarm-muscle-incr',.8)   # físico de levantador: volumen de deltoides, brazo y antebrazo (no cambia largos)
         pm(f'legs/{s}-upperleg-scale-vert',cfg['legs']['up']); pm(f'legs/{s}-lowerleg-scale-vert',cfg['legs']['low'])
     pm('arms/measure-upperarm-length',cfg['arms']['up']); pm('arms/measure-lowerarm-length',cfg['arms']['low']); pm('torso/torso-scale-vert',cfg['torso'])
-    tg('torso/torso-muscle-pectoral-incr',.6); tg('torso/torso-muscle-dorsi-incr',.6); tg('neck/measure-neck-circ-incr',.7)
+    tg('torso/torso-muscle-pectoral-incr',.85); tg('torso/torso-muscle-dorsi-incr',.8); tg('stomach/stomach-tone-incr',.5); tg('neck/measure-neck-circ-incr',.7)
     for p,w in cfg['extra']+cfg.get('face',[]): tg(p,w)
     TS.bake_targets(b)
     me=b.data

@@ -18,12 +18,17 @@ export function makeCanvas(w, h, draw) {
   return cv;
 }
 
-export function canvasTexture(cv, { srgb = true, repeat = false, aniso = 8, mip = true } = {}) {
+/**
+ * Textura a partir de un canvas. Salvo `keep` (canvas que se vuelve a dibujar: tablero, reloj), el canvas se vacía apenas
+ * la textura sube a la GPU: un canvas de 2048 px son 16 MB que no hace falta conservar, y el visor arma decenas.
+ */
+export function canvasTexture(cv, { srgb = true, repeat = false, aniso = 8, mip = true, keep = false } = {}) {
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.anisotropy = aniso; t.generateMipmaps = mip;
   if (!mip) t.minFilter = THREE.LinearFilter;
+  if (!keep) t.onUpdate = () => { t.onUpdate = null; t.userData.w = cv.width; t.userData.h = cv.height; cv.width = cv.height = 1; };
   return t;
 }
 

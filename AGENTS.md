@@ -4,7 +4,7 @@ Leé primero `HANDOFF.md`: tiene el estado, los problemas conocidos y los próxi
 
 ## Reglas de trabajo en este repo
 
-- **No ajustar poses a ojo.** Todo cambio en `blender/poses.py` se valida con `check()` (cero cuadros `BAD`) y con un render de control en `out/<nombre>/diag.png`. Agregá la vista que necesites en `WANT`.
+- **No ajustar poses a ojo.** Todo cambio en `blender/poses.py` se valida con `check()` (cero cuadros `BAD`) y con las hojas de control `out/<nombre>/sheet_<seg>_side.png` y `sheet_<seg>_front.png`. No aflojar `check()` ni excluir muestras para llegar a cero. Agregá la vista que necesites en `WANT`.
 - **Las poses son reglas, no rotaciones.** Si una fase se ve mal en un biotipo, corregí la regla o el parámetro de la fase; no hardcodees un valor por personaje.
 - **Un solo esqueleto.** 52 huesos con nombres Mixamo más `Bar`. No cambiar la pose de reposo ni los nombres: el visor y las animaciones dependen de eso.
 - **Personajes ficticios.** Nada de nombres, caras ni marcas de atletas reales.
@@ -13,8 +13,10 @@ Leé primero `HANDOFF.md`: tiene el estado, los problemas conocidos y los próxi
 ## Comandos
 
 ```bash
-FAST=1 ./build.sh ventura      # iteración rápida sobre un personaje
-./build.sh                     # los dos, con hoja de poses de costado
+FAST=1 ./build.sh ventura      # un personaje, sin hojas de poses
+./build.sh                     # los dos, con hojas de poses de costado y de frente
+.venv/bin/python blender/pose_only.py ventura   # solo poses, sobre out/ventura/s3b.blend (iteración rápida)
+node tools/check_viewer.mjs    # prueba del visor: consola, 404, fps y capturas en out/viewer/
 cd web && python3 -m http.server 8000
 ```
 
@@ -23,6 +25,9 @@ Líneas a mirar en la salida del build:
 - `POSE ...` una por fase, con torso, barra, cadera y las tres holguras en cm.
 - `rack ...` posición de barra, codo y muñeca que encontró la búsqueda del rack.
 - `CHK ... cuadros con superposición: N` y debajo las líneas `BAD`.
+- `TRAJ ...` una por segmento: amplitud de la S, velocidades y aceleraciones de la barra.
+
+Un solo proceso de Blender a la vez: en paralelo la máquina se satura y cada paso tarda diez veces más.
 
 ## Convenciones del código de Blender
 

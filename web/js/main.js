@@ -88,7 +88,7 @@ function applyQuality(name, scale = 1) {
   const t0 = performance.now(), first = !arena; S.qName = name; Q = QUALITY[name]; S.scale = scale; S.step = STEPS.findIndex(s => s.q === name && s.s === scale); S.shadowDirty = 4;
   if (first) buildStatic();
   arena.setQuality(Q); lighting.setQuality(Q);
-  post?.dispose(); post = new Post(renderer, scene, rig.camera, Q); post.reduceMotion = reduceMotion; post.motionObject = barbell.group;
+  post?.dispose(); post = new Post(renderer, scene, rig.camera, Q); post.reduceMotion = reduceMotion; post.motionObject = barbell.group; post.bokehObject = arena.bokeh;
   hud.setQuality(S.qSel, Q.label.toLowerCase() + (scale < 1 ? ` ${Math.round(scale * 100)}%` : ''));
   resize();
   if (first) { refreshBoard(); bakeEnv(); }
@@ -132,13 +132,16 @@ async function setWho(name) {
     if (!S.athletes[name]) {
       hud.message('Cargando atleta…');
       // una sola carga por personaje aunque se pida dos veces mientras baja el GLB
-      await (S.loading[name] ??= Athlete.load(name, S.data[name], { aniso: Math.min(Q.aniso, renderer.capabilities.getMaxAnisotropy()) })
+      await (S.loading[name] ??= Athlete.load(name, S.data[name], { aniso: Math.min(Q.aniso, renderer.capabilities.getMaxAnisotropy()), maxTex: Q.tex })
         .then(a => { a.root.visible = false; scene.add(a.root); S.athletes[name] = a; }));
     }
   } catch (err) { delete S.loading[name]; if (token === whoToken) hud.message('No se pudo cargar el modelo'); throw err; }
   if (token !== whoToken) return;
   gov.warm();                    // compilar shaders y subir texturas del personaje no cuenta como lentitud
-  for (const [k, a] of Object.entries(S.athletes)) a.root.visible = k === name;
+  // el que deja de verse suelta su memoria de GPU antes de que el nuevo suba la suya
+  for (const [k, a] of Object.entries(S.athletes)) if (k !== name && a.root.visible) { a.root.visible = false; a.releaseGpu(); }
+  await S.athletes[name].restoreGpu(); if (token !== whoToken) return;
+  S.athletes[name].root.visible = true;
   S.shadowDirty = 4;
   S.who = name; hud.setAthlete(name); rig.setAthleteHeight(S.data[name].h);
   rebuildTimeline(); stopAt(0); apply(0); hud.message('');
@@ -167,7 +170,7 @@ function apply(simDt) {
   if (S.scrubbing || simDt <= 0) barbell.settle(v.y); else barbell.step(simDt, v.y, S.playing ? tl.barAcc(S.t) : 0);
   trace.setTime(S.t);
   const p = s / tl.sub;
-  hud.update(tl.readout(p), v.y * 100, S.playing ? tl.barVel(S.t) : 0, p, tl.peakVel().v, S.t);
+  hud.update(tl.readout(p), v.y * 100, S.playing ? tl.barVel(S.t) : 0, p, tl.peakVel().v, S.t, S.playing);
 }
 
 // ---------- bucle ----------
@@ -187,6 +190,12 @@ function tick(dt) {
     arena.setClock(S.clock); hud.setClock(S.clock);
   }
 }
+/** Píxeles por metro con que se ve al atleta: elige su nivel de detalle (athlete.js). */
+function screenScale() {
+  const a = S.athletes[S.who]; if (!a || !post) return;
+  S.pxPerM = post.H / (2 * Math.tan(THREE.MathUtils.degToRad(rig.camera.fov) / 2)) / Math.max(.3, rig.camera.position.distanceTo(a.boneWorld('Spine1', v2)));
+  if (a.setScreenScale(S.pxPerM)) S.shadowDirty = Math.max(S.shadowDirty, 2);
+}
 /** Dibuja un cuadro. Los mapas de sombra solo se rehacen si algo que proyecta sombra cambió desde el cuadro anterior. */
 function draw(dt) { renderer.shadowMap.needsUpdate = S.shadowAlways || S.shadowDirty > 0; if (S.shadowDirty > 0) S.shadowDirty--; post.render(dt); }
 function frame(now) {
@@ -195,6 +204,7 @@ function frame(now) {
   if (!S.manualClock) tick(dt);
   if (++frameN % 20 === 0) measureInsets();
   rig.update(dt); trace.face(rig.camera); post.focus = rig.focusDistance; arena.update(dt, rig.camera);
+  screenScale();
   // desenfoque de movimiento: desplazamiento de la barra en pantalla durante la obturación (en cámara lenta se mueve menos por cuadro)
   const bp = barbell.group.position;
   if (S.testMotion) post.motion.copy(S.testMotion);
@@ -298,27 +308,69 @@ window.TARIMA = {
   async profile(reps = 8) {
     const gl = renderer.getContext(), px = new Uint8Array(4), out = {}, ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
     const wall = () => { const t0 = performance.now(); for (let i = 0; i < reps; i++) draw(0); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); return (performance.now() - t0) / reps; };
+    // una consulta por cuadro y se queda con el mínimo: el tiempo de GPU incluye la espera cuando otro proceso usa la GPU,
+    // y el mínimo de varias muestras es lo que más se acerca al costo propio del cuadro (la mediana va en `med`)
     const gpu = async () => {
-      const q = gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, q); for (let i = 0; i < reps; i++) draw(0); gl.endQuery(ext.TIME_ELAPSED_EXT); gl.flush();
-      for (let k = 0; k < 400 && !gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE); k++) await new Promise(r => setTimeout(r, 5));
-      const ok = gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE) && !gl.getParameter(ext.GPU_DISJOINT_EXT), ms = ok ? gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6 / reps : NaN; gl.deleteQuery(q); return ms;
+      const qs = []; for (let i = 0; i < reps; i++) { const q = gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, q); draw(0); gl.endQuery(ext.TIME_ELAPSED_EXT); gl.flush(); qs.push(q); }
+      const last = qs[qs.length - 1]; for (let k = 0; k < 400 && !gl.getQueryParameter(last, gl.QUERY_RESULT_AVAILABLE); k++) await new Promise(r => setTimeout(r, 5));
+      const dis = gl.getParameter(ext.GPU_DISJOINT_EXT), ms = [];
+      for (const q of qs) { if (!dis && gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)) ms.push(gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6); gl.deleteQuery(q); }
+      ms.sort((a, b) => a - b); gpu.med = ms.length ? ms[ms.length >> 1] : NaN; return ms.length ? ms[0] : NaN;
     };
     let useGpu = !!ext; if (useGpu && !((await gpu()) > 0)) useGpu = false;
-    const best = async () => { if (!useGpu) return Math.min(wall(), wall(), wall()); const a = [await gpu(), await gpu(), await gpu()].filter(x => x > 0); return a.length ? Math.min(...a) : Math.min(wall(), wall()); };
+    const med = out.med = {};
+    const best = async row => { if (!useGpu) return Math.min(wall(), wall(), wall()); const a = [], m = []; for (let i = 0; i < 3; i++) { const x = await gpu(); if (x > 0) { a.push(x); m.push(gpu.med); } } if (!a.length) return Math.min(wall(), wall()); med[row] = Math.min(...m); return Math.min(...a); };
     const a = S.athletes[S.who], cv = arena.crowd.visible, mc = S.manualClock; S.manualClock = true; S.shadowAlways = true;      // como en plena reproducción: sombras en cada cuadro
     try {
-      out.completo = await best();
-      for (const k of ['smaa', 'bloom', 'dof', 'ao']) { post.skip[k] = true; out['sin_' + k] = await best(); }
-      S.shadowAlways = false; S.shadowDirty = 0; out.sin_sombras = await best();
-      arena.crowd.visible = false; out.sin_publico = await best();
-      if (a) { a.root.visible = false; out.sin_atleta = await best(); a.root.visible = true; }
-      arena.group.visible = false; out.sin_entorno = await best();
+      out.completo = await best('completo');
+      for (const k of ['smaa', 'bloom', 'dof', 'ao']) { post.skip[k] = true; out['sin_' + k] = await best('sin_' + k); }
+      S.shadowAlways = false; S.shadowDirty = 0; out.sin_sombras = await best('sin_sombras');
+      arena.crowd.visible = false; out.sin_publico = await best('sin_publico');
+      if (a) { a.root.visible = false; out.sin_atleta = await best('sin_atleta'); a.root.visible = true; }
+      arena.group.visible = false; out.sin_entorno = await best('sin_entorno');
     } finally { arena.group.visible = true; arena.crowd.visible = cv; S.shadowAlways = false; S.shadowDirty = 4; post.skip = {}; S.manualClock = mc; }
     renderer.info.autoReset = false; renderer.info.reset(); S.shadowAlways = true; draw(0); S.shadowAlways = false; out.calls = renderer.info.render.calls; out.tris = renderer.info.render.triangles; renderer.info.autoReset = true; out.w = post.W; out.h = post.H; out.gpu = useGpu;
     return out;
   },
+  /**
+   * Para pruebas: tiempo de GPU por etapa del cuadro (ms), con una consulta por etapa y por cuadro. Devuelve el mínimo y la
+   * mediana de `reps` cuadros: con la GPU compartida con otros procesos, el mínimo es lo más cercano al costo propio.
+   * `shadows`: rehacer los mapas de sombra en cada cuadro (como en reproducción) o no (pose quieta). `whole`: una sola
+   * consulta por cuadro (clave 'escena' = cuadro entero), sin los cortes entre etapas.
+   */
+  async profilePasses(reps = 30, shadows = true, whole = false) {
+    const gl = renderer.getContext(), ext = gl.getExtension('EXT_disjoint_timer_query_webgl2'); if (!ext) return null;
+    const list = []; let open = false;
+    post.prof = name => { if (whole && name && name !== 'escena') return; if (open) { gl.endQuery(ext.TIME_ELAPSED_EXT); open = false; } if (name) { const q = gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, q); open = true; list.push([name, q]); } };
+    const mc = S.manualClock; S.manualClock = true; S.shadowAlways = shadows; if (!shadows) S.shadowDirty = 0;
+    try { for (let i = 0; i < reps; i++) { draw(0); gl.flush(); if (i % 6 === 5) await new Promise(r => setTimeout(r, 0)); } } finally { post.prof = null; S.shadowAlways = false; S.manualClock = mc; }
+    const last = list[list.length - 1][1]; for (let k = 0; k < 600 && !gl.getQueryParameter(last, gl.QUERY_RESULT_AVAILABLE); k++) await new Promise(r => setTimeout(r, 5));
+    const dis = gl.getParameter(ext.GPU_DISJOINT_EXT), by = {};
+    for (const [name, q] of list) { if (!dis && gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)) (by[name] ||= []).push(gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6); gl.deleteQuery(q); }
+    const out = { min: {}, med: {}, w: post.W, h: post.H }; let tm = 0, td = 0;
+    for (const k in by) { by[k].sort((a, b) => a - b); out.min[k] = by[k][0]; out.med[k] = by[k][by[k].length >> 1]; tm += out.min[k]; td += out.med[k]; }
+    out.min.total = tm; out.med.total = td; S.shadowDirty = 4; return out;
+  },
+  /**
+   * Para pruebas: memoria de GPU estimada (MB) de lo que está subido ahora: texturas de materiales (con mipmaps) y destinos
+   * de render (post, sombras, entorno). No cuenta buffers de geometría ni el lienzo.
+   */
+  gpuMemory() {
+    const P = renderer.properties, MB = 1 / 1048576, bpp = t => (t.type === THREE.HalfFloatType ? 2 : t.type === THREE.FloatType ? 4 : t.type === THREE.UnsignedInt101111Type ? 4 / 3 : 1) * (t.format === THREE.RGFormat ? 2 : t.format === THREE.RedFormat ? 1 : t.format === THREE.RGBFormat && t.type === THREE.UnsignedInt101111Type ? 3 : 4);
+    const seen = new Set(), out = { texturas: 0, atletas: 0, post: 0, sombras: 0, entorno: 0 };
+    const tex = (t, key) => { if (!t?.isTexture || t.isRenderTargetTexture || seen.has(t.source) || !P.get(t).__webglTexture) return; seen.add(t.source); const im = t.image, w = t.userData.w || im?.width, h = t.userData.h || im?.height; if (!w) return; out[key] += w * h * bpp(t) * (t.generateMipmaps && t.minFilter !== THREE.LinearFilter && t.minFilter !== THREE.NearestFilter ? 4 / 3 : 1) * MB; };
+    const mats = (o, key) => { for (const m of [].concat(o.material || [])) { for (const k in m) if (m[k]?.isTexture) tex(m[k], key); for (const k in (m.uniforms || {})) tex(m.uniforms[k]?.value, key); for (const k in (m.userData?.skin || {})) tex(m.userData.skin[k].value, key); } };
+    for (const a of Object.values(S.athletes)) a.root.traverse(o => mats(o, 'atletas'));
+    scene.traverse(o => mats(o, 'texturas'));
+    const rt = t => { if (!t || !P.get(t).__webglFramebuffer) return 0; const px = t.width * t.height, s = t.samples || 0, c = bpp(t.texture), d = t.depthTexture ? 4 : 0; return px * (c + d + (s > 1 ? s * (c + (t.depthBuffer ? 4 : 0)) : 0)) * MB; };
+    for (const t of post.targets()) out.post += rt(t);
+    for (const l of lighting.lights) if (l.shadow?.map) out.sombras += rt(l.shadow.map) + rt(l.shadow.mapPass);
+    if (lighting.envRT) out.entorno += rt(lighting.envRT);
+    out.total = 0; for (const k in out) if (k !== 'total') { out[k] = Math.round(out[k] * 10) / 10; out.total += out[k]; } out.total = Math.round(out.total);
+    return out;
+  },
   /** Para pruebas: avanza estado y cámara un paso fijo, sin dibujar. */
-  step(dt) { tick(dt); rig.update(dt); },
+  step(dt) { tick(dt); rig.update(dt); screenScale(); },
   /**
    * Para pruebas: extremos en NDC de lo que tiene que entrar en cuadro (discos con flecha, puntas de la barra, cabeza
    * y pies) y el rectángulo libre de gráfica, también en NDC.

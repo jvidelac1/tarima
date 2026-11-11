@@ -1,4 +1,5 @@
 """Zapatillas de halterofilia genéricas (sin marca), modeladas por script sobre el pie real de cada personaje.
+Diseño deliberadamente neutro: paneles rectos (puntera, talonera, correa); sin franjas laterales curvas ni tiras paralelas.
 Taco rígido en cuña (~23 mm atrás, ~9 mm adelante: caída visible de ~14 mm), suela plana, capellada con puntera,
 contrafuerte, lengüeta, cordones, correa de velcro con pasador y cuello acolchado. UV propio en un solo atlas.
 El piso está en z=-SOLE (la planta del pie queda en z=0, igual que en poses.py)."""
@@ -119,8 +120,8 @@ def build(sgn,side,pts,rig,mats,name='Shoe'):
     # puntera, contrafuerte, refuerzo de ojales
     aw=np.concatenate([[.02],as_[1:-1],[.98]])   # mismas líneas que la capellada: el parche nunca la corta
     B.shell(np.concatenate([[.80],ts[(ts>.80)&(ts<.994)]]),aw,.0012,0,UVR['toecap'])
-    # contrafuerte: envuelve el talón y su borde delantero baja en diagonal hacia la suela
-    B.shell(np.concatenate([[.0015],ts[(ts>.0015)&(ts<.30)],[.30]]),aw,.0014,3,UVR['counter'],warp=lambda T,A:np.where(T<.12,T,.12+(T-.12)/.18*(.20-.13*np.sin(np.pi*A)**.7)))
+    # contrafuerte: envuelve el talón; el borde delantero es recto y vertical (panel rectangular, sin diagonales ni curvas que parezcan un logo)
+    B.shell(np.concatenate([[.0015],ts[(ts>.0015)&(ts<.20)],[.20]]),aw,.0014,3,UVR['counter'])
     for a0,a1 in ((.27,.375),(.625,.73)): B.shell(np.linspace(.50,.75,12),np.linspace(a0,a1,4),.0011,0,UVR['misc'])
     # lengüeta: sobre el empeine y solapa que sube hacia la tibia
     tt=np.linspace(.44,.76,12); ta=np.linspace(.385,.615,7); B.shell(tt,ta,.0016,0,UVR['tongue'])

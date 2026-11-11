@@ -41,7 +41,7 @@ Tiene que ser por servidor local: abriendo `index.html` directo, el navegador bl
    FAST=1 ./build.sh ventura  # sin la hoja de poses de costado
    ```
 
-   Cada personaje tarda unos minutos en CPU. Deja todo en `out/<nombre>/` y copia el GLB y los datos a `web/`.
+   Cada personaje tarda unos 20 minutos con la máquina libre. Corré un solo build a la vez. Deja todo en `out/<nombre>/` y copia el GLB y los datos a `web/`.
 
 Si el script de texturas no encuentra una tipografía en negrita, definí `TARIMA_FONT` con la ruta a un `.ttf`.
 
@@ -49,18 +49,27 @@ Si el script de texturas no encuentra una tipografía en negrita, definí `TARIM
 
 ```
 blender/
-  common.py   arranque de Blender + MPFB, render de control
-  body.py     proporciones y físico de cada personaje (CFG)
-  make.py     cuerpo, rig y horneado de mapas de apoyo
-  finish.py   texturas, ojos, zapatillas; llama a poses.py y exporta el GLB
-  poses.py    sistema de poses por reglas y chequeo de superposiciones
+  common.py     arranque de Blender + MPFB, dispositivo de Cycles, render de control
+  body.py       proporciones, físico y cara de cada personaje (CFG)
+  style.py      colores, nombre e indumentaria (STYLES)
+  make.py       cuerpo, rig y horneado de mapas de apoyo
+  tex.py        texturas: color, relieve, rugosidad/oclusión, máscara
+  geo.py        pesos, subdivisión, morphs correctivos, pelo, pestañas, cinturón
+  shoes.py      zapatillas de halterofilia
+  finish.py     arma todo lo anterior, llama a poses.py y exporta el GLB
+  poses.py      sistema de poses por reglas, trayectoria, tiempos y chequeo de superposiciones
+  pose_only.py  corre solo poses.py sobre un s3b.blend ya generado
+  ctl3.py       renders de control de la malla en fases reales
 tools/
-  export_web.py   copia GLB y datos de poses al visor
+  export_web.py     GLB reempaquetado, máscaras y web/data/poses.json
+  verify_build.py   verifica que web/ corresponde al último build
+  check_viewer.mjs  prueba automática del visor (npm install; usa el Chrome del sistema)
 web/
-  index.html      visor (three.js)
-  models/         GLB exportados
-  data/poses.json fases y medidas que muestra el visor
-docs/img/         renders de control de la última corrida
+  index.html, css/, js/   visor (three.js r187, módulos ES)
+  vendor/three/           three.js vendorizado
+  models/                 GLB y máscaras exportados
+  data/poses.json         fases, tiempos y medidas que usa el visor
+docs/img/         renders de control del primer prototipo
 ```
 
 ## Licencias de terceros
