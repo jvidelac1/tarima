@@ -5,7 +5,7 @@ Uso (en el pod, cada comando con `flock /root/blender.lock` adelante; rutas rela
   .venv/bin/python blender/detail.py relief <nombre> <malla.glb> [--out out/arte/detail_<nombre>.npz] [--limite 0.012] [--tope 0.006] [--suave 0.02]
   .venv/bin/python blender/detail.py heat   <nombre> <malla.glb> [--pose fin] [--out out/arte/gen/armup_error.png] [--rango 0.010] [--zona busto]
   .venv/bin/python blender/detail.py sint   <nombre> --out out/arte/seco/sint_fin.glb [--pose fin] [--escala 0.37] [--giro 25]
-                                            [--tras 0.4,-0.25,0.15] [--ruido 0.001] [--ruido-en atleta] [--inflar 0.003]
+                                            [--tras 0.4,-0.25,0.15] [--ruido 0.001] [--ruido-en atleta] [--inflar 0.003] [--busto]
   .venv/bin/python blender/detail.py cmp    <nombre> <a/s3b.blend> <b/s3b.blend>
   TARIMA_DETAIL=out/arte/detail_ventura.npz ./build.sh ventura      # aplica el relieve en geo.anatomy; sin la variable no cambia nada
 
@@ -337,10 +337,12 @@ def cmd_sint(a):
     S=abrir(a.nombre,a.pose); co,no,tri=malla_eval(S.b); rng=np.random.default_rng(a.semilla); T=M4(a.escala,rz(a.giro),[float(x) for x in a.tras.split(',')]); infl=0
     if a.inflar:
         short,W,dom,body=piel(S.b); k=body&np.isin(dom,ARM_BONES); co=co+no*(a.inflar*k)[:,None]; infl=int(k.sum())
+    if a.busto:   # como el encuadre 'bust' de refs.py: sin lo que queda por debajo de la cadera
+        tri=tri[co[tri][:,:,2].mean(1)>=S.hipz+.05*S.K]; u,inv=np.unique(tri,return_inverse=True); co,no,tri=co[u],no[u],inv.reshape(-1,3).astype(np.int32)
     if a.ruido_en=='atleta': P=ap(T,co+rng.normal(0,a.ruido,co.shape))
     else: P=ap(T,co)+rng.normal(0,a.ruido,co.shape)
     me=bpy.data.meshes.new('sint'); me.from_pydata(P.tolist(),[],tri.tolist()); me.update(); ob=bpy.data.objects.new('sint',me); S.sc.collection.objects.link(ob); exportar(ob,a.out)
-    json.dump(dict(T=T.tolist(),escala=a.escala,giro_z=a.giro,tras=[float(x) for x in a.tras.split(',')],ruido=a.ruido,ruido_en=a.ruido_en,inflar=a.inflar,inflados=infl,pose=a.pose,cuadro=S.cuadro,vertices=len(P),triangulos=len(tri),semilla=a.semilla),
+    json.dump(dict(T=T.tolist(),escala=a.escala,giro_z=a.giro,tras=[float(x) for x in a.tras.split(',')],ruido=a.ruido,ruido_en=a.ruido_en,inflar=a.inflar,inflados=infl,busto=bool(a.busto),pose=a.pose,cuadro=S.cuadro,vertices=len(P),triangulos=len(tri),semilla=a.semilla),
               open(os.path.splitext(a.out)[0]+'.json','w',encoding='utf-8'),indent=1)
     print(f"SINT {a.nombre} {a.pose}: {len(P)} vértices, {len(tri)} triángulos · escala {a.escala}, giro {a.giro}° en Z, traslación {a.tras} · ruido {a.ruido*1000:.2f} mm ({a.ruido_en}) · {infl} vértices de brazo inflados {a.inflar*1000:.1f} mm · {a.out}")
 
@@ -389,7 +391,7 @@ def main():
     q=sub.add_parser('align'); comun(q); q.add_argument('--pose',default='fin'); q.add_argument('--decimate',type=int,default=300000); q.add_argument('--out'); q.add_argument('--json'); q.add_argument('--tex',action='store_true',help='conservar materiales y texturas del GLB'); q.add_argument('--verdad',help='JSON de `sint` para comparar'); q.set_defaults(f=cmd_align)
     q=sub.add_parser('relief'); comun(q); q.add_argument('--out'); q.add_argument('--limite',type=float,default=.012,help='largo del rayo (m)'); q.add_argument('--tope',type=float,default=.006,help='recorte final (m)'); q.add_argument('--suave',type=float,default=.02,help='ancho a media altura del suavizado (m)'); q.add_argument('--trabajo',type=int,default=800000,help='tope de triángulos de la malla generada para medir'); q.set_defaults(f=cmd_relief)
     q=sub.add_parser('heat'); comun(q); q.add_argument('--pose',default='fin'); q.add_argument('--out'); q.add_argument('--rango',type=float,default=.010,help='distancia que satura el color (m)'); q.add_argument('--limite',type=float,default=.03,help='distancia máxima de búsqueda (m)'); q.add_argument('--zona',choices=('busto','cuerpo'),default='busto'); q.add_argument('--res',type=int,default=800); q.add_argument('--trabajo',type=int,default=800000); q.set_defaults(f=cmd_heat)
-    q=sub.add_parser('sint'); comun(q,False); q.add_argument('--out',required=True); q.add_argument('--pose',default='fin'); q.add_argument('--escala',type=float,default=.37); q.add_argument('--giro',type=float,default=25.); q.add_argument('--tras',default='0.4,-0.25,0.15'); q.add_argument('--ruido',type=float,default=.001); q.add_argument('--ruido-en',dest='ruido_en',choices=('atleta','gen'),default='atleta'); q.add_argument('--inflar',type=float,default=0.); q.set_defaults(f=cmd_sint)
+    q=sub.add_parser('sint'); comun(q,False); q.add_argument('--out',required=True); q.add_argument('--pose',default='fin'); q.add_argument('--escala',type=float,default=.37); q.add_argument('--giro',type=float,default=25.); q.add_argument('--tras',default='0.4,-0.25,0.15'); q.add_argument('--ruido',type=float,default=.001); q.add_argument('--ruido-en',dest='ruido_en',choices=('atleta','gen'),default='atleta'); q.add_argument('--inflar',type=float,default=0.); q.add_argument('--busto',action='store_true',help='solo de la cadera hacia arriba'); q.set_defaults(f=cmd_sint)
     q=sub.add_parser('cmp'); q.add_argument('nombre'); q.add_argument('a'); q.add_argument('b'); q.set_defaults(f=cmd_cmp)
     a=p.parse_args(); a.f(a)
 if __name__=='__main__': main()
