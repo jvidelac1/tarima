@@ -17,7 +17,9 @@ FAST=1 ./build.sh ventura      # un personaje, sin hojas de poses
 ./build.sh                     # los dos, con hojas de poses de costado y de frente
 .venv/bin/python blender/pose_only.py ventura   # solo poses, sobre out/ventura/s3b.blend (iteración rápida)
 node tools/check_viewer.mjs    # prueba del visor: consola, 404, fps y capturas en out/viewer/
-cd web && python3 -m http.server 8000
+node tools/sim_test.mjs        # núcleo del juego, sin navegador (pocos segundos)
+node tools/check_game.mjs      # juega una partida completa en juego.html por teclado y por toques; no pide GPU
+cd web && python3 -m http.server 8000   # visor en /index.html, juego en /juego.html
 ```
 
 Líneas a mirar en la salida del build:
@@ -28,6 +30,13 @@ Líneas a mirar en la salida del build:
 - `TRAJ ...` una por segmento: amplitud de la S, velocidades y aceleraciones de la barra.
 
 Un solo proceso de Blender a la vez: en paralelo la máquina se satura y cada paso tarda diez veces más.
+
+## Reglas del juego (web/js/sim y web/js/game)
+
+- **El resultado lo calcula el núcleo.** `web/js/sim/` es una función pura de lo que el jugador tocó: solo enteros, sin reloj, sin DOM y sin three.js. `tools/sim_test.mjs` rechaza cualquier otra cosa. La presentación (`web/js/game/`) nunca decide un resultado.
+- **`web/data/sim.json` no se edita a mano**: lo escribe `tools/build_sim_data.mjs` y lleva huella. Cambiar reglas, balance o datos cambia la versión o la huella; si el cambio es intencional, `node tools/sim_test.mjs --update` reescribe las partidas de referencia.
+- **Los números de balance se ajustan con `tools/balance.mjs`**, contra las metas de docs/JUEGO.md (sección 9.7), no a ojo.
+- **El visor sigue siendo el visor.** Todo cambio en un archivo compartido de `web/js/` es una opción nueva que `index.html` no usa.
 
 ## Convenciones del código de Blender
 

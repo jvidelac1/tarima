@@ -16,7 +16,7 @@ const loader = new GLTFLoader();
 const _v = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
 
 const SKIN_PARS = /* glsl */`
-uniform sampler2D tMask; uniform sampler2D tDetailSkin; uniform sampler2D tDetailCloth; uniform vec2 uTile; uniform float uMaskMode; uniform vec3 uScatter; uniform float uSweat; uniform float uDetail; uniform float uSkinSat; uniform float uSkinRough; uniform vec3 uHairColor;
+uniform sampler2D tMask; uniform sampler2D tDetailSkin; uniform sampler2D tDetailCloth; uniform vec2 uTile; uniform float uMaskMode; uniform vec3 uScatter; uniform float uSweat; uniform float uDetail; uniform float uSkinSat; uniform float uSkinRough; uniform vec3 uHairColor; uniform vec4 uClothFlat;
 vec3 gMask = vec3( 0.0 ); float gGrain = 0.0; float gPatch = 0.5;
 // Subsuperficie barata: difuso envuelto teñido de rojo en el terminador (la luz "dobla" la esquina dentro de la piel),
 // transmisión en contraluz por los bordes finos (orejas, dedos) y nada de eso sobre la tela.
@@ -44,6 +44,8 @@ const SKIN_MASK = /* glsl */`
   }
   // el albedo de piel llega saturado del horneado: se baja un poco para que la luz cálida no lo vuelva naranja
   diffuseColor.rgb = mix( diffuseColor.rgb, mix( vec3( dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) ) ), diffuseColor.rgb, uSkinSat ), gMask.r );
+  // tela de color plano (el juego la usa para un pesista que comparte modelo): tapa lo que la textura trae horneado
+  diffuseColor.rgb = mix( diffuseColor.rgb, uClothFlat.rgb, uClothFlat.a * smoothstep( 0.5, 0.9, gMask.g ) * step( 0.5, uMaskMode ) );
   // bajo el pelo en capas (canal B) la piel toma el color del pelo: entre hebra y hebra no se ve cuero cabelludo claro
   diffuseColor.rgb = mix( diffuseColor.rgb, uHairColor, 0.7 * smoothstep( 0.25, 0.8, gMask.b ) * step( 0.5, uMaskMode ) );
 #endif
@@ -157,7 +159,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
   if (src.normalMap) m.normalScale.copy(src.normalScale);
   for (const t of [m.map, m.normalMap, m.roughnessMap, m.aoMap]) if (t) t.anisotropy = aniso;
   const uniforms = { tDetailSkin: { value: detail.skin }, tDetailCloth: { value: detail.cloth }, uTile: { value: new THREE.Vector2(mpu / .012, mpu / .008) }, uDetail: { value: 1 }, tMask: { value: mask }, uMaskMode: { value: mask ? 1 : 0 },
-    uScatter: { value: new THREE.Color(.5, .17, .1) }, uSweat: { value: .55 }, uSkinSat: { value: .78 }, uSkinRough: { value: .56 }, uHairColor: { value: new THREE.Color(.03, .025, .02) } };
+    uScatter: { value: new THREE.Color(.5, .17, .1) }, uSweat: { value: .55 }, uSkinSat: { value: .78 }, uSkinRough: { value: .56 }, uHairColor: { value: new THREE.Color(.03, .025, .02) }, uClothFlat: { value: new THREE.Vector4(0, 0, 0, 0) } };
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, uniforms);
     sh.fragmentShader = sh.fragmentShader
@@ -166,7 +168,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' + SKIN_DETAIL)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + SKIN_MATERIAL);
   };
-  m.customProgramCacheKey = () => 'tarima-skin-6';
+  m.customProgramCacheKey = () => 'tarima-skin-7';
   m.userData.skin = uniforms;
   return m;
 }
@@ -390,6 +392,8 @@ export class Athlete {
     for (let k = 0; k < A.length; k++) deg = Math.max(deg, THREE.MathUtils.radToDeg(A[k][0].angleTo(B[k][0])));
     return [this.barPos[i].distanceTo(this.barPos[j]) * 1000, deg];
   }
+  /** Tela de color plano sobre la máscara de tela (color de three o null para volver a la textura). Por defecto, apagada. */
+  setClothFlat(color) { for (const m of this.meshes) for (const mat of [].concat(m.material || [])) { const u = mat.userData?.skin?.uClothFlat; if (u) { if (color) u.value.set(color.r, color.g, color.b, 1); else u.value.w = 0; } } }
   /** Posición del centro de la barra (hueso Bar) en mundo. */
   barWorld(out) { return this.barBone.getWorldPosition(out); }
   boneWorld(name, out) { const b = this._byName.get(name); return b ? b.getWorldPosition(out) : out.set(0, 1, 0); }

@@ -487,10 +487,10 @@ export class Arena {
   }
   /** Datos del tablero del escenario. */
   setBoard(b) { this.board = b; this._drawBoard(); }
-  /** Decisión de los tres árbitros: null apaga; [true,true,true] tres blancas. */
+  /** Decisión de los tres árbitros: null apaga; [true,true,true] tres blancas. Una luz en null queda apagada (el juego las enciende de a una). */
   setDecision(d) {
     this.decision = d;
-    this.lamps.forEach((l, i) => l.material.color.copy(d ? (d[i] ? hdr('#f6f4ea', 7) : hdr('#ff2618', 7)) : new THREE.Color('#15171c')));
+    this.lamps.forEach((l, i) => l.material.color.copy(d && d[i] !== null ? (d[i] ? hdr('#f6f4ea', 7) : hdr('#ff2618', 7)) : new THREE.Color('#15171c')));
     this._drawClock();
   }
   setClock(seconds) { this.clock = seconds; if (Math.max(0, Math.ceil(seconds)) !== this._clockShown) this._drawClock(); }
