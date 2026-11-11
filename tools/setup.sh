@@ -101,6 +101,9 @@ else echo "AVISO: no encuentro Chrome ni Chromium. Instalá el .deb de Google (x
 if FONT="$(font_path)"; then echo "Tipografía: $FONT"
 else echo "AVISO: definí TARIMA_FONT con la ruta a una .ttf en negrita (Linux: apt-get install fonts-liberation)."; fi
 NCPU="$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo '?')"
+if read -r CQ CP 2>/dev/null < /sys/fs/cgroup/cpu.max && [ "$CQ" != max ] && [ "${CP:-0}" -gt 0 ] && [ "$NCPU" != '?' ]; then
+  CQN=$(( (CQ + CP - 1) / CP )); [ "$CQN" -ge 1 ] && [ "$CQN" -lt "$NCPU" ] && NCPU=$CQN   # cuota de CPU del contenedor
+fi
 echo "CPU: $NCPU núcleos disponibles (build.sh usa hasta 6 hilos, o menos si hay menos núcleos; TARIMA_THREADS lo cambia)"
 
 cat <<FIN
@@ -116,5 +119,6 @@ El estado del trabajo y los pendientes están en HANDOFF.md.
 FIN
 if [ "$OS" = Linux ]; then
   echo "En Linux sin GPU el build hornea y renderiza con Cycles en CPU, y la prueba del visor dibuja por software"
-  echo "(SwiftShader): verifica lógica, consola, 404 y capturas, pero no mide fps. Ver la sección de Linux del README."
+  echo "(SwiftShader): verifica lógica, consola, 404 y capturas, pero no mide fps. Con una NVIDIA, Cycles usa OptiX y la"
+  echo "prueba del visor abre Chrome con Vulkan sobre la placa. Ver la sección de Linux del README."
 fi

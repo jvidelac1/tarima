@@ -47,6 +47,30 @@ En una máquina nueva, `tools/setup.sh` hace los pasos 1 y 2 y verifica que est�
 
 Si el script de texturas no encuentra una tipografía en negrita, definí `TARIMA_FONT` con la ruta a un `.ttf`.
 
+### Linux
+
+El mismo build corre en Ubuntu 22.04 x86_64 sin pantalla (pod alquilado o contenedor, como root). `tools/setup.sh` instala ahí las bibliotecas que necesita `bpy`, las tipografías, Node, uv y Chrome.
+
+```bash
+git clone --branch linux https://github.com/jvidelac1/tarima.git && cd tarima
+tools/setup.sh
+TARIMA_THREADS=12 ./build.sh     # los hilos según los núcleos que tenga la máquina
+node tools/check_viewer.mjs
+```
+
+Medido el 11 de noviembre de 2026. Con GPU, 0 cuadros con superposición en los dos personajes; sin GPU se corrió solo ventura, también en 0:
+
+| Máquina | Cycles | Build completo (dos personajes, con hojas) | Prueba del visor |
+|---|---|---|---|
+| Pod con RTX 4090, 12 hilos | OptiX | 29 min (unos 14 por personaje) | Chrome con Vulkan sobre la placa, los dos personajes: pasa en 5 min, 59 fps en alta |
+| Pod de 4 vCPU sin GPU | CPU | 33 min solo ventura con `FAST=1` | por software (SwiftShader), solo ventura: pasa en 44 min; verifica lógica, consola, 404 y capturas, no mide fps |
+
+- **Mismas poses que en macOS.** `python3 tools/compare_poses.py <poses.json de macOS> <poses.json de Linux>` da estructura igual y diferencia máxima de 0,0001 s en `tt`; entre el build en CPU y el build con GPU no hay ninguna diferencia. Los GLB no son idénticos byte a byte (el tamaño cambia en menos de 2 KB).
+- **Horneados en CPU a propósito.** Los mapas se hornean en CPU aunque haya GPU, para que den lo mismo en todas las máquinas; la GPU se usa en los renders de control y en las hojas de poses.
+- **Chrome y la placa.** Sin pantalla y con una NVIDIA, Chrome no elige la placa solo y cae a dibujo por software. `tools/browser.mjs` pide `--use-angle=vulkan` cuando existe `/dev/nvidiactl`; `TARIMA_ANGLE` lo cambia (`gl-egl` también funciona, `swiftshader` fuerza software).
+- **Núcleos en contenedores.** Algunos pods limitan la CPU por cuota y `nproc` muestra todos los núcleos del anfitrión. El build lee la cuota de `/sys/fs/cgroup/cpu.max`; igual conviene fijar `TARIMA_THREADS`.
+- **Prueba del visor por software.** Tarda mucho más y no exige fps, tiempos ni desenfoque de movimiento. Por defecto captura las páginas de escritorio a media densidad de píxeles; `TARIMA_SOFT_DPR=1` las deja a tamaño completo y tarda más del doble.
+
 ## Estructura
 
 ```

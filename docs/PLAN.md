@@ -25,24 +25,23 @@ Dirección de arte: **realismo estilizado**, no fotorrealismo. La referencia de 
 
 | Máquina | Para qué | Notas |
 |---|---|---|
-| Mac mini M4 alquilado (Scaleway) | Blender, personaje, poses, prueba del visor con GPU real | Mismo sistema que el pipeline ya probado. Se cobra mientras exista: crearlo al empezar la etapa 2 y borrarlo al cerrar la 4 |
-| GPU NVIDIA por hora (pod Linux) | Trabajos aislados: imagen a 3D con modelos abiertos, captura de movimiento desde video, horneados de alta calidad | No se porta el pipeline entero: entra un insumo (imágenes o video) y sale un archivo (GLB, animación, mapas). Se prende solo para esos trabajos |
+| Pod Linux con GPU NVIDIA por hora (RunPod) | Blender, personaje, poses, prueba del visor con GPU real, imagen a 3D con modelos abiertos, horneados de alta calidad | Desde el 11-nov el pipeline entero corre en Linux (rama `linux`, ver README). Scaleway no tenía stock de Mac ni de GPU. Se cobra por hora mientras el pod existe, y si se detiene puede no volver a conseguirse la placa |
 | Sesión cloud de Claude | Gameplay, interfaz, online, backend | Rama propia; no necesita Blender |
 | Mac del usuario | Nada pesado | Solo mirar resultados |
 
 Una GPU más grande no mejora cómo se ve el juego para el jugador: eso lo dibuja el navegador de cada uno. Mejora los insumos (malla, mapas horneados, movimiento) y acorta cada iteración.
 
-En el Mac alquilado se puede paralelizar, pero midiendo: empezar con dos procesos de Blender y subir solo si los tiempos por paso no empeoran. En una máquina de 16 GB compartida, tres en paralelo multiplicaron cada paso por diez.
+En el pod se puede paralelizar, pero midiendo: empezar con dos procesos de Blender y subir solo si los tiempos por paso no empeoran. En una máquina de 16 GB compartida, tres en paralelo multiplicaron cada paso por diez.
 
 ## Etapas y criterio de terminado
 
 | # | Etapa | Dónde | Terminada cuando |
 |---|---|---|---|
-| 0 | Preparación | Mac alquilado y cloud | `tools/setup.sh` corre en el Mac alquilado y `./build.sh` da 0 cuadros con superposición en los dos; la sesión cloud abre el repo |
+| 0 | Preparación | Pod con GPU y cloud | `tools/setup.sh` corre en el pod y `./build.sh` da 0 cuadros con superposición en los dos; la sesión cloud abre el repo |
 | 1 | Juego mínimo jugable | Cloud | Una final de tres pesistas jugable de punta a punta con toques o teclado: orden de salida por kilos, tres intentos por levantamiento, elección de kilos, mecánica de timing y de «pelear el levantamiento», luces de jueces, válido o nulo, total y clasificación. Los dos rivales los maneja el juego. Escritorio y teléfono sin errores de consola. La prueba automática juega una partida completa |
-| 2 | Dirección de arte | Mac alquilado + GPU | Imagen objetivo elegida por el usuario. Lista fija de planos capturados en el visor. Comparación de ventura con brazos arriba en tres versiones (malla actual, malla generada por imagen a 3D, variante de proporciones) contra el objetivo. **El usuario decide cuál sigue, o si se compra o encarga la malla** |
-| 3 | Atletas definitivos | Mac alquilado + GPU | Los tres atletas (el tercero es nuevo y ficticio) con el look elegido pasan la lista de planos sin los defectos de hoy (pliegue de axila, rodillera, borde de barba, halo blanco). `./build.sh` en 0 para los tres. Cada GLB pesa 4 MB o menos. Dos ayudantes de pista con malla más simple. **El usuario aprueba las capturas** |
-| 4 | Movimiento y fallos | Mac alquilado + GPU | Cada fase comparada contra su cuadro de video en `docs/ref/`; la tabla de HANDOFF pasa de «coherente» a «comparada». Reservas de ritmo corregidas (subidas, segundo tirón, dip). Fallos animados (barra adelante, barra atrás, envión que no bloquea, intento peleado que sale y que no sale), festejos y ayudantes cargando la barra, todos en 0 en el chequeo |
+| 2 | Dirección de arte | Pod con GPU | Imagen objetivo elegida por el usuario. Lista fija de planos capturados en el visor. Comparación de ventura con brazos arriba en tres versiones (malla actual, malla generada por imagen a 3D, variante de proporciones) contra el objetivo. **El usuario decide cuál sigue, o si se compra o encarga la malla** |
+| 3 | Atletas definitivos | Pod con GPU | Los tres atletas (el tercero es nuevo y ficticio) con el look elegido pasan la lista de planos sin los defectos de hoy (pliegue de axila, rodillera, borde de barba, halo blanco). `./build.sh` en 0 para los tres. Cada GLB pesa 4 MB o menos. Dos ayudantes de pista con malla más simple. **El usuario aprueba las capturas** |
+| 4 | Movimiento y fallos | Pod con GPU | Cada fase comparada contra su cuadro de video en `docs/ref/`; la tabla de HANDOFF pasa de «coherente» a «comparada». Reservas de ritmo corregidas (subidas, segundo tirón, dip). Fallos animados (barra adelante, barra atrás, envión que no bloquea, intento peleado que sale y que no sale), festejos y ayudantes cargando la barra, todos en 0 en el chequeo |
 | 5 | Online | Cloud | Cuentas, competencia por turnos y tabla de posiciones en una URL pública. El servidor recalcula el resultado y rechaza uno falsificado. Dos personas en dispositivos distintos completan una competencia |
 | 6 | Pulido y lanzamiento | Ambos | 60 fps en calidad media en una laptop común y 30 estables en un teléfono de gama media. Carga inicial de 10 MB o menos. Audio de público y locutor. Podio, entrega de medallas y foto de los tres |
 
@@ -69,7 +68,7 @@ Las etapas 1 y 2 corren en paralelo. La 3 depende de la decisión de la 2. La 4 
 
 ## Lo que depende del usuario
 
-- Iniciar sesión y pagar en Scaleway y en el proveedor de GPU. La operación (crear la máquina, configurarla por SSH, correr los builds) la hace el agente desde la sesión local del usuario, que queda como orquestadora sin correr nada pesado.
+- Iniciar sesión y pagar en el proveedor de GPU (RunPod). La operación (crear la máquina, configurarla por SSH, correr los builds) la hace el agente desde la sesión local del usuario, que queda como orquestadora sin correr nada pesado.
 - Autorizar GitHub en claude.ai/code para la sesión cloud.
 - Subir dos o tres videos en cámara lenta a `docs/ref/`.
 - Cuenta y login de Higgsfield.
@@ -79,7 +78,7 @@ Las etapas 1 y 2 corren en paralelo. La 3 depende de la decisión de la 2. La 4 
 
 Las sesiones nuevas no recuerdan la conversación anterior. Pegar esto al abrirlas.
 
-**Mac alquilado (etapas 0 y 2):**
+**Pod con GPU (etapas 0 y 2):**
 
 > Leé AGENTS.md, HANDOFF.md y docs/PLAN.md. Trabajá sobre la rama `pasada-visual` en una rama nueva `arte`. Primero la etapa 0: corré `tools/setup.sh`, después `./build.sh`, y confirmá 0 cuadros con superposición en los dos y que `node tools/check_viewer.mjs` consigue GPU. Después la etapa 2 de docs/PLAN.md. Esta máquina es dedicada: usala a fondo, pero medí antes de paralelizar Blender. Frená y mostrame capturas en el punto de decisión de la etapa 2.
 

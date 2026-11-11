@@ -19,8 +19,12 @@ PY="${PYTHON:-python3}"; [ -z "${PYTHON:-}" ] && [ -x .venv/bin/python ] && PY=.
 NAMES=("$@"); [ ${#NAMES[@]} -eq 0 ] && NAMES=(ventura brenner)
 OUTR="${TARIMA_OUT:-out}"
 # Con menos de 6 núcleos no se piden más hilos que núcleos. nproc cuenta los asignados al proceso (en un contenedor de 4 vCPU
-# getconf y os.cpu_count() devuelven los del anfitrión); en macOS no está y se usa getconf.
+# getconf y os.cpu_count() devuelven los del anfitrión); en macOS no está y se usa getconf. Si el contenedor limita por cuota
+# de tiempo de CPU (cgroup v2, cpu.max) y no por afinidad, nproc sigue viendo todo el anfitrión: se toma el menor de los dos.
 NCPU="$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 6)"
+if read -r CQ CP 2>/dev/null < /sys/fs/cgroup/cpu.max && [ "$CQ" != max ] && [ "${CP:-0}" -gt 0 ]; then
+  CQN=$(( (CQ + CP - 1) / CP )); [ "$CQN" -ge 1 ] && [ "$CQN" -lt "$NCPU" ] && NCPU=$CQN
+fi
 export TARIMA_THREADS="${TARIMA_THREADS:-$(( NCPU < 6 ? NCPU : 6 ))}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-$TARIMA_THREADS}" VECLIB_MAXIMUM_THREADS="${VECLIB_MAXIMUM_THREADS:-$TARIMA_THREADS}"
 KEY='MEASURE|RADII|SKEL|GRIP|POSE|rack|TRAJ|UNION|PUSH|CHK|BAD|HAIR|LASH|GLB|CYCLES|BAKE dispositivo|MAPS|TEX |Error|ERROR|Traceback|^ +File "|Exception|SystemExit|No encuentro|Definí'

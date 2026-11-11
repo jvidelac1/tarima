@@ -22,6 +22,12 @@ cd web && python3 -m http.server 8000
 - **Un solo Blender a la vez.** En una M1 Pro de 16 GB, tres builds en paralelo llevaron el load average a más de 300 y cada paso pasó de 3 a 40 minutos. `build.sh` espera si detecta otro proceso.
 - `TARIMA_OUT=dir` cambia la carpeta de salida; `TARIMA_THREADS`, `TARIMA_GPU=0` y `EXPORT_BAD=1` están documentados en `build.sh`.
 
+## Linux y máquinas alquiladas (11-nov)
+
+El build y la prueba del visor corren también en Ubuntu 22.04 sin pantalla; el detalle y los tiempos medidos están en la sección «Linux» del README. Verificado en un pod con RTX 4090 (build completo en 29 min con Cycles por OptiX, 0 cuadros con superposición en los dos, prueba del visor en 59 fps sobre la placa) y en un pod de 4 vCPU sin GPU (ventura con `FAST=1` en 33 min, 0 cuadros; prueba del visor por software). Las poses coinciden con las de macOS: `tools/compare_poses.py` da estructura igual y 0,0001 s de diferencia máxima en `tt`.
+
+No verificado en Linux: brenner en el pod sin GPU (se probó solo ventura ahí) y la medición de fps por software, que no es concluyente por diseño.
+
 ## Salida del último build completo (11-nov, 03:25 a 04:03)
 
 ```
