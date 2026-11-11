@@ -131,14 +131,16 @@ try {
       if (!a.__arte && (clay || prop)) {
         a.__arte = true;
         const THREE = await import('three'), clays = new Map();
-        const gris = src => { const side = src?.side ?? THREE.FrontSide; if (!clays.has(side)) clays.set(side, new THREE.MeshStandardMaterial({ name: 'Arcilla', color: 0x6a6a6a, roughness: .8, metalness: 0, side })); return clays.get(side); };
+        const gris = src => { const side = src?.side ?? THREE.FrontSide; if (!clays.has(side)) clays.set(side, new THREE.MeshStandardMaterial({ name: 'Arcilla', color: 0x585858, roughness: .8, metalness: 0, side })); return clays.get(side); };
         const swap = o => { o.material = Array.isArray(o.material) ? o.material.map(gris) : gris(o.material); };
         if (prop && p.who === 'ventura') {
           const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js'), g = await new GLTFLoader().loadAsync(prop);
           g.scene.name = 'arte_prop'; g.scene.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; o.frustumCulled = false; if (clay) swap(o); } });
           a.root.add(g.scene); for (const o of a.meshes) o.visible = false;
         } else if (clay) for (const o of a.meshes) { const n = [].concat(o.material)[0]?.name; if (n === 'Hair' || n === 'Lashes') o.visible = false; else swap(o); }
-        if (a.hairDepth) a.hairDepth.visible = false;
+        // la pasada de profundidad del pelo: hay una por primitiva de pelo (cabello, barba) y a.hairDepth solo guarda la última;
+        // si queda alguna, la profundidad de campo recorta la silueta del pelo que ya no se dibuja
+        a.root.traverse(o => { if (o.isMesh && o.material?.name === 'HairDepth') o.visible = false; });
       }
       A.setLift(p.lift); if (p.lift === 'c') A.setJerk(p.jerk);
       const i = A.phaseIndex(p.fase); if (i < 0) return { error: `no hay fase ${p.fase} en ${p.who} (${S.tl.phases.map(x => x.n).join(', ')})` };
