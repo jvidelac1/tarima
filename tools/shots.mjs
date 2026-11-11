@@ -7,6 +7,10 @@
 //   --out=<carpeta>   destino de las capturas y de shots.json (lista de planos + datos de cada corrida)
 //   --clay            material de arcilla gris en las mallas del atleta; oculta pelo, barba, cejas y pestañas. Solo P01 a P12.
 //                     (gris oscuro 0x303030: con las luces de la sala un gris medio se quema y aplana el relieve)
+//   --mask            máscara para medir, sin post: el atleta solo, sobre negro, con color plano por segmento según el hueso que
+//                     más pesa en cada vértice (rojo = brazo, verde = antebrazo y mano, azul = resto); oculta el pelo como la
+//                     arcilla. Sale como <tag>_mask_P01.png y guarda en shots.json la posición en píxeles de hombros, codos y
+//                     muñecas (huesos_px), para que tools/widths.py mida en el mismo punto anatómico. Solo P01 a P12.
 //   --prop=<glb>      malla estática (ya alineada al rig, en metros): se cuelga de la raíz de ventura y se ocultan sus mallas
 //   --only=P01,P03    solo esos planos (los datos de los demás planos de la corrida se conservan en shots.json)
 //   --list            escribe la lista de planos y termina, sin abrir el navegador
@@ -24,7 +28,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const arg = (k, d) => { const a = process.argv.find(a => a.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3) : d; };
 const has = k => process.argv.includes(`--${k}`);
 const WEB = path.resolve(arg('web', path.join(ROOT, 'web'))), OUT = path.resolve(arg('out', path.join(ROOT, 'out', 'arte', 'shots')));
-const TAG = arg('tag', 'A'), CLAY = has('clay'), PROP = arg('prop') ? path.resolve(arg('prop')) : null, ONLY = arg('only') ? arg('only').split(',').map(s => s.trim()).filter(Boolean) : null, GFX = !has('no-gfx');
+const TAG = arg('tag', 'A'), CLAY = has('clay'), MASK = has('mask'), PROP = arg('prop') ? path.resolve(arg('prop')) : null, ONLY = arg('only') ? arg('only').split(',').map(s => s.trim()).filter(Boolean) : null, GFX = !has('no-gfx');
 const W = 1600, H = 900, QUERY = 'q=alta&auto=0&ui=0';
 
 // Primeros planos que el visor no trae: se agregan a TARIMA.SHOTS solo en la página de captura (no cambian el visor).
@@ -73,7 +77,9 @@ function writeIndex(run) {
 
 const unknown = (ONLY || []).filter(id => !PLANOS.some(p => p.id === id));
 if (unknown.length) { console.error(`planos que no existen: ${unknown.join(', ')}`); process.exit(1); }
-const todo = PLANOS.filter(p => (!ONLY || ONLY.includes(p.id)) && (!CLAY || p.arcilla));
+if (MASK && (CLAY || PROP)) { console.error('--mask no va con --clay ni con --prop (la malla estática no trae pesos de piel)'); process.exit(1); }
+const SUF = CLAY ? '_clay' : MASK ? '_mask' : '';
+const todo = PLANOS.filter(p => (!ONLY || ONLY.includes(p.id)) && (!(CLAY || MASK) || p.arcilla));
 if (has('list')) { for (const p of PLANOS) console.log(`${p.id} · ${p.who} · ${LIFT[p.lift]}${p.lift === 'c' ? ' ' + JERK[p.jerk] : ''} · ${p.fase} · ${p.shot ? `primer plano «${p.shot}»` : `cámara ${p.cam}`}${p.arcilla ? ' · arcilla' : ''} · ${p.nota}`); console.log(writeIndex(null)); process.exit(0); }
 if (!fs.existsSync(path.join(WEB, 'index.html'))) { console.error(`no hay visor en ${WEB}`); process.exit(1); }
 if (PROP && !fs.existsSync(PROP)) { console.error(`no existe ${PROP}`); process.exit(1); }
@@ -103,8 +109,8 @@ page.on('pageerror', e => problems.push(`pageerror: ${e.message}`));
 page.on('requestfailed', r => problems.push(`requestfailed: ${r.url()} ${r.failure()?.errorText}`));
 page.on('response', r => { if (r.status() >= 400) problems.push(`HTTP ${r.status()}: ${r.url()}`); });
 
-const stem = id => `${TAG}${CLAY ? '_clay' : ''}_${id}`;
-const run = { tag: TAG + (CLAY ? '_clay' : ''), version: TAG, arcilla: CLAY, prop: PROP ? path.relative(ROOT, PROP) : null, web: path.relative(ROOT, WEB) || '.', fecha: new Date().toISOString(), planos: {} };
+const stem = id => `${TAG}${SUF}_${id}`;
+const run = { tag: TAG + SUF, version: TAG, arcilla: CLAY, mascara: MASK, prop: PROP ? path.relative(ROOT, PROP) : null, web: path.relative(ROOT, WEB) || '.', fecha: new Date().toISOString(), planos: {} };
 try { run.commit = execFileSync('git', ['-C', ROOT, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim(); } catch { /* sin git */ }
 const t0 = Date.now();
 try {
@@ -123,11 +129,34 @@ try {
   }, [EXTRA_SHOTS, GFX]);
 
   for (const p of todo) {
-    const info = await page.evaluate(async ([p, clay, prop]) => {
+    const info = await page.evaluate(async ([p, clay, prop, mask]) => {
       const A = TARIMA, S = A.state;
       if (S.who !== p.who) await A.setWho(p.who);
       const a = S.athletes[p.who];
       // Aspecto de la corrida, una vez por atleta: arcilla o malla estática en lugar de la del build.
+      if (!a.__arte && mask) {
+        // Máscara por segmento: cada vértice toma el color de la clase de huesos que más pesa en su piel (0 brazo, 1 antebrazo
+        // y mano, 2 resto) y la malla se dibuja con color plano, sin luces.
+        a.__arte = true;
+        const THREE = await import('three'), mats = new Map(), GET = ['getX', 'getY', 'getZ', 'getW'];
+        const cls = n => (/(Left|Right)Arm$/.test(n) ? 0 : /(Left|Right)(ForeArm|Hand)/.test(n) ? 1 : 2);
+        const plano = src => { const side = src?.side ?? THREE.FrontSide; if (!mats.has(side)) mats.set(side, new THREE.MeshBasicMaterial({ name: 'Mascara', vertexColors: true, toneMapped: false, fog: false, side })); return mats.get(side); };
+        for (const o of a.meshes) {
+          const n = [].concat(o.material)[0]?.name; if (n === 'Hair' || n === 'Lashes') { o.visible = false; continue; }
+          const g = o.geometry;
+          if (!g.userData.arteMask) {
+            const N = g.attributes.position.count, col = new Float32Array(N * 3), si = g.attributes.skinIndex, sw = g.attributes.skinWeight, bones = o.skeleton?.bones;
+            for (let i = 0; i < N; i++) {
+              const w = [0, 0, 0];
+              if (si && sw && bones) for (let k = 0; k < 4; k++) { const wk = sw[GET[k]](i); if (wk > 0) w[cls(bones[si[GET[k]](i)]?.name || '')] += wk; } else w[2] = 1;
+              col[i * 3 + (w[0] >= w[1] && w[0] >= w[2] ? 0 : (w[1] >= w[2] ? 1 : 2))] = 1;
+            }
+            g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.userData.arteMask = true;
+          }
+          o.material = Array.isArray(o.material) ? o.material.map(plano) : plano(o.material);
+        }
+        a.root.traverse(o => { if (o.isMesh && o.material?.name === 'HairDepth') o.visible = false; });
+      }
       if (!a.__arte && (clay || prop)) {
         a.__arte = true;
         const THREE = await import('three'), clays = new Map();
@@ -150,12 +179,30 @@ try {
       A.measureInsets(); A.rig.settle(); A.step(0); A.step(0); S.shadowDirty = 4;
       await new Promise(r => { let n = 0; const f = () => (++n < 12 ? requestAnimationFrame(f) : r()); requestAnimationFrame(f); });
       const c = A.rig.camera, r3 = v => [v.x, v.y, v.z].map(x => +x.toFixed(4)), sh = A.SHOTS.find(s => s.key === p.shot);
-      return { fase: S.tl.phases[i].n, indice: i, t: +S.t.toFixed(4), kg: A.barbell.totalKg, camara: p.shot ? { ...sh } : { indice: p.cam, az: +A.rig.az.toFixed(4), el: +A.rig.el.toFixed(4) },
+      let extra = {};
+      if (mask) {
+        // El atleta solo, directo al lienzo y sin la cadena de post (que desenfoca, tiñe y agrega grano); se copia en la misma
+        // tarea, antes de que el visor vuelva a dibujar. Los huesos se proyectan con la misma cámara: [x, y, distancia en m].
+        const THREE = await import('three'), r = A.renderer, col = new THREE.Color(), v = new THREE.Vector3(), huesos = {};
+        const cc = r.getClearColor(col).getHex(), ca = r.getClearAlpha(), ac = r.autoClear, su = r.shadowMap.autoUpdate, nu = r.shadowMap.needsUpdate;
+        r.setRenderTarget(null); r.setClearColor(0x000000, 1); r.autoClear = true; r.shadowMap.autoUpdate = false; r.shadowMap.needsUpdate = false;
+        r.render(a.root, c);
+        const cv = document.createElement('canvas'); cv.width = r.domElement.width; cv.height = r.domElement.height; cv.getContext('2d').drawImage(r.domElement, 0, 0);
+        r.setClearColor(cc, ca); r.autoClear = ac; r.shadowMap.autoUpdate = su; r.shadowMap.needsUpdate = nu;
+        c.updateMatrixWorld();
+        for (const n of ['Hips', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand', 'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand']) {
+          if (!a._byName.has(n)) continue;
+          a.boneWorld(n, v); const d = v.distanceTo(c.position); v.project(c); huesos[n] = [+((v.x * .5 + .5) * cv.width).toFixed(2), +((.5 - v.y * .5) * cv.height).toFixed(2), +d.toFixed(4)];
+        }
+        extra = { png: cv.toDataURL('image/png'), mascara: { ancho: cv.width, alto: cv.height, clases: { rojo: 'brazo', verde: 'antebrazo y mano', azul: 'resto' } }, huesos_px: huesos };
+      }
+      return { ...extra, fase: S.tl.phases[i].n, indice: i, t: +S.t.toFixed(4), kg: A.barbell.totalKg, camara: p.shot ? { ...sh } : { indice: p.cam, az: +A.rig.az.toFixed(4), el: +A.rig.el.toFixed(4) },
         pos: r3(c.position), blanco: r3(A.rig.target), fov: +c.fov.toFixed(3), pxPorMetro: Math.round(S.pxPerM), lod: a.lod };
-    }, [p, CLAY, PROP ? PROP_URL : null]);
+    }, [p, CLAY, PROP ? PROP_URL : null, MASK]);
     if (info.error) { problems.push(`${p.id}: ${info.error}`); continue; }
     await page.waitForTimeout(250);
-    const file = path.join(OUT, stem(p.id) + '.png'); await page.screenshot({ path: file, timeout: 120000 });
+    const file = path.join(OUT, stem(p.id) + '.png');
+    if (MASK) { fs.writeFileSync(file, Buffer.from(info.png.split(',')[1], 'base64')); delete info.png; } else await page.screenshot({ path: file, timeout: 120000 });
     info.archivo = path.basename(file); info.sha256 = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
     run.planos[p.id] = info;
     console.log(`${stem(p.id)} · ${p.who} · ${info.fase} · ${p.shot ? '«' + p.shot + '»' : 'cámara ' + p.cam} · fov ${info.fov} · ${info.pxPorMetro} px/m · lod ${info.lod}`);
