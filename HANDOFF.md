@@ -181,11 +181,9 @@ Resumen: Ventura 18 ok, 26 ok con reservas, 1 mal. Brenner 22 ok, 23 ok con rese
 
 ## Próximos pasos
 
-1. **Referencia visual.** Dos o tres videos en cámara lenta, de costado y de frente; un cuadro por fase en `docs/ref/`. Sin eso todo ajuste de ángulos y de ritmo es estimación.
-2. **Gameplay en JS** (decidido el 10-nov: hacerlo en un entorno cloud de Claude sobre este repo): input de timing por fase, tres intentos con elección de kilos, luces de jueces, válido o nulo. Los fallos animados son poses nuevas y necesitan Blender.
-3. **Ritmo:** corregir las subidas, el segundo tirón de la cargada y el dip (lista de arriba).
-4. **Personaje:** hueso auxiliar o morph esculpido para rodilla y axila; piel con subsuperficie real; bajar triángulos de cabeza y manos.
-5. Ideas anotadas: ayudantes que cambian los discos al cambiar el peso, podio del ganador, build y verificación en GitHub Actions.
+El plan por etapas, con el criterio de terminado de cada una, dónde corre cada cosa y los mensajes para arrancar sesiones nuevas, está en [docs/PLAN.md](docs/PLAN.md).
+
+Resumen: (0) preparar el Mac alquilado y la sesión cloud, (1) juego mínimo jugable en cloud, (2) prueba de dirección de arte con decisión del usuario, (3) atletas definitivos, (4) movimiento contra video y fallos animados, (5) online, (6) pulido.
 
 ## Decisiones tomadas en el camino
 
