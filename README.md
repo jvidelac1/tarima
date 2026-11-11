@@ -18,6 +18,8 @@ Tiene que ser por servidor local: abriendo `index.html` directo, el navegador bl
 
 ## Reconstruir los personajes
 
+En una máquina nueva, `tools/setup.sh` hace los pasos 1 y 2 y verifica que estén Chrome y la tipografía.
+
 1. Dependencias de Python (3.13, que es la versión del módulo `bpy` 5.2):
 
    ```bash
