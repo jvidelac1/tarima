@@ -24,7 +24,7 @@ PRE='mixamorig:'
 VIEWS=(('front',0),('left',90),('back',180),('right',270))
 FOV=20.0       # grados, horizontal (cuadro cuadrado: el vertical es el mismo)
 FILL=1/1.1     # fracción del cuadro que ocupa el sujeto en su lado más ancho, en la vista más ajustada del juego
-WORLD=float(os.environ.get('REFS_WORLD','.45')); KEY=float(os.environ.get('REFS_KEY','400'))   # entorno uniforme y clave (W)
+WORLD=float(os.environ.get('REFS_WORLD','.35')); KEY=float(os.environ.get('REFS_KEY','130'))   # entorno uniforme y clave (W). Medido en ventura: 0 % de píxeles quemados (con .45 y 400 se quemaba el 26 %)
 KEY_AT=(3.2,2.6); KEY_SIZE=4.0   # la clave va a 3,2 m hacia la cámara y 2,6 m por encima del punto de mira; 4 m de lado (sombra muy blanda)
 
 def real_poses(src,keys):
