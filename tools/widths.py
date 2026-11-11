@@ -1,17 +1,20 @@
 """Ancho del brazo y de los hombros en píxeles, medido sobre las máscaras de tools/shots.mjs --mask.
 
-Compara dos o más versiones del personaje en los mismos planos. La máscara trae el atleta solo, sobre negro, sin post ni
+Compara dos o más versiones del personaje en los mismos planos. Las máscaras traen el atleta solo, sobre negro, sin post ni
 suavizado de bordes, con un color plano por segmento (rojo = brazo, verde = antebrazo y mano, azul = resto), y shots.json
 trae la posición en píxeles de hombros y codos (huesos_px) de la misma cámara. Con eso la medida cae en el mismo punto
-anatómico en cada versión aunque la silueta cambie.
+anatómico en cada versión aunque la silueta cambie. Son tres por plano: _mask_ (lo que se ve), _maskb_ (los brazos solos,
+sin que el torso o el antebrazo los tapen) y _maskt_ (el cuerpo sin antebrazos ni manos).
 
 Qué mide, por plano:
-  brazo (izq. y der.)   largo de la corrida de píxeles ROJOS sobre la recta perpendicular al húmero proyectado (hombro a codo),
-                        en 7 cortes entre el 40 % y el 70 % del largo; se informa la mediana de los 7.
-  hombros               ancho de la silueta sobre la recta que pasa por las dos articulaciones del hombro: distancia entre
-                        articulaciones más, de cada lado, el tramo desde la articulación hasta el borde de la silueta
-                        (ese tramo es el «casquete» del deltoides). El antebrazo y la mano (verde) no cuentan como silueta,
-                        así una mano que pasa por delante no alarga la medida.
+  brazo (izq. y der.)   largo de la corrida de píxeles del brazo sobre la recta perpendicular al húmero proyectado (hombro a
+                        codo), en 7 cortes entre el 40 % y el 70 % del largo; se informa la mediana de los 7. Se mide sobre
+                        _maskb_ (ancho propio del brazo). Aparte va el ancho visible, medido igual sobre los píxeles rojos de
+                        _mask_: si es menor que el propio, algo tapa el brazo en ese plano y se marca.
+  hombros               ancho de la silueta de _maskt_ sobre la recta que pasa por las dos articulaciones del hombro: distancia
+                        entre articulaciones más, de cada lado, el tramo desde la articulación hasta el borde de la silueta
+                        (ese tramo es el «casquete» del deltoides). Sin antebrazos ni manos, una mano que pasa por delante
+                        no alarga ni corta la medida.
 Umbral de la máscara: un píxel es del atleta si su canal mayor vale 128 o más; su clase es el canal mayor. Las rectas se
 recorren de a 0,25 px con el píxel más cercano. Con el húmero en escorzo (menos de --escorzo px proyectados) la perpendicular
 no es estable y el plano se marca.
@@ -36,10 +39,10 @@ STEP, CORTES = .25, (.40, .45, .50, .55, .60, .65, .70)
 
 
 def clases(path):
-    """(arm, sil, on) booleanos: brazo, silueta sin antebrazo ni mano, y atleta entero."""
+    """(brazo, atleta) booleanos de una máscara: píxeles cuyo canal mayor es el rojo, y todos los del atleta."""
     im = np.asarray(Image.open(path).convert('RGB')).astype(np.int16)
     on, k = im.max(axis=2) >= 128, im.argmax(axis=2)
-    return on & (k == 0), on & (k != 1), on
+    return on & (k == 0), on
 
 
 def at(m, x, y):
@@ -76,20 +79,25 @@ def corrida(m, c, n, busca=12.):
 
 
 def medir(path, huesos, escorzo):
-    arm, sil, on = clases(path)
-    out, lineas = {'alto': int(arm.shape[0]), 'ancho': int(arm.shape[1]), 'px_brazo': int(arm.sum()), 'px_atleta': int(on.sum())}, []
+    """path: la máscara _mask_; las otras dos se buscan al lado."""
+    vis, on = clases(path)
+    arm, sil = clases(path.replace('_mask_', '_maskb_'))[1], clases(path.replace('_mask_', '_maskt_'))[1]
+    out, lineas = {'alto': int(arm.shape[0]), 'ancho': int(arm.shape[1]), 'px_brazo': int(arm.sum()), 'px_brazo_visible': int(vis.sum()), 'px_atleta': int(on.sum())}, []
     for lado, L in (('izq', 'Left'), ('der', 'Right')):
         S, E = huesos[L + 'Arm'][:2], huesos[L + 'ForeArm'][:2]
         d = (E[0] - S[0], E[1] - S[1])
         largo = math.hypot(*d)
         u = (d[0] / largo, d[1] / largo) if largo > 1e-6 else (0., 1.)
         n = (-u[1], u[0])
-        ws = []
+        ws, vs = [], []
         for f in CORTES:
-            w, a, b = corrida(arm, (S[0] + d[0] * f, S[1] + d[1] * f), n)
+            c = (S[0] + d[0] * f, S[1] + d[1] * f)
+            w, a, b = corrida(arm, c, n)
             ws.append(round(w, 2))
+            vs.append(round(corrida(vis, c, n)[0], 2))
             lineas.append((a, b, (255, 230, 0)))
-        out['brazo_' + lado] = {'px': round(float(np.median(ws)), 2), 'cortes': ws, 'humero_px': round(largo, 1), 'escorzo': largo < escorzo}
+        mw, mv = float(np.median(ws)), float(np.median(vs))
+        out['brazo_' + lado] = {'px': round(mw, 2), 'cortes': ws, 'visible_px': round(mv, 2), 'cortes_visibles': vs, 'tapado': mv < mw - 1.5, 'humero_px': round(largo, 1), 'escorzo': largo < escorzo}
     SL, SR = huesos['LeftArm'][:2], huesos['RightArm'][:2]
     d = (SL[0] - SR[0], SL[1] - SR[1])
     sep = math.hypot(*d)
@@ -99,7 +107,7 @@ def medir(path, huesos, escorzo):
     out['hombros'] = {'px': round(sep + cl + cr, 2), 'entre_articulaciones': round(sep, 2), 'casquete_izq': round(cl, 2), 'casquete_der': round(cr, 2)}
     if cl == cl and cr == cr:
         lineas.append(((SL[0] + u[0] * cl, SL[1] + u[1] * cl), (SR[0] - u[0] * cr, SR[1] - u[1] * cr), (0, 255, 255)))
-    return out, lineas, (arm, on)
+    return out, lineas, (arm, sil)
 
 
 def dibujar(dst, fondo, mask_path, lineas, huesos, arm, on):
@@ -107,7 +115,7 @@ def dibujar(dst, fondo, mask_path, lineas, huesos, arm, on):
     if base.size != (on.shape[1], on.shape[0]):
         base = base.resize((on.shape[1], on.shape[0]))
     px = np.asarray(base).copy()
-    # borde de la silueta en blanco y borde de la clase brazo en rojo: muestra si la máscara calza con la captura
+    # borde del cuerpo sin antebrazos en blanco y de los brazos solos en rojo: muestra si las máscaras calzan con la captura
     for m, colr in ((on, (255, 255, 255)), (arm, (255, 60, 60))):
         e = np.zeros_like(m)
         e[1:, :] |= m[1:, :] != m[:-1, :]
@@ -146,7 +154,7 @@ def main():
         for t in tags:
             run = idx.get(t + '_mask', {})
             q, f = run.get('planos', {}).get(p), os.path.join(o.shots, f'{t}_mask_{p}.png')
-            if not q or not os.path.exists(f) or 'huesos_px' not in q:
+            if not q or 'huesos_px' not in q or not all(os.path.exists(f.replace('_mask_', k)) for k in ('_mask_', '_maskb_', '_maskt_')):
                 falta.append(f'{t}_mask_{p}')
                 continue
             m, lineas, (arm, on) = medir(f, q['huesos_px'], o.escorzo)
@@ -161,10 +169,12 @@ def main():
             continue
         cambios[p] = {}
         filas = [('brazo izq', lambda m: m['brazo_izq']['px']), ('brazo der', lambda m: m['brazo_der']['px']),
-                 ('brazo (media)', lambda m: (m['brazo_izq']['px'] + m['brazo_der']['px']) / 2), ('hombros', lambda m: m['hombros']['px']),
+                 ('brazo (media)', lambda m: (m['brazo_izq']['px'] + m['brazo_der']['px']) / 2),
+                 ('brazo izq visible', lambda m: m['brazo_izq']['visible_px']), ('brazo der visible', lambda m: m['brazo_der']['visible_px']),
+                 ('hombros', lambda m: m['hombros']['px']),
                  ('entre articulaciones', lambda m: m['hombros']['entre_articulaciones']), ('casquete izq', lambda m: m['hombros']['casquete_izq']),
                  ('casquete der', lambda m: m['hombros']['casquete_der']), ('casquete (media)', lambda m: (m['hombros']['casquete_izq'] + m['hombros']['casquete_der']) / 2),
-                 ('área brazo (px²)', lambda m: m['px_brazo']), ('área atleta (px²)', lambda m: m['px_atleta'])]
+                 ('área brazos solos (px²)', lambda m: m['px_brazo']), ('área atleta (px²)', lambda m: m['px_atleta'])]
         for nombre, g in filas:
             vals = [g(res[p][t]) if t in res[p] else float('nan') for t in tags]
             ps = [pct(vals[0], v) for v in vals[1:]]
@@ -173,9 +183,12 @@ def main():
         esc = [f"{t} {l}" for t in tags if t in res[p] for l in ('izq', 'der') if res[p][t]['brazo_' + l]['escorzo']]
         if esc:
             print(f"{p:5} AVISO húmero en escorzo (menos de {o.escorzo:g} px): {', '.join(esc)}")
-    doc = {'metodo': {'mascara': 'tools/shots.mjs --mask: atleta solo sobre negro, sin post ni suavizado; clase = canal mayor (rojo brazo, verde antebrazo y mano, azul resto)',
-                      'umbral': 'píxel del atleta si el canal mayor >= 128', 'brazo': f'mediana de {len(CORTES)} corridas de píxeles rojos perpendiculares al húmero proyectado, entre el 40 % y el 70 % de su largo',
-                      'hombros': 'ancho de la silueta (sin antebrazo ni mano) sobre la recta por las dos articulaciones del hombro; casquete = de la articulación al borde', 'paso_px': STEP},
+        tap = [f"{t} {l}" for t in tags if t in res[p] for l in ('izq', 'der') if res[p][t]['brazo_' + l]['tapado']]
+        if tap:
+            print(f"{p:5} AVISO brazo tapado en parte (el ancho visible es menor que el propio): {', '.join(tap)}")
+    doc = {'metodo': {'mascara': 'tools/shots.mjs --mask: atleta solo sobre negro, sin post ni suavizado; clase = canal mayor (rojo brazo, verde antebrazo y mano, azul resto); _maskb_ brazos solos, _maskt_ cuerpo sin antebrazos ni manos',
+                      'umbral': 'píxel del atleta si el canal mayor >= 128', 'brazo': f'mediana de {len(CORTES)} corridas de píxeles de _maskb_ perpendiculares al húmero proyectado, entre el 40 % y el 70 % de su largo; visible = lo mismo sobre los píxeles rojos de _mask_',
+                      'hombros': 'ancho de la silueta de _maskt_ sobre la recta por las dos articulaciones del hombro; casquete = de la articulación al borde', 'paso_px': STEP},
            'versiones': tags, 'medidas': res, 'resumen': cambios, 'faltan': falta}
     os.makedirs(os.path.dirname(os.path.abspath(o.out)), exist_ok=True)
     with open(o.out, 'w') as fh:

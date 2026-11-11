@@ -7,10 +7,12 @@
 //   --out=<carpeta>   destino de las capturas y de shots.json (lista de planos + datos de cada corrida)
 //   --clay            material de arcilla gris en las mallas del atleta; oculta pelo, barba, cejas y pestañas. Solo P01 a P12.
 //                     (gris oscuro 0x303030: con las luces de la sala un gris medio se quema y aplana el relieve)
-//   --mask            máscara para medir, sin post: el atleta solo, sobre negro, con color plano por segmento según el hueso que
+//   --mask            máscaras para medir, sin post: el atleta solo, sobre negro, con color plano por segmento según el hueso que
 //                     más pesa en cada vértice (rojo = brazo, verde = antebrazo y mano, azul = resto); oculta el pelo como la
-//                     arcilla. Sale como <tag>_mask_P01.png y guarda en shots.json la posición en píxeles de hombros, codos y
-//                     muñecas (huesos_px), para que tools/widths.py mida en el mismo punto anatómico. Solo P01 a P12.
+//                     arcilla. Tres imágenes por plano: <tag>_mask_P01.png (lo que se ve), <tag>_maskb_P01.png (los brazos solos,
+//                     sin que nada los tape) y <tag>_maskt_P01.png (el cuerpo sin antebrazos ni manos). Guarda en shots.json la
+//                     posición en píxeles de hombros, codos y muñecas (huesos_px), para que tools/widths.py mida en el mismo
+//                     punto anatómico. Solo P01 a P12.
 //   --prop=<glb>      malla estática (ya alineada al rig, en metros): se cuelga de la raíz de ventura y se ocultan sus mallas
 //   --only=P01,P03    solo esos planos (los datos de los demás planos de la corrida se conservan en shots.json)
 //   --list            escribe la lista de planos y termina, sin abrir el navegador
@@ -138,22 +140,28 @@ try {
         // Máscara por segmento: cada vértice toma el color de la clase de huesos que más pesa en su piel (0 brazo, 1 antebrazo
         // y mano, 2 resto) y la malla se dibuja con color plano, sin luces.
         a.__arte = true;
+        // El color lleva alfa: 1 en todo para la máscara de lo que se ve; 1 solo en el brazo, o en todo menos antebrazo y mano,
+        // para las otras dos, que se dibujan con corte por alfa y así dejan ver el segmento entero aunque otro lo tape.
         const THREE = await import('three'), mats = new Map(), GET = ['getX', 'getY', 'getZ', 'getW'];
         const cls = n => (/(Left|Right)Arm$/.test(n) ? 0 : /(Left|Right)(ForeArm|Hand)/.test(n) ? 1 : 2);
-        const plano = src => { const side = src?.side ?? THREE.FrontSide; if (!mats.has(side)) mats.set(side, new THREE.MeshBasicMaterial({ name: 'Mascara', vertexColors: true, toneMapped: false, fog: false, side })); return mats.get(side); };
+        const par = src => { const side = src?.side ?? THREE.FrontSide; if (!mats.has(side)) { const m = new THREE.MeshBasicMaterial({ name: 'Mascara', vertexColors: true, toneMapped: false, fog: false, side }), c = m.clone(); c.alphaTest = .5; mats.set(side, [m, c]); } return mats.get(side); };
+        a.__mask = [];
         for (const o of a.meshes) {
           const n = [].concat(o.material)[0]?.name; if (n === 'Hair' || n === 'Lashes') { o.visible = false; continue; }
           const g = o.geometry;
           if (!g.userData.arteMask) {
-            const N = g.attributes.position.count, col = new Float32Array(N * 3), si = g.attributes.skinIndex, sw = g.attributes.skinWeight, bones = o.skeleton?.bones;
+            const N = g.attributes.position.count, cols = [0, 1, 2].map(() => new Float32Array(N * 4)), si = g.attributes.skinIndex, sw = g.attributes.skinWeight, bones = o.skeleton?.bones;
             for (let i = 0; i < N; i++) {
               const w = [0, 0, 0];
               if (si && sw && bones) for (let k = 0; k < 4; k++) { const wk = sw[GET[k]](i); if (wk > 0) w[cls(bones[si[GET[k]](i)]?.name || '')] += wk; } else w[2] = 1;
-              col[i * 3 + (w[0] >= w[1] && w[0] >= w[2] ? 0 : (w[1] >= w[2] ? 1 : 2))] = 1;
+              const c = w[0] >= w[1] && w[0] >= w[2] ? 0 : (w[1] >= w[2] ? 1 : 2);
+              for (const col of cols) col[i * 4 + c] = 1;
+              cols[0][i * 4 + 3] = 1; cols[1][i * 4 + 3] = c === 0 ? 1 : 0; cols[2][i * 4 + 3] = c === 1 ? 0 : 1;
             }
-            g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.userData.arteMask = true;
+            g.userData.arteMask = cols.map(col => new THREE.BufferAttribute(col, 4)); g.setAttribute('color', g.userData.arteMask[0]);
           }
-          o.material = Array.isArray(o.material) ? o.material.map(plano) : plano(o.material);
+          const ms = [].concat(o.material).map(par), arr = Array.isArray(o.material), pick = k => (arr ? ms.map(m => m[k]) : ms[0][k]);
+          a.__mask.push({ o, plano: pick(0), corte: pick(1) }); o.material = pick(0);
         }
         a.root.traverse(o => { if (o.isMesh && o.material?.name === 'HairDepth') o.visible = false; });
       }
@@ -186,15 +194,19 @@ try {
         const THREE = await import('three'), r = A.renderer, col = new THREE.Color(), v = new THREE.Vector3(), huesos = {};
         const cc = r.getClearColor(col).getHex(), ca = r.getClearAlpha(), ac = r.autoClear, su = r.shadowMap.autoUpdate, nu = r.shadowMap.needsUpdate;
         r.setRenderTarget(null); r.setClearColor(0x000000, 1); r.autoClear = true; r.shadowMap.autoUpdate = false; r.shadowMap.needsUpdate = false;
-        r.render(a.root, c);
-        const cv = document.createElement('canvas'); cv.width = r.domElement.width; cv.height = r.domElement.height; cv.getContext('2d').drawImage(r.domElement, 0, 0);
+        const toma = k => {
+          for (const m of a.__mask) { m.o.geometry.setAttribute('color', m.o.geometry.userData.arteMask[k]); m.o.material = k ? m.corte : m.plano; }
+          r.render(a.root, c);
+          const cv = document.createElement('canvas'); cv.width = r.domElement.width; cv.height = r.domElement.height; cv.getContext('2d').drawImage(r.domElement, 0, 0); return cv;
+        };
+        const cv = toma(0), cvB = toma(1), cvT = toma(2); toma(0);
         r.setClearColor(cc, ca); r.autoClear = ac; r.shadowMap.autoUpdate = su; r.shadowMap.needsUpdate = nu;
         c.updateMatrixWorld();
         for (const n of ['Hips', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand', 'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand']) {
           if (!a._byName.has(n)) continue;
           a.boneWorld(n, v); const d = v.distanceTo(c.position); v.project(c); huesos[n] = [+((v.x * .5 + .5) * cv.width).toFixed(2), +((.5 - v.y * .5) * cv.height).toFixed(2), +d.toFixed(4)];
         }
-        extra = { png: cv.toDataURL('image/png'), mascara: { ancho: cv.width, alto: cv.height, clases: { rojo: 'brazo', verde: 'antebrazo y mano', azul: 'resto' } }, huesos_px: huesos };
+        extra = { png: cv.toDataURL('image/png'), png_b: cvB.toDataURL('image/png'), png_t: cvT.toDataURL('image/png'), mascara: { ancho: cv.width, alto: cv.height, clases: { rojo: 'brazo', verde: 'antebrazo y mano', azul: 'resto' }, archivos: { visible: '_mask_', brazos_solos: '_maskb_', sin_antebrazos: '_maskt_' } }, huesos_px: huesos };
       }
       return { ...extra, fase: S.tl.phases[i].n, indice: i, t: +S.t.toFixed(4), kg: A.barbell.totalKg, camara: p.shot ? { ...sh } : { indice: p.cam, az: +A.rig.az.toFixed(4), el: +A.rig.el.toFixed(4) },
         pos: r3(c.position), blanco: r3(A.rig.target), fov: +c.fov.toFixed(3), pxPorMetro: Math.round(S.pxPerM), lod: a.lod };
@@ -202,7 +214,11 @@ try {
     if (info.error) { problems.push(`${p.id}: ${info.error}`); continue; }
     await page.waitForTimeout(250);
     const file = path.join(OUT, stem(p.id) + '.png');
-    if (MASK) { fs.writeFileSync(file, Buffer.from(info.png.split(',')[1], 'base64')); delete info.png; } else await page.screenshot({ path: file, timeout: 120000 });
+    if (MASK) {
+      const b64 = u => Buffer.from(u.split(',')[1], 'base64');
+      fs.writeFileSync(file, b64(info.png)); fs.writeFileSync(path.join(OUT, `${TAG}_maskb_${p.id}.png`), b64(info.png_b)); fs.writeFileSync(path.join(OUT, `${TAG}_maskt_${p.id}.png`), b64(info.png_t));
+      delete info.png; delete info.png_b; delete info.png_t;
+    } else await page.screenshot({ path: file, timeout: 120000 });
     info.archivo = path.basename(file); info.sha256 = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
     run.planos[p.id] = info;
     console.log(`${stem(p.id)} · ${p.who} · ${info.fase} · ${p.shot ? '«' + p.shot + '»' : 'cámara ' + p.cam} · fov ${info.fov} · ${info.pxPorMetro} px/m · lod ${info.lod}`);

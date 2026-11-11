@@ -58,7 +58,7 @@ def capturas(folder):
     game, clay = {}, {}
     for f in sorted(os.listdir(folder)):
         m = re.fullmatch(r'(.+?)(_clay)?_(P\d\d)\.png', f)
-        if m:
+        if m and not re.search(r'_mask[bt]?$', m.group(1)):      # las máscaras de shots.mjs --mask son para medir, no van a la hoja
             (clay if m.group(2) else game).setdefault(m.group(1), {})[m.group(3)] = os.path.join(folder, f)
     return game, clay
 
