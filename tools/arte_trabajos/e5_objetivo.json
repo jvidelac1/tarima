@@ -1,0 +1,90 @@
+{
+ "nota": "E5 A, imágenes objetivo: se edita la captura P01 del visor (1600x900). Sin LoRA Lightning (40 pasos, CFG 4). La entrada se escala a 1360x768, que es el tamaño al que el codificador de Qwen lleva la referencia (1 MP, múltiplos de 8): así la referencia y el lienzo miden lo mismo y el encuadre no se corre. La elegida se devuelve a 1600x900 con `tools/e5_refs.py objetivo`. Tres estilos por dos semillas. Respecto de la negativa de la investigación se sacaron 'text, letters, numbers' (la captura trae el HUD y los discos rotulados, y se pide conservarlos) y 'tattoo' (el personaje tiene uno).",
+ "plantilla": "image_qwen_image_edit_2511_int8",
+ "puentes": {
+  "@Switch (Model)": "on_false",
+  "@Switch (CFG)": "on_false",
+  "@Switch (Steps)": "on_false"
+ },
+ "agregar": {
+  "esc": {
+   "class_type": "ImageScale",
+   "inputs": {
+    "image": [
+     "41",
+     0
+    ],
+    "upscale_method": "lanczos",
+    "width": 1360,
+    "height": 768,
+    "crop": "disabled"
+   }
+  }
+ },
+ "fijos": {
+  "TextEncodeQwenImageEditPlus.image1": [
+   "esc",
+   0
+  ],
+  "VAEEncode.pixels": [
+   "esc",
+   0
+  ]
+ },
+ "trabajos": [
+  {
+   "salida": "out/arte/target/candidatas/T_A_s1.png",
+   "semilla": 1101,
+   "indicacion": "Keep the camera, framing, pose, barbell, plates, arena background, lighting and on-screen graphics exactly as they are. Repaint only the athlete, as the finished character of a stylized-realistic sports video game: in-engine screenshot, real-time rendering, quality of a late previous-generation console title. He is a fictional adult male weightlifter with a compact powerful build, thick trapezius, round deltoids, defined biceps and triceps, dense forearms, wide lats, armpits and serratus clearly visible with both arms locked overhead, medium tan skin, short cropped dark hair, short full dark beard, calm focused face. Same red sleeveless weightlifting singlet with off-white trim, same white wrist wraps, same brown leather belt, same black armband tattoo. Strong warm key light from front-top, cool rim light on shoulders and arms. Near-photoreal real-time look: detailed skin with pores and light sweat, subsurface scattering, accurate muscle anatomy. No new text, no logos, no flags.",
+   "negativa": "logo, brand name, watermark, flag, national emblem, sponsor banner, celebrity, famous athlete, real person likeness, extra fingers, fused fingers, deformed hands, extra limbs, bent barbell, waxy skin, plastic skin, cartoon, anime, illustration, blurry, low resolution",
+   "imagenes": [
+    "out/arte/shots/A_P01.png"
+   ]
+  },
+  {
+   "salida": "out/arte/target/candidatas/T_A_s2.png",
+   "semilla": 1102,
+   "indicacion": "Keep the camera, framing, pose, barbell, plates, arena background, lighting and on-screen graphics exactly as they are. Repaint only the athlete, as the finished character of a stylized-realistic sports video game: in-engine screenshot, real-time rendering, quality of a late previous-generation console title. He is a fictional adult male weightlifter with a compact powerful build, thick trapezius, round deltoids, defined biceps and triceps, dense forearms, wide lats, armpits and serratus clearly visible with both arms locked overhead, medium tan skin, short cropped dark hair, short full dark beard, calm focused face. Same red sleeveless weightlifting singlet with off-white trim, same white wrist wraps, same brown leather belt, same black armband tattoo. Strong warm key light from front-top, cool rim light on shoulders and arms. Near-photoreal real-time look: detailed skin with pores and light sweat, subsurface scattering, accurate muscle anatomy. No new text, no logos, no flags.",
+   "negativa": "logo, brand name, watermark, flag, national emblem, sponsor banner, celebrity, famous athlete, real person likeness, extra fingers, fused fingers, deformed hands, extra limbs, bent barbell, waxy skin, plastic skin, cartoon, anime, illustration, blurry, low resolution",
+   "imagenes": [
+    "out/arte/shots/A_P01.png"
+   ]
+  },
+  {
+   "salida": "out/arte/target/candidatas/T_B_s1.png",
+   "semilla": 1201,
+   "indicacion": "Keep the camera, framing, pose, barbell, plates, arena background, lighting and on-screen graphics exactly as they are. Repaint only the athlete, as the finished character of a stylized-realistic sports video game: in-engine screenshot, real-time rendering, quality of a late previous-generation console title. He is a fictional adult male weightlifter with a compact powerful build, thick trapezius, round deltoids, defined biceps and triceps, dense forearms, wide lats, armpits and serratus clearly visible with both arms locked overhead, medium tan skin, short cropped dark hair, short full dark beard, calm focused face. Same red sleeveless weightlifting singlet with off-white trim, same white wrist wraps, same brown leather belt, same black armband tattoo. Strong warm key light from front-top, cool rim light on shoulders and arms. Stylized realism: slightly idealized anatomy, clean skin with soft subsurface scattering, clearly readable muscle planes, restrained detail. No new text, no logos, no flags.",
+   "negativa": "logo, brand name, watermark, flag, national emblem, sponsor banner, celebrity, famous athlete, real person likeness, extra fingers, fused fingers, deformed hands, extra limbs, bent barbell, waxy skin, plastic skin, cartoon, anime, illustration, blurry, low resolution",
+   "imagenes": [
+    "out/arte/shots/A_P01.png"
+   ]
+  },
+  {
+   "salida": "out/arte/target/candidatas/T_B_s2.png",
+   "semilla": 1202,
+   "indicacion": "Keep the camera, framing, pose, barbell, plates, arena background, lighting and on-screen graphics exactly as they are. Repaint only the athlete, as the finished character of a stylized-realistic sports video game: in-engine screenshot, real-time rendering, quality of a late previous-generation console title. He is a fictional adult male weightlifter with a compact powerful build, thick trapezius, round deltoids, defined biceps and triceps, dense forearms, wide lats, armpits and serratus clearly visible with both arms locked overhead, medium tan skin, short cropped dark hair, short full dark beard, calm focused face. Same red sleeveless weightlifting singlet with off-white trim, same white wrist wraps, same brown leather belt, same black armband tattoo. Strong warm key light from front-top, cool rim light on shoulders and arms. Stylized realism: slightly idealized anatomy, clean skin with soft subsurface scattering, clearly readable muscle planes, restrained detail. No new text, no logos, no flags.",
+   "negativa": "logo, brand name, watermark, flag, national emblem, sponsor banner, celebrity, famous athlete, real person likeness, extra fingers, fused fingers, deformed hands, extra limbs, bent barbell, waxy skin, plastic skin, cartoon, anime, illustration, blurry, low resolution",
+   "imagenes": [
+    "out/arte/shots/A_P01.png"
+   ]
+  },
+  {
+   "salida": "out/arte/target/candidatas/T_C_s1.png",
+   "semilla": 1301,
+   "indicacion": "Keep the camera, framing, pose, barbell, plates, arena background, lighting and on-screen graphics exactly as they are. Repaint only the athlete, as the finished character of a stylized-realistic sports video game: in-engine screenshot, real-time rendering, quality of a late previous-generation console title. He is a fictional adult male weightlifter with a compact powerful build, thick trapezius, round deltoids, defined biceps and triceps, dense forearms, wide lats, armpits and serratus clearly visible with both arms locked overhead, medium tan skin, short cropped dark hair, short full dark beard, calm focused face. Same red sleeveless weightlifting singlet with off-white trim, same white wrist wraps, same brown leather belt, same black armband tattoo. Strong warm key light from front-top, cool rim light on shoulders and arms. More stylized: bolder shapes, slightly exaggerated shoulders and forearms, simplified clean textures, still physically based lighting. No new text, no logos, no flags.",
+   "negativa": "logo, brand name, watermark, flag, national emblem, sponsor banner, celebrity, famous athlete, real person likeness, extra fingers, fused fingers, deformed hands, extra limbs, bent barbell, waxy skin, plastic skin, cartoon, anime, illustration, blurry, low resolution",
+   "imagenes": [
+    "out/arte/shots/A_P01.png"
+   ]
+  },
+  {
+   "salida": "out/arte/target/candidatas/T_C_s2.png",
+   "semilla": 1302,
+   "indicacion": "Keep the camera, framing, pose, barbell, plates, arena background, lighting and on-screen graphics exactly as they are. Repaint only the athlete, as the finished character of a stylized-realistic sports video game: in-engine screenshot, real-time rendering, quality of a late previous-generation console title. He is a fictional adult male weightlifter with a compact powerful build, thick trapezius, round deltoids, defined biceps and triceps, dense forearms, wide lats, armpits and serratus clearly visible with both arms locked overhead, medium tan skin, short cropped dark hair, short full dark beard, calm focused face. Same red sleeveless weightlifting singlet with off-white trim, same white wrist wraps, same brown leather belt, same black armband tattoo. Strong warm key light from front-top, cool rim light on shoulders and arms. More stylized: bolder shapes, slightly exaggerated shoulders and forearms, simplified clean textures, still physically based lighting. No new text, no logos, no flags.",
+   "negativa": "logo, brand name, watermark, flag, national emblem, sponsor banner, celebrity, famous athlete, real person likeness, extra fingers, fused fingers, deformed hands, extra limbs, bent barbell, waxy skin, plastic skin, cartoon, anime, illustration, blurry, low resolution",
+   "imagenes": [
+    "out/arte/shots/A_P01.png"
+   ]
+  }
+ ]
+}

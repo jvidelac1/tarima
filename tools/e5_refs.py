@@ -1,0 +1,248 @@
+#!/usr/bin/env python3
+"""E5 de la etapa 2 (dirección de arte): referencias repintadas con Qwen-Image-Edit-2511 y control de silueta.
+
+Repinta las vistas de blender/refs.py (out/arte/refs) con mejor anatomía de levantador y mide que la silueta no se mueva:
+IoU de la máscara contra el render crudo (objetivo 0,92 o más, hasta 2 reintentos con otra semilla) y fondo negro limpio.
+Primero el frente de cada juego; después izquierda, atrás y derecha con dos imágenes de entrada (el frente repintado y el
+render crudo de esa vista). Corre los trabajos con tools/comfy_run.mjs contra el ComfyUI del pod.
+
+Uso (en el pod, desde la raíz del repo, con ComfyUI en 127.0.0.1:8188 y sin Blender corriendo):
+  .venv/bin/python tools/e5_refs.py frente [--juegos rest_bust,fin_bust,fin_full] [--intentos 3]
+  .venv/bin/python tools/e5_refs.py vistas [--juegos ...] [--vistas left,back,right] [--orden plan|inverso] [--intentos 3]
+  .venv/bin/python tools/e5_refs.py cerrar          arma out/arte/refs_gen/<nombre>.png (RGBA) y resumen.json; lo que no
+                                                    llegó al objetivo queda con el render crudo y así se anota
+  .venv/bin/python tools/e5_refs.py medir <repintada.png> <cruda.png>      mide un par suelto
+  .venv/bin/python tools/e5_refs.py objetivo T_A_s1 T_B_s2 T_C_s1          copia las candidatas elegidas a out/arte/target
+                                                    a 1600x900 (las seis quedan en out/arte/target/candidatas)
+Opciones: --umbral 16 (canal mayor a partir del cual un píxel es del atleta)  --iou 0.92  --personaje ventura
+
+Carpetas (todas bajo out/arte/refs_gen):
+  entrada/   los renders crudos compuestos sobre negro (lo que se le da a Qwen)
+  qwen/      salida directa de Qwen por intento, <nombre>_s<semilla>.png, con su JSON (indicación, semilla, modelos, sha256)
+  <nombre>.png   la referencia final con alfa = máscara de la repintada (o copia del render crudo si no se repintó)
+  resumen.json   por imagen: origen (qwen o cruda), semilla, IoU, fondo e intentos
+
+Medida. Máscara cruda = alfa del render >= 128. Máscara repintada = canal mayor >= umbral. A las dos se les rellenan los
+huecos interiores (silueta exterior): el pelo, la barba y las rodilleras son casi negros y sin relleno contarían como fondo.
+También se informa el IoU sin rellenar. Fondo = lo que queda a más de 24 px de la silueta cruda: se informa el percentil 99
+y el máximo del canal mayor y la fracción de píxeles por encima de 24; «limpio» es p99 <= 10 y fracción <= 0,05 %.
+"""
+import argparse, json, os, shutil, subprocess, sys, time
+import numpy as np
+from PIL import Image, ImageDraw, ImageFilter
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REFS, GEN = 'out/arte/refs', 'out/arte/refs_gen'
+PUENTES = {'@Switch (Model)': 'on_false', '@Switch (CFG)': 'on_false', '@Switch (Steps)': 'on_false'}
+SEM = {'rest_bust': 2100, 'fin_bust': 2200, 'fin_full': 2300}
+NVISTA = {'front': 1, 'left': 2, 'back': 3, 'right': 4}
+
+ANAT = ('clearly separated anterior, lateral and posterior deltoid heads, defined biceps and triceps, dense forearms, '
+        'full pectorals, serratus anterior, wide latissimus dorsi, thick trapezius')
+ROPA = ('a plain red sleeveless one-piece weightlifting singlet with off-white trim, completely plain: no text, no lettering, '
+        'no belt')
+P_FRENTE = ('Keep the exact silhouette, pose, framing and camera of the figure, and keep the background pure solid black. '
+            'Repaint the figure as the same fictional adult male weightlifter with the anatomy of an elite weightlifter: '
+            f'{ANAT}. Realistic skin with clearly readable muscle shapes. He wears {ROPA}. Same face, beard, hair, skin tone, '
+            'white wrist wraps and black armband tattoo on the same arm; keep everything else unchanged. '
+            'Soft even studio lighting, no cast shadows, no rim light.')
+LADO = {'left': ('his left side', 'left side', 'lateral and posterior deltoid heads, triceps, biceps, forearm, serratus anterior, latissimus dorsi'),
+        'back': ('behind', 'back', 'posterior deltoids, trapezius, rhomboids, latissimus dorsi, triceps, spinal erectors'),
+        'right': ('his right side', 'right side', 'lateral and posterior deltoid heads, triceps, biceps, forearm, serratus anterior, latissimus dorsi')}
+NEG = ('text, letters, numbers, logo, brand name, watermark, belt, flag, national emblem, celebrity, famous athlete, '
+       'real person likeness, extra fingers, fused fingers, deformed hands, extra limbs, waxy skin, plastic skin, cartoon, anime, '
+       'illustration, blurry, low resolution, gray background, gradient background, floor, cast shadow, rim light')
+
+
+def p_vista(vista, orden):
+    desde, nombre, musc = LADO[vista]
+    if orden == 'plan':      # imagen 1 = frente repintado, imagen 2 = render crudo de la vista
+        return ('Picture 1 is the character reference, seen from the front. Picture 2 is a render of the same character seen from '
+                f'{desde}. Repaint Picture 2 as the character of Picture 1: same skin, same elite weightlifter muscle definition '
+                f'({musc}), {ROPA}, same soft even studio lighting. Keep the exact silhouette, pose, framing and camera of Picture 2 '
+                f'and its pure solid black background. Keep the armband tattoo only where Picture 2 shows it. The result is the {nombre} '
+                'view of Picture 2, not the front view.')
+    return (f'Picture 1 is a render of a character seen from {desde}. Picture 2 shows the same character from the front, repainted '
+            'in the final look. Repaint Picture 1 with the look of Picture 2: same skin, same elite weightlifter muscle definition '
+            f'({musc}), {ROPA}, same soft even studio lighting. Keep the exact silhouette, pose, framing and camera of Picture 1 and '
+            f'its pure solid black background. Keep the armband tattoo only where Picture 1 shows it. The result is the {nombre} view.')
+
+
+def ruta(*p): return os.path.join(ROOT, *p)
+
+
+# ---------- máscaras y medida ----------
+def rellenar(m):
+    """Silueta exterior: todo lo que no es fondo conectado al borde."""
+    h, w = m.shape
+    pad = Image.new('L', (w + 2, h + 2), 0); pad.paste(Image.fromarray((m * 255).astype('uint8')), (1, 1))
+    ImageDraw.floodfill(pad, (0, 0), 128)
+    return np.asarray(pad)[1:-1, 1:-1] != 128
+
+
+def sin_motas(m):
+    im = Image.fromarray((m * 255).astype('uint8')).filter(ImageFilter.MinFilter(3)).filter(ImageFilter.MaxFilter(3))
+    return np.asarray(im) > 127
+
+
+def iou(a, b):
+    u = np.logical_or(a, b).sum()
+    return float(np.logical_and(a, b).sum() / u) if u else 0.0
+
+
+def caja(m):
+    ys, xs = np.where(m)
+    return [int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())] if len(xs) else None
+
+
+def medir(gen_png, crudo_png, umbral=16):
+    crudo = Image.open(crudo_png).convert('RGBA'); gen = Image.open(gen_png).convert('RGB')
+    escalada = gen.size != crudo.size
+    if escalada: gen = gen.resize(crudo.size, Image.LANCZOS)
+    a = np.asarray(crudo)[..., 3] >= 128
+    g = np.asarray(gen).astype(np.int32); mx = g.max(axis=2)
+    m0 = sin_motas(mx >= umbral); m = rellenar(m0); ar = rellenar(a)
+    lejos = ~(np.asarray(Image.fromarray((a * 255).astype('uint8')).filter(ImageFilter.MaxFilter(49))) > 127)
+    f = mx[lejos]
+    # techo de la medida: el propio render crudo sobre negro pasado por el mismo umbral
+    c = np.asarray(crudo).astype(np.float32); cn = (c[..., :3] * (c[..., 3:4] / 255)).max(axis=2)
+    techo = iou(rellenar(sin_motas(cn >= umbral)), ar)
+    d = {'iou': round(iou(m, ar), 4), 'iou_sin_rellenar': round(iou(m0, a), 4), 'iou_techo_del_metodo': round(techo, 4),
+         'area_cruda_px': int(ar.sum()), 'area_repintada_px': int(m.sum()), 'area_relativa': round(float(m.sum() / max(1, ar.sum())), 4),
+         'caja_cruda': caja(ar), 'caja_repintada': caja(m), 'umbral': umbral, 'reescalada': escalada, 'tam': list(gen.size),
+         'fondo_p50': float(np.percentile(f, 50)), 'fondo_p99': float(np.percentile(f, 99)), 'fondo_max': int(f.max()),
+         'fondo_sobre_24_pct': round(float((f > 24).mean() * 100), 4)}
+    d['fondo_limpio'] = bool(d['fondo_p99'] <= 10 and d['fondo_sobre_24_pct'] <= 0.05)
+    return d, m
+
+
+def con_alfa(gen_png, m, destino):
+    """RGBA: color de la repintada, alfa = su máscara con el borde suavizado; fuera de la máscara, negro exacto."""
+    g = np.asarray(Image.open(gen_png).convert('RGB')).copy()
+    al = np.asarray(Image.fromarray((m * 255).astype('uint8')).filter(ImageFilter.GaussianBlur(0.8)))
+    g[al == 0] = 0
+    Image.fromarray(np.dstack([g, al])).save(destino)
+
+
+# ---------- corrida ----------
+def entrada(nombre):
+    """El render crudo compuesto sobre negro (RGB), que es lo que ve Qwen."""
+    dst = ruta(GEN, 'entrada', nombre + '.png')
+    if not os.path.exists(dst):
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        c = np.asarray(Image.open(ruta(REFS, nombre + '.png')).convert('RGBA')).astype(np.float32)
+        Image.fromarray((c[..., :3] * (c[..., 3:4] / 255) + 0.5).astype('uint8')).save(dst)
+    return os.path.relpath(dst, ROOT)
+
+
+def correr(nombre, semilla, plan):
+    sal = f'{GEN}/qwen/{nombre}_s{semilla}.png'
+    if os.path.exists(ruta(sal)) and os.path.exists(ruta(sal + '.json')): return sal
+    plan['trabajos'][0].update(salida=sal, semilla=semilla)
+    tj = ruta('out/arte/comfy', f'e5_{nombre}_s{semilla}.json'); os.makedirs(os.path.dirname(tj), exist_ok=True)
+    json.dump(plan, open(tj, 'w'), ensure_ascii=False, indent=1)
+    r = subprocess.run(['node', 'tools/comfy_run.mjs', '--trabajos=' + os.path.relpath(tj, ROOT)], cwd=ROOT)
+    if r.returncode: sys.exit(f'comfy_run falló con {nombre} semilla {semilla}')
+    return sal
+
+
+def intentos_de(nombre):
+    f = ruta(GEN, 'qwen', nombre + '.intentos.json')
+    return json.load(open(f)) if os.path.exists(f) else []
+
+
+def lote(nombre, plan_de, a):
+    """Hasta a.intentos semillas; se queda con el mejor IoU entre los de fondo limpio (o el mejor a secas)."""
+    juego, vista = nombre.split('_', 1)[1].rsplit('_', 1)
+    base = SEM[juego] + NVISTA[vista]; hechos = intentos_de(nombre)
+    k0 = max([0] + [h['ronda'] + 1 for h in hechos])
+    for k in range(k0, k0 + a.intentos):
+        semilla = base + 10 * k; t0 = time.time()
+        sal = correr(nombre, semilla, plan_de())
+        d, _ = medir(ruta(sal), ruta(REFS, nombre + '.png'), a.umbral)
+        d.update(ronda=k, semilla=semilla, archivo=sal, orden=getattr(a, 'orden', None), segundos=round(time.time() - t0, 1))
+        hechos.append(d); json.dump(hechos, open(ruta(GEN, 'qwen', nombre + '.intentos.json'), 'w'), indent=1)
+        print(f"MED {nombre} s{semilla} IoU {d['iou']:.4f} (sin rellenar {d['iou_sin_rellenar']:.4f}, techo {d['iou_techo_del_metodo']:.4f}) "
+              f"área x{d['area_relativa']:.3f} fondo p99 {d['fondo_p99']:.0f} máx {d['fondo_max']} >24: {d['fondo_sobre_24_pct']} % "
+              f"{'limpio' if d['fondo_limpio'] else 'SUCIO'} · {d['segundos']} s", flush=True)
+        if d['iou'] >= a.iou and d['fondo_limpio']: break
+    return mejor(hechos)
+
+
+def mejor(hechos):
+    if not hechos: return None
+    limpios = [h for h in hechos if h['fondo_limpio']] or hechos
+    return max(limpios, key=lambda h: h['iou'])
+
+
+def frente_elegido(juego, a):
+    nombre = f'{a.personaje}_{juego}_front'; m = mejor(intentos_de(nombre))
+    return m['archivo'] if m else None
+
+
+def cmd_frente(a):
+    for juego in a.juegos:
+        nombre = f'{a.personaje}_{juego}_front'
+        m = lote(nombre, lambda: {'plantilla': 'image_qwen_image_edit_2511_int8', 'puentes': PUENTES,
+                                  'trabajos': [{'indicacion': P_FRENTE, 'negativa': NEG, 'imagenes': [entrada(nombre)]}]}, a)
+        print(f"FRENTE {nombre}: queda s{m['semilla']} con IoU {m['iou']:.4f}", flush=True)
+
+
+def cmd_vistas(a):
+    for juego in a.juegos:
+        fr = frente_elegido(juego, a)
+        if not fr: sys.exit(f'Falta el frente repintado de {juego}: correr primero `frente`.')
+        for vista in a.vistas:
+            nombre = f'{a.personaje}_{juego}_{vista}'; cr = entrada(nombre)
+            im = {'41': fr, 'ref2': cr} if a.orden == 'plan' else {'41': cr, 'ref2': fr}
+            m = lote(nombre, lambda: {'plantilla': 'image_qwen_image_edit_2511_int8', 'puentes': PUENTES,
+                                      'agregar': {'ref2': {'class_type': 'LoadImage', 'inputs': {'image': ''}},
+                                                  'ref2s': {'class_type': 'FluxKontextImageScale', 'inputs': {'image': ['ref2', 0]}}},
+                                      'fijos': {'TextEncodeQwenImageEditPlus.image2': ['ref2s', 0]},
+                                      'trabajos': [{'indicacion': p_vista(vista, a.orden), 'negativa': NEG, 'imagenes': im}]}, a)
+            print(f"VISTA {nombre}: queda s{m['semilla']} con IoU {m['iou']:.4f}", flush=True)
+
+
+def cmd_cerrar(a):
+    res = {'objetivo_iou': a.iou, 'umbral': a.umbral, 'imagenes': {}}
+    for juego in a.juegos:
+        for vista in ['front', 'left', 'back', 'right']:
+            nombre = f'{a.personaje}_{juego}_{vista}'; hechos = intentos_de(nombre); m = mejor(hechos)
+            crudo, dst = ruta(REFS, nombre + '.png'), ruta(GEN, nombre + '.png')
+            fuerza = nombre in a.crudas
+            if m and m['iou'] >= a.iou and m['fondo_limpio'] and not fuerza:
+                d, mk = medir(ruta(m['archivo']), crudo, a.umbral); con_alfa(ruta(m['archivo']), mk, dst)
+                e = {'origen': 'qwen', 'semilla': m['semilla'], 'de': m['archivo'], 'iou': d['iou'], 'fondo_p99': d['fondo_p99'], 'fondo_max': d['fondo_max']}
+            else:
+                shutil.copyfile(crudo, dst)
+                e = {'origen': 'cruda', 'motivo': 'descartada a ojo' if fuerza and m else ('sin intentos' if not m else f"mejor IoU {m['iou']:.4f}, fondo {'limpio' if m['fondo_limpio'] else 'sucio'}")}
+            e['intentos'] = [{k: h[k] for k in ('semilla', 'iou', 'iou_sin_rellenar', 'area_relativa', 'fondo_p99', 'fondo_max', 'fondo_limpio', 'orden', 'segundos')} for h in hechos]
+            res['imagenes'][nombre] = e
+            print(f"{nombre}: {e['origen']}" + (f" s{e['semilla']} IoU {e['iou']:.4f}" if e['origen'] == 'qwen' else f" ({e['motivo']})"))
+    json.dump(res, open(ruta(GEN, 'resumen.json'), 'w'), ensure_ascii=False, indent=1)
+
+
+def cmd_objetivo(a):
+    os.makedirs(ruta('out/arte/target'), exist_ok=True)
+    for n in a.resto:
+        src = ruta('out/arte/target/candidatas', n + '.png'); im = Image.open(src).convert('RGB')
+        im.resize((1600, 900), Image.LANCZOS).save(ruta('out/arte/target', n + '.png'))
+        meta = json.load(open(src + '.json'))
+        json.dump({'elegida': n, 'de': f'out/arte/target/candidatas/{n}.png', 'tam_original': list(im.size), 'tam': [1600, 900],
+                   'sha256_original': meta.get('sha256'), 'semilla': meta.get('semilla'), 'indicacion': meta.get('indicacion'),
+                   'negativa': meta.get('negativa'), 'modelos': meta.get('modelos')}, open(ruta('out/arte/target', n + '.png.json'), 'w'), ensure_ascii=False, indent=1)
+        print(f'objetivo {n}: {im.size[0]}x{im.size[1]} -> 1600x900')
+
+
+if __name__ == '__main__':
+    ap = argparse.ArgumentParser()
+    ap.add_argument('cmd', choices=['frente', 'vistas', 'cerrar', 'medir', 'objetivo']); ap.add_argument('resto', nargs='*')
+    ap.add_argument('--juegos', default='rest_bust,fin_bust,fin_full'); ap.add_argument('--vistas', default='left,back,right')
+    ap.add_argument('--orden', default='plan', choices=['plan', 'inverso']); ap.add_argument('--intentos', type=int, default=3)
+    ap.add_argument('--umbral', type=int, default=16); ap.add_argument('--iou', type=float, default=0.92)
+    ap.add_argument('--crudas', default='', help='nombres que quedan con el render crudo aunque midan bien (descartadas a ojo)')
+    ap.add_argument('--personaje', default='ventura')
+    a = ap.parse_args(); a.juegos = a.juegos.split(','); a.vistas = a.vistas.split(','); a.crudas = [x for x in a.crudas.split(',') if x]
+    if a.cmd == 'medir':
+        d, _ = medir(a.resto[0], a.resto[1], a.umbral); print(json.dumps(d, indent=1))
+    else: {'frente': cmd_frente, 'vistas': cmd_vistas, 'cerrar': cmd_cerrar, 'objetivo': cmd_objetivo}[a.cmd](a)
