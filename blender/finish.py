@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 NAME=sys.argv[1]; OUT=out_dir(NAME)
 from style import STYLES
 STY=STYLES[NAME]
-FONT=next((p for p in [os.environ.get('TARIMA_FONT',''),'/usr/share/fonts/truetype/google-fonts/Poppins-Bold.ttf','/System/Library/Fonts/Supplemental/Arial Bold.ttf','/Library/Fonts/Arial Bold.ttf','C:/Windows/Fonts/arialbd.ttf','/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'] if p and os.path.exists(p)),None)
+FONT=next((p for p in [os.environ.get('TARIMA_FONT',''),'/usr/share/fonts/truetype/google-fonts/Poppins-Bold.ttf','/System/Library/Fonts/Supplemental/Arial Bold.ttf','/Library/Fonts/Arial Bold.ttf','C:/Windows/Fonts/arialbd.ttf','/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf','/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'] if p and os.path.exists(p)),None)
 if FONT is None: raise SystemExit('Definí TARIMA_FONT con la ruta a una tipografía .ttf en negrita')
 K=STY['H']/1.687
 bpy.ops.wm.open_mainfile(filepath=OUT+'s3.blend')

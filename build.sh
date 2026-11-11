@@ -9,8 +9,8 @@
 # Variables:
 #   FAST=1            saltea las hojas de poses de costado y de frente (los renders de control de WANT se hacen igual)
 #   TARIMA_OUT=dir    carpeta de salida (por defecto out/)
-#   TARIMA_THREADS=6  tope de hilos de CPU (Cycles y BLAS)
-#   TARIMA_GPU=0      renders de control en CPU (por defecto GPU Metal si está)
+#   TARIMA_THREADS=6  tope de hilos de CPU (Cycles y BLAS); por defecto 6, o la cantidad de núcleos si hay menos
+#   TARIMA_GPU=0      renders de control en CPU (por defecto GPU si hay: Metal en Mac, OptiX/CUDA/HIP/oneAPI en Linux; sin GPU cae a CPU)
 #   EXPORT_BAD=1      exporta a web/ aunque check() haya dado cuadros BAD (por defecto no pisa web/ y sale con error)
 # La salida completa de cada paso queda en <salida>/<nombre>/make.log y finish.log; por pantalla van las líneas clave.
 set -uo pipefail
@@ -18,7 +18,8 @@ cd "$(dirname "$0")"
 PY="${PYTHON:-python3}"; [ -z "${PYTHON:-}" ] && [ -x .venv/bin/python ] && PY=.venv/bin/python
 NAMES=("$@"); [ ${#NAMES[@]} -eq 0 ] && NAMES=(ventura brenner)
 OUTR="${TARIMA_OUT:-out}"
-export TARIMA_THREADS="${TARIMA_THREADS:-6}"
+NCPU="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 6)"   # con menos de 6 núcleos (pod de 4 vCPU) no se piden más hilos que núcleos
+export TARIMA_THREADS="${TARIMA_THREADS:-$(( NCPU < 6 ? NCPU : 6 ))}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-$TARIMA_THREADS}" VECLIB_MAXIMUM_THREADS="${VECLIB_MAXIMUM_THREADS:-$TARIMA_THREADS}"
 KEY='MEASURE|RADII|SKEL|GRIP|POSE|rack|TRAJ|UNION|PUSH|CHK|BAD|HAIR|LASH|GLB|CYCLES|BAKE dispositivo|MAPS|TEX |Error|ERROR|Traceback|^ +File "|Exception|SystemExit|No encuentro|Definí'
 

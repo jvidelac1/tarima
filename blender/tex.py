@@ -9,7 +9,7 @@ Salidas en <OUT>/<nombre>/:
 Todo sale de los mapas que hornea make.py (posición de reposo, normal de objeto, máscaras por hueso, AO) y de reglas.
 Sin fotos, sin caras ni marcas reales: los textos son el código de país y el apellido ficticios de style.py."""
 import os
-for _k in ('OMP_NUM_THREADS','VECLIB_MAXIMUM_THREADS','OPENBLAS_NUM_THREADS','MKL_NUM_THREADS','NUMEXPR_NUM_THREADS'): os.environ.setdefault(_k,os.environ.get('TARIMA_THREADS','6'))   # tope de hilos de BLAS (antes de importar numpy)
+for _k in ('OMP_NUM_THREADS','VECLIB_MAXIMUM_THREADS','OPENBLAS_NUM_THREADS','MKL_NUM_THREADS','NUMEXPR_NUM_THREADS'): os.environ.setdefault(_k,os.environ.get('TARIMA_THREADS') or str(min(6,os.cpu_count() or 6)))   # tope de hilos de BLAS (antes de importar numpy)
 import sys, json, math, numpy as np
 from PIL import Image, ImageDraw, ImageFont
 f32=np.float32
@@ -527,7 +527,7 @@ def belt(OUT,STY,Sx=2048,Sy=256):
 if __name__=='__main__':
     HERE=os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0,HERE); from style import STYLES
     NAME=sys.argv[1]; OUT=os.path.join(os.environ.get('TARIMA_OUT') or os.path.join(os.path.dirname(HERE),'out'),NAME)+os.sep; STY=STYLES[NAME]
-    FONT=next(p for p in [os.environ.get('TARIMA_FONT',''),'/System/Library/Fonts/Supplemental/Arial Bold.ttf','/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'] if p and os.path.exists(p))
+    FONT=next(p for p in [os.environ.get('TARIMA_FONT',''),'/System/Library/Fonts/Supplemental/Arial Bold.ttf','/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf','/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'] if p and os.path.exists(p))
     R=int(sys.argv[2]) if len(sys.argv)>2 else None; what=sys.argv[3].split(',') if len(sys.argv)>3 else ['body','eye','shoe','belt','hair','lash']
     if 'body' in what: body(NAME,OUT,STY,STY['H']/1.687,FONT,R)
     for k in ('eye','shoe','belt','hair','lash'):
