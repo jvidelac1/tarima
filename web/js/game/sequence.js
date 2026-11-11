@@ -53,7 +53,7 @@ function envion(M, now, m, G, env) {
 export function poseDe(m, now, P) {
   const lev = m.c.lev, G = tramo(P, SEG[lev]);
   let seg = G, tau;
-  if (m.fase === 'llamado' || !m.tConf) tau = 0;
+  if (m.fase === 'llamado' || m.tConf === undefined) tau = 0;      // ojo: confirmar en el instante 0 es válido (calentamiento y tutorial)
   else if (!m.movs.length) tau = Math.min(G.t('Salida'), (now - m.tConf) / 1000);
   else {
     const M1 = m.movs[0], M2 = m.movs[1];

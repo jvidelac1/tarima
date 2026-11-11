@@ -21,6 +21,8 @@
     <div class="etiqueta" id="etiqueta" hidden></div>
     <div class="cartel" id="cartel" hidden></div>
     <div class="veredicto" id="veredicto" hidden></div>
+    <div class="senal" id="senal" hidden aria-live="off"></div>
+    <div class="guia" id="guia" hidden></div>
     <div class="rival" id="rival" hidden></div>
     <div class="zocalo" id="zocalo" hidden>
       <div class="bandera" id="z-bandera"></div>
@@ -28,12 +30,13 @@
       <div class="lev"><div id="z-lev"></div><div id="z-intento"></div></div>
       <div class="kg"><b id="z-kg">0</b><span>kg</span></div>
     </div>
-    <button id="pausa" hidden aria-label="Pausa">II</button>
+    <button id="pausa" hidden aria-label="Pausa" title="Pausa (Esc)">II</button>
   </div>
   <div id="capa"></div>
+  <div id="sobre" hidden></div>
   <div id="msg">Cargando…</div>
 </div>
-<div id="zona" aria-label="Botón del juego"><span id="zona-txt">Tocá acá</span></div>
+<div id="zona" aria-label="Zona de toque del levantamiento"><span id="zona-txt">Tocá acá</span></div>
 <script type="module" src="js/game/main.js"></script>
 </body>
 </html>
