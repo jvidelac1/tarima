@@ -45,7 +45,8 @@ let ultimo = 0;
 function tic(pintar) {
   const now = reloj.ahora(), dt = Math.min(.25, Math.max(0, (now - ultimo) / 1000)); ultimo = now;
   for (let i = pend.length - 1; i >= 0; i--) if (pend[i].t <= now) pend.splice(i, 1)[0].res();
-  { const ver = puedePausar() && !E.sobre, b = $('pausa'); if (b.hidden === ver) b.hidden = !ver; }
+  // el botón de pausa (para el dedo; con teclado es Esc) no se muestra encima de un panel grande: taparía su título
+  { const ver = puedePausar() && !E.sobre && !$('capa').querySelector('.panel:not(.abajo)'), b = $('pausa'); if (b.hidden === ver) b.hidden = !ver; }
   try { enCuadro?.(now, dt); } catch (e) { E.errores.push(String(e.stack || e)); console.error(e); enCuadro = null; }
   if (!escena) return;
   // durante el intento propio se dibuja cada cuadro; detrás de un panel la imagen queda congelada; en el resto, tope de 30

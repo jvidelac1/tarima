@@ -211,7 +211,8 @@ async function corrida(via) {
   // ---- 2. con el reloj verdadero: pausa, ayuda, tutorial guiado y una práctica a velocidad real
   await J(() => JUEGO.test.real()); await page.waitForTimeout(700);
   await pulsa('#btn-cambiar'); await page.waitForFunction(() => JUEGO.estado().pantalla === 'inicio'); await page.waitForTimeout(500);
-  if (tactil) await page.locator('#pausa').tap(); else await page.keyboard.press('Escape');
+  // la pausa: con Esc desde el inicio; con el dedo, desde el panel del tutorial (el botón no se muestra sobre un panel grande)
+  if (tactil) { await pulsa('#btn-otro'); await page.waitForFunction(() => JUEGO.estado().pantalla === 'tutorial' && JUEGO.estado().panel); await page.waitForTimeout(500); await page.locator('#pausa').tap(); } else await page.keyboard.press('Escape');
   const p1 = await J(() => ({ sobre: JUEGO.estado().sobre, t: JUEGO.reloj.ahora(), foco: document.activeElement?.id })); await page.waitForTimeout(300);
   const p2 = await J(() => JUEGO.reloj.ahora());
   if (p1.sobre !== 'pausa' || p1.foco !== 'so-seguir') mal(`la pausa no abrió con foco en «Seguir»: ${JSON.stringify(p1)}`); else if (p2 !== p1.t) mal(`el reloj siguió corriendo en pausa (${(p2 - p1.t).toFixed(0)} ms)`);
@@ -224,9 +225,11 @@ async function corrida(via) {
     if (a1.sobre !== 'ayuda' || !/Cómo se juega/.test(a1.txt) || !/ESPACIO/.test(a1.txt)) mal(`H no abrió «Cómo se juega»: ${JSON.stringify(a1).slice(0, 200)}`);
     await page.keyboard.press('h'); if (await J(() => JUEGO.estado().sobre)) mal('H no cerró la ayuda');
   }
-  const otro = await page.locator('#btn-otro').textContent();
-  if (!/Repetir tutorial/.test(otro)) mal(`después del tutorial el inicio no ofrece repetirlo (dice «${otro}»)`);
-  await pulsa('#btn-otro'); await page.waitForFunction(() => JUEGO.estado().pantalla === 'tutorial'); await page.waitForTimeout(500);
+  if (!tactil) {
+    const otro = await page.locator('#btn-otro').textContent();
+    if (!/Repetir tutorial/.test(otro)) mal(`después del tutorial el inicio no ofrece repetirlo (dice «${otro}»)`);
+    await pulsa('#btn-otro'); await page.waitForFunction(() => JUEGO.estado().pantalla === 'tutorial'); await page.waitForTimeout(500);
+  }
   await J(() => { JUEGO.E.visitados.length = 0; JUEGO.E.propios = []; }); const tr0 = Date.now();
   await jugar(s => s.pantalla === 'practica' && s.panel, false);      // el arranque guiado, en cámara lenta
   await foto('practica_panel');

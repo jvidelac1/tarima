@@ -54,7 +54,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 .zocalo .lev{padding:calc(var(--u)*.3) calc(var(--u)*.8);border-left:1px solid var(--line);font-size:calc(var(--u)*.85);color:var(--mute);letter-spacing:.08em;white-space:nowrap}
 .zocalo .kg{background:var(--gold);color:#111;padding:0 calc(var(--u)*.8);display:flex;align-items:baseline;gap:.2em}
 .zocalo .kg b{font-weight:800;font-size:calc(var(--u)*2.3)}
-#pausa{position:absolute;top:calc(var(--u)*1.2 + var(--st));left:50%;transform:translateX(-50%);pointer-events:auto;min-height:0;min-width:44px;padding:.35em .9em;background:rgba(6,14,48,.88);font-size:calc(var(--u)*1.2)}
+#pausa{position:absolute;z-index:6;top:calc(var(--u)*1.2 + var(--st));left:50%;transform:translateX(-50%);font-family:var(--display);min-height:0;min-width:44px;padding:.35em .9em;background:rgba(6,14,48,.88);font-size:calc(var(--u)*1.2)}
 
 /* La señal: siempre en el mismo lugar. Horizontal: a la derecha del pesista, a media altura. Vertical: al pie del escenario. */
 .tecla{display:inline-block;font:inherit;font-family:var(--display);font-weight:800;font-style:normal;letter-spacing:.12em;text-transform:uppercase;line-height:1;color:#0a1020;background:#f2f4ff;border-radius:.42em;padding:.42em .8em .5em;box-shadow:0 .24em 0 #7c86a8,0 .24em 0 1px #03050c;white-space:nowrap}
