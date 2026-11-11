@@ -1,0 +1,188 @@
+{
+ "v": 1,
+ "sim": "1.0",
+ "temporada": 1,
+ "modelos": {
+  "ventura": {
+   "s": {
+    "knee": 508,
+    "power": 727,
+    "rec": 740
+   },
+   "c": {
+    "knee": 539,
+    "power": 720,
+    "rec": 631,
+    "amort": 126
+   },
+   "split": {
+    "dip": 359,
+    "rec": 554,
+    "post": 1305
+   },
+   "power": {
+    "dip": 359,
+    "rec": 553,
+    "post": 803
+   },
+   "squat": {
+    "dip": 359,
+    "rec": 725,
+    "post": 502,
+    "fondo": 538
+   }
+  },
+  "brenner": {
+   "s": {
+    "knee": 547,
+    "power": 746,
+    "rec": 749
+   },
+   "c": {
+    "knee": 584,
+    "power": 739,
+    "rec": 702,
+    "amort": 141
+   },
+   "split": {
+    "dip": 355,
+    "rec": 624,
+    "post": 1354
+   },
+   "power": {
+    "dip": 355,
+    "rec": 587,
+    "post": 833
+   },
+   "squat": {
+    "dip": 355,
+    "rec": 809,
+    "post": 521,
+    "fondo": 595
+   }
+  }
+ },
+ "atletas": {
+  "ventura": {
+   "nombre": "Dario Ventura",
+   "pais": "Arxenia",
+   "codigo": "ARX",
+   "dorsal": 7,
+   "modelo": "ventura",
+   "techo": {
+    "s": 169,
+    "c": 211
+   },
+   "apertura": {
+    "s": 158,
+    "c": 197
+   },
+   "enviones": [
+    "squat",
+    "split"
+   ],
+   "attrs": {
+    "tec": 9,
+    "tem": 6,
+    "gar": 6,
+    "fon": 7
+   },
+   "ia": {
+    "apertura": 935,
+    "saltos": {
+     "s": [
+      5,
+      3
+     ],
+     "c": [
+      6,
+      4
+     ]
+    },
+    "umbral": 1010,
+    "estilo": "fijo"
+   }
+  },
+  "brenner": {
+   "nombre": "Ilya Brenner",
+   "pais": "Novakia",
+   "codigo": "NVK",
+   "dorsal": 12,
+   "modelo": "brenner",
+   "techo": {
+    "s": 175,
+    "c": 207
+   },
+   "apertura": {
+    "s": 165,
+    "c": 195
+   },
+   "enviones": [
+    "split",
+    "power"
+   ],
+   "attrs": {
+    "tec": 7,
+    "tem": 8,
+    "gar": 5,
+    "fon": 8
+   },
+   "ia": {
+    "apertura": 940,
+    "saltos": {
+     "s": [
+      5,
+      5
+     ],
+     "c": [
+      5,
+      4
+     ]
+    },
+    "umbral": 1005,
+    "estilo": "pasa"
+   }
+  },
+  "marangi": {
+   "nombre": "Teo Marangi",
+   "pais": "Pelagia",
+   "codigo": "PEL",
+   "dorsal": 3,
+   "modelo": "brenner",
+   "techo": {
+    "s": 172,
+    "c": 209
+   },
+   "apertura": {
+    "s": 160,
+    "c": 194
+   },
+   "enviones": [
+    "power",
+    "split"
+   ],
+   "attrs": {
+    "tec": 5,
+    "tem": 9,
+    "gar": 9,
+    "fon": 5
+   },
+   "ia": {
+    "apertura": 930,
+    "saltos": {
+     "s": [
+      5,
+      5
+     ],
+     "c": [
+      5,
+      5
+     ]
+    },
+    "umbral": 1030,
+    "estilo": "orgullo"
+   }
+  }
+ },
+ "huella": "09c9b907"
+}

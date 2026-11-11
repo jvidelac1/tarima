@@ -1,0 +1,77 @@
+{
+ "datos": "09c9b907",
+ "casos": [
+  {
+   "semilla": 1000003,
+   "nivel": "amistoso",
+   "persona": -1,
+   "tabla": "brenner:165+196=361#1 ventura:157+190=347#2 marangi:162+0=0#-"
+  },
+  {
+   "semilla": 2000006,
+   "nivel": "normal",
+   "persona": 0,
+   "tabla": "marangi:169+204=373#1 brenner:170+202=372#2 ventura:153+200=353#3"
+  },
+  {
+   "semilla": 3000009,
+   "nivel": "dificil",
+   "persona": 1,
+   "tabla": "marangi:175+208=383#1 ventura:165+207=372#2 brenner:157+0=0#-"
+  },
+  {
+   "semilla": 4000012,
+   "nivel": "amistoso",
+   "persona": 2,
+   "tabla": "ventura:157+207=364#1 brenner:168+193=361#2 marangi:159+192=351#3"
+  },
+  {
+   "semilla": 5000015,
+   "nivel": "normal",
+   "persona": -1,
+   "tabla": "marangi:175+199=374#1 brenner:174+197=371#2 ventura:162+206=368#3"
+  },
+  {
+   "semilla": 6000018,
+   "nivel": "dificil",
+   "persona": 0,
+   "tabla": "marangi:173+211=384#1 brenner:174+202=376#2 ventura:154+202=356#3"
+  },
+  {
+   "semilla": 7000021,
+   "nivel": "amistoso",
+   "persona": 1,
+   "tabla": "brenner:165+192=357#1 ventura:156+196=352#2 marangi:162+0=0#-"
+  },
+  {
+   "semilla": 8000024,
+   "nivel": "normal",
+   "persona": 2,
+   "tabla": "ventura:166+208=374#1 brenner:172+201=373#2 marangi:165+184=349#3"
+  },
+  {
+   "semilla": 9000027,
+   "nivel": "dificil",
+   "persona": -1,
+   "tabla": "marangi:176+206=382#1 brenner:176+205=381#2 ventura:168+208=376#3"
+  },
+  {
+   "semilla": 10000030,
+   "nivel": "amistoso",
+   "persona": 0,
+   "tabla": "ventura:151+200=351#1 marangi:151+194=345#2 brenner:160+184=344#3"
+  },
+  {
+   "semilla": 11000033,
+   "nivel": "normal",
+   "persona": 1,
+   "tabla": "ventura:166+209=375#1 marangi:171+203=374#2 brenner:170+201=371#3"
+  },
+  {
+   "semilla": 12000036,
+   "nivel": "dificil",
+   "persona": 2,
+   "tabla": "ventura:169+210=379#1 brenner:174+204=378#2 marangi:170+191=361#3"
+  }
+ ]
+}
