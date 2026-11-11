@@ -116,16 +116,17 @@ def hoja(sets, tags, planos, meta, runs, targets, out, cell, labels, clay):
         y = top + head + i * (ch + gap)
         m = meta.get(p, {})
         d.text((gap, y + 4), p, font=f3, fill=INK)
-        lines = [m.get('who', ''), m.get('levantamiento', ''), re.sub(r'^\^', '', m.get('fase', '')), m.get('camara', '')]
-        # la nota se parte en renglones que entren en la columna de la izquierda
-        words, line = (m.get('nota') or '').split(), ''
-        for w in words:
-            if d.textlength(line + ' ' + w, font=f2) > left - gap * 3 and line:
-                lines.append(line)
-                line = w
-            else:
-                line = (line + ' ' + w).strip()
-        lines.append(line)
+        lines = []
+        # cada dato se parte en renglones que entren en la columna de la izquierda
+        for text in (m.get('who', ''), m.get('levantamiento', ''), re.sub(r'^\^', '', m.get('fase', '')), m.get('camara', ''), m.get('nota') or ''):
+            line = ''
+            for w in text.split():
+                if d.textlength(line + ' ' + w, font=f2) > left - gap * 3 and line:
+                    lines.append(line)
+                    line = w
+                else:
+                    line = (line + ' ' + w).strip()
+            lines.append(line)
         for k, s in enumerate(x for x in lines if x):
             d.text((gap, y + 4 + round(f3.size * 1.4) + k * round(f2.size * 1.4)), s, font=f2, fill=DIM)
         for j, t in enumerate(tags):
