@@ -115,7 +115,7 @@ async function corrida(via) {
         if (g.tipo === 'libre') { await av(150); await toque(); continue; }
         if (g.tipo === 'cierre') {
           const k = g.clave + g.desde;
-          if (I.guiado || hecho === k || (g.clave === 'explota' && o.sinExplotar?.(llamado))) { await av(manual ? 30 : 15); continue; }
+          if (I.seDetiene || hecho === k || (g.clave === 'explota' && o.sinExplotar?.(llamado))) { await av(manual ? 30 : 15); continue; }
           await ir(g.objetivo); await toque(); hecho = k; continue;
         }
         if (g.tipo === 'empuja') { if (s.ahora - ultToque >= 150) { await toque(); ultToque = s.ahora; } else await av(manual ? 16 : 10); continue; }

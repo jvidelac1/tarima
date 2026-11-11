@@ -47,8 +47,8 @@ async function recorrido(via) {
       const s = await E(), I = s.intento; if (!I || !I.propio) { if (s.pantalla === 'decision') return; await page.waitForTimeout(30); continue; }
       const g = I.senal; if (!g) { await page.waitForTimeout(16); continue; }
       const clave = g.clave + (I.parado ? '_parado' : '');
-      if (!vistas.has(clave) && (I.parado || g.tipo !== 'cierre' || !I.guiado)) { vistas.add(clave); if (g.tipo === 'cierre' && !I.parado) { if (o.mitad) { await irA((g.desde + g.objetivo) / 2); await foto(`${tag}_${g.clave}_cerrando`); } } else { await page.waitForTimeout(g.tipo === 'empuja' ? 60 : 250); await foto(`${tag}_${clave}`); } }
-      if (I.guiado && g.tipo === 'cierre' && !I.parado && !vistas.has(g.clave + '_lento') && s.ahora > 0) { vistas.add(g.clave + '_lento'); await page.waitForTimeout(500); await foto(`${tag}_${g.clave}_lento`); continue; }
+      if (!vistas.has(clave) && (I.parado || g.tipo !== 'cierre' || !I.seDetiene)) { vistas.add(clave); if (g.tipo === 'cierre' && !I.parado) { if (o.mitad) { await irA((g.desde + g.objetivo) / 2); await foto(`${tag}_${g.clave}_cerrando`); } } else { await page.waitForTimeout(g.tipo === 'empuja' ? 60 : 250); await foto(`${tag}_${clave}`); } }
+      if (I.seDetiene && g.tipo === 'cierre' && !I.parado && !vistas.has(g.clave + '_lento')) { vistas.add(g.clave + '_lento'); await page.waitForTimeout(500); await foto(`${tag}_${g.clave}_lento`); continue; }
       if (I.ctl === 'c') {      // Clásico
         if (I.fase === 'pelea' || I.fase === 'traba') { const p = I.pelea; if (((p.P < 1e6 && p.aguja < p.exi + 55) || (!p.trabado && p.E < p.exiTraba + 150)) && s.ahora - ult >= 150) { await toque(); ult = s.ahora; } else await page.waitForTimeout(10); }
         else if (I.fase === 'fijacion' && !I.apretado) { await baja(); await page.waitForTimeout(30); }
@@ -58,7 +58,7 @@ async function recorrido(via) {
       }
       if (I.parado) { await page.waitForTimeout(700); await toque(); await page.waitForTimeout(120); if (g.tipo === 'cierre') await foto(`${tag}_${g.clave}_palabra`); continue; }
       if (g.tipo === 'libre') { await page.waitForTimeout(900); await toque(); continue; }
-      if (g.tipo === 'cierre') { const kk = g.clave + g.desde; if (I.guiado || hecho === kk || o.sin === g.clave) { await page.waitForTimeout(15); continue; } await irA(g.objetivo + (o.atraso || 0)); await toque(); hecho = kk; await page.waitForTimeout(110); if (!vistas.has(g.clave + '_pal')) { vistas.add(g.clave + '_pal'); await foto(`${tag}_${g.clave}_palabra`); } continue; }
+      if (g.tipo === 'cierre') { const kk = g.clave + g.desde; if (I.seDetiene || hecho === kk || o.sin === g.clave) { await page.waitForTimeout(15); continue; } await irA(g.objetivo + (o.atraso || 0)); await toque(); hecho = kk; await page.waitForTimeout(110); if (!vistas.has(g.clave + '_pal')) { vistas.add(g.clave + '_pal'); await foto(`${tag}_${g.clave}_palabra`); } continue; }
       if (g.tipo === 'empuja') { if (s.ahora - ult >= 160) { await toque(); ult = s.ahora; } else await page.waitForTimeout(10); continue; }
       await page.waitForTimeout(15);
     }
