@@ -61,11 +61,12 @@ function bucle() { requestAnimationFrame(bucle); if (reloj.manual === null) tic(
  * al botón que lo tenía. El foco se ve siempre (borde dorado) y los botones no se deshabilitan mientras dura el bloqueo.
  */
 const capa = {
-  poner(html, clase = '') {
+  poner(html, clase = '', { foco = true } = {}) {
     const c = $('capa'), prev = c.firstElementChild, act = document.activeElement, clave = prev && prev.contains(act) ? claveDe(act) : null, sc = prev ? prev.scrollTop : 0;
     c.innerHTML = `<div class="panel ${clase}">${html}</div>`; E.modo = 'panel'; E.forzar = true;
     const pn = c.firstElementChild; pn.t0 = prev ? prev.t0 : -1e9; if (prev) pn.scrollTop = sc;
-    if (!E.sobre) enfocar(pn, clave); else E.sobre.foco = null;
+    // `foco: false`: panel donde Espacio es del juego (el metrónomo): nadie queda con foco, y a los botones se llega con Tab
+    if (!foco) { pn.dataset.libre = '1'; document.activeElement?.blur?.(); } else if (!E.sobre) enfocar(pn, clave); else E.sobre.foco = null;
     return pn;
   },
   quitar() { $('capa').innerHTML = ''; if (E.modo === 'panel') E.modo = 'tv'; },
@@ -93,13 +94,13 @@ function pintarSobre(tipo) {
 /** Abre la pausa o la ayuda: congela el reloj del juego (el del llamado no corre) hasta volver. */
 function abrirSobre(tipo) {
   if (E.sobre || !puedePausar()) return false;
-  E.sobre = { tipo, foco: document.activeElement, solto: reloj.manual === null }; if (E.sobre.solto) reloj.manual = reloj.ahora();
+  const act = document.activeElement; E.sobre = { tipo, foco: act && $('capa').contains(act) ? act : null, solto: reloj.manual === null }; if (E.sobre.solto) reloj.manual = reloj.ahora();
   boton.activo = false; pintarSobre(tipo); return true;
 }
 function cerrarSobre() {
   const S = E.sobre; if (!S) return; $('sobre').hidden = true; $('sobre').innerHTML = ''; E.sobre = null; boton.activo = true;
   if (S.solto) { reloj.soltar(); ultimo = reloj.ahora(); }
-  const pn = $('capa').firstElementChild; if (S.foco && S.foco.isConnected && S.foco !== document.body) S.foco.focus({ preventScroll: true }); else if (pn) enfocar(pn);
+  const pn = $('capa').firstElementChild; if (S.foco && S.foco.isConnected) S.foco.focus({ preventScroll: true }); else if (pn && !pn.dataset.libre) enfocar(pn); else document.activeElement?.blur?.();
 }
 /** Teclado de los paneles (se atiende antes que la entrada del levantamiento). */
 function alTeclado(e) {
@@ -111,6 +112,7 @@ function alTeclado(e) {
   if (k === 'Enter' || k === ' ') {
     if (e.repeat) { e.preventDefault(); return; }      // dejar la tecla apretada no activa nada, ni acá ni en el panel que sigue
     const act = document.activeElement; if (act && act.tagName === 'BUTTON' && raiz.contains(act)) return;      // el botón con foco se activa solo
+    if (raiz.dataset.libre) return;      // en el metrónomo, Espacio es el toque
     const b = principal(raiz); if (b) { e.preventDefault(); b.focus({ preventScroll: true }); b.click(); }
   }
 }
@@ -291,7 +293,7 @@ async function inicio() {
 /** Metrónomo de 8 toques: la mediana del atraso propone la corrección (0 a 100 ms), que queda fija para toda la partida. */
 async function metronomo() {
   visita('metronomo'); const defecto = tactil() ? 40 : 0, PULSO = 700, N = 8;
-  const pn = capa.poner(`<h2>Calentamiento · ritmo</h2><p>${tactil() ? 'Tocá la pantalla' : 'Tocá ESPACIO'} junto con cada pulso (${N} toques). Sirve para medir el atraso de tu dispositivo.</p><div class="pulso" id="pulso">${N}</div><div class="fila"><button id="btn-saltear">Saltear</button></div>`, 'chico');
+  const pn = capa.poner(`<h2>Calentamiento · ritmo</h2><p>${tactil() ? 'Tocá la pantalla' : 'Tocá ESPACIO'} junto con cada pulso (${N} toques). Sirve para medir el atraso de tu dispositivo.</p><div class="pulso" id="pulso">${N}</div><div class="fila"><button id="btn-saltear">Saltear</button></div>`, 'chico', { foco: false });
   bloquear(pn); const t0 = E.metro = reloj.ahora() + 1200, errs = []; let salto = false, k = -1;
   clic(pn, '#btn-saltear').then(() => { salto = true; });
   boton.oye = (t, v, via) => { if (!v || via === 'mouse') return; const x = t - t0, i = Math.round(x / PULSO); if (i >= 0 && i < N) errs[i] = x - i * PULSO; };
