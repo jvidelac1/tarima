@@ -7,7 +7,7 @@
 import { idiv, lerpi, mezclar, Azar } from './fixed.js';
 import {
   ventanas, calidad, palabra, alturaExplosion, desvioExplosion, velTiron, exigenciaTabla, alturaTabla, periodoAnillo, errorAnillo, gradoTension,
-  TENSION, ACOMODO_MS, ALTURA_MIN, TOPE_DESVIO, ALTURA_ENVION, NO_DOMINA, EXI_ARRANQUE, EXI_ERROR, PELEA, TRABA, FIJA, HOMBROS, JUEZ, esfuerzoPropio,
+  TENSION, FACIL, ACOMODO_MS, ALTURA_MIN, TOPE_DESVIO, ALTURA_ENVION, NO_DOMINA, EXI_ARRANQUE, EXI_ERROR, PELEA, TRABA, FIJA, HOMBROS, JUEZ, esfuerzoPropio,
 } from './rules.js';
 
 const INF = 2147483647;
@@ -24,6 +24,8 @@ const PASO = k => idiv(k * 25, 3);           // ms del paso k de la pelea (120 p
  * @property {number[]} jueces       umbral de cada juez en milésimas (900 a 1100)
  * @property {number} reloj          ms; 0 = sin reloj (calentamiento)
  * @property {number} [exiFija]      exigencia guionada (calentamiento)
+ * @property {'c'|'f'} [ctl]         nivel de control: 'f' (Fácil) ensancha las ventanas, vuelve amague el tirón anticipado y da siempre buena tensión.
+ *                                   Ausente o 'c': Clásico, las reglas de siempre (docs/CONTROLES.md, sección 4)
  */
 export class Intento {
   /** @param {Ctx} c */
@@ -60,14 +62,14 @@ export class Intento {
     this.M = { mov, k, t0, ign: t0, an: c.anclas[k], tDev: INF, tp: 0, tr: 0, tc: 0, tq: 0, tFallo: INF, causaFallo: null, pelea: null, grado: null, amagues: [] };
     this.movs.push(this.M);
   }
-  _w(g) { const c = this.c; return ventanas(c.I, `${this.M.mov}_${g}`, { tec: c.tec, temple: c.temple, primera: c.primera }); }
+  _w(g) { const c = this.c; return ventanas(c.I, `${this.M.mov}_${g}`, { tec: c.tec, temple: c.temple, primera: c.primera, ancho: c.ctl === 'f' ? FACIL.ancho : 1000 }); }
 
   _aprieta(t) {
     const M = this.M, c = this.c;
     if (this.fase === 'tension' || this.fase === 'hombros') {
       if (t < M.ign) return;
       const d = errorAnillo(Math.max(0, t - c.cal - M.t0), this.per);
-      M.grado = gradoTension(d); M.dTension = d; M.tp = t; M.w = this._w('exp');
+      M.grado = c.ctl === 'f' ? 'buena' : gradoTension(d); M.dTension = d; M.tp = t; M.w = this._w('exp');
       if (M.mov === 'j') { M.tx = t + idiv(M.an.dip * 1000, this.vel); this.fase = 'flexion'; }
       else { M.tk = t + idiv(M.an.knee * 1000, this.vel); M.tx = t + idiv(M.an.power * 1000, this.vel); this.fase = 'tiron'; }
       M.tTarde = M.tx + c.cal + M.w.l;
@@ -84,8 +86,10 @@ export class Intento {
   _suelta(t) {
     const M = this.M, c = this.c;
     if (this.fase === 'tiron') {
-      if (t < M.tk) { this.amagues++; M.amagues.push({ tp: M.tp, t }); const v = Math.min(t - M.tp, 600); M.t0 = M.ign = t + v; this.fase = 'tension'; return; }
-      const e = t - c.cal - M.tx; this.rodilla = true;
+      const e = t - c.cal - M.tx;
+      // amague: antes de la rodilla; en Fácil, también el tirón anticipado (entre la rodilla y el límite)
+      if (t < M.tk || (c.ctl === 'f' && e < -M.w.l)) { this.amagues++; M.amagues.push({ tp: M.tp, t }); const v = Math.min(t - M.tp, 600); M.t0 = M.ign = t + v; this.fase = 'tension'; return; }
+      this.rodilla = true;
       if (e < -M.w.l) { this.gestos.push({ g: 'explosion', mov: M.mov, e, pal: 'temprano', fuera: true }); return this._fallo(t, 'anticipado'); }
       this._explota(t, e);
     } else if (this.fase === 'flexion') {

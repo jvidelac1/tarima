@@ -30,7 +30,8 @@ export const multTemple = tem => 1000 + 80 * (tem - 7);
 /**
  * Ventanas de un gesto. Devuelve {p, g, l} en ms y `recorte`: los mm de altura que cuesta lo que el piso no dejó achicar
  * (1 cm por cada 10 % de ventana).
- * @param {number} I intensidad  @param {string} mov clave de MULT_MOV  @param {{tec:number, temple?:number, primera?:boolean}} o
+ * @param {number} I intensidad  @param {string} mov clave de MULT_MOV  @param {{tec:number, temple?:number, primera?:boolean, ancho?:number}} o
+ *   `ancho` (milésimas) estira las tres ventanas; `k` lo devuelve para que el desvío use la misma curva estirada.
  */
 export function ventanas(I, mov, o) {
   let m = MULT_MOV[mov] * multTecnica(o.tec);                       // millonésimas
@@ -40,7 +41,9 @@ export function ventanas(I, mov, o) {
   const g = Math.max(PISO.g, rdiv(p * 22, 10));
   let l = Math.max(PISO.l, g + 80);
   if (o.primera) l = idiv(l * 13, 10);
-  return { p, g, l, recorte };
+  // nivel de control: el ancho se aplica al final, sobre las tres ventanas a la vez (docs/CONTROLES.md, sección 4)
+  const k = o.ancho || 1000;
+  return k === 1000 ? { p, g, l, recorte, k } : { p: idiv(p * k, 1000), g: idiv(g * k, 1000), l: idiv(l * k, 1000), recorte, k };
 }
 /** Calidad de un gesto (milésimas): 1000 dentro de la ventana perfecta, 0 en el límite. */
 export const calidad = (e, w) => { const a = Math.abs(e); return a <= w.p ? 1000 : a >= w.l ? 0 : lerpi(a, w.p, w.l, 1000, 0); };
@@ -49,7 +52,7 @@ export const palabra = (e, w) => { const a = Math.abs(e); return a <= w.p ? 'per
 /** Altura (mm) que da la explosión: perfecta +30, borde de buena −40, límite −100. */
 export function alturaExplosion(e, w) { const a = Math.abs(e); return a <= w.p ? 30 : a <= w.g ? lerpi(a, w.p, w.g, 30, -40) : lerpi(Math.min(a, w.l), w.g, w.l, -40, -100); }
 /** Desvío (mm, positivo adelante): soltar temprano 0,6 mm por ms fuera de la perfecta; tarde 0,4 mm por ms hacia atrás. */
-export function desvioExplosion(e, w) { const a = Math.abs(e) - w.p; return a <= 0 ? 0 : e < 0 ? idiv(a * 6, 10) : -idiv(a * 4, 10); }
+export function desvioExplosion(e, w) { const a = idiv((Math.abs(e) - w.p) * 1000, w.k || 1000); return a <= 0 ? 0 : e < 0 ? idiv(a * 6, 10) : -idiv(a * 4, 10); }
 
 /** Anillo de tensión: período de respiración (ms) y calidad del apretar. */
 export const periodoAnillo = I => lerpi(clampi(I, 8000, 10000), 8000, 10000, 1600, 1300);
@@ -102,6 +105,10 @@ export const PLAN = [4, 3];                                  // saltos del plan 
 /** Niveles: error típico de tiempo (ms) y de pelea (milésimas) de los rivales, kilos de forma y cuánto más abajo abren y declaran (milésimas del techo). */
 export const NIVELES = { amistoso: { sd: 55, pelea: 90, forma: 0, abre: -35 }, normal: { sd: 36, pelea: 60, forma: 0, abre: 0 }, dificil: { sd: 27, pelea: 40, forma: 1, abre: 0 } };
 export const KG_MAX = 260;
+
+/** Nivel de control «Fácil» (docs/CONTROLES.md): ancho de las ventanas, en milésimas. Lo demás de Fácil vive en game/controles.js. */
+export const FACIL = { ancho: 2000 };
+export const CONTROLES = ['c', 'f'];
 
 /** Causas con su texto. Las de fallo y las de nulo (secciones 5.2 y 5.3). */
 export const CAUSAS = {
