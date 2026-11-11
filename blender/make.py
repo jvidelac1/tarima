@@ -1,14 +1,15 @@
 import bpy, os, sys, bmesh, numpy as np
 sys.path.insert(0,os.path.dirname(os.path.abspath(__file__))); from common import *
 from mathutils import Vector
-R=2048
+R=int(os.environ.get('TARIMA_TEX','4096'))   # resolución de horneado (posición, máscaras, AO, normal de objeto)
 import body
 NAME=sys.argv[1]; OUT=out_dir(NAME)
 boot()
 b,rig=body.build(NAME)
 me=b.data
 gi={g.name:g.index for g in b.vertex_groups}
-keep={gi['helper-l-eye'],gi['helper-r-eye']}; kill={gi['HelperGeometry'],gi['JointCubes']}
+LASH=[f'helper-{s}-eyelashes-{k}' for s in 'lr' for k in (1,2)]   # las tiras de pestañas del mallado base se conservan: finish.py las convierte en tarjetas con alfa
+keep={gi['helper-l-eye'],gi['helper-r-eye']}|{gi[n] for n in LASH}; kill={gi['HelperGeometry'],gi['JointCubes']}
 bm=bmesh.new(); bm.from_mesh(me); dl=bm.verts.layers.deform.verify()
 bmesh.ops.delete(bm,geom=[v for v in bm.verts if any(g in kill for g in v[dl].keys()) and not any(g in keep for g in v[dl].keys())],context='VERTS'); bm.to_mesh(me); bm.free()
 for m in list(b.modifiers):
@@ -19,7 +20,7 @@ P=lambda n:BN[n].head_local.copy()
 gname=[g.name for g in b.vertex_groups]
 co=np.empty(N*3); me.vertices.foreach_get('co',co); co=co.reshape(N,3)
 no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3)
-dom=np.empty(N,dtype=object); W={k:np.zeros(N) for k in ('scalp','lips','helper-l-eye','helper-r-eye','ears')}
+dom=np.empty(N,dtype=object); W={k:np.zeros(N) for k in ['scalp','lips','helper-l-eye','helper-r-eye','ears']+LASH}
 for v in me.vertices:
     bw=0;best=''
     for g in v.groups:
@@ -31,13 +32,13 @@ for v in me.vertices:
 dom=dom.astype(str); isin=lambda names:np.isin(dom,names).astype(float)
 sm=lambda e0,e1,v:(lambda t:t*t*(3-2*t))(np.clip((v-e0)/(e1-e0),0,1))
 hip=P('LeftUpLeg'); knee=P('LeftLeg'); ank=P('LeftFoot'); sh=P('LeftArm'); neck=P('Neck')
-eyeV=(W['helper-l-eye']+W['helper-r-eye']>0)
+eyeV=(W['helper-l-eye']+W['helper-r-eye']>0); lashV=sum(W[n] for n in LASH)>0
 F=dict(torso=isin(['Hips','Spine','Spine1','Spine2','LeftShoulder','RightShoulder','Neck']),thigh=isin(['LeftUpLeg','RightUpLeg']),leg=isin(['LeftUpLeg','RightUpLeg','LeftLeg','RightLeg']),
   low=isin(['LeftLeg','RightLeg','LeftFoot','RightFoot','LeftToeBase','RightToeBase']),scalp=W['scalp'],lips=np.clip(W['lips'],0,1),
-  head=isin(['Head','Neck'])*(~eyeV),farmL=isin(['LeftForeArm','LeftHand']),farmR=isin(['RightForeArm','RightHand']),uarmL=isin(['LeftArm']),eye=eyeV.astype(float),ears=W['ears'])
+  head=isin(['Head','Neck'])*(~eyeV)*(~lashV),farmL=isin(['LeftForeArm','LeftHand']),farmR=isin(['RightForeArm','RightHand']),uarmL=isin(['LeftArm']),eye=eyeV.astype(float),ears=W['ears'])
 x,y,z=co.T; axo=np.abs(x)
 LM=dict(lips=co[W['lips']>.5].mean(0),eyeL=co[W['helper-l-eye']>0].mean(0),eyeR=co[W['helper-r-eye']>0].mean(0),ears=co[(W['ears']>.5)&(x>0)].mean(0))
-hm=F['head']>0; LM['nose']=co[hm][np.argmin(y[hm])]; cm=hm&(axo<.015)&(y<LM['lips'][1]+.03); LM['chin']=co[cm][np.argmin(z[cm])]
+hm=(F['head']>0)&(W['scalp']<.5); LM['nose']=co[hm][np.argmin(y[hm])]; cm=hm&(axo<.015)&(y<LM['lips'][1]+.03); LM['chin']=co[cm][np.argmin(z[cm])]
 LM['eyeR_r']=float(np.linalg.norm(co[W['helper-l-eye']>0]-LM['eyeL'],axis=1).mean())
 print({k:np.round(v,4) for k,v in LM.items()})
 # volumen de prendas (por vértice)
@@ -65,7 +66,9 @@ def attr(name,r,g,bb):
     a=me.color_attributes.new(name,'FLOAT_COLOR','POINT'); a.data.foreach_set('color',np.stack([r,g,bb,np.ones(N)],1).ravel())
 attr('A',F['torso'],F['thigh'],F['leg']); attr('B',F['low'],F['scalp'],F['lips']); attr('C',F['head'],F['farmL'],F['farmR']); attr('D',F['uarmL'],F['eye'],F['ears'])
 attr('PO',co[:,0]+1,co[:,1]+1,co[:,2])
-sc=bpy.context.scene; sc.render.engine='CYCLES'; sc.cycles.device='CPU'
+sc=bpy.context.scene; sc.render.engine='CYCLES'
+# Horneado: CPU por defecto (resultado de referencia). TARIMA_BAKE_GPU=1 lo pasa a GPU; ver HANDOFF sobre la comparación de mapas. Los hilos de CPU quedan limitados en los dos casos.
+print('BAKE dispositivo',cycles_device(sc,gpu=os.environ.get('TARIMA_BAKE_GPU')=='1'))
 bimg=bpy.data.images.new('bake',R,R,alpha=False,float_buffer=True); bimg.colorspace_settings.name='Non-Color'
 bm_=bpy.data.materials.new('BakeMat'); bm_.use_nodes=True; nt=bm_.node_tree
 for n in list(nt.nodes): nt.nodes.remove(n)
@@ -73,7 +76,12 @@ out=nt.nodes.new('ShaderNodeOutputMaterial'); em=nt.nodes.new('ShaderNodeEmissio
 df=nt.nodes.new('ShaderNodeBsdfDiffuse')
 nt.links.new(at.outputs['Color'],em.inputs['Color']); nt.links.new(em.outputs[0],out.inputs['Surface']); nt.nodes.active=it; it.select=True
 me.materials.append(bm_)
-bpy.context.view_layer.objects.active=b; bpy.ops.object.select_all(action="DESELECT"); b.select_set(True)
+# Se hornea sobre una copia subdividida igual que en finish.py (geo.subdivide): así la posición horneada es la de la malla final
+# y los bordes definidos en 3D (ribetes, letras) no ondulan con la subdivisión.
+bk=b.copy(); bk.data=me.copy(); sc.collection.objects.link(bk); bpy.ops.object.select_all(action="DESELECT"); bk.select_set(True); bpy.context.view_layer.objects.active=bk
+import geo; geo.subdivide(bk); mk=bk.data; NK=len(mk.vertices); ck=np.empty(NK*3); mk.vertices.foreach_get('co',ck); ck=ck.reshape(NK,3)
+mk.color_attributes['PO'].data.foreach_set('color',np.stack([ck[:,0]+1,ck[:,1]+1,ck[:,2],np.ones(NK)],1).ravel()); mk.update(); print('BAKE malla subdividida',NK)
+b.hide_render=True   # si no, la malla original (coincidente) tapa a la copia en el AO
 sc.render.bake.margin=10
 def bake(name=None,kind='EMIT',samples=1):
     sc.cycles.samples=samples
@@ -81,12 +89,15 @@ def bake(name=None,kind='EMIT',samples=1):
     if kind=='AO': nt.links.new(df.outputs[0],out.inputs['Surface'])
     bpy.ops.object.bake(type=kind)
     a=np.empty(R*R*4,dtype=np.float32); bimg.pixels.foreach_get(a); return a.reshape(R,R,4)[:,:,:3].copy()
-maps={n:bake(n) for n in ('A','B','C','D','PO')}
-maps['AO']=bake(kind='AO',samples=48)
-np.savez_compressed(OUT+'maps.npz',**maps)
+u8=lambda a:(np.clip(a,0,1)*255+.5).astype(np.uint8)
+maps={n:u8(bake(n)) for n in ('A','B','C','D')}; maps['PO']=bake('PO')
+maps['AO']=u8(bake(kind='AO',samples=int(os.environ.get('TARIMA_AO','64')))[:,:,0])
+nt.links.new(df.outputs[0],out.inputs['Surface']); sc.cycles.samples=1; sc.render.bake.normal_space='OBJECT'; bpy.ops.object.bake(type='NORMAL')   # normal de objeto (para tex.py: palma/dorso, caras hacia arriba)
+a=np.empty(R*R*4,dtype=np.float32); bimg.pixels.foreach_get(a); maps['NO']=u8(a.reshape(R,R,4)[:,:,:3])
+np.savez(OUT+'maps.npz',**maps); print('MAPS',R,{k:(v.dtype.name,v.shape) for k,v in maps.items()})
 import json; json.dump({k:[float(u) for u in np.ravel(v)] for k,v in LM.items()},open(OUT+'lm.json','w'))
 json.dump(dict(hip=list(hip),knee=list(knee),ank=list(ank),sh=list(sh),neck=list(neck),hemz=hemz,arms={s:[list(P(s+'ForeArm')),list(P(s+'Hand')),list(P(s+'Arm'))] for s in ('Left','Right')}),open(OUT+'bones.json','w'))
-me.materials.clear()
+bpy.data.objects.remove(bk); b.hide_render=False; me.materials.clear()
 for n in ('A','B','C','D','PO'): me.color_attributes.remove(me.color_attributes[n])
 bpy.data.images.remove(bimg)
 bpy.ops.wm.save_as_mainfile(filepath=OUT+'s3.blend')
@@ -94,4 +105,4 @@ bpy.ops.wm.save_as_mainfile(filepath=OUT+'s3.blend')
 from PIL import Image
 cov=(maps['PO'][:,:,2]>0.001)
 Image.fromarray((np.clip(maps['PO'][::-1]/[2,2,1.8],0,1)*255).astype(np.uint8)).resize((768,768)).save(OUT+'uv_pos.png')
-Image.fromarray((np.clip(maps['AO'][::-1],0,1)*255).astype(np.uint8)).resize((768,768)).save(OUT+'uv_ao.png')
+Image.fromarray(maps['AO'][::-1]).resize((768,768)).save(OUT+'uv_ao.png'); Image.fromarray(maps['NO'][::-1]).resize((768,768)).save(OUT+'uv_no.png')

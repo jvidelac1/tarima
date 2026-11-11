@@ -3,196 +3,88 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Pesista GLB</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;700;800&family=Saira:wght@400;500;600&display=swap">
-<style>
-/* Layout: escena 3D a sangre completa; consola inferior con biotipo, levantamiento y un deslizador que recorre las fases. Look único de arena oscura. */
-:root{
-  color-scheme:dark;
-  --bg:#060918; --panel:#0b1126; --line:#1d2850; --ink:#eef2ff; --mute:#8e9ac4; --teal:#2fe0d0; --gold:#ffd23f;
-  --display:'Saira Condensed','Arial Narrow',system-ui,sans-serif;
-  --body:'Saira',system-ui,-apple-system,'Segoe UI',sans-serif;
-}
-html,body{height:100%;margin:0}
-[hidden]{display:none!important}
-body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;flex-direction:column;overflow:hidden}
-.stage{position:relative;flex:1;min-height:0}
-#gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
-.tl{position:absolute;top:12px;left:max(16px,env(safe-area-inset-left,0px));pointer-events:none}
-.tr{position:absolute;bottom:10px;right:max(16px,env(safe-area-inset-right,0px));display:flex;gap:6px}
-.name{font-family:var(--display);font-weight:800;font-size:26px;line-height:1;text-transform:uppercase;letter-spacing:.02em;text-shadow:0 2px 12px #000}
-.sub{font-size:12px;color:var(--mute);letter-spacing:.06em;text-transform:uppercase;text-shadow:0 1px 6px #000}
-#msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:20px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);pointer-events:none}
-.panel{background:var(--panel);border-top:1px solid var(--line);padding-block:10px 12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:8px}
-.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
-button:focus-visible,input:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
-.chip{flex:1 1 auto;font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.03em;text-transform:uppercase;padding:8px 6px;white-space:nowrap;background:#111a3a;border:1px solid var(--line);color:var(--mute)}
-.chip[aria-pressed="true"]{color:#04121a;background:var(--teal);border-color:var(--teal)}
-.chip.s{flex:0 0 auto;padding:6px 10px;font-size:13px;background:rgba(11,17,38,.8)}
-.chip.go{flex:0 0 auto;padding:8px 16px;background:var(--gold);border-color:var(--gold);color:#1a1400}
-#phase{font-family:var(--display);font-weight:700;font-size:20px;text-transform:uppercase;letter-spacing:.04em;line-height:1.1}
-#nums{font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums}
-#nums b{color:var(--ink);font-weight:600}
-input[type=range]{width:100%;accent-color:var(--teal);margin:0;height:28px}
-.head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
-</style>
-
+<meta name="color-scheme" content="dark">
+<title>Tarima · Halterofilia</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/app.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/addons/" } }
+</script>
 </head>
 <body>
-<div class="stage">
-  <canvas id="gl"></canvas>
-  <div class="tl"><div class="name" id="name"></div><div class="sub" id="bio"></div><div class="sub" id="bio2"></div></div>
-  <div class="tr" id="cams"></div>
-  <div id="msg">Cargando modelo…</div>
+<div class="stage" id="stage">
+  <canvas id="gl" aria-label="Transmisión 3D del levantamiento"></canvas>
+
+  <!-- gráfica de TV -->
+  <div class="gfx" id="gfx">
+    <div class="bug">
+      <svg viewBox="0 0 48 20" aria-hidden="true"><rect x="2" y="9" width="44" height="2"/><rect x="7" y="2" width="4" height="16"/><rect x="13" y="5" width="3" height="10"/><rect x="37" y="2" width="4" height="16"/><rect x="32" y="5" width="3" height="10"/></svg>
+      <div><b id="ev-title">TARIMA OPEN</b><span id="ev-sub">Final A · 2026</span></div>
+      <i class="live" id="live">EN VIVO</i>
+    </div>
+    <div class="clockbox">
+      <div class="lamps" id="lamps" aria-label="Decisión de los árbitros"><i></i><i></i><i></i></div>
+      <div class="clock" id="clock">1:00</div>
+    </div>
+    <div class="replay" id="replay" hidden>Repetición · cámara lenta</div>
+    <div class="verdict" id="verdict" hidden>Levantamiento válido</div>
+
+    <div class="telemetry" id="telemetry">
+      <div class="phase-label">Fase</div>
+      <div id="phase">Parado</div>
+      <div class="ticks" id="ticks"></div>
+      <div id="nums"></div>
+    </div>
+
+    <div class="lower" id="lower">
+      <div class="flag" id="flag"></div>
+      <div class="who">
+        <div class="l1"><span class="code" id="code">ARX</span><span id="cat">81 kg</span><span id="bio"></span></div>
+        <div class="name" id="name">&nbsp;</div>
+      </div>
+      <div class="lift">
+        <div class="l1" id="liftname">Dos tiempos</div>
+        <div class="att" id="attempt">Intento 1</div>
+      </div>
+      <div class="kg"><b id="kg">0</b><span>kg</span></div>
+    </div>
+  </div>
+
+  <div class="cams" id="cams" role="group" aria-label="Cámaras"></div>
+  <div id="msg">Cargando…</div>
 </div>
-<div class="panel">
-  <div class="row" id="who"></div>
-  <div class="row"><button class="chip" id="lift-c" aria-pressed="true">Dos tiempos</button><button class="chip" id="lift-s" aria-pressed="false">Arranque</button><button class="chip" id="slow" aria-pressed="false">Lento</button><button class="chip go" id="play">Reproducir</button></div>
-  <div class="row" id="jrow"><button class="chip" id="jk-split" aria-pressed="true">Envión en tijera</button><button class="chip" id="jk-power" aria-pressed="false">Power jerk</button><button class="chip" id="jk-squat" aria-pressed="false">Squat jerk</button></div>
-  <div class="head"><div id="phase">Parado</div><div id="nums"></div></div>
+
+<div class="panel" id="panel">
+  <div class="row">
+    <div class="grp" id="who" role="group" aria-label="Atleta"></div>
+    <div class="grp" role="group" aria-label="Levantamiento">
+      <button class="chip" id="lift-c" aria-pressed="true">Dos tiempos</button>
+      <button class="chip" id="lift-s" aria-pressed="false">Arranque</button>
+    </div>
+    <div class="grp main">
+      <button class="chip" id="more-btn" aria-expanded="false" aria-controls="more">Más</button>
+      <button class="chip go" id="play">Reproducir</button>
+    </div>
+    <div class="more" id="more">
+      <div class="grp" id="jrow" role="group" aria-label="Envión">
+        <button class="chip" id="jk-split" aria-pressed="true">Tijera</button>
+        <button class="chip" id="jk-power" aria-pressed="false">Power</button>
+        <button class="chip" id="jk-squat" aria-pressed="false">Squat</button>
+      </div>
+      <label class="kgin">Carga <input type="number" id="load" min="25" max="280" step="1" value="100" inputmode="numeric" aria-label="Carga total en kilos"> kg</label>
+      <div class="grp" role="group" aria-label="Opciones">
+        <button class="chip" id="trace" aria-pressed="false">Traza</button>
+        <button class="chip" id="slow" aria-pressed="false">Lento</button>
+        <select class="chip" id="quality" aria-label="Calidad"><option value="auto">Calidad: auto</option><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option></select>
+        <select class="chip" id="shot" aria-label="Plano de cámara"><option value="">Plano: general</option></select>
+      </div>
+      <div class="grp">
+        <button class="chip" id="replay-btn">Repetición</button>
+      </div>
+    </div>
+  </div>
   <input type="range" id="scrub" min="0" max="12" step="0.01" value="0" aria-label="Fase del levantamiento">
 </div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script>
-(function(){
-const T=THREE, $=id=>document.getElementById(id);
-const C=h=>new T.Color(h).convertSRGBToLinear();
-const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
-const small=Math.min(innerWidth,innerHeight)<600;
-const canvas=$('gl');
-const renderer=new T.WebGLRenderer({canvas,antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
-renderer.outputEncoding=T.sRGBEncoding;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;
-renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;
-const scene=new T.Scene();scene.background=C('#050716');scene.fog=new T.Fog(C('#050716'),9,26);
-const camera=new T.PerspectiveCamera(30,1,.05,80);
-function ctex(w,h,draw){const cv=document.createElement('canvas');cv.width=w;cv.height=h;draw(cv.getContext('2d'),w,h);const t=new T.CanvasTexture(cv);t.encoding=T.sRGBEncoding;t.anisotropy=4;return t;}
-
-// entorno para reflejos: una caja oscura con paneles de luz
-(function(){const env=new T.Scene();env.background=C('#0a0e22');
-  const panel=(col,i,x,y,z,w,h)=>{const m=new T.Mesh(new T.PlaneGeometry(w,h),new T.MeshBasicMaterial({color:C(col).multiplyScalar(i),side:T.DoubleSide}));m.position.set(x,y,z);m.lookAt(0,0,0);env.add(m);};
-  panel('#fff1dd',9,3,6,5,5,5);panel('#3fd0ff',5,-6,3,-5,4,6);panel('#ff4a6a',4,6,2,-5,4,5);panel('#8fa6ff',1.5,-5,2,6,6,4);panel('#2a3050',1,0,-4,0,20,20);
-  const pm=new T.PMREMGenerator(renderer);scene.environment=pm.fromScene(env,.04).texture;pm.dispose();})();
-
-scene.add(new T.HemisphereLight(C('#5a6fb0'),C('#1a0f0a'),.25));
-const key=new T.SpotLight(0xfff1dd,2.0,30,.5,.55,1);key.position.set(2.6,6.2,4.6);key.target.position.set(0,1,0);key.castShadow=true;
-key.shadow.mapSize.set(small?1024:2048,small?1024:2048);key.shadow.bias=-.0004;key.shadow.normalBias=.01;key.shadow.camera.near=2;key.shadow.camera.far=14;scene.add(key,key.target);
-const rimA=new T.DirectionalLight(C('#3fd0ff'),1.3);rimA.position.set(-4,3.5,-4);scene.add(rimA);
-const rimB=new T.DirectionalLight(C('#ff4a6a'),.9);rimB.position.set(4.5,2.5,-3.5);scene.add(rimB);
-
-const stageFloor=new T.Mesh(new T.PlaneGeometry(40,40),new T.MeshStandardMaterial({color:C('#04060e'),roughness:.6,metalness:.1,envMapIntensity:.08}));
-stageFloor.rotation.x=-Math.PI/2;stageFloor.position.y=-.1;stageFloor.receiveShadow=true;scene.add(stageFloor);
-const wood=ctex(512,512,(g,w,h)=>{g.fillStyle='#c9a36c';g.fillRect(0,0,w,h);
-  for(let i=0;i<8;i++){g.fillStyle=`rgba(${90+Math.random()*60|0},${60+Math.random()*30|0},20,${.06+Math.random()*.1})`;g.fillRect(i*64,0,64,h);g.fillStyle='rgba(60,35,10,.5)';g.fillRect(i*64,0,2,h);}
-  for(let i=0;i<260;i++){g.fillStyle=`rgba(80,50,20,${Math.random()*.12})`;g.fillRect(Math.random()*w,Math.random()*h,1+Math.random()*2,20+Math.random()*90);}
-  g.strokeStyle='rgba(20,30,90,.85)';g.lineWidth=10;g.strokeRect(5,5,w-10,h-10);});
-const plat=new T.Mesh(new T.BoxGeometry(4,.1,4),new T.MeshStandardMaterial({map:wood,color:C('#b9b9b9'),roughness:.6,envMapIntensity:.08}));plat.position.y=-.05;plat.receiveShadow=true;scene.add(plat);
-const wall=new T.Mesh(new T.PlaneGeometry(30,12),new T.MeshBasicMaterial({map:ctex(1024,512,(g,w,h)=>{
-  const gr=g.createLinearGradient(0,0,0,h);gr.addColorStop(0,'#070b24');gr.addColorStop(1,'#0c1440');g.fillStyle=gr;g.fillRect(0,0,w,h);
-  g.lineWidth=26;for(let i=0;i<9;i++){g.strokeStyle=`rgba(70,100,230,${.05+.03*(i%3)})`;g.beginPath();const x=i*130-60;g.moveTo(x,0);g.lineTo(x+150,h/2);g.lineTo(x,h);g.stroke();}
-  g.fillStyle='#2fe0d0';g.shadowColor='#2fe0d0';g.shadowBlur=30;[150,874].forEach(x=>g.fillRect(x,40,8,h-80));})}));
-wall.position.set(0,4.5,-7);scene.add(wall);
-(function(){const n=90,pos=new Float32Array(n*3),col=new Float32Array(n*3),pal=['#ffffff','#2fe0d0','#ffd23f','#6f8cff'];
-  for(let i=0;i<n;i++){pos[i*3]=(Math.random()-.5)*26;pos[i*3+1]=.3+Math.random()*5;pos[i*3+2]=-5.5-Math.random()*1.2+(Math.abs(pos[i*3])>6?4:0);const c=C(pal[i%4]);col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b;}
-  const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(pos,3));g.setAttribute('color',new T.BufferAttribute(col,3));
-  const tx=ctex(64,64,(c)=>{const r=c.createRadialGradient(32,32,2,32,32,30);r.addColorStop(0,'rgba(255,255,255,.9)');r.addColorStop(.6,'rgba(255,255,255,.35)');r.addColorStop(1,'rgba(255,255,255,0)');c.fillStyle=r;c.fillRect(0,0,64,64);});
-  scene.add(new T.Points(g,new T.PointsMaterial({map:tx,size:.5,vertexColors:true,transparent:true,opacity:.5,blending:T.AdditiveBlending,depthWrite:false})));})();
-
-const bar=new T.Group();bar.position.set(0,.225,.11);scene.add(bar);
-const SIDE={'-1':[],'1':[]};
-(function(){const PR=.225;
-  const steel=new T.MeshStandardMaterial({color:C('#c9ced6'),roughness:.25,metalness:.9});
-  const cyl=(r,l,mat,x,seg)=>{const m=new T.Mesh(new T.CylinderGeometry(r,r,l,seg||16),mat);m.rotation.z=Math.PI/2;m.position.x=x;m.castShadow=true;bar.add(m);return m;};
-  cyl(.014,1.34,steel,0,12);
-  const cap=(kg,col)=>ctex(256,256,(g)=>{g.fillStyle=col;g.fillRect(0,0,256,256);g.strokeStyle='rgba(0,0,0,.25)';g.lineWidth=10;g.beginPath();g.arc(128,128,121,0,7);g.stroke();
-    g.strokeStyle='rgba(255,255,255,.22)';g.lineWidth=3;g.beginPath();g.arc(128,128,96,0,7);g.stroke();g.fillStyle='#8a8f98';g.beginPath();g.arc(128,128,34,0,7);g.fill();g.fillStyle='#22252b';g.beginPath();g.arc(128,128,15,0,7);g.fill();
-    g.fillStyle='#fff';g.textAlign='center';g.textBaseline='middle';g.font="800 46px 'Saira Condensed','Arial Narrow',sans-serif";g.fillText(kg+'',128,62);g.save();g.translate(128,196);g.rotate(Math.PI);g.fillText(kg+'',0,0);g.restore();
-    g.font="700 20px 'Saira Condensed','Arial Narrow',sans-serif";g.fillText('TARIMA',62,128);g.fillText('KG',196,128);});
-  const caps={25:cap(25,'#d9261c'),20:cap(20,'#1f4fc4')};
-  [-1,1].forEach(s=>{cyl(.025,.415,steel,s*.8775);cyl(.042,.03,steel,s*.675);let x=.692;
-    [[25,'#d9261c',.058],[25,'#d9261c',.058],[20,'#1f4fc4',.048]].forEach(d=>{const cm=new T.MeshStandardMaterial({map:caps[d[0]],roughness:.5,envMapIntensity:.5});
-      const p=new T.Mesh(new T.CylinderGeometry(PR,PR,d[2],40),[new T.MeshStandardMaterial({color:C(d[1]),roughness:.55,envMapIntensity:.5}),cm,cm]);p.rotation.z=Math.PI/2;p.position.x=s*(x+d[2]/2);p.castShadow=true;bar.add(p);SIDE[s].push(p);x+=d[2]+.003;});
-    SIDE[s].push(cyl(.105,.018,new T.MeshStandardMaterial({color:C('#d9261c'),roughness:.5}),s*(x+.009),28));
-    cyl(.045,.05,new T.MeshStandardMaterial({color:C('#30343c'),roughness:.4,metalness:.6}),s*(x+.05));});})();
-
-
-// ---------- personajes y poses ----------
-let DATA=null;
-const INFO={ventura:['Dario Ventura','1,70 m · fémur corto · brazos cortos'],brenner:['Ilya Brenner','1,83 m · fémur largo · brazos largos']};
-const DUR={'Salida':1.2,'Primer tirón':.55,'Segundo tirón':.3,'Triple extensión':.13,'Bajada':.2,'Recepción':.22,'Recuperación':1.3,'Envión · Dip':.35,'Envión · Empuje':.16,
-  'Envión · Tijera':.2,'Envión · Recuperación':.7,'Envión · Final':.7,'Power jerk · Recepción':.2,'Squat jerk · Recepción':.25,'Squat jerk · Recuperación':.9};
-const LIFT={};let who=null,lift='c',jerk='split',pos=0,playing=false,slow=false,playT=0,FR=[];
-const fail=()=>{$('msg').hidden=false;$('msg').textContent='No se pudo cargar el modelo';};
-function load(name){
-  if(LIFT[name])return Promise.resolve(LIFT[name]);
-  $('msg').hidden=false;$('msg').textContent='Cargando modelo…';
-  return new Promise((res,rej)=>{
-    new T.GLTFLoader().load('models/'+name+'.glb',g=>{
-      const root=g.scene;root.position.y=.016;root.visible=false;scene.add(root);const bones=[];
-      root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;
-          (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{m.envMapIntensity=m.name==='Eyes'?1.4:.55;if(m.map)m.map.anisotropy=8;});}
-        if(o.isBone)bones.push(o);});
-      const mixer=new T.AnimationMixer(root),clip=g.animations[0],act=mixer.clipAction(clip);act.play();
-      const SUB=DATA[name].sub,n=Math.round(clip.duration*SUB)+1,snap=[];
-      for(let i=0;i<n;i++){mixer.setTime(Math.min(i/SUB,clip.duration-.001));snap.push(bones.map(b=>[b.quaternion.clone(),b.position.clone()]));}
-      act.stop();mixer.uncacheRoot(root);
-      res(LIFT[name]={root,bones,snap,bar:bones.find(b=>b.name==='Bar')});
-    },undefined,rej);}).then(l=>{$('msg').hidden=true;return l;});
-}
-// línea de tiempo: la cargada sigue con el envión elegido; cada cuadro guarda de qué tramo sale
-function build(){
-  if(!who)return;const S=DATA[who].segs;FR=[];
-  const add=(seg,from)=>S[seg].poses.forEach((p,i)=>{if(i>=from)FR.push({seg,i,p});});
-  if(lift==='s')add('snatch',0);else{add('clean',0);add(jerk,1);}
-  $('scrub').max=FR.length-1;pos=Math.min(pos,FR.length-1);
-}
-const v=new T.Vector3();
-function apply(){
-  const l=LIFT[who];if(!l||FR.length<2)return;const N=FR.length-1;pos=Math.min(N,Math.max(0,pos));
-  const a=Math.min(N-1,Math.floor(pos)),u=Math.min(1,pos-a),nx=FR[a+1],sg=DATA[who].segs[nx.seg];
-  const t=(sg.start+nx.i-1+u)*DATA[who].sub,ta=Math.min(l.snap.length-2,Math.floor(t)),tu=Math.min(1,t-ta),A=l.snap[ta],B=l.snap[ta+1];
-  l.bones.forEach((b,i)=>{b.quaternion.copy(A[i][0]).slerp(B[i][0],tu);b.position.copy(A[i][1]).lerp(B[i][1],tu);});
-  l.root.updateMatrixWorld(true);l.bar.getWorldPosition(v);bar.position.copy(v);
-  const pa=FR[a].p,pb=nx.p,mix=k=>pa[k]+(pb[k]-pa[k])*u;
-  $('phase').textContent=FR[Math.round(pos)].p.n;
-  $('nums').innerHTML='Torso <b>'+Math.round(mix('lean'))+'°</b> · Cadera <b>'+Math.round(mix('hip')*100)+' cm</b> · Barra <b>'+Math.round(mix('bz')*100)+' cm</b>';
-  $('scrub').value=pos;
-}
-function setWho(name){load(name).then(l=>{Object.keys(LIFT).forEach(k=>LIFT[k].root.visible=k===name);who=name;
-  $('name').textContent=INFO[name][0];$('bio').textContent=INFO[name][1];const s=DATA[name].seg,h=DATA[name].h,pc=x=>Math.round(x/h*100)+'%';
-  $('bio2').textContent='Fémur '+pc(s.femur)+' · tibia '+pc(s.tibia)+' · brazo '+pc(s.arm);
-  document.querySelectorAll('#who .chip').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===name));build();apply();}).catch(fail);}
-Object.keys(INFO).forEach(k=>{const b=document.createElement('button');b.className='chip';b.id='who-'+k;b.dataset.k=k;b.textContent=INFO[k][0].split(' ')[1]+(k==='ventura'?' · compacto':' · largo');b.setAttribute('aria-pressed','false');b.addEventListener('click',()=>setWho(k));$('who').appendChild(b);});
-function setLift(k){lift=k;playing=false;pos=0;$('lift-c').setAttribute('aria-pressed',k==='c');$('lift-s').setAttribute('aria-pressed',k==='s');$('jrow').hidden=k==='s';build();apply();}
-function setJerk(k){jerk=k;playing=false;['split','power','squat'].forEach(x=>$('jk-'+x).setAttribute('aria-pressed',x===k));build();pos=Math.min(pos,8);apply();}
-$('lift-c').addEventListener('click',()=>setLift('c'));$('lift-s').addEventListener('click',()=>setLift('s'));
-['split','power','squat'].forEach(x=>$('jk-'+x).addEventListener('click',()=>setJerk(x)));
-$('slow').addEventListener('click',()=>{slow=!slow;$('slow').setAttribute('aria-pressed',slow);});
-$('play').addEventListener('click',()=>{playing=true;playT=0;pos=0;});
-$('scrub').addEventListener('input',e=>{playing=false;pos=parseFloat(e.target.value);apply();});
-
-// ---------- cámara ----------
-const CAMS=[['3/4',.6],['Lado',1.5708],['Frente',0],['Atrás',2.7]];let az=.6,azT=.6,drag=null;
-CAMS.forEach((c,i)=>{const b=document.createElement('button');b.className='chip s';b.id='cam-'+i;b.textContent=c[0];b.addEventListener('click',()=>{azT=c[1];});$('cams').appendChild(b);});
-canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,a:azT};canvas.setPointerCapture(e.pointerId);});
-canvas.addEventListener('pointermove',e=>{if(drag)azT=drag.a-(e.clientX-drag.x)*.009;});
-['pointerup','pointercancel'].forEach(n=>canvas.addEventListener(n,()=>drag=null));
-function fit(){const w=canvas.clientWidth,h=canvas.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
-new ResizeObserver(fit).observe(canvas);fit();
-let last=performance.now();const tg=new T.Vector3(0,1.02,0);
-function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-last)/1000,.05);last=now;
-  if(playing&&FR.length>1){playT+=dt/(slow?4:1);const n=FR.length-1,du=k=>DUR[FR[k+1].p.n]||.5;let t=playT,k=0;while(k<n&&t>du(k)){t-=du(k);k++;}
-    if(k>=n){pos=n;playing=false;}else{let u=t/du(k);if(du(k)>.6)u=u*u*(3-2*u);pos=k+u;}
-    apply();}
-  az+=(azT-az)*Math.min(1,dt*5);const sn=Math.sin(az);SIDE['1'].forEach(m=>m.visible=!(sn>.8));SIDE['-1'].forEach(m=>m.visible=!(sn<-.8));
-  const tan=Math.tan(camera.fov*Math.PI/360),W=1.9*Math.abs(Math.cos(az))+1.3,d=Math.max(2.45/2/tan,W/2/(tan*camera.aspect))*1.06;
-  camera.position.set(tg.x+Math.sin(az)*d,tg.y+d*.05,tg.z+Math.cos(az)*d);camera.lookAt(tg);renderer.render(scene,camera);}
-requestAnimationFrame(frame);
-fetch('data/poses.json').then(r=>r.json()).then(d=>{DATA=d;setWho('ventura');}).catch(fail);
-})();
-</script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>

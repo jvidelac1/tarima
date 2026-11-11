@@ -31,7 +31,7 @@ Juego web de halterofilia. La prioridad acordada es el equilibrio entre calidad 
 | Agarre de cargada | 0,53 m | 0,56 m |
 | Agarre de arranque | 1,05 m | 1,13 m |
 
-Referencias pedidas: Ventura sigue el biotipo de Yeison López y Tian Tao (fémur corto, brazos cortos); Brenner, el de Karlos Nasar (fémur largo, brazos algo más largos). Las estaturas salen de fichas públicas (Tian Tao 1,73 m, Nasar 1,83 m). Las proporciones de segmentos **no están publicadas**: son una estimación a partir de esa descripción.
+Los dos biotipos son arquetipos de la halterofilia: Ventura es el levantador compacto (fémur corto, brazos cortos) y Brenner el largo (fémur largo, brazos algo más largos). Las proporciones de segmentos son una estimación, no una medición de ninguna persona.
 
 ### Secuencias que existen
 

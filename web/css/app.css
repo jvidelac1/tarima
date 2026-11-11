@@ -1,0 +1,133 @@
+/* Visor Tarima: escena a sangre con gráfica de transmisión superpuesta y consola de control inferior. */
+@font-face{font-family:'Saira Condensed';font-weight:500;font-display:swap;src:url('../assets/fonts/saira-condensed-500.woff2') format('woff2')}
+@font-face{font-family:'Saira Condensed';font-weight:700;font-display:swap;src:url('../assets/fonts/saira-condensed-700.woff2') format('woff2')}
+@font-face{font-family:'Saira Condensed';font-weight:800;font-display:swap;src:url('../assets/fonts/saira-condensed-800.woff2') format('woff2')}
+@font-face{font-family:'Saira';font-weight:400;font-display:swap;src:url('../assets/fonts/saira-400.woff2') format('woff2')}
+@font-face{font-family:'Saira';font-weight:500;font-display:swap;src:url('../assets/fonts/saira-500.woff2') format('woff2')}
+@font-face{font-family:'Saira';font-weight:600;font-display:swap;src:url('../assets/fonts/saira-600.woff2') format('woff2')}
+:root{
+  color-scheme:dark;
+  --bg:#03050c; --panel:#080d1e; --line:#1b2548; --ink:#f2f4ff; --mute:#93a0cc; --teal:#35e6d6; --gold:#ffd23f; --navy:#0a1a55; --red:#e2231a;
+  --display:'Saira Condensed','Arial Narrow',system-ui,sans-serif;
+  --body:'Saira',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --gut:max(18px,env(safe-area-inset-left,0px));
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;flex-direction:column;overflow:hidden}
+.stage{position:relative;flex:1;min-height:0;overflow:hidden;background:#000;container-type:size}
+.stage>*{--u:clamp(9px,1.55cqh,17px)}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:20px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);pointer-events:none;background:radial-gradient(ellipse at center,#0a1030 0,#03050c 70%)}
+
+/* ---- gráfica de TV ---- */
+.gfx{position:absolute;inset:0;pointer-events:none;font-family:var(--display);text-transform:uppercase}
+.bug{position:absolute;top:calc(var(--u)*1.6);left:var(--gut);display:flex;align-items:center;gap:calc(var(--u)*.7);background:linear-gradient(90deg,rgba(6,14,48,.92),rgba(6,14,48,.72));padding:calc(var(--u)*.45) calc(var(--u)*.9);border-left:calc(var(--u)*.28) solid var(--teal)}
+.bug svg{width:calc(var(--u)*2.9);fill:var(--teal)}
+.bug b{display:block;font-weight:800;font-size:calc(var(--u)*1.35);letter-spacing:.04em;line-height:1}
+.bug span{display:block;font-weight:500;font-size:calc(var(--u)*.78);letter-spacing:.12em;color:var(--mute);line-height:1.3}
+.live{font-style:normal;font-weight:700;font-size:calc(var(--u)*.8);letter-spacing:.1em;background:var(--red);padding:.15em .55em;margin-left:calc(var(--u)*.4)}
+.live::before{content:'';display:inline-block;width:.5em;height:.5em;border-radius:50%;background:#fff;margin-right:.4em;vertical-align:.08em}
+.clockbox{position:absolute;top:calc(var(--u)*1.6);right:var(--gut);display:flex;align-items:center;gap:calc(var(--u)*.8);background:rgba(6,14,48,.86);padding:calc(var(--u)*.4) calc(var(--u)*.9)}
+.clock{font-weight:800;font-size:calc(var(--u)*1.9);font-variant-numeric:tabular-nums;line-height:1;min-width:2.2em;text-align:right}
+.lamps{display:flex;gap:calc(var(--u)*.35)}
+.lamps i{width:calc(var(--u)*1.05);height:calc(var(--u)*1.05);border-radius:50%;background:#1a2140;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.lamps i.w{background:#f6f4ea;box-shadow:0 0 calc(var(--u)*.9) rgba(255,255,255,.8)}
+.lamps i.r{background:var(--red);box-shadow:0 0 calc(var(--u)*.9) rgba(226,35,26,.8)}
+.replay,.verdict{position:absolute;top:calc(var(--u)*5.2);font-weight:700;font-size:calc(var(--u)*.95);letter-spacing:.14em;padding:.3em .9em}
+.replay{left:var(--gut);background:var(--gold);color:#161100}
+.verdict{right:var(--gut);background:#f6f4ea;color:#0a1030}
+
+.telemetry{position:absolute;right:var(--gut);bottom:calc(var(--u)*8.2);width:calc(var(--u)*15);background:linear-gradient(180deg,rgba(6,14,48,.9),rgba(4,8,26,.82));padding:calc(var(--u)*.7) calc(var(--u)*.9);border-top:calc(var(--u)*.18) solid var(--teal)}
+.phase-label{font-weight:500;font-size:calc(var(--u)*.72);letter-spacing:.18em;color:var(--mute)}
+#phase{font-weight:800;font-size:calc(var(--u)*1.55);letter-spacing:.03em;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ticks{display:flex;gap:2px;margin:calc(var(--u)*.45) 0}
+.ticks i{flex:1;height:calc(var(--u)*.26);background:#24305e}
+.ticks i.on{background:var(--teal)}
+#nums{display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--u)*.2) calc(var(--u)*.8);font-size:calc(var(--u)*.78);letter-spacing:.08em;color:var(--mute);font-weight:500}
+#nums b{display:block;color:var(--ink);font-weight:700;font-size:calc(var(--u)*1.3);letter-spacing:0;font-variant-numeric:tabular-nums;line-height:1.05}
+#nums b small{font-size:.6em;font-weight:500;color:var(--mute);margin-left:.15em}
+
+.lower{position:absolute;left:var(--gut);bottom:calc(var(--u)*1.6);display:flex;align-items:stretch;height:calc(var(--u)*4.9);filter:drop-shadow(0 6px 18px rgba(0,0,0,.5))}
+.flag{width:calc(var(--u)*6.4);background:#333;position:relative;overflow:hidden}
+.flag::after{content:'';position:absolute;inset:0;background:linear-gradient(120deg,rgba(255,255,255,.22),rgba(255,255,255,0) 45%,rgba(0,0,0,.25))}
+.who{background:linear-gradient(90deg,#0b1c5c,#0a1648);padding:calc(var(--u)*.5) calc(var(--u)*1.2);display:flex;flex-direction:column;justify-content:center;min-width:calc(var(--u)*17)}
+.l1{font-weight:500;font-size:calc(var(--u)*.86);letter-spacing:.12em;color:#b9c6f5;display:flex;gap:1em;white-space:nowrap}
+.code{color:var(--teal);font-weight:700}
+#bio{text-transform:none;letter-spacing:.03em;opacity:.8}
+.name{font-weight:800;font-size:calc(var(--u)*2.35);letter-spacing:.02em;line-height:1.05;white-space:nowrap}
+.lift{background:#f2f4ff;color:#0a1030;padding:calc(var(--u)*.5) calc(var(--u)*1.1);display:flex;flex-direction:column;justify-content:center}
+.lift .l1{color:#0a1648;font-weight:700;font-size:calc(var(--u)*1.05)}
+.att{font-weight:500;font-size:calc(var(--u)*.86);letter-spacing:.12em;color:#4b577f}
+.kg{background:var(--gold);color:#161100;padding:0 calc(var(--u)*1.1);display:flex;align-items:baseline;gap:.25em;align-self:stretch;align-items:center}
+.kg b{font-weight:800;font-size:calc(var(--u)*3.3);line-height:1;font-variant-numeric:tabular-nums}
+.kg span{font-weight:700;font-size:calc(var(--u)*1.1)}
+
+.cams{position:absolute;left:50%;transform:translateX(-50%);top:calc(var(--u)*1.2);display:flex;gap:4px}
+
+/* ---- consola ---- */
+.panel{background:var(--panel);border-top:1px solid var(--line);padding:8px var(--gut) 10px;display:flex;flex-direction:column;gap:6px}
+.row{display:flex;gap:6px 14px;align-items:center;flex-wrap:wrap}
+.grp{display:flex;gap:4px;align-items:center}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.chip{font-family:var(--display);font-weight:700;font-size:14px;letter-spacing:.05em;text-transform:uppercase;padding:6px 11px;white-space:nowrap;background:#101938;border:1px solid var(--line);color:var(--mute);border-radius:0}
+.chip:hover{color:var(--ink)}
+.chip[aria-pressed="true"]{color:#04121a;background:var(--teal);border-color:var(--teal)}
+.chip.s{padding:4px 9px;font-size:12px;background:rgba(8,13,30,.72);backdrop-filter:blur(6px)}
+.chip.s[aria-pressed="true"]{background:var(--teal)}
+.chip.go{background:var(--gold);border-color:var(--gold);color:#1a1400;padding-inline:18px}
+select.chip{appearance:none;cursor:pointer}
+.kgin{font-family:var(--display);font-weight:700;font-size:14px;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);display:flex;align-items:center;gap:6px}
+.kgin input{width:66px;background:#101938;border:1px solid var(--line);color:var(--ink);padding:5px 6px;font-variant-numeric:tabular-nums;text-align:right}
+.row .grp.main{margin-left:auto;order:9}
+.more{display:contents}
+#more-btn{display:none}
+input[type=range]{width:100%;accent-color:var(--teal);margin:0;height:22px}
+
+body.clean .panel,body.clean .cams{display:none}
+
+/* ---- pantallas angostas o bajas: fase en una línea arriba, cámaras abajo, consola en una fila con desplegable ---- */
+@media (max-width:760px),(max-height:480px){
+  .telemetry{bottom:auto;top:calc(var(--u)*5);left:var(--gut);right:var(--gut);width:auto;display:flex;align-items:center;gap:calc(var(--u)*.9);padding:calc(var(--u)*.35) calc(var(--u)*.8);border-top:0;border-left:calc(var(--u)*.28) solid var(--teal)}
+  .phase-label,.ticks{display:none}
+  #phase{font-size:calc(var(--u)*1.25);flex:1;min-width:0}
+  #nums{display:flex;gap:calc(var(--u)*.9);font-size:0}
+  #nums b{font-size:calc(var(--u)*1.15)}
+  #nums div:nth-child(-n+2),#nums div:nth-child(n+5){display:none}
+  .lift{display:none}.who{min-width:0}#bio{display:none}
+  .cams{top:auto;bottom:calc(var(--u)*7.4);left:var(--gut);transform:none;max-width:calc(100% - 2*var(--gut));flex-wrap:wrap}
+  #more-btn{display:block}
+  .more{display:none;flex-basis:100%;flex-wrap:wrap;gap:6px 14px;align-items:center;order:10}
+  body.more-open .more{display:flex}
+  .row .grp.main{margin-left:auto}
+  .panel{padding-top:6px;padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
+}
+/* apaisado bajo (teléfono acostado): la fase va arriba al centro y las cámaras a la derecha, fuera del eje del atleta */
+@media (max-height:480px) and (min-width:600px){
+  .telemetry{left:50%;right:auto;transform:translateX(-50%);top:calc(var(--u)*1.6);max-width:44%}
+  .cams{bottom:calc(var(--u)*1.6);left:auto;right:var(--gut);flex-direction:column;max-width:none;flex-wrap:nowrap}
+  .lower{transform-origin:left bottom;transform:scale(.85)}
+}
+@media (max-width:430px){
+  .row{gap:6px 8px}
+  .panel .chip{padding-inline:9px;font-size:13px;letter-spacing:.03em}
+  .chip.s{padding-inline:8px}
+  .cams{flex-wrap:nowrap;gap:3px}
+}
+/* objetivos táctiles de 44 px */
+@media (pointer:coarse){
+  .chip{min-height:44px;padding-block:10px}
+  .chip.s{min-height:40px;padding-block:8px}
+  .kgin input{min-height:44px}
+  input[type=range]{height:44px}
+}
+@media (prefers-reduced-motion:no-preference){
+  .lower,.bug,.clockbox{animation:in .5s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes in{from{opacity:0}to{opacity:1}}
+}
+
+/* consola bloqueada mientras carga el primer atleta */
+body.booting .panel, body.booting .cams { opacity: .45; pointer-events: none; }
