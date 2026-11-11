@@ -6,6 +6,7 @@
 //   --tag=<A|B|C|A2>  versión; los archivos salen como <tag>_P01.png (con --clay, <tag>_clay_P01.png)
 //   --out=<carpeta>   destino de las capturas y de shots.json (lista de planos + datos de cada corrida)
 //   --clay            material de arcilla gris en las mallas del atleta; oculta pelo, barba, cejas y pestañas. Solo P01 a P12.
+//                     (gris medio oscuro: con las luces de la sala un gris claro se quema y aplana el relieve)
 //   --prop=<glb>      malla estática (ya alineada al rig, en metros): se cuelga de la raíz de ventura y se ocultan sus mallas
 //   --only=P01,P03    solo esos planos (los datos de los demás planos de la corrida se conservan en shots.json)
 //   --list            escribe la lista de planos y termina, sin abrir el navegador
@@ -29,8 +30,11 @@ const W = 1600, H = 900, QUERY = 'q=alta&auto=0&ui=0';
 // Primeros planos que el visor no trae: se agregan a TARIMA.SHOTS solo en la página de captura (no cambian el visor).
 // Mismo formato que cameras.js: `at` huesos cuyo punto medio es el blanco, `up` corrimiento vertical y `d` distancia, los dos
 // por metro de estatura; `az` 0 = de frente, π/2 = costado izquierdo del atleta, π = de espaldas.
+// axila-atras: el plan la apuntaba al punto medio de LeftArm y Spine2 a distancia 0,75 y el pliegue quedaba en un borde, con media
+// espalda en cuadro. Apunta a la articulación del hombro izquierdo, 10 cm más abajo (up -.06 por metro de estatura), más cerca
+// y algo más de costado: el pliegue entre el brazo y el dorsal queda en el centro, con la axila a la izquierda.
 const EXTRA_SHOTS = [
-  { key: 'axila-atras', label: 'Axila trasera', at: ['LeftArm', 'Spine2'], up: 0, d: .75, az: 2.6, el: .1, fov: 24 },
+  { key: 'axila-atras', label: 'Axila trasera', at: ['LeftArm'], up: -.06, d: .6, az: 2.45, el: .08, fov: 24 },
   { key: 'espalda', label: 'Espalda', at: ['Spine2', 'Neck'], up: 0, d: 1.25, az: 3.14, el: .06, fov: 24 },
 ];
 // La lista fija. `fase`: expresión que se busca en los nombres de fase de poses.json (TARIMA.phaseIndex); `shot`: clave de
@@ -127,7 +131,7 @@ try {
       if (!a.__arte && (clay || prop)) {
         a.__arte = true;
         const THREE = await import('three'), clays = new Map();
-        const gris = src => { const side = src?.side ?? THREE.FrontSide; if (!clays.has(side)) clays.set(side, new THREE.MeshStandardMaterial({ name: 'Arcilla', color: 0x8e8e8e, roughness: .72, metalness: 0, side })); return clays.get(side); };
+        const gris = src => { const side = src?.side ?? THREE.FrontSide; if (!clays.has(side)) clays.set(side, new THREE.MeshStandardMaterial({ name: 'Arcilla', color: 0x6a6a6a, roughness: .8, metalness: 0, side })); return clays.get(side); };
         const swap = o => { o.material = Array.isArray(o.material) ? o.material.map(gris) : gris(o.material); };
         if (prop && p.who === 'ventura') {
           const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js'), g = await new GLTFLoader().loadAsync(prop);

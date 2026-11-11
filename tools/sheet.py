@@ -208,6 +208,12 @@ def main():
     if a.target and os.path.isdir(a.target):
         targets = [os.path.join(a.target, f) for f in sorted(os.listdir(a.target)) if f.lower().endswith(EXT)]
     planos = planos_de(a.planos)
+    # si el encuadre de un plano se corrigió entre una corrida y otra, las columnas no son comparables: se avisa
+    for clay_s in ('', '_clay'):
+        for p in planos:
+            cams = {t: json.dumps(runs[t + clay_s]['planos'][p].get('camara'), sort_keys=True) for t in tags if p in runs.get(t + clay_s, {}).get('planos', {})}
+            if len(set(cams.values())) > 1:
+                print(f"AVISO {p}{clay_s}: las versiones no tienen la misma cámara ({', '.join(f'{t}: {c}' for t, c in cams.items())}); hay que volver a capturar")
     done = 0
     for sets, name, is_clay in ((game, a.out, False), (clay, re.sub(r'(\.\w+)$', r'_arcilla\1', a.out), True)):
         cols = [t for t in tags if t in sets] if not a.tags else tags
