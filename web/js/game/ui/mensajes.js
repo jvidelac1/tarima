@@ -9,7 +9,8 @@ export const PALABRAS = { perfecto: { txt: 'PERFECTO' }, bien: { txt: 'BIEN' }, 
  * @param {object} res  @param {'c'|'f'} ctl  @param {boolean} tactil  sin teclado: no nombra la tecla
  * @returns {string} '' si no hay nada que explicar (válido con tres blancas)
  */
-export function explicar(res, ctl = 'c', tactil = false) {
+export function explicar(res, ctl = 'c', tactil = false) { return linea(res, ctl, tactil).replace(/!\./g, '!'); }
+function linea(res, ctl, tactil) {
   if (!res || !res.causa) return '';
   const f = ctl === 'f', g = res.gestos || [], ex = [...g].reverse().find(x => x.g === 'explosion'), rc = [...g].reverse().find(x => x.g === 'recepcion'), j = (ex || rc)?.mov === 'j';
   const toca = tactil ? 'Tocá' : 'Tocá ESPACIO', apreta = tactil ? 'Tocá' : 'Apretá ESPACIO', manten = tactil ? 'Dejá el dedo apoyado' : 'Mantené ESPACIO';

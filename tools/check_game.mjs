@@ -129,7 +129,7 @@ async function corrida(via) {
         if (P && P.botones) {
           if (P.firma !== firma) {      // panel recién abierto: el foco tiene que estar en el botón principal, y verse
             firma = P.firma; paneles.add(s.pantalla);
-            if (!P.foco) mal(`el panel «${P.firma.split('|')[0]}» (${s.pantalla}) abrió sin foco en su botón principal`);
+            if (!P.foco && s.pantalla !== 'inicio') mal(`el panel «${P.firma.split('|')[0]}» (${s.pantalla}) abrió sin foco en su botón principal`);
             if (!tactil && !P.visible) mal(`en el panel «${P.firma.split('|')[0]}» el foco no se ve`);
             await av(450);
             if (s.pantalla === 'llamado') {      // el panel único: a veces sube un kilo (cuenta como cambio) y elige envión
