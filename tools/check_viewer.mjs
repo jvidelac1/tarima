@@ -40,10 +40,16 @@ if (!ONLY) for (const f of fs.readdirSync(OUT)) if (f.endsWith('.png')) fs.rmSyn
 
 const problems = [], warnings = [], notes = [];
 const LAUNCH = launchOptions({ headed: HEADED });      // ruta de Chrome y backend de WebGL según la plataforma (tools/browser.mjs)
-let SOFT = false;      // WebGL por software (SwiftShader en un Linux sin GPU): la prueba vale para lógica, consola, 404 y capturas; fps y tiempos no se exigen
 const browser = await chromium.launch(LAUNCH);
+// ¿WebGL por software (SwiftShader o llvmpipe en un Linux sin GPU)? Se pregunta el renderizador real en una página vacía antes
+// de empezar. Por software cada cuadro tarda segundos: la prueba vale para lógica, consola, 404 y capturas, pero no se exigen
+// fps, tiempos de cambio de calidad ni desenfoque de movimiento, no se perfila el costo por pase, y las esperas de reproducción
+// se alargan (el visor avanza como mucho 0,05 s de levantamiento por cuadro).
+const GPU0 = await (async () => { const p = await browser.newPage(); try { return await p.evaluate(() => { const gl = document.createElement('canvas').getContext('webgl2'); if (!gl) return null; const e = gl.getExtension('WEBGL_debug_renderer_info'); return String(e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)); }); } catch { return null; } finally { await p.close().catch(() => null); } })();
+const SOFT = isSoftware(GPU0), TO = ms => SOFT ? ms * 80 : ms;
 const extra = [];      // navegadores aparte para medir rendimiento (ver más abajo)
 const watch = page => {
+  if (SOFT) { page.setDefaultTimeout(900000); page.setDefaultNavigationTimeout(900000); }
   page.on('console', m => { const t = m.type(); if (t === 'error') problems.push(`console.error: ${m.text()}`); else if (t === 'warning') warnings.push(m.text()); });
   page.on('pageerror', e => problems.push(`pageerror: ${e.message}`));
   page.on('requestfailed', r => problems.push(`requestfailed: ${r.url()} ${r.failure()?.errorText}`));
@@ -75,13 +81,12 @@ try {
   const ok = await page.evaluate(() => window.TARIMA.ready);
   if (!ok) throw new Error('el visor no terminó de iniciar');
   const info = await T(() => { const gl = TARIMA.renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info'); return { three: TARIMA.renderer.constructor.name, gpu: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : '?', q: TARIMA.state.qName }; });
-  SOFT = isSoftware(info.gpu);
-  console.log(`GPU: ${info.gpu} · calidad ${info.q}${SOFT ? ' · RENDER POR SOFTWARE: no se exigen fps ni tiempos de cambio de calidad' : ''}`);
+  console.log(`GPU: ${info.gpu} · calidad ${info.q}${SOFT ? ' · RENDER POR SOFTWARE: no se exigen fps, tiempos ni desenfoque de movimiento, y no se perfila' : ''}`);
 
   const combos = [{ lift: 's', tag: 'arranque' }, { lift: 'c', jerk: 'split', tag: 'dostiempos-tijera' }, { lift: 'c', jerk: 'power', tag: 'dostiempos-power' }, { lift: 'c', jerk: 'squat', tag: 'dostiempos-squat' }];
   for (const who of ['ventura', 'brenner'].filter(w => !ONLY || w === ONLY)) {
     await page.click(`#who-${who}`);
-    await page.waitForFunction(w => TARIMA.state.who === w && document.getElementById('msg').hidden, who, { timeout: 60000 });
+    await page.waitForFunction(w => TARIMA.state.who === w && document.getElementById('msg').hidden, who, { timeout: TO(60000) });
     for (const c of combos) {
       await page.click(c.lift === 's' ? '#lift-s' : '#lift-c');
       if (c.jerk) await page.click(`#jk-${c.jerk}`);
@@ -124,8 +129,8 @@ try {
       // reproducción completa en tiempo real, con una captura en movimiento
       await T(() => TARIMA.cam(0)); await page.click('#play');
       await page.waitForTimeout(Math.min(meta.dur * 1000 * .62, 6000)); await page.screenshot({ path: path.join(OUT, `${pre}_play.png`), timeout: 120000 }); shots.push(`out/viewer/${pre}_play.png`);
-      await page.waitForFunction(() => !TARIMA.state.playing, null, { timeout: 30000 });
-      await page.waitForFunction(() => !!TARIMA.arena.decision, null, { timeout: 5000 });
+      await page.waitForFunction(() => !TARIMA.state.playing, null, { timeout: TO(30000) });
+      await page.waitForFunction(() => !!TARIMA.arena.decision, null, { timeout: TO(5000) });
       const end = await T(() => { const tl = TARIMA.state.tl, pk = tl.peakVel(); return { t: TARIMA.state.t, dur: tl.duration, phase: document.getElementById('phase').textContent, whip: TARIMA.barbell.freqHz, pk: pk.v, pkPhase: tl.phases[Math.min(tl.nPhases - 1, Math.ceil(tl.phaseAt(pk.t) - 1e-6))].n, liftPhase: tl.phases[Math.round(tl.phaseAt(tl.liftT))]?.n }; });
       if (!meta.real) problems.push(`${pre}: el visor no está usando el tt real de poses.json`);
       if (!(end.pk > .8 && end.pk < 3.2)) problems.push(`${pre}: velocidad vertical pico de la barra fuera de rango (${end.pk.toFixed(2)} m/s)`);
@@ -214,7 +219,8 @@ try {
     for (const [k, seg] of Object.entries(d.segs)) seg.tt = keep[k]; A.setLift('c'); out.back = A.state.tl.hasRealTiming; return out; });
   if (!tt.real || !tt.mono || !tt.fallback || !tt.back || Math.abs(tt.dur - tt.want) > 1e-6 || tt.err > .004 || tt.jump > 1.2) problems.push(`tt: ${JSON.stringify(tt)}`); else console.log(`ok tt real: ${tt.dur.toFixed(2)} s = cargada + pausa + envión de poses.json, cada muestra en su instante (error máx ${(tt.err * 1000).toFixed(1)} ms), monótono, salto máx ${tt.jump.toFixed(3)} muestras por 1/240 s; sin tt cae a duraciones por defecto`);
   // desenfoque de movimiento de barra y discos: se activa en la parte rápida del levantamiento y se apaga al terminar
-  if (QUALITY !== 'baja') {
+  if (SOFT) notes.push('VISOR: desenfoque de movimiento sin probar: depende del tiempo real entre cuadros y con WebGL por software no se activa');
+  else if (QUALITY !== 'baja') {
     await T(() => { TARIMA.setLift('s'); TARIMA.cam(1); }); await page.click('#play');
     const mb = await page.waitForFunction(() => TARIMA.post.mbActive && TARIMA.post.mbPx > 4 ? TARIMA.post.mbPx : false, null, { timeout: 15000, polling: 'raf' }).then(h => h.jsonValue(), () => 0);
     if (mb) { await page.screenshot({ path: path.join(OUT, 'desenfoque-movimiento.png'), timeout: 120000 }); shots.push('out/viewer/desenfoque-movimiento.png'); }
@@ -237,8 +243,8 @@ try {
   // cambio de calidad en plena reproducción (lo mismo que hace el gobernador): termina, llega la decisión y no queda en repetición
   await page.click('#play'); await page.waitForTimeout(700); await page.selectOption('#quality', 'media'); await page.waitForTimeout(300);
   const mid = await T(() => ({ playing: TARIMA.state.playing, scrub: TARIMA.state.scrubbing })); if (!mid.playing || mid.scrub) problems.push(`cambio de calidad en reproducción: estado ${JSON.stringify(mid)}`);
-  await page.waitForFunction(() => !TARIMA.state.playing, null, { timeout: 60000 });
-  await page.waitForFunction(() => !!TARIMA.arena.decision, null, { timeout: 8000 }).catch(() => problems.push('cambio de calidad en reproducción: no llegó la decisión'));
+  await page.waitForFunction(() => !TARIMA.state.playing, null, { timeout: TO(60000) });
+  await page.waitForFunction(() => !!TARIMA.arena.decision, null, { timeout: TO(8000) }).catch(() => problems.push('cambio de calidad en reproducción: no llegó la decisión'));
   const fin = await T(() => ({ endT: TARIMA.state.endT, verdict: !document.getElementById('verdict').hidden, replay: TARIMA.state.replay })); if (!(fin.endT > 0) || !fin.verdict || fin.replay) problems.push(`cambio de calidad en reproducción: final ${JSON.stringify(fin)}`);
   // el cambio de calidad no reconstruye entorno ni barra: mismos objetos, y tarda poco
   const sw = await T(() => { const A = TARIMA, ar = A.arena, bb = A.barbell, ms = []; for (const q of ['baja', 'alta', 'media', 'baja', 'media', 'alta']) { A.setQuality(q); ms.push(Math.round(A.state.qSwitchMs)); } return { ms, same: ar === A.arena && bb === A.barbell, imp: !!A.arena.impostors, crowd: A.arena.crowd.visible }; });
@@ -275,7 +281,8 @@ try {
   const mem = await perf.evaluate(() => TARIMA.gpuMemory?.());
   const prof = {};
   // costo por pase (ms por cuadro, mejor de 3 tandas con la GPU forzada): cada columna apaga una cosa más
-  for (const q of [...new Set([QUALITY, 'media', 'baja'])]) { const pf = await perf.evaluate(async q => { TARIMA.setQuality(q); TARIMA.cam(0); TARIMA.seekPhase(Math.max(1, TARIMA.phaseIndex('^Primer tirón'))); TARIMA.step(0); await TARIMA.profile(2); return TARIMA.profile(8); }, q); prof[q] = pf;
+  if (SOFT) notes.push('VISOR: costo por pase y por etapa sin perfilar (WebGL por software)');
+  for (const q of SOFT ? [] : [...new Set([QUALITY, 'media', 'baja'])]) { const pf = await perf.evaluate(async q => { TARIMA.setQuality(q); TARIMA.cam(0); TARIMA.seekPhase(Math.max(1, TARIMA.phaseIndex('^Primer tirón'))); TARIMA.step(0); await TARIMA.profile(2); return TARIMA.profile(8); }, q); prof[q] = pf;
     console.log(`perfil ${q} ${pf.gpu ? '(tiempo de GPU)' : '(reloj de pared)'} ${pf.w}x${pf.h} (${pf.calls} draw calls, ${Math.round(pf.tris / 1000)} mil triángulos): ` + Object.entries(pf).filter(([k]) => /^(completo|sin_)/.test(k)).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(' → ') + ' ms'); 
     // tiempo de GPU por etapa: mínimo de 3 tandas de 24 cuadros (el mínimo es lo que menos depende de la carga de la máquina)
     const pp = await perf.evaluate(async () => { const A = TARIMA, m = {}; let frame = Infinity; if (!A.profilePasses) return null;
@@ -300,8 +307,8 @@ try {
   // reproducción; el levantamiento tiene que terminar igual, con decisión y la barra en las manos
   await hi.goto(base, { waitUntil: 'load' }); await hi.evaluate(() => window.TARIMA.ready);
   const q0 = await hi.evaluate(() => TARIMA.state.qName); await hi.click('#play');
-  await hi.waitForFunction(() => !TARIMA.state.playing, null, { timeout: 90000 });
-  await hi.waitForFunction(() => !!TARIMA.arena.decision, null, { timeout: 8000 }).catch(() => problems.push('modo auto: no llegó la decisión'));
+  await hi.waitForFunction(() => !TARIMA.state.playing, null, { timeout: TO(90000) });
+  await hi.waitForFunction(() => !!TARIMA.arena.decision, null, { timeout: TO(8000) }).catch(() => problems.push('modo auto: no llegó la decisión'));
   const au = await hi.evaluate(() => { const A = TARIMA; return { q: A.state.qName, sel: A.state.qSel, fps: A.state.fps, hz: A.gov.refresh, log: A.gov.log, bar: A.barbell.group.position.y, bone: A.state.athletes[A.state.who].barBone.getWorldPosition(A.barbell.group.position.clone()).y }; });
   if (au.sel !== 'auto' || Math.abs(au.bar - au.bone) > 1e-3) problems.push(`modo auto: ${JSON.stringify(au)}`); else console.log(`ok modo auto: arrancó en ${q0}, terminó en ${au.q} (${au.fps ? au.fps.toFixed(0) + ' fps en la última ventana' : 'sin medición'}; refresco ${au.hz} Hz; cambios: ${au.log.length ? au.log.map(l => `${l.from}→${l.to} a ${l.fps} fps${l.playing ? ' en reproducción' : ''}`).join(', ') : 'ninguno'})`);
   await hb.close();
@@ -309,7 +316,7 @@ try {
   // ---- clics durante la carga: con el GLB demorado, la consola está bloqueada y ningún manejador revienta ----
   const slow = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 }); watch(slow);
   await slow.route('**/models/*.glb', async r => { await new Promise(x => setTimeout(x, 2500)); await r.continue(); });
-  await slow.goto(`${base}?q=baja&auto=0`, { waitUntil: 'load' }); await slow.waitForFunction(() => !!TARIMA.arena, null, { timeout: 60000 });
+  await slow.goto(`${base}?q=baja&auto=0`, { waitUntil: 'load' }); await slow.waitForFunction(() => !!TARIMA.arena, null, { timeout: TO(60000) });
   const early = await slow.evaluate(() => { const A = TARIMA, inert = document.getElementById('panel').inert, loaded = !!A.state.tl;
     for (const id of ['jk-power', 'jk-squat', 'lift-s', 'lift-c', 'jk-split', 'play', 'replay-btn', 'slow', 'trace', 'cam-2']) document.getElementById(id).click();      // click() programático: llega al manejador aunque el panel esté inerte
     const sc = document.getElementById('scrub'); sc.value = 3; sc.dispatchEvent(new Event('input')); const ld = document.getElementById('load'); ld.value = 120; ld.dispatchEvent(new Event('change'));
