@@ -47,6 +47,10 @@ const browser = await chromium.launch(LAUNCH);
 // se alargan (el visor avanza como mucho 0,05 s de levantamiento por cuadro).
 const GPU0 = await (async () => { const p = await browser.newPage(); try { return await p.evaluate(() => { const gl = document.createElement('canvas').getContext('webgl2'); if (!gl) return null; const e = gl.getExtension('WEBGL_debug_renderer_info'); return String(e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)); }); } catch { return null; } finally { await p.close().catch(() => null); } })();
 const SOFT = isSoftware(GPU0), TO = ms => SOFT ? ms * 80 : ms;
+// Por software el costo es por píxel (SwiftShader, 4 núcleos: 3,8 s por cuadro reproduciendo a 1600x817 y 1,5 s a 800x408), así
+// que las páginas de escritorio se abren a la mitad de densidad: el layout en px CSS, el encuadre y la lógica no cambian, las
+// capturas salen de 800x450. TARIMA_SOFT_DPR=1 las deja a tamaño completo (la prueba tarda más del doble).
+const SDPR = SOFT ? +(process.env.TARIMA_SOFT_DPR || .5) : 1;
 const extra = [];      // navegadores aparte para medir rendimiento (ver más abajo)
 const watch = page => {
   if (SOFT) { page.setDefaultTimeout(900000); page.setDefaultNavigationTimeout(900000); }
@@ -63,13 +67,13 @@ const fpsOf = (pg, ms = 3000) => pg.evaluate(ms => new Promise(res => { let n = 
 const fps0 = await (async () => {
   const b0 = await chromium.launch(LAUNCH); extra.push(b0);
   try {
-    const pg = await b0.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 1 }); watch(pg);
+    const pg = await b0.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: SDPR }); watch(pg);
     await pg.goto(`${base}?q=${QUALITY}&auto=0`, { waitUntil: 'load' }); if (!await pg.evaluate(() => window.TARIMA.ready)) return null;
     const ld = loadNow(); await pg.evaluate(() => TARIMA.play(false)); const f1p = await fpsOf(pg, 4000); await pg.evaluate(() => TARIMA.seekPhase(1)); const f1 = await fpsOf(pg, 2000);
     return { f1p, f1, ld };
   } catch (e) { problems.push(`medición de fps: ${e.message}`); return null; } finally { await b0.close().catch(() => null); }
 })();
-const page = await browser.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 1 });
+const page = await browser.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: SDPR });
 watch(page);
 
 const shots = [];
@@ -81,7 +85,7 @@ try {
   const ok = await page.evaluate(() => window.TARIMA.ready);
   if (!ok) throw new Error('el visor no terminó de iniciar');
   const info = await T(() => { const gl = TARIMA.renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info'); return { three: TARIMA.renderer.constructor.name, gpu: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : '?', q: TARIMA.state.qName }; });
-  console.log(`GPU: ${info.gpu} · calidad ${info.q}${SOFT ? ' · RENDER POR SOFTWARE: no se exigen fps, tiempos ni desenfoque de movimiento, y no se perfila' : ''}`);
+  console.log(`GPU: ${info.gpu} · calidad ${info.q}${SOFT ? ` · RENDER POR SOFTWARE: no se exigen fps, tiempos ni desenfoque de movimiento, no se perfila, y la densidad de píxeles se multiplica por ${SDPR}` : ''}`);
 
   const combos = [{ lift: 's', tag: 'arranque' }, { lift: 'c', jerk: 'split', tag: 'dostiempos-tijera' }, { lift: 'c', jerk: 'power', tag: 'dostiempos-power' }, { lift: 'c', jerk: 'squat', tag: 'dostiempos-squat' }];
   for (const who of ['ventura', 'brenner'].filter(w => !ONLY || w === ONLY)) {
@@ -273,7 +277,7 @@ try {
   // pasa a los 6 a 9 segundos de ~10 ms a ~90 ms de GPU por cuadro y no vuelve. No depende del visor. Por eso los fps se
   // toman apenas carga la página y el costo por etapa se mide con el bucle de dibujo detenido (mínimo de varias tandas). ----
   const pb = await chromium.launch(LAUNCH); extra.push(pb);
-  const perf = await pb.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 1 }); watch(perf);
+  const perf = await pb.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: SDPR }); watch(perf);
   await perf.addInitScript(() => { const raf = window.requestAnimationFrame.bind(window), held = []; window.__paused = false; window.requestAnimationFrame = cb => window.__paused ? (held.push(cb), 0) : raf(cb); window.__pause = on => { window.__paused = on; if (!on) held.splice(0).forEach(cb => raf(cb)); }; });
   await perf.goto(`${base}?q=${QUALITY}&auto=0`, { waitUntil: 'load' }); await perf.evaluate(() => window.TARIMA.ready);
   if (!fps0) throw new Error('no se pudieron medir los fps al comienzo');
@@ -298,7 +302,7 @@ try {
 
   // ---- DPR 2 (pantalla retina): tope de píxeles y fps ----
   const hb = await chromium.launch(LAUNCH); extra.push(hb);
-  const hi = await hb.newPage({ viewport: { width: 1440, height: 810 }, deviceScaleFactor: 2 }); watch(hi);
+  const hi = await hb.newPage({ viewport: { width: 1440, height: 810 }, deviceScaleFactor: 2 * SDPR }); watch(hi);
   await hi.goto(`${base}?q=${QUALITY}&auto=0`, { waitUntil: 'load' }); await hi.evaluate(() => window.TARIMA.ready);
   const f2 = await fpsOf(hi, 2500); console.log(`fps (${QUALITY}, DPR 2, ${f2.w}x${f2.h}, desenfoque máx ${f2.blur?.toFixed(0) ?? '-'} px): ${f2.fps.toFixed(0)}`);
   await hi.evaluate(() => { TARIMA.cam(0); TARIMA.seekPhase(TARIMA.state.tl.nPhases - 1); }); await hi.waitForTimeout(400);
@@ -314,7 +318,7 @@ try {
   await hb.close();
 
   // ---- clics durante la carga: con el GLB demorado, la consola está bloqueada y ningún manejador revienta ----
-  const slow = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 }); watch(slow);
+  const slow = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: SDPR }); watch(slow);
   await slow.route('**/models/*.glb', async r => { await new Promise(x => setTimeout(x, 2500)); await r.continue(); });
   await slow.goto(`${base}?q=baja&auto=0`, { waitUntil: 'load' }); await slow.waitForFunction(() => !!TARIMA.arena, null, { timeout: TO(60000) });
   const early = await slow.evaluate(() => { const A = TARIMA, inert = document.getElementById('panel').inert, loaded = !!A.state.tl;
