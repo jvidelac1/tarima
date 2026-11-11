@@ -6,7 +6,7 @@
 //   --tag=<A|B|C|A2>  versión; los archivos salen como <tag>_P01.png (con --clay, <tag>_clay_P01.png)
 //   --out=<carpeta>   destino de las capturas y de shots.json (lista de planos + datos de cada corrida)
 //   --clay            material de arcilla gris en las mallas del atleta; oculta pelo, barba, cejas y pestañas. Solo P01 a P12.
-//                     (gris medio oscuro: con las luces de la sala un gris claro se quema y aplana el relieve)
+//                     (gris oscuro 0x303030: con las luces de la sala un gris medio se quema y aplana el relieve)
 //   --prop=<glb>      malla estática (ya alineada al rig, en metros): se cuelga de la raíz de ventura y se ocultan sus mallas
 //   --only=P01,P03    solo esos planos (los datos de los demás planos de la corrida se conservan en shots.json)
 //   --list            escribe la lista de planos y termina, sin abrir el navegador
@@ -131,15 +131,15 @@ try {
       if (!a.__arte && (clay || prop)) {
         a.__arte = true;
         const THREE = await import('three'), clays = new Map();
-        const gris = src => { const side = src?.side ?? THREE.FrontSide; if (!clays.has(side)) clays.set(side, new THREE.MeshStandardMaterial({ name: 'Arcilla', color: 0x585858, roughness: .8, metalness: 0, side })); return clays.get(side); };
+        const gris = src => { const side = src?.side ?? THREE.FrontSide; if (!clays.has(side)) clays.set(side, new THREE.MeshStandardMaterial({ name: 'Arcilla', color: 0x303030, roughness: .8, metalness: 0, side })); return clays.get(side); };
         const swap = o => { o.material = Array.isArray(o.material) ? o.material.map(gris) : gris(o.material); };
         if (prop && p.who === 'ventura') {
           const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js'), g = await new GLTFLoader().loadAsync(prop);
           g.scene.name = 'arte_prop'; g.scene.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; o.frustumCulled = false; if (clay) swap(o); } });
           a.root.add(g.scene); for (const o of a.meshes) o.visible = false;
         } else if (clay) for (const o of a.meshes) { const n = [].concat(o.material)[0]?.name; if (n === 'Hair' || n === 'Lashes') o.visible = false; else swap(o); }
-        // la pasada de profundidad del pelo: hay una por primitiva de pelo (cabello, barba) y a.hairDepth solo guarda la última;
-        // si queda alguna, la profundidad de campo recorta la silueta del pelo que ya no se dibuja
+        // la pasada de profundidad del pelo se oculta por nombre de material (si quedara, la profundidad de campo recortaría la
+        // silueta de un pelo que ya no se dibuja)
         a.root.traverse(o => { if (o.isMesh && o.material?.name === 'HairDepth') o.visible = false; });
       }
       A.setLift(p.lift); if (p.lift === 'c') A.setJerk(p.jerk);
