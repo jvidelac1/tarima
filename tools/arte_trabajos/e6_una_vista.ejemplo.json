@@ -1,0 +1,27 @@
+{
+ "nota": "E6, G4 (Pixal3D de una vista) y G5 (TRELLIS.2 con la misma imagen): el interruptor 'Boolean (Switch to Trellis2)' elige el modelo y 'Switch: Remove background' en false usa el alfa del render en vez de BiRefNet. Armado en seco; sin correr.",
+ "plantilla": "3d_pixal3d_trellis2_image_to_model",
+ "fijos": {
+  "@Switch: Remove background.switch": false
+ },
+ "trabajos": [
+  {
+   "salida": "out/arte/gen/G4.glb",
+   "imagenes": [
+    "out/arte/refs_gen/ventura_rest_bust_front.png"
+   ],
+   "set": {
+    "@Boolean (Switch to Trellis2).value": false
+   }
+  },
+  {
+   "salida": "out/arte/gen/G5.glb",
+   "imagenes": [
+    "out/arte/refs_gen/ventura_rest_bust_front.png"
+   ],
+   "set": {
+    "@Boolean (Switch to Trellis2).value": true
+   }
+  }
+ ]
+}

@@ -1,0 +1,29 @@
+{
+ "nota": "E5 A, imágenes objetivo: una imagen de entrada (la captura P01 del visor). Los tres puentes dejan la rama sin LoRA Lightning (el LoRA no está bajado): 40 pasos y CFG 4 salen de los Primitive de la plantilla. Reemplazar las indicaciones; una entrada de 'trabajos' por estilo y semilla. Armado en seco contra la plantilla real; todavía no se corrió con el modelo.",
+ "plantilla": "image_qwen_image_edit_2511_int8",
+ "puentes": {
+  "@Switch (Model)": "on_false",
+  "@Switch (CFG)": "on_false",
+  "@Switch (Steps)": "on_false"
+ },
+ "trabajos": [
+  {
+   "salida": "out/arte/target/T_A_s1.png",
+   "semilla": 1101,
+   "indicacion": "<indicación con la frase del estilo A>",
+   "negativa": "<negativa de la investigación>",
+   "imagenes": [
+    "out/arte/shots/A_P01.png"
+   ]
+  },
+  {
+   "salida": "out/arte/target/T_A_s2.png",
+   "semilla": 1102,
+   "indicacion": "<indicación con la frase del estilo A>",
+   "negativa": "<negativa de la investigación>",
+   "imagenes": [
+    "out/arte/shots/A_P01.png"
+   ]
+  }
+ ]
+}

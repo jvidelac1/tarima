@@ -29,8 +29,10 @@
 // "indicacion" y "negativa" van al nodo de texto que alimenta las entradas positive y negative del muestreador (se busca hacia
 // atrás por los enlaces); si no se encuentra, hay que ponerlas con "set". "semilla" va a toda entrada seed o noise_seed.
 //
-// VERIFICADO el 11-nov-2026 leyendo /opt/comfy/object_info.json y las plantillas instaladas (ComfyUI 0.45.0, frontend 1.58.5,
-// plantillas 0.11.105), sin generar nada:
+// Ejemplos de archivos de trabajos, con las recetas para las plantillas del plan: tools/arte_trabajos/*.ejemplo.json.
+//
+// VERIFICADO el 11-nov-2026 contra la instalación del pod (ComfyUI 0.45.0, frontend 1.58.5, plantillas 0.11.105): object_info.json,
+// las plantillas, el código de los nodos y una corrida sin modelos (LoadImage -> SaveImage). No se generó nada con modelos:
 //   - Plantillas: image_qwen_image_edit_2511_int8 (la del peso int8 que está bajado; image_qwen_image_edit_2511 pide el fp8mixed),
 //     3d_pixal3d_multi_views (la multivista; el plan no la nombraba) y 3d_pixal3d_trellis2_image_to_model. Se sirven en /templates/<nombre>.json.
 //   - Qwen: TextEncodeQwenImageEditPlus(clip, prompt; vae, image1..3), título "TextEncodeQwenImageEditPlus (Positive)" en el positivo;
@@ -42,12 +44,19 @@
 //     para darle cuatro renders sueltos hay que agregar cuatro LoadImage, enlazarlos a front/left/back/right y quitar la lámina.
 //   - La conversión con el frontend (window.comfyAPI.app.app, loadGraphData y graphToPrompt) funciona con las tres plantillas:
 //     aplana los subgrafos con ids "170:169" y conserva `_meta.title`, que es el nombre visible del nodo ("Load Image", "Steps"...).
+//   - Vistas (comfy_extras/nodes_trellis2.py): front 0°, left 90°, back 180°, right 270°, con Z arriba y la cámara de frente en -Y;
+//     `left` es la cámara en +X, que ve el lado izquierdo del personaje. Es la misma convención de blender/refs.py. Las vistas van
+//     "con alfa o sobre fondo negro", cuadradas, con el objeto ocupando 1/1,1 del cuadro; LoadImage entrega RGB (el alfa sale aparte
+//     como máscara = 1 - alfa), así que un render con fondo negro entra directo a front/left/back/right.
+//   - ImageCropToMask da vuelta sola una máscara invertida: en la plantilla de una vista, "Switch: Remove background" en false usa
+//     el alfa del render.
+//   - FluxKontextImageScale reescala la imagen de entrada a un tamaño propio del modelo: la salida de Qwen no tiene por qué medir
+//     lo mismo que la entrada (para comparar máscaras con el render crudo hay que llevarlas al mismo tamaño).
 // SUPUESTO (sin verificar: falta correr un flujo con modelos):
 //   - en qué clave de /history deja Save3DAdvanced el GLB (se toma cualquier lista con `filename`; si no aparece, se busca el archivo
 //     por su prefijo en la carpeta output/ del servidor, que está en esta misma máquina);
-//   - que las entradas front/left/back/right acepten la IMAGE de LoadImage tal cual (fondo negro, sin pasar por ImageCropToMask);
-//   - qué lado del personaje es `left` (el plan lo controla con la corrida G0);
-//   - que sacar un nodo con "quitar" deje válido el flujo cuando la entrada que lo usaba es opcional (on_true lo es).
+//   - que los flujos armados con las recetas de tools/arte_trabajos pasen la validación de ComfyUI (solo se armaron en seco);
+//   - tiempos y VRAM: sin medir.
 import fs from 'node:fs'; import path from 'node:path'; import crypto from 'node:crypto'; import { spawn } from 'node:child_process'; import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -244,7 +253,7 @@ async function modelosDe(flujo) {
   return out;
 }
 async function subir(archivo) {
-  if (!fs.existsSync(abs(archivo))) fallar(`No encuentro la imagen de entrada ${archivo}`);
+  if (!fs.existsSync(abs(archivo))) { if (!SECO) fallar(`No encuentro la imagen de entrada ${archivo}`); console.log(`AVISO falta la imagen de entrada ${archivo} (en seco se sigue igual)`); return { ruta: archivo, sha256: null, bytes: 0, subida: 'FALTA_' + path.basename(archivo) }; }
   const buf = fs.readFileSync(abs(archivo)), h = sha256(buf), nombre = `arte_${h.slice(0, 12)}_${path.basename(archivo)}`, info = { ruta: archivo, sha256: h, bytes: buf.length, subida: nombre };
   if (SECO) return info;
   const fd = new FormData(); fd.append('image', new Blob([buf]), nombre); fd.append('type', 'input'); fd.append('overwrite', 'true');

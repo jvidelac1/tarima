@@ -1,0 +1,44 @@
+{
+ "nota": "E5 B, vistas izquierda, atrás y derecha: imagen 1 = el frente ya repintado (va al LoadImage 41 de la plantilla), imagen 2 = el render crudo de esa vista (LoadImage nuevo 'ref2', escalado igual que la imagen 1 y enlazado a image2 de los dos codificadores de texto). Para el frente alcanza con el otro ejemplo, cambiando la imagen. Armado en seco; sin correr.",
+ "plantilla": "image_qwen_image_edit_2511_int8",
+ "puentes": {
+  "@Switch (Model)": "on_false",
+  "@Switch (CFG)": "on_false",
+  "@Switch (Steps)": "on_false"
+ },
+ "agregar": {
+  "ref2": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": ""
+   }
+  },
+  "ref2s": {
+   "class_type": "FluxKontextImageScale",
+   "inputs": {
+    "image": [
+     "ref2",
+     0
+    ]
+   }
+  }
+ },
+ "fijos": {
+  "TextEncodeQwenImageEditPlus.image2": [
+   "ref2s",
+   0
+  ]
+ },
+ "trabajos": [
+  {
+   "salida": "out/arte/refs_gen/ventura_rest_bust_left.png",
+   "semilla": 2101,
+   "indicacion": "<mismo personaje de la imagen 1 con la silueta exacta de la imagen 2>",
+   "negativa": "<negativa>",
+   "imagenes": {
+    "41": "out/arte/refs_gen/ventura_rest_bust_front.png",
+    "ref2": "out/arte/refs/ventura_rest_bust_left.png"
+   }
+  }
+ ]
+}

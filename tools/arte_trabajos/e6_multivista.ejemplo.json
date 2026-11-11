@@ -1,0 +1,63 @@
+{
+ "nota": "E6, Pixal3D multivista con cuatro renders sueltos de blender/refs.py en vez de la lámina de la plantilla: cuatro LoadImage nuevos enlazados a front/left/back/right; al quitar los SaveImageAdvanced, la lámina, sus recortes y el quitafondos quedan sin uso y se podan solos. Sin 'semilla' quedan las cuatro semillas fijas de la plantilla (56, 43, 42, 42), que se anotan igual en el JSON de salida. G0 = renders crudos; G1 a G3 cambian las imágenes. Si falta memoria a 1536: \"set\": {\"Trellis2UpsampleStage.target_resolution\": 1024}. Armado en seco; sin correr.",
+ "plantilla": "3d_pixal3d_multi_views",
+ "quitar": [
+  "SaveImageAdvanced"
+ ],
+ "agregar": {
+  "v_front": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": ""
+   }
+  },
+  "v_left": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": ""
+   }
+  },
+  "v_back": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": ""
+   }
+  },
+  "v_right": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": ""
+   }
+  }
+ },
+ "fijos": {
+  "Pixal3DMultiViewConditioning.front": [
+   "v_front",
+   0
+  ],
+  "Pixal3DMultiViewConditioning.left": [
+   "v_left",
+   0
+  ],
+  "Pixal3DMultiViewConditioning.back": [
+   "v_back",
+   0
+  ],
+  "Pixal3DMultiViewConditioning.right": [
+   "v_right",
+   0
+  ],
+  "Pixal3DMultiViewConditioning.fov": 20
+ },
+ "trabajos": [
+  {
+   "salida": "out/arte/gen/G0.glb",
+   "imagenes": {
+    "v_front": "out/arte/refs/ventura_rest_bust_front.png",
+    "v_left": "out/arte/refs/ventura_rest_bust_left.png",
+    "v_back": "out/arte/refs/ventura_rest_bust_back.png",
+    "v_right": "out/arte/refs/ventura_rest_bust_right.png"
+   }
+  }
+ ]
+}
