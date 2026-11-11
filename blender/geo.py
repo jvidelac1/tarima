@@ -5,7 +5,7 @@
 - eyeball: globo ocular con abultamiento de córnea.
 - correctives: morphs 'corr_*' = (malla posada con Corrective Smooth) - (skinning lineal), llevados a reposo, con driver.
 """
-import bpy, bmesh, math, numpy as np
+import bpy, bmesh, math, os, numpy as np
 from mathutils import Vector, Matrix, Quaternion
 from style import VARIANT, var
 PRE='mixamorig:'
@@ -72,7 +72,10 @@ def anatomy(b,rig,K):
     co=coords(b); N=len(co); me=b.data; no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3)
     J={x.name[len(PRE):]:np.array(x.head_local) for x in rig.data.bones if x.name.startswith(PRE)}
     B,F,_=tex.anatomy(co,no,J,K); names,W=wget(b); keep=1-sum(W[:,j] for j,n in enumerate(names) if any(k in n for k in ('Head','Hand','Foot','Toe')))
-    d=(B*ANAT_GEO[0]+F*ANAT_GEO[1])*np.clip(keep,0,1); me.vertices.foreach_set('co',(co+no*d[:,None]).ravel()); me.update()
+    d=(B*ANAT_GEO[0]+F*ANAT_GEO[1])*np.clip(keep,0,1)
+    if os.environ.get('TARIMA_DETAIL'):   # relieve medido de una malla generada (blender/detail.py relief). Sin la variable este paso no existe
+        import detail; d=detail.aplicar(os.environ['TARIMA_DETAIL'],co,no,d,B*ANAT_GEO[0]*np.clip(keep,0,1))
+    me.vertices.foreach_set('co',(co+no*d[:,None]).ravel()); me.update()
     print(f'ANAT desplazamiento de malla: máx +{d.max()*1000:.1f} / {d.min()*1000:.1f} mm, {int((np.abs(d)>5e-4).sum())} vértices')
     if VARIANT: print(f'VARIANT {VARIANT} ANAT_GEO ({ANAT_GEO[0]:.4g}, {ANAT_GEO[1]:.4g})')
 SIMPLIFY=1.0   # fracción de caras que se conserva en las zonas simplificables. 1 = no simplificar (por defecto; TARIMA_SIMP=0.32 lo activa).

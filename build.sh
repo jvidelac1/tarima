@@ -15,6 +15,7 @@
 #   TARIMA_THREADS=6  tope de hilos de CPU (Cycles y BLAS); por defecto 6, o la cantidad de núcleos si hay menos
 #   TARIMA_GPU=0      renders de control en CPU (por defecto GPU si hay: Metal en Mac, OptiX/CUDA/HIP/oneAPI en Linux; sin GPU cae a CPU)
 #   EXPORT_BAD=1      exporta a web/ aunque check() haya dado cuadros BAD (por defecto no pisa web/ y sale con error)
+#   TARIMA_DETAIL=f.npz  suma al cuerpo el relieve medido por `blender/detail.py relief` (línea DETAIL). Sin la variable no cambia nada
 # La salida completa de cada paso queda en <salida>/<nombre>/make.log y finish.log; por pantalla van las líneas clave.
 set -uo pipefail
 cd "$(dirname "$0")"
@@ -26,7 +27,7 @@ OUTR="${TARIMA_OUT:-out}"
 NCPU="$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 6)"
 export TARIMA_THREADS="${TARIMA_THREADS:-$(( NCPU < 6 ? NCPU : 6 ))}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-$TARIMA_THREADS}" VECLIB_MAXIMUM_THREADS="${VECLIB_MAXIMUM_THREADS:-$TARIMA_THREADS}"
-KEY='VARIANT|MEASURE|RADII|SKEL|GRIP|POSE|rack|TRAJ|UNION|PUSH|CHK|BAD|HAIR|LASH|GLB|CYCLES|BAKE dispositivo|MAPS|TEX |Error|ERROR|Traceback|^ +File "|Exception|SystemExit|No encuentro|Definí'
+KEY='VARIANT|MEASURE|RADII|SKEL|GRIP|POSE|rack|TRAJ|UNION|PUSH|CHK|BAD|HAIR|LASH|GLB|CYCLES|BAKE dispositivo|MAPS|TEX |DETAIL|Error|ERROR|Traceback|^ +File "|Exception|SystemExit|No encuentro|Definí'
 
 # Nunca más de un Blender a la vez: si hay otro proceso de blender/*.py, se espera.
 while pgrep -f "blender/(make|finish|pose_only|ctl[0-9]*)\.py" >/dev/null 2>&1; do echo "== hay otro proceso de Blender corriendo: espero 30 s =="; sleep 30; done
