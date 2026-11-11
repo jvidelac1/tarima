@@ -76,7 +76,7 @@ function bloquear(panel) { panel.t0 = reloj.ahora(); }
 const vale = panel => reloj.ahora() - (panel.t0 ?? -1e9) >= 400;
 const clic = (panel, sel) => new Promise(res => panel.querySelectorAll(sel).forEach(b => b.addEventListener('click', () => { if (!vale(panel)) return; sonido.activar(); res(b); })));
 const teclas = (n, T, extra = '') => `<kbd class="tecla ${extra}">${T ? 'TOCÁ' : 'ESPACIO'}</kbd>`.repeat(n);
-const pasosHTML = (ctl, T) => `<ol class="pasos">${pasos(ctl).map(([n, txt], i) => `<li><b>${i + 1}</b><span class="tk">${teclas(n, T, n > 1 ? 'ch' : '')}</span><span>${txt}</span></li>`).join('')}</ol>`;
+const pasosHTML = (ctl, T) => `<ol class="pasos">${pasos(ctl, T).map(([n, txt], i) => `<li><b>${i + 1}</b><span class="tk">${teclas(n, T, n > 1 ? 'ch' : '')}</span><span>${txt}</span></li>`).join('')}</ol>`;
 const MENUS = '<p class="chica">Menús: flechas y ENTER · H ayuda · ESC pausa</p>';
 
 // ---------- pausa y «Cómo se juega» ----------
@@ -214,7 +214,7 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
       if (m.toques > visto.toques) { visto.toques = m.toques; if (propio) sonido.toque(); }
       const f = m.fij, abajo = !!f && f.firme && now >= f.tb; if (abajo && !chic) { chic = true; sonido.chicharra(); }
       const envTxt = m.fase === 'hombros' && propio ? 'ENVIÓN: ' + ENVIONES[env].toUpperCase() : '';
-      cartel(m.res ? '' : facil ? envTxt : f ? (abajo ? '¡ABAJO!' : '¡AGUANTÁ!') : envTxt, abajo ? 'abajo' : '');
+      cartel(m.res || leyenda ? '' : facil ? envTxt : f ? (abajo ? '¡ABAJO!' : '¡AGUANTÁ!') : envTxt, abajo ? 'abajo' : '');
       // la señal fija (jugador) y las ayudas pegadas a la barra (Clásico y rivales)
       const edad = (ahora - palT) / 1000;
       if (propio) { senalUI.pintar(E.modo === 'panel' ? null : s, now, pal ? { ...pal, edad } : null, { parado }); guiaTxt(leyenda); const z = s && s.tipo !== 'espera' && s.tipo !== 'auto' ? s.verbo : s ? '···' : 'Tocá acá'; if ($('zona-txt').textContent !== z) $('zona-txt').textContent = z; }
@@ -282,7 +282,7 @@ async function inicio() {
       <h2>Elegí tu pesista</h2><div class="pesistas">${IDS.map(id => { const f = datos.atletas[id], P = PLANTEL[id]; return `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${P.bandera}"></div><b>${f.nombre}</b><small>${f.pais} · dorsal ${f.dorsal}<br>${P.bio} · ${P.lema}<br>Techo ${f.techo.s} / ${f.techo.c} · ${f.enviones.map(e => ENVIONES[e]).join(' y ')}<br>${P.juego}</small></button>`; }).join('')}</div>
       <div class="fila"><span>Rivales:</span>${['amistoso', 'normal', 'dificil'].map(n => `<button class="nivel" data-n="${n}" aria-pressed="${n === cfg.nivel}">${n === 'dificil' ? 'Difícil' : n[0].toUpperCase() + n.slice(1)}</button>`).join('')}</div>
       <div class="fila"><span>Final:</span><button class="ritmo" data-r="expres" aria-pressed="${cfg.ritmo === 'expres'}">Exprés</button><button class="ritmo" data-r="completa" aria-pressed="${cfg.ritmo === 'completa'}">Completa</button></div>
-      <div class="fila"><button class="ir" id="btn-empezar">Empezar</button><button id="btn-otro">${facil ? (falta ? 'Saltear tutorial' : 'Repetir tutorial') : 'Empezar sin calentamiento'}</button>${facil && falta ? '<small class="nota">La primera vez arranca con un tutorial de un minuto.</small>' : ''}</div>`);
+      <div class="fila pie"><button class="ir" id="btn-empezar">Empezar</button><button id="btn-otro">${facil ? (falta ? 'Saltear tutorial' : 'Repetir tutorial') : 'Empezar sin calentamiento'}</button>${facil && falta ? '<small class="nota">La primera vez arranca con un tutorial de un minuto.</small>' : ''}</div>`);
     const b = await clic(pn, 'button');
     if (b.dataset.id) cfg.id = b.dataset.id; else if (b.dataset.n) cfg.nivel = b.dataset.n; else if (b.dataset.r) cfg.ritmo = b.dataset.r; else if (b.dataset.c) cfg.ctl = b.dataset.c;
     else { const principalBtn = b.id === 'btn-empezar'; cfg.calentar = facil ? principalBtn === falta : principalBtn; cfg.primera = primera; if (facil && !cfg.calentar) guardado.set('tarima.tutorial', '1'); break; }      // saltearlo también cuenta: no se vuelve a ofrecer solo
@@ -339,7 +339,7 @@ async function tutorial(cfg) {
   const salir = () => { guardado.set('tarima.tutorial', '1'); zocalo(null); return medio(); };
   await escena.mostrar(cfg.id); visita('tutorial'); preparar('s');
   // 1. las tres reglas
-  if (await panel('Cómo se juega', `<ul class="reglas"><li>Un toque de ${tk} por señal. No hay que mantener ni soltar.</li><li>Tocá cuando el círculo se cierra sobre el aro.</li><li>Si dice <b>¡EMPUJÁ!</b>, tocá rápido hasta quedar de pie.</li></ul><p>Primero, un arranque en cámara lenta: el juego se detiene y espera cada toque.</p>`, `<button class="ir" id="btn-practicar">Empezar</button>${SALTEAR}`) === 'btn-saltear') return salir();
+  if (await panel('Cómo se juega', `<ul class="reglas"><li>${T ? 'Un toque por señal.' : `Un toque de ${tk} por señal.`} No hay que mantener ni soltar.</li><li>Tocá cuando el círculo se cierra sobre el aro.</li><li>Si dice <b>¡EMPUJÁ!</b>, tocá rápido hasta quedar de pie.</li></ul><p>Primero, un arranque en cámara lenta: el juego se detiene y espera cada toque.</p>`, `<button class="ir" id="btn-practicar">Empezar</button>${SALTEAR}`) === 'btn-saltear') return salir();
   // 2. arranque guiado, en cámara lenta: no se puede fallar
   for (let k = 0; k < 3; k++) {
     visita('guiado'); preparar('s');

@@ -40,9 +40,9 @@ function linea(res, ctl, tactil) {
 }
 
 /** Los tres pasos de «Cómo se juega» y de la pantalla de inicio: [cantidad de teclas dibujadas, texto]. */
-export function pasos(ctl = 'f') {
+export function pasos(ctl = 'f', tactil = false) {
   return ctl === 'f'
-    ? [[1, 'Apretá para empezar el levantamiento.'], [1, 'Tocá cuando el círculo se cierra: ¡EXPLOTÁ!, ¡RECIBÍ!'], [3, 'Si dice ¡EMPUJÁ!, tocá rápido.']]
+    ? [[1, `${tactil ? 'Tocá' : 'Apretá'} para empezar el levantamiento.`], [1, 'Tocá cuando el círculo se cierra: ¡EXPLOTÁ!, ¡RECIBÍ!'], [3, 'Si dice ¡EMPUJÁ!, tocá rápido.']]
     : [[1, 'Apretá con el anillo lleno y mantené.'], [1, 'Soltá cuando la barra llega a la línea y apretá para recibir.'], [3, 'Si se traba, tocá repetido; de pie, dejá apretado hasta la chicharra.']];
 }
 /** Texto del tutorial guiado en cada parada (Fácil). */

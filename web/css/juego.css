@@ -59,10 +59,13 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 /* La señal: siempre en el mismo lugar. Horizontal: a la derecha del pesista, a media altura. Vertical: al pie del escenario. */
 .tecla{display:inline-block;font:inherit;font-family:var(--display);font-weight:800;font-style:normal;letter-spacing:.12em;text-transform:uppercase;line-height:1;color:#0a1020;background:#f2f4ff;border-radius:.42em;padding:.42em .8em .5em;box-shadow:0 .24em 0 #7c86a8,0 .24em 0 1px #03050c;white-space:nowrap}
 .tecla.ch{font-size:.82em;padding:.3em .55em .36em}
-.senal{--v:var(--u);position:absolute;left:min(calc(50% + var(--v)*19),calc(100% - var(--v)*24.5 - var(--sr)));top:24%;width:calc(var(--v)*23);display:flex;flex-direction:column;align-items:center;text-align:center;background:rgba(6,14,48,.84);border-top:calc(var(--v)*.3) solid var(--teal);padding:calc(var(--v)*.7) calc(var(--v)*.6) calc(var(--v)*.8)}
+.senal{--v:var(--u);position:absolute;left:min(calc(50% + var(--v)*21),calc(100% - var(--v)*24.5 - var(--sr)));top:22%;width:calc(var(--v)*23);display:flex;flex-direction:column;align-items:center;text-align:center;background:rgba(6,14,48,.84);border-top:calc(var(--v)*.3) solid var(--teal);padding:calc(var(--v)*.7) calc(var(--v)*.6) calc(var(--v)*.8)}
 .s-paso{font-weight:700;font-size:calc(var(--v)*1.15);letter-spacing:.16em;color:var(--teal);min-height:1.25em;line-height:1.25}
 .s-verbo{font-weight:800;font-size:calc(var(--v)*3.5);line-height:1.05;letter-spacing:.03em;white-space:nowrap}
-.s-aro{position:relative;width:calc(var(--v)*14);height:calc(var(--v)*11.5);display:flex;align-items:center;justify-content:center;margin:calc(var(--v)*.2) 0}
+/* el círculo arranca a 1,6 veces el aro: el hueco se reserva para que no pise el verbo ni el texto */
+.s-aro{position:relative;width:calc(var(--v)*14);height:calc(var(--v)*14);display:flex;align-items:center;justify-content:center}
+.senal[data-tipo=espera] .s-aro,.senal[data-tipo=auto] .s-aro,.senal[data-tipo=nada] .s-aro{height:calc(var(--v)*4.6)}
+.senal[data-tipo=empuja] .s-aro{height:calc(var(--v)*8.5)}
 .s-fijo,.s-cierra{position:absolute;left:50%;top:50%;width:calc(var(--v)*8.6);height:calc(var(--v)*8.6);margin:calc(var(--v)*-4.3) 0 0 calc(var(--v)*-4.3);border-radius:50%;display:none}
 .s-fijo{border:calc(var(--v)*.42) solid #fff}
 .s-cierra{border:calc(var(--v)*.5) solid var(--teal);will-change:transform}
@@ -81,7 +84,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 .senal[data-tipo=espera] .s-teclas,.senal[data-tipo=auto] .s-teclas,.senal[data-tipo=nada] .s-teclas{opacity:.22}
 .senal[data-tipo=espera],.senal[data-tipo=auto]{border-top-color:var(--line)}
 .senal[data-tipo=empuja] .s-teclas .tecla{display:inline-block;font-size:.8em;padding:.42em .5em .5em}
-.senal[data-tipo=empuja] .s-teclas{margin-bottom:calc(var(--v)*2.2)}
+.senal[data-tipo=empuja] .s-teclas{margin-bottom:calc(var(--v)*2.6)}
 .senal[data-tipo=empuja] .s-avance{display:block}
 .senal[data-gesto=mantiene] .s-teclas .tecla{transform:translateY(.2em);box-shadow:0 .04em 0 #7c86a8;background:var(--gold)}
 @media (prefers-reduced-motion:no-preference){
@@ -97,9 +100,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 .guia{position:absolute;left:50%;bottom:calc(var(--u)*5.6);transform:translateX(-50%);width:max-content;max-width:min(94cqw,calc(var(--u)*48));text-align:center;background:rgba(6,14,48,.94);border-bottom:calc(var(--u)*.3) solid var(--gold);padding:calc(var(--u)*.6) calc(var(--u)*1.2);font-family:var(--body);font-weight:600;text-transform:none;font-size:calc(var(--u)*1.45);line-height:1.3;color:var(--ink)}
 @media (orientation:portrait){
   /* vertical: la señal va en dos columnas (aro a la izquierda, texto a la derecha), centrada al pie del escenario */
-  .senal{--v:calc(var(--u)*1.15);left:50%;top:auto;bottom:calc(var(--u)*5.2);transform:translateX(-50%);width:min(94cqw,calc(var(--v)*33));display:grid;grid-template-columns:auto 1fr;grid-template-areas:"aro paso" "aro verbo" "aro sub" "aro pal";align-items:center;justify-items:center;column-gap:calc(var(--v)*.6);padding:calc(var(--v)*.4) calc(var(--v)*.7)}
-  .s-aro{grid-area:aro;width:calc(var(--v)*11.5);height:calc(var(--v)*10.4);margin:0}
-  .s-fijo,.s-cierra{width:calc(var(--v)*7.4);height:calc(var(--v)*7.4);margin:calc(var(--v)*-3.7) 0 0 calc(var(--v)*-3.7)}
+  .senal{--v:calc(var(--u)*1.15);left:50%;top:auto;bottom:calc(var(--u)*5.2);transform:translateX(-50%);width:min(94cqw,calc(var(--v)*33));background:rgba(6,14,48,.6);text-shadow:0 1px 6px #020814;display:grid;grid-template-columns:auto 1fr;grid-template-areas:"aro paso" "aro verbo" "aro sub" "aro pal";align-items:center;justify-items:center;column-gap:calc(var(--v)*.6);padding:calc(var(--v)*.4) calc(var(--v)*.7)}
+  .s-aro,.senal[data-tipo=espera] .s-aro,.senal[data-tipo=auto] .s-aro,.senal[data-tipo=nada] .s-aro,.senal[data-tipo=empuja] .s-aro{grid-area:aro;width:calc(var(--v)*11.4);height:calc(var(--v)*11)}
+  .s-fijo,.s-cierra{width:calc(var(--v)*6.8);height:calc(var(--v)*6.8);margin:calc(var(--v)*-3.4) 0 0 calc(var(--v)*-3.4)}
+  .tecla{text-shadow:none}
   .s-teclas{font-size:calc(var(--v)*1)}
   .s-paso{grid-area:paso}.s-verbo{grid-area:verbo;font-size:calc(var(--v)*3.1)}.s-sub{grid-area:sub}.s-pal{grid-area:pal;font-size:calc(var(--v)*1.8)}
   .guia{bottom:auto;top:calc(var(--u)*6.5 + var(--st));font-size:calc(var(--u)*1.5)}
@@ -132,6 +136,8 @@ button:focus{outline:3px solid var(--gold);outline-offset:2px}
 .como h2{margin-top:.5em}
 .reglas{margin:.4em 0;padding-left:1.2em;color:var(--ink);font-size:clamp(13px,2.1cqh,16px);line-height:1.6}
 .panel p.chica,.nota{font-size:clamp(11px,1.7cqh,13px);color:var(--mute);letter-spacing:.04em}
+/* la fila de acción del inicio queda a la vista aunque el panel no entre (teléfono) */
+.panel .pie{position:sticky;bottom:0;margin:.5em calc(-1*clamp(10px,2.2cqh,22px)) calc(-1*clamp(10px,2.2cqh,22px));padding:8px clamp(10px,2.2cqh,22px);background:#080d1e;border-top:1px solid var(--line)}
 .panel p.falla{color:var(--ink);border-left:3px solid var(--red);padding-left:.7em}
 .pesistas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:.6em 0}
 .pesista{display:block;text-align:left;padding:.5em .6em;text-transform:none;letter-spacing:0;font-family:var(--body);font-weight:400;min-width:0}

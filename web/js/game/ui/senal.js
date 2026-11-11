@@ -31,8 +31,8 @@ export class Senal {
     }
     let oro = false;
     if (s && s.tipo === 'cierre') {
-      // de 2,1 veces el aro (cuando arranca) a 1 en el objetivo; después sigue achicándose hasta el límite
-      const falta = s.objetivo - now, total = Math.max(1, s.objetivo - s.desde), k = o.parado ? 1 : falta >= 0 ? 1 + 1.1 * Math.min(1, falta / total) : 1 - .3 * Math.min(1, -falta / Math.max(1, s.lim));
+      // de 1,6 veces el aro (cuando arranca) a 1 en el objetivo; después sigue achicándose hasta el límite
+      const falta = s.objetivo - now, total = Math.max(1, s.objetivo - s.desde), k = o.parado ? 1 : falta >= 0 ? 1 + .6 * Math.min(1, falta / total) : 1 - .3 * Math.min(1, -falta / Math.max(1, s.lim));
       oro = o.parado || Math.abs(falta) <= s.perf;
       this.cierra.style.transform = `scale(${k.toFixed(3)})`; this.cierra.style.opacity = (falta >= 0 ? .45 + .55 * (1 - Math.min(1, falta / total)) : 1).toFixed(2);
     }
