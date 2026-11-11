@@ -23,7 +23,7 @@ const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web'), OUT = path.join(ROOT, 'out', 'game');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
-const ONLY = arg('only'), HEADED = process.argv.includes('--headed'), SEMILLA = +(arg('semilla') || 20261111), DIBUJO = process.argv.includes('--dibujo');
+const ONLY = arg('only'), HEADED = process.argv.includes('--headed'), SEMILLA = +(arg('semilla') || 20261111), DIBUJO = process.argv.includes('--dibujo'), TRAZA = process.argv.includes('--traza');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
 const datos = leerDatos(JSON.parse(fs.readFileSync(path.join(WEB, 'data/sim.json'), 'utf8')));
 
@@ -78,12 +78,13 @@ async function corrida(via) {
     const av = async ms => { if (manual) await J(ms => JUEGO.test.avanzar(ms), ms); else await page.waitForTimeout(ms); };
     const ir = async t => { if (manual) await J(t => JUEGO.test.hasta(t, 8), t); else { const d = t - await J(() => JUEGO.reloj.ahora()); if (d > 0) await page.waitForTimeout(d); } };
     const toque = async () => { await baja(); await av(30); await sube(); };
-    let ultToque = 0, metro = false, llamado = '', hecho = '', firma = '';
+    let ultToque = 0, metro = false, llamado = '', hecho = '', firma = '', traza = '';
     for (let n = 0; n < 80000; n++) {
       const s = await J(() => JUEGO.estado());
       if (s.errores.length) throw new Error('error en el juego: ' + s.errores[0]);
       if (hasta(s)) return s;
       const I = s.intento;
+      if (TRAZA) { const k = `${s.pantalla} ${s.modo}${s.panel ? ' panel' : ''}${s.sobre ? ' sobre:' + s.sobre : ''} foco:${s.foco} ${I ? `${I.fase} ${I.senal ? I.senal.clave + (I.parado ? ' PARADO' : '') : '-'}` : ''}`; if (k !== traza) { traza = k; console.log(`   ${tag} ${Math.round(s.ahora)} ${k}`); } }
       if (I && I.propio && s.modo !== 'panel') {
         const g = I.senal;
         if (g) {      // la señal tiene que verse, con la tecla dibujada, y quedar dentro del escenario
