@@ -1,6 +1,7 @@
 import bpy, os, sys, bmesh, json, numpy as np
 sys.path.insert(0,os.path.dirname(os.path.abspath(__file__))); from common import *
 from mathutils import Vector
+from style import VARIANT, var
 CFG={
  'ventura':dict(height=1.70,macro=dict(gender=1.0,age=.5,muscle=1.0,weight=.62,height=.4,proportions=.8,african=.15,asian=.15,caucasian=.7),
    legs=dict(up=-.05,low=-.3),arms=dict(up=.15,low=.12),torso=.4,extra=[('torso/torso-vshape-incr',.3),('buttocks/buttocks-volume-incr',.6),('torso/measure-shoulder-dist-incr',.35)],
@@ -11,11 +12,20 @@ CFG={
    # cara larga y angulosa: mentón prominente con hoyuelo, nariz larga con caballete, mejillas hundidas
    face=[('head/head-rectangular',.5),('chin/chin-prominent-incr',.45),('chin/chin-cleft-incr',.5),('chin/chin-height-incr',.3),('nose/nose-hump-incr',.45),('nose/nose-scale-vert-incr',.35),('nose/nose-width2-decr',.3),('cheek/l-cheek-volume-decr',.4),('cheek/r-cheek-volume-decr',.4),('forehead/forehead-temple-decr',.3),('eyebrows/eyebrows-angle-down',.3)]),
 }
+# Variante C (TARIMA_VARIANT=C, definida solo para ventura): valores que reemplazan a los de build() y CFG. Más volumen de brazo, antebrazo,
+# dorsal, pectoral y cuello, más V y hombros, algo menos de peso. Ninguno es un target de largo de segmento (la línea MEASURE lo muestra).
+VAR_C={'ventura':{'weight':.58,'upperarm':1.0,'lowerarm':1.0,'pectoral':1.0,'dorsi':1.0,'neck':.85,'torso/torso-vshape-incr':.5,'torso/measure-shoulder-dist-incr':.5}}
 def build(name,probe=False):
     cfg=CFG[name]
+    if VARIANT and name not in VAR_C: raise SystemExit(f'La variante {VARIANT} está definida solo para: '+', '.join(VAR_C))
+    vc=VAR_C[name] if VARIANT else {}; used={}
+    def V(k,a):
+        """Valor A, o el de la variante si la clave está en VAR_C (anota el cambio para la línea VARIANT)."""
+        if k not in vc: return a
+        used[k]=(a,var(a,vc[k])); return used[k][1]
     HS=di('mpfb.services.humanservice','HumanService'); TS=di('mpfb.services.targetservice','TargetService'); HP=di('mpfb.entities.objectproperties','HumanObjectProperties'); LS=di('mpfb.services.locationservice','LocationService')
     b=HS.create_human()
-    for k,v in cfg['macro'].items(): HP.set_value(k,v,entity_reference=b)
+    for k,v in cfg['macro'].items(): HP.set_value(k,V(k,v),entity_reference=b)
     TS.reapply_macro_details(b)
     T=LS.get_mpfb_data('targets')
     def tg(p,w):
@@ -24,11 +34,14 @@ def build(name,probe=False):
     def pm(base,w): tg(base+('-incr' if w>0 else '-decr'),abs(w))
     for s in 'lr':
         tg(f'legs/{s}-upperleg-muscle-incr',1.0); tg(f'legs/{s}-lowerleg-muscle-incr',.6)
-        tg(f'arms/{s}-upperarm-shoulder-muscle-incr',1.0); tg(f'arms/{s}-upperarm-muscle-incr',.85); tg(f'arms/{s}-lowerarm-muscle-incr',.8)   # físico de levantador: volumen de deltoides, brazo y antebrazo (no cambia largos)
+        tg(f'arms/{s}-upperarm-shoulder-muscle-incr',1.0); tg(f'arms/{s}-upperarm-muscle-incr',V('upperarm',.85)); tg(f'arms/{s}-lowerarm-muscle-incr',V('lowerarm',.8))   # físico de levantador: volumen de deltoides, brazo y antebrazo (no cambia largos)
         pm(f'legs/{s}-upperleg-scale-vert',cfg['legs']['up']); pm(f'legs/{s}-lowerleg-scale-vert',cfg['legs']['low'])
     pm('arms/measure-upperarm-length',cfg['arms']['up']); pm('arms/measure-lowerarm-length',cfg['arms']['low']); pm('torso/torso-scale-vert',cfg['torso'])
-    tg('torso/torso-muscle-pectoral-incr',.85); tg('torso/torso-muscle-dorsi-incr',.8); tg('stomach/stomach-tone-incr',.5); tg('neck/measure-neck-circ-incr',.7)
-    for p,w in cfg['extra']+cfg.get('face',[]): tg(p,w)
+    tg('torso/torso-muscle-pectoral-incr',V('pectoral',.85)); tg('torso/torso-muscle-dorsi-incr',V('dorsi',.8)); tg('stomach/stomach-tone-incr',.5); tg('neck/measure-neck-circ-incr',V('neck',.7))
+    for p,w in cfg['extra']+cfg.get('face',[]): tg(p,V(p,w))
+    if VARIANT:
+        if set(used)!=set(vc): raise SystemExit(f'VARIANT {VARIANT} {name}: claves sin aplicar {sorted(set(vc)-set(used))}')
+        print(f'VARIANT {VARIANT} {name}: '+' · '.join(f'{k.split("/")[-1]} {a:g}→{c:g}' for k,(a,c) in used.items()))
     TS.bake_targets(b)
     me=b.data
     zs=[v.co.z for v in me.vertices]; gi={g.name:g.index for g in b.vertex_groups}; body=gi['body']

@@ -9,6 +9,9 @@
 # Variables:
 #   FAST=1            saltea las hojas de poses de costado y de frente (los renders de control de WANT se hacen igual)
 #   TARIMA_OUT=dir    carpeta de salida (por defecto out/)
+#   TARIMA_WEB=dir    raíz web a la que exporta tools/export_web.py (por defecto web/): escribe <dir>/models y <dir>/data/poses.json
+#   TARIMA_VARIANT=C  variante de dirección de arte (más músculo en ventura; ver blender/style.py). Usar siempre con TARIMA_OUT y TARIMA_WEB
+#                     propios para no pisar la versión de siempre: TARIMA_VARIANT=C TARIMA_OUT=out_C TARIMA_WEB=webv/C FAST=1 ./build.sh ventura
 #   TARIMA_THREADS=6  tope de hilos de CPU (Cycles y BLAS); por defecto 6, o la cantidad de núcleos si hay menos
 #   TARIMA_GPU=0      renders de control en CPU (por defecto GPU si hay: Metal en Mac, OptiX/CUDA/HIP/oneAPI en Linux; sin GPU cae a CPU)
 #   EXPORT_BAD=1      exporta a web/ aunque check() haya dado cuadros BAD (por defecto no pisa web/ y sale con error)
@@ -23,7 +26,7 @@ OUTR="${TARIMA_OUT:-out}"
 NCPU="$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 6)"
 export TARIMA_THREADS="${TARIMA_THREADS:-$(( NCPU < 6 ? NCPU : 6 ))}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-$TARIMA_THREADS}" VECLIB_MAXIMUM_THREADS="${VECLIB_MAXIMUM_THREADS:-$TARIMA_THREADS}"
-KEY='MEASURE|RADII|SKEL|GRIP|POSE|rack|TRAJ|UNION|PUSH|CHK|BAD|HAIR|LASH|GLB|CYCLES|BAKE dispositivo|MAPS|TEX |Error|ERROR|Traceback|^ +File "|Exception|SystemExit|No encuentro|Definí'
+KEY='VARIANT|MEASURE|RADII|SKEL|GRIP|POSE|rack|TRAJ|UNION|PUSH|CHK|BAD|HAIR|LASH|GLB|CYCLES|BAKE dispositivo|MAPS|TEX |Error|ERROR|Traceback|^ +File "|Exception|SystemExit|No encuentro|Definí'
 
 # Nunca más de un Blender a la vez: si hay otro proceso de blender/*.py, se espera.
 while pgrep -f "blender/(make|finish|pose_only|ctl[0-9]*)\.py" >/dev/null 2>&1; do echo "== hay otro proceso de Blender corriendo: espero 30 s =="; sleep 30; done
@@ -55,6 +58,6 @@ for l in "${SUMMARY[@]}"; do echo "$l"; done
 if [ "$FAIL" -ne 0 ] && [ "${EXPORT_BAD:-}" != "1" ]; then
   echo "ERROR build con fallas o cuadros BAD: no se exporta a web/ (EXPORT_BAD=1 para exportar igual)"; exit 1
 fi
-echo "== export a web/ =="
+echo "== export a ${TARIMA_WEB:-web}/ =="
 "$PY" tools/export_web.py "${NAMES[@]}" || { echo "ERROR export_web.py falló"; exit 1; }
 exit "$FAIL"

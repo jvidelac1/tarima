@@ -7,6 +7,7 @@
 """
 import bpy, bmesh, math, numpy as np
 from mathutils import Vector, Matrix, Quaternion
+from style import VARIANT, var
 PRE='mixamorig:'
 def sm(e0,e1,v):
     t=np.clip((np.asarray(v,float)-e0)/(e1-e0),0,1); return t*t*(3-2*t)
@@ -63,7 +64,7 @@ def subdivide(b,levels=1):
     m=b.modifiers.new('sub','SUBSURF'); m.levels=levels; m.subdivision_type='CATMULL_CLARK'; m.uv_smooth='NONE'; m.boundary_smooth='PRESERVE_CORNERS'
     bpy.ops.object.modifier_move_to_index(modifier='sub',index=0); bpy.ops.object.modifier_apply(modifier='sub')
     for p in b.data.polygons: p.use_smooth=True
-ANAT_GEO=(1.15,.5)   # fracción del relieve muscular de tex.anatomy que va a la malla: (masas anchas, surcos). El resto del surco lo pone el normal map
+ANAT_GEO=(var(1.15,1.45),var(.5,.65))   # (1.15,.5); con TARIMA_VARIANT=C (1.45,.65). Fracción del relieve muscular de tex.anatomy que va a la malla: (masas anchas, surcos). El resto del surco lo pone el normal map
 def anatomy(b,rig,K):
     """Desplaza la malla subdividida sobre la normal con el relieve muscular por reglas (deltoides, bíceps, tríceps, antebrazo, pectoral, trapecio, dorsal, cuádriceps, gemelos).
     Misma definición que el normal map (tex.anatomy). No toca cabeza, manos ni pies."""
@@ -73,6 +74,7 @@ def anatomy(b,rig,K):
     B,F,_=tex.anatomy(co,no,J,K); names,W=wget(b); keep=1-sum(W[:,j] for j,n in enumerate(names) if any(k in n for k in ('Head','Hand','Foot','Toe')))
     d=(B*ANAT_GEO[0]+F*ANAT_GEO[1])*np.clip(keep,0,1); me.vertices.foreach_set('co',(co+no*d[:,None]).ravel()); me.update()
     print(f'ANAT desplazamiento de malla: máx +{d.max()*1000:.1f} / {d.min()*1000:.1f} mm, {int((np.abs(d)>5e-4).sum())} vértices')
+    if VARIANT: print(f'VARIANT {VARIANT} ANAT_GEO ({ANAT_GEO[0]:.4g}, {ANAT_GEO[1]:.4g})')
 SIMPLIFY=1.0   # fracción de caras que se conserva en las zonas simplificables. 1 = no simplificar (por defecto; TARIMA_SIMP=0.32 lo activa).
 # Queda apagado: esas zonas son solo el 9 % de las caras del cuerpo (la cabeza es el 37 % y las manos el 28 %), se ahorran ~6 mil triángulos,
 # y al cambiar la densidad de vértices del muslo cambia el radio por percentil que mide poses.py (muslo 10,2 -> 8,9 cm en brenner): afloja check() sin querer.
