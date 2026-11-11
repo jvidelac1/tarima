@@ -1,6 +1,7 @@
 import os
 # Tope de hilos de CPU (la máquina de trabajo se satura fácil): TARIMA_THREADS, 6 por defecto. Vale para Cycles (render y horneado) y para BLAS de numpy.
-THREADS=max(1,int(os.environ.get('TARIMA_THREADS') or min(6,os.cpu_count() or 6)))   # sin la variable: 6, o los núcleos que haya si son menos
+NCPU=len(os.sched_getaffinity(0)) if hasattr(os,'sched_getaffinity') else (os.cpu_count() or 6)   # núcleos asignados al proceso (en un contenedor, cpu_count() da los del anfitrión)
+THREADS=max(1,int(os.environ.get('TARIMA_THREADS') or min(6,NCPU)))   # sin la variable: 6, o los núcleos que haya si son menos
 for _k in ('OMP_NUM_THREADS','VECLIB_MAXIMUM_THREADS','OPENBLAS_NUM_THREADS','MKL_NUM_THREADS','NUMEXPR_NUM_THREADS'): os.environ.setdefault(_k,str(THREADS))
 import bpy, sys, shutil, importlib, math
 HERE=os.path.dirname(os.path.abspath(__file__)); ROOT=os.path.dirname(HERE)

@@ -9,7 +9,7 @@ Salidas en <OUT>/<nombre>/:
 Todo sale de los mapas que hornea make.py (posición de reposo, normal de objeto, máscaras por hueso, AO) y de reglas.
 Sin fotos, sin caras ni marcas reales: los textos son el código de país y el apellido ficticios de style.py."""
 import os
-for _k in ('OMP_NUM_THREADS','VECLIB_MAXIMUM_THREADS','OPENBLAS_NUM_THREADS','MKL_NUM_THREADS','NUMEXPR_NUM_THREADS'): os.environ.setdefault(_k,os.environ.get('TARIMA_THREADS') or str(min(6,os.cpu_count() or 6)))   # tope de hilos de BLAS (antes de importar numpy)
+for _k in ('OMP_NUM_THREADS','VECLIB_MAXIMUM_THREADS','OPENBLAS_NUM_THREADS','MKL_NUM_THREADS','NUMEXPR_NUM_THREADS'): os.environ.setdefault(_k,os.environ.get('TARIMA_THREADS') or str(min(6,len(os.sched_getaffinity(0)) if hasattr(os,'sched_getaffinity') else 6)))   # tope de hilos de BLAS (antes de importar numpy)
 import sys, json, math, numpy as np
 from PIL import Image, ImageDraw, ImageFont
 f32=np.float32

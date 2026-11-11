@@ -100,8 +100,8 @@ elif [ "$OS" = Darwin ]; then echo "AVISO: no encuentro Chrome. Instalalo (brew 
 else echo "AVISO: no encuentro Chrome ni Chromium. Instalá el .deb de Google (x86_64) o Chromium ('npx playwright-core install --with-deps chromium') y definí CHROME_PATH."; fi
 if FONT="$(font_path)"; then echo "Tipografía: $FONT"
 else echo "AVISO: definí TARIMA_FONT con la ruta a una .ttf en negrita (Linux: apt-get install fonts-liberation)."; fi
-NCPU="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo '?')"
-echo "CPU: $NCPU núcleos (build.sh usa hasta 6 hilos; TARIMA_THREADS lo cambia)"
+NCPU="$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo '?')"
+echo "CPU: $NCPU núcleos disponibles (build.sh usa hasta 6 hilos, o menos si hay menos núcleos; TARIMA_THREADS lo cambia)"
 
 cat <<FIN
 
