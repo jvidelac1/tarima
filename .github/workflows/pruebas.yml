@@ -56,6 +56,17 @@ jobs:
         if: ${{ !cancelled() }}
         run: node tools/play_human.mjs 2>&1 | tee out/logs/play_human.log
 
+      - name: Servidor, métricas y Functions de Pages sin red (servidor_test y worker_test)
+        if: ${{ !cancelled() }}
+        run: |
+          { node tools/servidor_test.mjs && node tools/worker_test.mjs; } 2>&1 | tee out/logs/servidor_test.log
+          exit "${PIPESTATUS[0]}"
+
+      - name: Métricas sin cookies y página de privacidad, con navegador (check_analitica)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 8
+        run: node tools/check_analitica.mjs 2>&1 | tee out/logs/check_analitica.log
+
       - name: Caída de la barra sin navegador (caida_test)
         if: ${{ !cancelled() }}
         run: node tools/caida_test.mjs 2>&1 | tee out/logs/caida_test.log
@@ -104,7 +115,7 @@ jobs:
         run: |
           {
             echo "### Pruebas del juego (dibujo por software: no mide cuadros por segundo)"
-            for f in sim_test play_human caida_test check_escenas check_game check_telefono check_fluidez capturas check_recorrido; do
+            for f in sim_test servidor_test check_analitica play_human caida_test check_escenas check_game check_telefono check_fluidez capturas check_recorrido; do
               echo; echo "**$f**"; echo '```'
               if [ -f "out/logs/$f.log" ]; then tail -n 14 "out/logs/$f.log"; else echo "(no corrió)"; fi
               echo '```'

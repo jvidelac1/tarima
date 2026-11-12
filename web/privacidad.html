@@ -1,0 +1,257 @@
+<!doctype html>
+<!--
+  Privacidad de Tarima (docs/MVP.md 5.2), en español neutro y en inglés. Versión 2026-11-b: es la que manda el juego al
+  anotarse (CONSENTIMIENTO en web/js/game/servidor.js). Si cambia lo que dice este texto, subir la versión en los dos
+  lugares y agregarla a VERSIONES_CONSENTIMIENTO en worker/src/reglas.js.
+
+  PARA COMPLETAR (decisión pendiente del dueño): buscar «data-completar» en este archivo. Son tres datos, cada uno
+  aparece en los dos idiomas:
+    - responsable  quién es el responsable de los datos (persona o empresa)
+    - pais         país del responsable
+    - contacto     correo de contacto (va también como enlace mailto: en «Tus derechos» y en la baja)
+  Se reemplaza el texto entre corchetes del <span> y se borra la clase «pendiente».
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#03050c">
+<meta name="referrer" content="no-referrer">
+<title>Tarima · Privacidad</title>
+<link rel="icon" href="data:,">
+<style>
+@font-face{font-family:'Saira Condensed';font-weight:700;font-display:swap;src:url('assets/fonts/saira-condensed-700.woff2') format('woff2')}
+@font-face{font-family:'Saira';font-weight:400;font-display:swap;src:url('assets/fonts/saira-400.woff2') format('woff2')}
+@font-face{font-family:'Saira';font-weight:600;font-display:swap;src:url('assets/fonts/saira-600.woff2') format('woff2')}
+:root{
+  color-scheme:dark;
+  --bg:#03050c; --panel:#080d1e; --line:#1b2548; --ink:#f2f4ff; --mute:#a3afd6; --teal:#35e6d6; --gold:#ffd23f; --red:#ff5a52;
+  --display:'Saira Condensed','Arial Narrow',system-ui,sans-serif;
+  --body:'Saira',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--body)}
+.pagina{max-width:720px;margin:0 auto;padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(40px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.arriba{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px}
+.arriba a{color:var(--teal);font-weight:600;text-decoration:none}
+.idioma{display:flex;gap:4px}
+.idioma button{background:transparent;color:var(--mute);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font:600 14px var(--body);cursor:pointer;min-height:36px}
+.idioma button[aria-pressed="true"]{background:var(--panel);color:var(--ink);border-color:var(--teal)}
+h1{font:700 clamp(28px,6vw,40px)/1.1 var(--display);letter-spacing:.02em;text-transform:uppercase;margin:0 0 4px}
+.version{color:var(--mute);margin:0 0 24px;font-size:14px}
+h2{font:700 20px/1.2 var(--display);letter-spacing:.04em;text-transform:uppercase;color:var(--teal);margin:28px 0 8px}
+p{margin:0 0 12px}
+code{font-size:.92em;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+a{color:var(--teal)}
+.pendiente{background:var(--gold);color:#000;font-weight:600;border-radius:4px;padding:0 4px}
+.caja{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}
+.fila{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+label{display:block;font-weight:600;margin-bottom:6px}
+input[type=email]{flex:1 1 220px;min-width:0;background:#000;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:16px var(--body);min-height:44px}
+input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
+.boton{background:var(--teal);color:#001a18;border:0;border-radius:8px;padding:10px 18px;font:600 16px var(--body);cursor:pointer;min-height:44px}
+.boton.secundario{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.boton:disabled{opacity:.6;cursor:default}
+.aviso{margin:10px 0 0;color:var(--mute)}
+.aviso.error{color:var(--red)}
+.estado-medicion b{color:var(--gold)}
+</style>
+</head>
+<body>
+<main class="pagina">
+  <div class="arriba">
+    <a href="juego.html" data-volver><span lang="es">← Volver al juego</span><span lang="en" hidden>← Back to the game</span></a>
+    <div class="idioma" role="group" aria-label="Idioma / Language">
+      <button type="button" data-lang="es" aria-pressed="true">ES</button>
+      <button type="button" data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+
+  <!-- ================================ ESPAÑOL ================================ -->
+  <article lang="es" data-idioma="es">
+    <h1>Privacidad de Tarima</h1>
+    <p class="version">Versión 2026-11-b · 12 de noviembre de 2026</p>
+
+    <p>Responsable: <span class="pendiente" data-completar="responsable">[RESPONSABLE PENDIENTE]</span>,
+      <span class="pendiente" data-completar="pais">[PAÍS PENDIENTE]</span>.
+      Contacto: <span class="pendiente" data-completar="contacto">[CONTACTO PENDIENTE]</span>.</p>
+
+    <h2>Jugar</h2>
+    <p>No hace falta cuenta. Tu nombre o apodo queda solo en tu dispositivo. Solo lo guardamos si te anotas en la lista, para saludarte.</p>
+
+    <h2>Finales gratis</h2>
+    <p>Para contar tus finales gratis guardamos un identificador al azar de tu navegador. Va en el almacenamiento del sitio y en una cookie técnica (<code>tdv</code>), que solo se usa para hablar con nuestro servidor y dura 180 días.</p>
+    <p>En el servidor no guardamos ese identificador ni tu dirección IP. Guardamos un código que sale de pasar cada uno por una clave secreta (HMAC). De la IP se usa la dirección entera en IPv4 y el prefijo /64 en IPv6. Con ese código no se puede recuperar la IP.</p>
+    <p>El código de la IP se borra a los 30 días. El del dispositivo, a los 180 días sin jugar. Lo hacemos por interés legítimo: que las finales gratis sean de verdad limitadas.</p>
+
+    <h2>Lista de espera</h2>
+    <p>Si te anotas, guardamos tu correo, el nombre que pusiste, el idioma, el país aproximado (según tu conexión), la fecha y la versión de este texto.</p>
+    <p>Los usamos para avisarte cuando abra el acceso anticipado. Si marcaste la otra casilla, también para mandarte novedades, como mucho una por mes. La base es tu consentimiento.</p>
+    <p>Guardamos los datos hasta que te des de baja. Por ahora no mandamos correos de confirmación. Cuando empecemos, te pediremos que confirmes tu correo; si no lo confirmas en 30 días desde ese correo, borraremos tus datos.</p>
+    <p>La lista es solo para mayores de 16 años.</p>
+
+    <h2>Medición</h2>
+    <p>Usamos PostHog (PostHog Inc., Estados Unidos) como encargado para medir cómo se juega: qué pantallas se ven, cuántas finales se terminan y dónde se deja de jugar. Los datos se alojan en la nube de PostHog en Estados Unidos. La transferencia desde Europa está cubierta por el acuerdo de tratamiento de datos de PostHog, con las cláusulas contractuales tipo de la Comisión Europea.</p>
+    <p>Los datos pasan primero por nuestro propio sitio, que no le reenvía tu IP a PostHog. No usamos cookies de medición ni guardamos nada en tu navegador para esto. No le mandamos a PostHog tu nombre, tu correo, tu IP ni el identificador de tu navegador. Si te anotas, tus partidas quedan ligadas a un número interno de la lista, nunca a tu correo.</p>
+    <p>Para probar variantes del juego (por ejemplo, el texto de una pantalla) usamos un código que sale del de tu dispositivo. Es un seudónimo y entra en el mismo interés legítimo de las finales gratis.</p>
+    <div class="caja estado-medicion">
+      <p data-medicion-texto>Medición anónima: <b data-medicion-valor>activada</b></p>
+      <button type="button" class="boton secundario" data-medicion-boton>Desactivar</button>
+    </div>
+
+    <h2>Encuesta</h2>
+    <p>Las respuestas van a PostHog sin tu nombre ni tu correo. No escribas datos personales en la respuesta libre.</p>
+
+    <h2>Alojamiento</h2>
+    <p>El juego y el servidor corren en Cloudflare (encargado), que procesa tu IP para entregar la página y frenar abusos.</p>
+    <p>No vendemos ni compartimos tus datos. No hay publicidad ni rastreadores de terceros.</p>
+
+    <h2>Tus derechos</h2>
+    <p>Puedes pedir acceso, corrección, borrado u oposición, o llevarte tus datos, escribiendo a <span class="pendiente" data-completar="contacto">[CONTACTO PENDIENTE]</span>. También puedes reclamar ante la autoridad de protección de datos de tu país.</p>
+
+    <h2 id="baja">Darte de baja de la lista</h2>
+    <form class="caja" data-baja novalidate>
+      <label for="baja-es">Tu correo</label>
+      <div class="fila">
+        <input id="baja-es" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="nombre@ejemplo.com" required>
+        <button type="submit" class="boton">Darme de baja</button>
+      </div>
+      <p class="aviso">Si anotaste ese correo desde este dispositivo, lo borramos enseguida. Si lo anotaste desde otro, usa este formulario allí o escríbenos a <span class="pendiente" data-completar="contacto">[CONTACTO PENDIENTE]</span>. Puedes seguir jugando igual.</p>
+      <p class="aviso" data-baja-resultado role="status" aria-live="polite" hidden></p>
+    </form>
+  </article>
+
+  <!-- ================================ ENGLISH ================================ -->
+  <article lang="en" data-idioma="en" hidden>
+    <h1>Tarima privacy</h1>
+    <p class="version">Version 2026-11-b · November 12, 2026</p>
+
+    <p>Controller: <span class="pendiente" data-completar="responsable">[CONTROLLER PENDING]</span>,
+      <span class="pendiente" data-completar="pais">[COUNTRY PENDING]</span>.
+      Contact: <span class="pendiente" data-completar="contacto">[CONTACT PENDING]</span>.</p>
+
+    <h2>Playing</h2>
+    <p>No account needed. Your name or nickname stays on your device. We only store it if you join the list, to greet you.</p>
+
+    <h2>Free finals</h2>
+    <p>To count your free finals we store a random ID for your browser. It lives in site storage and in a technical cookie (<code>tdv</code>), used only to talk to our server, which lasts 180 days.</p>
+    <p>On the server we store neither that ID nor your IP address. We store a code made by running each one through a secret key (HMAC). For the IP we use the full address on IPv4 and the /64 prefix on IPv6. The IP can't be recovered from that code.</p>
+    <p>The IP code is deleted after 30 days. The device code, after 180 days without play. Legal basis: our legitimate interest in keeping free finals actually limited.</p>
+
+    <h2>Waitlist</h2>
+    <p>If you join, we store your email, the name you entered, language, approximate country (from your connection), the date and the version of this text.</p>
+    <p>We use them to tell you when early access opens. If you ticked the other box, also to send you news, at most once a month. Legal basis: your consent.</p>
+    <p>We keep the data until you unsubscribe. We don't send confirmation emails yet. When we start, we'll ask you to confirm your email; if you don't confirm within 30 days of that email, we'll delete your data.</p>
+    <p>The list is for people 16 and older.</p>
+
+    <h2>Measurement</h2>
+    <p>We use PostHog (PostHog Inc., United States) as a processor to measure how the game is played: which screens are seen, how many finals are finished and where people stop playing. Data is hosted in PostHog's US cloud. Transfers from Europe are covered by PostHog's data processing agreement, which includes the European Commission's standard contractual clauses.</p>
+    <p>Data goes through our own site first, which doesn't forward your IP to PostHog. We use no measurement cookies and store nothing in your browser for this. We never send PostHog your name, email, IP or browser ID. If you join the list, your games are linked to an internal list number, never to your email.</p>
+    <p>To test variants of the game (for example, the text on a screen) we use a code derived from your device's code. It's a pseudonym, covered by the same legitimate interest as free finals.</p>
+    <div class="caja estado-medicion">
+      <p data-medicion-texto>Anonymous measurement: <b data-medicion-valor>on</b></p>
+      <button type="button" class="boton secundario" data-medicion-boton>Turn off</button>
+    </div>
+
+    <h2>Survey</h2>
+    <p>Answers go to PostHog without your name or email. Please don't write personal details in the free-text answer.</p>
+
+    <h2>Hosting</h2>
+    <p>The game and server run on Cloudflare (processor), which handles your IP to serve the page and stop abuse.</p>
+    <p>We never sell or share your data. No ads, no third-party trackers.</p>
+
+    <h2>Your rights</h2>
+    <p>You can ask for access, correction, deletion or objection, or take your data with you, by writing to <span class="pendiente" data-completar="contacto">[CONTACT PENDING]</span>. You can also complain to your country's data protection authority.</p>
+
+    <h2>Leave the list</h2>
+    <form class="caja" data-baja novalidate>
+      <label for="baja-en">Your email</label>
+      <div class="fila">
+        <input id="baja-en" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="name@example.com" required>
+        <button type="submit" class="boton">Unsubscribe me</button>
+      </div>
+      <p class="aviso">If you joined with that email on this device, we delete it right away. If you joined on another device, use this form there or write to <span class="pendiente" data-completar="contacto">[CONTACT PENDING]</span>. You can keep playing either way.</p>
+      <p class="aviso" data-baja-resultado role="status" aria-live="polite" hidden></p>
+    </form>
+  </article>
+</main>
+
+<script type="module">
+import { crearServidor } from './js/game/servidor.js';
+import { crearAnalitica } from './js/game/analitica.js';
+
+const T = {
+  es: {
+    titulo: 'Tarima · Privacidad', activada: 'activada', desactivada: 'desactivada', desactivar: 'Desactivar', activar: 'Activar',
+    enviando: 'Enviando…', formato: 'Ese correo no parece completo. ¿Lo revisas?', limite: 'Demasiados intentos. Prueba en un rato.',
+    red: 'No pudimos conectar. Prueba de nuevo.',
+    ok: 'Listo. Si ese correo estaba anotado desde este dispositivo, ya lo borramos. Si no, usa este formulario en el dispositivo donde te anotaste.',
+  },
+  en: {
+    titulo: 'Tarima · Privacy', activada: 'on', desactivada: 'off', desactivar: 'Turn off', activar: 'Turn on',
+    enviando: 'Sending…', formato: "That email doesn't look right. Mind checking it?", limite: 'Too many tries. Try again in a bit.',
+    red: "We couldn't connect. Try again.",
+    ok: "Done. If that email was on the list from this device, it's deleted. If not, use this form on the device you joined from.",
+  },
+};
+
+const guardado = k => { try { return localStorage.getItem(k); } catch { return null; } };
+const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch { /* sin almacenamiento */ } };
+
+// Idioma: ?lang=, después tarima.idioma, después el navegador (docs/MVP.md 4.1).
+function idiomaInicial() {
+  const q = new URLSearchParams(location.search).get('lang');
+  if (q === 'es' || q === 'en') return q;
+  const g = guardado('tarima.idioma');
+  if (g === 'es' || g === 'en') return g;
+  return (navigator.languages || [navigator.language || '']).some(l => /^es\b/i.test(l || '')) ? 'es' : 'en';
+}
+let idioma = idiomaInicial();
+
+const servidor = crearServidor();
+const analitica = crearAnalitica();
+
+function pintar() {
+  document.documentElement.lang = idioma;
+  document.title = T[idioma].titulo;
+  for (const a of document.querySelectorAll('[data-idioma]')) a.hidden = a.dataset.idioma !== idioma;
+  for (const s of document.querySelectorAll('[data-volver] [lang]')) s.hidden = s.lang !== idioma;
+  for (const b of document.querySelectorAll('[data-lang]')) b.setAttribute('aria-pressed', String(b.dataset.lang === idioma));
+  const on = analitica.medicionActivada();
+  for (const v of document.querySelectorAll('[data-medicion-valor]')) v.textContent = T[v.closest('[data-idioma]').dataset.idioma][on ? 'activada' : 'desactivada'];
+  for (const b of document.querySelectorAll('[data-medicion-boton]')) b.textContent = T[b.closest('[data-idioma]').dataset.idioma][on ? 'desactivar' : 'activar'];
+  // El enlace de volver conserva el idioma elegido.
+  const volver = document.querySelector('[data-volver]');
+  volver.href = 'juego.html?lang=' + idioma;
+}
+
+for (const b of document.querySelectorAll('[data-lang]')) {
+  b.addEventListener('click', () => { idioma = b.dataset.lang; guardar('tarima.idioma', idioma); pintar(); });
+}
+for (const b of document.querySelectorAll('[data-medicion-boton]')) {
+  b.addEventListener('click', () => {
+    if (analitica.medicionActivada()) analitica.desactivarMedicion(); else analitica.activarMedicion();
+    pintar();
+  });
+}
+for (const f of document.querySelectorAll('[data-baja]')) {
+  const lang = f.closest('[data-idioma]').dataset.idioma;
+  const res = f.querySelector('[data-baja-resultado]');
+  const boton = f.querySelector('button[type=submit]');
+  f.addEventListener('submit', async e => {
+    e.preventDefault();
+    const email = f.querySelector('input[type=email]').value;
+    res.hidden = false; res.classList.remove('error'); res.textContent = T[lang].enviando; boton.disabled = true;
+    const r = await servidor.baja({ email });
+    boton.disabled = false;
+    res.textContent = r.ok ? T[lang].ok : (T[lang][r.error] || T[lang].red);
+    res.classList.toggle('error', !r.ok);
+  });
+}
+pintar();
+</script>
+</body>
+</html>
