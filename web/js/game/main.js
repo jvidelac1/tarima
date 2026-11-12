@@ -45,12 +45,17 @@ const visita = n => { if (n !== E.pantalla) E.previa = E.pantalla; E.pantalla = 
 // ---------- tiempo del juego: esperas sobre el reloj inyectable ----------
 const pend = [];
 const espera = ms => new Promise(res => pend.push({ t: reloj.ahora() + ms, res }));
-/** Espera que se puede saltear con Espacio, Enter o un toque (después de `minimo` ms, para que un toque de más no saltee nada por accidente). */
-function saltable(ms, minimo = 400) {
+/**
+ * Espera que se puede saltear con Espacio, Enter o un toque. Para que un toque de más no saltee nada por accidente:
+ * - antes de `minimo` ms no saltea;
+ * - un toque de una ráfaga (toques a menos de 300 ms uno de otro) que empezó antes de `desde` ms tampoco: el que venía
+ *   machacando en el levantamiento tiene que parar un momento, o tocar de nuevo después de lo que hay que leer.
+ * Los toques que no saltean quedan anotados y con acuse («ESPERÁ»).
+ */
+function saltable(ms, minimo = 400, desde = 0) {
   return new Promise(res => {
     const t0 = reloj.ahora(), fin = () => { if (boton.oye === oye) boton.oye = null; res(); };
-    // antes del mínimo el toque no saltea nada, pero queda anotado y con acuse («ESPERÁ»)
-    const oye = (t, v) => { if (!v) return; if (t - t0 >= minimo) { toques.resolver(true, 'sigue'); fin(); } else toques.resolver(false, 'espera'); };
+    const oye = (t, v) => { if (!v) return; if (t - t0 >= minimo && toques.rafaga(t) >= t0 + desde) { toques.resolver(true, 'sigue'); fin(); } else toques.resolver(false, 'espera'); };
     boton.oye = oye; pend.push({ t: t0 + ms, res: fin });
   });
 }
@@ -426,7 +431,9 @@ async function decision(a, lev, res, et, propio, o = {}) {
     if (!hito.ver && t >= tVer) { hito.ver = true; veredicto(ok ? 'Levantamiento válido' : res.res === 'nulo' ? 'Levantamiento nulo' : 'Intento fallado', sub, !ok); if (vivo && !ok && (!fin || fin.tipo === 'bajada')) sonido.ovacion(false); }
   };
   enCuadro = (ahora, dt) => avanzar((ahora - t0) / 1000, dt, true);
-  await saltable(total * 1000, propio ? (linea ? 1200 : 600) : 400);
+  // un intento propio: el veredicto (y su línea) queda al menos 1 s a la vista antes de poder saltearlo, y una ráfaga que
+  // venía del levantamiento no lo saltea (tiene que empezar después de que aparece)
+  await saltable(total * 1000, propio ? Math.round((tVer + (linea ? 1 : .4)) * 1000) : 400, propio ? Math.round(tVer * 1000) : 0);
   enCuadro = null; avanzar(Math.max(total, tVer, tRev, tLuz + 3 * paso) + .01, 0, false); terminarFinal(fin);
   veredicto(''); setLuces(null);
   return linea;
@@ -578,14 +585,16 @@ function panelLlamado(p, L, t0, alConfirmar, corre = true) {
     const atajos = `<div class="fila">${facil ? '<span>Kilos:</span>' : ''}${Object.entries(fichas).map(([k, v]) => `<button class="ficha" data-kg="${v}" ${fijo ? 'disabled' : ''} aria-pressed="${v === S.kg}">${FICHA[k]} ${v}</button>`).join('')}</div>`;
     const envion = L.lev === 'c' ? `<div class="fila"><span>Envión:</span>${Object.keys(ENVIONES).map(e => `<button class="envion" data-env="${e}" aria-pressed="${e === S.env}">${ENVIONES[e]}${a.f.enviones.includes(e) ? '' : ' *'}</button>`).join('')}</div>` : '';
     const noDomina = L.lev === 'c' && !a.f.enviones.includes(S.env) ? ' · * envión que no domina: menos altura y menos desvío tolerado' : '';
+    // el motivo del fallo anterior queda escrito en el llamado siguiente (machacando se puede no haberlo leído)
+    const antes = E.antes ? `<p class="chica antes">Intento anterior: ${E.antes}</p>` : '';
     const reloj0 = corre ? `<b>El reloj ya corre.</b> ${T ? 'Confirmá' : '<b>ENTER</b> confirma'} y el pesista se prepara.` : `<b>Sin apuro: el reloj (${seg}) arranca cuando confirmás.</b> ${T ? 'Después, tocá la pantalla en ¡TIRÁ!' : '<b>ENTER</b> confirma; después, <b>ESPACIO</b> en ¡TIRÁ!'}`;
     // Fácil: a la vista quedan los kilos, qué dice el entrenador, la cuenta y qué tecla va; el resto, en «Más opciones»
     const cuerpo = facil
-      ? `${kilos}<p class="frase">Entrenador: ${frase(S.kg)} Más kilos, más difícil${T ? '' : ' (<b>← →</b> cambian los kilos)'}.</p>${cuenta ? `<p class="cuenta">${cuenta}</p>` : ''}
+      ? `${kilos}${antes}<p class="frase">Entrenador: ${frase(S.kg)} Más kilos, más difícil${T ? '' : ' (<b>← →</b> cambian los kilos)'}.</p>${cuenta ? `<p class="cuenta">${cuenta}</p>` : ''}
         ${S.dt ? `<p class="que"><b>Dos tiempos:</b> empieza igual que el arranque. Con la barra en los hombros el juego te espera: son tres toques más, <b>¡FLEXIONÁ!</b>, <b>¡ARRIBA!</b> y <b>¡RECIBÍ!</b></p>` : ''}<p class="que">${reloj0}</p>
         ${S.kg !== L.kg ? `<p class="chica"><b>Cambiaste los kilos</b> (pedido: ${L.kg}). Se puede dos veces por intento; si otro pesista pidió menos, sale antes que vos.</p>` : ''}${fijo ? '<p class="chica">Los kilos ya no se pueden cambiar.</p>' : ''}
         ${S.mas ? `${atajos}${envion}<p class="chica">Pedido: ${L.kg} kg · mínimo ${min} · cambios ${a.cambios} de 2${noDomina}</p>` : ''}<div class="fila"><button id="btn-mas" aria-expanded="${!!S.mas}">${S.mas ? 'Menos opciones' : 'Más opciones'}</button></div>`
-      : `${kilos}${atajos}${envion}<p class="frase">Entrenador: ${frase(S.kg)}</p><p class="cuenta">${cuenta}</p><p class="que">${reloj0}</p>
+      : `${kilos}${antes}${atajos}${envion}<p class="frase">Entrenador: ${frase(S.kg)}</p><p class="cuenta">${cuenta}</p><p class="que">${reloj0}</p>
         <p class="chica">Declarado: ${L.kg} kg · mínimo ${min} · cambios ${a.cambios} de 2${fijo ? ' (cerrados)' : ''}${S.kg !== L.kg ? ' · <b>confirmar cuenta como cambio; si otro pidió menos, sale antes</b>' : ''}${noDomina}</p>`;
     const pn = capa.poner(`<h2>${a.f.nombre} · ${LEV[L.lev]} · intento ${L.n}</h2>${cuerpo}`, 'chico abajo lado');      // al costado: no tapa al pesista
     const al = (b, fn) => { b.onclick = () => { if (activa(pn)) fn(); }; };
@@ -611,7 +620,7 @@ async function llamadoPropio(p, L) {
   const elegido = new Promise(res => panelLlamado(p, L, t0, res, corre)); setReloj(L.reloj);
   escena.primerPlano('medio', encuadreLibre()); E.forzar = true;      // plano americano del pesista en la parte que el panel deja libre
   const vence = new Promise(res => { if (corre) enCuadro = ahora => { setReloj(L.reloj - (ahora - t0)); if (ahora - t0 >= L.reloj) { enCuadro = null; res(null); } }; });
-  const S = await Promise.race([elegido, vence]); enCuadro = null; capa.quitar();
+  const S = await Promise.race([elegido, vence]); enCuadro = null; capa.quitar(); E.antes = null;
   if (!corre) t0 = reloj.ahora();
   const ms = corre ? Math.min(L.reloj, Math.round(reloj.ahora() - t0)) : 0;
   if (S) {
@@ -628,6 +637,7 @@ async function llamadoPropio(p, L) {
   const et = p.llamado.et, x = p.resolver({ conf: corrida.conf, env, ent: corrida.ent });
   if (JSON.stringify(x.res) !== JSON.stringify(corrida.res)) E.errores.push('el resultado mostrado no coincide con el recalculado');
   const fin = armarFinal(corrida, L.lev), linea = await decision(a, L.lev, x.res, et, true, { ctl: ctx.ctl, sinConfirmar: corrida.conf === null, tRes: corrida.tRes, fin });
+  E.antes = x.res.res !== 'valido' && linea ? linea : null;
   const rival = p.at.find(b => b.i !== L.a); recuadro(x.res.res === 'valido' ? `${PLANTEL[rival.id].corto} aprieta los dientes` : `${PLANTEL[rival.id].corto} respira`, rival.id);
   await repeticion(L.lev, corrida, linea, fin);
   for (const c of x.avisos) { sonido.aviso(); veredicto(`${p.at[c.a].f.pais} cambia a ${c.a_kg}`, `${p.at[c.a].f.nombre} · antes ${c.de} kg`); await saltable(1100); veredicto(''); }

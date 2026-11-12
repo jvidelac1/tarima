@@ -35,6 +35,16 @@ export const toques = {
     T.ok = !!ok; T.motivo = motivo; this[ok ? 'aceptados' : 'descartados']++; if (!sigue) T.vivo = 0; this.alCambiar?.(T, 'resuelto');
   },
   suelta() { this.alCambiar?.(this.abierto, 'sube'); },
+  /**
+   * Inicio de la ráfaga a la que pertenece la pulsación del instante `t`: hacia atrás, mientras entre una y la anterior
+   * haya menos de `hueco` ms. Sirve para no saltear una pantalla con toques que venían del levantamiento (el que machaca
+   * Espacio en ¡EMPUJÁ! sigue machacando un rato después del final). -Infinity si la ráfaga es más vieja que lo anotado.
+   */
+  rafaga(t, hueco = 300) {
+    const u = this.ultimos; let i = u.length - 1; while (i >= 0 && u[i].t > t + 1) i--; if (i < 0) return t;
+    let ini = u[i].t; for (let k = i - 1; k >= 0; k--) { if (ini - u[k].t >= hueco) return ini; ini = u[k].t; }
+    return u.length >= 16 ? -Infinity : ini;
+  },
 };
 
 /**
