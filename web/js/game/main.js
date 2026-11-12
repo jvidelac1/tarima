@@ -6,7 +6,7 @@ import { Escena } from './stage.js';
 import { poseDe, poseParado, marcas, tramo } from './sequence.js';
 import { armarCaida, poseCaida } from './caida.js';
 import { PLANTEL, ENVIONES, LEV, ETIQUETAS, GUIONES } from './roster.js';
-import { Registrador, Gobernador, calidadInicial, medirRefresco, decidirCalidad, pasoDe, metaDe, nombreDe, PRESET, PASO, PISO_MP, MARGEN, TECHO_MP } from './perf.js';
+import { Registrador, Gobernador, calidadInicial, medirRefresco, decidirCalidad, pasoDe, metaDe, nombreDe, escalones, pisoDe, PRESET, PISO_MP, MARGEN, TECHO_MP } from './perf.js';
 import { sonido } from './audio.js';
 import { Ayudas } from './ui/ayudas.js';
 import { Senal } from './ui/senal.js';
@@ -73,7 +73,7 @@ const perf = new Registrador();
  * `sombras`: siguen prendidas. `hz`: refresco medido de la pantalla; `paso`: se dibuja uno de cada `paso` refrescos.
  * `cambios`: cada vez que bajó, con lo medido. `calibracion`: lo que midió la calibración (para mirar desde la consola).
  */
-const C = { auto: false, clave: '', Q: null, sombras: true, nombre: '', hz: 60, paso: 1, cambios: [], calibrado: false, medido: null, calibracion: null };
+const C = { auto: false, clave: '', Q: null, sombras: true, nombre: '', hz: 60, paso: 1, pasoMin: 1, piso: 0, cambios: [], calibrado: false, medido: null, calibracion: null };
 let gov = null, nRaf = 0;
 let escena = null, datos = null, ayudas = null, boton = null, enCuadro = null, senalUI = null, depura = null;
 const visita = n => { if (n !== E.pantalla) E.previa = E.pantalla; E.pantalla = n; if (!E.visitados.includes(n)) E.visitados.push(n); perf.marcar(n); };
@@ -118,36 +118,39 @@ function tic(pintar, tRaf = null) {
 function bucle(t) { requestAnimationFrame(bucle); if (C.paso > 1 && ++nRaf % C.paso) return; perf.ofrecido(t); E.muestra?.(t); if (reloj.manual === null) tic(true, t + reloj.desfase); depura?.cuadro(t); }
 
 // ---------- calidad ----------
-function fijarHz(hz) { C.hz = hz; C.paso = pasoDe(hz); perf.periodo = 1000 / metaDe(hz); if (gov && gov.hz !== hz) gov.fijar(hz); }
+function fijarHz(hz) { C.hz = hz; C.paso = pasoDe(hz, C.pasoMin); perf.periodo = 1000 / metaDe(hz, C.pasoMin); if (gov && (gov.hz !== hz || gov.pasoMin !== C.pasoMin)) gov.fijar(hz, C.pasoMin); }
 const nombrar = () => { C.nombre = nombreDe(C.Q, escena.megapixeles, C.sombras); };
 /** Cambia de calidad (programas y pases nuevos): solo en la carga, y deja todo compilado antes de seguir. */
 async function ponerCalidad(clave) { C.clave = clave; C.Q = C.auto ? { ...PRESET[clave], dpr: 2 } : PRESET[clave]; escena.setCalidad(C.Q); await escena.precalentar(); }
+/** Aplica lo que devolvió escalones(): sombras (programas ya compilados en la carga) y tope de píxeles. */
+function aplicarEscalon(r) {
+  if (r.sombras !== C.sombras) { C.sombras = r.sombras; escena.setSombras(r.sombras); }
+  if (Math.abs(r.mp - escena.megapixeles) > 1e-3) escena.setTope(r.mp * 1e6);
+}
+/** Piso de resolución vigente: el que dejó la calibración, o el que corresponde a la pantalla de ahora. */
+const pisoAhora = () => C.piso || (escena ? pisoDe({ telefono: tactil(), techo: escena.nativoMP, cssMP: cssMP() }) : PISO_MP);
+const cssMP = () => { const c = escena?.canvas || $('gl'); return c ? c.clientWidth * c.clientHeight / 1e6 : 0; };
 /**
- * Baja `pasos` escalones sin compilar nada: cada uno deja el 85 % de los píxeles; en el piso de resolución apaga las
- * sombras (programas ya compilados en la carga) y ahí se queda. Devuelve false si no quedaba nada por bajar.
+ * Baja `pasos` escalones sin compilar nada (perf.js, escalones): 15 % menos de píxeles por escalón hasta el piso de la
+ * pantalla (70 % en una computadora, densidad 1 en un teléfono); en el piso apaga las sombras. Por debajo del piso solo
+ * si el gobernador pide una bajada urgente (muchos cuadros perdidos seguidos). Devuelve false si no quedaba nada por bajar.
  */
 function bajar(pasos, ms, donde = '') {
-  const de = C.nombre; let hecho = false;
-  for (let k = 0; k < pasos; k++) {
-    const mp = escena.megapixeles; if (!(mp > 0)) break;
-    if (mp * PASO >= PISO_MP) { escena.setTope(mp * PASO * 1e6); hecho = true; } else { if (C.sombras && !hecho) { C.sombras = false; escena.setSombras(false); hecho = true; } break; }
-  }
-  if (!hecho) return false;
-  nombrar(); C.cambios.push({ de, a: C.nombre, ms: Math.round(ms * 10) / 10, pantalla: donde || (E.pantalla === 'intento' ? 'fin del intento' : E.pantalla), enIntento: !!E.intento, t: Math.round(performance.now()) });
+  const de = C.nombre, urgente = !!gov?.urgente;      // se lee antes de gov.resultado()
+  const r = escalones({ mp: escena.megapixeles, sombras: C.sombras }, { pasos, piso: pisoAhora(), urgente });
+  if (!r.hecho) return false; aplicarEscalon(r);
+  nombrar(); C.cambios.push({ de, a: C.nombre, ms: Math.round(ms * 10) / 10, pantalla: donde || (E.pantalla === 'intento' ? 'fin del intento' : E.pantalla), enIntento: !!E.intento, urgente, t: Math.round(performance.now()) });
   E.forzar = true; return true;      // el gobernador empieza a calentar en resultado()
 }
 /**
  * Sube `pasos` escalones sin compilar nada (el gobernador vio la máquina libre, o deshace una bajada que no sirvió):
- * primero vuelven las sombras, después 15 % más de píxeles por escalón, hasta lo que dejó la calibración (`C.mpCal`).
+ * primero vuelve al piso si estaba debajo, después las sombras, después 15 % más de píxeles por escalón, hasta lo que
+ * dejó la calibración (`C.mpCal`).
  */
 function subir(pasos, ms) {
-  const de = C.nombre, tope = Math.min(escena.nativoMP, TECHO_MP, C.mpCal || Infinity); let hecho = false;
-  for (let k = 0; k < pasos; k++) {
-    if (!C.sombras) { C.sombras = true; escena.setSombras(true); hecho = true; continue; }
-    const mp = escena.megapixeles; if (!(mp > 0) || mp >= tope * .985) break;
-    escena.setTope(Math.min(tope, mp / PASO) * 1e6); hecho = true;
-  }
-  if (!hecho) return false;
+  const de = C.nombre, tope = Math.min(escena.nativoMP, TECHO_MP, C.mpCal || Infinity);
+  const r = escalones({ mp: escena.megapixeles, sombras: C.sombras }, { sube: true, pasos, piso: pisoAhora(), tope });
+  if (!r.hecho) return false; aplicarEscalon(r);
   nombrar(); C.cambios.push({ de, a: C.nombre, ms: Math.round(ms * 10) / 10, pantalla: E.pantalla, enIntento: !!E.intento, t: Math.round(performance.now()), sube: true, motivo: gov?.motivo || '' });
   E.forzar = true; return true;
 }
@@ -186,11 +189,12 @@ async function calibrar() {
     escena.setCarga(escena.kg || 100, 's'); let t = 1.3;
     const R = await decidirCalidad({
       periodo: gov.periodo, refresco: 1000 / C.hz, clave: C.clave, techo: () => escena.nativoMP, poner: ponerCalidad,
+      telefono: tactil(), cssMP: cssMP(), mitad: () => { C.pasoMin = 2; fijarHz(C.hz); return gov.periodo; },
       medir: mp => { escena.setTope(mp * 1e6, true); const c = escena.costo({ extra: lastre }); return { mp: escena.megapixeles, ms: c.ms, p90: Math.round(c.p90 * 100) / 100, n: c.n }; },
       fijar: mp => { escena.setTope(mp * 1e6); return escena.megapixeles; },
       cuadros: (n, calienta) => { enCuadro = (now, dt) => { t += dt; escena.bucle(t, dt); }; return cadencia(n, calienta).finally(() => { enCuadro = null; }); },
     });
-    Object.assign(K, { pruebas: R.pruebas, verificacion: R.verificacion }); C.medido = R.p80; nombrar();
+    Object.assign(K, { pruebas: R.pruebas, verificacion: R.verificacion, piso: R.piso, mitad: R.mitad }); C.medido = R.p80; C.piso = R.piso || 0; nombrar();
     const mp0 = Math.min(R.primera.techo, PRESET[clave0].maxPixels / 1e6);      // lo que se dibujaba sin calibrar
     if (ORDEN.indexOf(C.clave) < ORDEN.indexOf(clave0) || (C.clave === clave0 && escena.megapixeles < mp0 * .97)) C.cambios.push({ de: nombre0, a: C.nombre, ms: Math.round((R.primera.fijo + R.primera.porMP * mp0) * 10) / 10, pantalla: 'calibración', enIntento: false, t: Math.round(performance.now()) });
   } catch (e) { console.warn('calibración de calidad:', e); K.error = String(e.stack || e); escena.setTope(C.Q.maxPixels); }
@@ -1040,7 +1044,7 @@ function holgura(tb) {
 // ---------- API para la prueba automática y la depuración ----------
 const ceder = () => new Promise(r => { const c = new MessageChannel(); c.port1.onmessage = () => r(); c.port2.postMessage(0); });
 window.JUEGO = {
-  E, perf, reloj, toques, eventos: EVENTOS, ganchos, t, idioma: l => (l ? cambiarIdioma(l) : idiomaActual()), get calidad() { return { nombre: C.nombre, auto: C.auto, clave: C.clave, sombras: C.sombras, hz: C.hz, meta: +metaDe(C.hz).toFixed(2), paso: C.paso, periodo: +(1000 / metaDe(C.hz)).toFixed(2), medido: C.medido, cambios: C.cambios, megapixeles: escena ? +escena.megapixeles.toFixed(2) : 0, nativo: escena ? +escena.nativoMP.toFixed(2) : 0, ventana: gov ? gov.ult : null, quieto: gov ? gov.quieto : false, gobernador: gov ? gov.estado : null, calibracion: C.calibracion }; }, pausa: abrirSobre, seguir: cerrarSobre, get escena() { return escena; }, get registro() { return E.registro; }, PLAN,
+  E, perf, reloj, toques, eventos: EVENTOS, ganchos, t, idioma: l => (l ? cambiarIdioma(l) : idiomaActual()), get calidad() { return { nombre: C.nombre, auto: C.auto, clave: C.clave, sombras: C.sombras, hz: C.hz, meta: +metaDe(C.hz, C.pasoMin).toFixed(2), paso: C.paso, piso: +(C.piso || 0).toFixed(2), periodo: +(1000 / metaDe(C.hz, C.pasoMin)).toFixed(2), medido: C.medido, cambios: C.cambios, megapixeles: escena ? +escena.megapixeles.toFixed(2) : 0, nativo: escena ? +escena.nativoMP.toFixed(2) : 0, ventana: gov ? gov.ult : null, quieto: gov ? gov.quieto : false, gobernador: gov ? gov.estado : null, calibracion: C.calibracion }; }, pausa: abrirSobre, seguir: cerrarSobre, get escena() { return escena; }, get registro() { return E.registro; }, PLAN,
   /** Lo que la prueba necesita para jugar por la vía real de entrada: pantalla, y del intento en curso, fase y próximo objetivo. */
   estado() {
     const I = E.intento, pn = $('capa').firstElementChild, act = document.activeElement;
