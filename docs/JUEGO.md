@@ -607,15 +607,16 @@ Versión base de la foto: los tres juntos sin tocarse. El abrazo en el escalón 
 | Cambio de carga | Dos ayudantes (hasta 12 mil triángulos cada uno) | Entran sobre el plano cenital, con el pesista fuera de cuadro |
 | Podio y foto | Tres pesistas en detalle bajo, con texturas de 1024 | Los tres juntos solo en plano general. Depende de la meta de 4 MB por modelo de la etapa 3; antes, el podio es 2D |
 
-**Calidad del juego (12-nov).** El juego prioriza cuadros sobre efectos y no usa la calidad del visor:
+**Calidad del juego (12-nov, segunda vuelta).** El juego prioriza cuadros sobre efectos y no usa la calidad del visor:
 
-- Arranca en **Baja** (sin oclusión ambiental, desenfoque ni resplandor; hasta 1280 × 800 píxeles dibujados), o en **Móvil** con puntero grueso. `juego.html?q=alta|media|baja|movil` deja una calidad fija, sin gobernador.
-- **Se dibuja en cada cuadro que ofrece el navegador**, menos detrás de un panel, donde la imagen queda congelada (un cuadro al abrirlo o repintarlo). Antes había un tope de 30 ms entre dibujos fuera del intento propio, que en una pantalla de 75 Hz daba 25 cuadros por segundo.
-- **Calibración** (`calibrar()` en `main.js`): con los modelos cargados y el pesista en escena, detrás de «Cargando pesistas…», mide el intervalo real entre 30 cuadros y baja un escalón mientras el percentil 80 pase de 1,3 veces el cuadro de la meta. La meta es el refresco medido de la pantalla (la mitad por encima de 90 Hz).
-- **Gobernador** (`Gobernador` en `perf.js`): durante el dibujo continuo, dos ventanas seguidas de 1 s por debajo del 80 % de la meta piden bajar un escalón. **La calidad nunca cambia con un intento en curso** (propio o de un rival) ni en la repetición: el pedido espera al final. Solo baja; no vuelve a subir en la misma carga de la página.
-- Escalones, del más caro al más barato: Baja, Baja 80 %, Móvil, Móvil 80 %, Móvil 60 %. Entre calidades se rehacen los pases (un tirón, por eso se elige el momento); entre porcentajes solo cambia la resolución.
-- **Nada pesado en medio del intento**: los dos modelos se terminan de cargar y se muestran un cuadro antes de jugar (shaders compilados y texturas subidas); el lienzo 2D de las ayudas no se realoja (se oculta cuando no hay nada que dibujar); los búferes de ruido del sonido se generan una vez.
-- `JUEGO.calidad` (escalón, refresco, meta, lo medido al calibrar y cada cambio con su motivo), `JUEGO.perf.ult` (ofrecidos y dibujados del último segundo) y `?depura=1` lo muestran. `tools/check_fluidez.mjs` lo prueba; `--gobernador` usa `?lastre=N` (espera artificial de N ms por megapíxel dibujado, solo para esa prueba).
+- La meta es **no perder ningún refresco de la pantalla**. La frecuencia se mide (no se ajusta a una lista: 75 Hz son 13,3 ms por cuadro) y por encima de 90 Hz se dibuja uno de cada dos refrescos.
+- **Se dibuja en cada cuadro que ofrece el navegador**, menos detrás de un panel, donde la imagen queda congelada (un cuadro al abrirlo o repintarlo).
+- **La calidad se decide antes del primer intento** (`calibrar()` en `main.js`, `decidirCalidad()` en `perf.js`), detrás de «Cargando pesistas…» y con el pesista haciendo un arranque en bucle. Se mide el costo de un cuadro a dos resoluciones, se calcula cuántos megapíxeles entran en el 85 % del período y se verifica con cuadros de verdad. Arranca en **Baja** (sin oclusión ambiental, desenfoque ni resplandor), o en **Móvil** con puntero grueso; si sobra más del doble de margen prueba **Media** y **Alta**. El tope de píxeles es el que sale de esa cuenta, hasta la resolución de la pantalla (máximo 3,7 MP). `juego.html?q=alta|media|baja|movil` deja una calidad fija, sin calibración ni gobernador.
+- **Nada se recompila en la partida.** En la carga, `escena.precalentar()` compila y usa una vez los materiales de los dos modelos, con sombras y sin sombras. Después, bajar un escalón es dibujar 15 % menos de píxeles (hasta 0,3 MP) y el último escalón apaga las sombras, sin compilar nada.
+- **Gobernador** (`Gobernador` en `perf.js`): durante el dibujo continuo cuenta refrescos perdidos en ventanas de 1 s; dos ventanas malas entre las últimas cuatro piden bajar. **La calidad nunca cambia con un intento en curso** (propio o de un rival) ni en la repetición: el pedido espera al final. Solo baja, y deja de bajar si bajar no cambia lo que se pierde.
+- **Nada pesado en medio del intento**: los dos modelos se terminan de cargar y de compilar antes de jugar; el lienzo 2D de las ayudas no se realoja (se oculta cuando no hay nada que dibujar); los búferes de ruido del sonido se generan una vez.
+- El pesista usa el nivel de detalle del visor según los píxeles por metro (malla simplificada en plano general, completa en primeros planos).
+- `JUEGO.calidad` (calidad, megapíxeles, refresco, meta, lo que midió la calibración y cada cambio con su motivo), `JUEGO.perf.ult` (ofrecidos y dibujados del último segundo), `JUEGO.perf.largos` (cuadros que perdieron un refresco, con su fase) y `?depura=1` lo muestran. `juego.html?banco=1` es el banco de medición: qué cuesta cada cosa de la escena en esa máquina (HANDOFF.md, «Banco de medición»). `tools/perf_test.mjs` prueba la lógica sin navegador; `tools/check_fluidez.mjs --gobernador` (con placa) usa `?lastre=N` (espera artificial de N ms por megapíxel dibujado).
 
 Presupuesto por cuadro en un teléfono de gama media. Son valores iniciales sin medir: la primera medición en un teléfono real los corrige.
 
@@ -721,7 +722,8 @@ Presentación, en `web/js/game/`:
 | `cast.js` | Qué personaje está descargado, en memoria o dibujado; precarga del siguiente |
 | `effort.js` | Capas de esfuerzo |
 | `loosebar.js` | Barra suelta una vez que tocó la tarima (rebote y rodadura) y carga animada de discos |
-| `perf.js` | Registrador de cuadros por segundo y escalón de calidad «móvil» |
+| `perf.js` | Medición del refresco, decisión de calidad, gobernador, registrador de cuadros y calidades del juego |
+| `banco.js` | Banco de medición de fluidez (`juego.html?banco=1`) |
 | `ui/` | `senal.js` (la señal fija), `mensajes.js` (palabra de cada toque, línea de fallo, pasos de «Cómo se juega»), `ayudas.js` (anillo, línea y medidor de Clásico y de los rivales), `tablero.js` |
 
 Archivos de hoy que cambian. Cada cambio agrega una opción; el comportamiento por defecto, que es el del visor, queda igual.

@@ -5,7 +5,7 @@
 //  4. el banco de medición (juego.html?banco=1) entero, contra una escena simulada: recorre todas las variantes, deshace
 //     cada una, respeta el límite de tiempo y deja un JSON válido.
 // NO mide nada real: los costos son inventados. Lo que cuesta la escena en una máquina se mide con el banco en esa máquina.
-// Uso: node tools/perf_test.mjs [--sin-banco]      (el banco simulado tarda unos 35 s)
+// Uso: node tools/perf_test.mjs [--sin-banco]
 import { register } from 'node:module';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -81,8 +81,9 @@ if (!process.argv.includes('--sin-banco')) {
   const luz = () => ({ visible: true, castShadow: false }), L = { key: luz(), key2: luz(), stage: luz(), wash: luz(), rimA: luz(), rimB: luz(), hair: luz(), setQuality() {} };
   const est = { sombras: true, directo: false };
   const costo = () => 2.5 + (est.sombras ? 1.5 : 0) + (E.Q && E.Q.ao ? 4 : 0) + mp * (est.directo ? 3 : 8 - (L.rimA.visible ? 0 : 1.5));
-  // pantalla simulada: un cuadro por período; un cuadro dibujado que cuesta más que el período pierde refrescos
-  globalThis.requestAnimationFrame = cb => { const c = dibujo ? costo() : 0; dibujo = false; const t = Math.max(ultimo + Math.max(1, Math.ceil(c / P)) * P, performance.now()); ultimo = t; setTimeout(() => cb(t), Math.max(0, t - performance.now())); };
+  // Pantalla simulada con reloj propio (no depende de lo ocupada que esté la máquina que corre la prueba): un cuadro por
+  // período, y un cuadro dibujado que cuesta más que el período pierde refrescos. Las marcas de tiempo son las simuladas.
+  globalThis.requestAnimationFrame = cb => { const c = dibujo ? costo() : 0; dibujo = false; ultimo += Math.max(1, Math.ceil(c / P)) * P; const t = ultimo; setImmediate(() => cb(t)); };
   const grupo = new THREE.Group(), hazeTex = new THREE.Texture(), scene = new THREE.Scene(); scene.add(grupo);
   grupo.add(new THREE.Mesh(new THREE.BoxGeometry(), [new THREE.MeshStandardMaterial(), new THREE.MeshBasicMaterial()]), new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial({ map: new THREE.Texture() })), new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshBasicMaterial({ map: hazeTex })));
   const pelo = new THREE.Mesh(new THREE.BoxGeometry(), Object.assign(new THREE.MeshStandardMaterial(), { name: 'Hair' }));
@@ -109,9 +110,12 @@ if (!process.argv.includes('--sin-banco')) {
   ok(de('baja').mpReal > 1 && de('baja').mpReal <= (P - 4) / 8 + .01 && de('baja').mpFalla > (P - 4) / 8, `la búsqueda con cuadros encierra el límite real (${de('baja').mpReal} a ${de('baja').mpFalla} MP; cierto: ${((P - 4) / 8).toFixed(3)})`);
   ok(Math.abs(de('baja-sombras').ahorroMs - 1.5) < .01 && Math.abs(de('baja-sombras').ahorroFijoMs - 1.5) < .01 && Math.abs(de('baja-contraluces').ahorroPorMPms - 1.5) < .01, 'el ahorro de cada variante sale separado en fijo y por megapíxel');
   ok(de('baja-directo').mpReal > de('baja').mpReal, 'las variantes que más ahorran también se buscan con cuadros de verdad');
-  ok(seg < 47, `respeta el límite de tiempo pedido (45 s; tardó ${seg.toFixed(1)} s)`);
+  ok(seg < 45, `termina dentro del límite pedido (45 s; con la pantalla simulada tardó ${seg.toFixed(1)} s)`);
   ok(L.rimA.visible && L.key2.visible && !E.directo && E.lodFijo === null && E.post.finalMat === final0 && !Object.keys(E.post.skip).length && uno.root.visible && pelo.visible && otro.root.parent === scene && grupo.children[0].material[0].isMeshStandardMaterial && est.sombras, 'cada variante se deshace: la escena queda como estaba');
   ok(JSON.stringify(B).length > 2000 && !!tabla && tabla.innerHTML.includes('Banco de medición'), 'deja el JSON y la tabla');
+  // sin tiempo (el límite se cuenta desde que arrancó el proceso): no mide nada, lo dice en una nota y termina igual
+  console.log = () => {}; await correrBanco({ escena: E, cargas: [Promise.resolve()], hz: 60, params: new URLSearchParams('limite=10'), msg: { hidden: false } }); console.log = registro;
+  const C = globalThis.BANCO; ok(C.listo && !C.errores.length && C.variantes.length < B.variantes.length && C.notas.some(x => x.includes('Sin tiempo')), `sin tiempo: corta, lo anota y termina (${C.variantes.length} variantes, «${C.notas[0] || ''}»)`);
 }
 console.log(fallas ? `\n${fallas} de ${hechas} comprobaciones fallaron` : `OK: ${hechas} comprobaciones de la lógica de fluidez${process.argv.includes('--sin-banco') ? ' (sin el banco simulado)' : ' y del banco simulado'}`);
 process.exit(fallas ? 1 : 0);

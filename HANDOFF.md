@@ -194,7 +194,7 @@ node tools/primera.mjs                     # con navegador: capturas de lo que v
 node tools/build_sim_data.mjs [--check]    # reescribe web/data/sim.json desde poses.json (o compara contra el publicado)
 ```
 
-Parámetros de `juego.html`: `?semilla=N` (primera partida reproducible), `?q=movil|baja|media|alta`, `?ritmo=completa`, `?ctl=c` (arranca en Clásico), `?dibujo=0` (no dibuja el 3D; lo usa la prueba). Lo que guarda el navegador: `tarima.ctl`, `tarima.tutorial`, `tarima.pesista`, `tarima.nivel`, `tarima.jugadas`, `tarima.env.<ctl>.<pesista>`.
+Parámetros de `juego.html`: `?semilla=N` (primera partida reproducible), `?q=movil|baja|media|alta`, `?ritmo=completa`, `?ctl=c` (arranca en Clásico), `?dibujo=0` (no dibuja el 3D; lo usa la prueba), `?depura=1` (recuadro con cuadros, calidad y toques), `?banco=1` (banco de medición de fluidez: no abre el juego, mide y deja `window.BANCO`). Lo que guarda el navegador: `tarima.ctl`, `tarima.tutorial`, `tarima.pesista`, `tarima.nivel`, `tarima.jugadas`, `tarima.env.<ctl>.<pesista>`.
 
 | Pieza | Dónde | Estado |
 |---|---|---|
@@ -307,6 +307,7 @@ El usuario jugó el rediseño en su Mac (M1 Pro, Chrome, pantalla de 75 Hz) y di
 
 **Lo que no está medido o no cumple:**
 
+- *(Lo de calidad de esta lista quedó superado por la segunda vuelta, en la sección que sigue: el orquestador midió en la Mac, y la resolución ya no tiene el tope de 1280 × 800.)*
 - **Nada de esto se midió en la Mac del usuario.** Que Baja llegue a 75 cuadros en la M1 Pro es una inferencia de la medición vieja del visor (60 sostenidos en Baja); si no llega, la calibración baja a Baja 80 % antes del primer intento. Para verlo: `juego.html?depura=1` (ofrece y dibuja por segundo, ms por cuadro, calidad y cuántas veces bajó) o `JUEGO.calidad` y `JUEGO.perf.resumen()` en la consola.
 - **Baja se ve más blanda:** dibuja hasta 1280 × 800 píxeles (1453 × 704 en la ventana del usuario, reescalado) y no tiene oclusión, desenfoque ni resplandor. No hay selector en pantalla para volver a Media: solo `?q=media`. El gobernador no vuelve a subir.
 - **El estrangulamiento de procesador no imita una placa lenta.** El costo de GPU de otra máquina solo se probó con el lastre artificial, que es una espera en el hilo principal.
@@ -317,6 +318,79 @@ El usuario jugó el rediseño en su Mac (M1 Pro, Chrome, pantalla de 75 Hz) y di
 - `tools/primera.mjs` quedó atrás del tutorial nuevo (sale con un aviso); las capturas se sacan con `check_fluidez --capturas`.
 - Teléfono: el acuse y el botón de saltear solo pasaron por la emulación táctil de `check_game`; no se miraron en capturas de teléfono. El inicio en teléfono vertical sigue apretado (hallazgo de la verificación anterior, sin tocar).
 - En el inicio las flechas siguen moviendo el foco sin elegir (hallazgo anterior, sin tocar).
+
+### Fluidez, segunda vuelta: pantalla de 75 Hz, calibración y banco de medición (12-nov, rama `demo`)
+
+El usuario volvió a jugar y dijo «fps… le falta laburo para que ande fluido». **Lo que midió el orquestador en su Mac** (M1 Pro, Chrome, pantalla de 75 Hz, ventana de 1745 × 845, densidad 1,1) antes de esta vuelta:
+
+- En reposo, en «Baja»: 13,3 ms por cuadro (75 por segundo) con 1,9 ms de hilo principal. El hilo principal no es el problema.
+- El primer levantamiento en «Baja» (1,02 MP) tuvo cuadros duplicados (percentil 90 de 26,5 ms, uno de 148 ms). El gobernador bajó a «Baja 80 %» (0,65 MP) y el siguiente salió limpio (294 cuadros, máximo 14,3 ms). O sea: lo limita la placa, y 0,65 MP en esa ventana se ve blando.
+- `JUEGO.calidad` decía 60 Hz y meta 60 en una pantalla de 75: `medirRefresco` ajustaba lo medido a una lista y, si no caía a menos del 8 % de un valor, devolvía 60. Con meta de 16,7 ms el gobernador daba por buenos cuadros que a 75 Hz ya pierden el refresco.
+- Apagar las sombras en caliente dio un cuadro de 934 ms (recompilación de todos los materiales).
+
+**Qué cambió** (`web/js/game/perf.js`, `stage.js`, `main.js`, `banco.js`; el visor no se tocó):
+
+- **Pantalla.** `medirRefresco` devuelve la frecuencia medida (mediana de los intervalos del navegador, sin lista): 75, 67 o la que sea. Se mide al cargar y otra vez, sin dibujar, justo antes de calibrar. Si durante la partida casi todos los cuadros llegan antes del período supuesto (la ventana pasó a un monitor más rápido), el gobernador corrige la frecuencia solo. Por encima de 90 Hz se dibuja uno de cada dos refrescos, para que 120 Hz den 60 cuadros parejos y no una mezcla de 8 y 17 ms. El intervalo entre cuadros sale de la marca de tiempo del navegador, no de cuándo corrió el código.
+- **La calidad se decide antes del primer intento** (`calibrar()` en `main.js`, `decidirCalidad()` en `perf.js`), detrás de «Cargando pesistas…» y con el pesista haciendo un arranque en bucle, no en reposo. Mide cuánto cuesta un cuadro a dos resoluciones (`escena.costo()`: dibuja y lee un píxel, que obliga a la placa a terminar), traza la recta costo = fijo + por megapíxel y calcula cuántos megapíxeles entran en el **85 % del período**. Después verifica con cuadros de verdad: si se pierde un refresco, 15 % menos de píxeles y de nuevo. El tope ya no son 1,02 MP fijos: es lo que dé la cuenta, hasta la resolución de la pantalla (máximo 3,7 MP). Si «Baja» entra con más del doble de margen prueba «Media» y después «Alta», y se queda con la más alta que sostenga la pantalla (o 1080p); si no llega a 0,5 MP pasa a «Móvil». Tarda entre uno y dos segundos. Lo que midió queda en `JUEGO.calidad.calibracion`.
+- **Nada se recompila en la partida.** `escena.precalentar()` corre apenas bajan los modelos (detrás del panel del inicio): compila en paralelo (`compileAsync`, con el destino de la escena puesto, porque el programa depende del destino) los materiales de los dos modelos **con sombras y sin sombras**, y después dibuja un cuadro de cada variante con todo a la vista, que es donde suben las texturas y se compilan la pasada de sombra, los pases de pantalla y la traza de la repetición. three guarda los dos juegos de programas por material, así que prender o apagar sombras después no compila nada. Dentro de la partida, bajar un escalón es **solo dibujar menos píxeles** (15 % menos por escalón, hasta 0,3 MP) y el último escalón apaga las sombras. Cambiar de calidad (Baja a Media, por ejemplo) solo pasa en la calibración.
+- **Gobernador.** La meta es no perder ningún refresco: cuenta los refrescos perdidos en ventanas de 1 s (un intervalo de dos períodos es uno perdido). Dos ventanas con dos o más perdidos entre las últimas cuatro, o una sola que pierda la quinta parte, piden bajar (uno a tres escalones según cuánto se pierde). Sigue sin tocar nada con un intento en curso ni en la repetición. Si después de bajar se pierde casi lo mismo dos veces seguidas, deja de pedir (`JUEGO.calidad.quieto`): cuando lo que molesta es otra cosa de la máquina, la imagen no se sigue ablandando en vano. El costo de la placa no se ve desde el bucle (los intervalos llegan en múltiplos del período), por eso el margen del 85 % lo pone la calibración.
+- **Costo de la escena del juego**, lo que se podía deducir sin medir:
+  - El juego nunca elegía nivel de detalle: dibujaba siempre la malla completa del pesista (unos 90 mil triángulos de cuerpo y hasta 46 mil de pelo, dos veces por cuadro con la sombra) aunque en plano general cada triángulo mide menos de un píxel. Ahora usa el mismo criterio que el visor (`Athlete.setScreenScale`, por píxeles por metro): índice simplificado al 30 % y 45 % en plano general, completo en los primeros planos; y apaga las normales de detalle de piel y tela cuando no se resuelven.
+  - En «Baja» y «Móvil» ningún pase lee la profundidad de la escena: ya no se resuelve (una pasada de pantalla completa menos) ni se guarda la del MSAA.
+  - Sombra de «Baja» en un mapa de 768 en vez de 1024, con la misma penumbra en centímetros (44 % menos de píxeles en la pasada de sombra y su desenfoque).
+  - «Media» y «Alta» del juego no reservan los destinos del desenfoque de movimiento de la barra, que el juego nunca usó.
+  - **No se tocaron las luces ni los materiales**: seis focos, una direccional y la de sala entran en cada material iluminado, y la tarima y la alfombra son materiales físicos. Sacar luces o abaratar el piso cambia la imagen y acá no hubo cómo mirarla; el banco mide cuánto ahorra cada cosa para decidirlo con el dato.
+- `JUEGO.perf.largos`: los últimos 200 cuadros que perdieron un refresco, con la pantalla y la fase del intento en que cayeron. Sirve para ver si los tirones caen siempre en el mismo lugar.
+
+**Banco de medición: `juego.html?banco=1`.** Corre solo, sin tocar nada, y termina en menos de 90 s (contados desde que se abre la página; `?limite=60` lo acorta). Escena fija: Brenner haciendo el arranque en bucle con 140 kg y la cámara del juego. Al terminar muestra una tabla y deja todo en `window.BANCO` (JSON, `listo: true`; `BANCO.progreso` dice por dónde va, `BANCO.errores` lo que falló). Hay que dejar la pestaña a la vista: con la pestaña oculta el navegador no da cuadros. Otros parámetros: `?pesista=ventura`, `?solo=baja,media` (calidades), `?variantes=sombras,luces`.
+
+Qué mide por variante, en dos pasos:
+
+1. **Sin pantalla** (todas las variantes): dibuja 14 cuadros seguidos a 0,5 y a 1,6 megapíxeles (y a 1 MP en las escenas completas), leyendo un píxel después de cada uno para que la placa termine, y se queda con la mediana. Con esos dos puntos traza la recta.
+2. **Con pantalla** (las escenas completas siempre; las variantes de «Baja» que más ahorran, mientras quede tiempo): búsqueda sobre la resolución con `requestAnimationFrame`. Cada prueba descarta 10 cuadros y mide 50; sube 25 % si no se perdió ningún refresco, baja si se perdió, y parte la diferencia. Hasta cinco pruebas.
+
+Columnas de la tabla (los mismos nombres, más largos, en `BANCO.columnas`):
+
+| Columna | Campo | Qué es |
+|---|---|---|
+| Variante | `nombre` | «Baja completa» es la escena del juego; «Baja sin sombras» es esa escena con una sola cosa menos |
+| Fijo ms | `fijoMs` | Lo que cuesta el cuadro aunque no se dibuje ningún píxel: geometría, esqueletos, pasada de sombra, hilo principal |
+| Por MP ms | `porMPms` | Lo que agrega cada megapíxel dibujado: materiales, luces, MSAA y pases de pantalla |
+| A 1 MP ms | `ms1MP` | Fijo más por MP: el costo de un cuadro a un megapíxel |
+| A la de la pantalla ms | `msNativo` | El mismo costo a la resolución de la pantalla (`BANCO.nativoMP`) |
+| MP que entran (cuenta) | `mpModelo` | Megapíxeles que caben en el 85 % del período según la recta. Es una cuenta |
+| MP sin perder refrescos | `mpReal` | Lo medido con la pantalla: la mayor resolución probada que no perdió ningún refresco. Vacío si no se buscó |
+| Pierde desde MP | `mpFalla` | La menor resolución probada que sí perdió. El límite real está entre las dos |
+| Ahorro ms a 1 MP y Ahorro | `ahorroMs`, `ahorroPct` | Cuánto baja el costo a 1 MP contra la escena completa de la misma calidad. `ahorroFijoMs` y `ahorroPorMPms` lo separan |
+| Llamadas, Triángulos | `llamadas`, `triangulos` | De un cuadro entero, con la pasada de sombra |
+
+Además, por variante: `medidas` (cada punto con mediana, mínimo y percentil 90), `sondas` (cada prueba con pantalla: megapíxeles, cuadros, refrescos perdidos, mediana, percentil 99, máximo y ms de hilo principal), `desvio1MP` (qué tan recta es la recta), `mallasEsqueleto` (las que de verdad se dibujan) y `programas`.
+
+Cómo leerlo: una variante con mucho ahorro en «Fijo» dice que el problema es geometría o sombra; con mucho ahorro en «Por MP», que son los materiales, las luces o los pases. «Baja sin el segundo modelo» tiene que dar cero: el modelo oculto no se dibuja. «Baja directo al lienzo» es el piso: la escena sin destino HDR, sin MSAA y sin pase final. «Pesista con la malla completa» es lo que costaba antes de esta vuelta.
+
+Límites del banco, para no leerle más de lo que dice:
+
+- El costo sin pantalla es procesador más placa **en serie**; en el juego corren en paralelo, así que el cuadro real cuesta algo menos. Y se mide con la placa trabajando sin parar: si en el juego la placa baja de frecuencia por estar más descansada, el cuadro real puede costar más. Por eso existe la búsqueda con pantalla, y por eso la calibración del juego también verifica con cuadros de verdad.
+- Una prueba con pantalla son 50 cuadros (menos de un segundo): un refresco perdido por otra cosa de la máquina la da por fallada. Mirar `sondas` antes de creerle a un límite raro.
+- El banco fija el detalle del pesista en el del plano general (malla simplificada y normales de detalle) y el MSAA en el de la calidad, para que todas las variantes se comparen igual. El juego baja el MSAA a 2 muestras con densidad de 1,4 o más.
+
+**Cómo se probó.** No hubo máquina con placa ni navegador en esta vuelta. Lo que corrió:
+
+- `node tools/perf_test.mjs` (nuevo, sin navegador, 50 comprobaciones): medición de refresco de 50 a 165 Hz, gobernador (cuándo pide, cuántos pasos, cuándo se queda quieto), `decidirCalidad` contra doce máquinas simuladas (entre ellas la de la prueba `--gobernador`: 18 ms por megapíxel) y el banco entero contra una escena simulada (recorre las 29 variantes, deshace cada una, respeta el límite de tiempo, recupera el costo que se le inventó).
+- `tools/sim_test.mjs` y `tools/play_human.mjs`: en verde, sin tocar reglas ni referencias.
+- Actions (dibujo por software): ver el resultado de la corrida más abajo.
+
+**Lo que no está medido o no cumple:**
+
+- **Ni la calibración, ni el precalentado, ni el banco corrieron nunca en un navegador.** En Actions el juego se abre con `?dibujo=0` y esos caminos no se ejecutan; lo único que dibuja ahí es el cuadro forzado de las capturas, por software. La primera corrida de verdad es la del orquestador en la Mac. Si la calibración falla, queda anotado en `JUEGO.calidad.calibracion.error` y el juego sigue con «Baja» a 1,02 MP; si falla el banco, `BANCO.errores`.
+- **Fluidez en la Mac del usuario: sin medir.** No se sabe cuántos megapíxeles sostiene «Baja» a 75 Hz después de estos cambios ni si el primer levantamiento sale sin cuadros duplicados.
+- **El cuadro de 148 ms del primer levantamiento no tiene causa encontrada.** El precalentado ahora cubre los dos modelos, las dos variantes de sombra, la pasada de sombra y la traza; si vuelve a aparecer, `JUEGO.perf.largos` dice en qué fase.
+- **Cuánto ahorra el nivel de detalle, la profundidad sin resolver y la sombra de 768: sin medir.** Son deducciones del código. La sombra de 768 no se pudo mirar en una placa real.
+- **Las luces y los materiales del piso siguen como estaban.** Es probablemente donde está el costo por píxel, y es lo primero que hay que decidir con el banco.
+- **Si la calibración sube a «Media» o «Alta»**, las texturas del pesista y de la tarima quedan en 1024 (se eligen al construir la escena, en «Baja»). Y la regla para subir (más del doble de margen) no se probó en ninguna placa.
+- **Pantallas de más de 90 Hz**: dibujar uno de cada dos refrescos no se probó en ninguna.
+- **Teléfono**: la calibración arranca en «Móvil» y no sube. Sin medir.
+- `tools/check_fluidez.mjs --gobernador` (necesita placa) no se volvió a correr. Con el lastre de 18 ms por megapíxel la cuenta da unos 0,56 MP a 60 Hz, por debajo de los 1,02 de antes, así que la calibración tiene que anotar una bajada antes del primer intento; está probado solo con la máquina simulada.
 
 ### Pruebas en GitHub Actions (12-nov, rama `demo`)
 
@@ -376,8 +450,8 @@ Porcentaje de válidos · meta. Jugadores simulados con error típico de 25, 40 
 
 ### Pendientes del juego
 
-- **Que el usuario vuelva a jugar en su Mac con `?depura=1`** y diga qué muestran «ofrece», «dibuja» y «calidad» durante un intento: es la medición que falta de la fluidez. Después, un teléfono real (`JUEGO.perf.resumen()` da mínimo y mediana de cuadros por tramo).
-- Decidir si hace falta un selector de gráficos en pantalla (hoy `?q=media`) y si el gobernador tiene que poder volver a subir.
+- **Correr `juego.html?banco=1` en la Mac del usuario** y, con la tabla, decidir qué se abarata de la escena (luces secundarias, materiales del piso, MSAA): es lo que falta para que «Baja» llegue a la resolución de la pantalla a 75 Hz. Después, jugar una partida y mirar `JUEGO.calidad` (qué eligió la calibración y si bajó) y `JUEGO.perf.largos` (dónde cayeron los cuadros largos). Después, un teléfono real (`JUEGO.perf.resumen()` da mínimo y mediana de cuadros por tramo).
+- Decidir si hace falta un selector de gráficos en pantalla (hoy `?q=media`) y si el gobernador tiene que poder volver a subir (hoy solo baja; la calibración sí puede elegir una calidad más alta al cargar).
 - Rehacer `tools/primera.mjs` sobre el tutorial nuevo, o borrarlo y dejar `check_fluidez --capturas`.
 - Pruebas en Actions: `workflow_dispatch` y el flujo viven solo en `demo`; al fusionar a `main` revisar el filtro de ramas. Falta una prueba del gobernador que corra sin placa (hoy `--gobernador` necesita dibujar de verdad).
 - Balance de Fácil por encima de la apertura (95 % y 100 %) y contra rivales; decidir si el segundo y el tercer intento tienen que ser tan exigentes en la subida.
