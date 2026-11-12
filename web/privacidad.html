@@ -4,12 +4,7 @@
   anotarse (CONSENTIMIENTO en web/js/game/servidor.js). Si cambia lo que dice este texto, subir la versión en los dos
   lugares y agregarla a VERSIONES_CONSENTIMIENTO en worker/src/reglas.js.
 
-  PARA COMPLETAR (decisión pendiente del dueño): buscar «data-completar» en este archivo. Son tres datos, cada uno
-  aparece en los dos idiomas:
-    - responsable  quién es el responsable de los datos (persona o empresa)
-    - pais         país del responsable
-    - contacto     correo de contacto (va también como enlace mailto: en «Tus derechos» y en la baja)
-  Se reemplaza el texto entre corchetes del <span> y se borra la clase «pendiente».
+  Datos del responsable completados el 12-nov-2026 (Juan C. Videla, Argentina, contacto por mail).
 -->
 <html lang="es">
 <head>
@@ -75,9 +70,9 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
     <h1>Privacidad de Tarima</h1>
     <p class="version">Versión 2026-11-b · 12 de noviembre de 2026</p>
 
-    <p>Responsable: <span class="pendiente" data-completar="responsable">[RESPONSABLE PENDIENTE]</span>,
-      <span class="pendiente" data-completar="pais">[PAÍS PENDIENTE]</span>.
-      Contacto: <span class="pendiente" data-completar="contacto">[CONTACTO PENDIENTE]</span>.</p>
+    <p>Responsable: Juan C. Videla,
+      Argentina.
+      Contacto: <a href="mailto:juancaclips00@gmail.com">juancaclips00@gmail.com</a>.</p>
 
     <h2>Jugar</h2>
     <p>No hace falta cuenta. Tu nombre o apodo queda solo en tu dispositivo. Solo lo guardamos si te anotas en la lista, para saludarte.</p>
@@ -110,7 +105,7 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
     <p>No vendemos ni compartimos tus datos. No hay publicidad ni rastreadores de terceros.</p>
 
     <h2>Tus derechos</h2>
-    <p>Puedes pedir acceso, corrección, borrado u oposición, o llevarte tus datos, escribiendo a <span class="pendiente" data-completar="contacto">[CONTACTO PENDIENTE]</span>. También puedes reclamar ante la autoridad de protección de datos de tu país.</p>
+    <p>Puedes pedir acceso, corrección, borrado u oposición, o llevarte tus datos, escribiendo a <a href="mailto:juancaclips00@gmail.com">juancaclips00@gmail.com</a>. También puedes reclamar ante la autoridad de protección de datos de tu país.</p>
 
     <h2 id="baja">Darte de baja de la lista</h2>
     <form class="caja" data-baja novalidate>
@@ -119,7 +114,7 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
         <input id="baja-es" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="nombre@ejemplo.com" required>
         <button type="submit" class="boton">Darme de baja</button>
       </div>
-      <p class="aviso">Si anotaste ese correo desde este dispositivo, lo borramos enseguida. Si lo anotaste desde otro, usa este formulario allí o escríbenos a <span class="pendiente" data-completar="contacto">[CONTACTO PENDIENTE]</span>. Puedes seguir jugando igual.</p>
+      <p class="aviso">Si anotaste ese correo desde este dispositivo, lo borramos enseguida. Si lo anotaste desde otro, usa este formulario allí o escríbenos a <a href="mailto:juancaclips00@gmail.com">juancaclips00@gmail.com</a>. Puedes seguir jugando igual.</p>
       <p class="aviso" data-baja-resultado role="status" aria-live="polite" hidden></p>
     </form>
   </article>
@@ -129,9 +124,9 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
     <h1>Tarima privacy</h1>
     <p class="version">Version 2026-11-b · November 12, 2026</p>
 
-    <p>Controller: <span class="pendiente" data-completar="responsable">[CONTROLLER PENDING]</span>,
-      <span class="pendiente" data-completar="pais">[COUNTRY PENDING]</span>.
-      Contact: <span class="pendiente" data-completar="contacto">[CONTACT PENDING]</span>.</p>
+    <p>Controller: Juan C. Videla,
+      Argentina.
+      Contact: <a href="mailto:juancaclips00@gmail.com">juancaclips00@gmail.com</a>.</p>
 
     <h2>Playing</h2>
     <p>No account needed. Your name or nickname stays on your device. We only store it if you join the list, to greet you.</p>
@@ -164,7 +159,7 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
     <p>We never sell or share your data. No ads, no third-party trackers.</p>
 
     <h2>Your rights</h2>
-    <p>You can ask for access, correction, deletion or objection, or take your data with you, by writing to <span class="pendiente" data-completar="contacto">[CONTACT PENDING]</span>. You can also complain to your country's data protection authority.</p>
+    <p>You can ask for access, correction, deletion or objection, or take your data with you, by writing to <a href="mailto:juancaclips00@gmail.com">juancaclips00@gmail.com</a>. You can also complain to your country's data protection authority.</p>
 
     <h2>Leave the list</h2>
     <form class="caja" data-baja novalidate>
@@ -173,7 +168,7 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
         <input id="baja-en" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="name@example.com" required>
         <button type="submit" class="boton">Unsubscribe me</button>
       </div>
-      <p class="aviso">If you joined with that email on this device, we delete it right away. If you joined on another device, use this form there or write to <span class="pendiente" data-completar="contacto">[CONTACT PENDING]</span>. You can keep playing either way.</p>
+      <p class="aviso">If you joined with that email on this device, we delete it right away. If you joined on another device, use this form there or write to <a href="mailto:juancaclips00@gmail.com">juancaclips00@gmail.com</a>. You can keep playing either way.</p>
       <p class="aviso" data-baja-resultado role="status" aria-live="polite" hidden></p>
     </form>
   </article>
