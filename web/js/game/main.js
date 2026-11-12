@@ -5,7 +5,7 @@ import { reloj, Boton, toques, principal, claveDe, enfocar, navegar, enCampo } f
 import { Escena } from './stage.js';
 import { poseDe, poseParado, marcas, tramo } from './sequence.js';
 import { armarCaida, poseCaida } from './caida.js';
-import { PLANTEL, ENVIONES, LEV, ETIQUETAS, GUIONES, CUERPO, BARRA } from './roster.js';
+import { PLANTEL, JUGADOR, FICHA, nivelFicha, ENVIONES, LEV, ETIQUETAS, GUIONES, CUERPO, BARRA } from './roster.js';
 import { Registrador, Gobernador, calidadInicial, medirRefresco, decidirCalidad, pasoDe, metaDe, nombreDe, escalones, pisoDe, PRESET, PISO_MP, MARGEN, TECHO_MP } from './perf.js';
 import { sonido } from './audio.js';
 import { Ayudas } from './ui/ayudas.js';
@@ -14,6 +14,7 @@ import { Depura } from './ui/depura.js';
 import { explicar, pasos, PALABRAS, GUIA } from './ui/mensajes.js';
 import { alDia, tocar, senal as senalDe, GUIADO, EN_HOMBROS } from './controles.js';
 import { tableroHTML } from './ui/tablero.js';
+import { marcadorDe, etiquetasRival } from './ui/marcador.js';
 import { leerDatos } from '../sim/data.js';
 import { Partida } from '../sim/match.js';
 import { simular } from '../sim/attempt.js';
@@ -68,6 +69,8 @@ const nombreJugador = () => limpiarNombre(guardado.get('tarima.nombre')) || t('b
 /** Quién es un pesista para el jugador: su propio nombre si es el suyo; los rivales conservan el de siempre. */
 const quien = a => (a && a.i === E.yo ? nombreJugador() : a?.f?.nombre || '');
 const corto = a => (a && a.i === E.yo ? nombreJugador() : PLANTEL[a.id].corto);
+/** Color y bandera de un pesista: los del jugador son siempre los suyos (JUGADOR), nunca los del modelo que eligió. */
+const ident = a => (a && a.i === E.yo ? JUGADOR : PLANTEL[a.id]);
 /** Cada concepto se explica una sola vez, la primera vez que aparece (tarima.visto.<clave>). Devuelve true esa primera vez. */
 function primeraVez(clave) { if (guardado.get('tarima.visto.' + clave)) return false; guardado.set('tarima.visto.' + clave, '1'); return true; }
 /** Un campo donde se escribe: ahí las teclas son del campo, no del juego. */
@@ -337,11 +340,12 @@ const relojLibre = () => { $('reloj').textContent = '–:––'; $('reloj').cla
 function setReloj(ms) { const s = Math.max(0, Math.ceil(ms / 1000)), txt = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; if ($('reloj').textContent !== txt) { $('reloj').textContent = txt; $('reloj').classList.toggle('aviso', s <= 10); escena?.arena.setClock(s); } }
 function setLuces(d) { [...$('luces').children].forEach((el, i) => { el.className = d && d[i] !== null && d[i] !== undefined ? (d[i] ? 'b' : 'r') : ''; }); escena?.arena.setDecision(d ? [0, 1, 2].map(i => d[i] ?? null) : null); }
 function zocalo(a, L) {
-  if (!a) { $('zocalo').hidden = true; return; } const P = PLANTEL[a.id];
-  // el nombre del jugador reemplaza al del pesista (textContent: no hace falta escapar); sin dorsal, que es jerga
-  $('zocalo').hidden = false; $('z-bandera').style.background = P.bandera; $('z-codigo').textContent = a.f.codigo; $('z-dorsal').textContent = ''; $('z-nombre').textContent = quien(a);
+  if (!a) { $('zocalo').hidden = true; return; } const P = ident(a), pais = a.i === E.yo ? '' : a.f.codigo;
+  // el nombre del jugador reemplaza al del pesista (textContent: no hace falta escapar), con su bandera y sin el país del
+  // modelo; sin dorsal, que es jerga
+  $('zocalo').hidden = false; $('z-bandera').style.background = P.bandera; $('z-codigo').textContent = pais; $('z-codigo').hidden = !pais; $('z-dorsal').textContent = ''; $('z-nombre').textContent = quien(a);
   $('z-lev').textContent = t('lev.' + L.lev); $('z-intento').textContent = L.n ? t('zocalo.intento', { n: L.n }) : t('zocalo.practica'); $('z-kg').textContent = L.kg;
-  escena.arena.setBoard({ name: quien(a), country: a.f.codigo, kg: L.kg, attempt: L.n || 1, lift: t('lev.' + L.lev), intento: t('tablero.intento', { n: L.n || 1 }) });
+  escena.arena.setBoard({ name: quien(a), country: pais, kg: L.kg, attempt: L.n || 1, lift: t('lev.' + L.lev), intento: t('tablero.intento', { n: L.n || 1 }) });
 }
 let cartelAhora = '';
 const cartel = (txt, clase = '') => { const k = (txt || '') + '|' + clase; if (k === cartelAhora) return; cartelAhora = k; $('cartel').hidden = !txt; $('cartel').textContent = txt || ''; $('cartel').className = 'cartel ' + clase; };
@@ -652,7 +656,10 @@ async function inicio() {
 function cuerpoHTML(id) {
   const C = CUERPO[id], fr = (k, v) => { const r = BARRA[k]; return r ? Math.max(.08, Math.min(1, (v - r[0]) / (r[1] - r[0]))) : v === 'alta' ? .9 : .55; };
   const largo = (k, v) => (k === 'estatura' ? t(`pesista.${id}.alto`) : k === 'movilidad' ? t('cuerpo.' + v) : t(fr(k, v) > .5 ? (k === 'brazos' ? 'cuerpo.largos' : 'cuerpo.largo') : (k === 'brazos' ? 'cuerpo.cortos' : 'cuerpo.corto')));
-  return `<span class="cuerpo">${['estatura', 'femur', 'brazos', 'movilidad'].map(k => `<span class="med"><i>${t('cuerpo.' + k)}</i><span class="barra" style="--v:${Math.round(fr(k, C[k]) * 100)}%"></span><em>${largo(k, C[k])}</em></span>`).join('')}</span>`;
+  const med = (k, v, txt) => `<span class="med"><i>${t('cuerpo.' + k)}</i><span class="barra" style="--v:${Math.round(v * 100)}%"></span><em>${txt}</em></span>`;
+  // energía y margen (de la ficha de juego): lo que distingue a Largo de Potente mientras comparten cuerpo
+  const at = datos?.atletas?.[id]?.attrs, ficha = at ? Object.entries(FICHA).map(([k, c]) => med(k, Math.max(.08, at[c] / 10), t(`ficha.${k}.${nivelFicha(at[c])}`))).join('') : '';
+  return `<span class="cuerpo">${['estatura', 'femur', 'brazos', 'movilidad'].map(k => med(k, fr(k, C[k]), largo(k, C[k]))).join('')}${ficha}</span>`;
 }
 
 /** Metrónomo de 8 toques: la mediana del atraso propone la corrección (0 a 100 ms), que queda fija para toda la partida. */
@@ -672,7 +679,7 @@ async function metronomo() {
 
 /** Calentamiento de Pro: tres levantamientos de práctica, sin costo: dos livianos y uno pesado guionado que enseña la pelea y el pitido. */
 async function practica(cfg) {
-  const f = datos.atletas[cfg.id], a = { id: cfg.id, f, i: E.yo }, errs = [];
+  const f = datos.atletas[cfg.id], a = { id: cfg.id, f, i: E.yo }, errs = []; escena.yo = cfg.id;
   const casos = [{ lev: 's', I: 8000, txt: () => t('cal.s_liviano') },
     { lev: 'c', env: f.enviones[0], I: 8000, txt: () => t('cal.c_liviano', { envion: ENVIONES[f.enviones[0]] }) },
     { lev: 's', I: 8600, exiFija: exigenciaTabla(9800), txt: () => t('cal.s_pesado') }];
@@ -706,7 +713,7 @@ async function tarjeta() {
  * con Esc o con el botón «Saltar práctica». El dos tiempos se explica la primera vez que toca, en la final.
  */
 async function tutorial(cfg) {
-  const f = datos.atletas[cfg.id], a = { id: cfg.id, f, i: E.yo };
+  const f = datos.atletas[cfg.id], a = { id: cfg.id, f, i: E.yo }; escena.yo = cfg.id;
   const ctx = { lev: 's', I: 8000, exiFija: exigenciaTabla(9300), tec: f.attrs.tec, temple: 0, garra: f.attrs.gar, anclas: datos.modelos[f.modelo], semilla: 71, cal: cfg.cal, primera: true, domina: true, jueces: [1000, 1000, 1000], reloj: 0, ctl: 'f', ...(tactil() ? { tactil: true } : {}) };
   await escena.mostrar(cfg.id); visita('tutorial');
   escena.setCarga(Math.round(f.techo.s * .8), 's'); escena.posar(poseParado(escena.P, 's'), 's'); escena.camara(camPrincipal()); zocalo(a, { lev: 's', n: 0, kg: escena.kg }); relojLibre(); setLuces(null);
@@ -866,22 +873,16 @@ async function llamadoPropio(p, L) {
 /** Quién va primero ahora (índice), o null si nadie tiene marca todavía en lo que se compite (arranque o total). */
 function lider(p) { const f = p.tabla()[0]; return f && f.puesto === 1 ? f.a : null; }
 /**
- * Marcador siempre a la vista durante la final (pedido del dueño: «ver que estoy compitiendo contra alguien»): quién va
- * ganando y cuántos kilos te faltan para pasarlo, o cuánta ventaja tienes. null lo esconde.
+ * Marcador siempre a la vista durante la final (pedido del dueño: «ver que estoy compitiendo contra alguien»): un solo
+ * mensaje según el estado (ui/marcador.js). `L`: el intento que está por empezar (para avisar si el rival te pasa). null lo
+ * esconde.
  */
-function marcador(p) {
+function marcador(p, L = null) {
   const el = $('marcador'); if (!el) return;
-  if (!p || p.fase === 'fin') { el.hidden = true; return; }
-  const tab = p.tabla(), lev = p.lev, yo = tab.find(f => f.a === E.yo), val = f => (lev === 's' ? f.s : f.total) || 0, L = tab[0];
-  if (!L || !val(L)) { el.hidden = true; return; }
-  let txt, sub = '', color = PLANTEL[p.at[L.a].id].color;
-  if (L.a === E.yo) { const seg = tab[1]; txt = t('marcador.ganas', { kg: val(L) - (seg ? val(seg) : 0) }); color = 'var(--teal)'; }
-  else if (yo && val(yo) === val(L)) txt = t('marcador.empate', { kg: val(L) });
-  else {
-    txt = t('marcador.gana', { rival: quien(p.at[L.a]) }); const C = p.cuenta(E.yo);
-    sub = lev === 'c' && !p.at[E.yo].mejor.s ? t('marcador.sin_total') : C.oro ? t('marcador.falta', { kg: C.oro }) : '';
-  }
-  el.hidden = false; el.style.setProperty('--c', color);
+  const m = marcadorDe(p, E.yo, L);
+  if (!m) { el.hidden = true; return; }
+  const txt = t(m.clave, { kg: m.kg, rival: quien(p.at[m.lider]) }), sub = m.sub ? t(m.sub.clave, { kg: m.sub.kg, rival: m.sub.rival != null ? quien(p.at[m.sub.rival]) : '' }) : '';
+  el.hidden = false; el.style.setProperty('--c', ident(p.at[m.lider]).color);
   el.innerHTML = `<b>${esc(txt)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}`;
 }
 /** Cartel del turno de un rival (o null para sacarlo): con su color y su nombre; sin botón de levantar ni señal. */
@@ -901,7 +902,7 @@ async function llamadoRival(p, L, cfg) {
   void cfg;
   const a = p.at[L.a], antes = lider(p), x = p.resolverIA(), pasa = x.res.res === 'valido' && antes !== L.a && lider(p) === L.a;
   setReloj(L.reloj); setLuces(null);
-  visita('rival'); turno(a); await escena.mostrar(a.id); escena.setCarga(L.kg, L.lev); escena.posar(poseParado(escena.P, L.lev), L.lev); escena.camara(camPrincipal()); zocalo(a, L); etiqueta(L.et);
+  visita('rival'); turno(a); await escena.mostrar(a.id); escena.setCarga(L.kg, L.lev); escena.posar(poseParado(escena.P, L.lev), L.lev); escena.camara(camPrincipal()); zocalo(a, L); etiqueta(etiquetasRival(L.et, antes === E.yo));
   // un toque (una ráfaga nueva, pasados 400 ms) saltea el turno entero: el resultado ya está decidido
   let salta = false; const ts = reloj.ahora(), oye = (tt, v) => { if (!v) return; if (tt - ts >= 400 && toques.rafaga(tt) >= ts && E.intento) { toques.resolver(true, 'sigue'); salta = true; E.intento.alFinal(); } else toques.resolver(false, 'espera'); };
   boton.oye = oye;
@@ -970,11 +971,11 @@ async function cierre(p) {
   guardado.set('tarima.jugadas', String((+guardado.get('tarima.jugadas') || 0) + 1));
   ev('final_fin', { n: E.finalN, puesto, total: yo.total || 0, duracion_s: Math.round((performance.now() - (E.tFinal0 || performance.now())) / 1000) });
   // plano del ganador detrás del podio 2D
-  const oro = tab[0]?.total ? p.at[tab[0].a] : null; if (oro) { await escena.mostrar(oro.id); escena.posar(poseParado(escena.P, 'c'), 'c'); if (PLANTEL[oro.id].cara) escena.primerPlano('torso'); else escena.camara('3/4'); }
+  const oro = tab[0]?.total ? p.at[tab[0].a] : null; if (oro) { await escena.mostrar(oro.id); escena.posar(poseParado(escena.P, 'c'), 'c'); if (ident(oro).cara) escena.primerPlano('torso'); else escena.camara('3/4'); }
   visita('ceremonia');
   const arriba = () => {
     const nombre = esc(nombreJugador());
-    const bloque = k => { const f = tab[k]; return f && f.total ? `<div class="p${k + 1}"><i style="background:${PLANTEL[f.id].bandera}"></i><b>${esc(corto(p.at[f.a]))}</b>${f.total} kg<br>${t('medalla.' + MED[k])}</div>` : `<div class="p${k + 1} vacio"><b>—</b>${t('podio.vacio')}</div>`; };
+    const bloque = k => { const f = tab[k]; return f && f.total ? `<div class="p${k + 1}"><i style="background:${ident(p.at[f.a]).bandera}"></i><b>${esc(corto(p.at[f.a]))}</b>${f.total} kg<br>${t('medalla.' + MED[k])}</div>` : `<div class="p${k + 1} vacio"><b>—</b>${t('podio.vacio')}</div>`; };
     const rec = []; for (const a of p.at) { const q = esc(quien(a)); if (a.mejor.s > R.s) rec.push(t('podio.record', { quien: q, lev: t('lev.s').toLowerCase(), kg: a.mejor.s })); if (a.mejor.c > R.c) rec.push(t('podio.record', { quien: q, lev: t('lev.c').toLowerCase(), kg: a.mejor.c })); if (a.mejor.s && a.mejor.c && a.mejor.s + a.mejor.c > R.t) rec.push(t('podio.record', { quien: q, lev: t('lev.t'), kg: a.mejor.s + a.mejor.c })); }
     const ms = mejor('s'), mc = mejor('c');
     return `${idiomasHTML(true)}<h1>${t(puesto === 1 ? 'podio.oro' : puesto === 2 ? 'podio.plata' : puesto === 3 ? 'podio.bronce' : 'podio.sin_total', { nombre })}</h1><div class="podio">${bloque(1)}${bloque(0)}${bloque(2)}</div>${tableroHTML(p, { yo: E.yo, nombre: nombreJugador() })}
@@ -1019,7 +1020,7 @@ async function pedirPase(cfg, n, origen) {
 // ---------- la partida ----------
 /** Una final entera, de la carga a la ceremonia. Devuelve 'revancha', 'cambiar' o 'inicio'. */
 async function partida(cfg) {
-  E.cfg = cfg; E.yo = IDS.indexOf(cfg.id); E.registro = null;
+  E.cfg = cfg; E.yo = IDS.indexOf(cfg.id); escena.yo = cfg.id; E.registro = null;
   const semilla = params.has('semilla') && !E.jugadas ? (+params.get('semilla') >>> 0) : (crypto.getRandomValues(new Uint32Array(1))[0] >>> 0);
   E.jugadas = (E.jugadas || 0) + 1;
   let errMedio = null; cfg.cal = cfg.cal ?? (tactil() ? CAL_TACTIL : 0);
@@ -1039,7 +1040,7 @@ async function partida(cfg) {
   await presentacion(p, cfg, errMedio, n === 1); p.empezar();
   while (p.fase !== 'fin') {
     if (p.fase === 'intervalo') { await intervalo(p); continue; }
-    const L = { ...p.llamado }, a = p.at[L.a]; marcador(p);
+    const L = { ...p.llamado }, a = p.at[L.a]; marcador(p, L);
     if (a.ctrl === 'persona') { await carga(L.kg, L.lev); await llamadoPropio(p, L); } else await llamadoRival(p, L, cfg);
   }
   marcador(null); E.registro = JSON.parse(JSON.stringify(p.reg));

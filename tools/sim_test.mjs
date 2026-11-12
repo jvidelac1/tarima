@@ -22,6 +22,9 @@ import { Azar, mezclar } from '../web/js/sim/fixed.js';
 import { RELOJ, CAUSAS, FACIL, exigenciaTabla } from '../web/js/sim/rules.js';
 import { tocar, alDia, senal, GUIADO } from '../web/js/game/controles.js';
 import { explicar, pasos } from '../web/js/game/ui/mensajes.js';
+import { marcadorDe, amenaza, etiquetasRival } from '../web/js/game/ui/marcador.js';
+import { PLANTEL, JUGADOR, FICHA, nivelFicha, CUERPO } from '../web/js/game/roster.js';
+import { tableroHTML } from '../web/js/game/ui/tablero.js';
 import { DICCIONARIOS, tr, fijarIdioma, detectarIdioma } from '../web/js/game/i18n/t.js';
 import { toques } from '../web/js/game/input.js';
 import { jugarSenal, jugarFijo, BOTS } from './play_human.mjs';
@@ -329,6 +332,70 @@ function jugar(semilla, nivel, persona, estilo = {}) {
   pulsar(Array.from({ length: 20 }, (_, i) => i * 120)); ok(toques.rafaga(19 * 120) === -Infinity, 'ráfaga más larga que lo anotado: -Infinity (no saltea)');
   toques.ultimos.length = 0; toques.abierto = null;
   console.log('10. ráfagas de toques: el machaque que venía del levantamiento no saltea; una pausa de 300 ms o un toque nuevo sí');
+}
+
+// ---------- 11. marcador e identidad del jugador (verificación independiente del 12-nov) ----------
+{
+  // En partidas al azar, con el jugador en cada uno de los tres pesistas, antes de cada intento y después de cada uno:
+  // - «Vas ganando · N kg de ventaja» solo si vas primero y N es contra alguien que ya tiene marca (nunca contra 0).
+  // - Si vas primero y el rival en la tarima te pasa con lo que pidió: «si lo levanta, te pasa»; y si lo levanta, te pasa.
+  // - Si no vas primero, nunca «Vas ganando»; y la etiqueta «Para pasar al frente» del rival no sale suelta si vas primero.
+  let vistos = { ganas: 0, solo: 0, te_pasa: 0, gana: 0, empate: 0, pasó: 0 };
+  for (let k = 0; k < 120; k++) for (let yo = 0; yo < 3; yo++) {
+    const p = new Partida(datos, { semilla: 9000 + k, nivel: NIV[k % 3], cal: 0, primera: false, atletas: IDS.map(id => ({ id, ctrl: 'juego' })) });
+    p.empezar();
+    for (let g = 0; p.fase !== 'fin' && g < 80; g++) {
+      if (p.fase === 'intervalo') { p.empezar(); continue; }
+      const L = { ...p.llamado }, m = marcadorDe(p, yo, L), tab = p.tabla(), lev = p.lev, val = f => (lev === 's' ? f.s : f.total) || 0;
+      const primero = tab[0] && val(tab[0]) > 0 && tab[0].a === yo;
+      if (m) {
+        ok(m.propio === primero, `semilla ${9000 + k}, yo ${yo}: el marcador dice propio=${m.propio} y primero=${primero}`);
+        if (m.clave === 'marcador.ganas') {
+          vistos.ganas++;
+          const seg = tab.filter(f => f.a !== yo && val(f) > 0).sort((a, b) => val(b) - val(a))[0];
+          ok(primero && seg && m.kg === val(tab[0]) - val(seg) && m.kg > 0, `semilla ${9000 + k}: ventaja de ${m.kg} kg sin rival con marca o mal calculada`);
+        }
+        if (m.clave === 'marcador.ganas_solo') { vistos.solo++; ok(primero && tab.every(f => f.a === yo || !val(f)), `semilla ${9000 + k}: «Vas ganando» solo con rivales con marca`); }
+        if (m.clave === 'marcador.gana') { vistos.gana++; ok(!primero && m.lider !== yo, `semilla ${9000 + k}: «Va ganando» con el jugador primero`); }
+        if (m.clave === 'marcador.empate') vistos.empate++;
+        if (m.sub?.clave === 'marcador.te_pasa') { vistos.te_pasa++; ok(primero && L.a !== yo && m.sub.rival === L.a && m.sub.kg === L.kg, `semilla ${9000 + k}: «te pasa» fuera de lugar`); }
+        if (primero && L.a !== yo && L.et.includes('frente')) ok(m.sub?.clave === 'marcador.te_pasa' && !etiquetasRival(L.et, true).includes('frente'), `semilla ${9000 + k}: «Para pasar al frente» suelta con el jugador primero`);
+      }
+      const amenazaba = m?.sub?.clave === 'marcador.te_pasa', x = p.resolverIA();
+      if (amenazaba && x.res.res === 'valido') { vistos.pasó++; ok(p.tabla()[0].a === L.a, `semilla ${9000 + k}: dijo «si lo levanta, te pasa», lo levantó y no pasó`); }
+      const d = marcadorDe(p, yo, null);
+      if (d) ok(!d.sub || d.sub.clave !== 'marcador.te_pasa', 'después del intento no queda el aviso de «te pasa»');
+    }
+  }
+  ok(Object.values(vistos).every(v => v > 0), `el marcador no pasó por todos los estados: ${JSON.stringify(vistos)}`);
+  // El caso de la captura: vas primero en el arranque con 159, los rivales sin marca y uno va a levantar 161.
+  const p = new Partida(datos, { semilla: 1, nivel: 'normal', cal: 0, primera: false, atletas: IDS.map(id => ({ id, ctrl: 'juego' })) });
+  const falso = { fase: 's', lev: 's', at: p.at, tabla: () => [{ a: 0, s: 159, total: 0 }, { a: 1, s: 0, total: 0 }, { a: 2, s: 0, total: 0 }], puestoSi: (i, lev, kg) => (kg > 159 ? 1 : 2), cuenta: () => ({}) };
+  const m = marcadorDe(falso, 0, { a: 1, lev: 's', kg: 161, et: ['frente'] });
+  ok(m.clave === 'marcador.ganas_solo' && m.sub?.clave === 'marcador.te_pasa' && m.sub.kg === 161 && m.sub.rival === 1, `caso de la captura: ${JSON.stringify(m)}`);
+  ok(tr('es', m.clave) === 'Vas ganando' && tr('es', m.sub.clave, { rival: 'Ilya Brenner', kg: 161 }) === 'Ilya Brenner intenta 161 kg: si lo levanta, te pasa', 'caso de la captura: el texto');
+  ok(amenaza(falso, 0, { a: 1, lev: 's', kg: 159 }) === false, 'con los mismos kilos no te pasa (gana quien los levantó primero)');
+
+  // Identidad: el color y la bandera del jugador no son los de ningún rival; las telas de los tres se distinguen.
+  const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)), lejos = (a, b) => Math.hypot(...hex(a).map((v, i) => v - hex(b)[i]));
+  for (const [id, P] of Object.entries(PLANTEL)) {
+    ok(lejos(P.color, JUGADOR.color) > 90, `el color de ${id} (${P.color}) se confunde con el del jugador (${JUGADOR.color})`);
+    ok(P.bandera !== JUGADOR.bandera && !P.bandera.includes(JUGADOR.color), `la bandera de ${id} usa el color del jugador`);
+    if (P.tela) ok(lejos(P.tela, JUGADOR.tela) > 90, `la tela de ${id} (${P.tela}) se confunde con la del jugador`);
+  }
+  // Marangi (tela lisa) no va de rojo como Ventura (malla roja ARX, PLANTEL.ventura.color) ni de gris como Brenner.
+  { const [r, g, b] = hex(PLANTEL.marangi.tela); ok(!(r > g * 1.8 && r > b * 1.8) && Math.max(r, g, b) - Math.min(r, g, b) > 60, `la tela de Marangi (${PLANTEL.marangi.tela}) es roja o gris`); }
+  // La tabla: la fila del jugador lleva su bandera y su nombre, nunca la bandera del modelo.
+  for (let yo = 0; yo < 3; yo++) {
+    const p2 = new Partida(datos, { semilla: 3, nivel: 'normal', cal: 0, primera: false, atletas: IDS.map(id => ({ id, ctrl: 'juego' })) }); p2.empezar();
+    const html = tableroHTML(p2, { yo, nombre: 'Ana <b>' }), fila = html.split('<tr').find(r => /class="yo/.test(r)) || '';
+    ok(fila.includes(JUGADOR.bandera) && !fila.includes(PLANTEL[IDS[yo]].bandera) && fila.includes('Ana &lt;b&gt;'), `tabla con el jugador en ${IDS[yo]}: ${fila.slice(0, 160)}`);
+  }
+  // Tarjeta: Largo y Potente comparten cuerpo (CUERPO igual) pero no energía y margen.
+  const ficha = id => Object.values(FICHA).map(c => nivelFicha(datos.atletas[id].attrs[c])).join('/');
+  ok(JSON.stringify(CUERPO.brenner) !== JSON.stringify(CUERPO.marangi) || ficha('brenner') !== ficha('marangi'), `Largo y Potente se ven iguales en la tarjeta: ${ficha('brenner')}`);
+  for (const l of ['es', 'en']) for (const k of Object.keys(FICHA)) for (const n of ['alto', 'medio', 'bajo']) ok(tr(l, `ficha.${k}.${n}`) !== `ficha.${k}.${n}`, `falta ${l}.ficha.${k}.${n}`);
+  console.log(`11. Marcador: ${JSON.stringify(vistos)} en 360 partidas, sin ventaja contra quien no levantó ni «Vas ganando» con otro primero · identidad propia del jugador · Largo ${ficha('brenner')} y Potente ${ficha('marangi')}`);
 }
 
 console.log(fallas.length ? `\nFALLÓ: ${fallas.length} problemas` : `\nOK en ${((Date.now() - t0) / 1000).toFixed(1)} s`);

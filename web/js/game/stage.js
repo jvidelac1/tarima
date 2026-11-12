@@ -20,7 +20,7 @@ import { BarTrace } from '../trace.js';
 import { Athlete } from '../athlete.js';
 import { Timeline } from '../timeline.js';
 import { PLATE_R, PLATES, loadout, COLLAR_KG } from '../config.js';
-import { PLANTEL } from './roster.js';
+import { PLANTEL, JUGADOR } from './roster.js';
 import { aplicarEsfuerzo } from './effort.js';
 import { tramo } from './sequence.js';
 
@@ -214,7 +214,7 @@ export class Escena {
     this.arena.group.traverse(o => { o.castShadow = false; if (o.material) [].concat(o.material).forEach(conTono); });      // en la sombra, solo el pesista y la barra
     this._capaSombra();
     this._post(Q); this._modo();
-    this.atletas = {}; this.cargas = {}; this.tls = {}; this.activo = null; this.id = null; this.poses = null; this.plano = null; this.sombra = 4;
+    this.atletas = {}; this.cargas = {}; this.tls = {}; this.activo = null; this.id = null; this.yo = null; this.poses = null; this.plano = null; this.sombra = 4;
     this.barY = PLATE_R; this._py = [PLATE_R, PLATE_R]; this.kg = 0;
     this.barbell.setLoad(100); this._sombraBarra(); this.barbell.setPosition(v.set(0, PLATE_R, 0)); this.barbell.settle(PLATE_R);
     this.resize(); this.lighting.bake(r, [this.barbell.group, this.trace.group]);
@@ -409,7 +409,9 @@ export class Escena {
     if (id === null) { for (const a of Object.values(this.atletas)) a.root.visible = false; this.activo = null; this.id = null; this.sombra = 4; return; }
     const a = await this.cargar(id), f = PLANTEL[id];
     for (const b of Object.values(this.atletas)) b.root.visible = b === a;
-    a.setClothFlat(f.tela ? new THREE.Color(f.tela) : null);
+    // el pesista del jugador (this.yo, lo fija main.js) lleva siempre su malla lisa, nunca la del modelo con otro nombre
+    const tela = id === this.yo ? JUGADOR.tela : f.tela;
+    a.setClothFlat(tela ? new THREE.Color(tela) : null);
     this.activo = a; this.id = id; this.P = this.poses[f.modelo]; this.rig.setAthleteHeight(this.P.h); this.sombra = 4;
   }
   setCarga(kg, lev) { if (kg !== this.kg) { this.kg = this.barbell.setLoad(kg); this._sombraBarra(); this.sombra = 4; } if (lev && this.P) this.barbell.setGrip(lev === 's' ? this.P.grip?.snatch : this.P.grip?.clean); }
