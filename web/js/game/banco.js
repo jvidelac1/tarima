@@ -93,7 +93,7 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
   const hz = await medirRefresco(45, null) || hzCarga || 60, paso = pasoDe(hz), periodo = 1000 / metaDe(hz), DT = periodo / 1000, T0 = 1.3;
   const dbg = gl.getExtension('WEBGL_debug_renderer_info'), dpr = window.devicePixelRatio || 1, nativoMP = canvas.clientWidth * canvas.clientHeight * dpr * dpr / 1e6;
   Object.assign(B, { fecha: new Date().toISOString(), navegador: navigator.userAgent, gl: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : '?', ventana: [window.innerWidth, window.innerHeight], lienzo: [canvas.clientWidth, canvas.clientHeight],
-    dpr: num(dpr, 2), nativoMP: num(nativoMP), hz, hzAlCargar: hzCarga, paso, periodoMs: num(periodo, 2), margen: MARGEN, limiteS: LIMITE / 1000, vueltasPedidas: VUELTAS, pesista: id, camara, lodPxPorMetro: LOD_PLANO, mpMedidas: MP_A, mallasFijas: escena.fijos || null });
+    dpr: num(dpr, 2), nativoMP: num(nativoMP), hz, hzAlCargar: hzCarga, paso, periodoMs: num(periodo, 2), margen: MARGEN, limiteS: LIMITE / 1000, vueltasPedidas: VUELTAS, pesista: id, camara, lodPxPorMetro: LOD_PLANO, mpMedidas: MP_A, mallasFijas: escena.fijos || null, recibenSombra: escena.recibenSombra ?? null });
   if (paso > 1) B.notas.push(`Pantalla de ${hz} Hz: el juego dibuja uno de cada ${paso} refrescos, y el banco mide contra ese período (${num(periodo, 2)} ms).`);
   if (document.hidden) B.notas.push('La pestaña estaba oculta al empezar: las búsquedas con cuadros de verdad no valen.');
 

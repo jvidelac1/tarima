@@ -71,7 +71,20 @@ export function vineta() {
 /** Los ShaderMaterial de la arena (haces, discos de luz, público) no aplican tono ni sRGB solos: en el camino directo hace falta. */
 function conTono(m) {
   if (!m.isShaderMaterial || m.userData.conTono || !/\}\s*$/.test(m.fragmentShader)) return;
-  m.fragmentShader = m.fragmentShader.replace(/\}\s*$/, '\t#include <tonemapping_fragment>\n\t#include <colorspace_fragment>\n}'); m.userData.conTono = true; m.needsUpdate = true;
+  // cada #include en su propia línea: los haces tienen todo el main() en una sola, y un #include a mitad de línea no se resuelve
+  m.fragmentShader = m.fragmentShader.replace(/\}\s*$/, '\n\t#include <tonemapping_fragment>\n\t#include <colorspace_fragment>\n}'); m.userData.conTono = true; m.needsUpdate = true;
+}
+/**
+ * Pasada de sombra: la cámara de sombra de las luces ve solo esta capa (three usa la capa de la cámara de sombra si tiene
+ * alguna además de la 0). Entran el pesista, una copia sin grupos de material de cada pieza de la barra (una llamada por
+ * pieza en vez de una por grupo) y lo de la arena que recibe sombra dentro del cono de la clave (la tarima y la alfombra:
+ * con VSM three dibuja también lo que recibe, y sin ellos el borde de la sombra se aclara). Nada más.
+ */
+const CAPA_SOMBRA = 2, SOMBRA_MAT = new THREE.MeshBasicMaterial(), sinGrupos = new WeakMap();
+function copiaDeSombra(g) {
+  let p = sinGrupos.get(g);
+  if (!p) { p = new THREE.BufferGeometry(); if (g.index) p.setIndex(g.index); p.setAttribute('position', g.attributes.position); sinGrupos.set(g, p); }      // comparte los búferes: la barra que se curva se curva también acá
+  return p;
 }
 /**
  * Junta en una malla por material la geometría fija de `raiz` (lo que no se mueve, no cambia de material y no está en
@@ -128,10 +141,11 @@ export class Escena {
     this.barbell = new Barbell({ aniso, texSize: coarse ? 512 : 1024 }); this.scene.add(this.barbell.group);
     this.arena.setQuality(Q); this.lighting.setQuality(Q);
     this.arena.group.traverse(o => { o.castShadow = false; if (o.material) [].concat(o.material).forEach(conTono); });      // en la sombra, solo el pesista y la barra
+    this._capaSombra();
     this._post(Q); this._modo();
     this.atletas = {}; this.cargas = {}; this.tls = {}; this.activo = null; this.id = null; this.poses = null; this.plano = null; this.sombra = 4;
     this.barY = PLATE_R; this._py = [PLATE_R, PLATE_R]; this.kg = 0;
-    this.barbell.setLoad(100); this.barbell.setPosition(v.set(0, PLATE_R, 0)); this.barbell.settle(PLATE_R);
+    this.barbell.setLoad(100); this._sombraBarra(); this.barbell.setPosition(v.set(0, PLATE_R, 0)); this.barbell.settle(PLATE_R);
     this.resize(); this.lighting.bake(r, [this.barbell.group, this.trace.group]);
     // después de hornear el entorno (que la ve igual): la arena fija en pocas mallas
     const A = this.arena; this.fijos = juntarFijos(A.group, new Set([A.impostors, A.crowd, A.bokeh, A.flashMesh, ...A.beamMeshes, ...(A.lamps || [])].filter(Boolean)));
@@ -142,6 +156,22 @@ export class Escena {
     // Sin oclusión ni profundidad de campo ningún pase lee la profundidad de la escena: no se resuelve (una pasada de pantalla
     // completa menos por cuadro) ni se guarda la del MSAA (cuatro muestras por píxel que no salen de la memoria de la placa).
     const lee = !!(Q.ao || Q.dof || Q.mblur); p.sceneRT.resolveDepthBuffer = lee; p.sceneRT.storeMultisampledDepthBuffer = lee;
+  }
+  /** Qué entra en la pasada de sombra (CAPA_SOMBRA): ver arriba. La arena se decide una vez, con el cono de la clave. */
+  _capaSombra() {
+    const L = this.lighting; for (const l of [L.key, L.key2]) l.shadow.camera.layers.set(CAPA_SOMBRA);
+    this.scene.updateMatrixWorld(true); L.key.shadow.updateMatrices(L.key);
+    const c = L.key.shadow.camera, cono = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(c.projectionMatrix, c.matrixWorldInverse));
+    let n = 0; this.arena.group.traverse(o => { if (o.isMesh && o.receiveShadow && !o.isSkinnedMesh && !(o.material && o.material.transparent) && cono.intersectsObject(o)) { o.layers.enable(CAPA_SOMBRA); n++; } });
+    this.recibenSombra = n; this._sombraBarra();
+  }
+  /** Copias de sombra de las piezas de la barra que no la tienen (setLoad arma discos nuevos). */
+  _sombraBarra() {
+    this.barbell.group.traverse(o => {
+      if (!o.isMesh || o.userData.sombra || o.layers.mask === 1 << CAPA_SOMBRA || !o.castShadow) return;
+      const p = new THREE.Mesh(copiaDeSombra(o.geometry), SOMBRA_MAT); p.name = 'sombra'; p.layers.set(CAPA_SOMBRA); p.castShadow = true; p.receiveShadow = false; p.frustumCulled = o.frustumCulled;
+      o.add(p); o.userData.sombra = p;
+    });
   }
   /** Camino directo o con post: tono en los materiales (y niebla en colores de pantalla) o en el pase final. Cambia programas: solo en la carga. */
   _modo() {
@@ -212,7 +242,7 @@ export class Escena {
   cargar(id) {
     const mod = PLANTEL[id].modelo;
     return this.cargas[mod] ||= Athlete.load(mod, this.poses[mod], { aniso: Math.min(this.Q.aniso || 4, this.renderer.capabilities.getMaxAnisotropy()), maxTex: this.Q.tex })
-      .then(a => { a.root.visible = false; this.scene.add(a.root); this.atletas[mod] = a; return a; });
+      .then(a => { a.root.visible = false; a.root.traverse(o => { if (o.isMesh && o.castShadow) o.layers.enable(CAPA_SOMBRA); }); this.scene.add(a.root); this.atletas[mod] = a; return a; });
   }
   /** Pone en escena a un pesista (o a nadie, con null). Marangi comparte la instancia de Brenner con la tela de color plano. */
   async mostrar(id) {
@@ -222,7 +252,7 @@ export class Escena {
     a.setClothFlat(f.tela ? new THREE.Color(f.tela) : null);
     this.activo = a; this.id = id; this.P = this.poses[f.modelo]; this.rig.setAthleteHeight(this.P.h); this.sombra = 4;
   }
-  setCarga(kg, lev) { if (kg !== this.kg) { this.kg = this.barbell.setLoad(kg); this.sombra = 4; } if (lev && this.P) this.barbell.setGrip(lev === 's' ? this.P.grip?.snatch : this.P.grip?.clean); }
+  setCarga(kg, lev) { if (kg !== this.kg) { this.kg = this.barbell.setLoad(kg); this._sombraBarra(); this.sombra = 4; } if (lev && this.P) this.barbell.setGrip(lev === 's' ? this.P.grip?.snatch : this.P.grip?.clean); }
   /** Posa al pesista en el instante `t` (s) de un arranque que se repite sin parar (calibración y banco de medición). */
   bucle(t, dt = 0) {
     if (!this.activo) return; const G = tramo(this.P, 'snatch'), tau = ((t % G.fin) + G.fin) % G.fin, salto = tau < this._tau; this._tau = tau;
