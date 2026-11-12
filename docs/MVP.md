@@ -1104,3 +1104,11 @@ Sin huella digital del navegador: es invasiva y en la UE pide consentimiento.
 - Conversión de listas de espera (2 a 5 %): https://medium.com/@soyzamudio/maximizing-waitlist-conversion-rates-data-driven-strategies-6856cb91f83b
 - Cloudflare D1: https://developers.cloudflare.com/d1/
 - Código leído: `web/js/game/main.js`, `web/js/game/ui/mensajes.js`, `web/js/game/controles.js`, `web/js/game/roster.js`, `web/js/game/ui/senal.js`, `web/js/game/ui/tablero.js`, `web/js/sim/rules.js`, `web/juego.html`, `HANDOFF.md`, `docs/JUEGO.md`.
+
+## Decisiones del dueño (12 de noviembre de 2026)
+
+- **Quien deja el mail juega libre** en ese dispositivo hasta la próxima versión (recomendación aceptada).
+- **Español neutro desde el inicio**, sin voseo: se reescriben las claves en español de la tabla 4.5 con tuteo o sin tratamiento («toca», «gana», «tu pesista»). El inglés no cambia. Esto reemplaza la decisión de voseo de este documento.
+- **Edad mínima para la lista de espera: 16 años**, dicha en la línea legal y en la página de privacidad; el juego no pide edad.
+- Finales gratis antes del muro (1 o 2): pendiente de respuesta del dueño; mientras tanto se implementa con 2, configurable.
+- Dominio, mail de contacto y responsable de los datos: pendientes.
