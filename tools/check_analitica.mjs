@@ -5,7 +5,7 @@
 //     y después de todo no queda ninguna cookie ni clave de almacenamiento con «ph_» (posthog-js también usa nombres como
 //     __ph_opt_in_out_<clave>).
 //  2. Sin clave: PostHog ni se descarga.
-//  3. web/privacidad.html: idioma (?lang=, botones), marcadores de contacto pendiente, interruptor de la medición (manda
+//  3. web/privacidad.html: idioma (?lang=, botones), responsable y contacto completos (sin marcadores), interruptor de la medición (manda
 //     medicion_desactivada por /qx y deja tarima.medicion=0), formulario de baja contra /api/baja, y sin la promesa de pago.
 //  4. A 390x844 (teléfono parado) y a 844x390 (acostado) la privacidad no se desplaza de costado.
 import http from 'node:http';
@@ -175,7 +175,7 @@ async function rastros(ctx, page) {
   await page.goto(base + 'privacidad.html?lang=es');
   const html = await page.content();
   ok(!/nunca vas a pagar|never pay to lift/i.test(html), 'sin la promesa de pago');
-  ok((await page.locator('[data-completar="contacto"]').count()) >= 4, 'marcadores de contacto pendiente en los dos idiomas');
+  ok(!/PENDIENTE\]|PENDING\]|data-completar/.test(html) && (html.match(/mailto:[^"']+@/g) || []).length >= 6, 'responsable y contacto completos en los dos idiomas, sin marcadores pendientes');
   ok(await page.locator('article[lang=es]').isVisible() && !(await page.locator('article[lang=en]').isVisible()), '?lang=es muestra el español');
   ok(/16 años/.test(await page.locator('article[lang=es]').innerText()), 'edad mínima de 16 en español');
   ok(/Estados Unidos/.test(await page.locator('article[lang=es]').innerText()) && /HMAC/.test(html) && /tdv/.test(html), 'PostHog en EE. UU., HMAC de la IP y cookie técnica');
