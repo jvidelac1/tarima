@@ -219,7 +219,8 @@ async function medir(cpu, gob = false) {
   const T = out.teclas.filter(k => !k.rep), enInt = T.filter(k => k.propio && k.modo !== 'panel');
   const acept = enInt.filter(k => (k.reg ? k.reg.ok : k.ent1 !== null && k.ent1 > k.ent0)), desc = enInt.filter(k => !acept.includes(k));
   // el registro del juego contra lo que de verdad pasó: un toque «aceptado» en el intento tiene que haber agregado entradas, y uno «descartado» no
-  const cruzados = enInt.filter(k => k.reg && k.ent1 !== null && k.reg.ok !== (k.ent1 > k.ent0));
+  // un toque «guardado» (llegó con PREPÁRATE en pantalla) se acepta y su entrada entra recién al aparecer ¡TIRA!
+  const cruzados = enInt.filter(k => k.reg && k.ent1 !== null && k.reg.motivo !== 'guardado' && k.reg.ok !== (k.ent1 > k.ent0));
   if (cruzados.length) problemas.push(`${tag} ${cruzados.length} toques del intento con registro que no coincide con las entradas (${cruzados.slice(0, 3).map(k => `${k.fase}: ${k.reg.ok ? 'aceptado' : k.reg.motivo}, entradas ${k.ent0}→${k.ent1}`).join('; ')})`);
   const motivos = {}; for (const k of desc) { const m = k.reg ? (k.reg.motivo || 'SIN MOTIVO') : 'sin registro'; motivos[m] = (motivos[m] || 0) + 1; }
   const sinReg = T.filter(k => info.toques && !k.reg), sinMotivo = T.filter(k => k.reg && !k.reg.ok && !k.reg.motivo), sinAcuse = T.filter(k => info.toques && (!k.acuse || !k.acuse.visible || !k.acuse.hundida || (k.reg && k.reg.ok === false && !k.acuse.txt)));

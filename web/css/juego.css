@@ -290,7 +290,7 @@ html.rotado #app{position:fixed;left:0;top:0;flex:none;width:var(--app-w,100vh);
 .marcador span{font-weight:700;font-size:calc(var(--u)*.95);letter-spacing:.05em;color:var(--gold)}
 body:has(.etiqueta:not([hidden])) .marcador{top:calc(var(--u)*7 + var(--st))}
 /* durante el turno de un rival no hay botón de levantar ni señal: tocar solo saltea (y lo dice el cartel) */
-html.turno-rival #zona,html.turno-rival #senal,html.turno-rival #acuse{display:none!important}
+html.turno-rival #zona,html.turno-rival #senal{display:none!important}      /* el acuse queda: dice que el toque llegó (y que saltea) */
 
 /* ---------- campo de texto en el teléfono: un editor arriba de lo visible, derecho, con «Listo» ---------- */
 #editor{position:fixed;left:0;right:0;top:var(--vvy,0px);z-index:60;background:#080d1e;border-bottom:3px solid var(--teal);padding:calc(10px + env(safe-area-inset-top,0px)) calc(12px + env(safe-area-inset-right,0px)) 10px calc(12px + env(safe-area-inset-left,0px));box-shadow:0 10px 30px rgba(0,0,0,.6)}
