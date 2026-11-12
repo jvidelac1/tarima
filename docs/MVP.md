@@ -989,18 +989,19 @@ El hash de `d` no es dato personal directo, pero es seudónimo. Está cubierto p
 | `muro-partidas-gratis` | `1`, `2` | `2` | Cuántas finales antes del muro. Recién se prueba con 1.000 visitas |
 | `muro-texto` | `a`, `b` | `a` | El texto del muro (claves `_b`) |
 | `invitacion-podio1` | `on`, `off` | `on` | Si la invitación suave del podio 1 suma o le resta al muro |
-| `grabacion` | `off`, `muestra` | `off` | Ver 6.6 |
+| `grabacion` | `off`, `tercio`, `todas` | `tercio` | Qué parte de las cargas se graba. Ver 6.6 |
 
 ### 6.6 Grabación de sesión
 
-Queda apagada.
-- **Lo que vería.** El juego es un canvas de WebGL, y la grabación de PostHog guarda el DOM: se vería el texto de los paneles, no el levantamiento.
-- **Lo que costaría.** Prenderla en la UE pide consentimiento.
+Decisión del dueño del 12 de noviembre (noche): prendida en una parte de las cargas, solo la página. Reemplaza la propuesta anterior (apagada; 10 % con una pregunta en la pausa).
 
-Si los embudos no alcanzan para entender un abandono en los menús o en el muro, se prende con la bandera `grabacion=muestra`:
-- Al 10 % de las sesiones y por dos semanas.
-- Con `maskAllInputs` y `mask_all_text`, sin canvas.
-- Solo después de que la persona diga que sí en una línea dentro de la pausa: «¿Nos dejás grabar los menús para mejorar el juego? Sí / No».
+- **Qué se graba.** El DOM: paneles, botones, textos y toques. Nunca el lienzo 3D (`captureCanvas.recordCanvas: false`, y además los `canvas` van bloqueados): grabarlo le quitaría fluidez al juego y no hace falta para ver dónde se traba la gente.
+- **En qué parte.** La bandera `grabacion` dice la proporción: `off` (nada), `tercio` (por defecto) o `todas`. Se sortea una vez por carga de la página, que con `persistence: 'memory'` es una sesión de PostHog. Se cambia en PostHog sin publicar (6.5); los dispositivos que ya tienen banderas del día la ven al refrescarlas (hasta 24 h).
+- **Enmascarado.** `maskAllInputs` (nombre, correo, respuesta libre). Todo texto pasa por `maskTextFn`: se tapa si tiene una «@» o el nombre del jugador (el guardado en `tarima.nombre` o el que está escribiendo en `#nombre` o `#editor-campo`, de 2 letras o más). El resto del texto de la interfaz se lee.
+- **Fuera de la grabación** (`BLOQUEO_GRABACION`, se ven como cajas vacías): `canvas`, `#senal` (escala, opacidad y anillos en cada cuadro del intento), `#acuse` y `#depura`.
+- **Consentimiento.** Va con la medición: sin clave, con `?metricas=0` o con la medición desactivada en la privacidad no se carga PostHog ni el grabador; desactivarla con la página abierta corta la grabación. No hay pregunta aparte. Riesgo aceptado: en la UE una grabación de sesión suele pedir consentimiento previo (ver pendientes en HANDOFF).
+- **Cómo se arma sin pedir nada a PostHog.** El grabador de posthog-js (`dist/lazy-recorder.js`, 215 KB, 67 KB con gzip) va vendorizado en `web/vendor/posthog/` y se carga con un `<script>` solo en las cargas sorteadas, antes de `posthog.init`. Como el SDK no pide la configuración del proyecto (`advanced_disable_flags`), `analitica.js` la pone en `window._POSTHOG_REMOTE_CONFIG` (grabación a `/s/`, sin lienzo, consola ni red). Las grabaciones van por `/qx/s/`. Lo del cliente gana sobre lo que diga el proyecto de PostHog.
+- **Costo medido** (`tools/check_analitica.mjs`, sección 6, juego con `?dibujo=0` en Actions): durante el primer intento propio el DOM tiene unas 130 mutaciones por segundo (casi todas `#guia` `hidden` puesto igual en cada cuadro, que el grabador descarta, y `#senal`, bloqueada) y al grabador llegan unas 9 por segundo (la clase y el texto de `#zona`, `#reloj` y `#rival`: cambian por señal o por toque, no por cuadro). Cuadros y tareas largas iguales con y sin grabación; una instantánea completa de la página cuesta 2 a 5 ms. La prueba falla si pasan de 20 por segundo, si la instantánea pasa de 50 ms o si el nombre aparece en la grabación.
 
 ## 7. El bloqueo después de las finales gratis
 
@@ -1081,7 +1082,8 @@ Sin huella digital del navegador: es invasiva y en la UE pide consentimiento.
    - Activar «Discard client IP data».
    - Aceptar el DPA.
    - Crear la encuesta de tipo API con las 5 preguntas de 4.5 y pasar su id y los ids de las preguntas.
-   - Crear las banderas `muro-partidas-gratis` (`2` al 100 %), `muro-texto` (`a` al 100 %), `invitacion-podio1` (`on`) y `grabacion` (`off`).
+   - Crear las banderas `muro-partidas-gratis` (`2` al 100 %), `muro-texto` (`a` al 100 %), `invitacion-podio1` (`on`) y `grabacion` (multivariante `off`, `tercio`, `todas`; sin crearla vale `tercio`).
+   - Prender «Session replay» en el proyecto (6.6).
    - Fijar la retención de eventos en 12 meses.
 2. **Cloudflare:**
    - Dominio propio.
