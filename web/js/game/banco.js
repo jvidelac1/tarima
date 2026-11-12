@@ -134,7 +134,16 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
     return s;
   };
   const foto = () => { const f = new Map(); for (const m of materiales()) { const mp = r.properties.get(m).programs; f.set(m, new Set(mp ? mp.values() : [])); } return f; };
-  const extras = f => { let n = 0; for (const m of materiales()) { const mp = r.properties.get(m).programs, antes = f.get(m) || new Set(); if (mp) for (const p of mp.values()) if (!antes.has(p)) n++; } return n; };
+  /** Programas de materiales de la escena que no estaban en la foto `f`; en `quien`, de qué materiales (para diagnosticar). */
+  const extras = (f, quien = null) => {
+    let n = 0;
+    for (const m of materiales()) {
+      const mp = r.properties.get(m).programs, antes = f.get(m); if (!mp) continue; let k = 0;
+      for (const p of mp.values()) if (!antes || !antes.has(p)) k++;
+      if (k) { n += k; if (quien && quien.length < 8) quien.push(`${m.type}${m.name ? ' ' + m.name : ''}${antes ? '' : ' (nuevo)'} ×${k}`); }
+    }
+    return n;
+  };
   const liberar = f => {
     let n = 0;
     for (const m of materiales()) {
@@ -204,7 +213,7 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
       try { if (deshacer) deshacer(); usar(); liberar(f); usar(); } catch (e) { B.errores.push(`${v.id} (deshacer): ${e}`); }
       // de los materiales de la escena no tiene que quedar nada; lo demás son materiales internos de three (los de la pasada de
       // sombra, cuya clave incluye cuántas luces hay), que el banco no puede soltar desde afuera y que no se usan
-      const deEscena = extras(f), total = progs() - p0;
+      const quien = [], deEscena = extras(f, quien), total = progs() - p0; if (quien.length) v.sobrantesDe = quien;
       v.programasSobrantes = Math.max(v.programasSobrantes || 0, deEscena); v.programasInternos = Math.max(v.programasInternos || 0, total - deEscena);
     }
     return m;

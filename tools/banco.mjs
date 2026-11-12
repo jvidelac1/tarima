@@ -61,7 +61,7 @@ try {
     fila('variante de Baja', ['vueltas', 'a 1 MP', 'ahorro', 'rango', '%', 'fijo', 'por MP', 'llam', 'triáng', 'progr+']);
     for (const v of B.variantes) fila(v.nombre + marca(v), [v.vueltas, n(v.ms1MP), n(v.ahorroMs), `${n(v.ahorroMin, 1)}..${n(v.ahorroMax, 1)}`, n(v.ahorroPct, 1), n(v.ahorroFijoMs), n(v.ahorroPorMPms), v.llamadas ?? '—', v.triangulos ? Math.round(v.triangulos / 1000) + 'k' : '—', v.programasSobrantes ?? '—']);
     if (B.deriva) console.log(`deriva de la completa: ${n(B.deriva.primeraMs)} → ${n(B.deriva.ultimaMs)} ms a 1 MP (${n(B.deriva.cambioPct, 1)} %) · programas ${B.programasAlEmpezar} → ${B.programasAlTerminar} · mallas fijas de la arena: ${B.mallasFijas ? `${B.mallasFijas.antes} → ${B.mallasFijas.despues}` : '—'}`);
-    for (const v of B.variantes) if (v.programasSobrantes) problemas.push(`banco: ${v.id} dejó ${v.programasSobrantes} programas compilados al deshacerse`);
+    for (const v of B.variantes) if (v.programasSobrantes) problemas.push(`banco: ${v.id} dejó ${v.programasSobrantes} programas compilados al deshacerse${v.sobrantesDe ? ` (${v.sobrantesDe.join('; ')})` : ''}`);
     const internos = B.variantes.filter(v => v.programasInternos).map(v => `${v.quita} ${v.programasInternos}`); if (internos.length) console.log(`programas internos de three que quedan (pasada de sombra, no se usan): ${internos.join(', ')}`);
     for (const x of B.notas) console.log('nota: ' + x);
     for (const x of B.errores) problemas.push('banco: ' + x.split('\n')[0]);
