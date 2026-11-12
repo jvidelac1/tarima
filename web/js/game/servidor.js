@@ -27,6 +27,7 @@ const CLAVES = {
   lista: 'tarima.lista',
   motivo: 'tarima.motivo',
   pase: 'tarima.pase',      // sessionStorage: la final en curso, para reanudarla una vez si se recarga
+  vivo: 'tarima.pase_vivo', // localStorage (lo ven todas las pestañas): qué pases tienen una final en juego y en qué carga
   sim: 'tarima.sim',
 };
 
@@ -34,6 +35,11 @@ const ESPERA_ESTADO = 4000;          // P0: si no contesta en 4 s, vale la copia
 const ESPERA_PEDIDO = 3500;          // cada intento de /api/partida
 const REINTENTOS_PASE = [1000, 2000]; // «se reintenta 2 veces en 3 s» (P4)
 const ESPERA_FORM = 10000;           // anotar, encuesta y baja
+// Pase vivo: la pestaña que juega una final lo marca cada LATIDO ms y lo suelta al irse (pagehide). Otra pestaña solo
+// puede reanudar esa final si la marca está suelta o lleva VIVO_MS sin latir (la pestaña que jugaba murió sin avisar).
+// Así «Duplicar pestaña» (que copia el sessionStorage) no reanuda una final que sigue en juego en la original.
+const LATIDO = 5000;
+const VIVO_MS = 120000;              // holgado: Chrome espacia los temporizadores de una pestaña oculta
 
 const UUID4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const esLocal = host => host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1';
@@ -47,6 +53,8 @@ function almacen(s) {
   };
 }
 const leerJson = (a, k) => { try { return JSON.parse(a.get(k) || 'null'); } catch { return null; } };
+// La firma del pase (el tramo final): alcanza para reconocerlo sin guardar el pase entero en localStorage.
+const firmaDelPase = pase => (typeof pase === 'string' && pase.includes('.') ? pase.slice(pase.lastIndexOf('.') + 1) : null);
 
 function uuid4() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -122,6 +130,9 @@ export function crearServidor(o = {}) {
   const params = new URLSearchParams(o.buscar ?? g.location?.search ?? '');
   const ahora = o.ahora || (() => Date.now());
   const esperar = o.esperar || (ms => new Promise(r => setTimeout(r, ms)));
+  // Ventana para el latido y pagehide/pageshow (en node no hay: las pruebas llaman a soltarPase()).
+  const ventana = o.ventana !== undefined ? o.ventana : (typeof window !== 'undefined' ? window : null);
+  const carga = uuid4();              // esta carga de la página (no se copia al duplicar la pestaña)
 
   // Endurecimiento 1 de docs/MVP.md 7: «sin servidor» solo con historia limpia. Si este navegador ya tenía
   // dispositivo al cargar la página, una falla del servidor no regala una final.
@@ -217,7 +228,10 @@ export function crearServidor(o = {}) {
         if (j.estado === 'ok') {
           const libre = j.fuente === 'lista';
           guardarCopia({ quedan: libre ? null : j.quedan, lista: libre, muro: !libre && j.quedan === 0, motivo: !libre && j.quedan === 0 ? 'dispositivo' : null });
-          if (j.pase) sesion.set(CLAVES.pase, JSON.stringify({ pase: j.pase, n: j.n, fuente: j.fuente, exp: expDelPase(j.pase), reanudado: false }));
+          if (j.pase) {
+            sesion.set(CLAVES.pase, JSON.stringify({ pase: j.pase, n: j.n, fuente: j.fuente, exp: expDelPase(j.pase), reanudado: false }));
+            tomarPase(j.pase);
+          }
           return { ...j, estado: 'ok' };
         }
         if (j.estado === 'muro') {
@@ -248,18 +262,64 @@ export function crearServidor(o = {}) {
     return { estado: 'error', error };
   }
 
+  // ---------- pase vivo (compartido entre pestañas) ----------
+
+  let paseActual = null;              // firma del pase que juega esta carga
+  let latido = null;
+  const leerVivos = () => { const v = leerJson(local, CLAVES.vivo); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; };
+  function guardarVivos(v) {
+    const t = ahora();
+    for (const f of Object.keys(v)) if (!(Number.isFinite(v[f]?.exp) && v[f].exp * 1000 > t)) delete v[f];   // vencidos fuera
+    Object.keys(v).length ? local.set(CLAVES.vivo, JSON.stringify(v)) : local.del(CLAVES.vivo);
+  }
+  function tomarPase(pase) {
+    const f = firmaDelPase(pase);
+    if (!f) return;
+    paseActual = f;
+    const v = leerVivos();
+    v[f] = { c: carga, t: ahora(), suelto: false, exp: expDelPase(pase) };
+    guardarVivos(v);
+    if (ventana && !latido && typeof ventana.setInterval === 'function') latido = ventana.setInterval(latir, LATIDO);
+  }
+  function latir() {
+    if (!paseActual) return;
+    const v = leerVivos(), m = v[paseActual];
+    if (!m || m.c !== carga) return;      // la final terminó en otra pestaña, o la tomó otra carga
+    m.t = ahora(); m.suelto = false;
+    guardarVivos(v);
+  }
+  // pagehide (recargar, cerrar o irse): la final queda para que la reanude la próxima carga de esta pestaña.
+  function soltarPase() {
+    if (!paseActual) return;
+    const v = leerVivos(), m = v[paseActual];
+    if (m && m.c === carga) { m.suelto = true; guardarVivos(v); }
+  }
+  if (ventana && typeof ventana.addEventListener === 'function') {
+    ventana.addEventListener('pagehide', soltarPase);
+    ventana.addEventListener('pageshow', e => { if (e?.persisted) latir(); });   // volvió desde la caché de atrás/adelante
+  }
+
   // Al cargar: si en esta pestaña quedó una final a medias con su pase vigente, se reanuda UNA vez sin pedir otro.
-  // La segunda recarga la da por gastada (devuelve null y la borra).
+  // La segunda recarga la da por gastada (devuelve null y la borra). Y solo si ninguna otra pestaña la está jugando: el
+  // sessionStorage se copia al duplicar la pestaña, la marca en localStorage la comparten todas.
   function paseParaReanudar() {
     const p = leerJson(sesion, CLAVES.pase);
     if (!p || !p.pase) return null;
     const vigente = Number.isFinite(p.exp) && p.exp * 1000 > ahora();
-    if (p.reanudado || !vigente) { sesion.del(CLAVES.pase); return null; }
+    const m = leerVivos()[firmaDelPase(p.pase)];
+    const enJuego = m && !m.suelto && ahora() - m.t < VIVO_MS;
+    if (p.reanudado || !vigente || !m || enJuego) { sesion.del(CLAVES.pase); return null; }
     p.reanudado = true;
     sesion.set(CLAVES.pase, JSON.stringify(p));
+    tomarPase(p.pase);
     return { pase: p.pase, n: p.n, fuente: p.fuente };
   }
-  const finalTerminada = () => sesion.del(CLAVES.pase);
+  function finalTerminada() {
+    sesion.del(CLAVES.pase);
+    if (paseActual) { const v = leerVivos(); delete v[paseActual]; guardarVivos(v); }
+    paseActual = null;
+    if (latido && ventana) { ventana.clearInterval(latido); latido = null; }
+  }
 
   // ---------- lista de espera ----------
 
@@ -337,7 +397,7 @@ export function crearServidor(o = {}) {
       guardar();
       const exp = Math.floor(ahora() / 1000) + 3 * 3600;
       const cuerpo = btoa(JSON.stringify({ d: 'simulado', n: s.usadas, f: fuente, exp })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-      return ok({ estado: 'ok', pase: `v1.${cuerpo}.simulado`, fuente, quedan: s.lista ? null : quedan - 1, n: s.usadas, dispositivo: b.dispositivo, flags, contexto });
+      return ok({ estado: 'ok', pase: `v1.${cuerpo}.simulado${s.usadas}`, fuente, quedan: s.lista ? null : quedan - 1, n: s.usadas, dispositivo: b.dispositivo, flags, contexto });
     }
     if (ruta === '/api/anotar') {
       if (/@(noexiste|mailinator)\./.test(b.email)) return Promise.reject(new ErrorRed('http', 400, { error: /noexiste/.test(b.email) ? 'dominio' : 'descartable' }));
@@ -355,7 +415,7 @@ export function crearServidor(o = {}) {
 
   return {
     get modo() { return modo; },
-    dispositivo, copia, estado, pedirPase, paseParaReanudar, finalTerminada, anotar, encuesta, baja,
+    dispositivo, copia, estado, pedirPase, paseParaReanudar, finalTerminada, soltarPase, anotar, encuesta, baja,
   };
 }
 

@@ -105,7 +105,8 @@ igual(expDelPase('basura'), null, 'pase inválido');
   igual(s.copia().muro, true, 'después de la última final gratis la copia ya dice muro');
   const p = JSON.parse(sesion.getItem('tarima.pase'));
   igual([p.n, p.exp, p.reanudado], [2, exp, false], 'pase guardado en sessionStorage');
-  // Recargar en medio: se reanuda una vez; la segunda, no.
+  // Recargar en medio: se reanuda una vez; la segunda, no. Al recargar, la página vieja suelta el pase (pagehide).
+  s.soltarPase();
   const s2 = base({ fetch: w.fetch, local, sesion });
   igual(s2.paseParaReanudar()?.n, 2, 'primera recarga: reanuda la misma final');
   igual(s2.paseParaReanudar(), null, 'segunda recarga: la final ya se dio por gastada');
@@ -116,6 +117,50 @@ igual(expDelPase('basura'), null, 'pase inválido');
   sesion.setItem('tarima.pase', JSON.stringify({ pase: 'x', n: 1, exp: exp, reanudado: false }));
   s2.finalTerminada();
   igual(s2.paseParaReanudar(), null, 'después del podio no hay nada que reanudar');
+}
+
+// Duplicar pestaña copia el sessionStorage: mientras la original juega la final, ninguna copia la reanuda (el pase
+// vivo está en localStorage y lo comparten todas las pestañas). Con un solo pase, una sola final.
+{
+  class Copiable extends Mem { copiar() { return new Copiable(Object.fromEntries(this.m)); } }
+  const local = new Mem(), sesion = new Copiable();
+  let t = Date.now();
+  const exp = Math.floor(t / 1000) + 3 * 3600;
+  const w = workerFalso({ '/api/partida': [[200, { estado: 'ok', pase: paseFalso(exp, 2), fuente: 'gratis', quedan: 0, n: 2, dispositivo: UUID }]] });
+  const orig = base({ fetch: w.fetch, local, sesion, ahora: () => t });
+  igual((await orig.pedirPase({ idioma: 'es' })).estado, 'ok', 'duplicar: la original pide su pase');
+  let reanudadas = 0;
+  for (let k = 0; k < 5; k++) if (base({ fetch: w.fetch, local, sesion: sesion.copiar(), ahora: () => t }).paseParaReanudar()) reanudadas++;
+  igual([reanudadas, w.pedidos.length], [0, 1], 'duplicar: 5 copias de la pestaña mientras la original juega no reanudan nada');
+  // La copia hecha mientras la original jugaba guarda el pase; ni cuando la original termina sirve.
+  const copia = sesion.copiar();
+  orig.finalTerminada();
+  igual(local.getItem('tarima.pase_vivo'), null, 'duplicar: el podio borra el pase vivo');
+  igual(base({ fetch: w.fetch, local, sesion: copia, ahora: () => t }).paseParaReanudar(), null, 'duplicar: después del podio, la copia no reanuda');
+}
+{
+  // La original murió sin avisar (sin pagehide): pasados 2 minutos sin latido, la recarga de esa pestaña reanuda; antes, no.
+  class Copiable extends Mem { copiar() { return new Copiable(Object.fromEntries(this.m)); } }
+  const local = new Mem(), sesion = new Copiable();
+  let t = Date.now();
+  const exp = Math.floor(t / 1000) + 3 * 3600;
+  const w = workerFalso({ '/api/partida': [[200, { estado: 'ok', pase: paseFalso(exp, 1), fuente: 'gratis', quedan: 1, n: 1, dispositivo: UUID }]] });
+  const orig = base({ fetch: w.fetch, local, sesion, ahora: () => t });
+  await orig.pedirPase({ idioma: 'es' });
+  const dup = sesion.copiar();
+  t += 30000;
+  igual(base({ fetch: w.fetch, local, sesion: dup, ahora: () => t }).paseParaReanudar(), null, 'duplicar: con latido de hace 30 s no se reanuda');
+  t += 120000;
+  const s3 = base({ fetch: w.fetch, local, sesion, ahora: () => t });
+  igual(s3.paseParaReanudar()?.n, 1, 'sin latido hace más de 2 min, la recarga reanuda');
+  igual(base({ fetch: w.fetch, local, sesion: sesion.copiar(), ahora: () => t }).paseParaReanudar(), null, 'y duplicar la pestaña reanudada no da otra');
+  // Dos finales en dos pestañas (dos pases): cada una se reanuda en la suya.
+  const w2 = workerFalso({ '/api/partida': [[200, { estado: 'ok', pase: paseFalso(exp, 2).replace(/firma$/, 'otra'), fuente: 'gratis', quedan: 0, n: 2, dispositivo: UUID }]] });
+  const sesB = new Mem(), b = base({ fetch: w2.fetch, local, sesion: sesB, ahora: () => t });
+  await b.pedirPase({ idioma: 'es' });
+  s3.soltarPase(); b.soltarPase();
+  igual(Object.keys(JSON.parse(local.getItem('tarima.pase_vivo'))).sort(), ['firma', 'otra'], 'dos pases vivos a la vez');
+  igual(base({ fetch: w2.fetch, local, sesion: sesB, ahora: () => t }).paseParaReanudar()?.n, 2, 'la segunda pestaña reanuda la suya');
 }
 
 // pase: muro
