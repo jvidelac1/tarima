@@ -543,7 +543,7 @@ Actions, por software (SwiftShader; los tiempos no valen, cuentan las llamadas y
 
 - Baja como antes (dos ventanas malas de cuatro, o una que pierde la quinta parte). Si después de bajar se pierde más de dos tercios de lo de antes, baja otro escalón hasta que la racha sume tres (`ESCALAR`, 39 % menos de píxeles); si con eso tampoco cambia, **los píxeles no eran el problema**: pide deshacer la racha entera y no baja más (`ajena`) hasta que pasen 60 s o haya 3 s limpios seguidos. (Revisión: con un solo escalón, un costo propio que necesitaba dos escalones y perdía poco se tomaba por carga ajena para siempre: bajaba y deshacía cada 65 s sin arreglar nada. Lo reprodujo `perf_test` y ahora lo cubre.)
 - Una subida pendiente (esperando que termine un intento) se cancela si mientras tanto se pierden refrescos. Al terminar la calibración el gobernador vuelve al nivel 0 (`calibrado()`): lo que haya hecho en el menú no cuenta.
-- **Sube** de a un escalón después de 5 s sin perder un solo refresco (hilo principal bajo el 80 %) mientras esté por debajo de lo que dejó la calibración, y después de 20 s por encima (hasta la resolución de la pantalla). Primero vuelven las sombras si se habían apagado. Si una subida pierde refrescos en los 15 s siguientes, se deshace y la espera se duplica (hasta 120 s).
+- **Sube** de a un escalón después de 5 s sin perder un solo refresco (hilo principal bajo el 80 %) mientras esté por debajo de lo que dejó la calibración, y después de 20 s por encima (hasta la resolución de la pantalla). **(Corregido después de la revisión: ya no sube por encima de la calibración; ver «Revisión independiente» más abajo.)** Primero vuelven las sombras si se habían apagado. Si una subida pierde refrescos en los 15 s siguientes, se deshace y la espera se duplica (hasta 120 s).
 - Igual que antes: nada cambia con un intento en curso ni en la repetición, y nada se recompila. `JUEGO.calidad.gobernador` dice el nivel (escalones debajo de la calibración), si sospecha carga ajena, las esperas y los últimos cambios con su motivo; cada subida queda en `JUEGO.calidad.cambios` con `sube: true` y `motivo`.
 - `perf_test` lo prueba en partidas simuladas: carga ajena de 40 s que pierde lo mismo a cualquier resolución (baja una racha de tres escalones como mucho, la deshace entera y termina en la resolución de la calibración o más), costo propio de dos y tres escalones que pierde poco (llega abajo y no lo toma por carga ajena), subida pendiente cancelada, costo propio (baja hasta donde entra y las subidas que no aguantan se espacian 5, 10, 20, 40 s), y una escena que se alivia a los 30 s (vuelve a subir hasta la calibración).
 
@@ -573,7 +573,7 @@ Actions, por software (SwiftShader; los tiempos no valen, cuentan las llamadas y
 - **El especular del piso** queda fijo (horneado desde arriba): con cámaras rasantes, la alfombra pierde un reflejo de color hacia el fondo. A simple vista no se nota en las cámaras del juego; en la cenital sí, apenas.
 - **Los haces no se ven en Baja desde la tercera vuelta** (camino directo). En Media y Alta, con post, sí. Si se los quiere de vuelta en Baja hace falta otra curva para lo que se suma (que tenga en cuenta el fondo), y entonces vuelven a costar.
 - **La opacidad de la sombra en la tarima** se calcula al cargar con una lectura de un destino de 8 × 8 en coma flotante, pero hoy manda el mínimo (0,1; ver arriba). Sin `EXT_color_buffer_float` queda 0,45 (no se probó en una placa así: ahí la sombra saldría más marcada que antes).
-- **El gobernador puede probar subir** por encima de la calibración: en una máquina justa eso son unos segundos de cuadros perdidos cada vez más espaciados (20, 40, 80, 120 s). Si molesta, `SUBIR_ARRIBA_MS` más alto.
+- ~~**El gobernador puede probar subir** por encima de la calibración~~: la revisión mostró que esas pérdidas caían dentro de los intentos; ya no sube por encima (ver «Revisión independiente»).
 
 ### Pruebas en GitHub Actions (12-nov, rama `demo`)
 
@@ -595,7 +595,58 @@ gh workflow run pruebas.yml -R jvidelac1/tarima --ref demo           # a pedido
 - **Corrida sobre c3a9fee** (run 43237685694, 10 min 42 s): verde, los cuatro pasos y las capturas. `check_fluidez`: cuatro levantamientos propios válidos, tutorial de 13 s con el guiado válido. `play_human` y `sim_test` sin cambios de referencias.
 - **(Resuelto en la tercera vuelta de fluidez: run 43249216685 en verde.)** **El flujo aparte «Banco y calibración» está en rojo** (runs 43235024461 sobre 928f42a y 43237685661 sobre c3a9fee), siempre por lo mismo: `banco: baja-segundo: error de WebGL 0x506` (`glBlitFramebuffer: Attachments are not all the same size`). Causa probable en `web/js/game/banco.js`: la variante `directo` se deshace con `escena.directo = false`, pero «Baja» ya es camino directo (`PRESET.baja.directo`), así que desde ahí la escena queda en el camino con post, sin `_modo()`, y la variante siguiente (`segundo`) es la primera que lo dibuja. Además, todas las variantes de «Baja» que vienen después (`segundo` a `aniso`) se miden en el camino equivocado, y la variante `directo` no cambia nada. Arreglo sugerido: guardar el valor anterior y restaurarlo con `escena.setDirecto(previo)`. No se tocó desde el flujo de pruebas: es código del juego.
 - **Visto en las dos corridas, sin investigar:** en el paso de capturas el arranque guiado del tutorial terminó en fallo (dos luces rojas en la captura `capturas/tut_*_decision_.jpg`). Ahí la prueba deja Espacio apretado mientras saca la foto (unos 0,3 s o más) y atrasa los toques; `sim_test` da el guiado por imposible de fallar con toques de 100 ms a 3 s, así que hay un caso (tecla sostenida o pausa larga en ¡EMPUJÁ!) que no cubre.
+- **Recorrido de un jugador nuevo** (`tools/check_recorrido.mjs`, desde 04c5e3a; bloquea desde la revisión independiente, ver más abajo): final exprés en Fácil con tutorial, a 1745 × 845, por teclado y con el reloj inyectado, **sin tocar entre levantamientos**. Mide en segundos del juego la espera desde el final de cada levantamiento propio hasta el próximo panel que pide algo, y en qué pantallas se va; pierde tres levantamientos a propósito (sin ¡RECIBÍ!, sin ¡EXPLOTÁ!, sin el ¡RECIBÍ! del envión) y en uno sigue machacando Espacio después del final para ver si el motivo del fallo llega a leerse. Deja unas 85 capturas en `out/recorrido/`. Primera corrida (run 43271339849): esperas de 13,0 a 15,7 s cuando el jugador se sigue a sí mismo (repetición de 6 a 10 s cada vez) y 32,9 s con un intento entero de un rival en el medio (16,8 s, no se saltea); machacando, el veredicto se saltea a los 1,2 s y el motivo («No tocaste ¡EXPLOTÁ!…») no llega a verse (aparece a 1,3 s y el tirón sin altura no tiene repetición). `check_escenas` ahora saca las capturas de la carga a mitad de la animación (antes las tres salían en el estado final).
 - **Límites.** Nada de esto dice cuántos cuadros por segundo da el juego: eso se mide en la Mac del usuario. Chrome del runner sin pantalla entrega cuadros a 60 Hz, no a 75. No se prueba ningún teléfono real.
+
+### Revisión independiente: gobernador, saltear y esperas (12-nov, rama `demo`)
+
+Tres hallazgos graves de la verificación independiente, corregidos y medidos otra vez (sin navegador acá; las pruebas con navegador en Actions).
+
+**1. El gobernador subía de calidad solo y metía cuadros duplicados dentro de los levantamientos** (`Gobernador` en `perf.js`, `asegurarCalidad()` en `main.js`).
+
+- Ya **no sube por encima de lo que dejó la calibración** (nivel > 0 solamente; `SUBIR_ARRIBA_MS` no existe más). Los intervalos llegan en múltiplos del período y «no se perdió nada» no dice cuánto margen queda: en el modelo de la revisión subía a 1,18 MP (95 % del período) y probaba 1,38. El tope de `subir()` es `C.mpCal`.
+- Cada subida (hacia la calibración) queda **a prueba 15 s de dibujo continuo** (`PRUEBA_MS`; antes, de reloj: un panel de más de 15 s la vencía y la pérdida se tomaba como «pierde refrescos», bajaba dos escalones y la espera no se duplicaba). Se confirma con 3 s limpios seguidos (`CONFIRMA_MS`); **la que no se confirmó se deshace antes de `correrIntento`** (queda en `JUEGO.calidad.cambios` con `pantalla: 'antes del intento'`).
+- A 120 y 144 Hz (se dibuja uno de cada dos refrescos) perder uno da 1,5 períodos y se contaba la mitad de las veces: ahora `perdidosEn(ms, periodo, refresco)` cuenta en refrescos de la pantalla (gobernador y verificación de la calibración).
+- `hzDe` toma el grupo de intervalos más corto que junta la cuarta parte de la muestra, no la mediana: con más de la mitad de los cuadros dobles al medir (página cargando) daba 37,5 Hz en una pantalla de 75 y el gobernador nunca veía pérdidas.
+- `perf_test` (ahora corre en Actions): el modelo de la revisión (`partidaConPaneles`: placa de 4,3 + 7 ms/MP a 75 Hz, ciclos de rival 12 s, panel de 5 o 20 s, intento 8 s) da **0 refrescos perdidos en 18 015 cuadros de intentos** calibrado a 1,0 MP (antes 300, el 1,7 %, y 601, el 3,5 %, con paneles de 20 s) y nunca pasa de 1,0 MP; con la calibración pasada (1,3 MP no entran) también 0 en los intentos, con 1 o 2 subidas deshechas antes del intento. Cuadros sintéticos a 60, 75, 120 y 144 Hz: sin pérdidas no pide; perdiendo 1 de cada 10, pide y cuenta todas (antes, a 120/144, la mitad).
+- **Es un modelo, no una medida en la Mac.** Lo que queda en la Mac: una calibración que se pasa todavía prueba volver a ella fuera de los intentos (en el modelo `gob_mundo` de la revisión, sin intentos, 2,6 % de cuadros perdidos con 1,3 MP que no entran, con las esperas duplicándose hasta 120 s).
+
+**2. Machacando Espacio después de un fallo el motivo no se veía** (`saltable()`, `decision()`, `toques.rafaga()` en `input.js`).
+
+- El veredicto propio se puede saltear recién **1 s después de que aparece** (0,4 s si no tiene línea), y solo con una **ráfaga que empezó después de que apareció** (toques a menos de 300 ms uno de otro son una ráfaga). En todas las esperas salteables, una ráfaga que venía de antes no saltea: hay que parar 300 ms o tocar de nuevo. Esos toques salen con acuse «ESPERÁ».
+- El motivo del último fallo queda en el panel del llamado siguiente, en dorado: «Intento anterior: …».
+- Medido en `check_recorrido` (run 43276056293, arranque 3 sin ¡EXPLOTÁ!, un toque cada 120 ms): el veredicto con el motivo aparece a 1,32 s y queda **1,68 s** a la vista mientras se machaca, y sigue después (antes se salteaba a 1,2 s sin verse).
+
+**3. Esperas largas entre levantamientos propios** (`decision()`, `repeticion()`, `llamadoRival()`, `carga()`, `correrIntento()` para rivales).
+
+- **Repetición solo en los fallos con explosión**, de 0,3 s antes de la explosión a 0,45 s después de la recepción, en cámara lenta de hasta 3 veces y **2,3 s como mucho**; la caída ya se vio en vivo. Si hay repetición, el veredicto dura tVer + 1,6 s (la línea sigue en la repetición: unos 4 s a la vista en total); si no, tVer + 4,2 s. El válido no tiene repetición ni espera a que la barra termine de rebotar: luces, ovación, giro de cámara (unos 3 s) y sigue.
+- Los cambios de kilos de los rivales salen en el recuadro durante el veredicto, sin espera aparte (antes 1,1 s cada uno).
+- Cambio de carga: discos que salen en 0,2 s y entran en 0,25 s, 0,35 s de cola (de 2,8 a unos 2 s).
+- **Intento entero de un rival** (decisivos en exprés, todos en completa): arranca 1,2 s antes de que agarre la barra para tirar, la pelea, la barra en los hombros y la espera de la chicharra van 2,5 veces más rápido, y **Espacio lo lleva al final** (una ráfaga nueva, pasados 400 ms). El de la revisión pasó de 16,8 s a 7,5 s.
+- `check_recorrido` ahora **decide y bloquea** en Actions: espera sin tocar, cuando entre un levantamiento propio y el próximo panel no hay nada de los rivales, menor a 6 s; machacando, el motivo a la vista al menos 1 s. `check_game`: un dos tiempos sin ¡RECIBÍ! a propósito (tiene que tener repetición) y ningún válido con repetición.
+
+**Medido** (Actions, por software, reloj del juego inyectado; no dice nada de cuadros por segundo):
+
+Run 43278229297 sobre fea8488 (último commit de código), «Pruebas del juego» en verde, con `check_recorrido` bloqueando:
+
+| Después de | Antes (run 43271339849) | Ahora | Meta |
+|---|---|---|---|
+| Arranque 1 válido, se sigue a sí mismo | 13,5 s (decisión 3,0 + repetición 7,8 + carga 2,8) | **5,0 s** (decisión 3,0 + carga 2,0) | < 6 s, cumple |
+| Arranque 2 fallado (sin ¡RECIBÍ!) | 15,7 s (decisión 5,5 + repetición 10,2) | **5,5 s** (decisión 2,9 + repetición 2,6) | < 6 s, cumple |
+| Dos tiempos 2 fallado | 13,0 s | **5,5 s** (decisión 2,9 + repetición 2,6) | < 6 s, cumple |
+| Tutorial | 3,0 s | 3,0 s | < 6 s, cumple |
+| Dos tiempos 1 válido, con un rival «Para el oro» en el medio | 32,9 s (intento del rival 16,8) | **17,1 s** (decisión 3,0 + resumen 2,6 + intento del rival 7,5 + su decisión 3,1 + carga 0,9), salteable | sin meta |
+| Arranque 3 fallado, con seis intentos de rivales resumidos en el medio | (21 s) | 21,1 s (decisión 5,5 + resúmenes 15,6) | sin meta |
+| Machacando después del fallo: motivo a la vista | no se vio | **1,68 s** mientras se machaca, y sigue | ≥ 1 s, cumple |
+
+`check_game`: con teclado 152✓ 157✓ 160✗sin_altura 190✓ 195✓ 198✗fondo, repetición solo en el fallo con explosión; con el dedo, seis válidos y ninguna repetición. `sim_test`, `play_human` (criterio cumplido, sin cambios de referencias: no se tocaron reglas), `perf_test` (93 comprobaciones), `caida_test`, `check_escenas` y `check_fluidez`: verdes.
+
+**Lo que no está hecho o no se midió:**
+
+- La repetición «a pedido» de un válido (con una tecla) no está: el válido no tiene repetición.
+- El cambio de carga no se superpone con el resumen de un rival (siguen en serie: resumen 2,6 s y carga unos 2 s).
+- Con un rival decisivo en el medio la espera sigue siendo larga sin tocar (resumen + intento del rival + su veredicto + carga); ahora se saltea con Espacio.
+- Nada de esto se midió en la Mac del usuario ni con una placa: las pruebas con navegador son por software.
 
 ### En qué se aparta de docs/JUEGO.md
 

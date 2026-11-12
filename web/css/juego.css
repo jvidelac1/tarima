@@ -179,6 +179,7 @@ button:focus{outline:3px solid var(--gold);outline-offset:2px}
 .kgsel output{font-weight:800;font-size:clamp(30px,6cqh,52px);min-width:3.2ch;text-align:center;color:var(--gold);font-variant-numeric:tabular-nums}
 .cuenta{font-family:var(--display);font-weight:700;letter-spacing:.05em;color:var(--gold);text-transform:uppercase;font-size:clamp(13px,2.1cqh,17px)}
 .frase{font-style:italic;color:var(--ink)!important}
+.panel p.antes{color:var(--gold);border-left:2px solid var(--gold);padding-left:.5em}
 table.tabla{width:100%;border-collapse:collapse;font-family:var(--display);font-size:clamp(12px,2.1cqh,17px);font-variant-numeric:tabular-nums}
 .tabla th{font-weight:500;color:var(--mute);text-transform:uppercase;letter-spacing:.08em;font-size:.75em;padding:.2em .3em;text-align:center}
 .tabla td{padding:.3em .3em;text-align:center;border-top:1px solid var(--line);white-space:nowrap}

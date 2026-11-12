@@ -56,6 +56,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node tools/play_human.mjs 2>&1 | tee out/logs/play_human.log
 
+      - name: Lógica de fluidez sin navegador (perf_test)
+        if: ${{ !cancelled() }}
+        run: node tools/perf_test.mjs 2>&1 | tee out/logs/perf_test.log
+
       - name: Caída de la barra sin navegador (caida_test)
         if: ${{ !cancelled() }}
         run: node tools/caida_test.mjs 2>&1 | tee out/logs/caida_test.log
@@ -91,11 +95,11 @@ jobs:
         timeout-minutes: 15
         run: node tools/check_fluidez.mjs --tutorial --capturas=out/capturas --json=out/capturas/fluidez.json 2>&1 | tee out/logs/capturas.log
 
-      # Revisión de experiencia: un jugador nuevo que no saltea nada entre levantamientos (cuánto espera y en qué), un
-      # fallo machacando Espacio, y capturas a 1745x845 de cada momento en out/recorrido. No decide el resultado.
-      - name: Recorrido de un jugador nuevo (check_recorrido, no bloquea)
+      # Recorrido de un jugador nuevo que no saltea nada entre levantamientos (cuánto espera y en qué), un fallo machacando
+      # Espacio, y capturas a 1745x845 de cada momento en out/recorrido. Falla si la espera sin rivales en el medio llega a
+      # 6 s o si machacando no se ve el motivo del fallo al menos 1 s.
+      - name: Recorrido de un jugador nuevo (check_recorrido)
         if: ${{ !cancelled() }}
-        continue-on-error: true
         timeout-minutes: 20
         run: node tools/check_recorrido.mjs 2>&1 | tee out/logs/check_recorrido.log
 
@@ -111,7 +115,7 @@ jobs:
         run: |
           {
             echo "### Pruebas del juego (dibujo por software: no mide cuadros por segundo)"
-            for f in sim_test play_human caida_test check_escenas check_game check_telefono check_fluidez capturas check_recorrido check_recorrido_en; do
+            for f in sim_test play_human perf_test caida_test check_escenas check_game check_telefono check_fluidez capturas check_recorrido check_recorrido_en; do
               echo; echo "**$f**"; echo '```'
               if [ -f "out/logs/$f.log" ]; then tail -n 14 "out/logs/$f.log"; else echo "(no corrió)"; fi
               echo '```'

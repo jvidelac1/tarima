@@ -92,11 +92,22 @@ export function calidadInicial(pedida, grueso = false) {
 }
 
 const mediana = a => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[s.length >> 1] : 0; };
-/** Frecuencia (Hz, dos decimales) a partir de intervalos entre cuadros en ms. 60 si no hay datos que sirvan. */
+/**
+ * Frecuencia (Hz, dos decimales) a partir de intervalos entre cuadros en ms. 60 si no hay datos que sirvan.
+ * El período es el grupo de intervalos MÁS CORTO que junta al menos la cuarta parte de la muestra (no la mediana): si al
+ * medir se pierden refrescos (la página todavía está cargando), más de la mitad de los intervalos pueden ser dobles y la
+ * mediana daría la mitad de la frecuencia; con eso el gobernador nunca vería un refresco perdido.
+ */
 export function hzDe(intervalos) {
-  const d = intervalos.filter(x => x > 1 && x < 100); if (d.length < 4) return 60;
-  const m = mediana(d), cerca = d.filter(x => Math.abs(x - m) < m * .06), p = cerca.reduce((a, b) => a + b, 0) / cerca.length;
-  return Math.round(100000 / p) / 100;
+  const d = intervalos.filter(x => x > 1 && x < 100).sort((a, b) => a - b); if (d.length < 4) return 60;
+  const minimo = Math.max(3, Math.ceil(d.length * .25));
+  for (const x of d) {
+    const cerca = d.filter(y => Math.abs(y - x) < x * .06); if (cerca.length < minimo) continue;
+    const c = cerca.reduce((a, b) => a + b, 0) / cerca.length, fino = d.filter(y => Math.abs(y - c) < c * .06);
+    return Math.round(100000 / (fino.reduce((a, b) => a + b, 0) / fino.length)) / 100;
+  }
+  const m = mediana(d), cerca = d.filter(x => Math.abs(x - m) < m * .06);
+  return Math.round(100000 / (cerca.reduce((a, b) => a + b, 0) / cerca.length)) / 100;
 }
 /**
  * Refresco de la pantalla (Hz), medido: mediana de los intervalos de requestAnimationFrame sin dibujar nada, afinada con
@@ -127,8 +138,15 @@ export function ajustar(a, b) {
 }
 /** Megapíxeles que entran en `margen` del período con ese modelo de costo (Infinity si el costo no depende de los píxeles). */
 export const mpSostenible = (modelo, periodo, margen = MARGEN) => (modelo.porMP > 1e-6 ? Math.max(0, (periodo * margen - modelo.fijo) / modelo.porMP) : (modelo.fijo <= periodo * margen ? Infinity : 0));
+/**
+ * Refrescos de la pantalla perdidos en un intervalo entre cuadros dibujados (ms). `periodo`: lo que tiene que durar un
+ * cuadro (la meta); `refresco`: un refresco de la pantalla. Son iguales salvo en pantallas de más de 90 Hz, donde se
+ * dibuja uno de cada dos refrescos: ahí perder uno da un intervalo de 1,5 períodos (25 ms a 120 Hz), que con el umbral de
+ * 1,5 períodos se contaba la mitad de las veces.
+ */
+export const perdidosEn = (ms, periodo, refresco = periodo) => (ms > periodo + refresco * .5 ? Math.round((ms - periodo) / refresco) : 0);
 /** Refrescos perdidos en una lista de intervalos entre cuadros (ms): un intervalo de dos períodos es un refresco perdido. */
-export function perdidos(intervalos, periodo) { let n = 0; for (const x of intervalos) if (x > periodo * 1.5) n += Math.round(x / periodo) - 1; return n; }
+export function perdidos(intervalos, periodo, refresco = periodo) { let n = 0; for (const x of intervalos) n += perdidosEn(x, periodo, refresco); return n; }
 
 /** Resolución (MP) que tiene que sostener «Media» o «Alta» para elegirla en vez de la calidad de abajo: la de la pantalla o 1080p. */
 const MP_1080 = 2.07;
@@ -150,6 +168,7 @@ const MP_1080 = 2.07;
  *    15 % menos de píxeles y otra vez (un solo refresco perdido se mira dos veces antes de bajar), sin bajar del piso.
  * @param {object} io
  * @param {number} io.periodo  ms por cuadro de la meta
+ * @param {number} [io.refresco]  ms de un refresco de la pantalla (menos que el período en pantallas de más de 90 Hz o a media frecuencia)
  * @param {string} io.clave    calidad de partida
  * @param {boolean} [io.telefono]  puntero grueso (teléfono o tableta); falso: computadora. Sin el dato: teléfono si arranca en «Móvil»
  * @param {number} [io.cssMP]  megapíxeles del lienzo en píxeles CSS (densidad 1): el piso del teléfono
@@ -191,7 +210,7 @@ export async function decidirCalidad(io) {
   let mp = io.fijar(Math.max(P, Math.min(r.techo, r.sostiene))), repetida = false;
   for (let k = 0; k < 5; k++) {
     const d = await io.cuadros(45, 12); if (!d || !d.length) break;
-    const dup = perdidos(d, periodo), o = d.slice().sort((x, y) => x - y); p80 = Math.round(o[Math.floor(o.length * .8)] * 10) / 10;
+    const dup = perdidos(d, periodo, Math.min(periodo, io.refresco || io.periodo)), o = d.slice().sort((x, y) => x - y); p80 = Math.round(o[Math.floor(o.length * .8)] * 10) / 10;
     verificacion.push({ mp: r2(mp), cuadros: d.length, perdidos: dup, p50: Math.round(o[o.length >> 1] * 10) / 10, max: Math.round(o[o.length - 1] * 10) / 10 });
     if (!dup) break;
     if (dup === 1 && !repetida) { repetida = true; continue; }      // uno solo puede ser de otra cosa: se mira de nuevo antes de bajar
@@ -202,8 +221,14 @@ export async function decidirCalidad(io) {
   return { clave, mp, piso: P, mitad, periodo, p80, primera: limpia(primera), elegida: limpia(r), pruebas: pruebas.map(limpia), verificacion };
 }
 
-/** Tiempo limpio (sin perder ningún refresco) antes de subir un escalón, en ms: hasta lo que dejó la calibración, y por encima. */
-export const SUBIR_MS = 5000, SUBIR_ARRIBA_MS = 20000, SUBIR_MAX_MS = 120000;
+/** Tiempo limpio (sin perder ningún refresco) antes de subir un escalón hacia la calibración, en ms, y su tope al duplicarse. */
+export const SUBIR_MS = 5000, SUBIR_MAX_MS = 120000;
+/**
+ * Una subida queda a prueba durante PRUEBA_MS de dibujo continuo (no de reloj: detrás de un panel no se dibuja y no se
+ * prueba nada): si en ese tramo pierde refrescos, se deshace y la próxima espera el doble. Queda confirmada con
+ * CONFIRMA_MS de dibujo continuo sin perder ni un refresco; una subida sin confirmar se deshace antes de un intento propio.
+ */
+export const PRUEBA_MS = 15000, CONFIRMA_MS = 3000;
 /** Cuánto dura la sospecha de carga ajena (ms): pasado eso, se vuelve a probar si bajar sirve. */
 export const AJENA_MS = 60000;
 /**
@@ -214,8 +239,8 @@ export const AJENA_MS = 60000;
 export const ESCALAR = 3;
 /**
  * Gobernador. La meta es no perder ningún refresco: mira los cuadros dibujados en ventanas de 1 s y cuenta los refrescos
- * perdidos (intervalos de dos períodos o más) y el tiempo de hilo principal por cuadro. Una ventana es mala si pierde dos
- * refrescos o más, o si el hilo principal solo ya se lleva el 92 % del período.
+ * perdidos (perdidosEn) y el tiempo de hilo principal por cuadro. Una ventana es mala si pierde dos refrescos o más, o si
+ * el hilo principal solo ya se lleva el 92 % del período.
  * Solo pide (`pide`, con `sube` y `pasos`); main.js aplica el pedido cuando no hay un intento en curso y avisa con
  * resultado(hecho, now).
  * - Baja con dos ventanas malas entre las últimas cuatro, o con una sola que pierda la quinta parte de los refrescos
@@ -226,17 +251,19 @@ export const ESCALAR = 3;
  *   ventanas limpias seguidas).
  * - Una subida pendiente (esperando que termine un intento) se cancela si mientras tanto se pierden refrescos.
  * - Sube de a un escalón después de SUBIR_MS sin perder un solo refresco (y con el hilo principal por debajo del 80 %),
- *   mientras esté por debajo de lo que dejó la calibración; por encima, después de SUBIR_ARRIBA_MS. Si una subida pierde
- *   refrescos en los 15 s siguientes, se deshace y la espera para volver a probar se duplica (hasta SUBIR_MAX_MS).
- * El costo de la placa no se ve desde acá (los intervalos llegan en múltiplos del período): el margen del 85 % sobre el
- * costo del cuadro lo pone la calibración, que lo mide antes de jugar.
+ *   solo mientras esté por debajo de lo que dejó la calibración (nivel > 0). **Nunca sube por encima de la calibración**:
+ *   los intervalos llegan en múltiplos del período y «no se perdió nada» no dice cuánto margen queda; a 75 Hz, una subida
+ *   que deja el cuadro en el 95 % del período no pierde nada en reposo y pierde en cuanto la escena se mueve. El margen lo
+ *   mide la calibración, con el costo de la placa.
+ * - Cada subida queda a prueba (PRUEBA_MS de dibujo continuo); si pierde, se deshace y la espera se duplica. Hasta que
+ *   junta CONFIRMA_MS limpios no está confirmada, y main.js la deshace antes de un intento propio (sinConfirmar()).
  */
 export class Gobernador {
   constructor(hz, pasoMin = 1) {
     this.pasoMin = pasoMin; this.fijar(hz); this.v = { t: 0, n: 0, dup: 0, cb: 0, d: [] }; this.malas = []; this.hasta = 0; this.pide = false; this.sube = false; this.pasos = 1; this.fps = 0; this.ult = null;
-    this.nivel = 0;            // escalones por debajo de lo que dejó la calibración (negativo: por encima)
+    this.nivel = 0;            // escalones por debajo de lo que dejó la calibración (nunca negativo: no sube por encima)
     this.limpioMs = 0;         // tiempo seguido sin perder refrescos
-    this.espera = SUBIR_MS; this.esperaArriba = SUBIR_ARRIBA_MS;
+    this.espera = SUBIR_MS;
     this.ajena = false; this.tAjena = 0; this.ignoradas = 0; this.tope = false; this.piso = false; this.ultimo = null; this.motivo = ''; this._frac = 0; this.historia = [];
     this.seguidas = 0;         // ventanas seguidas que pierden URGENTE_FRAC o más desde el último cambio
     this.pisoDuro = false;     // ya bajó del piso hasta PISO_MP: no hay nada más para bajar
@@ -247,12 +274,25 @@ export class Gobernador {
   /** Compatibilidad: «quieto» era dejar de bajar porque bajar no servía. */
   get quieto() { return this.ajena; }
   /** Cambia la frecuencia de pantalla con la que se juzga. */
-  fijar(hz, pasoMin = this.pasoMin || 1) { this.pasoMin = pasoMin; this.hz = hz; this.paso = pasoDe(hz, pasoMin); this.meta = metaDe(hz, pasoMin); this.periodo = 1000 / this.meta; }
+  fijar(hz, pasoMin = this.pasoMin || 1) { this.pasoMin = pasoMin; this.hz = hz; this.paso = pasoDe(hz, pasoMin); this.meta = metaDe(hz, pasoMin); this.periodo = 1000 / this.meta; this.refresco = 1000 / hz; }
   _vaciar() { const v = this.v; v.t = v.n = v.dup = v.cb = 0; v.d.length = 0; }
   /** Descarta lo medido hasta dentro de `ms`: después de cargar o de cambiar de calidad los primeros cuadros no cuentan. */
   calentar(now, ms = 2500) { this.hasta = now + ms; this._vaciar(); this.malas = []; this.pide = false; this.sube = false; this.pasos = 1; this.limpioMs = 0; }
   /** Estado para mirar desde la consola (JUEGO.calidad.gobernador). */
-  get estado() { return { nivel: this.nivel, seguidas: this.seguidas, pisoDuro: this.pisoDuro, pasoMin: this.pasoMin, ajena: this.ajena, ignoradas: this.ignoradas, tope: this.tope, piso: this.piso, limpioS: Math.round(this.limpioMs / 100) / 10, esperaS: this.espera / 1000, esperaArribaS: this.esperaArriba / 1000, motivo: this.motivo, historia: this.historia.slice(-8) }; }
+  get estado() { const u = this.ultimo; return { nivel: this.nivel, seguidas: this.seguidas, pisoDuro: this.pisoDuro, pasoMin: this.pasoMin, ajena: this.ajena, ignoradas: this.ignoradas, tope: this.tope, piso: this.piso, limpioS: Math.round(this.limpioMs / 100) / 10, esperaS: this.espera / 1000, aPrueba: !!(u && u.sube && !u.deshace && u.dibujo < PRUEBA_MS), sinConfirmar: this.sinConfirmar(), motivo: this.motivo, historia: this.historia.slice(-8) }; }
+  /**
+   * Escalones de la última subida si todavía no se confirmó (CONFIRMA_MS de dibujo continuo sin perder nada); 0 si no hay
+   * nada que deshacer. main.js la deshace antes de un intento propio: una subida que no se probó no se estrena en el
+   * levantamiento. No cuenta la que deshace una bajada por carga ajena (esa vuelve a donde estaba).
+   */
+  sinConfirmar() { const u = this.ultimo; return u && u.sube && !u.deshace && !u.confirmada ? u.pasos : 0; }
+  /** main.js deshizo la subida sin confirmar (bajar(sinConfirmar())). No es una subida fallida: la espera no se duplica. */
+  subidaDeshecha(now) {
+    const n = this.sinConfirmar(); if (!n) return; this.nivel += n;
+    this.ultimo = { sube: false, t: now, frac: 0, pasos: n, nivel: this.nivel - n, deshace: true, acum: 0, frac0: 0 };
+    this.motivo = 'subida sin confirmar: se deshace antes del intento'; this.historia.push({ t: Math.round(now), sube: false, pasos: n, nivel: this.nivel, motivo: this.motivo }); if (this.historia.length > 40) this.historia.shift();
+    this.calentar(now);
+  }
   /**
    * @param {number} ms tiempo desde el cuadro dibujado anterior  @param {number} now  @param {number} cb ms de hilo principal de este cuadro
    * @returns {boolean} hay un pedido (bajar o, con `sube`, subir)
@@ -260,7 +300,7 @@ export class Gobernador {
   cuadro(ms, now, cb = 0) {
     const v = this.v;
     if (ms > 250 || now < this.hasta) { this._vaciar(); return this.pide; }      // una pausa o un panel no son lentitud
-    v.t += ms; v.n++; v.cb += cb; v.d.push(ms); if (ms > this.periodo * 1.5) v.dup += Math.round(ms / this.periodo) - 1;
+    v.t += ms; v.n++; v.cb += cb; v.d.push(ms); v.dup += perdidosEn(ms, this.periodo, this.refresco);
     if (v.t < 1000) return this.pide;
     const fps = v.n * 1000 / v.t, frac = v.dup / (v.n + v.dup), hilo = v.cb / v.n, med = mediana(v.d), rapidos = v.d.filter(x => x < this.periodo * .93).length;
     this.fps = fps; this.ult = { fps: Math.round(fps * 10) / 10, perdidos: v.dup, cuadros: v.n, hilo: Math.round(hilo * 10) / 10 };
@@ -270,22 +310,25 @@ export class Gobernador {
     this.malas.push(mala); if (this.malas.length > 4) this.malas.shift();
     this.seguidas = frac >= URGENTE_FRAC ? this.seguidas + 1 : 0;
     this.limpioMs = limpia ? this.limpioMs + v.t : 0;
+    // la última subida, a prueba: cuánto dibujo continuo lleva y si ya juntó CONFIRMA_MS limpios seguidos
+    const u = this.ultimo;
+    if (u && u.sube && !u.deshace) { u.dibujo += v.t; u.limpio = limpia ? u.limpio + v.t : 0; if (u.limpio >= CONFIRMA_MS) u.confirmada = true; }
     if (this.ajena && (now - this.tAjena > AJENA_MS || (limpia && this.limpioMs >= 2900))) { this.ajena = false; this.motivo = now - this.tAjena > AJENA_MS ? 'se vuelve a probar si bajar sirve' : 'la máquina se liberó'; }
     const pasos = frac > .45 ? 3 : frac > .2 ? 2 : 1;
     // ya pidió y todavía no se pudo aplicar (hay un intento en curso): una bajada pendiente crece; una subida pendiente
     // (salvo la que deshace una bajada por carga ajena) se cancela si mientras tanto se pierden refrescos
     if (this.pide) { if (!this.sube) this.pasos = Math.max(this.pasos, pasos); else if (mala && !this._deshace) { this.pide = this.sube = false; this.pasos = 1; this.motivo = 'subida pendiente cancelada: perdió refrescos'; } }
     else if (frac >= .2 || this.malas.filter(Boolean).length >= 2) this._mal(frac, pasos, now);
-    else if (!this.ajena && !this.tope && limpia && this.limpioMs >= (this.nivel > 0 ? this.espera : this.esperaArriba)) this._pedir(true, 1, this.nivel > 0 ? 'la máquina está libre: vuelve hacia la calibración' : 'la máquina está libre: prueba un escalón más', frac);
+    else if (!this.ajena && !this.tope && limpia && this.nivel > 0 && this.limpioMs >= this.espera) this._pedir(true, 1, 'la máquina está libre: vuelve hacia la calibración', frac);
     this._vaciar();
     return this.pide;
   }
   _mal(frac, pasos, now) {
     const u = this.ultimo; this.malas = [];
-    // una subida que no aguantó: se deshace y la próxima prueba espera el doble
-    if (u && u.sube && !u.deshace && now - u.t < 15000) {
-      if (u.nivel > 0) this.espera = Math.min(SUBIR_MAX_MS, this.espera * 2); else this.esperaArriba = Math.min(SUBIR_MAX_MS, this.esperaArriba * 2);
-      this._pedir(false, 1, 'la subida no aguantó', frac); this._deshace = true; return;
+    // una subida que no aguantó (pierde dentro de su prueba, contada en dibujo continuo): se deshace y la próxima espera el doble
+    if (u && u.sube && !u.deshace && u.dibujo < PRUEBA_MS) {
+      this.espera = Math.min(SUBIR_MAX_MS, this.espera * 2);
+      this._pedir(false, u.pasos, 'la subida no aguantó', frac); this._deshace = true; return;
     }
     // en el piso de resolución: solo se baja de ahí perdiendo muchos cuadros de forma sostenida (URGENTE_VENTANAS seguidas);
     // si la bajada anterior por debajo del piso no cambió lo que se pierde, es carga ajena y se deshace
@@ -308,7 +351,7 @@ export class Gobernador {
    * La calibración dejó una resolución nueva (main.js, al terminar calibrar): esa es la referencia del nivel 0. Lo que el
    * gobernador haya hecho antes (en el menú) no cuenta.
    */
-  calibrado(now, ms = 1500) { this.nivel = 0; this.ultimo = null; this.tope = this.piso = this.ajena = this.pisoDuro = false; this.seguidas = 0; this.espera = SUBIR_MS; this.esperaArriba = SUBIR_ARRIBA_MS; this.calentar(now, ms); }
+  calibrado(now, ms = 1500) { this.nivel = 0; this.ultimo = null; this.tope = this.piso = this.ajena = this.pisoDuro = false; this.seguidas = 0; this.espera = SUBIR_MS; this.calentar(now, ms); }
   /**
    * main.js avisa qué pasó con el pedido: `hecho` si cambió algo (false: no había más para bajar o para subir).
    * Empieza el calentamiento: los cuadros de los próximos 2,5 s no cuentan.
@@ -316,10 +359,10 @@ export class Gobernador {
   resultado(hecho, now) {
     if (!this.pide) return; const sube = this.sube, pasos = this.pasos;
     if (hecho) {
-      const nivel = this.nivel; this.nivel += sube ? -pasos : pasos;
+      const nivel = this.nivel; this.nivel = Math.max(0, this.nivel + (sube ? -pasos : pasos));
       // racha de bajadas: `acum` escalones desde la primera, que perdía `frac0`
       const u = this.ultimo, sigue = !sube && this._sigue && u && !u.sube;
-      this.ultimo = { sube, t: now, frac: this._frac, pasos, nivel, deshace: !!this._deshace, urgente: this._urgente, acum: sigue ? u.acum + pasos : pasos, frac0: sigue ? u.frac0 : this._frac };
+      this.ultimo = { sube, t: now, frac: this._frac, pasos, nivel, deshace: !!this._deshace, urgente: this._urgente, acum: sigue ? u.acum + pasos : pasos, frac0: sigue ? u.frac0 : this._frac, dibujo: 0, limpio: 0, confirmada: false };
       if (sube) this.piso = this.pisoDuro = false; else this.tope = false;
       this.seguidas = 0;
       this.historia.push({ t: Math.round(now), sube, pasos, nivel: this.nivel, motivo: this.motivo }); if (this.historia.length > 40) this.historia.shift();

@@ -23,6 +23,7 @@ import { RELOJ, CAUSAS, FACIL, exigenciaTabla } from '../web/js/sim/rules.js';
 import { tocar, alDia, senal, GUIADO } from '../web/js/game/controles.js';
 import { explicar, pasos } from '../web/js/game/ui/mensajes.js';
 import { DICCIONARIOS, tr, fijarIdioma, detectarIdioma } from '../web/js/game/i18n/t.js';
+import { toques } from '../web/js/game/input.js';
 import { jugarSenal, jugarFijo, BOTS } from './play_human.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SIM = path.join(ROOT, 'web/js/sim'), REF = path.join(ROOT, 'tools/sim_ref.json'), REF_F = path.join(ROOT, 'tools/sim_ref_facil.json');
@@ -313,6 +314,21 @@ function jugar(semilla, nivel, persona, estilo = {}) {
   // idioma: ?lang= primero, después lo guardado y por último el navegador; lo que no empieza con «es», inglés
   ok(detectarIdioma({ lang: 'en', guardado: 'es', navegador: ['es-AR'] }) === 'en' && detectarIdioma({ guardado: 'es', navegador: ['en-US'] }) === 'es' && detectarIdioma({ navegador: ['es-MX', 'en'] }) === 'es' && detectarIdioma({ navegador: ['pt-BR', 'es'] }) === 'en' && detectarIdioma({ lang: 'fr', navegador: ['es'] }) === 'es', 'detectarIdioma no respeta el orden de prioridad');
   console.log(`9. Textos: ${ke.length} claves en español neutro y en inglés, sin voseo ni jerga, todas resueltas con y sin teclado · señal y pasos según el idioma`);
+}
+
+// ---------- 10. ráfagas de toques (saltear pantallas, input.js) ----------
+{
+  const pulsar = ts => { toques.ultimos.length = 0; for (const t of ts) toques.nuevo(t, 'teclado', 'ESPACIO'); };
+  // machaca cada 120 ms desde el intento (t 0) y sigue: la ráfaga empezó en 0
+  pulsar([0, 120, 240, 360, 480, 600, 720]); ok(toques.rafaga(720) === 0, `ráfaga continua: empieza en el primer toque (${toques.rafaga(720)})`);
+  // para 400 ms y vuelve a tocar: el toque nuevo empieza otra ráfaga
+  pulsar([0, 120, 240, 640]); ok(toques.rafaga(640) === 640, 'después de una pausa de 400 ms, el toque empieza otra ráfaga');
+  pulsar([0, 120, 400, 520]); ok(toques.rafaga(520) === 0, 'una pausa de 280 ms no corta la ráfaga');
+  pulsar([0, 120, 240, 540, 640]); ok(toques.rafaga(640) === 540, 'una pausa de 300 ms la corta');
+  // más toques seguidos que los anotados: la ráfaga es más vieja que todo lo que se ve
+  pulsar(Array.from({ length: 20 }, (_, i) => i * 120)); ok(toques.rafaga(19 * 120) === -Infinity, 'ráfaga más larga que lo anotado: -Infinity (no saltea)');
+  toques.ultimos.length = 0; toques.abierto = null;
+  console.log('10. ráfagas de toques: el machaque que venía del levantamiento no saltea; una pausa de 300 ms o un toque nuevo sí');
 }
 
 console.log(fallas.length ? `\nFALLÓ: ${fallas.length} problemas` : `\nOK en ${((Date.now() - t0) / 1000).toFixed(1)} s`);

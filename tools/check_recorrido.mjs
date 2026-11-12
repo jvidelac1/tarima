@@ -9,7 +9,11 @@
 //    anota si el veredicto con el motivo llegó a verse antes de que el machaque lo saltee;
 //  - por cada señal con círculo anota cuánto antes del cierre aparece, y cuándo abre la ventana;
 //  - capturas de cada momento en out/recorrido/ (un cuadro del 3D forzado antes de cada una).
-// No mide cuadros por segundo. No falla por la experiencia: falla solo ante errores de consola o si el recorrido no avanza.
+// Criterios (falla si no se cumplen, además de errores de consola o si el recorrido no avanza):
+//  - cuando entre un levantamiento propio y el próximo panel no hay nada de los rivales (el jugador se sigue a sí mismo),
+//    la espera sin tocar es de menos de 6 s;
+//  - machacando Espacio después del fallo, el veredicto con el motivo se ve, y al menos 1 s.
+// No mide cuadros por segundo.
 // Uso: node tools/check_recorrido.mjs [--headed] [--semilla=N] [--sin-fotos] [--lang=en] (en inglés, capturas en out/recorrido_en)
 import http from 'node:http';
 import fs from 'node:fs';
@@ -115,23 +119,27 @@ for (let n = 0; n < 60000; n++) {
     enIntento = false; tFin = s.ahora;
     const p = (await J(() => JUEGO.E.propios || [])).at(-1) || {};
     tramos.push({ lev: nLev, llamado: llamadoTxt || '(tutorial)', res: p.res + (p.causa ? ':' + p.causa : ''), linea: p.linea || '', desde: seg.length - 1 });
-    if (plan && plan.machaca) {      // el que venía empujando sigue tocando: ¿llega a leer el motivo?
-      const t0 = s.ahora; let visto = '';
+    if (plan && plan.machaca) {      // el que venía empujando sigue tocando: ¿llega a leer el motivo, y cuánto?
+      const t0 = s.ahora, trozo = (p.linea || '').slice(0, 25); let visto = '', tVe = null, tSale = null;
       for (let k = 0; k < 25; k++) {
         await toque(); await av(90);
-        const u = await leerUI(), e = await J(() => JUEGO.estado().pantalla);
-        if (u.veredicto && !visto) visto = `${Math.round((await J(() => JUEGO.reloj.ahora())) - t0)} ms: «${u.veredicto}»`;
+        const u = await leerUI(), e = await J(() => JUEGO.estado().pantalla), ahora = await J(() => JUEGO.reloj.ahora());
+        if (u.veredicto && !visto) visto = `${Math.round(ahora - t0)} ms: «${u.veredicto}»`;
+        const conMotivo = !!trozo && u.veredicto.includes(trozo);
+        if (conMotivo && tVe === null) tVe = ahora; else if (!conMotivo && tVe !== null && tSale === null) tSale = ahora;
         if (k === 10 || k === 16) await foto(`machaque_${k}_${e}`);
         machaque.push(`${Math.round((await J(() => JUEGO.reloj.ahora())) - t0)} ${e}${u.veredicto ? ' «' + u.veredicto.slice(0, 60) + '»' : ''}`);
       }
       tramos.at(-1).machaca = visto || 'el veredicto con el motivo no llegó a verse';
+      tramos.at(-1).motivoMs = tVe === null ? 0 : Math.round((tSale ?? await J(() => JUEGO.reloj.ahora())) - tVe);
+      tramos.at(-1).motivoSigue = tVe !== null && tSale === null;
     }
     plan = null; continue;
   }
   if (s.panel) {
     const P = await J(() => { const pn = document.querySelector('#capa .panel'); return pn ? { titulo: (pn.querySelector('h1,h2')?.textContent || '').trim(), botones: pn.querySelectorAll('button:not(:disabled)').length } : null; });
     if (P && P.botones) {
-      if (tFin !== null) { const T = tramos.at(-1); T.espera = Math.round(s.ahora - tFin); T.hasta = `${s.pantalla}: ${P.titulo}`; T.pantallas = seg.slice(T.desde + 1).map(x => `${x.p} ${(((x.t1 ?? s.ahora) - x.t0) / 1000).toFixed(1)}`).join(' · '); tFin = null; }
+      if (tFin !== null) { const T = tramos.at(-1); T.espera = Math.round(s.ahora - tFin); T.hasta = `${s.pantalla}: ${P.titulo}`; const entre = seg.slice(T.desde, -1); T.pantallas = entre.map(x => `${x.p} ${((x.t1 - x.t0) / 1000).toFixed(1)}`).join(' · '); T.lista = entre.map(x => x.p); tFin = null; }
       if (s.pantalla === 'llamado') { llamadoTxt = P.titulo; plan = PLAN.find(x => x.re.test(P.titulo)) || null; await foto(`llamado_${slug(P.titulo)}`); }
       await av(300);
       const ok = await J(() => { const b = document.querySelector('#capa .panel button.ir:not(:disabled)'); if (!b) return false; b.focus(); return document.activeElement === b; });
@@ -153,6 +161,21 @@ console.log('\nSEÑALES CON CÍRCULO: ms desde que aparece hasta el cierre');
 const porClave = {}; for (const x of senales) (porClave[(x.guiado ? 'guiado ' : '') + x.clave] ||= []).push(x.anticipa);
 for (const [k, v] of Object.entries(porClave)) console.log(`  ${k}: ${v.join(', ')}`);
 if (machaque.length) console.log('\nMACHAQUE (ms desde el final · pantalla · veredicto):\n  ' + machaque.join('\n  '));
+// criterios
+const PROPIAS = new Set(['decision', 'repeticion', 'carga', 'desplazado']), META_MS = 6000;
+console.log('\nCRITERIOS:');
+for (const T of tramos) {
+  if (T.espera === undefined || !T.lista) continue;
+  const solo = T.lista.every(x => PROPIAS.has(x)), txt = `lev ${T.lev} [${T.llamado}] ${T.res}: ${(T.espera / 1000).toFixed(1)} s (${T.pantallas})`;
+  if (!solo) { console.log(`  info   ${txt} · con rivales en el medio`); continue; }
+  const bien = T.espera < META_MS; console.log(`  ${bien ? 'cumple' : 'NO    '} ${txt} · meta < ${META_MS / 1000} s`);
+  if (!bien) problemas.push(`espera de ${(T.espera / 1000).toFixed(1)} s sin rivales en el medio (lev ${T.lev}, ${T.pantallas}); meta < ${META_MS / 1000} s`);
+}
+for (const T of tramos.filter(x => x.machaca)) {
+  const bien = T.motivoMs >= 1000; console.log(`  ${bien ? 'cumple' : 'NO    '} machacando después del fallo, el motivo se ve ${T.motivoMs} ms${T.motivoSigue ? ' (y sigue a la vista al dejar de machacar)' : ''} · meta ≥ 1 s`);
+  if (!bien) problemas.push(`machacando Espacio el motivo del fallo se vio ${T.motivoMs} ms (meta ≥ 1 s): ${T.machaca}`);
+}
+if (!tramos.some(x => x.machaca)) problemas.push('no se llegó a probar el machaque después del fallo');
 console.log('\nPANTALLAS (s): ' + seg.map(x => `${x.p} ${(((x.t1 ?? x.t0) - x.t0) / 1000).toFixed(1)}`).join(' · '));
 if (problemas.length) { console.log('\nPROBLEMAS:\n' + problemas.join('\n')); process.exit(1); }
 console.log(`\ncheck_recorrido: terminó (${nFoto} capturas en out/recorrido)`);
