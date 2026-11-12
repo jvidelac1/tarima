@@ -114,9 +114,9 @@ r = await caso({ hz: 60, nativo: .74, clave: 'movil', costos: { movil: [6, 14] }
   ok(/radial-gradient\(ellipse farthest-corner/.test(S.vineta()), 'viñeta como gradiente CSS');
   { const { A, X0, P } = S.CURVA_HAZ; let e = 0; for (let x = .001; x < .25; x *= 1.1) e = Math.max(e, Math.abs(A * Math.max(0, x - X0) ** P - gris(x) / 255));
     ok(e < .03, `los haces en colores de pantalla siguen al tono del juego (error máximo ${e.toFixed(3)})`); }
-  { const g = S.conoCorto(.72, .45), uv = g.attributes.uv, pos = g.attributes.position; let arriba = 0, abajo = 1, bajo = 0;
-    for (let i = 0; i < uv.count; i++) { const y = pos.getY(i); if (y > -1e-6) arriba = Math.max(arriba, uv.getY(i)); if (y < -.72 + 1e-6) abajo = Math.min(abajo, uv.getY(i)); bajo = Math.min(bajo, y); }
-    ok(Math.abs(arriba - 1) < 1e-6 && abajo < 1e-6 && Math.abs(bajo + .72) < 1e-6, `haz corto: brillo entero en el foco, cero en el corte, 72 % del largo (${arriba.toFixed(2)}, ${abajo.toFixed(2)}, ${bajo.toFixed(2)})`); }
+  { const g = S.conoCorto(), uv = g.attributes.uv, pos = g.attributes.position; let arriba = 0, abajo = 1, bajo = 0;
+    for (let i = 0; i < uv.count; i++) { const y = pos.getY(i); if (y > -1e-6) arriba = Math.max(arriba, uv.getY(i)); if (y < -.56 + 1e-6) abajo = Math.min(abajo, uv.getY(i)); bajo = Math.min(bajo, y); }
+    ok(Math.abs(arriba - 1) < 1e-6 && abajo < 1e-6 && Math.abs(bajo + .56) < 1e-6, `haz corto: brillo entero en el foco, cero en el corte, 56 % del largo (${arriba.toFixed(2)}, ${abajo.toFixed(2)}, ${bajo.toFixed(2)})`); }
   ok(PRESET.baja.barato && PRESET.movil.barato && PRESET.baja.barato.piso && PRESET.baja.barato.bordes === 'material' && !PRESET.media.barato && !PRESET.alta.barato, 'escena barata en Baja y Móvil, no en Media ni Alta');
   const g = new THREE.Group(), m1 = new THREE.MeshStandardMaterial(), m2 = new THREE.MeshBasicMaterial({ transparent: true }), fuera = new THREE.Mesh(new THREE.BoxGeometry(), m1);
   for (let i = 0; i < 5; i++) { const o = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 3), m1); o.position.set(i, i * .5, -i); o.rotation.y = i; g.add(o); }

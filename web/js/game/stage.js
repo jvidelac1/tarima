@@ -142,9 +142,12 @@ void main(){
 /**
  * Cono de haz corto: el mismo cono que el de la arena (vértice en el foco, radio 0,09 → 1 a lo largo de 1), cortado en
  * `corte` del largo. En `uv.y` va el brillo del cono entero (vT^1,6) por un desvanecido que llega a cero en el corte, ya
- * pasado por la raíz 1,6 (el sombreador vuelve a elevar). La parte de abajo, la más ancha, era la que menos se veía.
+ * pasado por la raíz 1,6 (el sombreador vuelve a elevar). La parte de abajo, la más ancha, no se veía: con el tono del
+ * camino directo todo lo que suma menos de CURVA_HAZ.X0 sale negro, y pasada la mitad del largo el haz más fuerte (0,05)
+ * ya no llega (vT^1,6 · 0,05 < 0,0158 desde t ≈ 0,51). Cortado en 0,56, con el desvanecido recién desde 0,5, queda el
+ * 31 % del área y la misma imagen.
  */
-export function conoCorto(corte = .72, desde = .45, anillos = 8) {
+export function conoCorto(corte = .56, desde = .5, anillos = 8) {
   const g = new THREE.CylinderGeometry(.09, .09 + (1 - .09) * corte, corte, 28, anillos, true); g.translate(0, -corte / 2, 0);
   const uv = g.attributes.uv, s = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   for (let i = 0; i < uv.count; i++) { const t = (1 - uv.getY(i)) * corte, f = Math.pow(1 - t, 1.6) * (1 - s(desde, corte, t)); uv.setY(i, Math.pow(f, 1 / 1.6)); }
