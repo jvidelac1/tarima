@@ -33,7 +33,9 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const CLAVE = 'phc_PruebaDeCheckAnalitica123';
 const AGENTE = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
 const LISTA_ID = 'c'.repeat(32);
-const MAX_MUT_S = 10;                 // mutaciones por segundo que manda el grabador durante un intento, como mucho
+// Eventos de mutación por segundo que puede mandar el grabador durante un intento. El juego dibuja ~60 cuadros por segundo:
+// un nodo que cambia en cada cuadro y no está bloqueado lo pasa enseguida; los cambios por señal o por toque, no.
+const MAX_MUT_S = 20;
 const NOMBRE = 'Zoraida', ESCRITO = 'Wilfredo', CORREO = 'secreto@ejemplo.com', LIBRE = 'respuesta libre muy secreta';
 
 let conClave = true;
@@ -70,6 +72,33 @@ const rrwebDe = desde => llegadas.slice(desde).filter(l => l.ruta.startsWith('/q
 // Nodos serializados de una instantánea completa (para mirar lienzos y bloqueos).
 function nodos(n, out = []) { if (n && typeof n === 'object') { out.push(n); for (const c of n.childNodes || []) nodos(c, out); } return out; }
 const esMutacion = e => e.type === 3 && e.data?.source === 0;
+// De qué nodo de la página (el id propio o el del antepasado más cercano con id) es cada nodo de la grabación.
+function mapaNodos(ev) {
+  const m = new Map();
+  const visitar = (n, padre) => {
+    if (!n || typeof n !== 'object') return;
+    const d = n.attributes?.id ? '#' + n.attributes.id : (padre ?? n.tagName ?? '?');
+    if (n.id != null) m.set(n.id, d);
+    for (const c of n.childNodes || []) visitar(c, d);
+  };
+  for (const e of ev) {
+    if (e.type === 2) visitar(e.data?.node, null);
+    else if (esMutacion(e)) for (const a of e.data.adds || []) visitar(a.node, m.get(a.parentId));
+  }
+  return m;
+}
+// Qué nodos movieron las mutaciones grabadas: «#zona class», «#reloj texto»…
+function quienGrabo(ev, mut) {
+  const m = mapaNodos(ev), out = {};
+  const sumar = k => { out[k] = (out[k] || 0) + 1; };
+  for (const e of mut) {
+    for (const t of e.data.texts || []) sumar(`${m.get(t.id) ?? '?'} texto`);
+    for (const a of e.data.attributes || []) sumar(`${m.get(a.id) ?? '?'} ${Object.keys(a.attributes || {}).join('+')}`);
+    for (const a of e.data.adds || []) sumar(`${m.get(a.parentId) ?? '?'} agrega`);
+    for (const r of e.data.removes || []) sumar(`${m.get(r.parentId) ?? '?'} quita`);
+  }
+  return Object.entries(out).sort((a, b) => b[1] - a[1]).slice(0, 6);
+}
 
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
@@ -410,6 +439,14 @@ async function partida(flag) {
   await page.goto(base + 'juego.html?lang=es&dibujo=0&q=baja&semilla=20261112', { waitUntil: 'load' });
   await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 90000 });
   const { tA, tB } = await interactuarJuego(page);
+  // Lo que costaría la instantánea completa que posthog-js vuelve a tomar cada 5 minutos (puede caer en un intento).
+  const instantanea = await page.evaluate(() => {
+    const rec = window.__PosthogExtensions__?.rrweb?.record;
+    if (!rec?.takeFullSnapshot) return null;
+    const ms = [];
+    for (let i = 0; i < 3; i++) { const t = performance.now(); rec.takeFullSnapshot(); ms.push(performance.now() - t); }
+    return ms.map(x => +x.toFixed(1));
+  });
   await page.waitForTimeout(3500);
   await page.evaluate(() => { document.dispatchEvent(new Event('visibilitychange')); window.dispatchEvent(new Event('pagehide')); });
   await page.waitForTimeout(1500);
@@ -423,13 +460,14 @@ async function partida(flag) {
   const dt = m.raf.slice(1).map((t, i) => t - m.raf[i]);
   const quien = {}; for (const d of m.mut) quien[d] = (quien[d] || 0) + 1;
   const r = {
-    flag, seg, ev, bytes: llegadas.slice(desde).filter(l => l.ruta.startsWith('/qx/s')).reduce((a, l) => a + l.bytes, 0),
+    flag, seg, ev, instantanea, bytes: llegadas.slice(desde).filter(l => l.ruta.startsWith('/qx/s')).reduce((a, l) => a + l.bytes, 0),
     mutDom: m.mut.length, top: Object.entries(quien).sort((a, b) => b[1] - a[1]).slice(0, 6),
     mutGrab: ev.filter(e => esMutacion(e) && e.timestamp >= tA && e.timestamp <= tB).length,
+    topGrab: quienGrabo(ev, ev.filter(e => esMutacion(e) && e.timestamp >= tA && e.timestamp <= tB)),
     cuadros: m.raf.length, p50: pct(dt, 0.5), p95: pct(dt, 0.95), lentos: dt.filter(x => x > 33).length, lt: m.lt.length, ltMs: Math.round(m.lt.reduce((a, b) => a + b, 0)),
   };
   console.log(`  juego, grabacion=${flag}: intento de ${seg.toFixed(1)} s · ${r.mutDom} mutaciones del DOM (${(r.mutDom / seg).toFixed(0)}/s; ${r.top.map(([k, v]) => `${k} ${v}`).join(', ')}) · ` +
-    `al grabador ${r.mutGrab} (${(r.mutGrab / seg).toFixed(1)}/s) · cuadros ${r.cuadros}, p50 ${r.p50.toFixed(1)} ms, p95 ${r.p95.toFixed(1)} ms, >33 ms ${r.lentos} · tareas largas ${r.lt} (${r.ltMs} ms) · /qx/s/ ${(r.bytes / 1024).toFixed(1)} KB en toda la carga`);
+    `al grabador ${r.mutGrab} (${(r.mutGrab / seg).toFixed(1)}/s; ${r.topGrab.map(([k, v]) => `${k} ${v}`).join(', ') || 'nada'}) · cuadros ${r.cuadros}, p50 ${r.p50.toFixed(1)} ms, p95 ${r.p95.toFixed(1)} ms, >33 ms ${r.lentos} · tareas largas ${r.lt} (${r.ltMs} ms) · instantánea completa ${r.instantanea ? r.instantanea.join(', ') + ' ms' : '—'} · /qx/s/ ${(r.bytes / 1024).toFixed(1)} KB en toda la carga`);
   await ctx.close();
   return r;
 }
@@ -442,6 +480,7 @@ async function partida(flag) {
   ok(!todo.includes(NOMBRE), `juego: el nombre del jugador no aparece en la grabación`);
   ok(!/rr_dataURL|data:image\//.test(todo), 'juego: ni un cuadro del 3D en la grabación');
   ok(con.mutGrab / con.seg <= MAX_MUT_S, `juego: durante el intento el grabador recibe ${(con.mutGrab / con.seg).toFixed(1)} mutaciones por segundo (tope ${MAX_MUT_S}; el DOM tuvo ${(con.mutDom / con.seg).toFixed(0)}/s)`);
+  ok(con.instantanea && Math.max(...con.instantanea) < 50, `juego: una instantánea completa de la página cuesta ${con.instantanea?.join(', ')} ms (menos de 50)`);
   notas.push(`juego: cuadros durante el intento con grabación p95 ${con.p95.toFixed(1)} ms, >33 ms ${con.lentos}, tareas largas ${con.lt}; sin grabación p95 ${sin.p95.toFixed(1)} ms, >33 ms ${sin.lentos}, tareas largas ${sin.lt}`);
 }
 
