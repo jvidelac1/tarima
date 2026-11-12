@@ -342,37 +342,7 @@ El usuario volvió a jugar y dijo «fps… le falta laburo para que ande fluido�
   - **No se tocaron las luces ni los materiales**: seis focos, una direccional y la de sala entran en cada material iluminado, y la tarima y la alfombra son materiales físicos. Sacar luces o abaratar el piso cambia la imagen y acá no hubo cómo mirarla; el banco mide cuánto ahorra cada cosa para decidirlo con el dato.
 - `JUEGO.perf.largos`: los últimos 200 cuadros que perdieron un refresco, con la pantalla y la fase del intento en que cayeron. Sirve para ver si los tirones caen siempre en el mismo lugar.
 
-**Banco de medición: `juego.html?banco=1`.** Corre solo, sin tocar nada, y termina en menos de 90 s (contados desde que se abre la página; `?limite=60` lo acorta). Escena fija: Brenner haciendo el arranque en bucle con 140 kg y la cámara del juego. Al terminar muestra una tabla y deja todo en `window.BANCO` (JSON, `listo: true`; `BANCO.progreso` dice por dónde va, `BANCO.errores` lo que falló). Hay que dejar la pestaña a la vista: con la pestaña oculta el navegador no da cuadros. Otros parámetros: `?pesista=ventura`, `?solo=baja,media` (calidades), `?variantes=sombras,luces`.
-
-Qué mide por variante, en dos pasos:
-
-1. **Sin pantalla** (todas las variantes): dibuja 14 cuadros seguidos a 0,5 y a 1,6 megapíxeles (y a 1 MP en las escenas completas), leyendo un píxel después de cada uno para que la placa termine, y se queda con la mediana. Con esos dos puntos traza la recta.
-2. **Con pantalla** (las escenas completas siempre; las variantes de «Baja» que más ahorran, mientras quede tiempo): búsqueda sobre la resolución con `requestAnimationFrame`. Cada prueba descarta 10 cuadros y mide 50; sube 25 % si no se perdió ningún refresco, baja si se perdió, y parte la diferencia. Hasta cinco pruebas.
-
-Columnas de la tabla (los mismos nombres, más largos, en `BANCO.columnas`):
-
-| Columna | Campo | Qué es |
-|---|---|---|
-| Variante | `nombre` | «Baja completa» es la escena del juego; «Baja sin sombras» es esa escena con una sola cosa menos |
-| Fijo ms | `fijoMs` | Lo que cuesta el cuadro aunque no se dibuje ningún píxel: geometría, esqueletos, pasada de sombra, hilo principal |
-| Por MP ms | `porMPms` | Lo que agrega cada megapíxel dibujado: materiales, luces, MSAA y pases de pantalla |
-| A 1 MP ms | `ms1MP` | Fijo más por MP: el costo de un cuadro a un megapíxel |
-| A la de la pantalla ms | `msNativo` | El mismo costo a la resolución de la pantalla (`BANCO.nativoMP`) |
-| MP que entran (cuenta) | `mpModelo` | Megapíxeles que caben en el 85 % del período según la recta. Es una cuenta |
-| MP sin perder refrescos | `mpReal` | Lo medido con la pantalla: la mayor resolución probada que no perdió ningún refresco. Vacío si no se buscó |
-| Pierde desde MP | `mpFalla` | La menor resolución probada que sí perdió. El límite real está entre las dos |
-| Ahorro ms a 1 MP y Ahorro | `ahorroMs`, `ahorroPct` | Cuánto baja el costo a 1 MP contra la escena completa de la misma calidad. `ahorroFijoMs` y `ahorroPorMPms` lo separan |
-| Llamadas, Triángulos | `llamadas`, `triangulos` | De un cuadro entero, con la pasada de sombra |
-
-Además, por variante: `medidas` (cada punto con mediana, mínimo y percentil 90), `sondas` (cada prueba con pantalla: megapíxeles, cuadros, refrescos perdidos, mediana, percentil 99, máximo y ms de hilo principal), `desvio1MP` (qué tan recta es la recta), `mallasEsqueleto` (las que de verdad se dibujan) y `programas`.
-
-Cómo leerlo: una variante con mucho ahorro en «Fijo» dice que el problema es geometría o sombra; con mucho ahorro en «Por MP», que son los materiales, las luces o los pases. «Baja sin el segundo modelo» tiene que dar cero: el modelo oculto no se dibuja. «Baja directo al lienzo» es el piso: la escena sin destino HDR, sin MSAA y sin pase final. «Pesista con la malla completa» es lo que costaba antes de esta vuelta.
-
-Límites del banco, para no leerle más de lo que dice:
-
-- El costo sin pantalla es procesador más placa **en serie**; en el juego corren en paralelo, así que el cuadro real cuesta algo menos. Y se mide con la placa trabajando sin parar: si en el juego la placa baja de frecuencia por estar más descansada, el cuadro real puede costar más. Por eso existe la búsqueda con pantalla, y por eso la calibración del juego también verifica con cuadros de verdad.
-- Una prueba con pantalla son 50 cuadros (menos de un segundo): un refresco perdido por otra cosa de la máquina la da por fallada. Mirar `sondas` antes de creerle a un límite raro.
-- El banco fija el detalle del pesista en el del plano general (malla simplificada y normales de detalle) y el MSAA en el de la calidad, para que todas las variantes se comparen igual. El juego baja el MSAA a 2 muestras con densidad de 1,4 o más.
+**Banco de medición**: el de esta vuelta medía las variantes en tira y derivaba con la máquina cargada; se rehízo en la tercera vuelta (abajo).
 
 **Cómo se probó.** No hubo máquina con placa ni navegador en esta vuelta. Lo que corrió:
 
@@ -392,6 +362,86 @@ Límites del banco, para no leerle más de lo que dice:
 - **Teléfono**: la calibración arranca en «Móvil» y no sube. Sin medir.
 - `tools/check_fluidez.mjs --gobernador` (necesita placa) no se volvió a correr. Con el lastre de 18 ms por megapíxel la cuenta da unos 0,56 MP a 60 Hz, por debajo de los 1,02 de antes, así que la calibración tiene que anotar una bajada antes del primer intento; está probado solo con la máquina simulada.
 
+### Fluidez, tercera vuelta: camino directo, sombra barata y banco que aguanta ruido (12-nov, rama `demo`)
+
+**Punto de partida: el banco que corrió el usuario en su Mac** (M1 Pro, 74,96 Hz, período 13,34 ms, ventana 1745 × 845, densidad 1,1, 1,78 MP a su resolución), con la máquina muy cargada (carga media 38 en 8 núcleos):
+
+- «Baja completa» (destino HDR con MSAA 4 y pase final): 9,3 ms fijos + 5,3 ms por MP: 14,5 ms a 1 MP y 18,7 a la resolución de la pantalla. No entra en 13,3 ms; la búsqueda con cuadros de verdad perdió refrescos aun a 0,15 MP.
+- «Directo al lienzo» (sin destino HDR, MSAA ni pase final): costo fijo 4,3 ms. La pasada de sombra eran 96 de 243 llamadas y 84 mil de 188 mil triángulos.
+- Lo que no valía: todas las variantes medidas después de la primera costaron más que la escena completa (ahorros de −5 % a −340 %) y los programas compilados crecieron de 82 a 197 durante la corrida. El banco medía en tira y la máquina cambió de carga en el medio.
+
+**Qué cambió** (`web/js/game/stage.js`, `perf.js`, `banco.js`; `tools/banco.mjs` y `tools/perf_test.mjs`; el visor no se tocó: nada de esto corre en `index.html`):
+
+- **Camino directo en «Baja» y «Móvil»** (`PRESET.baja.directo`, `Escena._modo()`): la escena se dibuja en una sola pasada al lienzo, con MSAA del propio lienzo (`antialias: true`; en una placa por mosaicos como la M1 se resuelve dentro del mosaico). El tono AgX con exposición 1,12 y la corrección del pase final (saturación 1,04, contraste 1,03, gamma de sombras 0,86 y el tinte frío/cálido) van dentro de cada material como `CustomToneMapping` (el visor no lo usa). Los `ShaderMaterial` de la arena (haces, discos de luz, público) se completan con el tono y el paso a sRGB. La viñeta y los negros levantados son un gradiente CSS encima del lienzo (lo compone el navegador), con la cuenta hecha para que dé lo mismo que el pase final; la niebla se pasa a colores de pantalla porque three la mezcla después del tono. Se pierde el grano (0,02) y la mezcla de lo aditivo (haces, bruma, flashes) se hace después del tono y no antes: puede verse algo distinta. **No se miró en una placa**: hay que compararlo a ojo con `?q=media` o con la variante «post» del banco.
+- **Sombra barata**: la arena entera deja de proyectar (tarima, escenario, magnesiera, cartelones). Ojo: con sombras VSM three dibuja en el mapa de sombra también todo lo que *recibe* sombra, así que apagar `castShadow` no alcanzaba (la primera corrida en Actions seguía dando 95 llamadas en la pasada de sombra). Ahora la cámara de sombra ve solo una capa propia (`CAPA_SOMBRA`, 2) donde están el pesista, una copia sin grupos de material de cada pieza de la barra (una llamada por pieza en vez de una por grupo: el eje sólo tenía nueve) y lo de la arena que recibe sombra dentro del cono de la clave (tarima y alfombra; `JUEGO.escena.recibenSombra` dice cuántas). Fuera de ese cono la sombra no llega, así que no cambia nada visible. Mapa de 512 en «Baja» (antes 768), con la misma penumbra en centímetros. La cámara de sombra ya estaba cerrada sobre el pesista y la barra (`focus` 0,64 del cono de la clave: 3,8 m en la tarima; cerrarla más corta la sombra de la barra arriba de la cabeza). Con el pesista quieto la sombra no se recalcula (ya era así: solo se rehace cuando se posa).
+- **Arena fija junta** (`juntarFijos` en `stage.js`): al construir la escena, la geometría de la arena que no se mueve se junta en una malla por material, después de hornear el entorno. Quedan afuera lo transparente, lo instanciado, los `ShaderMaterial`, lo espejado, el público, los haces, las luces de los jueces, el tablero y el reloj. Cuántas mallas había y cuántas quedaron: `JUEGO.escena.fijos` y `BANCO.mallasFijas`.
+- **0x506 del banco**: venía de enlazar la profundidad del destino de post (`BOKEH.tDepth`) dibujando directo: three la creaba con un tamaño viejo y el destino quedaba con piezas de distinto tamaño. En el camino directo ya no se enlaza.
+
+**Banco de medición: `juego.html?banco=1`.** Corre solo, sin tocar nada, y termina en menos de 2 minutos (115 s contados desde que se abre la página; `?limite=` lo cambia). Escena fija: Brenner haciendo el arranque en bucle con 140 kg y la cámara del juego, con el detalle del pesista del plano general. Al terminar muestra dos tablas y deja todo en `window.BANCO` (JSON, `listo: true`, `version: 2`; `BANCO.progreso` dice por dónde va, `BANCO.errores` lo que falló). **Hay que dejar la pestaña a la vista** (oculta, el navegador no da cuadros). Parámetros: `?pesista=ventura`, `?solo=baja,media`, `?variantes=sombras,luces`, `?vueltas=3`, `?mp=0.5,1.5`, `?n=10`.
+
+Cómo mide, para que sirva con la máquina en uso:
+
+1. Una **medida** es el costo de un cuadro sin esperar a la pantalla (dibuja y lee un píxel, que obliga a la placa a terminar), mediana de 10 cuadros, a 0,5 y a 1,5 MP; con los dos puntos traza la recta costo = fijo + por MP.
+2. **Calidades**, en tres vueltas: Baja, Móvil, Baja, Media, Baja, Alta… Cada calidad se compara con la Baja medida justo antes (`vsBajaMs`).
+3. **Variantes de Baja**, en tres vueltas, intercaladas con la escena completa: A, B, A, C, A… Cada variante se compara con el promedio de las dos completas que la rodean, no con una de hace un minuto. Se informa la mediana de las vueltas y el rango.
+4. Lo que una variante compila **se libera al deshacerla**: por cada material de la escena con programas nuevos, se le deja a three solo esos en su mapa y se le avisa que el material se descartó; three los suelta por su camino de siempre y el material vuelve a tomar los suyos, ya compilados (`programasSobrantes` tiene que dar 0). Lo que no se puede soltar desde afuera son los programas de los materiales internos de la pasada de sombra de three, cuya clave incluye cuántas luces hay: quedan después de «contraluces», «luces» y «post» (unos 6, 6 y 2 por software) y se informan en `programasInternos`; no se usan después de deshacer la variante. Destruir los programas a mano no sirve: three los sigue teniendo en su caché por clave y la vuelta siguiente usa uno destruido (0x502; pasó en la segunda corrida). Y a un `ShaderMaterial` el aviso le borra los ids de su código, así que al volver compilaba otra vez lo mismo con otra clave (13 programas de más por variante de luces): durante el aviso deja de parecer `ShaderMaterial`.
+5. **Cuadros de verdad**: búsqueda sobre la resolución con `requestAnimationFrame` para «Baja completa» (cada prueba descarta 10 cuadros y mide hasta 50): cuántos MP sostiene sin perder ningún refresco.
+6. Si se acaba el tiempo, se cortan vueltas enteras (todas las variantes con las mismas vueltas) y lo dice una nota.
+
+Variantes de «Baja»: sin sombras, sombra de 1024 (más cara: para saber si se puede pagar), sin público, sin haces, sin bruma ni puntos de luz, sin los tres contraluces, solo la clave y la luz de sala, **post** (la Baja de antes: destino HDR, MSAA 4 y pase final; su «ahorro» negativo es lo que ahorra el camino directo), sin arena, sin el segundo modelo (tiene que dar 0), sin pesista, pesista con malla completa, sin normales de detalle, sin pelo, sin barra, piso con material difuso simple, anisotropía 1.
+
+Columnas (los nombres largos están en `BANCO.columnas`):
+
+| Columna | Campo | Qué es |
+|---|---|---|
+| Calidad / Variante | `nombre` | «Baja completa» es la escena del juego por defecto; «Baja sin sombras» es esa escena con una sola cosa menos |
+| Vueltas | `vueltas` | Cuántas medidas hay; los números son la mediana |
+| Fijo ms | `fijoMs` | Lo que cuesta el cuadro aunque no se dibuje ningún píxel: geometría, esqueletos, pasada de sombra, llamadas |
+| Por MP ms | `porMPms` | Lo que agrega cada megapíxel: materiales, luces, MSAA |
+| A 1 MP ms | `ms1MP` | Fijo más por MP |
+| Rango a 1 MP | `ms1MPmin`, `ms1MPmax` | La menor y la mayor de las vueltas (`dispersion`: rango sobre mediana) |
+| A la de la pantalla ms | `msNativo` | El costo a la resolución de la pantalla (`BANCO.nativoMP`) |
+| MP que entran (cuenta) | `mpModelo` | Megapíxeles que caben en el 85 % del período según la recta |
+| MP sin perder refrescos | `mpReal` | Lo medido con la pantalla: la mayor resolución probada sin perder un refresco |
+| Pierde desde MP | `mpFalla` | La menor probada que sí perdió. El límite real está entre las dos |
+| Contra Baja ms | `vsBajaMs` | Solo calidades: costo a 1 MP menos el de la Baja de justo antes |
+| Ahorro ms | `ahorroMs` | Cuánto baja el costo a 1 MP contra las completas de al lado. Negativo: cuesta más |
+| Rango del ahorro | `ahorroMin`, `ahorroMax` | El menor y el mayor ahorro de las vueltas |
+| Ahorro % | `ahorroPct` | El ahorro sobre el costo de la completa a 1 MP |
+| Del fijo, Por MP | `ahorroFijoMs`, `ahorroPorMPms` | El ahorro separado en costo fijo y por megapíxel |
+| Llamadas, Triángulos | `llamadas`, `triangulos` | De un cuadro entero, con la pasada de sombra |
+| Programas sobrantes | `programasSobrantes` | Programas de materiales de la escena que quedaron después de deshacer la variante. Tiene que ser 0. Los internos de three van en `programasInternos` |
+| ruidosa | `ruidosa` | El número no sirve para decidir: las completas de alrededor difieren 15 % o más, el rango de los ahorros es 15 % o más del costo de la completa, o los ahorros cambian de signo con mediana chica. En «Baja completa» marca que la máquina cambió de carga (las comparaciones siguen valiendo) |
+
+Además: `BANCO.deriva` (costo de la completa al principio y al final de las variantes; si cambia mucho, la máquina cambió de carga), `medidas` (cada medida con sus puntos), `sondas` (cada prueba con pantalla: MP, cuadros, refrescos perdidos, mediana, percentil 99, máximo, ms de hilo principal), `dispersionBases`, `mallasEsqueleto`, `programas`.
+
+**Qué tiene que mirar el orquestador en el Chrome del usuario** (con la pestaña a la vista, sin recargar durante 2 minutos, y con la máquina como la usa siempre):
+
+1. `juego.html?banco=1` y, al terminar, «Copiar el JSON». Lo primero: `BANCO.errores` vacío, `programasSobrantes` en 0 en todas las variantes, `BANCO.deriva` (cuánto cambió la máquina durante la corrida) y cuántas variantes salieron «ruidosas».
+2. «Baja completa»: `ms1MP`, `fijoMs`, `porMPms`, `mpModelo` y sobre todo **`mpReal`**. **Objetivo de esta vuelta: `mpReal` de 1,3 MP o más**, o, si las sondas salieron sucias por la carga, `fijoMs + 1,3 × porMPms` ≤ 11,3 ms (el 85 % de 13,34).
+3. «Baja post» (la Baja de antes): su `ahorroMs` negativo dice cuánto ahorró el camino directo. Si no es claramente negativo (y no es ruidosa), el camino directo no sirvió en esa placa.
+4. Las variantes con más ahorro y sin «ruidosa»: es lo próximo que hay que abaratar (luces, haces, piso…). «sin el segundo modelo» tiene que dar cerca de 0.
+5. Después, una partida en `juego.html?depura=1`: `JUEGO.calidad` (qué eligió la calibración, cuántos MP, si bajó y por qué) y `JUEGO.perf.largos` (dónde cayeron los cuadros que perdieron un refresco). Y **mirar la imagen**: el camino directo tiene que verse como antes (tono, viñeta, niebla del fondo, haces).
+
+**Cómo se probó.** Sin navegador en esta máquina. `node tools/perf_test.mjs` (58 comprobaciones): el tono en JavaScript coincide con el del sombreador, la arena se junta sin moverse, y el banco entero contra una escena simulada que se va cargando hasta 30 % y con medidas que salen el doble de caras: recupera los ahorros con la deriva, marca ruidosas, libera los programas de cada variante y termina en el tiempo. `tools/sim_test.mjs`: verde.
+
+Actions, por software (SwiftShader; los tiempos no valen, cuentan las llamadas y que corra entero):
+
+- «Banco y calibración», run 43249216685 sobre c05160d: **verde**. La calibración corre de punta a punta sin errores de WebGL; el banco, con `?mp=0.06,0.18&n=4&vueltas=2` (lo pone `tools/banco.mjs` con dibujo por software), mide las 4 calidades y las 17 variantes en dos vueltas, sin errores, con `programasSobrantes` en 0 en todas. Quedan 28 programas internos de three más que al empezar (pasada de sombra de las otras calidades y de las variantes de luces).
+- «Pruebas del juego»: verde desde 8d8bd91 (la primera corrida, sobre 8c0fa1c, cayó por el `#include` de los haces a mitad de línea).
+- Llamadas de dibujo de un cuadro de «Baja completa» en el banco: **182** (antes 243). Sin sombras, 136: la pasada de sombra pasó de 96 a 46 llamadas (pesista, copias de la barra y 13 piezas de tarima y alfombra). Sin barra, 110: la barra se lleva unas 60 llamadas en la pasada principal (cada disco es cuerpo, cubo y dos caras; el eje, nueve tramos). Sin arena, 96. Triángulos: 178 mil (antes 188 mil).
+- Corridas que fallaron en el camino, por si vuelve a pasar algo parecido: 43241143449 (`#include` a mitad de línea: los haces no compilaban), 43243020395 y 43244595018 (programas destruidos a mano que three seguía usando: 0x502; programas de más que no se soltaban).
+
+**Lo que no está medido o no cumple:**
+
+- **Fluidez en la Mac del usuario: sin medir.** No se sabe si «Baja» directa entra en 11,3 ms a 1,3 MP. Lo dice el banco del punto anterior.
+- **El aspecto del camino directo no se miró en ninguna placa.** Las capturas de Actions son por software y con `?dibujo=0` no dibujan el 3D.
+- **El MSAA del lienzo** cuesta en placas que no son por mosaicos (Intel, NVIDIA de escritorio) y no se puede apagar sin recrear el contexto. En «Media» y «Alta» (post) no agrega nada visible y se paga igual.
+- **Luces y materiales del piso** siguen iguales: seis focos, una direccional y la de sala en cada material iluminado. Esperan al banco.
+- **La barra son unas 60 llamadas de dibujo** en la pasada principal (cada disco: cuerpo con dos grupos de material, y dos caras). Juntar por material todo lo de cada lado (manga, discos y traba se mueven juntos) las bajaría a unas 16; no se hizo: hay que rehacerlo en cada cambio de carga y no se pudo mirar.
+- **«Programas» no vuelve exactamente al valor del principio**: los de los materiales de la escena sí, pero quedan los internos de la pasada de sombra de three (unos 28 por software). No se usan.
+- **El primerísimo plano de la cara** en el panel del llamado propio (`escena.primerPlano('cara')` en `main.js`) no se tocó: no es de esta parte.
+
 ### Pruebas en GitHub Actions (12-nov, rama `demo`)
 
 Ya no hay pod ni máquina con navegador para las pruebas: corren en GitHub Actions (`.github/workflows/pruebas.yml`, repo público, `ubuntu-latest`, Node 22, Chrome 156 del runner) en cada push a `demo`. Pasos: `sim_test`, `play_human`, `check_game` y `check_fluidez --tutorial`; cada uno corre aunque falle el anterior. Unos 12 minutos.
@@ -410,7 +460,7 @@ gh workflow run pruebas.yml -R jvidelac1/tarima --ref demo           # a pedido
 - **Primera corrida** (commit c87bd02, run 43226037618): verde. `check_game` en 3 min 50 s (partida por teclado 152✓ 157✓ 160✗ a propósito, 190✓ 195✓ 198✓; por toques 6 de 6; Clásico y «lento» bien; el primer intento a velocidad real salió válido en las dos vías). `check_fluidez` en 3 min 25 s: 85 Espacio enviados y 85 recibidos, 42 aceptados y 17 descartados con motivo dentro del intento (4 espera, 4 rebote, 9 sobra), tres arranques y un dos tiempos válidos, tutorial de 13 s con un solo levantamiento.
 - **Segunda corrida y corrida a pedido** (commit 79519e0, runs 43228276473 y 43228330433): verdes, con los mismos números (85 Espacio enviados y recibidos, cuatro levantamientos válidos, tutorial de 13 s). `gh workflow run pruebas.yml --ref demo` funciona aunque el flujo no esté en `main`.
 - **Corrida sobre c3a9fee** (run 43237685694, 10 min 42 s): verde, los cuatro pasos y las capturas. `check_fluidez`: cuatro levantamientos propios válidos, tutorial de 13 s con el guiado válido. `play_human` y `sim_test` sin cambios de referencias.
-- **El flujo aparte «Banco y calibración» está en rojo** (runs 43235024461 sobre 928f42a y 43237685661 sobre c3a9fee), siempre por lo mismo: `banco: baja-segundo: error de WebGL 0x506` (`glBlitFramebuffer: Attachments are not all the same size`). Causa probable en `web/js/game/banco.js`: la variante `directo` se deshace con `escena.directo = false`, pero «Baja» ya es camino directo (`PRESET.baja.directo`), así que desde ahí la escena queda en el camino con post, sin `_modo()`, y la variante siguiente (`segundo`) es la primera que lo dibuja. Además, todas las variantes de «Baja» que vienen después (`segundo` a `aniso`) se miden en el camino equivocado, y la variante `directo` no cambia nada. Arreglo sugerido: guardar el valor anterior y restaurarlo con `escena.setDirecto(previo)`. No se tocó desde el flujo de pruebas: es código del juego.
+- **(Resuelto en la tercera vuelta de fluidez: run 43249216685 en verde.)** **El flujo aparte «Banco y calibración» está en rojo** (runs 43235024461 sobre 928f42a y 43237685661 sobre c3a9fee), siempre por lo mismo: `banco: baja-segundo: error de WebGL 0x506` (`glBlitFramebuffer: Attachments are not all the same size`). Causa probable en `web/js/game/banco.js`: la variante `directo` se deshace con `escena.directo = false`, pero «Baja» ya es camino directo (`PRESET.baja.directo`), así que desde ahí la escena queda en el camino con post, sin `_modo()`, y la variante siguiente (`segundo`) es la primera que lo dibuja. Además, todas las variantes de «Baja» que vienen después (`segundo` a `aniso`) se miden en el camino equivocado, y la variante `directo` no cambia nada. Arreglo sugerido: guardar el valor anterior y restaurarlo con `escena.setDirecto(previo)`. No se tocó desde el flujo de pruebas: es código del juego.
 - **Visto en las dos corridas, sin investigar:** en el paso de capturas el arranque guiado del tutorial terminó en fallo (dos luces rojas en la captura `capturas/tut_*_decision_.jpg`). Ahí la prueba deja Espacio apretado mientras saca la foto (unos 0,3 s o más) y atrasa los toques; `sim_test` da el guiado por imposible de fallar con toques de 100 ms a 3 s, así que hay un caso (tecla sostenida o pausa larga en ¡EMPUJÁ!) que no cubre.
 - **Límites.** Nada de esto dice cuántos cuadros por segundo da el juego: eso se mide en la Mac del usuario. Chrome del runner sin pantalla entrega cuadros a 60 Hz, no a 75. No se prueba ningún teléfono real.
 
@@ -452,7 +502,7 @@ Porcentaje de válidos · meta. Jugadores simulados con error típico de 25, 40 
 
 ### Pendientes del juego
 
-- **Correr `juego.html?banco=1` en la Mac del usuario** y, con la tabla, decidir qué se abarata de la escena (luces secundarias, materiales del piso, MSAA): es lo que falta para que «Baja» llegue a la resolución de la pantalla a 75 Hz. Después, jugar una partida y mirar `JUEGO.calidad` (qué eligió la calibración y si bajó) y `JUEGO.perf.largos` (dónde cayeron los cuadros largos). Después, un teléfono real (`JUEGO.perf.resumen()` da mínimo y mediana de cuadros por tramo).
+- **Correr `juego.html?banco=1` en la Mac del usuario** (el banco nuevo de la tercera vuelta, que aguanta la máquina cargada) y, con la tabla, decidir qué se abarata de la escena (luces secundarias, haces, materiales del piso): es lo que falta para que «Baja» llegue a la resolución de la pantalla a 75 Hz. Qué mirar: «Fluidez, tercera vuelta». Después, jugar una partida y mirar `JUEGO.calidad` (qué eligió la calibración y si bajó) y `JUEGO.perf.largos` (dónde cayeron los cuadros largos). Después, un teléfono real (`JUEGO.perf.resumen()` da mínimo y mediana de cuadros por tramo).
 - Decidir si hace falta un selector de gráficos en pantalla (hoy `?q=media`) y si el gobernador tiene que poder volver a subir (hoy solo baja; la calibración sí puede elegir una calidad más alta al cargar).
 - Rehacer `tools/primera.mjs` sobre el tutorial nuevo, o borrarlo y dejar `check_fluidez --capturas`.
 - Pruebas en Actions: `workflow_dispatch` y el flujo viven solo en `demo`; al fusionar a `main` revisar el filtro de ramas. Falta una prueba del gobernador que corra sin placa (hoy `--gobernador` necesita dibujar de verdad).
