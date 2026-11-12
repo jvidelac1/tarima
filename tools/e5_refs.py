@@ -43,6 +43,7 @@ REFS, GEN = 'out/arte/refs', 'out/arte/refs_gen'
 PUENTES = {'@Switch (Model)': 'on_false', '@Switch (CFG)': 'on_false', '@Switch (Steps)': 'on_false'}
 SEM = {'rest_bust': 2100, 'fin_bust': 2200, 'fin_full': 2300}
 NVISTA = {'front': 1, 'left': 2, 'back': 3, 'right': 4}
+DENOISE = 1.0     # --denoise: menos de 1 parte del render crudo con ruido (conserva más la silueta y cambia menos la forma)
 
 V_IND = 2      # versión de las indicaciones (queda anotada en cada intento)
 QUIEN = ('the same fictional adult male weightlifter with accurate, clearly readable muscle anatomy of an elite 81 kg class '
@@ -175,6 +176,7 @@ def correr(nombre, semilla, plan):
     sal = f'{GEN}/qwen/{nombre}_s{semilla}.png'
     if os.path.exists(ruta(sal)) and os.path.exists(ruta(sal + '.json')): return sal
     plan['trabajos'][0].update(salida=sal, semilla=semilla)
+    if DENOISE < 1: plan.setdefault('fijos', {})['KSampler.denoise'] = DENOISE
     tj = ruta('out/arte/comfy', f'e5_{nombre}_s{semilla}.json'); os.makedirs(os.path.dirname(tj), exist_ok=True)
     json.dump(plan, open(tj, 'w'), ensure_ascii=False, indent=1)
     r = subprocess.run(['node', 'tools/comfy_run.mjs', '--trabajos=' + os.path.relpath(tj, ROOT)], cwd=ROOT)
@@ -196,7 +198,7 @@ def lote(nombre, plan_de, a):
         semilla = base + 10 * k; t0 = time.time()
         sal = correr(nombre, semilla, plan_de())
         d, _ = medir(ruta(sal), ruta(REFS, nombre + '.png'), a.umbral)
-        d.update(ronda=k, semilla=semilla, archivo=sal, orden=getattr(a, 'orden', None), indicacion_v=V_IND, segundos=round(time.time() - t0, 1))
+        d.update(ronda=k, semilla=semilla, archivo=sal, orden=getattr(a, 'orden', None), indicacion_v=V_IND, denoise=DENOISE, segundos=round(time.time() - t0, 1))
         hechos.append(d); json.dump(hechos, open(ruta(GEN, 'qwen', nombre + '.intentos.json'), 'w'), indent=1)
         print(f"MED {nombre} s{semilla} IoU {d['iou']:.4f} (sin rellenar {d['iou_sin_rellenar']:.4f}, techo {d['iou_techo_del_metodo']:.4f}) "
               f"área x{d['area_relativa']:.3f} fondo p99 {d['fondo_p99']:.0f} máx {d['fondo_max']} >24: {d['fondo_sobre_24_pct']} % "
@@ -236,7 +238,7 @@ def cmd_vistas(a):
             m = lote(nombre, lambda: {'plantilla': 'image_qwen_image_edit_2511_int8', 'puentes': PUENTES,
                                       'agregar': {'ref2': {'class_type': 'LoadImage', 'inputs': {'image': ''}},
                                                   'ref2s': {'class_type': 'FluxKontextImageScale', 'inputs': {'image': ['ref2', 0]}}},
-                                      'fijos': {'TextEncodeQwenImageEditPlus.image2': ['ref2s', 0]},
+                                      'fijos': {'TextEncodeQwenImageEditPlus.image2': ['ref2s', 0], **({'VAEEncode.pixels': ['ref2s', 0]} if a.orden == 'plan' else {})},
                                       'trabajos': [{'indicacion': p_vista(vista, a.orden, juego), 'negativa': NEG, 'imagenes': im}]}, a)
             print(f"VISTA {nombre}: queda s{m['semilla']} con IoU {m['iou']:.4f}" if m else f"VISTA {nombre}: sin intentos válidos", flush=True)
 
@@ -253,8 +255,12 @@ def cmd_cerrar(a):
                 e = {'origen': 'qwen', 'semilla': m['semilla'], 'de': m['archivo'], 'iou': d['iou'], 'fondo_p99': d['fondo_p99'], 'fondo_max': d['fondo_max']}
             else:
                 shutil.copyfile(crudo, dst)
+                if m and not fuerza:      # la mejor repintada que no llegó al objetivo queda aparte, por si sirve igual
+                    alt = ruta(GEN, 'bajo_umbral', nombre + '.png'); os.makedirs(os.path.dirname(alt), exist_ok=True)
+                    d, mk = medir(ruta(m['archivo']), crudo, a.umbral); con_alfa(ruta(m['archivo']), mk, alt)
                 e = {'origen': 'cruda', 'motivo': 'descartada a ojo' if fuerza and m else ('sin intentos' if not hechos else 'todos los intentos descartados a ojo' if not m else f"mejor IoU {m['iou']:.4f}, fondo {'limpio' if m['fondo_limpio'] else 'sucio'}")}
-            e['intentos'] = [{k: h.get(k) for k in ('semilla', 'iou', 'iou_sin_rellenar', 'area_relativa', 'fondo_p99', 'fondo_max', 'fondo_limpio', 'orden', 'indicacion_v', 'segundos', 'descartada')} for h in hechos]
+                if m and not fuerza: e.update(mejor_bajo_umbral=f'{GEN}/bajo_umbral/{nombre}.png', semilla=m['semilla'], de=m['archivo'], iou=m['iou'])
+            e['intentos'] = [{k: h.get(k) for k in ('semilla', 'iou', 'iou_sin_rellenar', 'area_relativa', 'fondo_p99', 'fondo_max', 'fondo_limpio', 'orden', 'indicacion_v', 'denoise', 'segundos', 'descartada')} for h in hechos]
             res['imagenes'][nombre] = e
             print(f"{nombre}: {e['origen']}" + (f" s{e['semilla']} IoU {e['iou']:.4f}" if e['origen'] == 'qwen' else f" ({e['motivo']})"))
     json.dump(res, open(ruta(GEN, 'resumen.json'), 'w'), ensure_ascii=False, indent=1)
@@ -283,7 +289,7 @@ def hoja(nombre, lado=512):
         dif = np.zeros(ar.shape + (3,), 'uint8'); dif[ar & m] = 70; dif[m & ~ar] = (255, 40, 40); dif[ar & ~m] = (60, 120, 255)
         fila = Image.new('RGB', (lado * 3, lado + 22), (20, 20, 20))
         for k, im in enumerate([cr, g.resize((lado, lado), Image.LANCZOS), Image.fromarray(dif).resize((lado, lado), Image.LANCZOS)]): fila.paste(im, (k * lado, 22))
-        ImageDraw.Draw(fila).text((6, 5), f"{nombre} s{h['semilla']} v{h.get('indicacion_v', 1)} IoU {h['iou']:.4f} area x{h['area_relativa']:.3f} fondo p99 {h['fondo_p99']:.0f}"
+        ImageDraw.Draw(fila).text((6, 5), f"{nombre} s{h['semilla']} v{h.get('indicacion_v', 1)} d{h.get('denoise', 1.0)} {h.get('orden') or ''} IoU {h['iou']:.4f} area x{h['area_relativa']:.3f} fondo p99 {h['fondo_p99']:.0f}"
                                   + (' DESCARTADA: ' + h['descartada'] if h.get('descartada') else ''), fill=(255, 255, 255))
         filas.append(fila)
     out = Image.new('RGB', (lado * 3, sum(f.size[1] for f in filas))); y = 0
@@ -318,7 +324,8 @@ if __name__ == '__main__':
     ap.add_argument('--umbral', type=int, default=16); ap.add_argument('--iou', type=float, default=0.92)
     ap.add_argument('--crudas', default='', help='nombres que quedan con el render crudo aunque midan bien (descartadas a ojo)')
     ap.add_argument('--personaje', default='ventura')
-    a = ap.parse_args(); a.juegos = a.juegos.split(','); a.vistas = a.vistas.split(','); a.crudas = [x for x in a.crudas.split(',') if x]
+    ap.add_argument('--denoise', type=float, default=1.0, help='denoise del muestreador; el lienzo es el render crudo de la vista (en orden plan, se cambia el lienzo a la imagen 2)')
+    a = ap.parse_args(); DENOISE = a.denoise; a.juegos = a.juegos.split(','); a.vistas = a.vistas.split(','); a.crudas = [x for x in a.crudas.split(',') if x]
     if a.cmd == 'medir':
         d, _ = medir(a.resto[0], a.resto[1], a.umbral); print(json.dumps(d, indent=1))
     else: {'frente': cmd_frente, 'vistas': cmd_vistas, 'cerrar': cmd_cerrar, 'objetivo': cmd_objetivo, 'descartar': cmd_descartar, 'hoja': cmd_hoja}[a.cmd](a)
