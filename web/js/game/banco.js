@@ -64,7 +64,8 @@ export const COLUMNAS = {
   triangulos: 'Triángulos de un cuadro (incluye la pasada de sombra).',
   mallasEsqueleto: 'Mallas con esqueleto que de verdad se dibujan.',
   programas: 'Programas de sombreado compilados mientras se medía la variante.',
-  programasSobrantes: 'Programas que quedaron compilados después de deshacer la variante y liberar lo suyo. Tiene que ser 0.',
+  programasSobrantes: 'Programas de los materiales de la escena que quedaron después de deshacer la variante y liberar lo suyo. Tiene que ser 0.',
+  programasInternos: 'Programas de materiales internos de three (la pasada de sombra: su clave incluye cuántas luces hay) que quedaron compilados y el banco no puede soltar desde afuera. No se usan después de deshacer la variante.',
   errorGL: 'Si aparece: WebGL dio un error mientras se medía esa variante (código en hexadecimal). Ese número no vale.',
 };
 
@@ -133,6 +134,7 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
     return s;
   };
   const foto = () => { const f = new Map(); for (const m of materiales()) { const mp = r.properties.get(m).programs; f.set(m, new Set(mp ? mp.values() : [])); } return f; };
+  const extras = f => { let n = 0; for (const m of materiales()) { const mp = r.properties.get(m).programs, antes = f.get(m) || new Set(); if (mp) for (const p of mp.values()) if (!antes.has(p)) n++; } return n; };
   const liberar = f => {
     let n = 0;
     for (const m of materiales()) {
@@ -165,7 +167,8 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
     poner(valor); return () => poner(null);
   };
   const pelo = () => { const a = escena.activo; return ocultar([...a.meshes.filter(m => [].concat(m.material).some(x => x.name === 'Hair')), a.hairDepth]); };
-  const sombraDe = n => () => { L.setQuality({ ...escena.Q, shadow: n }); escena._sombras(); escena.sombra = 4; return () => { L.setQuality(escena.Q); escena._sombras(); escena.sombra = 4; }; };
+  // misma cantidad de muestras del desenfoque VSM que en 512 (penumbra algo más dura): si no, el desenfoque compila otro programa
+  const sombraDe = n => () => { L.setQuality({ ...escena.Q, shadow: n, shadowR: (escena.Q.shadowR ?? 4) * 512 / n }); escena._sombras(); escena.sombra = 4; return () => { L.setQuality(escena.Q); escena._sombras(); escena.sombra = 4; }; };
   const MENOS = [
     { id: 'sombras', nombre: 'sin sombras', poner: () => { escena.setSombras(false); return () => escena.setSombras(true); } },
     { id: 'sombra1024', nombre: 'sombra en un mapa de 1024 (más cara)', poner: sombraDe(1024) },
@@ -199,7 +202,10 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
     } catch (e) { v.error = String(e.stack || e); B.errores.push(`${v.id}: ${e}`); console.error(e); }
     finally {
       try { if (deshacer) deshacer(); usar(); liberar(f); usar(); } catch (e) { B.errores.push(`${v.id} (deshacer): ${e}`); }
-      const sobra = progs() - p0; v.programasSobrantes = Math.max(v.programasSobrantes || 0, sobra);
+      // de los materiales de la escena no tiene que quedar nada; lo demás son materiales internos de three (los de la pasada de
+      // sombra, cuya clave incluye cuántas luces hay), que el banco no puede soltar desde afuera y que no se usan
+      const deEscena = extras(f), total = progs() - p0;
+      v.programasSobrantes = Math.max(v.programasSobrantes || 0, deEscena); v.programasInternos = Math.max(v.programasInternos || 0, total - deEscena);
     }
     return m;
   };
@@ -309,7 +315,7 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
   if (cb && queda(5000)) { decir('búsqueda con pantalla · Baja completa'); await unCuadro(); try { Object.assign(cb, await buscar(cb.mpModelo100 ?? 1)); } catch (e) { B.errores.push(`baja (búsqueda): ${e}`); console.error(e); } }
   else if (cb) B.notas.push('Sin tiempo para la búsqueda con cuadros de verdad.');
   usar(); liberar(fotoBaja); usar(); B.programasAlTerminar = progs();
-  if (B.programasAlTerminar > programas0) B.notas.push(`Quedaron ${B.programasAlTerminar - programas0} programas más que al empezar.`);
+  if (B.programasAlTerminar > programas0) B.notas.push(`Quedaron ${B.programasAlTerminar - programas0} programas más que al empezar (internos de three; ver programasInternos por variante).`);
   // la imagen queda como en el juego
   escena.lodFijo = null; escena.setTope(Math.min(nativoMP, 2) * 1e6); escena.bucle(T0, 0); escena.cuadro(0, true);
   const eg = errorGL(); if (eg) B.errores.push(`al terminar: error de WebGL ${eg}`);
