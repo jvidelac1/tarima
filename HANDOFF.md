@@ -290,7 +290,7 @@ El usuario pidió «emoción (ayudantes cambiándole peso), ver cómo un pesista
   - `tools/check_escenas.mjs` (con navegador): arma las 23 escenas en los dos modelos, mide cuadro a cuadro la holgura entre la barra y el cuerpo, prueba la carga animada y el plano del llamado, y deja capturas en `out/escenas/`.
   - Las dos corren en Actions.
 
-**Medido** (Actions, run 43265823178 sobre a17032d, dibujo por software):
+**Medido** (Actions, dibujo por software: run 43265823178 sobre a17032d, y run 43267950535 sobre 3e48a23 con los encuadres más abiertos, los dos en verde):
 
 - `check_escenas`: 46 finales (23 escenas por 2 modelos), cero cuadros BAD.
   - **Criterio**: el cuerpo se aproxima con cápsulas gruesas (tronco 13 cm, muslo 7,5 cm…). En la pose del final, que es una fase de `poses.json` validada en Blender, la barra apoyada en los hombros o rozando la cadera ya da holgura negativa contra esas cápsulas: hasta −2,4 cm en el rack de la cargada. Por eso un cuadro es BAD si la barra atraviesa un segmento **más** de lo que lo atravesaba en esa pose, con 5 mm de margen.
