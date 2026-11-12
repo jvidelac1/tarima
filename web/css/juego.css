@@ -73,6 +73,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 .s-teclas .tecla:nth-child(n+2){display:none}
 .s-avance{display:none;position:absolute;left:8%;right:8%;bottom:calc(var(--v)*1.1);height:calc(var(--v)*1);background:#1a2040;border:1px solid var(--line)}
 .s-avance b{display:block;height:100%;width:0;background:var(--teal)}
+.s-avance i{position:absolute;left:0;top:0;height:100%;width:0;background:repeating-linear-gradient(135deg,var(--red) 0 4px,#7a1d1a 4px 8px);border-right:2px solid #fff}
+.senal.apuro .s-sub{color:var(--gold);font-weight:700}
 .s-sub{font-family:var(--body);text-transform:none;font-size:calc(var(--v)*1.12);line-height:1.3;color:var(--ink);min-height:1.3em;max-width:100%}
 .s-pal{font-weight:800;font-size:calc(var(--v)*2.1);line-height:1.15;min-height:1.15em;letter-spacing:.05em;color:#fff;white-space:nowrap}
 .s-pal.floja{color:#ffb020}.s-pal.mal{color:#ff6a5e}
@@ -140,6 +142,7 @@ button:focus{outline:3px solid var(--gold);outline-offset:2px}
 /* la fila de acción del inicio queda a la vista aunque el panel no entre (teléfono) */
 .panel .pie{position:sticky;bottom:0;margin:.5em calc(-1*clamp(10px,2.2cqh,22px)) calc(-1*clamp(10px,2.2cqh,22px));padding:8px clamp(10px,2.2cqh,22px);background:#080d1e;border-top:1px solid var(--line)}
 .panel p.falla{color:var(--ink);border-left:3px solid var(--red);padding-left:.7em}
+.panel p.que{color:var(--ink);border-left:3px solid var(--gold);padding-left:.7em;font-size:clamp(13px,2.1cqh,16px)}
 .pesistas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:.6em 0}
 .pesista{display:block;text-align:left;padding:.5em .6em;text-transform:none;letter-spacing:0;font-family:var(--body);font-weight:400;min-width:0}
 .pesista .b{height:1.4em;margin-bottom:.4em}

@@ -70,7 +70,7 @@ export class Intento {
       if (t < M.ign) return;
       const d = errorAnillo(Math.max(0, t - c.cal - M.t0), this.per);
       M.grado = c.ctl === 'f' ? 'buena' : gradoTension(d); M.dTension = d; M.tp = t; M.w = this._w('exp');
-      if (M.mov === 'j') { M.tx = t + idiv(M.an.dip * 1000, this.vel); this.fase = 'flexion'; }
+      if (M.mov === 'j') { const dip = idiv(M.an.dip * 1000, this.vel); M.tx = t + (c.ctl === 'f' ? Math.max(dip, FACIL.cierreMs) : dip); this.fase = 'flexion'; }
       else { M.tk = t + idiv(M.an.knee * 1000, this.vel); M.tx = t + idiv(M.an.power * 1000, this.vel); this.fase = 'tiron'; }
       M.tTarde = M.tx + c.cal + M.w.l;
     } else if (this.fase === 'vuelo' || this.fase === 'empuje') {
@@ -88,13 +88,20 @@ export class Intento {
     if (this.fase === 'tiron') {
       const e = t - c.cal - M.tx;
       // amague: antes de la rodilla; en Fácil, también el tirón anticipado (entre la rodilla y el límite)
-      if (t < M.tk || (c.ctl === 'f' && e < -M.w.l)) { this.amagues++; M.amagues.push({ tp: M.tp, t }); const v = Math.min(t - M.tp, 600); M.t0 = M.ign = t + v; this.fase = 'tension'; return; }
+      if (t < M.tk || (c.ctl === 'f' && e < -M.w.l)) {
+        // Fácil: dos amagues por levantamiento; el tercero es fallo (tocar a ciegas no puede tirar los dados sin fin)
+        if (c.ctl === 'f' && M.amagues.length >= FACIL.amagues) { this.gestos.push({ g: 'explosion', mov: M.mov, e, pal: 'temprano', fuera: true }); return this._fallo(t, 'anticipado'); }
+        this.amagues++; M.amagues.push({ tp: M.tp, t }); const v = Math.min(t - M.tp, 600); M.t0 = M.ign = t + v; this.fase = 'tension'; return;
+      }
       this.rodilla = true;
       if (e < -M.w.l) { this.gestos.push({ g: 'explosion', mov: M.mov, e, pal: 'temprano', fuera: true }); return this._fallo(t, 'anticipado'); }
       this._explota(t, e);
     } else if (this.fase === 'flexion') {
       const e = t - c.cal - M.tx;
-      if (e < -M.w.l) { this.amagues++; M.amagues.push({ tp: M.tp, t }); M.t0 = M.ign = t + HOMBROS.amagueMs; this.fase = 'hombros'; return; }
+      if (e < -M.w.l) {
+        if (c.ctl === 'f' && M.amagues.length >= FACIL.amagues) { this.gestos.push({ g: 'explosion', mov: 'j', e, pal: 'temprano', fuera: true }); return this._fallo(t, 'anticipado'); }
+        this.amagues++; M.amagues.push({ tp: M.tp, t }); M.t0 = M.ign = t + HOMBROS.amagueMs; this.fase = 'hombros'; return;
+      }
       this._explota(t, e);
     } else if (this.fase === 'fijacion') {
       const f = this.fij; if (!f.abajo) return;
@@ -121,9 +128,13 @@ export class Intento {
   _recibe(t, e) {
     const M = this.M, c = this.c, wr = M.wr, a = Math.abs(e), q = calidad(e, wr);
     M.tq = t; M.e2 = e; M.q2 = q; this.gestos.push({ g: 'recepcion', mov: M.mov, e, pal: palabra(e, wr) });
-    const base = c.exiFija ?? exigenciaTabla(c.I), ad = Math.abs(M.des);
-    M.exi = base + (M.mov === 's' ? EXI_ARRANQUE : 0) + Math.min(EXI_ERROR.tope, M.perdida * EXI_ERROR.porMm) + (ad > 20 ? (ad - 20) * EXI_ERROR.porDesvio : 0) + (a <= wr.p ? 0 : lerpi(Math.min(a, wr.l), wr.p, wr.l, 0, EXI_ERROR.recepcion));
+    const base = c.exiFija ?? exigenciaTabla(c.I), ad = Math.abs(M.des), f = c.ctl === 'f';
+    // en Fácil, lo que cuesta empuje empieza donde termina BIEN: la palabra que se mostró no contradice a la subida
+    const porAltura = f ? Math.max(0, M.perdida - FACIL.perdidaLibre) * FACIL.porMm : M.perdida * EXI_ERROR.porMm, w0 = f ? wr.g : wr.p;
+    M.exi = base + (M.mov === 's' ? EXI_ARRANQUE : 0) + Math.min(EXI_ERROR.tope, porAltura) + (ad > 20 ? (ad - 20) * EXI_ERROR.porDesvio : 0) + (a <= w0 ? 0 : lerpi(Math.min(a, wr.l), w0, wr.l, 0, EXI_ERROR.recepcion));
     if (M.exi < 0) M.exi = 0;
+    // en Fácil la subida siempre pide toques: nadie queda de pie sin empujar
+    if (f) M.exi = Math.max(M.exi, esfuerzoPropio(c.garra) + FACIL.minEmpuje);
     const blando = M.mov !== 'c' && a > wr.g, L = blando ? lerpi(Math.min(a, wr.l), wr.g, wr.l, TRABA.ini, TRABA.iniLimite) : null;
     const squat = M.mov === 'j' && c.env === 'squat';
     if (M.mov === 'j' && !squat) {
@@ -148,13 +159,13 @@ export class Intento {
     p.A += d < PELEA.mitadMs ? PELEA.toque / 2 : PELEA.toque; p.ultToque = p.ultEmpuje = t; p.toques++; this.toques++;
   }
   _paso(t) {
-    const M = this.M, p = M.pelea, hz = PELEA.hz; p.k++;
+    const M = this.M, p = M.pelea, hz = PELEA.hz, f = this.c.ctl === 'f'; p.k++;
     const ms = t - p.t0, cae = ms > PELEA.aguanteMs ? idiv((ms - PELEA.aguanteMs) * PELEA.aguanteCae, 1000) : 0;
     p.A -= idiv(p.A, hz);
     const E = p.E = Math.min(1000, Math.max(0, p.propio - cae) + idiv(p.A, 1000));
     const i = p.k % PELEA.agujaPasos; p.suma += E - p.buf[i]; p.buf[i] = E; p.aguja = idiv(p.suma, PELEA.agujaPasos);
     if (p.modo === 'pelea') {
-      const X = p.exiAhora = p.exi + (p.P >= PELEA.estancaDe && p.P <= PELEA.estancaA && p.P < 1000000 ? PELEA.estanca : 0);
+      const X = p.exiAhora = p.exi + (p.P >= PELEA.estancaDe && p.P <= PELEA.estancaA && p.P < 1000000 ? (f ? 0 : PELEA.estanca) : 0);
       if (p.P < 1000000) {
         if (p.P < p.rebote) p.P += idiv(PELEA.topeSubir, hz);
         else {
@@ -166,14 +177,18 @@ export class Intento {
       }
       // temblor: empujar de más solo tiembla si hubo un toque reciente
       const reciente = t - p.ultEmpuje <= PELEA.recienteMs, sobre = p.aguja - (X + PELEA.franja);
-      if (reciente) { if (sobre > 0) p.T += idiv(PELEA.temblorExceso * sobre * 1000, hz); if (p.aguja > PELEA.roja) p.T += idiv(PELEA.temblorRoja, hz); }
+      // en Fácil empujar de más no hace temblar: «tocá rápido» es toda la regla
+      if (f) { if (!reciente) p.T -= idiv(PELEA.temblorBaja, hz); }
+      else if (reciente) { if (sobre > 0) p.T += idiv(PELEA.temblorExceso * sobre * 1000, hz); if (p.aguja > PELEA.roja) p.T += idiv(PELEA.temblorRoja, hz); }
       else p.T -= idiv(PELEA.temblorBaja, hz);
       const ad = Math.abs(M.des) - PELEA.desvioLibre; if (ad > 0) p.T += idiv(ad * PELEA.temblorDesvio, hz);
       if (p.T < 0) p.T = 0;
       p.enFranja = p.aguja >= X && sobre <= 0;
-      if (p.P < 1000000 && (p.aguja < X || (sobre > 0 && reciente))) { p.fuera++; this.fuera++; }
+      if (p.P < 1000000 && (p.aguja < X || (sobre > 0 && reciente && !f))) { p.fuera++; this.fuera++; }
       if (p.T >= 1000000) return this._fallo(t, 'temblor');
-      if (p.P === 0 && ms >= PELEA.graciaMs) { p.cero++; if (p.cero * 1000 >= PELEA.hundidoMs * hz) return this._fallo(t, M.mov === 'c' ? 'aplastado' : 'codos'); } else p.cero = 0;
+      // Fácil: la subida se corta apenas el avance se queda atrás del piso (no hay 12 s de toques para nada)
+      if (f) { if (p.P < 1000000 && ms > FACIL.plazoMs && p.P < (ms - FACIL.plazoMs) * FACIL.ritmo) return this._fallo(t, M.mov === 'c' ? 'aplastado' : 'codos'); }
+      else if (p.P === 0 && ms >= PELEA.graciaMs) { p.cero++; if (p.cero * 1000 >= PELEA.hundidoMs * hz) return this._fallo(t, M.mov === 'c' ? 'aplastado' : 'codos'); } else p.cero = 0;
     }
     if (!p.trabado) {
       const d = E - p.exiTraba;
@@ -181,7 +196,7 @@ export class Intento {
       if (p.L < TRABA.pierde) return this._fallo(t, 'codos');
       if (p.L >= 1000000) { p.L = 1000000; p.trabado = true; this.trabaMs = t - M.tq; }
     }
-    if (ms >= PELEA.maxMs) return this._fallo(t, p.modo === 'traba' || M.mov !== 'c' ? 'codos' : 'aplastado');
+    if (ms >= (f ? FACIL.maxMs : PELEA.maxMs)) return this._fallo(t, p.modo === 'traba' || M.mov !== 'c' ? 'codos' : 'aplastado');
     if (p.trabado && (p.modo === 'traba' || p.P >= 1000000)) this._enPie(t);
   }
   _enPie(t) {

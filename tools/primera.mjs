@@ -57,9 +57,13 @@ async function recorrido(via) {
         continue;
       }
       if (I.parado) { await page.waitForTimeout(700); await toque(); await page.waitForTimeout(120); if (g.tipo === 'cierre') await foto(`${tag}_${g.clave}_palabra`); continue; }
+      if (g.tipo === 'libre' && o.sin === g.clave) { if (/Quedan [1-7] s/.test(g.texto) && !vistas.has('quedan')) { vistas.add('quedan'); await foto(`${tag}_quedan`); } await page.waitForTimeout(100); continue; }
       if (g.tipo === 'libre') { await page.waitForTimeout(900); await toque(); continue; }
       if (g.tipo === 'cierre') { const kk = g.clave + g.desde; if (I.seDetiene || hecho === kk || o.sin === g.clave) { await page.waitForTimeout(15); continue; } await irA(g.objetivo + (o.atraso || 0)); await toque(); hecho = kk; await page.waitForTimeout(110); if (!vistas.has(g.clave + '_pal')) { vistas.add(g.clave + '_pal'); await foto(`${tag}_${g.clave}_palabra`); } continue; }
-      if (g.tipo === 'empuja') { if (s.ahora - ult >= 160) { await toque(); ult = s.ahora; } else await page.waitForTimeout(10); continue; }
+      if (g.tipo === 'empuja') {
+        if (o.fotoEmpuja && !vistas.has('piso') && s.ahora - g.desde >= o.fotoEmpuja) { vistas.add('piso'); await foto(`${tag}_empuja_piso`); }
+        if (s.ahora - ult >= (o.empujeCada || 160)) { await toque(); ult = s.ahora; } else await page.waitForTimeout(10); continue;
+      }
       await page.waitForTimeout(15);
     }
   }
@@ -93,12 +97,19 @@ async function recorrido(via) {
   await ok(); await hasta(() => JUEGO.estado().pantalla === 'presentacion' && JUEGO.estado().panel); await page.waitForTimeout(900); await foto('presentacion');
   if (!tel) { await page.keyboard.press('ArrowRight'); await page.waitForTimeout(150); }
   await ok();
-  for (let k = 0; k < 400; k++) {      // los rivales que salgan antes
-    const s = await E(); if (s.pantalla === 'llamado' && s.panel) break;
-    if (['resumen', 'decision', 'carga', 'repeticion'].includes(s.pantalla)) await toque(); await page.waitForTimeout(500);
-  }
-  await page.waitForTimeout(900); await foto('llamado_panel');
+  const alLlamado = async () => {      // los rivales que salgan antes, y los cortes
+    for (let k = 0; k < 400; k++) { const s = await E(); if (s.pantalla === 'llamado' && s.panel) break; if (['resumen', 'decision', 'carga', 'repeticion'].includes(s.pantalla)) await toque(); await page.waitForTimeout(500); }
+    await page.waitForTimeout(900);
+  };
+  await alLlamado(); await foto('llamado_panel');
   await ok(); await intento('final', { mitad: true }); await veredicto('final_veredicto');
+  if (!tel) {
+    // segundo intento: 33 s leyendo el panel (el reloj no corre), y después de confirmar no se toca: cuenta regresiva y nulo por reloj
+    await alLlamado(); await page.waitForTimeout(33000); await foto('llamado2_panel_tras_33s');
+    await ok(); await intento('reloj', { sin: 'tira' }); await veredicto('reloj_veredicto');
+    // tercer intento: un toque cada 500 ms en ¡EMPUJÁ! (lento): el rojo alcanza al avance y la subida se corta
+    await alLlamado(); await ok(); await intento('lento', { empujeCada: 500, fotoEmpuja: 2400 }); await veredicto('lento_veredicto');
+  }
   await ctx.close();
 }
 try { for (const via of ['escritorio', 'telefono', 'clasico'].filter(v => !ONLY || v === ONLY)) { console.log(`== ${via} ==`); await recorrido(via); } }

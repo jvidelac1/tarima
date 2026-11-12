@@ -5,11 +5,14 @@
 //    Después, con el reloj verdadero: pausa (Esc), ayuda (H), tutorial guiado y una práctica a velocidad real.
 //  - tactil (Fácil): lo mismo en tamaño de teléfono, con toques sobre la zona táctil y sobre los botones.
 //  - clasico: metrónomo y un intento de práctica con el esquema de mantener y soltar.
+//  - lento (Fácil, con Brenner): el arranque guiado tocando ¡EMPUJÁ! cada 600 ms tiene que salir válido a la primera; en la
+//    final, 40 s con el panel del llamado abierto no gastan reloj; y después de confirmar, sin tocar, la señal cuenta los
+//    últimos segundos y el nulo por reloj lleva su línea.
 //  - Falla ante errores de consola, excepciones, 404 o pedidos externos; si no se visitan todos los estados; si un panel
 //    abre sin foco en su botón principal; si un clic en el escenario agrega entradas; si la señal no se ve o se sale del
 //    escenario; si la barra queda bajo la tarima, separada de las manos o no sube en el tutorial; o si el registro
 //    exportado no recalcula a la misma tabla.
-// Uso: node tools/check_game.mjs [--headed] [--only=teclado|tactil|clasico] [--semilla=N] [--dibujo]
+// Uso: node tools/check_game.mjs [--headed] [--only=teclado|tactil|clasico|lento] [--semilla=N] [--dibujo]
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -41,7 +44,7 @@ const browser = await chromium.launch(launchOptions({ headed: HEADED }));
 const ESTADOS = ['inicio', 'presentacion', 'llamado', 'intento', 'decision', 'repeticion', 'resumen', 'intervalo', 'clasificacion', 'ceremonia', 'fin'];
 
 async function corrida(via) {
-  const tactil = via === 'tactil', clasico = via === 'clasico', tag = `[${via}]`;
+  const tactil = via === 'tactil', clasico = via === 'clasico', lento = via === 'lento', tag = `[${via}]`;
   const ctx = await browser.newContext(tactil ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true } : { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
   const page = await ctx.newPage(), cdp = tactil ? await ctx.newCDPSession(page) : null;
   page.on('console', m => { if (m.type() === 'error') problemas.push(`${tag} console.error: ${m.text()}`); });
@@ -118,7 +121,7 @@ async function corrida(via) {
           if (I.seDetiene || hecho === k || (g.clave === 'explota' && o.sinExplotar?.(llamado))) { await av(manual ? 30 : 15); continue; }
           await ir(g.objetivo); await toque(); hecho = k; continue;
         }
-        if (g.tipo === 'empuja') { if (s.ahora - ultToque >= 150) { await toque(); ultToque = s.ahora; } else await av(manual ? 16 : 10); continue; }
+        if (g.tipo === 'empuja') { if (s.ahora - ultToque >= (o.empujeCada || 150)) { await toque(); ultToque = s.ahora; } else await av(manual ? 16 : 10); continue; }
         await av(manual ? 30 : 15); continue;
       }
       if (s.pantalla === 'metronomo' && !metro && o.metronomo) {      // ocho toques sobre el pulso, con 30 ms de atraso
@@ -166,6 +169,37 @@ async function corrida(via) {
     if (!(r.alto.practica > 1.5)) mal(`en el calentamiento la barra no subió (máximo ${r.alto.practica?.toFixed(2)} m)`);
     for (const v of ['APRETÁ Y MANTENÉ', '¡SOLTÁ!', '¡APRETÁ!', 'DEJÁ APRETADO']) if (!vistas.has(v)) mal(`en Clásico no apareció la señal «${v}»`);
     await foto('practica'); await ctx.close(); return;
+  }
+
+  if (lento) {
+    // ---- el arranque guiado no se puede fallar, ni con el pesista de menos garra y un toque cada 600 ms en ¡EMPUJÁ!
+    if (!await pulsa('.pesista[data-id="brenner"]')) mal('no se pudo elegir a Brenner');
+    await jugar(s => s.pantalla === 'practica' && s.panel, true, { empujeCada: 600 });
+    const g = await J(() => JUEGO.E.propios || []);
+    console.log(`${tag} arranque guiado con Brenner y un toque cada 600 ms en ¡EMPUJÁ!: ${g.map(x => x.res + (x.causa ? ':' + x.causa : '')).join(' ')}`);
+    if (g.length !== 1 || g[0].pantalla !== 'guiado' || g[0].res !== 'valido') mal(`el arranque guiado con toques lentos no salió válido a la primera: ${JSON.stringify(g)}`);
+    // ---- la final: el panel del llamado no gasta reloj
+    await jugar(s => s.pantalla === 'llamado' && s.panel, true, { botones: ['#btn-saltear', '#capa .panel button.ir'] });
+    await J(() => JUEGO.test.avanzar(450));
+    const a1 = await J(() => ({ reloj: document.getElementById('reloj').textContent, txt: document.querySelector('#capa .panel').textContent }));
+    await J(() => JUEGO.test.avanzar(40000, 100));
+    const a2 = await J(() => ({ s: JUEGO.estado(), reloj: document.getElementById('reloj').textContent }));
+    console.log(`${tag} panel del llamado: reloj ${a1.reloj}; 40 s después, ${a2.reloj} (pantalla ${a2.s.pantalla})`);
+    if (a2.s.pantalla !== 'llamado' || !a2.s.panel || a2.reloj !== a1.reloj || !/^0:(30|45)$/.test(a1.reloj)) mal(`con el panel del llamado abierto el reloj corrió o venció: ${a1.reloj} → ${a2.reloj}, pantalla ${a2.s.pantalla}`);
+    if (!/arranca cuando confirmás/.test(a1.txt) || !/ENTER/.test(a1.txt)) mal(`el panel del llamado no dice cuándo arranca el reloj: «${a1.txt.replace(/\s+/g, ' ').slice(0, 300)}»`);
+    // ---- confirmar y no tocar: cuenta regresiva en la señal y nulo por reloj con su línea
+    await page.keyboard.press('Enter'); let aviso = '', ultimo = null;
+    for (let i = 0; i < 100 && !ultimo; i++) {
+      await J(() => JUEGO.test.avanzar(500));
+      const x = await J(() => ({ senal: document.getElementById('senal').hidden ? '' : document.getElementById('senal').textContent.replace(/\s+/g, ' '), reloj: document.getElementById('reloj').textContent, propios: JUEGO.E.propios || [], err: JUEGO.estado().errores }));
+      if (x.err.length) throw new Error('error en el juego: ' + x.err[0]);
+      if (!aviso && /Quedan \d+ s/.test(x.senal)) aviso = `${x.senal.trim()} (reloj ${x.reloj})`;
+      if (x.propios.length > 1) ultimo = x.propios[x.propios.length - 1];
+    }
+    console.log(`${tag} sin tocar después de confirmar: aviso «${aviso}» · ${ultimo ? `${ultimo.res}:${ultimo.causa} · «${ultimo.linea}»` : 'no terminó'}`);
+    if (!aviso) mal('la señal no avisó que se acababa el reloj');
+    if (!ultimo || ultimo.res !== 'nulo' || ultimo.causa !== 'reloj' || !/desde que confirmás/.test(ultimo.linea)) mal(`el nulo por reloj no salió con su línea: ${JSON.stringify(ultimo)}`);
+    await foto('reloj'); await ctx.close(); return;
   }
 
   // ---- 1. Fácil: partida completa con el reloj inyectado, sin mouse
@@ -246,9 +280,9 @@ async function corrida(via) {
 }
 
 try {
-  for (const via of ['teclado', 'tactil', 'clasico'].filter(v => !ONLY || v === ONLY)) await corrida(via);
+  for (const via of ['teclado', 'tactil', 'clasico', 'lento'].filter(v => !ONLY || v === ONLY)) await corrida(via);
 } catch (e) { problemas.push('excepción de la prueba: ' + (e.stack || e.message)); }
 await browser.close(); server.close();
 for (const n of notas) console.log('nota: ' + n);
 if (problemas.length) { console.log(`\nFALLÓ (${problemas.length}):`); for (const p of problemas.slice(0, 30)) console.log('  ' + p); process.exit(1); }
-console.log('\nOK: partida completa en Fácil por teclado (sin mouse) y por toques, y un intento en Clásico, sin errores de consola ni pedidos externos');
+console.log('\nOK: partida completa en Fácil por teclado (sin mouse) y por toques, un intento en Clásico, y tutorial guiado con toques lentos y reloj del llamado, sin errores de consola ni pedidos externos');

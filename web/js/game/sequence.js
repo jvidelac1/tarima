@@ -32,7 +32,7 @@ function tiron(M, now, m, G) {
   return Math.min(fondo, rec + (now - M.tc) / 1000);      // espera en la primera pose de reposo
 }
 function envion(M, now, m, G, env) {
-  const dip = G.t('Envión · Dip'), rec = G.t(REC[env]), bajar = t => Math.min(dip, (t - M.tp) / 1000 * m.vel / 1000);
+  const dip = G.t('Envión · Dip'), rec = G.t(REC[env]), bajar = t => (M.tx > M.tp ? mix(0, dip, (t - M.tp) / (M.tx - M.tp)) : Math.min(dip, (t - M.tp) / 1000 * m.vel / 1000));      // llega al fondo en el instante objetivo que fijó el núcleo
   if (now < M.t0 && M.amagues.length) { const a = M.amagues[M.amagues.length - 1]; return mix(bajar(a.t), 0, (now - a.t) / Math.max(1, M.t0 - a.t)); }
   if (!M.tp || m.fase === 'hombros') return 0;
   if (!M.tr) return bajar(now);

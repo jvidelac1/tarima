@@ -5,11 +5,14 @@
 // cada gesto es UN toque: la capa mira en qué fase está el intento en el instante del toque y lo convierte en lo que el
 // núcleo espera. Soltar la tecla no significa nada, la subida es asistida y la fijación y la bajada son automáticas.
 import { simular } from '../sim/attempt.js';
-import { TENSION } from '../sim/rules.js';
+import { TENSION, FACIL } from '../sim/rules.js';
 
 const INF = 2147483647;
-/** Rebote de tecla, demora de la bajada automática tras la chicharra y márgenes del toque útil en la subida (los de los rivales). */
-export const CAPA = { reboteMs: 60, bajaMs: 150, margen: 50, trabaMargen: 150 };
+/**
+ * Rebote de tecla, demora de la bajada automática tras la chicharra y márgenes del toque útil en la subida. En Fácil
+ * empujar de más no hace temblar (sección 4), así que el margen es ancho: solo evita gastar Resto en toques que ya no suman.
+ */
+export const CAPA = { reboteMs: 60, bajaMs: 150, margen: 200, trabaMargen: 150 };
 const NADA = { ent: [], aviso: null };
 
 /**
@@ -94,9 +97,14 @@ export function senal(m, now, ctl = 'c') {
     case 'acomodo': return { clave: 'prep', verbo: 'PREPARATE', tipo: 'espera' };
     case 'tension': case 'hombros': {
       const j = m.fase === 'hombros';
-      if (now < M.ign) return M.amagues.length ? { clave: 'amague', verbo: 'AMAGUE', sub: 'muy temprano: de nuevo', tipo: 'espera' } : { clave: 'respira', verbo: j ? 'RESPIRÁ' : 'PREPARATE', tipo: 'espera' };
+      if (now < M.ign) {
+        if (!M.amagues.length) return { clave: 'respira', verbo: j ? 'RESPIRÁ' : 'PREPARATE', tipo: 'espera' };
+        const quedan = FACIL.amagues - M.amagues.length;
+        return { clave: 'amague', verbo: 'AMAGUE', sub: !f ? 'muy temprano: de nuevo' : quedan > 0 ? 'muy temprano · esperá el círculo' : 'muy temprano · otro más y es fallo', tipo: 'espera' };
+      }
+      // `vence`: instante en que se acaba el tiempo para este toque libre (el reloj del llamado, o los 8 s en los hombros)
       if (f) return j ? { clave: 'flexiona', verbo: '¡FLEXIONÁ!', sub: 'Apretá {T} para el envión', paso: 4, de, tipo: 'libre', vence: M.tDev }
-        : { clave: 'tira', verbo: '¡TIRÁ!', sub: 'Apretá {T} para empezar el levantamiento', paso: 1, de, tipo: 'libre' };
+        : { clave: 'tira', verbo: '¡TIRÁ!', sub: 'Apretá {T} para empezar el levantamiento', paso: 1, de, tipo: 'libre', vence: c.reloj || undefined };
       // Clásico: el anillo respira; los llenos caen en t0 + k·per
       const k = Math.max(1, Math.ceil((now - c.cal - M.t0 - TENSION.buena) / m.per));      // el lleno más cercano que todavía vale
       const obj = M.t0 + k * m.per + c.cal;
@@ -109,7 +117,9 @@ export function senal(m, now, ctl = 'c') {
       return f ? cierre(m.fase === 'vuelo' ? 'recibi' : 'recibi2', '¡RECIBÍ!', m.fase === 'vuelo' ? 3 : 6, M.tc + c.cal, M.tr, M.wr) : cierre(m.fase === 'vuelo' ? 'recibe' : 'recibe2', '¡APRETÁ!', 0, M.tc + c.cal, M.tr, M.wr, 'para recibir', 'baja');
     case 'pelea': case 'traba': {
       const p = M.pelea, avance = p.modo === 'pelea' && p.P < 1000000 ? p.P / 1000000 : p.L === null ? 1 : p.L / 1000000;
-      return { clave: 'empuja', verbo: '¡EMPUJÁ!', sub: f ? 'tocá rápido' : 'tocá repetido, sin pasarte de la franja', tipo: 'empuja', avance, desde: p.t0 };
+      // `piso` (Fácil): lo que el avance tiene que llevar de ventaja; si lo alcanza, la barra se cae
+      const piso = f && p.modo === 'pelea' && p.P < 1000000 ? Math.max(0, Math.min(1, (now - p.t0 - FACIL.plazoMs) * FACIL.ritmo / 1000000)) : 0;
+      return { clave: 'empuja', verbo: '¡EMPUJÁ!', sub: f ? 'tocá rápido: que no te alcance el rojo' : 'tocá repetido, sin pasarte de la franja', tipo: 'empuja', avance, piso, desde: p.t0 };
     }
     case 'post': return f ? { clave: 'aguanta', verbo: 'AGUANTÁ', sub: 'no toques nada', tipo: 'auto' } : { clave: 'deja', verbo: m.n > 0 ? 'DEJÁ APRETADO' : 'APRETÁ Y MANTENÉ', sub: 'hasta la chicharra', tipo: m.n > 0 ? 'auto' : 'libre', gesto: m.n > 0 ? 'mantiene' : 'baja' };
     case 'fijacion': {
@@ -121,3 +131,12 @@ export function senal(m, now, ctl = 'c') {
     default: return null;
   }
 }
+
+/**
+ * Reloj guiado del tutorial (lo lleva la presentación, main.js): a media velocidad, se detiene en cada objetivo hasta el
+ * toque, y en la subida solo avanza `porToque` ms después de cada toque. Así, para el núcleo, hasta el jugador más lento
+ * empuja a 4 toques por segundo, que le alcanza a cualquiera de los tres pesistas (lo verifica tools/sim_test.mjs).
+ */
+export const GUIADO = { vel: .5, para: new Set(['tira', 'explota', 'recibi']), empuje: true, estricto: true, porToque: 250 };
+/** Práctica de dos tiempos: velocidad real, con una sola parada en los hombros. */
+export const EN_HOMBROS = { vel: 1, para: new Set(['flexiona']), empuje: false, estricto: false, porToque: 250 };

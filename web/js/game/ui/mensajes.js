@@ -4,35 +4,49 @@
 /** Palabra después de cada toque. `floja`: ámbar (el levantamiento sigue). */
 export const PALABRAS = { perfecto: { txt: 'PERFECTO' }, bien: { txt: 'BIEN' }, temprano: { txt: 'TEMPRANO', floja: true }, tarde: { txt: 'TARDE', floja: true } };
 
+/** Verbo de la señal de un gesto en Fácil. */
+const VERBO = { 's|explosion': '¡EXPLOTÁ!', 'c|explosion': '¡EXPLOTÁ!', 'j|explosion': '¡ARRIBA!', 's|recepcion': '¡RECIBÍ!', 'c|recepcion': '¡RECIBÍ!', 'j|recepcion': '¡RECIBÍ!' };
+/** «180 ms tarde»: el error de un toque, redondeado a 10 ms. */
+const cuanto = e => `${Math.max(10, Math.round(Math.abs(e) / 10) * 10)} ms ${e < 0 ? 'temprano' : 'tarde'}`;
 /**
  * Qué pasó y qué hacer distinto, en una línea. `res` es el resultado del núcleo (causa, gestos, toques).
  * @param {object} res  @param {'c'|'f'} ctl  @param {boolean} tactil  sin teclado: no nombra la tecla
+ * @param {{sinConfirmar?:boolean, practica?:boolean}} [o]  sinConfirmar: el reloj se acabó con el panel abierto; practica: no hay kilos que elegir
  * @returns {string} '' si no hay nada que explicar (válido con tres blancas)
  */
-export function explicar(res, ctl = 'c', tactil = false) { return linea(res, ctl, tactil).replace(/!\./g, '!'); }
-function linea(res, ctl, tactil) {
+export function explicar(res, ctl = 'c', tactil = false, o = {}) { return linea(res, ctl, tactil, o).replace(/!\./g, '!'); }
+function linea(res, ctl, tactil, o) {
   if (!res || !res.causa) return '';
   const f = ctl === 'f', g = res.gestos || [], ex = [...g].reverse().find(x => x.g === 'explosion'), rc = [...g].reverse().find(x => x.g === 'recepcion'), j = (ex || rc)?.mov === 'j';
-  const toca = tactil ? 'Tocá' : 'Tocá ESPACIO', apreta = tactil ? 'Tocá' : 'Apretá ESPACIO', manten = tactil ? 'Dejá el dedo apoyado' : 'Mantené ESPACIO';
+  const toca = tactil ? 'Tocá' : 'Tocá ESPACIO', tocaMin = tactil ? 'tocá' : 'tocá ESPACIO', apreta = tactil ? 'Tocá' : 'Apretá ESPACIO', manten = tactil ? 'Dejá el dedo apoyado' : 'Mantené ESPACIO';
   const EXP = f ? (j ? '¡ARRIBA!' : '¡EXPLOTÁ!') : 'la explosión', cuando = f ? 'cuando el círculo se cierra' : j ? 'en el fondo de la flexión' : 'cuando la barra llega a la línea';
   const hacer = f ? toca : 'Soltá', hiciste = f ? 'Tocaste' : 'Soltaste';
   switch (res.causa) {
     case 'sin_altura':
       if (ex && ex.fuera && ex.e > 0) return f ? `No tocaste ${EXP}. ${toca} ${cuando}.` : `No soltaste a tiempo. Soltá ${cuando}.`;
+      if (f && ex) return `Tocaste ${EXP} ${cuanto(ex.e)} y la barra no subió. ${toca} ${cuando}.`;
       return `${hiciste} ${EXP} muy ${ex && ex.e > 0 ? 'tarde' : 'temprano'} y la barra no subió. ${hacer} ${cuando}.`;
-    case 'anticipado': return `Soltaste antes de tiempo. Soltá ${cuando}.`;
-    case 'adelante': return `${hiciste} ${EXP} temprano y la barra se fue adelante. Esperá ${f ? 'a que el círculo se cierre' : 'a que la barra llegue a la línea'}.`;
-    case 'atras': return `${hiciste} ${EXP} tarde y la barra se fue atrás. ${hacer} ${f ? 'apenas se cierra el círculo' : 'apenas la barra llega a la línea'}.`;
+    case 'anticipado': return f ? `Tocaste ${EXP} antes de tiempo tres veces. Esperá a que el círculo se cierre sobre el aro.` : `Soltaste antes de tiempo. Soltá ${cuando}.`;
+    case 'adelante': return f && ex ? `Tocaste ${EXP} ${cuanto(ex.e)} y la barra se fue adelante. Esperá a que el círculo se cierre.` : `${hiciste} ${EXP} temprano y la barra se fue adelante. Esperá ${f ? 'a que el círculo se cierre' : 'a que la barra llegue a la línea'}.`;
+    case 'atras': return f && ex ? `Tocaste ${EXP} ${cuanto(ex.e)} y la barra se fue atrás. ${toca} apenas se cierra el círculo.` : `${hiciste} ${EXP} tarde y la barra se fue atrás. ${hacer} ${f ? 'apenas se cierra el círculo' : 'apenas la barra llega a la línea'}.`;
     case 'fondo':
       if (rc && rc.e < 0) return f ? 'Tocaste ¡RECIBÍ! antes de tiempo. Un toque por señal: esperá el círculo.' : 'Apretaste para recibir antes de tiempo. Esperá a que el anillo se cierre.';
       return f ? `No recibiste la barra. ${toca} cuando el círculo se cierra.` : `No recibiste la barra. ${apreta} cuando el anillo se cierra.`;
     case 'aplastado': case 'codos':
-      if ((res.toques || 0) < 3) return f ? `La subida se trabó y no empujaste. Con ¡EMPUJÁ!, ${toca.toLowerCase()} rápido.` : `La subida se trabó y no empujaste. ${toca} repetido hasta la franja verde.`;
-      return f ? 'No alcanzó el empuje: venías a destiempo. Cuanto más justo toques, menos hay que empujar.' : 'No alcanzó el empuje: venías a destiempo. Mantené la flecha en la franja verde.';
+      if ((res.toques || 0) < 3) return f ? `La subida se trabó y no empujaste. Con ¡EMPUJÁ!, ${tocaMin} rápido.` : `La subida se trabó y no empujaste. ${toca} repetido hasta la franja verde.`;
+      if (f) {
+        // la línea no contradice a las palabras: si todos los toques salieron PERFECTO o BIEN, lo que faltó fue ritmo en la subida
+        const malo = g.filter(x => !x.fuera && (x.pal === 'temprano' || x.pal === 'tarde')).sort((a, b) => Math.abs(b.e) - Math.abs(a.e))[0];
+        return malo ? `Tocaste ${VERBO[malo.mov + '|' + malo.g]} ${cuanto(malo.e)} y la barra quedó más pesada: no alcanzó el empuje. ${toca} cuando el círculo se cierra.`
+          : `Los toques venían bien: faltó empuje. En ¡EMPUJÁ!, ${tocaMin} más rápido${o.practica ? '' : '; si no alcanza, pedí menos kilos'}.`;
+      }
+      return 'No alcanzó el empuje: venías a destiempo. Mantené la flecha en la franja verde.';
     case 'codos_blandos': return f ? 'Recibiste a destiempo y los codos quedaron blandos. Tocá ¡RECIBÍ! justo en el cierre.' : 'Recibiste a destiempo y los codos quedaron blandos. Apretá justo cuando el anillo se cierra.';
     case 'temblor': case 'tiembla': return f ? `La barra llegó desviada y tembló. Tocá ${EXP} más cerca del cierre.` : 'La barra tembló: llegó desviada o empujaste de más. Soltá más justo y no pases la franja verde.';
     case 'devuelve': return `Pasaron 8 segundos con la barra en los hombros. ${apreta} para ${f ? 'flexionar' : 'empezar el envión'}.`;
-    case 'reloj': return `Se acabó el reloj. ${apreta} para empezar antes del 0:00.`;
+    case 'reloj':
+      if (o.sinConfirmar) return tactil ? 'Se acabó el reloj. Confirmá y tocá la pantalla antes del 0:00.' : 'Se acabó el reloj. Confirmá con ENTER y apretá ESPACIO antes del 0:00.';
+      return f ? `Se acabó el reloj: corre desde que confirmás. ${apreta} apenas dice ¡TIRÁ!` : `Se acabó el reloj. ${apreta} para empezar antes del 0:00.`;
     case 'antes': return `Soltaste antes de la chicharra. ${tactil ? 'No levantes el dedo' : 'Dejá apretado'} hasta ¡ABAJO!`;
     case 'sin_apoyo': return `No dejaste apretado al quedar de pie. ${manten} hasta ¡ABAJO!`;
     default: return '';

@@ -106,8 +106,19 @@ export const PLAN = [4, 3];                                  // saltos del plan 
 export const NIVELES = { amistoso: { sd: 55, pelea: 90, forma: 0, abre: -35 }, normal: { sd: 36, pelea: 60, forma: 0, abre: 0 }, dificil: { sd: 27, pelea: 40, forma: 1, abre: 0 } };
 export const KG_MAX = 260;
 
-/** Nivel de control «Fácil» (docs/CONTROLES.md): ancho de las ventanas, en milésimas. Lo demás de Fácil vive en game/controles.js. */
-export const FACIL = { ancho: 2000 };
+/**
+ * Nivel de control «Fácil» (docs/CONTROLES.md, sección 4). Lo que es de teclas vive en game/controles.js.
+ *   ancho        de las ventanas, en milésimas
+ *   amagues      amagues permitidos por movimiento; el siguiente toque anticipado es fallo
+ *   perdidaLibre mm de altura perdida que no suman exigencia (el borde de BIEN): PERFECTO y BIEN piden el mismo empuje
+ *   porMm        de ahí al límite, milésimas de exigencia por mm (TEMPRANO y TARDE sí cuestan)
+ *   minEmpuje    la subida pide siempre toques: la exigencia nunca baja de esfuerzo propio + esto (unos 3 toques por segundo)
+ *   plazoMs, ritmo  la subida se corta sola: pasado el plazo, el avance tiene que ir por delante de un piso que sube a
+ *                `ritmo` millonésimas por ms; si el piso lo alcanza, se cae. Reemplaza al «hundido»; no hay zona de estancamiento
+ *   maxMs        tope de la pelea y de la traba de codos
+ *   cierreMs     tiempo mínimo entre ¡FLEXIONÁ! y ¡ARRIBA! (el círculo tiene que poder verse cerrar)
+ */
+export const FACIL = { ancho: 2000, amagues: 2, perdidaLibre: 80, porMm: 4, minEmpuje: 175, plazoMs: 1500, ritmo: 250, maxMs: 6000, cierreMs: 600 };
 export const CONTROLES = ['c', 'f'];
 
 /** Causas con su texto. Las de fallo y las de nulo (secciones 5.2 y 5.3). */

@@ -17,10 +17,10 @@ import { Intento, simular } from '../web/js/sim/attempt.js';
 import { gestos } from '../web/js/sim/ai.js';
 import { recalcular, resumen } from '../web/js/sim/replay.js';
 import { Azar, mezclar } from '../web/js/sim/fixed.js';
-import { RELOJ, CAUSAS } from '../web/js/sim/rules.js';
-import { tocar, alDia, senal } from '../web/js/game/controles.js';
+import { RELOJ, CAUSAS, FACIL, exigenciaTabla } from '../web/js/sim/rules.js';
+import { tocar, alDia, senal, GUIADO } from '../web/js/game/controles.js';
 import { explicar } from '../web/js/game/ui/mensajes.js';
-import { jugarSenal, BOTS } from './play_human.mjs';
+import { jugarSenal, jugarFijo, BOTS } from './play_human.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SIM = path.join(ROOT, 'web/js/sim'), REF = path.join(ROOT, 'tools/sim_ref.json'), REF_F = path.join(ROOT, 'tools/sim_ref_facil.json');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
@@ -202,8 +202,12 @@ function jugar(semilla, nivel, persona, estilo = {}) {
     while (!m.res && t < 200000) { t += 1 + r.ent(40); if (!conf && S.conf <= t) { m.confirmar(S.conf); conf = true; } while (i < S.ent.length && S.ent[i][0] <= t) { m.entrada(S.ent[i][0], S.ent[i][1]); i++; } m.avanzar(t); ok(m.res || senal(m, t, 'f') !== undefined, 'senal'); }
     ok(JSON.stringify(m.res) === JSON.stringify(a.res), `Fácil, intento ${k}: avanzar de a pasos da otro resultado`);
     vistos.add(a.res.res + (a.res.causa ? ':' + a.res.causa : '')); k2++;
-    // Fácil no puede terminar en las causas que la capa vuelve imposibles
-    ok(!['anticipado', 'antes', 'sin_apoyo'].includes(a.res.causa), `Fácil, intento ${k}: terminó en «${a.res.causa}»`);
+    // Fácil no puede terminar en las causas que la capa vuelve imposibles («anticipado» sí: es el tercer amague)
+    ok(!['antes', 'sin_apoyo'].includes(a.res.causa), `Fácil, intento ${k}: terminó en «${a.res.causa}»`);
+    ok(a.res.causa !== 'anticipado' || a.res.amagues === FACIL.amagues, `Fácil, intento ${k}: «anticipado» con ${a.res.amagues} amagues`);
+    // una subida fallada no dura más que el tope de Fácil, y el envión no se pide antes de que el círculo pueda verse cerrar
+    if (a.res.res === 'fallo' && (a.res.causa === 'aplastado' || a.res.causa === 'codos')) ok(a.res.t - a.M.pelea.t0 <= FACIL.maxMs + 10, `Fácil, intento ${k}: la subida fallada duró ${a.res.t - a.M.pelea.t0} ms`);
+    for (const M of a.movs) if (M.mov === 'j' && M.tp && M.tx) ok(M.tx - M.tp >= FACIL.cierreMs, `Fácil, intento ${k}: ¡ARRIBA! se cierra en ${M.tx - M.tp} ms`);
   }
   // soltar la tecla no significa nada en Fácil; en Clásico la capa es la identidad
   { const ctx = { lev: 's', I: 9000, tec: 7, temple: 0, garra: 6, anclas: datos.modelos.ventura, semilla: 5, cal: 0, primera: false, domina: true, jueces: [1000, 1000, 1000], reloj: 30000, ctl: 'f' };
@@ -216,7 +220,54 @@ function jugar(semilla, nivel, persona, estilo = {}) {
     ok(typeof txt === 'string' && txt.length > 20 && txt.length < 130 && !/undefined|\{/.test(txt) && !(tactil && /ESPACIO/.test(txt)), `explicar(${causa}, ${ctl}${tactil ? ', táctil' : ''}): «${txt}»`);
   }
   ok(explicar({ res: 'valido', causa: null }, 'f') === '', 'explicar: un válido limpio no lleva línea');
+  // la línea de la subida no contradice a las palabras: con todo en PERFECTO o BIEN no habla de destiempo; con un toque flojo, lo nombra con sus ms
+  { const bien = explicar({ res: 'fallo', causa: 'aplastado', toques: 12, gestos: [{ g: 'explosion', mov: 'c', e: 180, pal: 'bien' }, { g: 'recepcion', mov: 'c', e: -20, pal: 'perfecto' }] }, 'f');
+    ok(/más rápido/.test(bien) && !/destiempo|tarde|temprano/.test(bien), `explicar, subida con todo BIEN: «${bien}»`);
+    const tarde = explicar({ res: 'fallo', causa: 'codos', toques: 12, gestos: [{ g: 'explosion', mov: 's', e: 263, pal: 'tarde' }, { g: 'recepcion', mov: 's', e: 10, pal: 'perfecto' }] }, 'f');
+    ok(/¡EXPLOTÁ! 260 ms tarde/.test(tarde), `explicar, subida con un toque tarde: «${tarde}»`);
+    ok(/ENTER/.test(explicar({ res: 'nulo', causa: 'reloj', gestos: [] }, 'c', false, { sinConfirmar: true })) && /desde que confirmás/.test(explicar({ res: 'nulo', causa: 'reloj', gestos: [] }, 'f')), 'explicar: la línea del reloj no dice qué tecla faltó'); }
   console.log(`7. Fácil: ${casos.length} partidas de referencia · ${n} partidas en vivo contra recalculadas (${Math.round(validos * 100 / intentos)} % de válidos del jugador) · ${k2} intentos por la capa · resultados vistos: ${[...vistos].sort().join(', ')}`);
+}
+
+// ---------- 8. Fácil: amagues, la subida y el tutorial guiado ----------
+{
+  const ctxDe = (id, lev, I, extra = {}) => { const f = datos.atletas[id]; return { lev, env: lev === 'c' ? 'split' : undefined, I, tec: f.attrs.tec, temple: 0, garra: f.attrs.gar, anclas: datos.modelos[f.modelo], semilla: 9, cal: 0, primera: false, domina: true, jueces: [1000, 1000, 1000], reloj: 30000, ctl: 'f', ...extra }; };
+  // dos amagues se perdonan; el tercer toque anticipado es fallo, con su línea
+  { const ctx = ctxDe('ventura', 's', 9000), ent = []; let t = 2600;
+    for (let k = 0; k < 3; k++) { tocar(ctx, 1000, ent, t, 1, 'f'); tocar(ctx, 1000, ent, t + 100, 1, 'f'); const m = alDia(ctx, 1000, ent, t + 100, 'f'); ok(k < 2 ? !m.res && m.amagues === k + 1 : m.res?.causa === 'anticipado', `Fácil, amague ${k + 1}: ${m.res ? m.res.causa : m.fase + ' con ' + m.amagues + ' amagues'}`); if (m.res) ok(/tres veces/.test(explicar(m.res, 'f')), 'el tercer amague no explica qué pasó'); t += 1500; }
+    const c = { ...ctx, ctl: 'c' }, e2 = [[2600, 1], [2700, 0], [4000, 1], [4100, 0], [5500, 1], [5600, 0], [7000, 1], [7100, 0]], m2 = simular(c, 1000, e2, 8000); ok(!m2.res && m2.amagues === 4, 'Clásico: los amagues antes de la rodilla dejaron de ser libres'); }
+  // sin tocar en ¡EMPUJÁ! la subida se corta enseguida (no hay 12 s de espera); tocando cada 250 ms con todo PERFECTO se levanta siempre hasta el 100 %
+  let nSub = 0;
+  for (const id of IDS) for (const lev of ['s', 'c']) for (const I of [8800, 9200, 9700, 10000]) {
+    const quieto = jugarFijo(ctxDe(id, lev, I), [0, 0, 0, 0], 0).m, d = quieto.res.t - (quieto.M.pelea?.t0 ?? 0);
+    ok(quieto.res.res === 'fallo' && ['aplastado', 'codos'].includes(quieto.res.causa) && d >= FACIL.plazoMs && d <= FACIL.plazoMs + 1200, `Fácil, ${id} ${lev} ${I}: sin empujar da ${quieto.res.res}:${quieto.res.causa} a los ${d} ms de la subida`);
+    const bien = jugarFijo(ctxDe(id, lev, I), [0, 0, 0, 0], 250).m; ok(bien.res.res === 'valido', `Fácil, ${id} ${lev} ${I}: todo PERFECTO y un toque cada 250 ms da ${bien.res.res}:${bien.res.causa}`);
+    const p = bien.movs[0].pelea; ok(p && bien.movs[0].tEnPie - p.t0 < 4000, `Fácil, ${id} ${lev} ${I}: la subida ganada tarda ${bien.movs[0].tEnPie - p.t0} ms`); nSub++;
+  }
+  // el arranque guiado del tutorial no se puede fallar: copia del reloj guiado de main.js (se detiene en cada objetivo; en la
+  // subida corre GUIADO.porToque ms por toque), con jugadores que tocan ¡EMPUJÁ! desde muy rápido hasta uno cada 3 s
+  const guiado = (ctx, per, reac) => {
+    const ent = []; let ahora = 1000, ult = -1e9, sA = null, prox = Infinity, m = null; const R = { tb: ahora, vb: 0, vel: 1, tope: Infinity, clave: null };
+    const vt = t => Math.min(R.vb + Math.max(0, t - R.tb) * R.vel, R.tope);
+    const tecla = tEv => { const det = R.tope < Infinity && vt(tEv) >= R.tope; if (!det && sA && (sA.tipo === 'cierre' || sA.tipo === 'espera')) return; ult = tEv; const r = tocar(ctx, 0, ent, Math.round(vt(tEv)), 1, 'f'); if (r.n) { R.vb = r.t; R.tb = tEv; R.tope = Infinity; R.clave = null; } };
+    for (let g = 0; g < 100000; g++) {
+      ahora += 16; if (prox <= ahora) { tecla(prox); prox = Infinity; }
+      const now = Math.round(vt(ahora)); m = alDia(ctx, 0, ent, now, 'f'); if (m.res) return m;
+      const s = senal(m, now, 'f'); sA = s; let vel = GUIADO.vel, tope = Infinity, clave = null;
+      if (s && GUIADO.para.has(s.clave)) { clave = s.clave; tope = s.tipo === 'cierre' ? s.objetivo : R.clave === clave ? R.tope : now; }
+      else if (s && s.tipo === 'empuja') vel = now >= s.desde && ahora - ult > GUIADO.porToque ? 0 : 1; else vel = 1;
+      if (vel !== R.vel || tope !== R.tope) { const v = vt(ahora); R.vb = v; R.tb = ahora; R.vel = vel; R.tope = Math.max(tope, v); }
+      R.clave = clave; const parado = R.tope < Infinity && vt(ahora) >= R.tope;
+      if (prox === Infinity) { if (parado) prox = ahora + reac; else if (s && s.tipo === 'empuja') prox = ahora + per; }
+    }
+    return m;
+  };
+  let nG = 0;
+  for (const id of IDS) for (const per of [100, 150, 200, 240, 260, 300, 400, 600, 1000, 3000]) for (const sem of [71, 72, 73]) {
+    const m = guiado(ctxDe(id, 's', 8000, { exiFija: exigenciaTabla(9300), primera: true, reloj: 0, semilla: sem }), per, 700); nG++;
+    ok(m.res && m.res.res === 'valido', `tutorial guiado, ${id}, un toque cada ${per} ms en ¡EMPUJÁ!: ${m.res ? m.res.res + ':' + m.res.causa : 'no termina'}`);
+  }
+  console.log(`8. Fácil: tercer amague es fallo · ${nSub} subidas sin empujar cortadas a tiempo y ganadas tocando cada 250 ms · tutorial guiado sin fallo posible en ${nG} casos (tres pesistas, un toque cada 100 ms a 3 s)`);
 }
 
 console.log(fallas.length ? `\nFALLÓ: ${fallas.length} problemas` : `\nOK en ${((Date.now() - t0) / 1000).toFixed(1)} s`);
