@@ -185,6 +185,18 @@ El plan por etapas, con el criterio de terminado de cada una, dónde corre cada 
 
 Resumen: (0) preparar el Mac alquilado y la sesión cloud, (1) juego mínimo jugable en cloud, (2) prueba de dirección de arte con decisión del usuario, (3) atletas definitivos, (4) movimiento contra video y fallos animados, (5) online, (6) pulido.
 
+## Etapa 2, dirección de arte: malla generada (E7) y relieve generado (E8), 12-nov
+
+Corrido en el pod con GPU; nada de esto entró a `web/` ni a `out/`. Capturas en `out/arte/shots`, hojas en `out/arte/comparacion_ventura_AB.png` y `_AB_arcilla.png`.
+
+- **Arcilla de espaldas.** `tools/shots.mjs --clay` baja los contraluces (el cálido a 0,25 y la luz de pelo a 0,15): de espaldas lavaban el relieve. Las `A_clay_*` se recapturaron con ese cambio; las anteriores quedaron en `out/arte/shots/antes_luces/`. Las `C_clay_*` son de antes y no se comparan con estas.
+- **B (E7): la malla generada G3, estática**, en `webv/B/models/prop_fin.glb` (300.000 triángulos, alineada a 4,25 mm de mediana). `--prop` funciona: queda en el lugar del atleta, con la barra en las manos y sin el atleta original. Tiene más definición en brazos, hombros y pecho que A, pero trae la malla de competencia, sus tirantes y el cinturón en relieve y una cara caricaturesca. Sirve como referencia de forma, no como personaje. En P03 la axila trasera queda en sombra detrás del tirante: no se puede decir que se lea como anatomía.
+- **B2 y B3 (E8): relieve de G1 (reposo) sumado a nuestra malla** con `blender/detail.py relief` y `TARIMA_DETAIL`. `relief` ahora resta la parte gruesa del desplazamiento (`--grueso`, sigma 3 cm) antes de recortar: de 6,19 mm RMS, 4,65 eran error de alineación y proporción y 3,03 relieve fino. B2: tope 6 mm y suavizado 2 cm (`out/arte/detail_ventura.npz`, `out_B`, `webv/B2`). B3: tope 4,5 mm y suavizado 3 cm (`detail_ventura_suave.npz`, `out_B3`, `webv/B3`).
+- Los dos builds dan `CHK ventura cuadros con superposición: 0` sin tocar `check()`, y el GLB pesa lo mismo que A (11,11 MB). La búsqueda del rack sí se mueve: la barra contra el hombro cambia 3 mm o menos, pero el codo queda hasta 1,5 cm más adentro en tres de las seis líneas `rack` (el criterio era 5 mm).
+- A ojo, en arcilla: B3 se lee mejor que A en reposo (P11), con los brazos arriba (P01), en el tirón (P10) y de espaldas (P04); en el rack (P08) casi no cambia. B2 marca más, pero deja bultos en hombro y clavícula y un escalón al costado de la columna. Es lectura de un solo agente: no hubo orden a ciegas de dos revisores.
+- **Estimación, sin referencia:** el trapecio, la zona escapular y los erectores de B2 y B3 los puso el generador (las vistas de espalda repintadas eran casi lisas). Hay que compararlos con cuadros de video antes de darlos por buenos.
+- El relieve se mide en reposo y se deforma con la piel: con los brazos arriba no corrige la axila (las manchas claras y el pliegue quebrado de la axila están igual en A, B2 y B3). `out/arte/gen/armup_error.png` (A contra G2, brazos arriba) es el objetivo de forma para `corr_armUp_*`: nos falta volumen en clavícula, deltoides posterior y tríceps y nos sobra en el dorsal bajo la axila. El mapa de B2 (`armup_error_B2.png`) es casi igual: el relieve fino no acerca la forma gruesa.
+
 ## Decisiones tomadas en el camino
 
 - Se descartó el personaje hecho con primitivas por código, el pre-renderizado y el video generado por IA como base del juego (sin interacción ni consistencia de técnica).
