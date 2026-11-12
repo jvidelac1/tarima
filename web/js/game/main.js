@@ -429,8 +429,9 @@ async function decision(a, lev, res, et, propio, o = {}) {
   // momentos (s desde el final del intento)
   const paso = lento ? .55 : .3, tLuz = fin && !ok ? .45 : fin ? .2 : .25, tVer = tLuz + 2 * paso + .25;
   const tCaida = fin ? fin.pl.suelta : 0, tRev = ok && fin ? tCaida + 1.1 : Infinity;
-  // la línea se lee 4,2 s; si después viene la repetición (`o.rep`), que la vuelve a mostrar, acá solo 1,6 s
-  const total = Math.max(tVer + (propio ? (linea ? (o.rep ? 1.6 : 4.2) : 1.9) : 1.3), fin ? fin.dur : 0);
+  // la línea se lee 4,2 s; si después viene la repetición (`o.rep`), que la vuelve a mostrar, acá solo 1,6 s. En un válido
+  // propio no se espera a que la barra termine de rebotar (fin.dur llega a 4,3 s): luces, ovación, la cámara gira y sigue
+  const total = Math.max(tVer + (propio ? (linea ? (o.rep ? 1.6 : 4.2) : 1.9) : 1.3), fin && !(propio && ok) ? fin.dur : 0);
   if (fin && !ok) escena.primerPlano('caida');
   const t0 = reloj.ahora(), d = [null, null, null], hito = { luz: 0, ver: false, caida: !fin || !ok, rev: false };
   const avanzar = (t, dt, vivo) => {
@@ -651,12 +652,13 @@ async function llamadoPropio(p, L) {
   } else { env = L.lev === 'c' ? a.f.enviones[0] : undefined; ctx = p.contexto(env); corrida = { conf: null, ent: [], res: simular(ctx, null, []).res, grab: [], m: { movs: [] } }; }
   const et = p.llamado.et, x = p.resolver({ conf: corrida.conf, env, ent: corrida.ent });
   if (JSON.stringify(x.res) !== JSON.stringify(corrida.res)) E.errores.push('el resultado mostrado no coincide con el recalculado');
+  // los cambios de kilos de los rivales salen en el recuadro desde el veredicto (sin espera aparte)
+  const avisos = x.avisos.map(c => `${p.at[c.a].f.pais} cambia a ${c.a_kg} (antes ${c.de})`).join(' · ');
+  if (avisos) { sonido.aviso(); recuadro(avisos, p.at[x.avisos[0].a].id); }
   const fin = armarFinal(corrida, L.lev), rep = !!tramoRepeticion(corrida), linea = await decision(a, L.lev, x.res, et, true, { ctl: ctx.ctl, sinConfirmar: corrida.conf === null, tRes: corrida.tRes, fin, rep });
   E.antes = x.res.res !== 'valido' && linea ? linea : null;
-  const rival = p.at.find(b => b.i !== L.a); recuadro(x.res.res === 'valido' ? `${PLANTEL[rival.id].corto} aprieta los dientes` : `${PLANTEL[rival.id].corto} respira`, rival.id);
+  const rival = p.at.find(b => b.i !== L.a); if (!avisos) recuadro(x.res.res === 'valido' ? `${PLANTEL[rival.id].corto} aprieta los dientes` : `${PLANTEL[rival.id].corto} respira`, rival.id);
   await repeticion(L.lev, corrida, linea);
-  // los cambios de kilos de los rivales, todos juntos en un solo cartel
-  if (x.avisos.length) { sonido.aviso(); veredicto(x.avisos.map(c => `${p.at[c.a].f.pais} cambia a ${c.a_kg}`).join(' · '), x.avisos.map(c => `${p.at[c.a].f.nombre} · antes ${c.de} kg`).join(' · ')); await saltable(1300); veredicto(''); }
   recuadro(null); etiqueta(null); zocalo(null);
 }
 

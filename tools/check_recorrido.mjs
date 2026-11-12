@@ -139,7 +139,7 @@ for (let n = 0; n < 60000; n++) {
   if (s.panel) {
     const P = await J(() => { const pn = document.querySelector('#capa .panel'); return pn ? { titulo: (pn.querySelector('h1,h2')?.textContent || '').trim(), botones: pn.querySelectorAll('button:not(:disabled)').length } : null; });
     if (P && P.botones) {
-      if (tFin !== null) { const T = tramos.at(-1); T.espera = Math.round(s.ahora - tFin); T.hasta = `${s.pantalla}: ${P.titulo}`; T.pantallas = seg.slice(T.desde + 1).map(x => `${x.p} ${(((x.t1 ?? s.ahora) - x.t0) / 1000).toFixed(1)}`).join(' · '); T.lista = seg.slice(T.desde + 1).map(x => x.p); tFin = null; }
+      if (tFin !== null) { const T = tramos.at(-1); T.espera = Math.round(s.ahora - tFin); T.hasta = `${s.pantalla}: ${P.titulo}`; const entre = seg.slice(T.desde, -1); T.pantallas = entre.map(x => `${x.p} ${((x.t1 - x.t0) / 1000).toFixed(1)}`).join(' · '); T.lista = entre.map(x => x.p); tFin = null; }
       if (s.pantalla === 'llamado') { llamadoTxt = P.titulo; plan = PLAN.find(x => x.re.test(P.titulo)) || null; await foto(`llamado_${slug(P.titulo)}`); }
       await av(300);
       const ok = await J(() => { const b = document.querySelector('#capa .panel button.ir:not(:disabled)'); if (!b) return false; b.focus(); return document.activeElement === b; });
