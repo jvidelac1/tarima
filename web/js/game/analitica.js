@@ -111,12 +111,56 @@ export function limpiarProps(props) {
   return out;
 }
 
-/** `fuente_trafico`: utm_source si viene, «compartido» con ?c=, si no «directo». */
-export function fuenteTrafico(buscar) {
+/** Click-ids que ponen las redes y los avisos en el link: dicen de dónde vino aunque el navegador no mande el referente. */
+const CLICK_IDS = [['fbclid', 'facebook'], ['igshid', 'instagram'], ['ttclid', 'tiktok'], ['twclid', 'x'], ['gclid', 'google_ads'],
+  ['gbraid', 'google_ads'], ['wbraid', 'google_ads'], ['msclkid', 'bing_ads'], ['li_fat_id', 'linkedin'], ['rdt_cid', 'reddit'], ['sccid', 'snapchat']];
+/** Dominio del referente → fuente. Solo el nombre del sitio, nunca la dirección completa. */
+const REFERENTES = [[/(^|\.)instagram\.com$/, 'instagram'], [/(^|\.)(facebook\.com|fb\.com|fb\.me)$/, 'facebook'],
+  [/(^|\.)(t\.co|twitter\.com|x\.com)$/, 'x'], [/(^|\.)tiktok\.com$/, 'tiktok'], [/(^|\.)reddit\.com$/, 'reddit'],
+  [/(^|\.)(youtube\.com|youtu\.be)$/, 'youtube'], [/(^|\.)linkedin\.com$|^lnkd\.in$/, 'linkedin'], [/(^|\.)(whatsapp\.com|wa\.me)$/, 'whatsapp'],
+  [/(^|\.)(t\.me|telegram\.org)$/, 'telegram'], [/(^|\.)discord(app)?\.com$/, 'discord'], [/^(www\.)?google\./, 'google'],
+  [/(^|\.)bing\.com$/, 'bing'], [/(^|\.)duckduckgo\.com$/, 'duckduckgo']];
+
+/** Nombre del sitio del referente («l.instagram.com»), o '' si no hay o es el propio juego. */
+export function dominioReferente(referente, origen = '') {
+  try {
+    const u = new URL(referente);
+    if (!/^https?:$/.test(u.protocol)) return '';
+    if (origen && u.origin === new URL(origen).origin) return '';
+    return u.hostname.toLowerCase().slice(0, 80);
+  } catch { return ''; }
+}
+
+/**
+ * `fuente_trafico`: utm_source si viene; «compartido» con ?c=; si no, la red según el click-id del link (fbclid → facebook)
+ * o según el sitio del que vino; «directo» si no hay nada.
+ */
+export function fuenteTrafico(buscar, referente = '', origen = '') {
   const p = new URLSearchParams(buscar || '');
   const utm = (p.get('utm_source') || '').trim().toLowerCase().replace(/[^a-z0-9_.-]/g, '').slice(0, 40);
   if (utm) return utm;
-  return p.has('c') ? 'compartido' : 'directo';
+  if (p.has('c')) return 'compartido';
+  for (const [k, f] of CLICK_IDS) if (p.has(k)) return f;
+  const d = dominioReferente(referente, origen);
+  if (d) { for (const [re, f] of REFERENTES) if (re.test(d)) return f; return 'otro_sitio'; }
+  return 'directo';
+}
+
+/**
+ * Lo mínimo para encontrar un error sin mandar texto libre largo: mensaje recortado (sin direcciones de mail ni
+ * parámetros de URL), archivo (solo el nombre), línea y columna.
+ */
+export function detalleError(e, ev = null) {
+  const msgCrudo = String((e && (e.message ?? (typeof e === 'string' ? e : ''))) || ev?.message || '');
+  const mensaje = msgCrudo.replace(/[^\s@]+@[^\s@]+/g, '[mail]').replace(/(https?:\/\/[^\s?#]+)[?#]\S*/g, '$1').replace(/\s+/g, ' ').trim().slice(0, 160);
+  let archivo = ev?.filename || '', linea = ev?.lineno || null, col = ev?.colno || null;
+  if (!archivo && typeof e?.stack === 'string') {
+    const m = e.stack.match(/(?:https?:\/\/[^\s)]*\/)?([^\s/()]+\.m?js)(?:\?[^\s:)]*)?:(\d+):(\d+)/);
+    if (m) { archivo = m[1]; linea = +m[2]; col = +m[3]; }
+  }
+  archivo = String(archivo).split(/[?#]/)[0].split('/').pop().slice(0, 60);
+  const out = { mensaje: mensaje || null, archivo: archivo || null, linea: Number.isFinite(linea) ? linea : null, col: Number.isFinite(col) ? col : null };
+  return out;
 }
 
 export function crearAnalitica(o = {}) {
@@ -127,6 +171,7 @@ export function crearAnalitica(o = {}) {
   const sesion = almacen(o.sesion !== undefined ? o.sesion : (() => { try { return g.sessionStorage; } catch { return null; } })());
   const buscar = o.buscar ?? ventana?.location?.search ?? '';
   const origen = o.origen ?? ventana?.location?.origin ?? '';
+  const referente = o.referente ?? (() => { try { return ventana?.document?.referrer || ''; } catch { return ''; } })();
   const ahora = o.ahora || (() => Date.now());
   const azar = o.azar || Math.random;
   const cargarGrabador = o.cargarGrabador || (() => scriptGrabador(ventana));
@@ -215,7 +260,10 @@ export function crearAnalitica(o = {}) {
         idioma, idioma_origen, version,
         tactil: !!(ventana.matchMedia && ventana.matchMedia('(pointer: coarse)').matches),
         pais: est?.contexto?.pais ?? null, previas: est?.contexto?.previas ?? null, dias: est?.contexto?.dias ?? null,
-        fuente_trafico: fuenteTrafico(buscar), pantalla, grabada: grabar, ...banderasProps,
+        fuente_trafico: fuenteTrafico(buscar, referente, origen), referente: dominioReferente(referente, origen) || null,
+        pantalla, grabada: grabar, ...banderasProps,
+        // Sin IP del jugador (el proxy no la manda), PostHog ubicaría a todos en el país del servidor de Cloudflare: el país real va en `pais`.
+        $geoip_disable: true,
       }));
       estado = 'activa';
       // La privacidad se abre en otra pestaña: si ahí se desactiva la medición, esta carga deja de medir y de grabar.
@@ -304,7 +352,7 @@ export function crearAnalitica(o = {}) {
   const activarMedicion = () => local.del('tarima.medicion');
   const medicionActivada = () => local.get('tarima.medicion') !== '0';
 
-  /** `error_juego` desde window.onerror y promesas sin atrapar, con un tipo corto y sin texto libre. Hasta 5 por carga. */
+  /** `error_juego` desde window.onerror y promesas sin atrapar: tipo corto y `detalleError` (mensaje recortado, archivo, línea). Hasta 5 por carga. */
   function instalarErrores(pantallaActual = () => null) {
     if (!ventana?.addEventListener) return;
     let n = 0;
@@ -312,9 +360,9 @@ export function crearAnalitica(o = {}) {
       const nombre = e && typeof e.name === 'string' ? e.name : '';
       return /^[A-Za-z]{1,40}$/.test(nombre) ? nombre : 'Error';
     };
-    const mandar = tipo => { if (n++ < 5) ev('error_juego', { tipo, pantalla: pantallaActual() }); };
-    ventana.addEventListener('error', e => mandar(tipoDe(e?.error)));
-    ventana.addEventListener('unhandledrejection', e => mandar('promesa_' + tipoDe(e?.reason)));
+    const mandar = (tipo, det) => { if (n++ < 5) ev('error_juego', { tipo, pantalla: pantallaActual(), ...det }); };
+    ventana.addEventListener('error', e => mandar(tipoDe(e?.error), detalleError(e?.error, e)));
+    ventana.addEventListener('unhandledrejection', e => mandar('promesa_' + tipoDe(e?.reason), detalleError(e?.reason)));
   }
 
   return {

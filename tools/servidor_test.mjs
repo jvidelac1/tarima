@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearServidor, expDelPase, pareceCorreo, sugerirCorreo, CONSENTIMIENTO } from '../web/js/game/servidor.js';
-import { crearAnalitica, nombreVisible, limpiarProps, fuenteTrafico, proporcionGrabacion, taparTexto, taparAtributo, BLOQUEO_GRABACION, BANDERAS } from '../web/js/game/analitica.js';
+import { crearAnalitica, nombreVisible, limpiarProps, fuenteTrafico, dominioReferente, detalleError, proporcionGrabacion, taparTexto, taparAtributo, BLOQUEO_GRABACION, BANDERAS } from '../web/js/game/analitica.js';
 import { reenviar } from '../functions/_reenviar.js';
 import { onRequest as raiz } from '../functions/index.js';
 import { VERSIONES_CONSENTIMIENTO } from '../worker/src/reglas.js';
@@ -302,6 +302,21 @@ const ESTADO = { metricas: { clave: 'phc_PRUEBA123', host: '/qx', ui: 'https://u
 
 igual(limpiarProps({ nombre: 'Ana', email: 'a@b.com', ip: '1.2.3.4', dispositivo: 'x', n: 1, ok: true, txt: 'ana@b.com', obj: {}, pantalla: 'muro' }), { n: 1, ok: true, pantalla: 'muro' }, 'propiedades sin datos personales');
 igual([fuenteTrafico('?utm_source=Amigos'), fuenteTrafico('?c=abc'), fuenteTrafico('')], ['amigos', 'compartido', 'directo'], 'fuente_trafico');
+igual([fuenteTrafico('?fbclid=PAZ'), fuenteTrafico('?ttclid=1'), fuenteTrafico('', 'https://l.instagram.com/?u=x'), fuenteTrafico('', 'https://t.co/abc'),
+  fuenteTrafico('', 'https://www.google.com/'), fuenteTrafico('', 'https://foro.ejemplo.org/hilo/3'), fuenteTrafico('', 'https://liftinggame.pages.dev/x', 'https://liftinggame.pages.dev'),
+  fuenteTrafico('?utm_source=ig&fbclid=1', 'https://l.facebook.com/')],
+  ['facebook', 'tiktok', 'instagram', 'x', 'google', 'otro_sitio', 'directo', 'ig'], 'fuente_trafico con click-id y referente');
+igual([dominioReferente('https://l.instagram.com/?u=secreto'), dominioReferente(''), dominioReferente('android-app://com.x'), dominioReferente('https://a.dev/p', 'https://a.dev')],
+  ['l.instagram.com', '', '', ''], 'referente: solo el sitio, nunca el propio juego');
+{
+  const err = new TypeError('Cannot read properties of undefined (reading \'x\') de juan@mail.com en https://a.dev/p?token=1');
+  err.stack = 'TypeError: …\n    at f (https://liftinggame.pages.dev/js/game/stage.js?v=3:812:17)\n    at g (https://liftinggame.pages.dev/js/game/main.js:1:1)';
+  const d = detalleError(err);
+  igual([d.archivo, d.linea, d.col, d.mensaje.includes('@'), d.mensaje.includes('token')], ['stage.js', 812, 17, false, false], 'detalleError: archivo, línea, sin mail ni parámetros');
+  const d2 = detalleError(null, { message: 'Script error.', filename: 'https://x.dev/vendor/three/three.module.js', lineno: 5, colno: 9 });
+  igual([d2.mensaje, d2.archivo, d2.linea], ['Script error.', 'three.module.js', 5], 'detalleError desde ErrorEvent');
+  igual(detalleError(undefined), { mensaje: null, archivo: null, linea: null, col: null }, 'detalleError sin nada');
+}
 
 {
   // Sin clave: no-op, pero los eventos quedan en window.JUEGO.eventos y PostHog ni se carga.

@@ -8,6 +8,7 @@ import { armarCaida, poseCaida } from './caida.js';
 import { PLANTEL, JUGADOR, FICHA, nivelFicha, ENVIONES, LEV, ETIQUETAS, GUIONES, CUERPO, BARRA } from './roster.js';
 import { Registrador, Gobernador, calidadInicial, medirRefresco, decidirCalidad, pasoDe, metaDe, nombreDe, escalones, pisoDe, PRESET, PISO_MP, MARGEN, TECHO_MP } from './perf.js';
 import { sonido } from './audio.js';
+import { detalleError } from './analitica.js';
 import { Ayudas } from './ui/ayudas.js';
 import { Senal } from './ui/senal.js';
 import { Depura } from './ui/depura.js';
@@ -1050,7 +1051,7 @@ async function partida(cfg) {
 
 /** Un error que detiene el juego: queda en E.errores, sale en pantalla y va a las métricas como clave corta. */
 function fallar(e, tipo = 'excepcion') {
-  E.errores.push(String(e?.stack || e)); console.error(e); ev('error_juego', { tipo, pantalla: E.pantalla });
+  E.errores.push(String(e?.stack || e)); console.error(e); ev('error_juego', { tipo, pantalla: E.pantalla, ...detalleError(e) });
   $('msg').hidden = false; $('msg').textContent = t(tipo === 'inicio' ? 'carga.no_inicia' : 'carga.error');
 }
 
