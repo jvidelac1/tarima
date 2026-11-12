@@ -3,7 +3,8 @@
 // ?dibujo=0 para que el dibujo por software no atrase nada. En los dos primeros intentos propios de una final:
 //  1. Un toque durante PREPÁRATE (antes de ¡TIRA!) no se pierde: queda guardado y el levantamiento arranca solo apenas
 //     aparece ¡TIRA!, sin otro toque. Antes se descartaba con «ESPERA» y no se levantaba nada.
-//  2. Un toque justo al cambiar de señal y un doble toque pegado: se anotan, y si se descartan, con motivo y acuse.
+//  2. Un toque justo al cambiar de señal (pegado al de ¡EXPLOTA!) y un doble toque pegado: se anotan, y si se descartan
+//     (un toque a menos de 60 ms del anterior es un rebote del dedo), con motivo y acuse.
 //  3. Ráfagas en ¡EMPUJA! (8 toques cada 60 ms): todas anotadas.
 //  4. Un toque largo (700 ms apretado) en ¡TIRA! cuenta como uno y arranca el levantamiento.
 //  5. Después de una pausa (Esc en el llamado, Esc para volver) el primer toque de ¡TIRA! funciona.
@@ -92,7 +93,7 @@ for (;;) {
     await dormir(10); continue;
   }
   if (estadoIntento && !(I && I.propio)) estadoIntento = null;
-  if (s.pantalla === 'rival' && I && !I.propio && !rivalVisto) rivalVisto = { ...s.turno };
+  if (s.turno.ve && !rivalVisto) rivalVisto = { ...s.turno, pantalla: s.pantalla };
   if (s.panel && !s.sobre) {
     const P = await J(() => { const pn = document.querySelector('#capa .panel'), ir = pn?.querySelector('button.ir:not(:disabled)'); return { ir: !!ir, foco: document.activeElement === ir }; });
     if (P.ir) {
@@ -101,7 +102,7 @@ for (;;) {
       await dormir(500); if (!P.foco) await J(() => document.querySelector('#capa .panel button.ir:not(:disabled)')?.focus()); await enter(); await dormir(300); continue;
     }
   }
-  if (['rival', 'decision', 'repeticion', 'repeticion_rival', 'carga', 'desplazado'].includes(s.pantalla) && Date.now() - ultSalto > 1500) { await espacio(); ultSalto = Date.now(); continue; }
+  if (['rival', 'decision', 'repeticion', 'repeticion_rival', 'carga', 'desplazado'].includes(s.pantalla) && Date.now() - ultSalto > 1500 && (s.pantalla !== 'rival' || rivalVisto)) { await espacio(); ultSalto = Date.now(); continue; }
   await dormir(30);
 }
 await dormir(1600);

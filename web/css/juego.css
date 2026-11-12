@@ -306,6 +306,7 @@ html.editando #app{visibility:hidden}
 
 /* ---------- teléfono de costado: menos texto mientras se juega, un solo mensaje a la vez, señal más grande ---------- */
 :where(html.horiz.bajo) .senal{--v:calc(var(--u)*1)}
+:where(html.horiz.bajo) body:has(#guia:not([hidden])) .senal{--v:calc(var(--u)*.88)}      /* con la guía de la práctica, la señal de siempre: si no, se tapan */
 :where(html.horiz.bajo) .s-franja{border-color:rgba(255,196,40,.42)}
 :where(html.horiz.bajo) .s-franja.s-perf{border-color:rgba(255,214,90,.7)}
 :where(html.horiz.bajo) .s-fijo{border-width:calc(var(--v)*.55)}

@@ -446,10 +446,10 @@ export default {
 
   // ---- weight and lifters
   'kilos.menos5': 'Down 5 kg', 'kilos.menos1': 'Down 1 kg', 'kilos.mas1': 'Up 1 kg', 'kilos.mas5': 'Up 5 kg',
-  'peso.teclas5': '← → 1 kg at a time · ↑ ↓ 5 at a time · ENTER confirms.',
+  'peso.teclas5': '← → 1 kg · ↑ ↓ 5 kg · ENTER confirms.',
   'cuerpo.estatura': 'Height', 'cuerpo.femur': 'Thigh', 'cuerpo.brazos': 'Arms', 'cuerpo.movilidad': 'Mobility',
   'cuerpo.corto': 'short', 'cuerpo.largo': 'long', 'cuerpo.cortos': 'short', 'cuerpo.largos': 'long', 'cuerpo.alta': 'high', 'cuerpo.media': 'average',
-  'pesista.ventura.conviene': 'Good at: short thighs and arms, so the bar travels less. Forgives taps that are a bit off.',
-  'pesista.brenner.conviene': 'Good at: long levers that pull hard, and stamina. Shines when the final gets heavy.',
-  'pesista.marangi.conviene': 'Good at: big weights if your timing is precise. Tires fast: don’t waste attempts.',
+  'pesista.ventura.conviene': 'Short levers: the bar travels less. Forgives taps a bit off.',
+  'pesista.brenner.conviene': 'Long levers: pulls hard and tires slowly. Shines on heavy lifts.',
+  'pesista.marangi.conviene': 'Very strong if your timing is precise. Tires fast: don’t waste attempts.',
 };

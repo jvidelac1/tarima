@@ -646,7 +646,7 @@ async function inicio() {
 function cuerpoHTML(id) {
   const C = CUERPO[id], fr = (k, v) => { const r = BARRA[k]; return r ? Math.max(.08, Math.min(1, (v - r[0]) / (r[1] - r[0]))) : v === 'alta' ? .9 : .55; };
   const largo = (k, v) => (k === 'estatura' ? t(`pesista.${id}.alto`) : k === 'movilidad' ? t('cuerpo.' + v) : t(fr(k, v) > .5 ? (k === 'brazos' ? 'cuerpo.largos' : 'cuerpo.largo') : (k === 'brazos' ? 'cuerpo.cortos' : 'cuerpo.corto')));
-  return `<span class="cuerpo">${['estatura', 'femur', 'brazos', 'movilidad'].map(k => `<span class="med"><i>${t('cuerpo.' + k)}</i><span class="barra"><b style="width:${Math.round(fr(k, C[k]) * 100)}%"></b></span><em>${largo(k, C[k])}</em></span>`).join('')}</span>`;
+  return `<span class="cuerpo">${['estatura', 'femur', 'brazos', 'movilidad'].map(k => `<span class="med"><i>${t('cuerpo.' + k)}</i><span class="barra" style="--v:${Math.round(fr(k, C[k]) * 100)}%"></span><em>${largo(k, C[k])}</em></span>`).join('')}</span>`;
 }
 
 /** Metrónomo de 8 toques: la mediana del atraso propone la corrección (0 a 100 ms), que queda fija para toda la partida. */
@@ -723,7 +723,7 @@ async function elegirApertura(p, lev, sugerida, html) {
   for (;;) {
     const arriba = html();
     const pn = capa.poner(`${idiomasHTML(true)}${arriba}<h2>${t(lev === 's' ? 'peso.titulo_s' : 'peso.titulo_c')}</h2>
-      ${kilosHTML(kg, lo, hi)}<div class="fila centro"><button class="ir grande" id="btn-confirmar">${t('peso.boton', { kg })}</button></div>
+      ${kilosHTML(kg, lo, hi, false, `<button class="ir grande" id="btn-confirmar">${t('peso.boton', { kg })}</button>`)}
       <p>${t('peso.rango', { lo, hi })}${lev === 's' ? ' ' + t('peso.ayuda') : ''}</p>${tactil() ? '' : `<p class="chica">${t('peso.teclas5')}</p>`}`, arriba ? 'peso con-tabla' : 'peso');
     if (!abierto) { bloquear(pn); abierto = true; }      // el bloqueo es al abrir, no en cada kilo
     const b = await Promise.race([clic(pn, '.kg,#btn-confirmar'), new Promise(res => { E.repintar = () => res(null); })]);

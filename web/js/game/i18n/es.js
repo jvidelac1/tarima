@@ -461,10 +461,10 @@ export default {
 
   // ---- kilos y pesistas
   'kilos.menos5': 'Bajar 5 kg', 'kilos.menos1': 'Bajar 1 kg', 'kilos.mas1': 'Subir 1 kg', 'kilos.mas5': 'Subir 5 kg',
-  'peso.teclas5': '← → de a 1 kg · ↑ ↓ de a 5 · ENTER confirma.',
+  'peso.teclas5': '← → 1 kg · ↑ ↓ 5 kg · ENTER confirma.',
   'cuerpo.estatura': 'Estatura', 'cuerpo.femur': 'Fémur', 'cuerpo.brazos': 'Brazos', 'cuerpo.movilidad': 'Movilidad',
   'cuerpo.corto': 'corto', 'cuerpo.largo': 'largo', 'cuerpo.cortos': 'cortos', 'cuerpo.largos': 'largos', 'cuerpo.alta': 'alta', 'cuerpo.media': 'media',
-  'pesista.ventura.conviene': 'Le conviene: fémur y brazos cortos, la barra recorre menos. Perdona toques un poco a destiempo.',
-  'pesista.brenner.conviene': 'Le conviene: palancas largas que tiran fuerte y aguante. Rinde mejor cuando la final se pone pesada.',
-  'pesista.marangi.conviene': 'Le conviene: pedir muchos kilos si tocas preciso. Se cansa rápido: no gastes intentos.',
+  'pesista.ventura.conviene': 'Palancas cortas: la barra recorre menos. Perdona toques algo a destiempo.',
+  'pesista.brenner.conviene': 'Palancas largas: tira fuerte y se cansa poco. Rinde con mucho peso.',
+  'pesista.marangi.conviene': 'Muy fuerte si tocas preciso. Se cansa rápido: no gastes intentos.',
 };

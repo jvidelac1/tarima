@@ -85,7 +85,7 @@ async function escenario(L) {
       if (s.errores.length) throw new Error('error en el juego: ' + s.errores[0]);
       if (hasta(s)) return s;
       const f = `${s.pantalla}${s.panel ? ' panel' : ''}`; if (f !== firma) { firma = f; tFirma = Date.now(); traza.push(f); if (traza.length > 30) traza.shift(); }
-      if (s.pantalla === 'muro') throw new Error(`${que}: apareció el muro antes de lo esperado`);
+      if (s.pantalla === 'muro' && s.panel) throw new Error(`${que}: apareció el muro antes de lo esperado`);      // sin panel: el muro ya se cerró y la final está cargando
       const I = s.intento;
       if (I && I.propio && s.modo !== 'panel') {
         const g = I.senal; if (!g) { await av(20); continue; }
