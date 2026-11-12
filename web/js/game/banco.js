@@ -149,7 +149,12 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
     for (const m of materiales()) {
       const pr = r.properties.get(m), mapa = pr.programs; if (!mapa) continue; const antes = f.get(m) || new Set();
       const extra = [...mapa].filter(([, p]) => !antes.has(p)); if (!extra.length) continue;
-      pr.programs = new Map(extra); m.dispatchEvent({ type: 'dispose' }); n += extra.length;
+      // en un ShaderMaterial three además olvidaría los ids de su código, y al volver le daría una clave nueva y compilaría
+      // otra vez lo mismo: durante el aviso deja de parecer ShaderMaterial, así sus ids (y sus programas de siempre) quedan
+      const sh = m.isShaderMaterial === true; pr.programs = new Map(extra);
+      if (sh) m.isShaderMaterial = false;
+      try { m.dispatchEvent({ type: 'dispose' }); } finally { if (sh) m.isShaderMaterial = true; }
+      n += extra.length;
     }
     return n;
   };
