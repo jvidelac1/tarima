@@ -607,6 +607,16 @@ Versión base de la foto: los tres juntos sin tocarse. El abrazo en el escalón 
 | Cambio de carga | Dos ayudantes (hasta 12 mil triángulos cada uno) | Entran sobre el plano cenital, con el pesista fuera de cuadro |
 | Podio y foto | Tres pesistas en detalle bajo, con texturas de 1024 | Los tres juntos solo en plano general. Depende de la meta de 4 MB por modelo de la etapa 3; antes, el podio es 2D |
 
+**Calidad del juego (12-nov).** El juego prioriza cuadros sobre efectos y no usa la calidad del visor:
+
+- Arranca en **Baja** (sin oclusión ambiental, desenfoque ni resplandor; hasta 1280 × 800 píxeles dibujados), o en **Móvil** con puntero grueso. `juego.html?q=alta|media|baja|movil` deja una calidad fija, sin gobernador.
+- **Se dibuja en cada cuadro que ofrece el navegador**, menos detrás de un panel, donde la imagen queda congelada (un cuadro al abrirlo o repintarlo). Antes había un tope de 30 ms entre dibujos fuera del intento propio, que en una pantalla de 75 Hz daba 25 cuadros por segundo.
+- **Calibración** (`calibrar()` en `main.js`): con los modelos cargados y el pesista en escena, detrás de «Cargando pesistas…», mide el intervalo real entre 30 cuadros y baja un escalón mientras el percentil 80 pase de 1,3 veces el cuadro de la meta. La meta es el refresco medido de la pantalla (la mitad por encima de 90 Hz).
+- **Gobernador** (`Gobernador` en `perf.js`): durante el dibujo continuo, dos ventanas seguidas de 1 s por debajo del 80 % de la meta piden bajar un escalón. **La calidad nunca cambia con un intento en curso** (propio o de un rival) ni en la repetición: el pedido espera al final. Solo baja; no vuelve a subir en la misma carga de la página.
+- Escalones, del más caro al más barato: Baja, Baja 80 %, Móvil, Móvil 80 %, Móvil 60 %. Entre calidades se rehacen los pases (un tirón, por eso se elige el momento); entre porcentajes solo cambia la resolución.
+- **Nada pesado en medio del intento**: los dos modelos se terminan de cargar y se muestran un cuadro antes de jugar (shaders compilados y texturas subidas); el lienzo 2D de las ayudas no se realoja (se oculta cuando no hay nada que dibujar); los búferes de ruido del sonido se generan una vez.
+- `JUEGO.calidad` (escalón, refresco, meta, lo medido al calibrar y cada cambio con su motivo), `JUEGO.perf.ult` (ofrecidos y dibujados del último segundo) y `?depura=1` lo muestran. `tools/check_fluidez.mjs` lo prueba; `--gobernador` usa `?lastre=N` (espera artificial de N ms por megapíxel dibujado, solo para esa prueba).
+
 Presupuesto por cuadro en un teléfono de gama media. Son valores iniciales sin medir: la primera medición en un teléfono real los corrige.
 
 | | Levantamiento | Podio |

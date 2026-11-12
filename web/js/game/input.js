@@ -57,9 +57,10 @@ export class Boton {
       this.contactos.set(id, via); this.via = via; this.oye?.(reloj.deEvento(e), 1, via);
       if (toques.abierto && toques.abierto.ok === null) toques.resolver(false, 'espera');      // nadie lo tomó
     };
-    const esTecla = e => e.code === 'Space' || e.code === 'Enter';
+    // por código físico o por carácter: un teclado remapeado que manda ' ' con otro código también vale
+    const esEspacio = e => e.code === 'Space' || e.key === ' ', esTecla = e => esEspacio(e) || e.code === 'Enter' || e.key === 'Enter';
     // en captura y antes que el teclado de los paneles: la pulsación queda anotada (y con acuse) pase lo que pase después
-    this._k0 = e => { if (esTecla(e) && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) toques.nuevo(reloj.deEvento(e), 'teclado', e.code === 'Space' ? 'ESPACIO' : 'ENTER'); };
+    this._k0 = e => { if (esTecla(e) && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) toques.nuevo(reloj.deEvento(e), 'teclado', esEspacio(e) ? 'ESPACIO' : 'ENTER'); };
     this._kd = e => {
       if (!esTecla(e)) return;
       const T = toques.abierto, pend = !e.repeat && T && T.ok === null;
@@ -67,9 +68,9 @@ export class Boton {
       if (e.defaultPrevented || e.target.closest?.('button,input,select,a')) { if (pend) toques.resolver(true, 'boton', true); return; }
       e.preventDefault(); if (e.repeat) return;
       if (!this.activo) { if (pend) toques.resolver(false, 'pausa'); return; }
-      baja('k' + e.code, e, 'teclado');
+      baja('k' + (e.code || e.key), e, 'teclado');
     };
-    this._ku = e => { if (esTecla(e)) { sube('k' + e.code, e); toques.suelta(); } };
+    this._ku = e => { if (esTecla(e)) { sube('k' + (e.code || e.key), e); toques.suelta(); } };
     this._pd = e => {
       if (!this.activo || (e.pointerType === 'mouse' && e.button !== 0) || e.target.closest?.('button,input,select,a,.panel')) return;
       const via = e.pointerType === 'mouse' ? 'mouse' : 'tactil'; e.preventDefault(); toques.nuevo(reloj.deEvento(e), via, via === 'mouse' ? 'CLIC' : 'TOQUE'); baja('p' + e.pointerId, e, via);

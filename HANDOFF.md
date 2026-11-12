@@ -217,7 +217,7 @@ Especificación: [docs/CONTROLES.md](docs/CONTROLES.md). Lo que quedó hecho:
 - **Capa de traducción** (`web/js/game/controles.js`, pura): mira la fase del núcleo en el instante del toque y lo convierte en apretar o soltar. El núcleo sigue recibiendo lo mismo de siempre. En Fácil, detrás de `ctx.ctl === 'f'`: ventanas por 2 (`FACIL.ancho` en `rules.js`), el tirón anticipado es amague (dos por movimiento), la tensión es siempre buena y la subida tiene reglas propias (ver «Corrección» más abajo y `docs/CONTROLES.md`, sección 4). `ctl` va en la cabecera del registro y entra solo en el contexto de la persona: **los rivales juegan con las reglas de Clásico y `tools/sim_ref.json` no cambió**. Las referencias de Fácil están en `tools/sim_ref_facil.json`.
 - **Señal fija** (`#senal`, `ui/senal.js`): verbo en imperativo, aro fijo con un círculo que se cierra, la tecla dibujada (ESPACIO, o TOCÁ en teléfono) y el paso («2 de 3»). A la derecha del pesista en horizontal; al pie del escenario en vertical. Después de cada toque, PERFECTO, BIEN, TEMPRANO o TARDE en el mismo lugar. Clásico usa la misma señal con sus verbos y conserva anillo, línea y medidor.
 - **Línea de fallo** (`ui/mensajes.js`, `explicar()`): debajo de «Intento fallado», qué pasó y qué hacer («No tocaste ¡EXPLOTÁ! Tocá ESPACIO cuando el círculo se cierra.»). También en la repetición y en el panel de reintento del tutorial.
-- **Tutorial guiado** (Fácil, la primera vez; después el inicio ofrece «Repetir tutorial»): panel con tres reglas, un arranque en cámara lenta que se detiene en cada toque y no se puede fallar, y dos prácticas a velocidad real (arranque y dos tiempos) con «Reintentar». En Clásico quedan el metrónomo y las tres prácticas de antes.
+- **Tutorial guiado** (Fácil, la primera vez; después el inicio ofrece «Repetir tutorial»): desde el 12-nov es **un solo arranque en cámara lenta** que se detiene en cada toque, no se puede fallar y se saltea con Esc (ver «Fluidez, entrada y tutorial» más abajo; antes eran un panel, el guiado y dos prácticas). En Clásico quedan el metrónomo y las tres prácticas de antes.
 - **Menús sin mouse**: todo panel abre con foco visible (borde dorado) en su botón principal; ↑ ↓ y Tab mueven el foco, ← → cambian los kilos, Enter o Espacio activan. Esc pausa fuera del intento (congela el reloj; hay un botón «II» para el dedo); H o ? abre «Cómo se juega».
 - **Pantalla de inicio**: tres pasos con la tecla dibujada en lugar de la oración, y el selector «Controles: Fácil · Clásico».
 - **Error corregido**: en el calentamiento el pesista no se movía (`poseDe()` tomaba el instante 0 de confirmación como «sin confirmar»). La prueba ahora mide que la barra suba también en el tutorial.
@@ -259,7 +259,61 @@ Medido (`node tools/play_human.mjs --info`, 2000 intentos por casilla, aperturas
 - **En Fácil el jugador tiene ventanas más anchas y una subida más simple que los rivales**, que juegan con las reglas de Clásico. Con rivales amistosos el oro sale 24 a 42 % de las veces con las opciones que vienen puestas; con rivales normales y difíciles no se midió.
 - **Dibujo con errores grandes**: con los límites anchos de Fácil el tirón puede seguir hasta 0,28 s de clip más allá de `Segundo tirón` antes del toque, y la flexión del envión dura 0,6 s (más lenta que en Clásico). Se miró en capturas con toques justos y uno tarde; no un toque en el borde del límite.
 - **El registro guarda la salida de la capa, no las teclas**, y no se subió la versión de reglas (está atada a `sim.json`). Con servidor: subir versión y separar la tabla por `ctl`.
-- No se midieron cuadros por segundo del juego.
+- Cuadros por segundo del juego: medidos el 12-nov en el pod, no en la Mac (ver la sección que sigue).
+
+### Fluidez, entrada y tutorial (12-nov, rama `demo`)
+
+El usuario jugó el rediseño en su Mac (M1 Pro, Chrome, pantalla de 75 Hz) y dijo: «sigue siendo complejo jugar sobre todo porque tuve que hacer el tutorial 3 veces, además tiene pocos fps por el timing de tocar los botones para completar el levantamiento, necesito que se vea más fluido, y no me detecta bien a veces la barra espaciadora». En su Chrome el registrador del juego daba 22 cuadros dibujados por segundo de mediana durante el intento (mínimo 4) y 25 en el inicio, con calidad «Media» a 1919 × 929.
+
+**Qué se encontró** (`tools/check_fluidez.mjs` sobre el commit 6e23160, en el pod con RTX 4090, Chrome sin pantalla a 60 Hz, ventana de 1920 × 930, juego en tiempo real con teclado real, sin estrangular y con el procesador a 1/4 y 1/6):
+
+- **Durante el intento propio el juego no salteaba cuadros.** Dibujó 407 de 407, 388 de 388, 382 de 382 y 608 de 608 cuadros ofrecidos (tres arranques y un dos tiempos), y lo mismo a 1/4 y a 1/6. La idea de que «el navegador ofrece 75 y el juego dibuja uno de cada tres» no se reproduce en el intento: en `tic()` el modo `intento` dibujaba siempre.
+- **Fuera del intento sí:** había un tope de 30 ms entre dibujos (veredicto, carga, intento de un rival, espera de la carga). A 60 Hz eso da 30 por segundo (el registrador marcó `decision 30/30`); a 75 Hz, donde un cuadro dura 13,3 ms, el tope cae en el tercer cuadro: 25 por segundo. Es el «25» que se midió en la Mac fuera del intento.
+- **Los 22 por segundo durante el intento en la Mac no salen del bucle: son el costo de «Media» en esa placa.** No se pudo medir desde acá (la 4090 dibuja Media a 60 sin perder un cuadro). El dato que hay es de la prueba del visor en esa misma máquina (sección «Pendientes», Rendimiento): alta y media caen a 20 a 45 fps tras 60 a 80 s de dibujo continuo, y solo baja sostiene 60. El juego elegía Media y no tenía gobernador.
+- **Hilo principal:** 4,6 a 6,3 ms por cuadro con el perfilador puesto (3,4 ms de mediana en una traza), casi todo recorrido de escena y llamadas de dibujo de three.js; la lógica del juego no aparece entre las primeras 28 funciones, y cuesta lo mismo en Media, Baja y Móvil. Recolección de basura en un arranque de 7,7 s: 13 menores, la más larga de 1,7 ms; ninguna mayor.
+- **Trabajo pesado en medio del intento que sí había:** el segundo modelo (10 MB) se cargaba «durante el calentamiento», o sea encima del primer levantamiento; el lienzo 2D de las ayudas se realojaba entero (`width = width`) cada vez que las ayudas aparecían o se iban (Clásico e intentos de rivales); cada sonido generaba su búfer de ruido en el momento. A 1/6 hubo una tarea larga de 65 ms dentro de un intento.
+- **Toques: todos llegaban a la página** (82 a 86 enviados, los mismos recibidos, `target` BODY). De los 56 a 59 que caían dentro del intento, **13 a 17 se descartaban sin dejar rastro** (en PREPARATE, en AGUANTÁ, por rebote, o en ¡EMPUJÁ! cuando ya alcanzaba), y fuera del intento otros 26 (16 de ellos en el veredicto, antes de los 0,4 a 1,2 s en que se puede saltear). Además, un `keyup` perdido dejaba la tecla «apoyada» y el toque siguiente se tiraba; un toque que llegaba después del límite recibía «No tocaste ¡EXPLOTÁ!»; y Tab en medio del intento podía sacar el foco de la página.
+- **Tutorial:** eran tres levantamientos (guiado y dos prácticas); el guiado se repetía hasta tres veces si fallaba; y `tarima.tutorial` se guardaba recién al final, así que recargar a mitad lo empezaba de nuevo.
+
+**Qué cambió:**
+
+- **Bucle** (`main.js`, `tic`): se dibuja en cada cuadro que ofrece el navegador, salvo detrás de un panel (imagen congelada).
+- **Calidad** (`perf.js`, `stage.js`): por defecto Baja en vez de Media; calibración antes de jugar y gobernador que solo baja y nunca con un intento en curso. Detalle en `docs/JUEGO.md`, sección 8.7. `?q=media` o `?q=alta` devuelven los efectos, sin gobernador.
+- **Sin trabajo pesado en el intento:** los dos modelos se terminan de cargar antes de jugar (empiezan a bajar con el inicio) y se muestra cada pesista un cuadro (shaders y texturas); el lienzo de las ayudas se oculta en vez de realojarse; los búferes de ruido se generan una vez.
+- **Entrada** (`input.js`, `controles.js`, `main.js`): registro `toques` y acuse de cada pulsación con motivo en una palabra; el `keyup` perdido ya no descarta; Tab no sale de la página; cartel si la ventana pierde el teclado; `?depura=1`. Tabla de descartes en `docs/CONTROLES.md`, sección 1.1. Los que quedaron tienen motivo: repetición del sistema, rebote de 60 ms, RESPIRÁ, AGUANTÁ, 400 ms de panel recién abierto y el mínimo del veredicto.
+- **Tutorial**: un arranque guiado, sin panel ni prácticas; Esc o el botón «Saltear tutorial ESC» lo cortan; se anota al salir del inicio. El dos tiempos se explica en su primer llamado de la final, con una parada en los hombros (`docs/CONTROLES.md`, sección 6).
+- **Pendientes de la verificación anterior que se cerraron:** la línea de fallo dice temprano o tarde y cuánto (`codos_blandos`, `temblor`) y distingue «tocaste tarde» de «no tocaste»; la palabra de cada toque lleva su verbo («¡EXPLOTÁ! PERFECTO»); «ENVIÓN: TIJERA» ya no va sobre el pesista en Fácil; el panel del llamado en Fácil deja a la vista kilos, entrenador, cuenta y reloj (atajos de kilos, envión y cambios en «Más opciones») y va al costado derecho, sin tapar al pesista; «Techo» pasó a «Tope» y la ayuda (H) explica Tope, Resto, «jueces 2 a 1» y apertura; el inicio entra en 1280 × 720 (Rivales y Final en una fila).
+
+**Medido después** (mismo script, commit 7c98bb9, mismo pod):
+
+| | Antes (6e23160, Media) | Después (Baja, automática) |
+|---|---|---|
+| Cuadros dibujados sobre ofrecidos, en el intento, 1x · 1/4 · 1/6 | 100 % · 100 % · 100 % | 100 % · 100 % · 100 % (entre 356 y 621 cuadros por intento) |
+| Cuadros por segundo fuera del intento (registrador, `decision`) | 30 (tope) | 60 |
+| Tareas de más de 50 ms dentro de un intento, 1x · 1/4 · 1/6 | 0 · 0 · 1 (65 ms); otra corrida a 1x con `?q=baja`, 1 de 82 ms | 0 · 0 · 1 (52 ms) |
+| Toques del intento descartados sin motivo | 13 a 17 de 56 a 59 | 0 (13 a 16 descartados, todos con motivo y acuse: espera 4, rebote 0 a 4, sobra 8 a 10) |
+| Toques fuera del intento sin registro | 26 | 0 (26: 14 aceptados, que saltean el resumen, el veredicto o la repetición, y 12 «esperá» en el veredicto) |
+| Levantamientos antes de jugar la primera vez | 3 | 1 (14 s de «Empezar» a la presentación con un jugador que toca a los 450 ms; 11,2 s en `check_game`) |
+| Recargar la página repite el tutorial | Sí, si no se había terminado | No |
+| Círculo desde que aparece hasta que cierra | — | ¡EXPLOTÁ! 0,78 a 0,84 s · ¡RECIBÍ! 0,68 a 0,75 s · ¡ARRIBA! 0,58 a 0,60 s · ¡RECIBÍ! de arriba 0,60 a 0,62 s |
+
+- **Gobernador** (`--gobernador`, con una espera artificial por megapíxel dibujado): con 18 ms/MP la calibración bajó de Baja a Baja 80 % antes del primer intento (midió 33,3 ms por cuadro); con 40 ms/MP desde la mitad del primer intento la calidad no se tocó hasta que terminó, y después bajó tres escalones (al final del intento, en la carga y al final del siguiente). En la corrida a 1/6, sin lastre, bajó solo una vez, al terminar el dos tiempos (21,6 ms por cuadro).
+- **Lo que no se movió:** en el pod la cuenta de cuadros del intento ya daba 100 % antes; lo que cambia ahí es el dibujo fuera del intento, las tareas largas y los toques. La mejora que le importa al usuario (Media a Baja en su placa) no se ve en una 4090.
+- **Ruido del pod.** Entre cuadros hay rachas de 33 ms (un refresco perdido) que no dependen del juego: una página con un solo `clear` de WebGL perdió 1 cuadro en 20 s en una corrida y 38 en otra (36 en 6 s seguidos); el juego en Media sin estrangular perdió 0, 0, 0 y 1, y en Baja 4, 0, 31 y 20 en otra corrida de la misma noche. Había otro equipo usando la máquina (carga media 4 a 14). Por eso la prueba tiene como umbral los cuadros dibujados sobre ofrecidos y las tareas largas, y no el percentil 99.
+- `tools/sim_test.mjs` y `tools/play_human.mjs` en verde sin tocar `tools/sim_ref.json`; `tools/check_game.mjs` en verde con el tutorial nuevo (ahora juega en tiempo real el guiado y el primer intento de la final).
+
+**Lo que no está medido o no cumple:**
+
+- **Nada de esto se midió en la Mac del usuario.** Que Baja llegue a 75 cuadros en la M1 Pro es una inferencia de la medición vieja del visor (60 sostenidos en Baja); si no llega, la calibración baja a Baja 80 % antes del primer intento. Para verlo: `juego.html?depura=1` (ofrece y dibuja por segundo, ms por cuadro, calidad y cuántas veces bajó) o `JUEGO.calidad` y `JUEGO.perf.resumen()` en la consola.
+- **Baja se ve más blanda:** dibuja hasta 1280 × 800 píxeles (1453 × 704 en la ventana del usuario, reescalado) y no tiene oclusión, desenfoque ni resplandor. No hay selector en pantalla para volver a Media: solo `?q=media`. El gobernador no vuelve a subir.
+- **El estrangulamiento de procesador no imita una placa lenta.** El costo de GPU de otra máquina solo se probó con el lastre artificial, que es una espera en el hilo principal.
+- **Los 22 por segundo de la Mac se explican por inferencia**, no por una medición propia. Si con Baja siguiera habiendo diferencia entre «ofrece» y «dibuja» en el recuadro de depuración, la causa es otra y hay que mirarla ahí.
+- **Qué toque «no detectaba» el usuario no se sabe.** Lo medido es que todos llegan y que 13 a 17 por partida se descartaban sin aviso; ahora cada descarte dice por qué. Si vuelve a pasar, el recuadro de depuración muestra los últimos siete toques.
+- En una corrida de control hubo un cuadro de 100 ms justo al aparecer ¡TIRÁ! en el primer intento, sin tarea larga en el hilo principal (o sea, fuera de JavaScript: composición o placa). Una vez en siete corridas; no se encontró la causa ni se sabe si es del pod.
+- El doble toque accidental en ¡EXPLOTÁ! o ¡ARRIBA! a más de 60 ms sigue contando como ¡RECIBÍ! temprano (regla documentada en `docs/CONTROLES.md`); no se cambió.
+- `tools/primera.mjs` quedó atrás del tutorial nuevo (sale con un aviso); las capturas se sacan con `check_fluidez --capturas`.
+- Teléfono: el acuse y el botón de saltear solo pasaron por la emulación táctil de `check_game`; no se miraron en capturas de teléfono. El inicio en teléfono vertical sigue apretado (hallazgo de la verificación anterior, sin tocar).
+- En el inicio las flechas siguen moviendo el foco sin elegir (hallazgo anterior, sin tocar).
 
 ### En qué se aparta de docs/JUEGO.md
 
@@ -299,7 +353,9 @@ Porcentaje de válidos · meta. Jugadores simulados con error típico de 25, 40 
 
 ### Pendientes del juego
 
-- **Que el usuario juegue el tutorial y una final en Fácil con el teclado.** Es la única prueba que falta de verdad. Después, un teléfono real. Medir una partida entera en el teléfono (`JUEGO.perf.resumen()` da mínimo y mediana de cuadros por tramo).
+- **Que el usuario vuelva a jugar en su Mac con `?depura=1`** y diga qué muestran «ofrece», «dibuja» y «calidad» durante un intento: es la medición que falta de la fluidez. Después, un teléfono real (`JUEGO.perf.resumen()` da mínimo y mediana de cuadros por tramo).
+- Decidir si hace falta un selector de gráficos en pantalla (hoy `?q=media`) y si el gobernador tiene que poder volver a subir.
+- Rehacer `tools/primera.mjs` sobre el tutorial nuevo, o borrarlo y dejar `check_fluidez --capturas`.
 - Balance de Fácil por encima de la apertura (95 % y 100 %) y contra rivales; decidir si el segundo y el tercer intento tienen que ser tan exigentes en la subida.
 - Segunda vuelta de balance de Clásico: squat, 106 %, casual al 90 y 95 %, Ventura rival y gasto de Resto.
 - Extraer `stage.js` del visor y verificarlo con GPU; política de interrupciones; simular el resto de la final cuando el jugador queda sin marca.
