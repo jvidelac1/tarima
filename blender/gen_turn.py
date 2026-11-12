@@ -1,6 +1,6 @@
 """Turno en arcilla de una malla generada (etapa 2, E6): 4 vistas cada 90° con luz propia rasante, más las mismas 4 con su textura.
 Uso (en el pod, con `flock /root/blender.lock` adelante y los modelos de ComfyUI descargados):
-  .venv/bin/python blender/gen_turn.py <malla.glb> [<otra.glb> ...] [--res 1000] [--muestras 48] [--sin-tex] [--giro 0] [--lado 55] [--alto 35]
+  .venv/bin/python blender/gen_turn.py <malla.glb> [<otra.glb> ...] [--res 1000] [--muestras 48] [--sin-tex] [--plano] [--giro 0] [--lado 55] [--alto 35]
   .venv/bin/python blender/gen_turn.py --hoja back G0 G1 G4 G5 [--dir out/arte/gen] [--fila clay]      # una vista de varias mallas, lado a lado
 Por cada GLB escribe al lado:
   <nombre>_turn.png   contacto de 2 x 2 en arcilla (frente, izquierda, atrás, derecha), sin textura ni mapa de normales: solo geometría
@@ -12,7 +12,8 @@ relleno débil del otro lado y entorno casi negro. Es rasante a propósito: con 
 grande de frente) el relieve de la espalda no se ve. La exposición se fija una vez por malla con la vista de frente (mediana de la
 arcilla a 0,42 en sRGB) para que mallas de distinto tamaño se puedan comparar.
 Convención de vistas: la de blender/refs.py (front = cámara en -Y; left = cámara en +X, ve el lado izquierdo del personaje). Si el
-frente de la malla generada no queda en -Y después de importar, `--giro` la gira sobre Z antes de renderizar.
+frente de la malla generada no queda en -Y después de importar, `--giro` la gira sobre Z antes de renderizar. `--plano` sombrea por cara
+(sin normales suavizadas): muestra los polígonos reales de una malla de pocos polígonos, como la nuestra exportada con `detail.py sint`.
 Líneas a mirar: `TURN ...`."""
 import os, sys, json, math, time
 HERE=os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0,HERE)
@@ -94,6 +95,9 @@ def turno(path,a):
         sc.render.filepath=fn; bpy.ops.render.render(write_still=True); im=Image.open(fn).convert('RGBA'); al=np.asarray(im)[:,:,3]/255.
         out=Image.new('RGB',im.size,fondo); out.paste(im,(0,0),im); out.save(fn); return out,al
     # ---- arcilla: solo geometría ----
+    if a.plano:
+        for pl in g.data.polygons: pl.use_smooth=False
+        g.data.update()
     g.data.materials.clear(); g.data.materials.append(clay); bg.inputs['Color'].default_value=(1,1,1,1); bg.inputs['Strength'].default_value=.02
     poner(0); sc.cycles.samples=8; im,al=render(os.path.join(vd,f'{nombre}_cal.png')); os.remove(os.path.join(vd,f'{nombre}_cal.png'))
     lum=(np.asarray(im,float)/255).mean(2); op=al>.99; med=float(np.median(lum[op])) if op.any() else .2; lin=lambda v:v/12.92 if v<=.04045 else ((v+.055)/1.055)**2.4
@@ -120,7 +124,7 @@ def hoja(a):
 
 if __name__=='__main__':
     import argparse
-    p=argparse.ArgumentParser(prog='gen_turn.py'); p.add_argument('glb',nargs='+'); p.add_argument('--res',type=int,default=1000); p.add_argument('--muestras',type=int,default=48); p.add_argument('--sin-tex',dest='sin_tex',action='store_true')
+    p=argparse.ArgumentParser(prog='gen_turn.py'); p.add_argument('glb',nargs='+'); p.add_argument('--res',type=int,default=1000); p.add_argument('--muestras',type=int,default=48); p.add_argument('--sin-tex',dest='sin_tex',action='store_true'); p.add_argument('--plano',action='store_true',help='sombreado por cara')
     p.add_argument('--giro',type=float,default=0.,help='giro sobre Z (grados) antes de renderizar'); p.add_argument('--lado',type=float,default=55.,help='azimut de la clave respecto de la cámara'); p.add_argument('--alto',type=float,default=35.,help='elevación de la clave')
     p.add_argument('--hoja',choices=[v for v,_ in VIEWS],help='arma una hoja con esa vista de las mallas nombradas (sin renderizar)'); p.add_argument('--dir',default='out/arte/gen'); p.add_argument('--fila',choices=('clay','tex'),default='clay')
     a=p.parse_args()
