@@ -87,7 +87,7 @@ function cadencia(n, calienta = 10) {
  */
 async function calibrar() {
   if (!C.auto || C.calibrado || !DIBUJA || reloj.manual !== null) return; C.calibrado = true;
-  const tope = 1000 / gov.meta * 1.3;
+  const tope = 1000 / gov.meta * 1.3; gov.calentar(reloj.ahora(), 60000);      // mientras se calibra, el gobernador no opina
   for (;;) {
     const d = await cadencia(30); if (!d) break; d.sort((a, b) => a - b); C.medido = Math.round(d[Math.floor(d.length * .8)] * 10) / 10;
     if (C.medido <= tope || C.i <= 0) break;

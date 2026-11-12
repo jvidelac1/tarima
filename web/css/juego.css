@@ -122,6 +122,9 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
   .s-avance{left:3%;right:3%;bottom:calc(var(--v)*1.2);height:calc(var(--v)*1.5)}
   .s-paso{grid-area:paso}.s-verbo{grid-area:verbo;font-size:calc(var(--v)*3.1)}.s-sub{grid-area:sub}.s-pal{grid-area:pal;font-size:calc(var(--v)*1.8)}
   .guia{bottom:auto;top:calc(var(--u)*6.5 + var(--st));font-size:calc(var(--u)*1.5)}
+  /* vertical: abajo están la señal y el zócalo; el acuse va arriba a la derecha, debajo del reloj */
+  .acuse{bottom:auto;top:calc(var(--u)*8.6 + var(--st));flex-direction:row-reverse}
+  .acuse b{text-align:right}
 }
 #sobre{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(2,4,12,.72)}
 
