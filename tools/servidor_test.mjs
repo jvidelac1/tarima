@@ -278,7 +278,7 @@ igual([fuenteTrafico('?utm_source=Amigos'), fuenteTrafico('?c=abc'), fuenteTrafi
   const [, clave, cfg] = ph.llamadas.find(l => l[0] === 'init');
   igual(clave, 'phc_PRUEBA123', 'clave pública');
   igual([cfg.persistence, cfg.person_profiles, cfg.api_host, cfg.autocapture, cfg.capture_pageview, cfg.capture_pageleave, cfg.disable_session_recording, cfg.disable_surveys, cfg.advanced_disable_flags, cfg.disable_external_dependency_loading],
-    ['memory', 'identified_only', 'https://liftinggame.pages.dev/qx', false, false, true, true, true, true, true], 'configuración de posthog.init');
+    ['memory', 'identified_only', 'https://liftinggame.pages.dev/qx', false, true, true, true, true, true, true], 'configuración de posthog.init');
   igual(cfg.bootstrap.featureFlags['muro-texto'], 'b', 'banderas del Worker como bootstrap');
   const reg = ph.llamadas.find(l => l[0] === 'register')[1];
   igual([reg.idioma, reg.tactil, reg.pais, reg.previas, reg.fuente_trafico, reg['$feature/muro-texto'], reg['$feature/muro-partidas-gratis']], ['es', true, 'AR', 1, 'compartido', 'b', '2'], 'súper propiedades');

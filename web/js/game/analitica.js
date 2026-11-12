@@ -192,7 +192,7 @@ export function crearAnalitica(o = {}) {
         ui_host: m.ui || 'https://us.posthog.com',
         persistence: 'memory',                  // nada en cookies ni en almacenamiento: no hace falta aviso de cookies
         person_profiles: 'identified_only',
-        autocapture: false, capture_pageview: false, capture_pageleave: true,
+        autocapture: false, capture_pageview: true, capture_pageleave: true,   // $pageview: lo necesitan Web analytics y los embudos por página
         rageclick: false, capture_dead_clicks: false, capture_heatmaps: false, capture_performance: false,
         capture_exceptions: false, disable_session_recording: !grabar, disable_surveys: true,
         disable_surveys_automatic_display: true, disable_web_experiments: true, disable_product_tours: true,
