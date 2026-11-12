@@ -233,7 +233,7 @@ Medido (`node tools/play_human.mjs --info`, 2000 intentos por casilla, aperturas
 
 - `tools/sim_test.mjs` pasa entero sin tocar `tools/sim_ref.json`: Clásico no cambió.
 - `tools/check_game.mjs` en el pod (RTX 4090): partida completa en Fácil por teclado sin mouse (tutorial incluido, con un fallo a propósito para ver su línea) y otra por toques en 390 × 844; arranque guiado y práctica con el reloj verdadero; pausa y ayuda; metrónomo y una práctica en Clásico. Sin errores de consola.
-- `tools/primera.mjs`: 129 capturas (escritorio, teléfono emulado y Clásico) miradas una por una el 11-nov.
+- `tools/primera.mjs`: 129 capturas (62 de escritorio, 59 de teléfono emulado y 8 de Clásico) miradas todas el 11-nov, en hojas de contacto. De ahí salieron dos arreglos: «APRETÁ Y MANTENÉ» se salía de la caja de la señal en Clásico, y en RESPIRÁ aparecía «TODAVÍA NO» por los toques de cola de ¡EMPUJÁ!.
 
 **Lo que no está medido o es estimación:**
 
