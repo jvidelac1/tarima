@@ -61,6 +61,21 @@ export function taparTexto(texto, nombres = []) {
   return t;
 }
 
+/** Atributos que hacen a la forma de la página y no llevan texto del jugador (el CSS tiene «@media», por eso va aparte). */
+const ATRIBUTOS_DE_FORMA = new Set(['class', 'style', '_cssText', 'id', 'src', 'srcset', 'href', 'rel', 'type', 'for', 'role', 'hidden', 'disabled', 'lang', 'dir', 'tabindex', 'width', 'height', 'viewBox', 'd', 'fill', 'stroke', 'transform']);
+
+/**
+ * Atributo tal como va a la grabación. `value` siempre tapado: maskAllInputs tapa el valor actual del campo, pero si el
+ * campo está vacío rrweb deja el atributo del HTML (`value="<nombre guardado>"`, `value="<correo>"`). El resto (data-*,
+ * title, aria-*, placeholder…) con la misma regla que el texto: tapado si tiene una «@» o el nombre del jugador.
+ */
+export function taparAtributo(atributo, valor, nombres = []) {
+  if (typeof valor !== 'string' || !valor) return valor;
+  if (atributo === 'value') return valor.replace(/\S/g, '*');
+  if (ATRIBUTOS_DE_FORMA.has(atributo) || atributo.startsWith('rr_')) return valor;
+  return taparTexto(valor, nombres);
+}
+
 const PROHIBIDAS = /^(nombre|name|email|mail|correo|ip|\$ip|dispositivo|device|lista_id|telefono|phone)$/i;
 const CLAVE_PUBLICA = 'tarima.clave_publica';   // sessionStorage: solo para mandar `medicion_desactivada` desde la privacidad
 const MAX_COLA = 200;
@@ -168,6 +183,8 @@ export function crearAnalitica(o = {}) {
     grabar = p > 0 && azar() < p;
     try {
       [ph] = await Promise.all([cargar(), grabar ? cargarGrabador().catch(() => { grabar = false; }) : null]);
+      // Si mientras se descargaba se apagó la medición (apagar() o el interruptor en otra pestaña), no se arranca.
+      if (estado !== 'esperando' || apagadaPorUsuario()) { grabar = false; if (estado === 'esperando') apagar(); return false; }
       if (grabar) configGrabacionRemota(ventana, clave);
       const banderasProps = Object.fromEntries(Object.entries(flags).map(([k, v]) => [`$feature/${k}`, String(v)]));
       ph.init(clave, {
@@ -193,6 +210,8 @@ export function crearAnalitica(o = {}) {
         fuente_trafico: fuenteTrafico(buscar), pantalla, grabada: grabar, ...banderasProps,
       }));
       estado = 'activa';
+      // La privacidad se abre en otra pestaña: si ahí se desactiva la medición, esta carga deja de medir y de grabar.
+      try { ventana.addEventListener?.('storage', e => { if (e?.key === 'tarima.medicion' && e.newValue === '0') apagar(); }); } catch { /* nada */ }
     } catch {
       grabar = false;
       apagar();
@@ -306,6 +325,7 @@ export function opcionesGrabacion(nombres = () => []) {
     maskAllInputs: true,                          // mail, nombre, respuesta libre: siempre «***»
     maskTextSelector: '*',                        // todo texto pasa por maskTextFn…
     maskTextFn: texto => taparTexto(texto, nombres()),   // …que tapa solo lo del jugador
+    maskAttributeFn: (atributo, valor) => taparAtributo(atributo, valor, nombres()),   // value, data-v del correo sugerido…
     blockSelector: BLOQUEO_GRABACION,
     captureCanvas: { recordCanvas: false },       // nunca el 3D: le quitaría fluidez al juego
     recordHeaders: false, recordBody: false,      // nada de la red

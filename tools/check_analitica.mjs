@@ -155,7 +155,12 @@ window.__listo = true;
 <label>Nombre <input id="nombre" type="text" maxlength="20"></label><label>Correo <input id="correo" type="email"></label>
 <textarea id="q5" rows="2"></textarea><canvas id="gl" width="128" height="72"></canvas>
 <div id="senal"><div class="cierra">TIRA</div></div><button id="jugar" type="button">Jugar</button>
+<input id="viejo" type="text" value="${NOMBRE}"><p class="sugerencia"><button id="sug" type="button" data-v="${CORREO}" title="Perfil de ${NOMBRE}">¿Quisiste decir…?</button></p>
 <script type="module">
+// Como la bienvenida del juego (value="\${S.nombre}") y el correo de la lista: campos que se vacían con el atributo del
+// HTML todavía puesto, y la sugerencia de correo en data-v. Se agregan otra vez después de arrancar (camino de mutación).
+document.getElementById('viejo').value = '';
+const tardio = () => { const d = document.createElement('div'); d.innerHTML = '<input id="viejo2" type="email" value="${CORREO}"><span id="sug2" data-v="${CORREO}" aria-label="Hola ${NOMBRE}">x</span>'; document.body.appendChild(d); d.querySelector('input').value = ''; };
 import { crearServidor } from './js/game/servidor.js';
 import { crearAnalitica } from './js/game/analitica.js';
 const q = new URLSearchParams(location.search);
@@ -174,6 +179,7 @@ const s = crearServidor(), a = crearAnalitica({ azar: () => Number(q.get('azar')
 const e = await s.estado({ idioma: 'es' });
 window.__activa = await a.iniciar({ estado: e, idioma: 'es', idioma_origen: 'url', version: 'prueba', pantalla: 'bienvenida' });
 window.__grabando = a.grabando();
+setTimeout(tardio, 200);
 window.__listo = true;
 </script>`);
       return;
@@ -354,6 +360,8 @@ async function paginaGrabacion({ flag, azar = 0, medicion = true }) {
   ok(completas.length > 0 && ev.some(e => e.type === 4), `llegó la grabación por /qx/s/ (${ev.length} eventos de rrweb, ${completas.length} instantáneas completas)`);
   ok(!ev.some(e => e.ilegible), 'la prueba pudo abrir todos los eventos comprimidos');
   for (const [txt, que] of [[NOMBRE, 'el nombre guardado'], [ESCRITO, 'el nombre que se escribe'], [CORREO, 'el correo'], ['secreto@', 'el correo (parte)'], [LIBRE, 'la respuesta libre']]) ok(!todo.includes(txt), `${que} no aparece en la grabación`);
+  ok(['"viejo"', '"sug"', '"viejo2"', '"sug2"'].every(x => todo.includes(x)) && /data-v/.test(todo),
+    'están grabados los campos vaciados con value en el HTML y la sugerencia con data-v (tapados: la línea de arriba)');
   ok(todo.includes('Juega la final contra dos rivales') && todo.includes('Jugar'), 'el texto de la interfaz se lee en la grabación');
   ok(!/rr_dataURL|data:image\//.test(todo), 'ni un cuadro del lienzo en la grabación');
   const n = completas.flatMap(e => nodos(e.data?.node));

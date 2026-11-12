@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearServidor, expDelPase, pareceCorreo, sugerirCorreo, CONSENTIMIENTO } from '../web/js/game/servidor.js';
-import { crearAnalitica, limpiarProps, fuenteTrafico, proporcionGrabacion, taparTexto, BLOQUEO_GRABACION, BANDERAS } from '../web/js/game/analitica.js';
+import { crearAnalitica, limpiarProps, fuenteTrafico, proporcionGrabacion, taparTexto, taparAtributo, BLOQUEO_GRABACION, BANDERAS } from '../web/js/game/analitica.js';
 import { reenviar } from '../functions/_reenviar.js';
 import { onRequest as raiz } from '../functions/index.js';
 import { VERSIONES_CONSENTIMIENTO } from '../worker/src/reglas.js';
@@ -395,6 +395,42 @@ igual([fuenteTrafico('?utm_source=Amigos'), fuenteTrafico('?c=abc'), fuenteTrafi
     // Si el grabador no carga, la medición sigue sin grabación.
     const x = armar({ grabacion: 'todas', falla: true });
     igual([await x.a.iniciar({ estado: x.est }), x.cfg().disable_session_recording, x.a.grabando(), x.reg().grabada, x.v._POSTHOG_REMOTE_CONFIG], [true, true, false, false, undefined], 'grabador que no carga: medición sin grabación');
+  }
+  {
+    // Atributos: `value` siempre tapado (un campo vacío deja ver el atributo del HTML), data-v del correo sugerido y
+    // cualquier atributo con el nombre tapados; la forma de la página (clase, estilo, CSS con «@media») en claro.
+    const tapado = t => t.replace(/\S/g, '*');
+    igual([taparAtributo('value', 'Brenda', []), taparAtributo('data-v', 'ana@gmail.com', []), taparAtributo('aria-label', 'Perfil de Brenda', ['brenda']),
+      taparAtributo('title', 'Jugar', ['brenda']), taparAtributo('class', 'brenda', ['brenda']), taparAtributo('_cssText', '@media (max-width:600px){a{b:c}}', []),
+      taparAtributo('hidden', '', ['x']), taparAtributo('rr_width', '128px', [])],
+    [tapado('Brenda'), tapado('ana@gmail.com'), tapado('Perfil de Brenda'), 'Jugar', 'brenda', '@media (max-width:600px){a{b:c}}', '', '128px'], 'taparAtributo');
+    const x = armar({ grabacion: 'todas', local: new Mem({ 'tarima.nombre': 'Brenda' }) });
+    await x.a.iniciar({ estado: x.est });
+    const f = x.cfg().session_recording.maskAttributeFn;
+    igual([f('value', 'Brenda'), f('placeholder', 'Hola Brenda'), f('data-k', 'arranque')], [tapado('Brenda'), tapado('Hola Brenda'), 'arranque'], 'maskAttributeFn en la configuración de la grabación');
+  }
+  {
+    // La privacidad se abre en otra pestaña: si ahí se desactiva la medición, el evento `storage` corta la grabación.
+    const x = armar({ grabacion: 'todas' });
+    const oyentes = [];
+    x.v.addEventListener = (tipo, fn) => { if (tipo === 'storage') oyentes.push(fn); };
+    await x.a.iniciar({ estado: x.est });
+    for (const fn of oyentes) fn({ key: 'muro-texto', newValue: '0' });
+    const antes = x.a.grabando();
+    for (const fn of oyentes) fn({ key: 'tarima.medicion', newValue: '0' });
+    igual([oyentes.length, antes, x.a.grabando(), x.a.activa(), x.ph.llamadas.some(l => l[0] === 'stopSessionRecording')], [1, true, false, false, true], 'medición desactivada en otra pestaña: se corta la grabación');
+  }
+  {
+    // Si la medición se apaga mientras se descargan PostHog y el grabador, no se llama a init.
+    const local = new Mem();
+    const x = armar({ grabacion: 'todas', local });
+    const p = x.a.iniciar({ estado: x.est });
+    local.setItem('tarima.medicion', '0');
+    igual([await p, x.orden.includes('init'), x.a.grabando(), x.a.estado], [false, false, false, 'apagada'], 'medición apagada durante la descarga: ni init ni grabación');
+    const y = armar({ grabacion: 'todas' });
+    const q = y.a.iniciar({ estado: y.est });
+    y.a.apagar();
+    igual([await q, y.orden.includes('init'), y.a.grabando(), y.a.estado], [false, false, false, 'apagada'], 'apagar() durante la descarga: ni init ni grabación');
   }
 }
 
