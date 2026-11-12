@@ -16,7 +16,7 @@ const WEB = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'we
 // `three` es el vendorizado de web/vendor, igual que en el navegador (ahí lo resuelve el importmap de juego.html)
 register('data:text/javascript,' + encodeURIComponent(`const V = ${JSON.stringify(url('vendor/three/'))};
 export async function resolve(s, c, n) { if (s === 'three') return { url: V + 'build/three.module.js', shortCircuit: true }; if (s.startsWith('three/addons/')) return { url: V + 'addons/' + s.slice(13), shortCircuit: true }; return n(s, c); }`));
-const { hzDe, pasoDe, metaDe, ajustar, mpSostenible, perdidos, decidirCalidad, Gobernador, Registrador, PRESET, MARGEN, calidadInicial, nombreDe } = await import(url('js/game/perf.js'));
+const { hzDe, pasoDe, metaDe, ajustar, mpSostenible, perdidos, perdidosEn, decidirCalidad, Gobernador, Registrador, PRESET, MARGEN, PASO, PRUEBA_MS, calidadInicial, nombreDe } = await import(url('js/game/perf.js'));
 
 let fallas = 0, hechas = 0;
 const ok = (c, m) => { hechas++; if (!c) { fallas++; console.log('FALLA: ' + m); } };
@@ -26,12 +26,17 @@ const iv = (p, n) => Array.from({ length: n }, (_, i) => p + Math.sin(i * 7.3) *
 for (const hz of [50, 60, 67, 75, 90, 120, 144, 165]) ok(Math.abs(hzDe(iv(1000 / hz, 40)) - hz) < hz * .006, `refresco de ${hz} Hz medido como ${hzDe(iv(1000 / hz, 40))}`);
 ok(Math.abs(hzDe([...iv(1000 / 75, 36), 26.6, 40, 26.7, 13.2]) - 75) < .5, 'refresco de 75 Hz con cuadros perdidos en la muestra');
 ok(hzDe([]) === 60, 'sin datos: 60');
+// medido mientras la página carga: más de la mitad de los intervalos son dobles (antes la mediana daba la mitad de la frecuencia)
+for (const hz of [60, 75, 144]) { const P = 1000 / hz, d = iv(P, 40).map((x, i) => (i % 5 < 3 ? 2 * x : x)); ok(Math.abs(hzDe(d) - hz) < hz * .006, `refresco de ${hz} Hz con el 60 % de los intervalos dobles: ${hzDe(d)}`); }
 ok(pasoDe(75) === 1 && metaDe(75) === 75 && pasoDe(120) === 2 && metaDe(120) === 60 && metaDe(144) === 72, 'meta: el refresco, o la mitad por encima de 90 Hz');
 const recta = ajustar({ mp: .5, ms: 6 }, { mp: 1.5, ms: 14 });
 ok(Math.abs(recta.fijo - 2) < 1e-9 && Math.abs(recta.porMP - 8) < 1e-9, 'recta de costo');
 ok(Math.abs(mpSostenible(recta, 1000 / 75) - (1000 / 75 * MARGEN - 2) / 8) < 1e-9, 'megapíxeles que entran en el margen');
 ok(mpSostenible({ fijo: 2, porMP: 0 }, 13) === Infinity && mpSostenible({ fijo: 20, porMP: 0 }, 13) === 0, 'costo que no depende de los píxeles');
 ok(perdidos([13.3, 13.3, 26.6, 13.3, 40], 13.33) === 3, 'refrescos perdidos');
+// a 120 y 144 Hz se dibuja uno de cada dos refrescos: perder uno da 1,5 períodos (25 ms a 120 Hz) y tiene que contar siempre
+ok(perdidosEn(25, 1000 / 60, 1000 / 120) === 1 && perdidosEn(24.9, 1000 / 60, 1000 / 120) === 1 && perdidosEn(33.4, 1000 / 60, 1000 / 120) === 2 && perdidosEn(17, 1000 / 60, 1000 / 120) === 0 && perdidosEn(20.9, 1000 / 72, 1000 / 144) === 1, 'a 120 y 144 Hz un refresco perdido cuenta aunque el intervalo sea 1,5 períodos');
+ok(perdidos([25, 24.9, 16.6, 33.3], 1000 / 60, 1000 / 120) === 4, 'refrescos perdidos a 120 Hz (calibración)');
 ok(PRESET.baja.shadow === 512 && PRESET.baja.directo && PRESET.movil.directo && !PRESET.media.directo && !PRESET.media.mblur && !PRESET.alta.mblur && !calidadInicial('baja').auto && calidadInicial(null).clave === 'baja' && calidadInicial(null, true).clave === 'movil' && nombreDe(PRESET.baja, 1.234) === 'Baja 1,23 MP', 'calidades del juego');
 
 // ---------- 2. gobernador ----------
@@ -47,6 +52,12 @@ g = new Gobernador(60); ok(corre(g, 4, () => 16.67, 12) === false, 'el hilo prin
 g = new Gobernador(60); corre(g, 3, () => 13.33); ok(Math.abs(g.hz - 75) < .5, `pantalla de 75 medida como 60: se corrige sola (${g.hz})`);
 g = new Gobernador(120); ok(g.paso === 2 && Math.abs(g.periodo - 16.667) < .01 && corre(g, 5, () => 16.67) === false, '120 Hz: uno de cada dos refrescos, parejo');
 g = new Gobernador(75); corre(g, 5, () => 13.33); ok(corre(g, .9, () => 400, 2, 20000) === false, 'una pausa no es lentitud');
+// cuadros sintéticos: perder un refresco de cada 10 cuadros (con paso 2, el cuadro tarda un refresco más) se cuenta entero
+for (const hz of [60, 75, 120, 144]) {
+  const R = 1000 / hz, D = R * pasoDe(hz), j = k => Math.sin(k * 3.7) * .2, g1 = new Gobernador(hz), g2 = new Gobernador(hz);
+  const limpio = corre(g1, 6, k => D + j(k)), pierde = corre(g2, 6, k => (k % 10 === 9 ? D + R : D) + j(k));
+  ok(!limpio && pierde && g2.ult.perdidos >= Math.floor(g2.ult.cuadros / 10), `${hz} Hz: sin pérdidas no pide; perdiendo 1 de cada 10 pide y cuenta todos (${g2.ult.perdidos} perdidos en ${g2.ult.cuadros} cuadros)`);
+}
 // Partida simulada: main.js aplica lo que pide el gobernador (bajar: 15 % menos de píxeles y al final sin sombras; subir:
 // primero las sombras y después 15 % más, hasta la pantalla). `frac(mp, t)`: fracción de refrescos que se pierden.
 function partida({ seg, frac, mp = 1.5, tope = 1.78, hz = 75 }) {
@@ -69,7 +80,7 @@ function partida({ seg, frac, mp = 1.5, tope = 1.78, hz = 75 }) {
 // carga ajena entre los 10 y los 50 s: pierde lo mismo a cualquier resolución
 { const r = partida({ seg: 110, frac: (mp, t) => (t > 10 && t < 50 ? .25 : 0) });
   ok(r.bajadas <= 2 && r.minimo > 1.5 * .85 ** 3 * .99 && r.g.historia.some(h => h.motivo.startsWith('carga ajena') && h.pasos === 3), `carga ajena: baja una racha de tres escalones como mucho, ve que no sirvió y la deshace entera (bajadas ${r.bajadas}, mínimo ${r.minimo.toFixed(2)} MP; ${r.serie.join(', ')})`);
-  ok(r.mp >= 1.5 && r.g.nivel <= 0, `carga ajena: al terminar vuelve a la resolución de la calibración o más (${r.mp.toFixed(2)} MP, nivel ${r.g.nivel})`); }
+  ok(Math.abs(r.mp - 1.5) < .01 && r.g.nivel === 0, `carga ajena: al terminar vuelve a la resolución de la calibración (${r.mp.toFixed(2)} MP, nivel ${r.g.nivel})`); }
 // costo propio que necesita dos o tres escalones y pierde poco (se pide de a uno): bajar uno no cambia lo que se pierde,
 // y eso no es carga ajena (antes bajaba y deshacía cada 65 s sin arreglar nada)
 for (const [n, lim] of [[2, 1.2], [3, 1.0]]) {
@@ -88,11 +99,47 @@ const propio = (fijo, porMP) => mp => Math.max(0, (fijo + porMP * mp - 12) / 6.7
 { const r = partida({ seg: 120, frac: propio(4, 8) });
   ok(r.mp <= 1.0 && r.mp > .6 && !r.g.ajena, `costo propio: baja hasta donde entra y no lo confunde con carga ajena (${r.mp.toFixed(2)} MP; ${r.serie.join(', ')})`);
   ok(r.subidas <= 6 && r.g.espera > 5000, `costo propio: las subidas que no aguantan se espacian (${r.subidas} subidas, espera ${r.g.espera / 1000} s)`); }
-// la escena se alivia a los 30 s (otra cámara, un panel liviano): vuelve a subir hasta la calibración
+// la escena se alivia a los 30 s (otra cámara, un panel liviano): vuelve a subir hasta la calibración, y no más
 { const r = partida({ seg: 120, frac: (mp, t) => (t < 30 ? propio(4, 8)(mp) : propio(2, 5)(mp)) });
-  ok(r.minimo < 1.1 && r.mp >= 1.5, `si deja de costar, sube de a un escalón hasta la calibración y más (mínimo ${r.minimo.toFixed(2)}, final ${r.mp.toFixed(2)} MP; ${r.serie.join(', ')})`); }
-// con todo limpio arriba de la pantalla no pide nada
-{ const r = partida({ seg: 60, mp: 1.78, frac: () => 0 }); ok(r.bajadas === 0 && r.subidas === 0 && r.g.tope, `a la resolución de la pantalla y sin perder nada: no cambia (tope ${r.g.tope})`); }
+  ok(r.minimo < 1.1 && Math.abs(r.mp - 1.5) < .01 && r.g.nivel === 0, `si deja de costar, sube de a un escalón hasta la calibración y ahí queda (mínimo ${r.minimo.toFixed(2)}, final ${r.mp.toFixed(2)} MP; ${r.serie.join(', ')})`); }
+// con todo limpio no sube por encima de la calibración, aunque la pantalla tenga más píxeles: «no se perdió nada» no dice cuánto margen queda
+for (const mp of [1.0, 1.78]) { const r = partida({ seg: 300, mp, frac: () => 0 }); ok(r.bajadas === 0 && r.subidas === 0 && r.mp === mp && r.g.nivel === 0, `${mp} MP calibrados, pantalla de 1,78 y sin perder nada en 5 minutos: no cambia (${r.serie.join(', ') || 'sin cambios'})`); }
+// Partida con paneles (modelo de la revisión, gob_partida): ciclos de [rival o veredicto 12 s (se aplican los pedidos),
+// panel P s (no se dibuja), intento propio 8 s (se cuenta pero no se aplica)]. Placa de 4,3 ms + 7 ms/MP a 75 Hz. Antes del
+// intento propio main.js deshace la subida sin confirmar (asegurarCalidad). `mp0`: lo que dejó la calibración.
+function partidaConPaneles({ P, mp0, ciclos = 30, fijo = 4.3, porMP = 7 }) {
+  const hz = 75, R = 1000 / hz, g = new Gobernador(hz); let mp = mp0, now = 0, k = 0; g.calibrado(0);
+  const r = { perdIntento: 0, cuadrosIntento: 0, perdTv: 0, log: [], maxMp: mp, deshechas: 0 };
+  const aplicar = (sube, pasos, motivo = g.motivo) => { const nuevo = Math.min(mp0, sube ? mp / PASO ** pasos : mp * PASO ** pasos); r.log.push(`${(now / 1000).toFixed(0)}s ${sube ? '↑' : '↓'} ${mp.toFixed(2)}→${nuevo.toFixed(2)} ${motivo}`); const hecho = Math.abs(nuevo - mp) > 1e-9; mp = nuevo; r.maxMp = Math.max(r.maxMp, mp); return hecho; };
+  for (let c = 0; c < ciclos; c++) for (const [tramo, dur] of [['tv', 12000], ['panel', P * 1000], ['intento', 8000]]) {
+    const fin = now + dur; let primero = true;
+    if (tramo === 'panel') { now = fin; continue; }
+    if (tramo === 'intento') { const n = g.sinConfirmar(); if (n) { aplicar(false, n, 'subida sin confirmar: se deshace antes del intento'); g.subidaDeshecha(now); r.deshechas++; } }
+    while (now < fin) {
+      const costo = fijo + porMP * mp + Math.sin(++k * 1.7) * .3, ms = Math.max(1, Math.ceil(costo / R - 1e-9)) * R; now += ms;
+      const lost = ms > R * 1.5 ? Math.round(ms / R) - 1 : 0; if (tramo === 'intento') { r.perdIntento += lost; r.cuadrosIntento++; } else r.perdTv += lost;
+      if (primero) { primero = false; continue; }
+      if (g.cuadro(ms, now, 1.5) && tramo === 'tv') g.resultado(aplicar(g.sube, g.pasos), now);
+    }
+  }
+  return r;
+}
+for (const P of [5, 20]) {
+  const r = partidaConPaneles({ P, mp0: 1.0 });
+  ok(r.perdIntento === 0 && r.maxMp <= 1.0 + 1e-9, `partida con paneles de ${P} s, calibrada a 1,0 MP (85 % del período): 0 refrescos perdidos dentro de los intentos (${r.perdIntento} en ${r.cuadrosIntento}), nunca pasa de la calibración (máximo ${r.maxMp.toFixed(2)} MP; ${r.log.slice(0, 4).join(', ') || 'sin cambios'})`);
+}
+// la calibración se pasó (1,3 MP no entran): baja, y las subidas que vuelven hacia 1,3 se prueban fuera del intento; las
+// que no se confirmaron se deshacen antes del intento propio, y la prueba se cuenta en dibujo (un panel de 20 s no la vence)
+for (const P of [5, 20]) {
+  const r = partidaConPaneles({ P, mp0: 1.3 });
+  ok(r.perdIntento <= r.cuadrosIntento * .002, `partida con paneles de ${P} s y calibración de más (1,3 MP no entran): ${r.perdIntento} refrescos perdidos en ${r.cuadrosIntento} cuadros de intentos (≤ 0,2 %), ${r.deshechas} subidas deshechas antes del intento (${r.log.slice(0, 6).join(', ')})`);
+}
+// la prueba de una subida se cuenta en dibujo continuo: pasa un panel de 20 s y pierde después → «la subida no aguantó» (deshace un escalón y duplica la espera)
+{ const g = new Gobernador(75); g.nivel = 1; corre(g, 8, () => 13.33); const pidio = g.pide && g.sube; g.resultado(true, 18000);
+  corre(g, 4, () => 13.33, 2, 18000); const now = 22000 + 20000;      // 20 s de panel: no se dibuja
+  corre(g, 4, k => (k % 3 === 0 ? 26.67 : 13.33), 2, now);
+  ok(pidio && g.pide && !g.sube && g.motivo === 'la subida no aguantó' && g.espera === 10000, `una subida que pierde después de un panel de 20 s se deshace como subida fallida (${g.motivo}, espera ${g.espera / 1000} s)`);
+  ok(PRUEBA_MS === 15000, 'la prueba de una subida dura 15 s de dibujo'); }
 const R = new Registrador(); R.periodo = 13.33; R.cuadro(13.3, true); R.cuadro(27, true, 'vuelo'); R.cuadro(300, false);
 ok(R.largos.length === 1 && R.largos[0].nota === 'vuelo' && R.resumen().inicio.n === 3, 'el registrador anota el cuadro largo con su fase');
 

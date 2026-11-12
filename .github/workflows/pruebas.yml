@@ -56,6 +56,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node tools/play_human.mjs 2>&1 | tee out/logs/play_human.log
 
+      - name: Lógica de fluidez sin navegador (perf_test)
+        if: ${{ !cancelled() }}
+        run: node tools/perf_test.mjs 2>&1 | tee out/logs/perf_test.log
+
       - name: Caída de la barra sin navegador (caida_test)
         if: ${{ !cancelled() }}
         run: node tools/caida_test.mjs 2>&1 | tee out/logs/caida_test.log
@@ -96,7 +100,7 @@ jobs:
         run: |
           {
             echo "### Pruebas del juego (dibujo por software: no mide cuadros por segundo)"
-            for f in sim_test play_human caida_test check_escenas check_game check_fluidez capturas check_recorrido; do
+            for f in sim_test play_human perf_test caida_test check_escenas check_game check_fluidez capturas check_recorrido; do
               echo; echo "**$f**"; echo '```'
               if [ -f "out/logs/$f.log" ]; then tail -n 14 "out/logs/$f.log"; else echo "(no corrió)"; fi
               echo '```'

@@ -96,10 +96,10 @@ function bajar(pasos, ms, donde = '') {
 }
 /**
  * Sube `pasos` escalones sin compilar nada (el gobernador vio la máquina libre, o deshace una bajada que no sirvió):
- * primero vuelven las sombras, después 15 % más de píxeles por escalón, hasta la resolución de la pantalla.
+ * primero vuelven las sombras, después 15 % más de píxeles por escalón, hasta lo que dejó la calibración (`C.mpCal`).
  */
 function subir(pasos, ms) {
-  const de = C.nombre, tope = Math.min(escena.nativoMP, TECHO_MP); let hecho = false;
+  const de = C.nombre, tope = Math.min(escena.nativoMP, TECHO_MP, C.mpCal || Infinity); let hecho = false;
   for (let k = 0; k < pasos; k++) {
     if (!C.sombras) { C.sombras = true; escena.setSombras(true); hecho = true; continue; }
     const mp = escena.megapixeles; if (!(mp > 0) || mp >= tope * .985) break;
@@ -108,6 +108,16 @@ function subir(pasos, ms) {
   if (!hecho) return false;
   nombrar(); C.cambios.push({ de, a: C.nombre, ms: Math.round(ms * 10) / 10, pantalla: E.pantalla, enIntento: !!E.intento, t: Math.round(performance.now()), sube: true, motivo: gov?.motivo || '' });
   E.forzar = true; return true;
+}
+/**
+ * Antes de un intento propio: una subida del gobernador que todavía no se confirmó con dibujo continuo se deshace, para
+ * que no se estrene dentro del levantamiento (se aplica con el panel del llamado cerrándose; es solo cambiar el tope de
+ * píxeles o las sombras, sin compilar).
+ */
+function asegurarCalidad() {
+  const n = gov ? gov.sinConfirmar() : 0; if (!n) return;
+  if (bajar(n, gov.fps ? 1000 / gov.fps : 0, 'antes del intento')) C.cambios[C.cambios.length - 1].motivo = 'subida sin confirmar';
+  gov.subidaDeshecha(reloj.ahora());
 }
 /** Intervalos (ms) entre `n` cuadros seguidos del navegador mientras se dibuja, sin contar los primeros `calienta`. null si no hay cuadros. */
 function cadencia(n, calienta = 10) {
@@ -133,7 +143,7 @@ async function calibrar() {
     if (hz) { fijarHz(hz); K.hz = hz; }
     escena.setCarga(escena.kg || 100, 's'); let t = 1.3;
     const R = await decidirCalidad({
-      periodo: gov.periodo, clave: C.clave, techo: () => escena.nativoMP, poner: ponerCalidad,
+      periodo: gov.periodo, refresco: 1000 / C.hz, clave: C.clave, techo: () => escena.nativoMP, poner: ponerCalidad,
       medir: mp => { escena.setTope(mp * 1e6, true); const c = escena.costo({ extra: lastre }); return { mp: escena.megapixeles, ms: c.ms, p90: Math.round(c.p90 * 100) / 100, n: c.n }; },
       fijar: mp => { escena.setTope(mp * 1e6); return escena.megapixeles; },
       cuadros: (n, calienta) => { enCuadro = (now, dt) => { t += dt; escena.bucle(t, dt); }; return cadencia(n, calienta).finally(() => { enCuadro = null; }); },
@@ -142,7 +152,7 @@ async function calibrar() {
     const mp0 = Math.min(R.primera.techo, PRESET[clave0].maxPixels / 1e6);      // lo que se dibujaba sin calibrar
     if (ORDEN.indexOf(C.clave) < ORDEN.indexOf(clave0) || (C.clave === clave0 && escena.megapixeles < mp0 * .97)) C.cambios.push({ de: nombre0, a: C.nombre, ms: Math.round((R.primera.fijo + R.primera.porMP * mp0) * 10) / 10, pantalla: 'calibración', enIntento: false, t: Math.round(performance.now()) });
   } catch (e) { console.warn('calibración de calidad:', e); K.error = String(e.stack || e); escena.setTope(C.Q.maxPixels); }
-  finally { E.sinDibujo = false; enCuadro = null; if (escena.P) escena.posar(poseParado(escena.P, 's'), 's'); nombrar(); K.gl = escena.renderer.getContext().getError(); K.ms = Math.round(performance.now() - ini); gov.calibrado(reloj.ahora()); E.forzar = true; }
+  finally { E.sinDibujo = false; enCuadro = null; if (escena.P) escena.posar(poseParado(escena.P, 's'), 's'); nombrar(); K.gl = escena.renderer.getContext().getError(); K.ms = Math.round(performance.now() - ini); C.mpCal = escena.megapixeles; gov.calibrado(reloj.ahora()); E.forzar = true; }
 }
 
 // ---------- gráfica ----------
@@ -609,7 +619,7 @@ async function llamadoPropio(p, L) {
     if (S.kg !== L.kg && !p.cambioValido(ms, S.kg)) { desplazado = p.cambio(ms, S.kg).desplazado; if (!desplazado) kgFinal = S.kg; }
     if (desplazado) { visita('desplazado'); etiqueta(null); veredicto(`${a.f.nombre} pasa a ${S.kg} kg`, 'Otro pesista pidió menos: sale antes. Tu reloj vuelve a empezar.'); await saltable(1800); veredicto(''); return; }
     escena.setCarga(kgFinal, L.lev); zocalo(a, { ...L, kg: kgFinal }); etiqueta(p.llamado.et);
-    ctx = p.contexto(env); visita('intento');
+    ctx = p.contexto(env); asegurarCalidad(); visita('intento');
     // el primer dos tiempos en Fácil se explica sobre la marcha: con la barra en los hombros el reloj espera el toque de ¡FLEXIONÁ!
     const primerDT = ctx.ctl === 'f' && L.lev === 'c' && !guardado.get('tarima.dostiempos');
     corrida = await correrIntento(ctx, { a, lev: L.lev, env, conf0: ms, t0, guia: primerDT ? EN_HOMBROS : null });
