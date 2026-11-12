@@ -186,7 +186,7 @@ Si todavía no contestó la encuesta, se le ofrece sin premio («¿Nos ayudás a
 
 Es el de una transmisión deportiva entre amigos: cálida, con cancha y con humor seco. Celebra fuerte el ¡VALE! y nunca se burla del fallo. El español va en español neutro, con tuteo (decisión del dueño; las tablas de 4.5 todavía están en voseo y se reescriben sobre las mismas claves). El inglés es llano, con los verbos cortos del gimnasio y los nombres reales del deporte (Snatch, Clean & jerk), porque son los que la gente busca.
 
-La promesa pública de la marca es «Nunca vas a pagar para levantar más.» / «You'll never pay to lift more.», y va en la página de privacidad y en el agradecimiento. Deja abierta la monetización por cosméticos o por un pago único sin prometer precios.
+Por decisión del dueño (12 de noviembre) no hay ninguna promesa pública sobre pagos hasta que se defina la monetización: no va en el juego, la privacidad, los correos ni las páginas del Worker.
 
 ### 4.4 Glosario para el jugador
 
@@ -591,7 +591,6 @@ Variantes de la bandera `muro-texto`: la `a` usa `muro.promesa` y `muro.camino_m
 | `lista.ok_confirmar` | Revisá tu mail. Mientras, jugá todo lo que quieras. | Check your inbox. Meanwhile, play as much as you like. |
 | `lista.ok_encuesta` | ¿Nos ayudás a decidir qué hacer primero? 4 preguntas, 1 minuto. | Help us decide what to build first? 4 questions, 1 minute. |
 | `lista.seguir` | Seguir jugando | Keep playing |
-| `marca.promesa` | Nunca vas a pagar para levantar más. | You'll never pay to lift more. |
 
 **Encuesta**
 
@@ -688,11 +687,13 @@ Variantes de la bandera `muro-texto`: la `a` usa `muro.promesa` y `muro.camino_m
 
 **Incentivo.** Juego libre en este dispositivo hasta la próxima versión. El texto dice «sin límite» y no promete nada más: ni fechas, ni funciones aseguradas, ni premios. Las funciones del muro se presentan como «estamos armando» y «nos ayudás a elegir», nunca como «vas a tener». Si alguien se da de baja, no pierde el juego libre.
 
-**Confirmación (doble opt-in).** No frena el juego: el desbloqueo es inmediato. El mail confirmado es la cifra limpia de la lista y la prueba del consentimiento. Si el mail no se confirma en 30 días, se borra; el dispositivo conserva el juego libre.
+**Confirmación (doble opt-in).** No frena el juego: el desbloqueo es inmediato. El mail confirmado es la cifra limpia de la lista y la prueba del consentimiento. Si el mail no se confirma en 30 días desde que salió el correo de confirmación, se borra; el dispositivo conserva el juego libre. Mientras no haya envío de correos (sin dominio propio), ninguna alta se borra por no confirmar (decisión del dueño del 12 de noviembre; columna `confirmar_mandado_en`).
 
 ### 5.2 Texto de privacidad (`web/privacidad.html`, con las dos versiones)
 
 Los campos `{responsable}`, `{país}` y `{contacto}` los completa el dueño (decisión 2). La versión del texto (`2026-11-a`) se guarda con cada alta.
+
+**Texto vigente:** `web/privacidad.html`, versión `2026-11-b`, en español neutro. Cambia respecto de lo de abajo: sin borrado por no confirmar mientras no haya correos, el HMAC de la IP y la cookie `tdv` explicados, marcadores visibles para responsable, país y contacto, y la baja desde el dispositivo que anotó el correo. El Worker acepta las dos versiones.
 
 **Español**
 
@@ -755,6 +756,8 @@ Los campos `{responsable}`, `{país}` y `{contacto}` los completa el dueño (dec
 
 ### 5.5 Contrato del servidor
 
+**Cambio del 12 de noviembre (decisión del dueño):** el sitio lo sirve Cloudflare Pages («tarimagame», https://tarimagame.pages.dev) y le pasa `/api/*`, `/qx/*`, `/baja` y `/confirmar` al Worker «tarima», sin dirección pública, por una service binding (`functions/` y `wrangler.jsonc` de la raíz; ver `worker/README.md`). Lo que sigue sobre assets y `run_worker_first` describe el diseño anterior.
+
 Es un solo Worker de Cloudflare con assets estáticos, D1 y el límite de pedidos de Workers (`ratelimit`). Va en `worker/` (`wrangler.jsonc`, `src/index.js`, `src/reglas.js`, `schema.sql`) y sirve `web/` como sitio. `/` reescribe a `juego.html`, y el visor no se enlaza. `run_worker_first` se aplica a `/api/*`, `/qx/*`, `/baja` y `/confirmar`. Las reglas de la cuenta van puras en `src/reglas.js`, sin `fetch` ni D1, para probarlas en Node con una base en memoria (`tools/worker_test.mjs`).
 
 **Configuración**
@@ -799,7 +802,7 @@ CREATE TABLE lista (id TEXT PRIMARY KEY, email TEXT UNIQUE, nombre TEXT, idioma 
 - `partidas.i` y `encuestas.i` pasan a NULL a los 30 días.
 - Se borran las `partidas` de más de 180 días.
 - Se borran los `dispositivos` con `ultimo` de hace más de 180 días, estén o no en la lista (es lo que dice la página de privacidad). Anotarse también actualiza `ultimo`.
-- Se borran las filas de `lista` sin confirmar con más de 30 días.
+- Se borran las filas de `lista` sin confirmar cuyo correo de confirmación salió hace más de 30 días (sin envío de correos, ninguna).
 
 **La regla** (`reglas.js`), con `ahora` y la ventana de 30 días:
 
@@ -823,7 +826,7 @@ La cuenta por IP excluye a los dispositivos anotados. Por eso, cuando alguien se
 |---|---|---|---|
 | `POST /api/estado` | `{dispositivo, idioma}` | `{dispositivo, puede, quedan, lista, lista_id?, motivo?, encuesta_disponible, flags, contexto, metricas}`. No cuenta nada | 60 cada 10 min |
 | `POST /api/partida` | `{dispositivo, idioma}` | `{estado:'ok', pase, fuente, quedan, n, flags, contexto}` o `{estado:'muro', motivo, encuesta_disponible, contexto}` | 20 cada 10 min |
-| `POST /api/anotar` | `{dispositivo, sesion, email, nombre?, idioma, aviso:true, novedades:bool, consentimiento:'2026-11-a', turnstile?}` | `{estado:'nuevo' o 'ya_estaba', lista_id, confirmar:bool}`; 400 `{error}` | 5 por hora |
+| `POST /api/anotar` | `{dispositivo, sesion, email, nombre?, idioma, aviso:true, novedades:bool, consentimiento:'2026-11-b', turnstile?}` | `{estado:'nuevo' o 'ya_estaba', lista_id, confirmar:bool}`; 400 `{error}` | 5 por hora |
 | `POST /api/encuesta` | `{dispositivo, sesion, idioma, r:{q1:[…], q2:[…], q3:'…', q4:'…', q5?:'…'}, turnstile?}` | `{estado:'ok', bono:2 o 0}`; 409 `{error:'ya_respondida'}`; 400 `{error:'incompleta'}` | 3 por hora |
 | `POST /api/baja` | `{email}` | 202 `{}` siempre | 3 por hora |
 | `GET /baja?t=` y `POST /baja` | token | página bilingüe (`baja.*`) | 10 tokens inválidos por hora; los válidos no tienen límite |
@@ -1050,7 +1053,7 @@ Sin huella digital del navegador: es invasiva y en la UE pide consentimiento.
 5. **Sedes.** Finales en sedes inspiradas en eventos reales, con nombres parecidos y siempre ficticios: sin anillos, sin «Olímpico», sin «ciudad + año», sin emblemas.
 6. **Jugar contra amigos u online.** Primero asincrónico (el punto 1) y después en vivo.
 7. **Más realismo.** Ayudantes que cargan la barra, fallos visibles con el pesista soltando la barra, y control antidoping como momento de relato, nunca como mecánica de castigo.
-8. **Monetización.** Según la pregunta 4: cosméticos o un pago único por el juego completo, nunca kilos. Se mantiene «Nunca vas a pagar para levantar más».
+8. **Monetización.** Según la pregunta 4: cosméticos o un pago único por el juego completo, nunca kilos.
 
 ## 9. Riesgos y decisiones del dueño
 
@@ -1152,5 +1155,5 @@ Revisión independiente de este documento y de `worker/`, en la rama `mvp`. Las 
 - **`lista_id` con un mail ajeno.** Quien escribe el mail de otra persona recibe su `lista_id`, y desde ese momento sus eventos se juntan en PostHog con el perfil de esa persona. Eso ensucia las métricas, pero no deja leer nada, porque la clave `phc_` solo sirve para escribir. Si molesta, se identifica en PostHog solo después de confirmar el mail.
 - **La casilla de aviso obligatoria agrega fricción.** Si el botón dice con claridad para qué es el mail («Anotarme: avisame por mail cuando abra»), apretarlo ya es un consentimiento explícito, y bastaría con la casilla opcional de novedades. Conviene que lo decida alguien de legales. El servidor no cambia: el juego manda `aviso: true` al tocar el botón.
 - **429 y 503 en `/api/partida` pasan a «sin servidor».** Con eso, una red que llegó a 20 pedidos cada 10 minutos juega una final por carga sin que nadie la cuente. Hay que aplicar el endurecimiento 1 de la sección 7 desde el principio.
-- **«Nunca vas a pagar para levantar más»** es una promesa pública que ya aparece en las páginas del Worker. Deja afuera vender entrenamiento o progreso más rápido. El dueño tiene que confirmarla antes de publicar.
+- **Promesa sobre pagos.** Resuelto el 12 de noviembre: el dueño la saca de todo hasta definir la monetización (juego, páginas del Worker, correos y estos documentos).
 - **En español neutro, «mail» suena rioplatense.** Al reescribir las tablas conviene usar «correo» o «email». Los textos del Worker usan «mail» hasta que se decida.
