@@ -66,6 +66,11 @@ export default {
   'opciones.repetir_practica': 'Repetir la práctica',
   'opciones.saltar_practica': 'Saltar la práctica',
   'opciones.sin_calentar': 'Empezar sin calentamiento',
+  'opciones.sonido': 'Sonido',
+  'opciones.sonido_si': 'Con sonido',
+  'opciones.sonido_no': 'Sin sonido',
+  'opciones.pantalla': 'Pantalla',
+  'opciones.como_instalar': 'Cómo verlo a pantalla completa',
   'opciones.nota_practica': 'La primera vez hay una práctica guiada de menos de un minuto.',
 
   // ---- práctica (tutorial guiado)
@@ -444,7 +449,13 @@ export default {
   // ---- teléfono: girar e instalar (pantalla completa en iPhone)
   'girar.titulo': 'Gira el teléfono',
   'girar.sub': 'Tarima se juega de costado.',
-  'instalar.ios': 'Para jugar a pantalla completa: toca Compartir y después «Agregar a inicio».',
+  // el iPhone no deja poner pantalla completa (ningún navegador): instalado en la pantalla de inicio sí. Pasos de cada navegador
+  'instalar.safari': 'Pantalla completa: toca Compartir (o ··· y después Compartir), elige «Agregar a inicio» y abre Tarima desde el ícono.',
+  'instalar.chrome': 'Pantalla completa: toca Compartir en la barra de la dirección, elige «Agregar a la pantalla de inicio» y abre Tarima desde el ícono.',
+  'instalar.otro': 'Pantalla completa: abre Compartir en el menú del navegador, elige «Agregar a inicio» y abre Tarima desde el ícono.',
+  // sonido: botón de la barra (parlante) y fila de Opciones
+  'sonido.prender': 'Prender el sonido',
+  'sonido.apagar': 'Apagar el sonido',
   'instalar.cerrar': 'Entendido',
 
   // ---- turno de un rival y marcador
