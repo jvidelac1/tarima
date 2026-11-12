@@ -63,7 +63,7 @@ for (;;) {
   if (Date.now() - t0 > 6 * 60000) { mal('la prueba no avanza en 6 minutos'); break; }
   const s = await J(() => { const e = JUEGO.estado(); e.propios = (JUEGO.E.propios || []).length; e.turno = { ve: !document.getElementById('turno').hidden, txt: document.getElementById('turno').textContent, senal: !document.getElementById('senal').hidden }; return e; });
   if (s.errores.length) { mal('error en el juego: ' + s.errores[0]); break; }
-  if (s.propios >= 2 && !(s.intento && s.intento.propio) && s.pantalla !== 'decision') break;
+  if (s.propios >= 2 && rivalVisto && !(s.intento && s.intento.propio) && s.pantalla !== 'decision') break;      // los dos propios y al menos un turno de un rival
   const I = s.intento;
   if (I && I.propio && s.modo !== 'panel') {
     if (!estadoIntento) { k++; estadoIntento = { k, prep: false, tira: null, hecho: '', ultClave: '', ultEmp: 0, cambioHecho: false, dobleHecho: false, largo: false, ent0: I.entradas }; }

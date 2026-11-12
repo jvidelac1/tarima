@@ -24,13 +24,13 @@ let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ ch
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), OUT = path.join(ROOT, 'out', 'muro');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const SOLO = arg('solo'), HEADED = process.argv.includes('--headed');
-fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT, { recursive: true });
+fs.mkdirSync(OUT, { recursive: true });      // cada escenario borra solo su carpeta (el flujo corre en, después es)
 const problemas = [], notas = [];
 const browser = await chromium.launch(launchOptions({ headed: HEADED }));
 const CORREO = { en: 'player.one@pruebas-tarima.com', es: 'ana.prueba@pruebas-tarima.com' };      // example.com está en la lista de descartables del Worker
 
 async function escenario(L) {
-  const tactil = L === 'es', D = L === 'es' ? ES : EN, tag = `[${L}]`, dir = path.join(OUT, L); fs.mkdirSync(dir, { recursive: true });
+  const tactil = L === 'es', D = L === 'es' ? ES : EN, tag = `[${L}]`, dir = path.join(OUT, L); fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
   const srv = await iniciarServidorLocal({ silencio: true });
   const base = srv.url.replace(/\/$/, '');
   const ctx = await browser.newContext(tactil
