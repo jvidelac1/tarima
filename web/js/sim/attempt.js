@@ -7,7 +7,7 @@
 import { idiv, lerpi, mezclar, Azar } from './fixed.js';
 import {
   ventanas, calidad, palabra, alturaExplosion, desvioExplosion, velTiron, exigenciaTabla, alturaTabla, periodoAnillo, errorAnillo, gradoTension,
-  TENSION, FACIL, ACOMODO_MS, ALTURA_MIN, TOPE_DESVIO, ALTURA_ENVION, NO_DOMINA, EXI_ARRANQUE, EXI_ERROR, PELEA, TRABA, FIJA, HOMBROS, JUEZ, esfuerzoPropio,
+  anchoFacil, asistFacil, segunHolgura, TENSION, FACIL, ACOMODO_MS, ALTURA_MIN, TOPE_DESVIO, ALTURA_ENVION, NO_DOMINA, EXI_ARRANQUE, EXI_ERROR, PELEA, TRABA, FIJA, HOMBROS, JUEZ, esfuerzoPropio,
 } from './rules.js';
 
 const INF = 2147483647;
@@ -62,7 +62,15 @@ export class Intento {
     this.M = { mov, k, t0, ign: t0, an: c.anclas[k], tDev: INF, tp: 0, tr: 0, tc: 0, tq: 0, tFallo: INF, causaFallo: null, pelea: null, grado: null, amagues: [] };
     this.movs.push(this.M);
   }
-  _w(g) { const c = this.c; return ventanas(c.I, `${this.M.mov}_${g}`, { tec: c.tec, temple: c.temple, primera: c.primera, ancho: c.ctl === 'f' ? FACIL.ancho : 1000 }); }
+  /**
+   * Ventanas del gesto. La ventana de la señal va de −`A` a +`L` ms del objetivo: fuera de ella un toque no cuenta. En
+   * Clásico las dos son el límite `l`. En Fácil son fijas (FACIL.abreMs y FACIL.limMin, o `l` si es más ancho del lado tarde):
+   * no se achican con los kilos, aunque PERFECTO y BIEN sí.
+   */
+  _w(g) {
+    const c = this.c, f = c.ctl === 'f', w = ventanas(c.I, `${this.M.mov}_${g}`, { tec: c.tec, temple: c.temple, primera: c.primera, ancho: f ? anchoFacil(c.I) : 1000 });
+    w.A = f ? FACIL.abreMs : w.l; w.L = f ? Math.max(w.l, FACIL.limMin) : w.l; return w;
+  }
 
   _aprieta(t) {
     const M = this.M, c = this.c;
@@ -72,11 +80,11 @@ export class Intento {
       M.grado = c.ctl === 'f' ? 'buena' : gradoTension(d); M.dTension = d; M.tp = t; M.w = this._w('exp');
       if (M.mov === 'j') { const dip = idiv(M.an.dip * 1000, this.vel); M.tx = t + (c.ctl === 'f' ? Math.max(dip, FACIL.cierreMs) : dip); this.fase = 'flexion'; }
       else { M.tk = t + idiv(M.an.knee * 1000, this.vel); M.tx = t + idiv(M.an.power * 1000, this.vel); this.fase = 'tiron'; }
-      M.tTarde = M.tx + c.cal + M.w.l;
+      M.tTarde = M.tx + c.cal + M.w.L;
     } else if (this.fase === 'vuelo' || this.fase === 'empuje') {
       if (M.tFallo < INF || M.tq) return;
       const e = t - c.cal - M.tc;
-      if (e < -M.wr.l) { M.tFallo = M.tc; M.causaFallo = 'fondo'; M.e2 = e; this.gestos.push({ g: 'recepcion', mov: M.mov, e, pal: 'temprano', fuera: true }); return; }
+      if (e < -M.wr.A) { M.tFallo = M.tc; M.causaFallo = 'fondo'; M.e2 = e; this.gestos.push({ g: 'recepcion', mov: M.mov, e, pal: 'temprano', fuera: true }); return; }
       this._recibe(t, e);
     } else if (this.fase === 'fijacion') {
       const f = this.fij;
@@ -87,18 +95,18 @@ export class Intento {
     const M = this.M, c = this.c;
     if (this.fase === 'tiron') {
       const e = t - c.cal - M.tx;
-      // amague: antes de la rodilla; en Fácil, también el tirón anticipado (entre la rodilla y el límite)
-      if (t < M.tk || (c.ctl === 'f' && e < -M.w.l)) {
+      // amague: antes de la rodilla; en Fácil, también antes de que abra la ventana de la señal (la capa no deja pasar esos toques)
+      if (t < M.tk || (c.ctl === 'f' && e < -M.w.A)) {
         // Fácil: dos amagues por levantamiento; el tercero es fallo (tocar a ciegas no puede tirar los dados sin fin)
         if (c.ctl === 'f' && M.amagues.length >= FACIL.amagues) { this.gestos.push({ g: 'explosion', mov: M.mov, e, pal: 'temprano', fuera: true }); return this._fallo(t, 'anticipado'); }
         this.amagues++; M.amagues.push({ tp: M.tp, t }); const v = Math.min(t - M.tp, 600); M.t0 = M.ign = t + v; this.fase = 'tension'; return;
       }
       this.rodilla = true;
-      if (e < -M.w.l) { this.gestos.push({ g: 'explosion', mov: M.mov, e, pal: 'temprano', fuera: true }); return this._fallo(t, 'anticipado'); }
+      if (e < -M.w.A) { this.gestos.push({ g: 'explosion', mov: M.mov, e, pal: 'temprano', fuera: true }); return this._fallo(t, 'anticipado'); }
       this._explota(t, e);
     } else if (this.fase === 'flexion') {
       const e = t - c.cal - M.tx;
-      if (e < -M.w.l) {
+      if (e < -M.w.A) {
         if (c.ctl === 'f' && M.amagues.length >= FACIL.amagues) { this.gestos.push({ g: 'explosion', mov: 'j', e, pal: 'temprano', fuera: true }); return this._fallo(t, 'anticipado'); }
         this.amagues++; M.amagues.push({ tp: M.tp, t }); M.t0 = M.ign = t + HOMBROS.amagueMs; this.fase = 'hombros'; return;
       }
@@ -113,14 +121,16 @@ export class Intento {
   _explota(t, e) {
     const M = this.M, c = this.c, w = M.w, j = M.mov === 'j';
     const ae = alturaExplosion(e, w), at = TENSION.mm[M.grado];
-    M.e = e; M.tr = t; M.tc = t + M.an.rec; M.wr = this._w('rec'); M.tTardeRec = M.tc + c.cal + M.wr.l;
+    M.e = e; M.tr = t; M.tc = t + M.an.rec; M.wr = this._w('rec'); M.tTardeRec = M.tc + c.cal + M.wr.L;
     M.alt = alturaTabla(c.I) + ae + at - w.recorte + (j ? ALTURA_ENVION[c.env] + (c.domina ? 0 : NO_DOMINA.altura) : 0);
     M.des = desvioExplosion(e, w) + this.varDesvio[j ? 1 : 0];
     M.perdida = (30 - ae) + (TENSION.mm.perfecta - at);
-    const tope = TOPE_DESVIO[M.k] + (j && !c.domina ? NO_DOMINA.desvio : 0);
-    // en Fácil, un toque que salió PERFECTO o BIEN no pierde la barra en el vuelo: lo que falte se paga en la subida
-    if (c.ctl === 'f' && Math.abs(e) <= w.g) { /* sigue */ }
-    else if (M.alt < ALTURA_MIN) { M.tFallo = t + 150; M.causaFallo = 'sin_altura'; }
+    // en Fácil, un toque que salió PERFECTO o BIEN no pierde la barra en el vuelo: lo que falte se paga en la subida; y en
+    // los pesos livianos TEMPRANO y TARDE tienen `vueloMm` de margen (la barra no se cae por poco)
+    const f = c.ctl === 'f', libre = f ? segunHolgura(c.I, FACIL.vueloMm, 0) : 0;
+    const tope = TOPE_DESVIO[M.k] + (j && !c.domina ? NO_DOMINA.desvio : 0) + libre;
+    if (f && Math.abs(e) <= w.g) { /* sigue */ }
+    else if (M.alt < ALTURA_MIN - libre) { M.tFallo = t + 150; M.causaFallo = 'sin_altura'; }
     else if (M.des > tope) { M.tFallo = M.tc; M.causaFallo = 'adelante'; }
     else if (M.des < -tope && M.mov !== 'c') { M.tFallo = M.tc; M.causaFallo = 'atras'; }
     this.gestos.push({ g: 'explosion', mov: M.mov, e, pal: palabra(e, w) });
@@ -135,8 +145,6 @@ export class Intento {
     const porAltura = f ? Math.max(0, M.perdida - FACIL.perdidaLibre) * FACIL.porMm : M.perdida * EXI_ERROR.porMm, w0 = f ? wr.g : wr.p;
     M.exi = base + (M.mov === 's' ? EXI_ARRANQUE : 0) + Math.min(EXI_ERROR.tope, porAltura) + (ad > 20 ? (ad - 20) * EXI_ERROR.porDesvio : 0) + (a <= w0 ? 0 : lerpi(Math.min(a, wr.l), w0, wr.l, 0, EXI_ERROR.recepcion));
     if (M.exi < 0) M.exi = 0;
-    // en Fácil la subida siempre pide toques: nadie queda de pie sin empujar
-    if (f) M.exi = Math.max(M.exi, esfuerzoPropio(c.garra) + FACIL.minEmpuje);
     const blando = M.mov !== 'c' && a > wr.g, L = blando ? lerpi(Math.min(a, wr.l), wr.g, wr.l, TRABA.ini, TRABA.iniLimite) : null;
     const squat = M.mov === 'j' && c.env === 'squat';
     if (M.mov === 'j' && !squat) {
@@ -147,9 +155,11 @@ export class Intento {
 
   // ---------- pelea y traba ----------
   _pelea(t0, o) {
-    const M = this.M, A = PELEA.precarga + PELEA.precargaCal * M.q2, propio = esfuerzoPropio(this.c.garra), E = Math.min(1000, propio + idiv(A, 1000));
+    const M = this.M, c = this.c, A = PELEA.precarga + PELEA.precargaCal * M.q2, propio = esfuerzoPropio(c.garra), E = Math.min(1000, propio + idiv(A, 1000));
+    // Fácil: en los pesos livianos la barra sube sola, más lenta que tocando (avance por paso; 0 si la exigencia no lo deja)
+    const sola = c.ctl === 'f' ? idiv(Math.min(FACIL.solaMax, Math.max(0, PELEA.subir * (propio + asistFacil(c.I) - M.exi) * 1000)), PELEA.hz) : 0;
     M.pelea = {
-      modo: o.modo, t0, k: 0, P: 0, A, propio, E, aguja: E, exi: M.exi, exiAhora: M.exi, exiTraba: Math.max(0, o.base - TRABA.menos), rebote: o.rebote || 0,
+      modo: o.modo, t0, k: 0, P: 0, A, propio, E, sola, aguja: E, exi: M.exi, exiAhora: M.exi, exiTraba: Math.max(0, o.base - TRABA.menos), rebote: o.rebote || 0,
       L: o.L, trabado: o.L === null, T: 0, buf: new Array(PELEA.agujaPasos).fill(E), suma: E * PELEA.agujaPasos, ultToque: M.tq, ultEmpuje: -INF, cero: 0, toques: 0, fuera: 0, enFranja: false,
     };
     this.fase = o.modo;
@@ -173,6 +183,9 @@ export class Intento {
         else {
           const d = E - X; let dP = d > 0 ? Math.min(idiv(PELEA.subir * d * 1000, hz), idiv(PELEA.topeSubir, hz)) : idiv(PELEA.hundir * d * 100, hz);
           if (dP < 0 && ms < PELEA.graciaReboteMs) dP = 0;
+          // Fácil: sin un toque reciente sube a lo sumo a la velocidad de la subida sola (que puede ser 0: cerca del techo hay
+          // que tocar); tocar solo suma si empuja más rápido que eso
+          if (f) { if (dP > p.sola && t - p.ultEmpuje > PELEA.recienteMs) dP = p.sola; if (p.sola > 0 && dP < p.sola) dP = p.sola; }
           p.P += dP; if (p.P < 0) p.P = 0;
         }
         if (p.P > 1000000) p.P = 1000000;
@@ -196,7 +209,8 @@ export class Intento {
       const d = E - p.exiTraba;
       p.L += d > 0 ? Math.min(idiv(PELEA.subir * d * 1000, hz), idiv(PELEA.topeSubir, hz)) : idiv(PELEA.hundir * d * 100, hz);
       if (p.L < TRABA.pierde) return this._fallo(t, 'codos');
-      if (p.L >= 1000000) { p.L = 1000000; p.trabado = true; this.trabaMs = t - M.tq; }
+      // en Fácil la traba se cuenta desde que la barra llega (con un toque temprano, el vuelo que falta no es codo blando)
+      if (p.L >= 1000000) { p.L = 1000000; p.trabado = true; this.trabaMs = t - (f ? p.t0 : M.tq); }
     }
     if (ms >= (f ? FACIL.maxMs : PELEA.maxMs)) return this._fallo(t, p.modo === 'traba' || M.mov !== 'c' ? 'codos' : 'aplastado');
     if (p.trabado && (p.modo === 'traba' || p.P >= 1000000)) this._enPie(t);
@@ -239,12 +253,12 @@ export class Intento {
     switch (this.fase) {
       case 'llamado': case 'tension': return this._nulo(d, 'reloj');
       case 'acomodo': if (d === this.tSet) { this._mov(this.c.lev, d); this.fase = 'tension'; return; } return this._nulo(d, 'reloj');
-      case 'tiron': if (d === M.tTarde) { this.rodilla = true; this.gestos.push({ g: 'explosion', mov: M.mov, e: M.w.l + 1, pal: 'tarde', fuera: true }); return this._fallo(d, 'sin_altura'); } return this._nulo(d, 'reloj');
+      case 'tiron': if (d === M.tTarde) { this.rodilla = true; this.gestos.push({ g: 'explosion', mov: M.mov, e: M.w.L + 1, pal: 'tarde', fuera: true }); return this._fallo(d, 'sin_altura'); } return this._nulo(d, 'reloj');
       case 'hombros': return this._fallo(d, 'devuelve');
-      case 'flexion': if (d === M.tTarde && d <= M.tDev) { this.gestos.push({ g: 'explosion', mov: 'j', e: M.w.l + 1, pal: 'tarde', fuera: true }); return this._fallo(d, 'sin_altura'); } return this._fallo(d, 'devuelve');
+      case 'flexion': if (d === M.tTarde && d <= M.tDev) { this.gestos.push({ g: 'explosion', mov: 'j', e: M.w.L + 1, pal: 'tarde', fuera: true }); return this._fallo(d, 'sin_altura'); } return this._fallo(d, 'devuelve');
       case 'vuelo': case 'empuje':
         if (M.tFallo <= d) return this._fallo(d, M.causaFallo);
-        this.gestos.push({ g: 'recepcion', mov: M.mov, e: M.wr.l + 1, pal: 'tarde', fuera: true }); return this._fallo(d, 'fondo');
+        this.gestos.push({ g: 'recepcion', mov: M.mov, e: M.wr.L + 1, pal: 'tarde', fuera: true }); return this._fallo(d, 'fondo');
       case 'pelea': case 'traba': return this._paso(d);
       case 'post': return this._fija(d);
       case 'fijacion': {

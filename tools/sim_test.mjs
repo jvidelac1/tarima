@@ -232,17 +232,33 @@ function jugar(semilla, nivel, persona, estilo = {}) {
 // ---------- 8. Fácil: amagues, la subida y el tutorial guiado ----------
 {
   const ctxDe = (id, lev, I, extra = {}) => { const f = datos.atletas[id]; return { lev, env: lev === 'c' ? 'split' : undefined, I, tec: f.attrs.tec, temple: 0, garra: f.attrs.gar, anclas: datos.modelos[f.modelo], semilla: 9, cal: 0, primera: false, domina: true, jueces: [1000, 1000, 1000], reloj: 30000, ctl: 'f', ...extra }; };
-  // dos amagues se perdonan; el tercer toque anticipado es fallo, con su línea
-  { const ctx = ctxDe('ventura', 's', 9000), ent = []; let t = 2600;
-    for (let k = 0; k < 3; k++) { tocar(ctx, 1000, ent, t, 1, 'f'); tocar(ctx, 1000, ent, t + 100, 1, 'f'); const m = alDia(ctx, 1000, ent, t + 100, 'f'); ok(k < 2 ? !m.res && m.amagues === k + 1 : m.res?.causa === 'anticipado', `Fácil, amague ${k + 1}: ${m.res ? m.res.causa : m.fase + ' con ' + m.amagues + ' amagues'}`); if (m.res) ok(/tres veces/.test(explicar(m.res, 'f')), 'el tercer amague no explica qué pasó'); t += 1500; }
+  // entrada tolerante: un toque antes de que abra la ventana no llega al núcleo ni gasta la señal; vale el primero de adentro
+  { const ctx = ctxDe('ventura', 's', 9000), ent = []; let malos = 0;
+    tocar(ctx, 1000, ent, 2600, 1, 'f');      // ¡TIRÁ!
+    let m = alDia(ctx, 1000, ent, 2600, 'f'); const s0 = senal(m, 2600, 'f');
+    ok(m.fase === 'tiron' && s0.tipo === 'cierre' && s0.abre > 2600 && s0.abre < s0.objetivo, `Fácil: la señal de ¡EXPLOTÁ! no dice desde cuándo vale (${JSON.stringify(s0)})`);
+    for (let t = 2700; t < s0.abre; t += 70) { const r = tocar(ctx, 1000, ent, t, 1, 'f'); if (r.n || r.motivo !== 'temprano') malos++; }
+    m = alDia(ctx, 1000, ent, s0.abre - 1, 'f'); ok(!malos && m.fase === 'tiron' && !m.amagues && ent.length === 1, `Fácil: ${malos} toques antes de la ventana llegaron al núcleo o no dijeron «temprano» (fase ${m.fase}, amagues ${m.amagues})`);
+    const r = tocar(ctx, 1000, ent, s0.abre, 1, 'f'); m = alDia(ctx, 1000, ent, s0.abre, 'f');
+    ok(r.n === 1 && m.fase === 'vuelo' && m.gestos.length === 1, `Fácil: el primer toque dentro de la ventana no fue la explosión (${m.fase})`);
+    // en el vuelo, igual; y desde la recepción todo toque empuja, aunque la subida no haya arrancado
+    const s1 = senal(m, s0.abre, 'f'); let antes = 0;
+    for (let t = s0.abre + 80; t < s1.abre; t += 80) { const x = tocar(ctx, 1000, ent, t, 1, 'f'); if (x.n || x.motivo !== 'temprano') antes++; }
+    const rr = tocar(ctx, 1000, ent, s1.abre, 1, 'f'); m = alDia(ctx, 1000, ent, s1.abre, 'f');
+    ok(!antes && rr.n === 1 && m.fase === 'pelea', `Fácil: la recepción no tomó el primer toque de la ventana (${antes} antes, fase ${m.fase})`);
+    let desc = 0; for (let t = s1.abre + 100; t < m.M.pelea.t0 + 300; t += 100) { const x = tocar(ctx, 1000, ent, t, 1, 'f'); if (!x.n) desc++; }
+    ok(!desc, `Fácil: ${desc} toques entre la recepción y el arranque de la subida se descartaron`);
     const c = { ...ctx, ctl: 'c' }, e2 = [[2600, 1], [2700, 0], [4000, 1], [4100, 0], [5500, 1], [5600, 0], [7000, 1], [7100, 0]], m2 = simular(c, 1000, e2, 8000); ok(!m2.res && m2.amagues === 4, 'Clásico: los amagues antes de la rodilla dejaron de ser libres'); }
-  // sin tocar en ¡EMPUJÁ! la subida se corta enseguida (no hay 12 s de espera); tocando cada 250 ms con todo PERFECTO se levanta siempre hasta el 100 %
+  // la subida: en los pesos livianos sube sola, más lenta que tocando; cerca del techo, sin empujar se corta enseguida (no hay
+  // 12 s de espera); tocando cada 250 ms con todo PERFECTO se levanta siempre hasta el 100 %
   let nSub = 0;
   for (const id of IDS) for (const lev of ['s', 'c']) for (const I of [8800, 9200, 9700, 10000]) {
     const quieto = jugarFijo(ctxDe(id, lev, I), [0, 0, 0, 0], 0).m, d = quieto.res.t - (quieto.M.pelea?.t0 ?? 0);
-    ok(quieto.res.res === 'fallo' && ['aplastado', 'codos'].includes(quieto.res.causa) && d >= FACIL.plazoMs && d <= FACIL.plazoMs + 1200, `Fácil, ${id} ${lev} ${I}: sin empujar da ${quieto.res.res}:${quieto.res.causa} a los ${d} ms de la subida`);
     const bien = jugarFijo(ctxDe(id, lev, I), [0, 0, 0, 0], 250).m; ok(bien.res.res === 'valido', `Fácil, ${id} ${lev} ${I}: todo PERFECTO y un toque cada 250 ms da ${bien.res.res}:${bien.res.causa}`);
-    const p = bien.movs[0].pelea; ok(p && bien.movs[0].tEnPie - p.t0 < 4000, `Fácil, ${id} ${lev} ${I}: la subida ganada tarda ${bien.movs[0].tEnPie - p.t0} ms`); nSub++;
+    const p = bien.movs[0].pelea, dB = bien.movs[0].tEnPie - p?.t0; ok(p && dB < 4000, `Fácil, ${id} ${lev} ${I}: la subida ganada tarda ${dB} ms`);
+    if (I <= FACIL.holgadoHasta) { const q = quieto.movs[0]; ok(quieto.res.res === 'valido' && q.tEnPie - q.pelea.t0 > dB + 800 && q.tEnPie - q.pelea.t0 < 5000, `Fácil, ${id} ${lev} ${I}: sin empujar da ${quieto.res.res}:${quieto.res.causa}, la subida tarda ${q.tEnPie - q.pelea?.t0} ms (tocando, ${dB})`); }
+    else ok(quieto.res.res === 'fallo' && ['aplastado', 'codos'].includes(quieto.res.causa) && d >= FACIL.plazoMs && d <= FACIL.plazoMs + 1200, `Fácil, ${id} ${lev} ${I}: sin empujar da ${quieto.res.res}:${quieto.res.causa} a los ${d} ms de la subida`);
+    nSub++;
   }
   // el arranque guiado del tutorial no se puede fallar: copia del reloj guiado de main.js (se detiene en cada objetivo; en la
   // subida corre GUIADO.porToque ms por toque), con jugadores que tocan ¡EMPUJÁ! desde muy rápido hasta uno cada 3 s
@@ -267,7 +283,7 @@ function jugar(semilla, nivel, persona, estilo = {}) {
     const m = guiado(ctxDe(id, 's', 8000, { exiFija: exigenciaTabla(9300), primera: true, reloj: 0, semilla: sem }), per, 700); nG++;
     ok(m.res && m.res.res === 'valido', `tutorial guiado, ${id}, un toque cada ${per} ms en ¡EMPUJÁ!: ${m.res ? m.res.res + ':' + m.res.causa : 'no termina'}`);
   }
-  console.log(`8. Fácil: tercer amague es fallo · ${nSub} subidas sin empujar cortadas a tiempo y ganadas tocando cada 250 ms · tutorial guiado sin fallo posible en ${nG} casos (tres pesistas, un toque cada 100 ms a 3 s)`);
+  console.log(`8. Fácil: toques antes de la ventana sin efecto · ${nSub} subidas: sola en los pesos livianos, cortada a tiempo cerca del techo, ganada tocando cada 250 ms · tutorial guiado sin fallo posible en ${nG} casos (tres pesistas, un toque cada 100 ms a 3 s)`);
 }
 
 console.log(fallas.length ? `\nFALLÓ: ${fallas.length} problemas` : `\nOK en ${((Date.now() - t0) / 1000).toFixed(1)} s`);

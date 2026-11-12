@@ -108,17 +108,42 @@ export const KG_MAX = 260;
 
 /**
  * Nivel de control «Fácil» (docs/CONTROLES.md, sección 4). Lo que es de teclas vive en game/controles.js.
- *   ancho        de las ventanas, en milésimas
- *   amagues      amagues permitidos por movimiento; el siguiente toque anticipado es fallo
+ * La dificultad aparece al pedir kilos, no en la apertura: varias reglas se aflojan según la «holgura» de la intensidad
+ * (`holgura(I)`, milésimas): 1000 hasta `holgadoHasta`, baja en línea recta y llega a 0 en el 100 % del techo.
+ *   ancho        de las ventanas de PERFECTO, BIEN y límite, en milésimas: `ancho` con holgura entera, `anchoTecho` sin holgura
+ *   abreMs, limMin  la ventana de la señal: un toque cuenta desde `abreMs` antes del objetivo (en el tirón, además, no antes
+ *                de la rodilla) hasta `limMin` después (o el límite, si es más ancho). Fijas a cualquier peso: con más kilos
+ *                se achican PERFECTO y BIEN, no lo que se acepta. Un toque antes de que abra no llega al núcleo (la capa
+ *                responde «todavía no» y la señal sigue esperando); uno más allá del límite de calidad cuenta como el peor
+ *                TEMPRANO o TARDE
+ *   vueloMm      con holgura entera, mm de altura y de desvío que la barra puede perder de más en el vuelo con un toque en
+ *                TEMPRANO o TARDE sin caerse (un toque en PERFECTO o BIEN no la pierde nunca)
+ *   amagues      amagues permitidos por movimiento; el siguiente toque anticipado es fallo (desde el 13-nov la capa no
+ *                deja pasar toques anticipados: queda para registros armados a mano)
  *   perdidaLibre mm de altura perdida que no suman exigencia (el borde de BIEN): PERFECTO y BIEN piden el mismo empuje
  *   porMm        de ahí al límite, milésimas de exigencia por mm (TEMPRANO y TARDE sí cuestan)
- *   minEmpuje    la subida pide siempre toques: la exigencia nunca baja de esfuerzo propio + esto (unos 3 toques por segundo)
+ *   asist, asistTecho, asistHasta, solaMax  la barra sube sola en los pesos livianos, más lenta que tocando: con
+ *                esfuerzo propio + asist por encima de la exigencia, avanza a la velocidad que daría ese esfuerzo, con
+ *                tope `solaMax` (millonésimas por s: 300 000, unos 3,3 s de subida). `asist` (milésimas) vale con holgura
+ *                entera y baja en línea recta hasta `asistTecho` en la intensidad `asistHasta`: desde el 96 % hay que tocar.
+ *                Tocar suma solo si empuja más rápido que eso
  *   plazoMs, ritmo  la subida se corta sola: pasado el plazo, el avance tiene que ir por delante de un piso que sube a
  *                `ritmo` millonésimas por ms; si el piso lo alcanza, se cae. Reemplaza al «hundido»; no hay zona de estancamiento
  *   maxMs        tope de la pelea y de la traba de codos
  *   cierreMs     tiempo mínimo entre ¡FLEXIONÁ! y ¡ARRIBA! (el círculo tiene que poder verse cerrar)
  */
-export const FACIL = { ancho: 2000, amagues: 2, perdidaLibre: 80, porMm: 4, minEmpuje: 175, plazoMs: 1500, ritmo: 250, maxMs: 6000, cierreMs: 600 };
+export const FACIL = {
+  holgadoHasta: 9200, ancho: 2000, anchoTecho: 1150, abreMs: 300, limMin: 330, vueloMm: 40, amagues: 2, perdidaLibre: 80, porMm: 4,
+  asist: 250, asistTecho: 30, asistHasta: 9600, solaMax: 300000, plazoMs: 1500, ritmo: 250, maxMs: 6000, cierreMs: 600,
+};
+/** Holgura de Fácil a la intensidad I (milésimas): 1000 en los pesos de apertura, 0 desde el 100 % del techo. */
+export const holgura = I => (I <= FACIL.holgadoHasta ? 1000 : I >= 10000 ? 0 : lerpi(I, FACIL.holgadoHasta, 10000, 1000, 0));
+/** De `sin` (holgura 0) a `con` (holgura entera). */
+export const segunHolgura = (I, con, sin) => sin + idiv((con - sin) * holgura(I), 1000);
+/** Esfuerzo que el pesista pone solo en la subida de Fácil a la intensidad I (milésimas). */
+export const asistFacil = I => (I <= FACIL.holgadoHasta ? FACIL.asist : I >= FACIL.asistHasta ? FACIL.asistTecho : lerpi(I, FACIL.holgadoHasta, FACIL.asistHasta, FACIL.asist, FACIL.asistTecho));
+/** Ancho de las ventanas de Fácil a la intensidad I (milésimas). */
+export const anchoFacil = I => segunHolgura(I, FACIL.ancho, FACIL.anchoTecho);
 export const CONTROLES = ['c', 'f'];
 
 /** Causas con su texto. Las de fallo y las de nulo (secciones 5.2 y 5.3). */

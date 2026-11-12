@@ -8,12 +8,13 @@ import { simular } from '../sim/attempt.js';
 import { TENSION, FACIL } from '../sim/rules.js';
 
 const INF = 2147483647;
+/** Rebote de tecla y demora de la bajada automática tras la chicharra. */
+export const CAPA = { reboteMs: 60, bajaMs: 150 };
 /**
- * Rebote de tecla, demora de la bajada automática tras la chicharra y márgenes del toque útil en la subida. En Fácil
- * empujar de más no hace temblar (sección 4), así que el margen es ancho: solo evita gastar Resto en toques que ya no suman.
+ * Un toque que no llega al núcleo siempre lleva `motivo`: 'espera' (todavía no hay nada que tocar), 'temprano' (hay
+ * señal, pero su ventana todavía no abrió: «todavía no», y la señal sigue esperando), 'rebote', 'sobra' (no hace falta),
+ * 'tarde' (ya se perdió) o 'termino'.
  */
-export const CAPA = { reboteMs: 60, bajaMs: 150, margen: 200, trabaMargen: 150 };
-/** Un toque que no llega al núcleo siempre lleva `motivo`: 'espera' (todavía no), 'rebote', 'sobra' (no hace falta), 'tarde' (ya se perdió) o 'termino'. */
 const no = (motivo, aviso = null) => ({ ent: [], aviso, motivo });
 
 /**
@@ -43,21 +44,40 @@ export function traducir(m, t, v, ctl) {
       // en los 450 ms de RESPIRÁ el toque suele ser la cola de ¡EMPUJÁ!: no cuenta (y no dice «todavía no»); después de un amague sí se avisa
       if (t < M.ign) return no('espera', M.amagues.length ? 'espera' : null);
       return { ent: m.n > 0 ? [[t, 0], [t, 1]] : [[t, 1]], aviso: null };
+    // Entrada tolerante (13-nov): un toque antes de que abra la ventana de la señal no la gasta ni arruina el intento.
+    // No llega al núcleo, la señal sigue esperando y vale el primer toque que cae adentro. Tocar de más no castiga.
     case 'tiron': case 'flexion':
       if (t - M.tp < CAPA.reboteMs) return no('rebote', 'rebote');
+      if (t < abre(m)) return no('temprano', 'temprano');
       return { ent: [[t, 0]], aviso: null };
     case 'vuelo': case 'empuje':
       if (M.tq) return no('sobra'); if (M.tFallo < INF) return no('tarde');
       if (t - M.tr < CAPA.reboteMs) return no('rebote', 'rebote');
+      if (t < abre(m)) return no('temprano', 'temprano');
       return { ent: [[t, 1]], aviso: null };
     case 'pelea': case 'traba': {
-      const p = M.pelea; if (t < p.t0) return no('espera');
-      const util = (p.modo === 'pelea' && p.P < 1000000 && p.aguja < p.exiAhora + CAPA.margen) || (!p.trabado && p.E < p.exiTraba + CAPA.trabaMargen);
+      // desde la recepción cada toque empuja, aunque la subida todavía no haya arrancado (antes se descartaban por «espera»)
+      const p = M.pelea;
+      // mientras la barra no está arriba (o los codos sin trabar) todo toque empuja: sin tocar, la subida va a lo sumo a su
+      // velocidad sola. Los de después no llegan al núcleo (no gastan Resto)
+      const util = (p.modo === 'pelea' && p.P < 1000000) || !p.trabado;
       return util ? { ent: [[t, 1], [t, 0]], aviso: null } : no('sobra', 'sobra');
     }
     case 'acomodo': return no('espera', 'espera');
     default: return no('sobra');      // AGUANTÁ y ¡ABAJO!: no hay que tocar nada
   }
+}
+
+/**
+ * Instante (ms del intento) en que abre la ventana de la señal de toque en curso: `A` ms antes del objetivo (en Fácil,
+ * FACIL.abreMs, fijo a cualquier peso) y, en el tirón, no antes de que la barra pase la rodilla.
+ */
+export function abre(m) {
+  const M = m.M, c = m.c;
+  if (m.fase === 'tiron') return Math.max(M.tk, M.tx + c.cal - M.w.A);
+  if (m.fase === 'flexion') return M.tx + c.cal - M.w.A;
+  if (m.fase === 'vuelo' || m.fase === 'empuje') return M.tc + c.cal - M.wr.A;
+  return -INF;
 }
 
 /** Recalcula el intento hasta `t` y agrega a `ent` los eventos automáticos que ya vencieron. Devuelve la máquina. */
@@ -95,7 +115,8 @@ export const PASOS = { s: 3, c: 6 };
 export function senal(m, now, ctl = 'c') {
   if (!m || m.res) return null;
   const M = m.M, c = m.c, f = ctl === 'f', de = PASOS[c.lev];
-  const cierre = (clave, verbo, paso, objetivo, desde, w, sub, gesto) => ({ clave, verbo, sub, paso, de, tipo: 'cierre', objetivo, desde, perf: w.p, lim: w.l, gesto });
+  // `bien`: borde de BIEN (± ms); `lim`: hasta cuándo vale el toque; `abre` (Fácil): desde cuándo vale (antes, «todavía no»)
+  const cierre = (clave, verbo, paso, objetivo, desde, w, sub, gesto) => ({ clave, verbo, sub, paso, de, tipo: 'cierre', objetivo, desde, perf: w.p, bien: w.g, lim: w.L ?? w.l, abre: f ? abre(m) : objetivo - (w.A ?? w.l), gesto });
   switch (m.fase) {
     case 'acomodo': return { clave: 'prep', verbo: 'PREPARATE', tipo: 'espera' };
     case 'tension': case 'hombros': {
