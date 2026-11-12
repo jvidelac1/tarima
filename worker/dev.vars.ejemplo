@@ -1,0 +1,9 @@
+# Copiar como worker/.dev.vars para `npx wrangler dev` (ese archivo está en .gitignore y nunca se sube).
+# Son valores solo para la máquina local; los de producción se cargan con `npx wrangler secret put`.
+SECRETO_IP=local-ip-cambiar-0123456789abcdef
+SECRETO_DISPOSITIVO=local-dispositivo-cambiar-01234567
+SECRETO_PASE=local-pase-cambiar-0123456789abcdef
+SECRETO_BAJA=local-baja-cambiar-0123456789abcdef
+# Opcionales:
+# POSTHOG_KEY=phc_...            (sin ella las métricas quedan apagadas)
+# EXPORTAR_CLAVE=...             (sin ella /api/exportar no existe)

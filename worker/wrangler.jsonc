@@ -1,0 +1,61 @@
+// Worker de Tarima (docs/MVP.md 5.5). Sirve web/ y responde /api/*, /qx/* (proxy de PostHog), /baja y /confirmar.
+// Los secretos NO van acá: se cargan con `npx wrangler secret put` (ver worker/README.md).
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "tarima",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-30",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "assets": {
+    "directory": "../web",
+    "binding": "ASSETS",
+    // Sin redirecciones mágicas: /juego.html y /privacidad.html se sirven tal cual, como con el servidor de Python.
+    "html_handling": "none",
+    "not_found_handling": "none",
+    "run_worker_first": ["/", "/api/*", "/qx/*", "/qx", "/baja", "/confirmar"]
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tarima",
+      // Reemplazar por el id que devuelve `npx wrangler d1 create tarima` (no es un secreto).
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migraciones"
+    }
+  ],
+
+  // Primera barrera contra ráfagas, por código de IP. Las ventanas largas (10 min, 1 h) se cuentan en D1:
+  // este límite solo admite períodos de 10 o 60 segundos.
+  "ratelimits": [
+    { "name": "LIMITE", "namespace_id": "4101", "simple": { "limit": 40, "period": 10 } }
+  ],
+
+  // Limpieza diaria: códigos de IP a los 30 días, partidas y dispositivos a los 180, altas sin confirmar a los 30.
+  "triggers": { "crons": ["17 4 * * *"] },
+
+  // Email Sending: para activarlo, sacar el comentario y poner MAIL_DESDE con una casilla del dominio verificado.
+  // "send_email": [{ "name": "EMAIL" }],
+
+  "vars": {
+    "POSTHOG_HOST": "us.i.posthog.com",
+    "POSTHOG_ASSETS": "us-assets.i.posthog.com",
+    "GRATIS": "2",
+    "TOPE_IP": "6",
+    "BONO_ENCUESTA": "2",
+    "ENCUESTAS_POR_IP": "3",
+    "ENCUESTA_ID": "",
+    "ENCUESTA_PREGUNTAS": "",
+    "MAIL_DESDE": "",
+    "TURNSTILE": "0"
+  },
+
+  // Registros propios en JSON y sin datos personales. Los registros automáticos de cada pedido y las trazas quedan
+  // apagados porque guardan la URL completa (los links de /baja y /confirmar llevan el token) y datos de la conexión.
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1, "invocation_logs": false },
+    "traces": { "enabled": false }
+  }
+}
