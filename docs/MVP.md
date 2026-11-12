@@ -8,7 +8,7 @@ Estado al 12 de noviembre de 2026. Esto es lo que se construye para la primera v
 |---|---|
 | Promesa | «Halterofilia a un botón: ganá la final levantando más kilos que tus rivales.» |
 | Finales gratis | 2 por dispositivo. El tutorial no cuenta. Bandera para probar 1 contra 2 cuando haya 1.000 visitas |
-| Cuándo se gasta una final | Cuando el servidor entrega el pase, al empezar la final (después del tutorial). Si recargás en medio de la final, esa final ya está gastada |
+| Cuándo se gasta una final | Cuando el servidor entrega el pase, al empezar la final (después del tutorial). Si la página se recarga en medio de la final, el juego reanuda esa misma final una vez con el pase guardado en la pestaña, sin gastar otra (ver «Revisión») |
 | Duración | Final rápida, de 5 a 6 minutos. Del link a la primera final hay menos de 1 minuto |
 | Después de la final 1 | Podio, después «Jugar otra vez» como botón principal y una invitación suave a la lista que se puede cerrar |
 | Después de la final 2 | El muro, con dos caminos: dejar el mail (juego libre hasta la próxima versión) o la encuesta (2 finales más, una sola vez) |
@@ -16,7 +16,7 @@ Estado al 12 de noviembre de 2026. Esto es lo que se construye para la primera v
 | Quién lleva la cuenta | El Worker. Cuenta por dispositivo (2) y por IP con HMAC (6 en 30 días). El navegador solo guarda una copia para mostrar el muro al instante |
 | Datos que se piden | Nombre o apodo (opcional, queda en el dispositivo). En el muro: el mail, la casilla de aviso (obligatoria) y la de novedades (opcional). Nada más |
 | Métricas | PostHog, US Cloud (proyecto 606461), con proxy en el mismo Worker (`/qx/`). Sin cookies ni almacenamiento de medición. Sin mail ni IP |
-| Idiomas | Español rioplatense con voseo e inglés llano. Se detecta el idioma del navegador; `?lang=` y el selector ES · EN lo cambian |
+| Idiomas | Español neutro, sin voseo (decisión del dueño del 12 de noviembre: los textos en voseo de 4.5 se reescriben con tuteo), e inglés llano. Se detecta el idioma del navegador; `?lang=` y el selector ES · EN lo cambian |
 | Personalización | Tu nombre reemplaza al del pesista que elegís en el zócalo, la tabla y el podio |
 | Nombre del evento | «Final Tarima · Pretemporada» / «Tarima Final · Preseason». Sale «Mundial Tarima 2026» |
 
@@ -72,7 +72,7 @@ En todas las pantallas fuera del intento hay un pie con «Privacidad» y el sele
 **P0 · Carga** (`#msg`). Se ve el logo y la línea «Levantá más kilos que tus rivales. Un solo botón.». En paralelo pasan tres cosas:
 1. Se fija el idioma (sección 4.1).
 2. Se pinta la pantalla que corresponde según la copia local (`tarima.muro`): la bienvenida o el muro.
-3. Se pide `POST /api/estado` al Worker, y con la respuesta se corrige la pantalla si hace falta. Los modelos siguen bajando atrás.
+3. Se pide `POST /api/estado` al Worker, y con la respuesta se corrige la pantalla si hace falta. Los modelos siguen bajando atrás. Excepción: si el servidor dice muro con `previas=0` (red compartida que ya gastó su tope), se pinta igual la bienvenida y la práctica, que no gastan nada, y el muro aparece recién en P4, con el camino de la encuesta arriba. Nadie ve un muro antes de saber qué es el juego.
 
 Si el Worker no contesta en 4 s, vale la copia local.
 
@@ -113,7 +113,7 @@ Abajo de todo, «Ahora no». No desbloquea nada: deja visibles la lista de lo qu
 
 **P11 · Anotado.**
 - Si el alta es nueva: «¡Adentro, {nombre}! Estás en la lista de acceso anticipado.» y debajo «Te mandamos un mail para confirmar. Mientras, jugá todo lo que quieras.».
-- Si ya estaba: «Ya estabas en la lista. ¡A jugar!».
+- Si ya estaba: el servidor responde igual que con un alta nueva para no revelar quién está en la lista (sección 5.5), así que se ve lo mismo que arriba. «Ya estabas en la lista. ¡A jugar!» solo sale si este mismo dispositivo ya estaba anotado con ese mail.
 
 Si todavía no contestó la encuesta, se le ofrece sin premio («¿Nos ayudás a decidir qué hacer primero? 4 preguntas, 1 minuto.»). El botón «Seguir jugando» lleva a la revancha directa.
 
@@ -122,7 +122,7 @@ Si todavía no contestó la encuesta, se le ofrece sin premio («¿Nos ayudás a
 | Momento | Qué pasa |
 |---|---|
 | Antes de P4 (bienvenida, práctica) | No se gastó nada. Vuelve a la bienvenida |
-| En medio de una final | Esa final ya está gastada. Vuelve a la bienvenida con el contador al día o, si era la última, al muro |
+| En medio de una final | El pase de esa final queda en `sessionStorage` (`tarima.pase`, con `n`, `exp` y si ya se reanudó). Al recargar en la misma pestaña, antes del podio y dentro de `exp`, el juego reanuda esa misma final desde el principio, sin pedir otro pase. Se reanuda una sola vez por pase; la segunda recarga la da por gastada y vuelve a la bienvenida con el contador al día o, si era la última, al muro |
 | En el muro o en la encuesta sin enviar | Muro. El servidor responde muro aunque se haya borrado la copia local |
 | Después de mandar la encuesta | Bienvenida, con «Te quedan 2 finales» |
 | Anotado | Bienvenida y juego libre |
@@ -133,6 +133,8 @@ Si todavía no contestó la encuesta, se le ofrece sin premio («¿Nos ayudás a
 - **Teléfono.** Funciona igual. El mail usa `type=email`, `inputmode=email` y `autocomplete=email`. El muro y la encuesta son una columna con scroll. La zona «Tocá acá» se esconde mientras haya un formulario abierto. Con el foco en un campo, `input.js` ignora Espacio y Enter: hoy el botón escucha Espacio en toda la página, y con eso un nombre con espacio dispararía toques.
 - **Borrar los datos o abrir una ventana privada.** Hay un dispositivo nuevo, pero la cuenta por IP lo frena a las 6 finales en 30 días (sección 7).
 - **No quiere dejar el mail.** Tiene la encuesta (2 finales, una vez) y después solo el mail. No hay otra puerta.
+- **Dos pestañas.** Cada una pide su pase, y el servidor cuenta las dos. El «te queda 1 final» de una pestaña puede estar viejo si la otra ya jugó: lo corrige P4, que lleva al muro sin gastar nada.
+- **Sin JavaScript.** El juego no anda. `juego.html` lleva un `<noscript>` de una línea en los dos idiomas («Tarima necesita JavaScript activado.» / «Tarima needs JavaScript turned on.»). No hay JavaScript de terceros: posthog-js va vendorizado y lo que pida después pasa por `/qx`.
 
 ## 3. Onboarding: del link a la primera final en menos de un minuto
 
@@ -182,7 +184,7 @@ Si todavía no contestó la encuesta, se le ofrece sin premio («¿Nos ayudás a
 
 ### 4.3 Tono de marca
 
-Es el de una transmisión deportiva entre amigos: cálida, con cancha y con humor seco. Celebra fuerte el ¡VALE! y nunca se burla del fallo. El español va en voseo rioplatense, que es el sello de la marca. El inglés es llano, con los verbos cortos del gimnasio y los nombres reales del deporte (Snatch, Clean & jerk), porque son los que la gente busca.
+Es el de una transmisión deportiva entre amigos: cálida, con cancha y con humor seco. Celebra fuerte el ¡VALE! y nunca se burla del fallo. El español va en español neutro, con tuteo (decisión del dueño; las tablas de 4.5 todavía están en voseo y se reescriben sobre las mismas claves). El inglés es llano, con los verbos cortos del gimnasio y los nombres reales del deporte (Snatch, Clean & jerk), porque son los que la gente busca.
 
 La promesa pública de la marca es «Nunca vas a pagar para levantar más.» / «You'll never pay to lift more.», y va en la página de privacidad y en el agradecimiento. Deja abierta la monetización por cosméticos o por un pago único sin prometer precios.
 
@@ -212,6 +214,7 @@ Variables comunes que resuelve `t()`:
 | `{cuando}` | «cuando el círculo llega al aro» | «when the circle hits the ring» |
 | `{cuanto}` | «un poco», «bastante» o «muy» más «temprano» o «tarde», con cortes en 60 y 150 ms | «a bit», «quite» or «way» plus «early» or «late» |
 | `{ajuste}` | «antes» / «después» | «earlier» / «later» |
+| `{pos}` | — (el español usa `{n}`) | «1st», «2nd» o «3rd» |
 
 En inglés, la primera letra de `{T}` y de `{A}` va en mayúscula al empezar una frase. En español, el `{cuanto}` en Pro sigue siendo «180 ms tarde».
 
@@ -310,21 +313,21 @@ En inglés, la primera letra de `{T}` y de `{A}` va en mayúscula al empezar una
 
 | Clave | Reemplaza | Español | Inglés |
 |---|---|---|---|
-| `peso.titulo_s` | «Tu apertura (primer intento) de arranque» | ¿Con cuántos kilos empezás el arranque? | How much do you open with on the snatch? |
-| `peso.titulo_c` | ídem, dos tiempos | ¿Con cuántos kilos empezás el dos tiempos? | How much do you open with on the clean & jerk? |
+| `peso.titulo_s` | «Tu apertura (primer intento) de arranque» | ¿Con cuántos kilos empezás el arranque? | How much weight for your first snatch? |
+| `peso.titulo_c` | ídem, dos tiempos | ¿Con cuántos kilos empezás el dos tiempos? | How much weight for your first clean & jerk? |
 | `peso.boton` | «Confirmar» | Empezar con {kg} kg | Start with {kg} kg |
 | `peso.rango` | «Entre {lo} y {hi} kg. Sugerida: {s} kg.» | Entre {lo} y {hi} kg. | Between {lo} and {hi} kg. |
 | `peso.ayuda` | «Una apertura alta ahorra un intento; tres nulos te dejan sin marca.» | Empezar más bajo es más seguro. Si fallás los 3 intentos, te quedás sin total. | Starting lower is safer. Miss all 3 and you get no total. |
 | `peso.teclas` | «← → cambian los kilos, ENTER confirma.» | ← → cambian los kilos, ENTER confirma. | ← → change the weight, ENTER confirms. |
 | `intervalo.titulo` | «Intervalo» | Terminó el arranque | Snatch done |
-| `intervalo.texto` | «Descanso: los tres recuperan energía (15 de Resto).» | Vas en el puesto {n}. Ahora el dos tiempos: la barra va primero a los hombros y después arriba de la cabeza. Los tres recuperan energía. | You're in place {n}. Now the clean & jerk: bar to the shoulders first, then overhead. Everyone gets some energy back. |
+| `intervalo.texto` | «Descanso: los tres recuperan energía (15 de Resto).» | Vas en el puesto {n}. Ahora el dos tiempos: la barra va primero a los hombros y después arriba de la cabeza. Los tres recuperan energía. | You're in {pos} place. Now the clean & jerk: bar to the shoulders first, then overhead. Everyone gets some energy back. |
 | `lev.s` | «Arranque» (`LEV.s`) | Arranque | Snatch |
 | `lev.c` | «Dos tiempos» (`LEV.c`) | Dos tiempos | Clean & jerk |
 | `lev.t` | «total» | total | total |
 | `llamado.titulo` | «{nombre} · Arranque · intento 2» | {quien} · {lev} · intento {n} de 3 | {quien} · {lev} · attempt {n} of 3 |
-| `entrenador.facil` | «Entrenador: «Sale caminando.»» | Entrenador: «Este sale.» | Coach: «You've got this.» |
-| `entrenador.pelea` | «Entrenador: «Es para pelearla.»» | Entrenador: «Se puede, pero hay que pelearlo.» | Coach: «Doable, but you'll have to fight for it.» |
-| `entrenador.dificil` | «Entrenador: «Es un tiro.»» | Entrenador: «Es mucho: casi imposible.» | Coach: «That's a long shot.» |
+| `entrenador.facil` | «Entrenador: «Sale caminando.»» | Entrenador: «Este sale.» | Coach: “You've got this.” |
+| `entrenador.pelea` | «Entrenador: «Es para pelearla.»» | Entrenador: «Se puede, pero hay que pelearlo.» | Coach: “Doable, but you'll have to fight for it.” |
+| `entrenador.dificil` | «Entrenador: «Es un tiro.»» | Entrenador: «Es mucho: casi imposible.» | Coach: “That's a long shot.” |
 | `llamado.mas_dificil` | «Más kilos, más difícil» | Más kilos, más difícil. | More weight, harder lift. |
 | `cuenta.oro` | «Para el oro: {kg}» | Con {kg} kg ganás el oro. | Lift {kg} kg to win gold. |
 | `cuenta.plata` | «Plata asegurada con {kg}» | Con {kg} kg te asegurás la plata. | {kg} kg locks in silver. |
@@ -339,13 +342,13 @@ En inglés, la primera letra de `{T}` y de `{A}` va en mayúscula al empezar una
 | `llamado.confirmar` | «Confirmar» | Confirmar | Confirm |
 | `llamado.barra_no_baja` | nuevo, la primera vez | La barra nunca baja: si fallás, repetís el mismo peso o subís. | The bar never goes down: miss and you repeat the weight or go up. |
 | `llamado.dt_primera` | «Dos tiempos: empieza igual que el arranque…» | Dos tiempos: empieza igual que el arranque. Con la barra en los hombros el juego te espera: 3 toques más, ¡FLEXIONÁ!, ¡ARRIBA! y ¡AGARRALA! | Clean & jerk: starts like the snatch. With the bar on your shoulders the game waits: 3 more taps, DIP!, UP! and CATCH! |
-| `llamado.cambio` | «Cambiaste los kilos (pedido: X). Se puede dos veces…» | Cambiaste los kilos (pedido: {kg}). Podés cambiar 2 veces. Ojo: el que pide menos kilos levanta primero. | You changed the weight (asked: {kg}). You can change twice. Heads up: lower weight lifts first. |
+| `llamado.cambio` | «Cambiaste los kilos (pedido: X). Se puede dos veces…» | Cambiaste los kilos (pedido: {kg}). Podés cambiar 2 veces. Ojo: el que pide menos kilos levanta primero. | You changed the weight (now {kg} kg). You can change it twice. Heads up: whoever asks for less weight lifts first. |
 | `llamado.fijo` | «Los kilos ya no se pueden cambiar.» | Ya no se pueden cambiar los kilos. | The weight is locked now. |
 | `llamado.no_baja` | nuevo (tooltip del − bloqueado) | No se puede bajar: la barra ya tiene {kg} kg. | Can't go lower: the bar already has {kg} kg. |
 | `llamado.mas_opciones` | «Más opciones» | Más opciones | More options |
 | `llamado.menos_opciones` | «Menos opciones» | Menos opciones | Fewer options |
-| `llamado.pedido` | «Pedido: {kg} kg · mínimo {min} · cambios {c} de 2» | Pedido: {kg} kg · mínimo {min} · cambios {c} de 2 | Asked: {kg} kg · minimum {min} · changes {c} of 2 |
-| `llamado.declarado` | «Declarado: … (cerrados)» (Pro) | Pedido: {kg} kg · mínimo {min} · cambios {c} de 2 (cerrados) | Asked: {kg} kg · minimum {min} · changes {c} of 2 (locked) |
+| `llamado.pedido` | «Pedido: {kg} kg · mínimo {min} · cambios {c} de 2» | Pedido: {kg} kg · mínimo {min} · cambios {c} de 2 | Your weight: {kg} kg · minimum {min} · changes {c} of 2 |
+| `llamado.declarado` | «Declarado: … (cerrados)» (Pro) | Pedido: {kg} kg · mínimo {min} · cambios {c} de 2 (cerrados) | Your weight: {kg} kg · minimum {min} · changes {c} of 2 (locked) |
 | `llamado.cambio_pro` | «confirmar cuenta como cambio; si otro pidió menos, sale antes» | Confirmar cuenta como cambio; si otro pidió menos, levanta antes. | Confirming counts as a change; if someone asked for less, they lift first. |
 | `envion.titulo` | «Envión:» | Envión: | Jerk: |
 | `envion.split` | «Tijera» | Tijera | Split |
@@ -445,7 +448,7 @@ En inglés, la primera letra de `{T}` y de `{A}` va en mayúscula al empezar una
 | `tabla.total` | «Total» | Total | Total |
 | `tabla.energia` | «Resto» | Energía | Energy |
 | `tabla.sin_total` | «SM» | — (con `title` «sin total») | — (with `title` «no total») |
-| `etiqueta.record` | «Récord» | Récord del torneo | Meet record |
+| `etiqueta.record` | «Récord» | Récord del torneo | Competition record |
 | `etiqueta.todo_o_nada` | «A todo o nada» | Último intento: todo o nada | Last try: all or nothing |
 | `etiqueta.oro` | «Para el oro» | Para el oro | For gold |
 | `etiqueta.medalla` | «Para medalla» | Para una medalla | For a medal |
@@ -528,7 +531,7 @@ En inglés, la primera letra de `{T}` y de `{A}` va en mayúscula al empezar una
 | `medalla.bronce` | «Bronce» | Bronce | Bronze |
 | `podio.vacio` | «vacío» | vacío | empty |
 | `podio.mejores` | «Mejor arranque: … · Mejor dos tiempos: …» | Mejor arranque: {a} · Mejor dos tiempos: {c} | Best snatch: {a} · Best clean & jerk: {c} |
-| `podio.record` | «{nombre}: récord de arranque ({kg})» | {quien}: récord del torneo en {lev} ({kg} kg) | {quien}: meet record in {lev} ({kg} kg) |
+| `podio.record` | «{nombre}: récord de arranque ({kg})» | {quien}: récord del torneo en {lev} ({kg} kg) | {quien}: competition record in the {lev} ({kg} kg) |
 | `podio.otra` | «Revancha» | Jugar otra vez | Play again |
 | `podio.otra_quedan` | nuevo | Jugar otra vez · te queda 1 final gratis | Play again · 1 free final left |
 | `podio.cambiar` | «Cambiar pesista» | Cambiar de pesista | Switch lifter |
@@ -585,7 +588,7 @@ Variantes de la bandera `muro-texto`: la `a` usa `muro.promesa` y `muro.camino_m
 | `lista.error_limite` | Demasiados intentos. Probá en un rato. | Too many tries. Try again in a bit. |
 | `lista.ok` | ¡Adentro, {nombre}! Estás en la lista de acceso anticipado. | You're in, {nombre}! You're on the early access list. |
 | `lista.ok_ya` | Ya estabas en la lista. ¡A jugar! | You were already on the list. Let's play! |
-| `lista.ok_confirmar` | Te mandamos un mail para confirmar. Mientras, jugá todo lo que quieras. | We sent you an email to confirm. Meanwhile, play as much as you like. |
+| `lista.ok_confirmar` | Revisá tu mail. Mientras, jugá todo lo que quieras. | Check your inbox. Meanwhile, play as much as you like. |
 | `lista.ok_encuesta` | ¿Nos ayudás a decidir qué hacer primero? 4 preguntas, 1 minuto. | Help us decide what to build first? 4 questions, 1 minute. |
 | `lista.seguir` | Seguir jugando | Keep playing |
 | `marca.promesa` | Nunca vas a pagar para levantar más. | You'll never pay to lift more. |
@@ -657,7 +660,12 @@ Variantes de la bandera `muro-texto`: la `a` usa `muro.promesa` y `muro.camino_m
 | Clave | Español | Inglés |
 |---|---|---|
 | `mail.confirmar.asunto` | Confirmá tu lugar en Tarima | Confirm your spot in Tarima |
-| `mail.confirmar.cuerpo` | Hola, {nombre}. Tocá el botón para confirmar tu lugar en la lista de acceso anticipado de Tarima. Si no fuiste vos, ignorá este mail: no te vamos a escribir más. | Hi {nombre}. Tap the button to confirm your spot on Tarima's early access list. If this wasn't you, ignore this email: we won't write again. |
+| `mail.confirmar.cuerpo` | Hola, {nombre}. Toca el botón para confirmar tu lugar en la lista de acceso anticipado de Tarima. Si no fuiste tú, ignora este mail: si no se confirma, borramos tu dirección a los 30 días. | Hi {nombre}. Tap the button to confirm your spot on Tarima's early access list. If this wasn't you, just ignore this email: unconfirmed addresses are deleted after 30 days. |
+| `mail.ya.asunto` | Ya estás en la lista de Tarima | You're already on the Tarima list |
+| `mail.ya.cuerpo` | Alguien, probablemente tú, puso este mail en Tarima desde otro dispositivo. Ya estabas en la lista de acceso anticipado: ese dispositivo quedó con juego libre y no cambiamos nada más. Si no fuiste tú, no tienes que hacer nada. | Someone, probably you, entered this email in Tarima on another device. You were already on the early access list: that device now has unlimited play, and nothing else changed. If this wasn't you, there's nothing you need to do. |
+| `mail.ya.boton` | Ir a Tarima | Go to Tarima |
+| `confirmar.pregunta` | ¿Confirmas tu lugar en la lista de Tarima? | Confirm your spot on the Tarima list? |
+| `confirmar.boton` | Sí, confirmar | Yes, confirm |
 | `mail.confirmar.boton` | Confirmar | Confirm |
 | `mail.pie` | Recibís este mail porque te anotaste en Tarima. Darte de baja: {link} | You're getting this because you joined Tarima. Unsubscribe: {link} |
 | `confirmado.texto` | ¡Listo! Tu lugar está confirmado. | Done! Your spot is confirmed. |
@@ -734,7 +742,7 @@ Los campos `{responsable}`, `{país}` y `{contacto}` los completa el dueño (dec
 
 - **Desde un mail.** Cada mail lleva `List-Unsubscribe` y `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058) con un link a `/baja?t=<token>`. Con GET, la página muestra un botón; con POST, da de baja. Así un escáner de links no da de baja a nadie.
 - **Desde la privacidad.** La página tiene un formulario: `POST /api/baja` con el mail. Siempre responde lo mismo, para no revelar quién está en la lista. Si el mail existe, le manda el link.
-- **Qué borra.** La fila completa de `lista`: mail, nombre y país. El dispositivo conserva `lista_id` y su juego libre. En PostHog se manda el evento `baja`, sin persona.
+- **Qué borra.** La fila completa de `lista`: mail, nombre y país. El dispositivo conserva `lista_id` y su juego libre hasta que pasen 180 días sin jugar, como cualquier dispositivo. En PostHog se manda el evento `baja`, sin persona.
 
 ### 5.4 La encuesta
 
@@ -790,7 +798,7 @@ CREATE TABLE lista (id TEXT PRIMARY KEY, email TEXT UNIQUE, nombre TEXT, idioma 
 **Limpieza diaria** (Cron Trigger):
 - `partidas.i` y `encuestas.i` pasan a NULL a los 30 días.
 - Se borran las `partidas` de más de 180 días.
-- Se borran los `dispositivos` sin `lista_id` y con `ultimo` de hace más de 180 días.
+- Se borran los `dispositivos` con `ultimo` de hace más de 180 días, estén o no en la lista (es lo que dice la página de privacidad). Anotarse también actualiza `ultimo`.
 - Se borran las filas de `lista` sin confirmar con más de 30 días.
 
 **La regla** (`reglas.js`), con `ahora` y la ventana de 30 días:
@@ -818,8 +826,8 @@ La cuenta por IP excluye a los dispositivos anotados. Por eso, cuando alguien se
 | `POST /api/anotar` | `{dispositivo, sesion, email, nombre?, idioma, aviso:true, novedades:bool, consentimiento:'2026-11-a', turnstile?}` | `{estado:'nuevo' o 'ya_estaba', lista_id, confirmar:bool}`; 400 `{error}` | 5 por hora |
 | `POST /api/encuesta` | `{dispositivo, sesion, idioma, r:{q1:[…], q2:[…], q3:'…', q4:'…', q5?:'…'}, turnstile?}` | `{estado:'ok', bono:2 o 0}`; 409 `{error:'ya_respondida'}`; 400 `{error:'incompleta'}` | 3 por hora |
 | `POST /api/baja` | `{email}` | 202 `{}` siempre | 3 por hora |
-| `GET /baja?t=` y `POST /baja` | token | página bilingüe (`baja.*`) | 10 por hora |
-| `GET /confirmar?t=` | token | página bilingüe (`confirmado.*`) y evento `mail_confirmado` | 10 por hora |
+| `GET /baja?t=` y `POST /baja` | token | página bilingüe (`baja.*`) | 10 tokens inválidos por hora; los válidos no tienen límite |
+| `GET /confirmar?t=` y `POST /confirmar` | token | GET: página con el botón «Sí, confirmar» (`confirmar.*`), sin confirmar nada. POST: confirma, página `confirmado.*` y evento `mail_confirmado` | 10 tokens inválidos por hora; los válidos no tienen límite |
 | `/qx/*` | proxy a PostHog (sección 6.2) | tal cual | sin límite propio |
 
 Los límites devuelven 429 `{error:'limite'}`.
@@ -840,7 +848,7 @@ Los límites devuelven 429 `{error:'limite'}`.
   - El dominio no tiene registro MX ni A, consultado por DNS sobre HTTPS a `cloudflare-dns.com` con un caché de 1 día: `error:'dominio'`.
   - Formato inválido: `error:'formato'`.
 - **Nombre.** Se valida igual que en el juego. Si no cumple, se descarta sin error.
-- **Si el mail ya existe.** Se responde `ya_estaba`, se liga el dispositivo a ese `lista_id` y no se modifica el consentimiento guardado. Si `novedades` viene en true, se actualiza.
+- **Si el mail ya existe.** Se liga el dispositivo a ese `lista_id` y no se modifica nada de lo guardado: ni el consentimiento ni `novedades` (en el MVP no se verifica la propiedad del mail, así que un tercero no puede anotar a nadie en las novedades). Para no revelar quién está en la lista, la respuesta es la misma que la de un alta nueva (`estado:'nuevo'`, el mismo `confirmar`), y se manda un mail, como mucho uno por día por dirección: otra vez la confirmación si no estaba confirmado, o el aviso `mail.ya.*` si ya lo estaba. `ya_estaba` solo vuelve cuando este mismo dispositivo ya estaba ligado a ese mail.
 - **Alta nueva.** `id` son 16 bytes al azar en hex, sin relación con el mail. Se manda el mail de confirmación con `/confirmar?t=HMAC(SECRETO_BAJA, id + 'c')`, y el token de baja es `HMAC(SECRETO_BAJA, id)`.
 - **En PostHog.** No se manda nada desde el Worker: el juego hace `identify(lista_id)` y captura `anotar_ok`.
 
@@ -886,7 +894,7 @@ posthog.register({ idioma, idioma_origen, tactil, version, pais, previas, dias, 
 
 - **Banderas como propiedades.** `propsDeBanderas` es `{'$feature/muro-partidas-gratis': '2', …}`, para separar por variante en cualquier gráfico.
 - **Pantalla actual.** `visita()` actualiza la súper propiedad `pantalla`, así `$pageleave` dice dónde se fue la gente.
-- **Prueba de humo.** `check_game` verifica que después de una final no quede ninguna cookie, clave de `localStorage` ni de `sessionStorage` que empiece con `ph_`.
+- **Prueba de humo.** `check_game` verifica que después de una final no quede ninguna cookie, clave de `localStorage` ni de `sessionStorage` que contenga `ph_` (posthog-js usa también nombres como `__ph_opt_in_out_<clave>`).
 
 **Sin cookies.** Como no se guarda nada en el navegador para medir, no hace falta aviso de cookies en la UE. Lo que se guarda es funcional (`tarima.dispositivo`, la cookie `tdv`, el idioma y el nombre) y está dicho en la página de privacidad.
 
@@ -937,7 +945,7 @@ Todos van en minúscula y en español. Ninguno lleva nombre, mail, IP ni disposi
 | `survey dismissed` | Sale sin mandar | `$survey_id` |
 | `survey sent` | Lo manda el Worker (5.5) | Respuestas de la encuesta |
 | `privacidad_abierta` | Link del pie | `pantalla` |
-| `medicion_desactivada` | Interruptor, antes de `opt_out_capturing()` | — |
+| `medicion_desactivada` | Interruptor, antes de apagar. No se llama a `opt_out_capturing()`, que guarda su propia marca en el navegador: con `tarima.medicion = 0` posthog-js no se inicia y la página se recarga | — |
 | `error_juego` | `E.errores` o `window.onerror` | `tipo` (clave corta, sin texto libre), `pantalla` |
 | `mail_confirmado` | Lo manda el Worker al confirmar (`distinct_id = lista_id`) | — |
 | `baja` | Lo manda el Worker (sin persona) | `via` (`mail`, `formulario`) |
@@ -1030,7 +1038,6 @@ Sin huella digital del navegador: es invasiva y en la UE pide consentimiento.
 - Grabación de sesión prendida.
 - Imagen del podio para compartir (va solo el texto).
 - Filtro de insultos.
-- Español neutro (decisión 4).
 - Verificar la propiedad del mail en el desbloqueo.
 - Pro y la final completa como camino por defecto.
 
@@ -1112,3 +1119,38 @@ Sin huella digital del navegador: es invasiva y en la UE pide consentimiento.
 - **Edad mínima para la lista de espera: 16 años**, dicha en la línea legal y en la página de privacidad; el juego no pide edad.
 - Finales gratis antes del muro (1 o 2): pendiente de respuesta del dueño; mientras tanto se implementa con 2, configurable.
 - Dominio, mail de contacto y responsable de los datos: pendientes.
+
+## Revisión (12 de noviembre de 2026)
+
+Revisión independiente de este documento y de `worker/`, en la rama `mvp`. Las pruebas quedaron así: `cd worker && npm test` da 36 bien y `node tools/worker_test.mjs` da 127 controles bien. Las 8 pruebas nuevas o cambiadas fallan contra el código anterior.
+
+### Arreglado en el servidor, con prueba
+
+1. **La lista se podía enumerar desde `/api/anotar`.** Respondía `ya_estaba` para cualquier mail que ya estuviera en la lista. Eso anulaba el cuidado de `/api/baja`, que siempre responde lo mismo. Ahora un dispositivo que no estaba ligado a ese mail recibe la misma respuesta que un alta nueva, y sale un mail en los dos casos, como mucho uno por día por dirección: otra vez la confirmación si no estaba confirmado, o el aviso nuevo `mail.ya.*` si ya lo estaba. `ya_estaba` solo vuelve cuando el mismo dispositivo repite su propio mail.
+2. **Un tercero podía anotar a cualquiera en las novedades.** Con un mail que ya existía y `novedades: true`, la fila se actualizaba sin verificar el mail y sin registrar un consentimiento nuevo. Con eso se salteaba el doble opt-in y se perdía la prueba de consentimiento. Ahora un mail existente no cambia nada de lo guardado.
+3. **La confirmación se hacía con un GET.** Los escáneres de links de los correos de empresa abren cada link, así que un mail anotado por otra persona quedaba confirmado solo. Ahora `/confirmar` funciona como `/baja`: el GET muestra un botón y el POST confirma.
+4. **El límite por IP de `/baja` y `/confirmar` frenaba la baja de un clic.** Gmail y Yahoo mandan el POST del RFC 8058 desde pocas IP compartidas, así que con 10 por hora por IP las bajas empezaban a fallar con 429. Ahora el límite cuenta solo los tokens inválidos, y un token válido nunca lo toca. Adivinar un token es imposible: tiene 128 bits de id y 160 de firma.
+5. **La variable `GRATIS` no tenía efecto.** `combinarBanderas` siempre devolvía `muro-partidas-gratis = '2'` por defecto, y `config` lo leía como si fuera la bandera. Además, si PostHog respondía sin esa bandera (por ejemplo, antes de crearla), el `'2'` por defecto se guardaba en D1 y quedaba pegado al dispositivo. Era justo la decisión pendiente del dueño, 1 o 2 finales, «configurable». Ahora en D1 solo se guarda lo que asignó PostHog, y mientras no haya asignación manda `GRATIS`.
+6. **Los dispositivos anotados no se borraban nunca, ni siquiera después de la baja.** La página de privacidad dice «el del dispositivo, a los 180 días sin jugar». Ahora la limpieza borra todo dispositivo con 180 días sin jugar, y anotarse cuenta como actividad. Quien vuelve después pone el mismo mail y recupera el juego libre.
+7. **El proxy `/qx` dejaba pasar `Authorization` con claves `phs_` y `phx_`.** Eso lo convertía en un pasaje a la API privada de PostHog. Ahora deja pasar solo `phc_`, como dice 6.2.
+8. **El mail de confirmación prometía «no te vamos a escribir más».** Con el punto 1 eso puede no cumplirse. Ahora dice que, si no se confirma, la dirección se borra a los 30 días.
+
+### Cambiado en el diseño
+
+- **Recargar en medio de una final** (sección 0 y tabla «Recargar»). La final se reanuda una vez con el pase guardado en la pestaña. Con solo 2 finales gratis, perder una por una recarga, por una llamada en el teléfono (iOS descarta las pestañas WebGL que quedan en segundo plano) o por un cuelgue es la manera más segura de que alguien se vaya enojado antes de ver el muro. Esto no abre ningún hueco nuevo: el servidor ya contó esa final, y quien edita el JavaScript ya juega sin límite.
+- **Muro por IP para quien nunca jugó** (P0). Antes, quien entraba desde una red compartida que ya había gastado su tope veía el muro al cargar, sin saber todavía qué era el juego. Ahora juega primero la bienvenida y la práctica, y el muro aparece en P4 con la encuesta arriba.
+- **Idioma.** La tabla de la sección 0 y la 4.3 ya dicen español neutro, y «Español neutro» sale de lo que queda fuera (sección 8). Las tablas de 4.5 siguen en voseo y hay que reescribirlas, como dice «Decisiones del dueño».
+- **Textos en inglés que sonaban a traducción o a jerga.** «How much do you open with» pasa a «How much weight for your first…». «You're in place {n}» pasa a «You're in {pos} place», con la variable nueva `{pos}`. «Asked:» pasa a «Your weight:». «Meet record» pasa a «Competition record». «lower weight lifts first» pasa a «whoever asks for less weight lifts first». Y el inglés usa comillas “ ” en lugar de « ».
+- **P11 y `lista.ok_confirmar`.** Ahora dicen «Revisá tu mail» y no «te mandamos un mail para confirmar», porque al que ya estaba confirmado le llega el aviso y no una confirmación.
+- **Medición apagada** (6.1 y 6.3). No se llama a `opt_out_capturing()`, que guarda una marca propia en el navegador. La prueba de humo busca `ph_` en cualquier parte del nombre.
+- **Otros casos** (sección 2). Se agregan las dos pestañas y el `<noscript>`.
+
+### Queda abierto
+
+- **Faltan 12 a 13 minutos hasta el muro.** Es el riesgo más grande para la meta de mails. Con la invitación del podio 1 y la reanudación hay menos pérdida, pero si menos del 50 % empieza la final 2, la palanca que sigue es `muro-partidas-gratis=1` o una primera final de solo arranque, y no un cambio de texto.
+- **Tope de 5 altas por hora por IP.** En una oficina, una universidad o detrás del CGNAT de un celular con IPv4, el sexto que se anota en esa hora ve «Demasiados intentos» y ese mail se pierde. Hay que mirar `anotar_error` con `motivo=limite` y, si aparece, subir a 20 por IP y sumar un tope de 5 por dispositivo. El tope está bajo a propósito, porque cada alta manda un mail y protege la reputación del dominio.
+- **`lista_id` con un mail ajeno.** Quien escribe el mail de otra persona recibe su `lista_id`, y desde ese momento sus eventos se juntan en PostHog con el perfil de esa persona. Eso ensucia las métricas, pero no deja leer nada, porque la clave `phc_` solo sirve para escribir. Si molesta, se identifica en PostHog solo después de confirmar el mail.
+- **La casilla de aviso obligatoria agrega fricción.** Si el botón dice con claridad para qué es el mail («Anotarme: avisame por mail cuando abra»), apretarlo ya es un consentimiento explícito, y bastaría con la casilla opcional de novedades. Conviene que lo decida alguien de legales. El servidor no cambia: el juego manda `aviso: true` al tocar el botón.
+- **429 y 503 en `/api/partida` pasan a «sin servidor».** Con eso, una red que llegó a 20 pedidos cada 10 minutos juega una final por carga sin que nadie la cuente. Hay que aplicar el endurecimiento 1 de la sección 7 desde el principio.
+- **«Nunca vas a pagar para levantar más»** es una promesa pública que ya aparece en las páginas del Worker. Deja afuera vender entrenamiento o progreso más rápido. El dueño tiene que confirmarla antes de publicar.
+- **En español neutro, «mail» suena rioplatense.** Al reescribir las tablas conviene usar «correo» o «email». Los textos del Worker usan «mail» hasta que se decida.
