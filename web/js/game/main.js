@@ -5,7 +5,7 @@ import { reloj, Boton, toques, principal, claveDe, enfocar, navegar } from './in
 import { Escena } from './stage.js';
 import { poseDe, poseParado, marcas } from './sequence.js';
 import { PLANTEL, ENVIONES, LEV, ETIQUETAS, GUIONES } from './roster.js';
-import { Registrador, Gobernador, calidadInicial, medirRefresco, ESCALONES, presetDe, nombreDe } from './perf.js';
+import { Registrador, Gobernador, calidadInicial, medirRefresco, decidirCalidad, pasoDe, metaDe, nombreDe, PRESET, PASO, PISO_MP, MARGEN } from './perf.js';
 import { sonido } from './audio.js';
 import { Ayudas } from './ui/ayudas.js';
 import { Senal } from './ui/senal.js';
@@ -31,9 +31,13 @@ const IDS = ['ventura', 'brenner', 'marangi'];
 
 const E = { pantalla: 'carga', visitados: [], intento: null, p: null, yo: 0, cfg: null, ctl: 'f', sobre: null, monitor: { barraMin: 9, manosMax: 0, cuadros: 0, alto: {} }, errores: [], modo: 'panel', ultDibujo: 0 };
 const perf = new Registrador();
-/** Calidad en uso. `auto`: la maneja el gobernador (`i` es el escalón); `cambios`: cada vez que bajó, con el motivo medido. */
-const C = { auto: false, i: -1, nombre: '', hz: 60, cambios: [], calibrado: false, medido: null };
-let gov = null;
+/**
+ * Calidad en uso. `auto`: la decide la calibración y la cuida el gobernador. `clave`/`Q`: calidad (movil, baja, media, alta).
+ * `sombras`: siguen prendidas. `hz`: refresco medido de la pantalla; `paso`: se dibuja uno de cada `paso` refrescos.
+ * `cambios`: cada vez que bajó, con lo medido. `calibracion`: lo que midió la calibración (para mirar desde la consola).
+ */
+const C = { auto: false, clave: '', Q: null, sombras: true, nombre: '', hz: 60, paso: 1, cambios: [], calibrado: false, medido: null, calibracion: null };
+let gov = null, nRaf = 0;
 let escena = null, datos = null, ayudas = null, boton = null, enCuadro = null, senalUI = null, depura = null;
 const visita = n => { if (n !== E.pantalla) E.previa = E.pantalla; E.pantalla = n; if (!E.visitados.includes(n)) E.visitados.push(n); perf.marcar(n); };
 
@@ -50,28 +54,44 @@ function saltable(ms, minimo = 400) {
   });
 }
 let ultimo = 0;
-function tic(pintar) {
-  const now = reloj.ahora(), dt = Math.min(.25, Math.max(0, (now - ultimo) / 1000)); ultimo = now;
+function tic(pintar, tRaf = null) {
+  const c0 = performance.now(), now = reloj.ahora(), dt = Math.min(.25, Math.max(0, (now - ultimo) / 1000)); ultimo = now;
   for (let i = pend.length - 1; i >= 0; i--) if (pend[i].t <= now) pend.splice(i, 1)[0].res();
   // el botón de pausa (para el dedo; con teclado es Esc) no se muestra encima de un panel grande: taparía su título
   { const ver = puedePausar() && !E.sobre && !$('capa').querySelector('.panel:not(.abajo)'), b = $('pausa'); if (b.hidden === ver) b.hidden = !ver; }
   try { enCuadro?.(now, dt); } catch (e) { E.errores.push(String(e.stack || e)); console.error(e); enCuadro = null; }
   if (!escena) return;
   // se dibuja en cada cuadro que ofrece el navegador; detrás de un panel la imagen queda congelada (un cuadro al abrirlo o repintarlo)
-  const dib = pintar && DIBUJA && (E.modo !== 'panel' || E.forzar), seguido = E.seguido; E.seguido = dib && E.modo !== 'panel';
+  const dib = pintar && DIBUJA && !E.sinDibujo && (E.modo !== 'panel' || E.forzar), seguido = E.seguido; E.seguido = dib && E.modo !== 'panel';
   escena.cuadro(dt, dib); if (!dib) return;
-  const ms = now - E.ultDibujo; perf.cuadro(ms); E.ultDibujo = now; E.forzar = false;
+  // el intervalo entre cuadros sale de la marca del navegador (el refresco en que cae el cuadro), no de cuándo corrió este código
+  const marca = tRaf ?? now, ms = marca - E.ultDibujo; perf.cuadro(ms, seguido && E.seguido, E.intento?.m?.fase || ''); E.ultDibujo = marca; E.forzar = false;
   if (LASTRE) { const fin = performance.now() + LASTRE * escena.megapixeles; while (performance.now() < fin); }
   // el gobernador mira solo el dibujo continuo, y la calidad no cambia con un intento en curso (propio o de un rival) ni en la repetición
-  if (gov && seguido && E.seguido && gov.cuadro(ms, now) && !E.intento && E.pantalla !== 'repeticion') { if (C.i > 0) ponerEscalon(C.i - 1, 1000 / gov.fps); else gov.pide = false; }
+  if (gov && seguido && E.seguido && gov.cuadro(ms, now, performance.now() - c0) && !E.intento && E.pantalla !== 'repeticion') { if (!bajar(gov.pasos, 1000 / gov.fps)) { gov.pide = false; gov.quieto = true; } }
+  if (gov && gov.hz !== C.hz) fijarHz(gov.hz);      // el gobernador vio que la pantalla es más rápida de lo medido
 }
-function bucle(t) { requestAnimationFrame(bucle); perf.ofrecido(t); E.muestra?.(t); if (reloj.manual === null) tic(true); depura?.cuadro(t); }
+// En pantallas de más de 90 Hz se dibuja en uno de cada dos refrescos (C.paso), para que los cuadros salgan parejos.
+function bucle(t) { requestAnimationFrame(bucle); if (C.paso > 1 && ++nRaf % C.paso) return; perf.ofrecido(t); E.muestra?.(t); if (reloj.manual === null) tic(true, t + reloj.desfase); depura?.cuadro(t); }
 
 // ---------- calidad ----------
-function ponerEscalon(i, ms) {
-  const e = ESCALONES[i], de = C.nombre; escena.setCalidad(presetDe(e), e.s); C.i = i; C.nombre = nombreDe(e);
-  C.cambios.push({ de, a: C.nombre, ms: Math.round(ms * 10) / 10, pantalla: C.calibrando ? 'calibración' : E.pantalla === 'intento' ? 'fin del intento' : E.pantalla, enIntento: !!E.intento, t: Math.round(performance.now()) });
-  gov?.calentar(reloj.ahora()); E.forzar = true;
+function fijarHz(hz) { C.hz = hz; C.paso = pasoDe(hz); perf.periodo = 1000 / metaDe(hz); if (gov && gov.hz !== hz) gov.fijar(hz); }
+const nombrar = () => { C.nombre = nombreDe(C.Q, escena.megapixeles, C.sombras); };
+/** Cambia de calidad (programas y pases nuevos): solo en la carga, y deja todo compilado antes de seguir. */
+async function ponerCalidad(clave) { C.clave = clave; C.Q = C.auto ? { ...PRESET[clave], dpr: 2 } : PRESET[clave]; escena.setCalidad(C.Q); await escena.precalentar(); }
+/**
+ * Baja `pasos` escalones sin compilar nada: cada uno deja el 85 % de los píxeles; en el piso de resolución apaga las
+ * sombras (programas ya compilados en la carga) y ahí se queda. Devuelve false si no quedaba nada por bajar.
+ */
+function bajar(pasos, ms, donde = '') {
+  const de = C.nombre; let hecho = false;
+  for (let k = 0; k < pasos; k++) {
+    const mp = escena.megapixeles; if (!(mp > 0)) break;
+    if (mp * PASO >= PISO_MP) { escena.setTope(mp * PASO * 1e6); hecho = true; } else { if (C.sombras && !hecho) { C.sombras = false; escena.setSombras(false); hecho = true; } break; }
+  }
+  if (!hecho) return false;
+  nombrar(); C.cambios.push({ de, a: C.nombre, ms: Math.round(ms * 10) / 10, pantalla: donde || (E.pantalla === 'intento' ? 'fin del intento' : E.pantalla), enIntento: !!E.intento, t: Math.round(performance.now()) });
+  gov?.calentar(reloj.ahora()); E.forzar = true; return true;
 }
 /** Intervalos (ms) entre `n` cuadros seguidos del navegador mientras se dibuja, sin contar los primeros `calienta`. null si no hay cuadros. */
 function cadencia(n, calienta = 10) {
@@ -81,19 +101,32 @@ function cadencia(n, calienta = 10) {
   });
 }
 /**
- * Antes de jugar, con el pesista en escena: mide a qué ritmo llegan los cuadros y baja escalones hasta que cuatro de cada
- * cinco lleguen a tiempo (percentil 80 dentro de 1,3 veces el cuadro de la meta: con la mediana sola, una máquina justa
- * pasaba y después el intento, que cuesta un poco más, iba a la mitad de cuadros). Unos 0,7 s por escalón, detrás de «Cargando…».
+ * La calidad se decide acá, antes del primer intento y detrás de «Cargando…», con el pesista haciendo un arranque en bucle
+ * (un pesista quieto no rehace sombras ni mueve la cámara, y cuesta menos que un intento). Primero se vuelve a medir el
+ * refresco de la pantalla, sin dibujar; después decide perf.js (decidirCalidad): costo del cuadro a dos resoluciones,
+ * megapíxeles que entran en el 85 % del período, la calidad más alta que los sostiene y una verificación con cuadros de
+ * verdad. Tarda entre uno y dos segundos. Si algo falla, queda la calidad con la que se cargó.
  */
 async function calibrar() {
   if (!C.auto || C.calibrado || !DIBUJA || reloj.manual !== null) return; C.calibrado = true;
-  const tope = 1000 / gov.meta * 1.3; gov.calentar(reloj.ahora(), 60000);      // mientras se calibra, el gobernador no opina
-  for (;;) {
-    const d = await cadencia(30); if (!d) break; d.sort((a, b) => a - b); C.medido = Math.round(d[Math.floor(d.length * .8)] * 10) / 10;
-    if (C.medido <= tope || C.i <= 0) break;
-    C.calibrando = true; ponerEscalon(C.i - 1, C.medido); C.calibrando = false;
-  }
-  gov.calentar(reloj.ahora(), 1500);
+  const K = C.calibracion = { hz: C.hz, margen: MARGEN, ms: 0 }, ini = performance.now(), clave0 = C.clave, nombre0 = C.nombre, ORDEN = Object.keys(PRESET);
+  const lastre = () => { if (LASTRE) { const fin = performance.now() + LASTRE * escena.megapixeles; while (performance.now() < fin); } };
+  gov.calentar(reloj.ahora(), 120000);      // mientras se calibra, el gobernador no opina
+  try {
+    E.sinDibujo = true; const hz = await medirRefresco(30, null); E.sinDibujo = false;
+    if (hz) { fijarHz(hz); K.hz = hz; }
+    escena.setCarga(escena.kg || 100, 's'); let t = 1.3;
+    const R = await decidirCalidad({
+      periodo: gov.periodo, clave: C.clave, techo: () => escena.nativoMP, poner: ponerCalidad,
+      medir: mp => { escena.setTope(mp * 1e6, true); const c = escena.costo({ extra: lastre }); return { mp: escena.megapixeles, ms: c.ms, p90: Math.round(c.p90 * 100) / 100, n: c.n }; },
+      fijar: mp => { escena.setTope(mp * 1e6); return escena.megapixeles; },
+      cuadros: (n, calienta) => { enCuadro = (now, dt) => { t += dt; escena.bucle(t, dt); }; return cadencia(n, calienta).finally(() => { enCuadro = null; }); },
+    });
+    Object.assign(K, { pruebas: R.pruebas, verificacion: R.verificacion }); C.medido = R.p80; nombrar();
+    const mp0 = Math.min(R.primera.techo, PRESET[clave0].maxPixels / 1e6);      // lo que se dibujaba sin calibrar
+    if (ORDEN.indexOf(C.clave) < ORDEN.indexOf(clave0) || (C.clave === clave0 && escena.megapixeles < mp0 * .97)) C.cambios.push({ de: nombre0, a: C.nombre, ms: Math.round((R.primera.fijo + R.primera.porMP * mp0) * 10) / 10, pantalla: 'calibración', enIntento: false, t: Math.round(performance.now()) });
+  } catch (e) { console.warn('calibración de calidad:', e); K.error = String(e.stack || e); escena.setTope(C.Q.maxPixels); }
+  finally { E.sinDibujo = false; enCuadro = null; if (escena.P) escena.posar(poseParado(escena.P, 's'), 's'); nombrar(); K.ms = Math.round(performance.now() - ini); gov.calentar(reloj.ahora(), 1500); E.forzar = true; }
 }
 
 // ---------- gráfica ----------
@@ -560,10 +593,12 @@ async function partida(cfg) {
   E.jugadas = (E.jugadas || 0) + 1;
   let errMedio = null; cfg.cal = cfg.cal ?? (tactil() ? 40 : 0);
   // Los dos modelos se terminan de cargar antes de jugar (venían bajando desde el inicio): leer un GLB, compilar sus shaders o
-  // subir sus texturas en medio de un levantamiento es un tirón. Se muestra cada pesista un cuadro y después se calibra la calidad.
+  // subir sus texturas en medio de un levantamiento es un tirón. Todo eso lo hace escena.precalentar() (arrancó en el inicio,
+  // detrás del panel) y recién después se calibra la calidad.
   $('msg').hidden = false; $('msg').textContent = 'Cargando pesistas…'; await Promise.all(IDS.map(id => escena.cargar(id)));
-  if (DIBUJA && !E.caliente) { E.caliente = true; for (const id of IDS) { await escena.mostrar(id); escena.posar(poseParado(escena.P, 's'), 's'); escena.cuadro(0, true); } }
-  await escena.mostrar(cfg.id); escena.posar(poseParado(escena.P, 's'), 's'); escena.camara(camPrincipal()); await calibrar(); $('msg').hidden = true;
+  await escena.mostrar(cfg.id); escena.posar(poseParado(escena.P, 's'), 's'); escena.camara(camPrincipal());
+  if (DIBUJA) { E.sinDibujo = true; await E.precal; E.sinDibujo = false; await calibrar(); }
+  $('msg').hidden = true; E.forzar = true;
   if (cfg.calentar) { if (cfg.ctl === 'f') errMedio = await tutorial(cfg); else { cfg.cal = await metronomo(); errMedio = await practica(cfg); } }
   const p = E.p = new Partida(datos, { semilla, nivel: cfg.nivel, cal: cfg.cal, primera: cfg.primera, ctl: cfg.ctl, atletas: IDS.map((id, i) => ({ id, ctrl: i === E.yo ? 'persona' : 'juego' })) });
   await presentacion(p, cfg, errMedio); p.empezar();
@@ -582,10 +617,14 @@ async function iniciar() {
   const [poses, sim] = await Promise.all(['data/poses.json', 'data/sim.json'].map(u => fetch(u).then(r => { if (!r.ok) throw new Error(u + ': ' + r.status); return r.json(); })));
   datos = leerDatos(sim);
   await Promise.all([`800 20px 'Saira Condensed'`, `700 20px 'Saira Condensed'`, `500 20px 'Saira Condensed'`].map(f => document.fonts.load(f).catch(() => null)));
-  Object.assign(C, calidadInicial(params.get('q')), { hz: await refresco });
-  escena = new Escena($('gl'), C.Q, { reduceMotion, escala: C.s }); escena.poses = poses;
+  Object.assign(C, calidadInicial(params.get('q'), tactil())); fijarHz(await refresco);
+  if (C.auto) C.Q = { ...C.Q, dpr: 2 };      // en automático el tope de píxeles lo pone la calibración, no la densidad de cada calidad
+  escena = new Escena($('gl'), C.Q, { reduceMotion }); escena.poses = poses; nombrar();
   if (C.auto) { gov = new Gobernador(C.hz); gov.calentar(reloj.ahora(), 4000); }
-  for (const id of IDS) escena.cargar(id).catch(() => null);      // los modelos bajan mientras se mira el inicio
+  // los modelos bajan mientras se mira el inicio; apenas están, se compila y se usa una vez todo lo que se va a dibujar
+  const cargas = IDS.map(id => escena.cargar(id).catch(() => null));
+  if (params.get('banco') === '1') { $('msg').textContent = 'Banco de medición…'; const { correrBanco } = await import('./banco.js'); correrBanco({ escena, cargas, hz: C.hz, params, msg: $('msg') }); return; }
+  E.precal = DIBUJA ? Promise.all(cargas).then(() => escena.precalentar()).catch(e => { console.warn('precalentar:', e); }) : Promise.resolve();
   ayudas = new Ayudas($('ayudas')); senalUI = new Senal($('senal'), tactil()); boton = new Boton([$('escena'), $('zona')]);
   addEventListener('keydown', alTeclado, true); $('pausa').onclick = () => abrirSobre('pausa'); $('saltar').onclick = () => E.saltar?.();
   ponerAcuse(); if (params.get('depura') === '1') depura = new Depura($('depura'), () => ({ perf: perf.ult, calidad: window.JUEGO.calidad, toques, pantalla: E.pantalla }));
@@ -597,7 +636,7 @@ async function iniciar() {
 // ---------- API para la prueba automática y la depuración ----------
 const ceder = () => new Promise(r => { const c = new MessageChannel(); c.port1.onmessage = () => r(); c.port2.postMessage(0); });
 window.JUEGO = {
-  E, perf, reloj, toques, get calidad() { return { nombre: C.nombre, auto: C.auto, escalon: C.i, hz: C.hz, meta: gov ? gov.meta : null, medido: C.medido, cambios: C.cambios, megapixeles: escena ? +escena.megapixeles.toFixed(2) : 0 }; }, pausa: abrirSobre, seguir: cerrarSobre, get escena() { return escena; }, get registro() { return E.registro; }, PLAN,
+  E, perf, reloj, toques, get calidad() { return { nombre: C.nombre, auto: C.auto, clave: C.clave, sombras: C.sombras, hz: C.hz, meta: +metaDe(C.hz).toFixed(2), paso: C.paso, periodo: +(1000 / metaDe(C.hz)).toFixed(2), medido: C.medido, cambios: C.cambios, megapixeles: escena ? +escena.megapixeles.toFixed(2) : 0, nativo: escena ? +escena.nativoMP.toFixed(2) : 0, ventana: gov ? gov.ult : null, quieto: gov ? gov.quieto : false, calibracion: C.calibracion }; }, pausa: abrirSobre, seguir: cerrarSobre, get escena() { return escena; }, get registro() { return E.registro; }, PLAN,
   /** Lo que la prueba necesita para jugar por la vía real de entrada: pantalla, y del intento en curso, fase y próximo objetivo. */
   estado() {
     const I = E.intento, pn = $('capa').firstElementChild, act = document.activeElement;
