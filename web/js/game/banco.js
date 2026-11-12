@@ -109,7 +109,7 @@ async function fotos(B, { escena, cargas, params, msg, decir }) {
   const lista = camaras.flatMap(c => modos.map(([m]) => ({ camara: c, modo: m, nombre: `${c.replace('/', '-')}_${m}` })));
   const T = +(params.get('t') || 1.3);
   window.BANCO_FOTOS = {
-    lista, listo: true, opacidadSombra: escena._barato?.piso?.opacidad ?? null,
+    lista, listo: true, opacidadSombra: escena._barato?.piso?.opacidad ?? null, opacidadCruda: escena.opacidadCruda ?? null,
     poner(i) {
       const f = lista[i]; escena.setBarato(modos.find(([m]) => m === f.modo)[1]);
       if (f.camara === 'arriba') escena.primerPlano('arriba'); else escena.camara(f.camara);
