@@ -103,14 +103,15 @@ async function fotos(B, { escena, cargas, params, msg, decir }) {
   decir('cargando los modelos'); await Promise.all(cargas);
   const id = PLANTEL[params.get('pesista')] ? params.get('pesista') : 'brenner';
   await escena.mostrar(id); escena.setCarga(140, 's'); msg.hidden = true; escena.setCalidad(PRESET.baja);
-  const modos = [['antes', null], ['ahora', PRESET.baja.barato]], camaras = ['3/4', 'lado', 'rev', 'baja', 'jib', 'arriba'];
-  decir('compilando'); for (const [, b] of modos) { escena.setBarato(b); await escena.precalentar(); }
+  // «sinhaces»: como ahora pero sin los haces, para ver cuánto se ven los haces en el camino directo
+  const modos = [['antes', null], ['ahora', PRESET.baja.barato], ['sinhaces', PRESET.baja.barato]], camaras = ['3/4', 'lado', 'rev', 'baja', 'jib', 'arriba'];
+  decir('compilando'); for (const [, b] of modos.slice(0, 2)) { escena.setBarato(b); await escena.precalentar(); }
   const lista = camaras.flatMap(c => modos.map(([m]) => ({ camara: c, modo: m, nombre: `${c.replace('/', '-')}_${m}` })));
   const T = +(params.get('t') || 1.3);
   window.BANCO_FOTOS = {
     lista, listo: true, opacidadSombra: escena._barato?.piso?.opacidad ?? null,
     poner(i) {
-      const f = lista[i]; escena.setBarato(modos.find(([m]) => m === f.modo)[1]);
+      const f = lista[i]; escena.setBarato(modos.find(([m]) => m === f.modo)[1]); escena.arena.beamMeshes.forEach(m => { m.visible = f.modo !== 'sinhaces' && !!escena.Q.beams; });
       if (f.camara === 'arriba') escena.primerPlano('arriba'); else escena.camara(f.camara);
       escena.setTope(escena.nativoMP * 1e6); escena.bucle(T, 0); escena.sombra = 4;
       for (let k = 0; k < 3; k++) escena.cuadro(k ? 0 : 5, true);      // la cámara llega a su lugar antes del cuadro de la foto
@@ -457,7 +458,7 @@ export async function resultado(B, { periodo, nativoMP }) {
   o.textoControl = !ctl.length ? '' : malos.length
     ? `Esta máquina pierde cuadros aun sin dibujar nada: cerrá otras apps. El control (el lienzo a ${n(ctl[0].mp)} MP, solo limpiándolo) perdió refrescos en ${malos.length} de ${ctl.length} pruebas (hasta ${Math.max(...malos.map(c => c.perdidos))} en ${malos[0].cuadros} cuadros). Mientras pase eso, lo que se pierde con el juego no es culpa de la escena.`
     : `El control de la máquina (el lienzo a ${n(ctl[0].mp)} MP sin dibujar nada) no perdió refrescos en ${ctl.length} pruebas: la máquina y el compositor dan.`;
-  o.textoPantalla = T.length ? `Con la pantalla, «Baja completa» sostuvo sin perder refrescos: ${T.map(t => `${t.momento} ${t.mpReal === null ? `ninguna resolución probada (perdió desde ${n(t.mpFalla)} MP)` : `${n(t.mpReal)} MP${t.mpFalla ? ` (perdió a ${n(t.mpFalla)})` : ''}`}${[t.controlAntes, t.controlDespues].some(c => c && c.pierde) ? ', con el control perdiendo' : ''}`).join(' · ')}.` : '';
+  o.textoPantalla = T.length ? `Con la pantalla, «Baja completa» sostuvo sin perder refrescos: ${T.map(t => `${t.momento} ${t.mpReal === null ? (t.mpFalla === null ? 'sin cuadros (pestaña oculta o cada cuadro tarda más de un segundo)' : `ninguna resolución probada (perdió desde ${n(t.mpFalla)} MP)`) : `${n(t.mpReal)} MP${t.mpFalla ? ` (perdió a ${n(t.mpFalla)})` : ''}`}${[t.controlAntes, t.controlDespues].some(c => c && c.pierde) ? ', con el control perdiendo' : ''}`).join(' · ')}.` : '';
   return o;
 }
 
