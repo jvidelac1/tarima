@@ -21,6 +21,7 @@ let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ ch
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.woff2': 'font/woff2' };
 const CLAVE = 'phc_PruebaDeCheckAnalitica123';
+const AGENTE = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
 const LISTA_ID = 'c'.repeat(32);
 
 let conClave = true;
@@ -65,7 +66,7 @@ const server = http.createServer((req, res) => {
     }
     if (u.pathname === '/__prueba.html') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      res.end(`<!doctype html><meta charset="utf-8"><title>prueba</title><script type="module">
+      res.end(`<!doctype html><meta charset="utf-8"><title>prueba</title><link rel="icon" href="data:,"><script type="module">
 import { crearServidor } from './js/game/servidor.js';
 import { crearAnalitica } from './js/game/analitica.js';
 const s = crearServidor(), a = crearAnalitica();
@@ -97,10 +98,13 @@ const ok = (c, m) => { if (!c) mal(m); else notas.push(m); };
 const browser = await chromium.launch(launchOptions());
 
 async function pagina(o = {}) {
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: 'es-AR', ...o });
+  // posthog-js descarta los eventos de navegadores que se anuncian como robots («HeadlessChrome»): en producción es lo que
+  // se quiere; acá se usa el agente de un Chrome común para ver qué manda.
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: 'es-AR', userAgent: AGENTE, ...o });
   const page = await ctx.newPage();
   page.on('pageerror', e => mal(`pageerror: ${e.message}`));
-  page.on('console', m => { if (m.type() === 'error') mal(`console.error: ${m.text()}`); });
+  page.on('console', m => { if (m.type() === 'error') mal(`console.error: ${m.text()} (${m.location()?.url || ''})`); });
+  page.on('response', r => { if (r.status() >= 400 && !/\/baja/.test(r.url())) mal(`HTTP ${r.status()}: ${r.url()}`); });
   page.on('request', r => { const url = r.url(); if (!url.startsWith(base) && !url.startsWith('data:') && !url.startsWith('blob:')) mal(`pedido externo: ${url}`); });
   return { ctx, page };
 }
