@@ -11,11 +11,14 @@ export const IDIOMAS = ['es', 'en'];
 let idioma = 'es', tactilAhora = false;
 const oyentes = new Set();
 
-/** El primero que empieza con «es» da español; cualquier otro caso, inglés. */
+/**
+ * ?lang= primero, después lo elegido a mano en este dispositivo. Si no hay ninguno, el navegador: español si el español
+ * aparece en CUALQUIER lugar de la lista de idiomas (decisión del dueño: su Chrome tiene el inglés primero y el español
+ * después, y lo quiere en español); si no, inglés.
+ */
 export function detectarIdioma({ lang = null, guardado = null, navegador = [] } = {}) {
   for (const c of [lang, guardado]) if (c && IDIOMAS.includes(String(c).slice(0, 2).toLowerCase())) return String(c).slice(0, 2).toLowerCase();
-  for (const l of navegador || []) if (l) return /^es\b/i.test(l) ? 'es' : 'en';
-  return 'en';
+  return (navegador || []).some(l => /^es\b/i.test(String(l || ''))) ? 'es' : 'en';
 }
 export const idiomaActual = () => idioma;
 /** Cambia el idioma. Con DOM, actualiza <html lang> y <title>, y avisa a quien escuche (para repintar). */
