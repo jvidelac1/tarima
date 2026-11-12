@@ -5,10 +5,12 @@
 //    seguras, el botón no tapa la señal, el zócalo ni el acuse, la señal no tapa el zócalo, y los paneles entran sin
 //    cortar texto (si un panel necesita desplazarse, falla). Varios dedos a la vez cuentan como varios toques. También
 //    844 × 340: el iPhone en Safari con la barra de direcciones a la vista (el iPhone no deja pantalla completa).
-//  - Campos: en un campo de texto (nombre, mail), Espacio y Enter son del campo: el juego no los toma como toques ni
-//    activa botones, y el texto llega entero.
+//  - Campos: al tocar un campo de texto (nombre, correo) se abre el editor de arriba (#editor, telefono.js), derecho y
+//    dentro de lo visible, con «Listo»; Espacio y Enter son del campo (no cuentan como toques ni activan botones) y el
+//    texto vuelve entero al campo del panel.
 //  - Mano izquierda (?mano=izq): el botón va a la izquierda sin tapar nada.
-//  - En vertical (390 × 844): se ve «Gira el teléfono» encima de todo, en los dos idiomas; al girar, desaparece.
+//  - En vertical (390 × 844, teléfono con la rotación trabada): el contenido se gira 90° (html.rotado) y se juega igual,
+//    con toques sobre el botón; al girar el teléfono de verdad, se usa la orientación real.
 // Sin --dibujo el 3D no se dibuja solo (?dibujo=0, como check_game): antes de cada captura se fuerza un cuadro.
 // Uso: node tools/check_telefono.mjs [--headed] [--solo=nombre] [--capturas=out/telefono] [--dibujo]
 import http from 'node:http';
@@ -17,6 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { launchOptions } from './browser.mjs';
+import { sinApi } from './sin_api.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
@@ -25,6 +28,7 @@ const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('
 const SOLO = arg('solo'), HEADED = process.argv.includes('--headed'), DIBUJO = process.argv.includes('--dibujo'), OUT = path.resolve(ROOT, arg('capturas') || 'out/telefono');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.svg': 'image/svg+xml' };
 const server = http.createServer((req, res) => {
+  if (sinApi(req, res)) return;      // /api/estado y /api/partida: juego sin límite (tools/sin_api.mjs)
   const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname), file = path.join(WEB, rel.endsWith('/') ? rel + 'index.html' : rel);
   if (!file.startsWith(WEB) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end('404'); return; }
   res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' }); fs.createReadStream(file).pipe(res);
@@ -41,7 +45,7 @@ const CASOS = [
   { nombre: 'zurdo_740x360', w: 740, h: 360, dpr: 3, url: '&mano=izq', hastaIntentos: 2 },
   // iPhone en Safari de costado, con la barra de direcciones a la vista: quedan unos 340 px de alto
   { nombre: 'safari_844x340', w: 844, h: 340, dpr: 3, seguras: { top: 0, right: 47, bottom: 21, left: 47 }, hastaIntentos: 2 },
-  { nombre: 'vertical_390x844', w: 390, h: 844, dpr: 3, vertical: true },
+  { nombre: 'vertical_390x844', w: 390, h: 844, dpr: 3, vertical: true, hastaIntentos: 2 },
 ];
 
 async function correr(C) {
@@ -72,21 +76,16 @@ async function correr(C) {
   if (!S0.tactil) mal('la emulación no da puntero grueso: la prueba no sirve');
   if (C.seguras && S0.seguras.left !== C.seguras.left) { notas.push(`${tag} áreas seguras pedidas ${JSON.stringify(C.seguras)}, la página ve ${JSON.stringify(S0.seguras)}`); seguras = S0.seguras; }
 
-  // ---------- vertical: «Gira el teléfono» ----------
+  // ---------- vertical: el contenido va girado 90° (html.rotado) y se juega igual ----------
   if (C.vertical) {
-    const g = () => J(() => { const el = document.getElementById('girar'), r = el.getBoundingClientRect(), c = getComputedStyle(el), arriba = document.elementFromPoint(innerWidth / 2, innerHeight / 2); return { ve: c.display !== 'none' && r.width >= innerWidth - 1 && r.height >= innerHeight - 1, tapa: el.contains(arriba), txt: el.textContent.replace(/\s+/g, ' ').trim(), scroll: document.scrollingElement.scrollHeight > innerHeight + 1 || document.scrollingElement.scrollWidth > innerWidth + 1 }; });
-    let v = await g(); await foto('vertical_es');
-    if (!v.ve || !v.tapa) mal(`en vertical no se ve «Gira el teléfono» encima de todo (${JSON.stringify(v)})`);
-    if (!/Gira el teléfono/.test(v.txt)) mal(`en vertical, en español, el aviso dice «${v.txt}»`);
+    const g = () => J(() => { const app = document.getElementById('app'), r = app.getBoundingClientRect(), tf = getComputedStyle(app).transform; return { rotado: document.documentElement.classList.contains('rotado'), horiz: document.documentElement.classList.contains('horiz'), tf, caja: [Math.round(r.width), Math.round(r.height)], interior: [app.clientWidth, app.clientHeight], girar: !!document.getElementById('girar'), scroll: document.scrollingElement.scrollHeight > innerHeight + 1 || document.scrollingElement.scrollWidth > innerWidth + 1 }; });
+    const v = await g(); await foto('vertical_girado');
+    console.log(`${tag} en vertical: html.rotado ${v.rotado}, #app ${v.interior.join('x')} girado a ${v.caja.join('x')} (${v.tf})`);
+    if (!v.rotado || !v.horiz) mal(`en vertical el contenido no se giró (html.rotado ${v.rotado}, html.horiz ${v.horiz})`);
+    if (v.interior[0] < v.interior[1]) mal(`en vertical, el juego girado no quedó apaisado: ${v.interior.join('x')}`);
+    if (Math.abs(v.caja[0] - C.w) > 2 || Math.abs(v.caja[1] - C.h) > 2) mal(`en vertical, el contenido girado no ocupa la pantalla: ${v.caja.join('x')} en ${C.w}x${C.h}`);
+    if (v.girar) mal('sigue en la página el aviso «Gira el teléfono»');
     if (v.scroll) mal('en vertical la página se desplaza');
-    await J(() => { document.documentElement.lang = 'en'; }); await page.waitForTimeout(50); v = await g(); await foto('vertical_en');
-    if (!/Turn your phone/i.test(v.txt)) mal(`con la página en inglés el aviso dice «${v.txt}»`);
-    await J(() => { document.documentElement.lang = 'es'; });
-    await page.setViewportSize({ width: C.h, height: C.w }); await page.waitForTimeout(200); v = await g();
-    if (v.ve) mal('al girar a horizontal el aviso sigue a la vista');
-    await J(() => window.JUEGO?.listo); await page.waitForTimeout(300); await foto('girado_a_horizontal');
-    console.log(`${tag} aviso en vertical (es/en) y desaparece al girar · capturas en ${path.relative(ROOT, dir)}`);
-    await ctx.close(); return;
   }
 
   if (!await J(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
@@ -153,11 +152,18 @@ async function correr(C) {
     const propio = await campo.count();
     if (!propio) { await J(() => { const i = document.createElement('input'); i.id = 'prueba-campo'; i.type = 'text'; i.autocomplete = 'off'; document.querySelector('#capa .panel').prepend(i); }); campo = page.locator('#prueba-campo'); }
     await campo.tap(); await page.waitForTimeout(400);
+    // un campo del juego abre el editor de arriba (#editor): se escribe ahí y «Listo» (o Enter) lo devuelve al campo
+    const ed = await J(() => { const e = document.getElementById('editor'), r = e.getBoundingClientRect(); return { abierto: !e.hidden, foco: document.activeElement?.id, caja: [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)], W: innerWidth, H: (window.visualViewport?.height ?? innerHeight) }; });
     const esc = await J(() => ({ clase: document.documentElement.classList.contains('escribiendo'), zona: getComputedStyle(document.getElementById('zona')).display, fs: parseFloat(getComputedStyle(document.activeElement).fontSize) }));
-    // Enter en el nombre de la bienvenida es «Jugar» (docs/MVP.md, P1): ahí se prueba sin Enter
-    await campo.fill(''); await page.keyboard.type('Ana María  h'); await page.keyboard.press('ArrowLeft'); if (!propio) await page.keyboard.press('Enter'); await page.waitForTimeout(100);
-    const desp = await J(() => ({ total: JUEGO.toques.total, valor: document.activeElement?.value, foco: document.activeElement?.tagName, pantalla: JUEGO.estado().pantalla, sobre: JUEGO.estado().sobre, firma: document.querySelector('#capa .panel')?.innerHTML.length }));
-    await foto('campo_con_teclado');
+    if (propio && (!ed.abierto || ed.foco !== 'editor-campo')) mal(`al tocar el campo del juego no se abrió el editor de arriba (${JSON.stringify(ed)})`);
+    if (propio && ed.abierto && (ed.caja[1] < -1 || ed.caja[3] > ed.H + 1 || ed.caja[2] > ed.W + 1)) mal(`el editor no queda dentro de lo visible: ${JSON.stringify(ed)}`);
+    // Enter en el nombre de la bienvenida es «Jugar» (docs/MVP.md, P1), salvo en el editor, donde es «Listo»
+    if (!propio) await campo.fill('');
+    await page.keyboard.type('Ana María  h'); await page.keyboard.press('ArrowLeft'); await foto('campo_con_teclado');
+    if (propio) await page.locator('#editor-listo').tap(); else await page.keyboard.press('Enter');
+    await page.waitForTimeout(150);
+    const desp = await J(sel => { const el = document.querySelector(sel); return { total: JUEGO.toques.total, valor: el?.value, foco: el && (document.activeElement === el || el.readOnly) ? 'INPUT' : document.activeElement?.tagName, editor: !document.getElementById('editor').hidden, pantalla: JUEGO.estado().pantalla, sobre: JUEGO.estado().sobre, firma: document.querySelector('#capa .panel')?.innerHTML.length }; }, propio ? '#capa .panel input' : '#prueba-campo');
+    if (desp.editor) mal('«Listo» no cerró el editor');
     console.log(`${tag} campo de texto${propio ? ' del juego' : ' de prueba'}: «${desp.valor}», toques ${antes.total} → ${desp.total}, escribiendo ${esc.clase}, botón ${esc.zona}, letra ${esc.fs} px`);
     if (desp.foco === 'INPUT' && desp.total !== antes.total) mal(`escribir en un campo contó ${desp.total - antes.total} toques del levantamiento (input.js)`);
     if (desp.valor !== 'Ana María  h') mal(`en un campo de texto se escribió «${desp.valor}» en lugar de «Ana María  h»: el juego se come teclas (main.js, alTeclado: falta \`if (enCampo(e)) return;\`)`);
@@ -217,8 +223,8 @@ async function correr(C) {
       const hay = await J(() => !!document.querySelector('#capa .panel button.ir:not(:disabled)'));
       if (hay) { const ok = await pulsa('#capa .panel button.ir'); if (s.pantalla === 'llamado' && ok) nIntentos++; await av(ok ? 50 : 200); continue; }
     }
-    await av(['resumen', 'decision', 'repeticion'].includes(s.pantalla) ? 450 : 200);
-    if (['resumen', 'decision', 'repeticion', 'carga', 'desplazado', 'rival'].includes(s.pantalla) && n % 3 === 0 && !(I && I.propio)) await toque();      // el toque de saltear
+    await av(['rival', 'decision', 'repeticion', 'repeticion_rival'].includes(s.pantalla) ? 450 : 200);
+    if (['decision', 'repeticion', 'repeticion_rival', 'carga', 'desplazado', 'rival'].includes(s.pantalla) && n % 3 === 0 && !(I && I.propio)) await toque();      // el toque de saltear
   }
   const fin = await J(() => ({ s: JUEGO.estado(), propios: (JUEGO.E.propios || []).map(x => `${x.pantalla} ${x.res}${x.causa ? ':' + x.causa : ''}`), toques: { total: JUEGO.toques.total, aceptados: JUEGO.toques.aceptados } }));
   console.log(`${tag} ${C.partida ? 'partida' : 'recorrido'} con toques: pantalla final ${fin.s.pantalla} · intentos propios: ${fin.propios.join(' · ')} · toques ${fin.toques.total} (${fin.toques.aceptados} aceptados; ${enBoton} sobre el botón, ${fueraBoton} sobre el escenario) · señales: ${[...vistas].join(' ')} · ${revisadas} pantallas revisadas · ${nFoto} capturas en ${path.relative(ROOT, dir)}`);
@@ -229,6 +235,12 @@ async function correr(C) {
   if (C.campos && !campoSolo) mal('no se llegó a probar un campo sin panel');
   // la última pantalla (el podio con sus botones) también se revisa
   if (fin.s.pantalla === 'fin') { await av(3000); await revisar('fin (podio con botones)'); }
+  if (C.vertical) {      // el teléfono gira de verdad: orientación real, sin girar el contenido
+    await page.setViewportSize({ width: C.h, height: C.w }); await page.waitForTimeout(300);
+    const r = await J(() => ({ rotado: document.documentElement.classList.contains('rotado'), horiz: document.documentElement.classList.contains('horiz'), tf: getComputedStyle(document.getElementById('app')).transform }));
+    if (r.rotado || !r.horiz || r.tf !== 'none') mal(`al girar el teléfono a horizontal el contenido sigue girado (${JSON.stringify(r)})`);
+    await foto('girado_a_horizontal');
+  }
   await foto('final'); await ctx.close();
 }
 
@@ -237,4 +249,4 @@ catch (e) { problemas.push('excepción de la prueba: ' + (e.stack || e.message))
 await browser.close(); server.close();
 for (const n of notas) console.log('nota: ' + n);
 if (problemas.length) { console.log(`\nFALLÓ (${problemas.length}):`); for (const p of problemas.slice(0, 40)) console.log('  ' + p); process.exit(1); }
-console.log('\nOK: teléfono de costado (dos tamaños y mano izquierda) jugado con toques, campos de texto, dos dedos y aviso de girar en vertical, sin cortes ni superposiciones');
+console.log('\nOK: teléfono de costado (dos tamaños y mano izquierda) y en vertical con el contenido girado, jugado con toques, campos de texto con el editor de arriba y dos dedos, sin cortes ni superposiciones');

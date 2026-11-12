@@ -24,6 +24,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { launchOptions, isSoftware } from './browser.mjs';
+import { sinApi } from './sin_api.mjs';
 import { leerDatos } from '../web/js/sim/data.js';
 import { recalcular, resumen } from '../web/js/sim/replay.js';
 import ES from '../web/js/game/i18n/es.js';
@@ -38,6 +39,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const datos = leerDatos(JSON.parse(fs.readFileSync(path.join(WEB, 'data/sim.json'), 'utf8')));
 
 const server = http.createServer((req, res) => {
+  if (sinApi(req, res)) return;      // /api/estado y /api/partida: juego sin límite (tools/sin_api.mjs)
   const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname), file = path.join(WEB, rel.endsWith('/') ? rel + 'index.html' : rel);
   if (!file.startsWith(WEB) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end('404'); return; }
   res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' }); fs.createReadStream(file).pipe(res);
@@ -48,7 +50,7 @@ fs.mkdirSync(OUT, { recursive: true });
 const problemas = [], notas = [];
 const browser = await chromium.launch(launchOptions({ headed: HEADED }));
 
-const ESTADOS = ['inicio', 'presentacion', 'apertura', 'llamado', 'intento', 'decision', 'repeticion', 'resumen', 'intervalo', 'clasificacion', 'ceremonia', 'fin'];
+const ESTADOS = ['inicio', 'presentacion', 'apertura', 'llamado', 'intento', 'decision', 'repeticion', 'rival', 'intervalo', 'clasificacion', 'ceremonia', 'fin'];
 
 async function corrida(via) {
   if (via === 'idioma') return idiomas();
@@ -154,8 +156,8 @@ async function corrida(via) {
           await av(hizo ? 50 : 200); continue;
         }
       }
-      await av(s.pantalla === 'resumen' || s.pantalla === 'decision' || s.pantalla === 'repeticion' ? 450 : 200);
-      if (['resumen', 'decision', 'repeticion', 'carga', 'desplazado'].includes(s.pantalla) && n % 3 === 0 && !(I && I.propio)) { await baja(); await av(20); await sube(); }      // el toque de saltear
+      await av(['rival', 'decision', 'repeticion', 'repeticion_rival'].includes(s.pantalla) ? 450 : 200);
+      if (['rival', 'decision', 'repeticion', 'repeticion_rival', 'carga', 'desplazado'].includes(s.pantalla) && n % 3 === 0 && !(I && I.propio)) { await baja(); await av(20); await sube(); }      // el toque de saltear
     }
     throw new Error('la prueba no avanza (pantalla ' + (await J(() => JUEGO.estado().pantalla)) + ')');
   }
@@ -245,7 +247,7 @@ async function corrida(via) {
   if (r.registro.ctl !== 'f') mal(`el registro no quedó en Fácil (ctl ${r.registro.ctl})`);
   if (tactil && !r.visitados.includes('rival')) mal('final completa: no se mostró ningún intento de un rival');
   // la repetición es solo de los fallos: con el dedo los seis salen válidos y no tiene que haber ninguna
-  for (const e of ESTADOS.concat(tactil ? [] : ['tarjeta', 'tutorial', 'guiado']).filter(e => !(tactil && (e === 'resumen' || e === 'repeticion')))) if (!r.visitados.includes(e)) mal(`no se visitó el estado «${e}»`);
+  for (const e of ESTADOS.concat(tactil ? [] : ['tarjeta', 'tutorial', 'guiado']).filter(e => !(tactil && e === 'repeticion'))) if (!r.visitados.includes(e)) mal(`no se visitó el estado «${e}»`);
   { const fl = r.propios.filter(x => x.pantalla !== 'guiado'), conRep = fl.filter(x => x.rep);
     if (conRep.some(x => x.res === 'valido')) mal(`un levantamiento válido tuvo repetición: ${JSON.stringify(conRep)}`);
     if (!tactil && !fl.some(x => x.rep && x.res !== 'valido')) mal(`el dos tiempos sin ¡ATRÁPALA! no tuvo repetición: ${JSON.stringify(fl)}`);
@@ -347,8 +349,14 @@ async function idiomas() {
   const ay = await J(() => ({ dt: [...document.querySelectorAll('#sobre .glosario dt')].map(d => d.textContent), h2: document.querySelector('#sobre h2')?.textContent }));
   if (ay.dt.length !== 7 || ay.dt[0] !== EN['glosario.arranque.t']) mal(`la ayuda en inglés: ${JSON.stringify(ay)}`);
   await page.screenshot({ path: path.join(OUT, 'idioma_ayuda_en.png') }).catch(() => null);
-  console.log(`${tag} navegador en inglés → ${EN['bienvenida.jugar']} · selector → ${ES['bienvenida.jugar']}, guardado y recordado al recargar · ?lang=en manda · ayuda: ${ay.h2} (${ay.dt.length} palabras)`);
   await ctx.close();
+  // el caso del dueño: el inglés primero en la lista del navegador y el español después → español
+  const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, locale: 'en-US' }); await ctx2.addInitScript(() => { Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en', 'es-419'] }); });
+  const p2 = await ctx2.newPage(); await p2.goto(`${base}juego.html?dibujo=0&q=baja`, { waitUntil: 'load' }); await p2.evaluate(() => window.JUEGO.listo);
+  const l2 = await p2.evaluate(() => ({ lang: document.documentElement.lang, jugar: document.getElementById('btn-empezar')?.textContent.trim() }));
+  if (l2.lang !== 'es' || l2.jugar !== ES['bienvenida.jugar']) mal(`con el inglés primero y el español después en el navegador no salió en español: ${JSON.stringify(l2)}`);
+  await ctx2.close();
+  console.log(`${tag} navegador en inglés → ${EN['bienvenida.jugar']} · inglés y después español → ${l2.jugar} · selector → ${ES['bienvenida.jugar']}, guardado y recordado al recargar · ?lang=en manda · ayuda: ${ay.h2} (${ay.dt.length} palabras)`);
 }
 
 try {

@@ -12,6 +12,7 @@ on:
       - 'web/css/juego.css'
       - 'web/juego.html'
       - 'tools/check_telefono.mjs'
+      - 'tools/check_toques.mjs'
       - '.github/workflows/telefono.yml'
   workflow_dispatch:
 
@@ -52,6 +53,10 @@ jobs:
         if: ${{ !cancelled() }}
         timeout-minutes: 25
         run: node tools/check_telefono.mjs 2>&1 | tee out/logs/check_telefono.log
+      - name: Toques en tiempo real (check_toques)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 10
+        run: node tools/check_toques.mjs 2>&1 | tee out/logs/check_toques.log
       - name: Partida por toques de costado (check_game --only=tactil)
         if: ${{ !cancelled() }}
         timeout-minutes: 20
@@ -61,7 +66,7 @@ jobs:
         run: |
           {
             echo "### Teléfono (dibujo por software)"
-            for f in check_telefono check_game_tactil; do
+            for f in check_telefono check_toques check_game_tactil; do
               echo; echo "**$f**"; echo '```'
               if [ -f "out/logs/$f.log" ]; then tail -n 40 "out/logs/$f.log"; else echo "(no corrió)"; fi
               echo '```'

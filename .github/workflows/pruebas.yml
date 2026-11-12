@@ -56,6 +56,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node tools/play_human.mjs 2>&1 | tee out/logs/play_human.log
 
+      - name: Toques con el dedo, sin navegador (dedo_test)
+        if: ${{ !cancelled() }}
+        run: node tools/dedo_test.mjs 2>&1 | tee out/logs/dedo_test.log
+
       - name: Lógica de fluidez sin navegador (perf_test)
         if: ${{ !cancelled() }}
         run: node tools/perf_test.mjs 2>&1 | tee out/logs/perf_test.log
@@ -78,6 +82,13 @@ jobs:
         if: ${{ !cancelled() }}
         timeout-minutes: 20
         run: node tools/check_fluidez.mjs --tutorial --json=out/fluidez/fluidez.json 2>&1 | tee out/logs/check_fluidez.log
+
+      # Entrada en tiempo real con teclado real: toque durante PREPÁRATE, al cambiar de señal, doble, largo, ráfagas en
+      # ¡EMPUJA!, después de una pausa y en el turno de un rival. Cada pulsación anotada, resuelta, con motivo y acuse.
+      - name: Toques en tiempo real (check_toques)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 10
+        run: node tools/check_toques.mjs 2>&1 | tee out/logs/check_toques.log
 
       # Teléfono emulado (táctil): de costado en dos tamaños y con mano izquierda, jugado solo con toques, con una captura y
       # una revisión de cada pantalla (nada cortado, nada tapado, nada debajo de la muesca), campos de texto, dos dedos a
@@ -115,7 +126,7 @@ jobs:
         run: |
           {
             echo "### Pruebas del juego (dibujo por software: no mide cuadros por segundo)"
-            for f in sim_test play_human perf_test caida_test check_escenas check_game check_telefono check_fluidez capturas check_recorrido check_recorrido_en; do
+            for f in sim_test play_human dedo_test perf_test caida_test check_escenas check_game check_toques check_telefono check_fluidez capturas check_recorrido check_recorrido_en; do
               echo; echo "**$f**"; echo '```'
               if [ -f "out/logs/$f.log" ]; then tail -n 14 "out/logs/$f.log"; else echo "(no corrió)"; fi
               echo '```'

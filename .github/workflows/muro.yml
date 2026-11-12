@@ -1,0 +1,80 @@
+# Muro de punta a punta (docs/MVP.md 2, 5 y 7) sin cuenta de Cloudflare: el Worker de verdad (worker/src/index.js) corre en
+# Node sobre una D1 falsa (node:sqlite) detrás de las Functions de Pages (functions/_reenviar.js), con tools/servidor_local.mjs.
+# Dos jugadores nuevos: en inglés con teclado en una computadora, y en español con toques en un teléfono de costado.
+# Por software (SwiftShader): verifica el flujo, no mide cuadros por segundo.
+name: Muro y lista (punta a punta)
+
+on:
+  push:
+    branches: [mvp]
+    paths:
+      - 'web/js/game/conexion.js'
+      - 'web/js/game/servidor.js'
+      - 'web/js/game/analitica.js'
+      - 'worker/src/**'
+      - 'functions/**'
+      - 'tools/servidor_local.mjs'
+      - 'tools/check_muro.mjs'
+      - '.github/workflows/muro.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  muro:
+    name: Dos finales, muro, recarga, encuesta, dos más, muro y correo
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TARIMA_ANGLE: swiftshader
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24      # node:sqlite para la D1 falsa
+          cache: npm
+      - name: Dependencias
+        run: npm ci
+      - name: Chrome
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || true)"
+          if [ -z "$CHROME" ]; then
+            wget -q -O "$RUNNER_TEMP/chrome.deb" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+            sudo apt-get update -q && sudo apt-get install -y -q "$RUNNER_TEMP/chrome.deb"
+            CHROME="$(command -v google-chrome)"
+          fi
+          "$CHROME" --version
+          echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
+          mkdir -p out/logs
+      - name: Jugador nuevo en inglés, con teclado (check_muro --solo=en)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 28
+        run: node tools/check_muro.mjs --solo=en 2>&1 | tee out/logs/check_muro_en.log
+      - name: Jugador nuevo en español, teléfono de costado con toques (check_muro --solo=es)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 28
+        run: node tools/check_muro.mjs --solo=es 2>&1 | tee out/logs/check_muro_es.log
+      - name: Resumen
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Muro de punta a punta (Worker local, dibujo por software)"
+            for f in check_muro_en check_muro_es; do
+              echo; echo "**$f**"; echo '```'
+              if [ -f "out/logs/$f.log" ]; then tail -n 30 "out/logs/$f.log"; else echo "(no corrió)"; fi
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Capturas y registros como artefacto
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: pruebas-out
+          path: out/
+          if-no-files-found: warn
+          retention-days: 14

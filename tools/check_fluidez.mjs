@@ -29,6 +29,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { launchOptions, isSoftware, rendererWebGL } from './browser.mjs';
+import { sinApi } from './sin_api.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
@@ -41,6 +42,7 @@ const GOB = process.argv.includes('--gobernador');
 const TUTORIAL = process.argv.includes('--tutorial'), LASTRE = arg('lastre') || (GOB ? '18' : ''), SOLO_TUT = process.argv.includes('--solo-tutorial'), UMBRAL = +(arg('umbral') || 95);
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
 const server = http.createServer((req, res) => {
+  if (sinApi(req, res)) return;      // /api/estado y /api/partida: juego sin límite (tools/sin_api.mjs)
   const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname), file = path.join(WEB, rel);
   if (!file.startsWith(WEB) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end('404'); return; }
   res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' }); fs.createReadStream(file).pipe(res);
@@ -180,7 +182,7 @@ async function jugar(page, hasta, { minutos = 8, eti = '' } = {}) {
     const f = `${r.pantalla}|${r.titulo}|${r.botones}`;
     if (f !== firma) { firma = f; tFirma = Date.now(); bit.push(`${((Date.now() - t0) / 1000).toFixed(1)} ${r.pantalla}${r.titulo ? ' «' + r.titulo + '»' : ''}`); if (CAPT) { await dormir(500); await foto(`${r.pantalla}_${r.titulo}`); tFirma = Date.now(); } }
     if (r.panel && r.botones > 0 && !r.sobre) { if (Date.now() - tFirma > 700 && r.foco) { await page.keyboard.press('Enter'); tFirma = Date.now() + 400; } continue; }
-    if (['resumen', 'decision', 'repeticion', 'carga', 'desplazado'].includes(r.pantalla) && Date.now() - ultSalto > 700 && Date.now() - tFirma > 1500) { await toque(page); enviados++; ultSalto = Date.now(); }
+    if (['rival', 'decision', 'repeticion', 'repeticion_rival', 'carga', 'desplazado'].includes(r.pantalla) && Date.now() - ultSalto > 700 && Date.now() - tFirma > 1500) { await toque(page); enviados++; ultSalto = Date.now(); }
   }
 }
 
