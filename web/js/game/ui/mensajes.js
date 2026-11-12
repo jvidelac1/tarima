@@ -1,79 +1,92 @@
-// Textos del control (docs/CONTROLES.md, secciones 5 a 7): la palabra de cada toque, la línea que explica un fallo y
-// los pasos de «Cómo se juega». Puro, sin DOM: lo prueba tools/sim_test.mjs.
+// Textos del control (docs/CONTROLES.md, secciones 5 a 7, y docs/MVP.md, sección 4.5): la palabra de cada toque, la línea
+// que explica un fallo y los pasos de «Cómo se juega». Puro, sin DOM: lo prueba tools/sim_test.mjs. Las frases salen de los
+// diccionarios (i18n/es.js y en.js) con plantillas enteras por idioma, porque el orden de las palabras cambia.
+import { tr, idiomaActual, teclasDe } from '../i18n/t.js';
 
-/** Palabra después de cada toque. `floja`: ámbar (el levantamiento sigue). */
-export const PALABRAS = { perfecto: { txt: 'PERFECTO' }, bien: { txt: 'BIEN' }, temprano: { txt: 'TEMPRANO', floja: true }, tarde: { txt: 'TARDE', floja: true } };
+/** Palabra después de cada toque (`clave` en el diccionario). `floja`: ámbar (el levantamiento sigue). */
+export const PALABRAS = { perfecto: { clave: 'palabra.perfecto' }, bien: { clave: 'palabra.bien' }, temprano: { clave: 'palabra.temprano', floja: true }, tarde: { clave: 'palabra.tarde', floja: true } };
 
-/** Verbo de la señal de un gesto en Fácil. */
-const VERBO = { 's|explosion': '¡EXPLOTÁ!', 'c|explosion': '¡EXPLOTÁ!', 'j|explosion': '¡ARRIBA!', 's|recepcion': '¡RECIBÍ!', 'c|recepcion': '¡RECIBÍ!', 'j|recepcion': '¡RECIBÍ!' };
-/** «180 ms tarde»: el error de un toque, redondeado a 10 ms. */
-const cuanto = e => `${Math.max(10, Math.round(Math.abs(e) / 10) * 10)} ms ${e < 0 ? 'temprano' : 'tarde'}`;
+/** Verbo de la señal de un gesto en Un toque: la clave del diccionario. */
+const VERBO = { 's|explosion': 'senal.explota', 'c|explosion': 'senal.explota', 'j|explosion': 'senal.arriba', 's|recepcion': 'senal.recibi', 'c|recepcion': 'senal.recibi', 'j|recepcion': 'senal.recibi' };
+export const verboDe = (mov, g, l = idiomaActual()) => tr(l, VERBO[mov + '|' + g] || 'senal.explota');
+/**
+ * Cuánto se desvió un toque. Un toque: «un poco», «bastante» o «muy» (cortes en 60 y 150 ms) más temprano o tarde; a quien
+ * empieza un número no le dice nada. Pro: «180 ms tarde», redondeado a 10 ms.
+ */
+export function cuanto(e, l = idiomaActual(), pro = false) {
+  const lado = tr(l, e < 0 ? 'cuanto.temprano' : 'cuanto.tarde'), a = Math.abs(e);
+  if (pro) return tr(l, 'cuanto.ms', { ms: Math.max(10, Math.round(a / 10) * 10), lado });
+  return tr(l, 'cuanto.frase', { grado: tr(l, a < 60 ? 'cuanto.poco' : a < 150 ? 'cuanto.bastante' : 'cuanto.muy'), lado });
+}
 /**
  * Qué pasó y qué hacer distinto, en una línea. `res` es el resultado del núcleo (causa, gestos, toques).
  * @param {object} res  @param {'c'|'f'} ctl  @param {boolean} tactil  sin teclado: no nombra la tecla
  * @param {{sinConfirmar?:boolean, practica?:boolean, tardio?:number}} [o]  sinConfirmar: el reloj se acabó con el panel abierto; practica: no hay
  *   kilos que elegir; tardio: ms después del final en que llegó un toque que ya no servía (para no decir «no tocaste»)
+ * @param {'es'|'en'} [l]  idioma (por defecto, el actual)
  * @returns {string} '' si no hay nada que explicar (válido con tres blancas)
  */
-export function explicar(res, ctl = 'c', tactil = false, o = {}) { return linea(res, ctl, tactil, o).replace(/!\./g, '!'); }
-function linea(res, ctl, tactil, o) {
-  if (!res || !res.causa) return '';
+export function explicar(res, ctl = 'c', tactil = false, o = {}, l = idiomaActual()) {
+  const r = linea(res, ctl, tactil, o || {}, l); if (!r) return '';
+  return tr(l, r[0], { tactil, ...r[1] }).replace(/!\./g, '!');
+}
+function linea(res, ctl, tactil, o, l) {
+  if (!res || !res.causa) return null;
   const f = ctl === 'f', g = res.gestos || [], ex = [...g].reverse().find(x => x.g === 'explosion'), rc = [...g].reverse().find(x => x.g === 'recepcion'), j = (ex || rc)?.mov === 'j';
-  const toca = tactil ? 'Tocá' : 'Tocá ESPACIO', tocaMin = tactil ? 'tocá' : 'tocá ESPACIO', apreta = tactil ? 'Tocá' : 'Apretá ESPACIO', manten = tactil ? 'Dejá el dedo apoyado' : 'Mantené ESPACIO';
-  const EXP = f ? (j ? '¡ARRIBA!' : '¡EXPLOTÁ!') : 'la explosión', cuando = f ? 'cuando el círculo se cierra' : j ? 'en el fondo de la flexión' : 'cuando la barra llega a la línea';
-  const hacer = f ? toca : 'Soltá', hiciste = f ? 'Tocaste' : 'Soltaste';
+  const verbo = tr(l, j ? 'senal.arriba' : 'senal.explota'), cuando = tr(l, f ? 'cuando.facil' : j ? 'cuando.pro_j' : 'cuando.pro');
+  const lado = e => tr(l, e > 0 ? 'cuanto.tarde' : 'cuanto.temprano'), ajuste = e => tr(l, e > 0 ? 'ajuste.antes' : 'ajuste.despues');
+  const v = { verbo, cuando };
+  if (f) switch (res.causa) {
+    case 'sin_altura':
+      if (ex && ex.fuera && ex.e > 0) return [o.tardio !== undefined ? 'explica.sin_altura.tardio' : 'explica.sin_altura.no_toco', v];
+      return ex ? ['explica.sin_altura', { ...v, cuanto: cuanto(ex.e, l) }] : ['explica.sin_altura.no_toco', v];
+    case 'anticipado': return ['explica.anticipado', v];
+    case 'adelante': return ex ? ['explica.adelante', { ...v, cuanto: cuanto(ex.e, l) }] : ['explica.adelante.gen', v];
+    case 'atras': return ex ? ['explica.atras', { ...v, cuanto: cuanto(ex.e, l) }] : ['explica.atras.gen', v];
+    case 'fondo':
+      if (rc && rc.e < 0) return ['explica.fondo.temprano', v];
+      return [o.tardio !== undefined ? 'explica.fondo.tardio' : 'explica.fondo', v];
+    case 'aplastado': case 'codos': {
+      if ((res.toques || 0) < 3) return ['explica.empuje.sin_toques', v];
+      // la línea no contradice a las palabras: si todos los toques salieron PERFECTO o BIEN, lo que faltó fue ritmo en la subida
+      const malo = g.filter(x => !x.fuera && (x.pal === 'temprano' || x.pal === 'tarde')).sort((a, b) => Math.abs(b.e) - Math.abs(a.e))[0];
+      if (malo) return ['explica.empuje.destiempo', { ...v, verbo: verboDe(malo.mov, malo.g, l), cuanto: cuanto(malo.e, l) }];
+      return [o.practica ? 'explica.empuje.ritmo' : 'explica.empuje.ritmo_kilos', v];
+    }
+    // a destiempo: se dice para qué lado y cuánto, que es lo que el jugador puede corregir
+    case 'codos_blandos': return rc ? ['explica.codos_blandos', { ...v, cuanto: cuanto(rc.e, l), ajuste: ajuste(rc.e) }] : ['explica.codos_blandos.gen', v];
+    case 'temblor': case 'tiembla': return ex ? ['explica.temblor', { ...v, cuanto: cuanto(ex.e, l), ajuste: ajuste(ex.e) }] : ['explica.temblor.gen', v];
+    case 'devuelve': return ['explica.devuelve', v];
+    case 'reloj': return [o.sinConfirmar ? 'explica.reloj.sin_confirmar' : 'explica.reloj', v];
+    case 'antes': return ['explica.pro.antes', v];
+    case 'sin_apoyo': return ['explica.pro.sin_apoyo', v];
+    default: return null;
+  }
   switch (res.causa) {
     case 'sin_altura':
-      if (ex && ex.fuera && ex.e > 0) return f ? (o.tardio !== undefined ? `Tocaste ${EXP} tarde: el tiempo ya se había acabado. ${toca} ${cuando}, no después.` : `No tocaste ${EXP}. ${toca} ${cuando}.`) : `No soltaste a tiempo. Soltá ${cuando}.`;
-      if (f && ex) return `Tocaste ${EXP} ${cuanto(ex.e)} y la barra no subió. ${toca} ${cuando}.`;
-      return `${hiciste} ${EXP} muy ${ex && ex.e > 0 ? 'tarde' : 'temprano'} y la barra no subió. ${hacer} ${cuando}.`;
-    case 'anticipado': return f ? `Tocaste ${EXP} antes de tiempo tres veces. Esperá a que el círculo se cierre sobre el aro.` : `Soltaste antes de tiempo. Soltá ${cuando}.`;
-    case 'adelante': return f && ex ? `Tocaste ${EXP} ${cuanto(ex.e)} y la barra se fue adelante. Esperá a que el círculo se cierre.` : `${hiciste} ${EXP} temprano y la barra se fue adelante. Esperá ${f ? 'a que el círculo se cierre' : 'a que la barra llegue a la línea'}.`;
-    case 'atras': return f && ex ? `Tocaste ${EXP} ${cuanto(ex.e)} y la barra se fue atrás. ${toca} apenas se cierra el círculo.` : `${hiciste} ${EXP} tarde y la barra se fue atrás. ${hacer} ${f ? 'apenas se cierra el círculo' : 'apenas la barra llega a la línea'}.`;
-    case 'fondo':
-      if (rc && rc.e < 0) return f ? 'Tocaste ¡RECIBÍ! antes de tiempo. Un toque por señal: esperá el círculo.' : 'Apretaste para recibir antes de tiempo. Esperá a que el anillo se cierre.';
-      if (f && o.tardio !== undefined) return `Tocaste ¡RECIBÍ! tarde: la barra ya se había caído. ${toca} cuando el círculo llega al aro, no después.`;
-      return f ? `No recibiste la barra. ${toca} cuando el círculo se cierra.` : `No recibiste la barra. ${apreta} cuando el anillo se cierra.`;
-    case 'aplastado': case 'codos':
-      if ((res.toques || 0) < 3) return f ? `La subida se trabó y no empujaste. Con ¡EMPUJÁ!, ${tocaMin} rápido.` : `La subida se trabó y no empujaste. ${toca} repetido hasta la franja verde.`;
-      if (f) {
-        // la línea no contradice a las palabras: si todos los toques salieron PERFECTO o BIEN, lo que faltó fue ritmo en la subida
-        const malo = g.filter(x => !x.fuera && (x.pal === 'temprano' || x.pal === 'tarde')).sort((a, b) => Math.abs(b.e) - Math.abs(a.e))[0];
-        return malo ? `Tocaste ${VERBO[malo.mov + '|' + malo.g]} ${cuanto(malo.e)} y la barra quedó más pesada: no alcanzó el empuje. ${toca} cuando el círculo se cierra.`
-          : `Los toques venían bien: faltó empuje. En ¡EMPUJÁ!, ${tocaMin} más rápido${o.practica ? '' : '; si no alcanza, pedí menos kilos'}.`;
-      }
-      return 'No alcanzó el empuje: venías a destiempo. Mantené la flecha en la franja verde.';
-    // a destiempo: se dice para qué lado y cuánto, que es lo que el jugador puede corregir
-    case 'codos_blandos':
-      if (f && rc) return `Tocaste ¡RECIBÍ! ${cuanto(rc.e)} y los codos quedaron blandos. Tocá un poco ${rc.e > 0 ? 'antes' : 'después'}: justo cuando el círculo llega al aro.`;
-      return f ? 'Recibiste a destiempo y los codos quedaron blandos. Tocá ¡RECIBÍ! justo en el cierre.' : `Recibiste ${rc ? (rc.e > 0 ? 'tarde' : 'temprano') : 'a destiempo'} y los codos quedaron blandos. Apretá justo cuando el anillo se cierra.`;
-    case 'temblor': case 'tiembla':
-      if (f && ex) return `Tocaste ${EXP} ${cuanto(ex.e)}: la barra llegó desviada y tembló. Tocá un poco ${ex.e > 0 ? 'antes' : 'después'}, justo en el cierre.`;
-      return f ? `La barra llegó desviada y tembló. Tocá ${EXP} más cerca del cierre.` : 'La barra tembló: llegó desviada o empujaste de más. Soltá más justo y no pases la franja verde.';
-    case 'devuelve': return `Pasaron 8 segundos con la barra en los hombros. ${apreta} para ${f ? 'flexionar' : 'empezar el envión'}.`;
-    case 'reloj':
-      if (o.sinConfirmar) return tactil ? 'Se acabó el reloj. Confirmá y tocá la pantalla antes del 0:00.' : 'Se acabó el reloj. Confirmá con ENTER y apretá ESPACIO antes del 0:00.';
-      return f ? `Se acabó el reloj: corre desde que confirmás. ${apreta} apenas dice ¡TIRÁ!` : `Se acabó el reloj. ${apreta} para empezar antes del 0:00.`;
-    case 'antes': return `Soltaste antes de la chicharra. ${tactil ? 'No levantes el dedo' : 'Dejá apretado'} hasta ¡ABAJO!`;
-    case 'sin_apoyo': return `No dejaste apretado al quedar de pie. ${manten} hasta ¡ABAJO!`;
-    default: return '';
+      if (ex && ex.fuera && ex.e > 0) return ['explica.pro.sin_altura.no_solto', v];
+      return ['explica.pro.sin_altura', { ...v, lado: lado(ex ? ex.e : -1) }];
+    case 'anticipado': return ['explica.pro.anticipado', v];
+    case 'adelante': return ['explica.pro.adelante', v];
+    case 'atras': return ['explica.pro.atras', v];
+    case 'fondo': return [rc && rc.e < 0 ? 'explica.pro.fondo.temprano' : 'explica.pro.fondo', v];
+    case 'aplastado': case 'codos': return [(res.toques || 0) < 3 ? 'explica.pro.empuje.sin_toques' : 'explica.pro.empuje', v];
+    case 'codos_blandos': return ['explica.pro.codos_blandos', { ...v, lado: rc ? lado(rc.e) : tr(l, 'lado.destiempo') }];
+    case 'temblor': case 'tiembla': return ['explica.pro.temblor', v];
+    case 'devuelve': return ['explica.pro.devuelve', v];
+    case 'reloj': return [o.sinConfirmar ? (tactil ? 'explica.reloj.sin_confirmar' : 'explica.pro.reloj.sin_confirmar') : 'explica.pro.reloj', v];
+    case 'antes': return ['explica.pro.antes', v];
+    case 'sin_apoyo': return ['explica.pro.sin_apoyo', v];
+    default: return null;
   }
 }
 
-/** Los tres pasos de «Cómo se juega» y de la pantalla de inicio: [cantidad de teclas dibujadas, texto]. */
-export function pasos(ctl = 'f', tactil = false) {
-  return ctl === 'f'
-    ? [[1, `${tactil ? 'Tocá' : 'Apretá'} para empezar el levantamiento.`], [1, 'Tocá cuando el círculo se cierra: ¡EXPLOTÁ!, ¡RECIBÍ!'], [3, 'Si dice ¡EMPUJÁ!, tocá rápido.']]
-    : [[1, 'Apretá con el anillo lleno y mantené.'], [1, 'Soltá cuando la barra llega a la línea y apretá para recibir.'], [3, 'Si se traba, tocá repetido; de pie, dejá apretado hasta la chicharra.']];
+/** Los tres pasos de «Cómo se juega»: [cantidad de teclas dibujadas, texto]. */
+export function pasos(ctl = 'f', tactil = false, l = idiomaActual()) {
+  const k = ctl === 'f' ? ['f1', 'f2', 'f3'] : ['c1', 'c2', 'c3'];
+  return k.map((x, i) => [i === 2 ? 3 : 1, tr(l, 'pasos.' + x, { tactil })]);
 }
-/** Texto del tutorial guiado en cada parada (Fácil). */
-export const GUIA = {
-  tira: '¡TIRÁ! {A} para empezar el levantamiento.',
-  explota: '¡EXPLOTÁ! El círculo se cerró: {t} ahora.',
-  recibi: '¡RECIBÍ! Otra vez: círculo cerrado, {t}.',
-  empuja: '¡EMPUJÁ! La subida se trabó. {T} rápido hasta quedar de pie.',
-  aguanta: 'AGUANTÁ. No toques nada: espera la chicharra y baja solo.',
-  flexiona: '¡FLEXIONÁ! {A}. Enseguida ¡ARRIBA! cuando el círculo se cierra, y ¡RECIBÍ!',
-};
-/** Reemplaza {A} «Apretá ESPACIO», {T} «Tocá ESPACIO» y {t} en minúscula, según haya teclado o no. */
-export const conTecla = (txt, tactil) => txt.replace('{A}', tactil ? 'Tocá la pantalla' : 'Apretá ESPACIO').replace('{T}', tactil ? 'Tocá' : 'Tocá ESPACIO').replace('{t}', tactil ? 'tocá' : 'tocá ESPACIO');
+/** Clave del texto del tutorial guiado en cada parada (Un toque). */
+export const GUIA = { tira: 'guia.tira', explota: 'guia.explota', recibi: 'guia.recibi', empuja: 'guia.empuja', aguanta: 'guia.aguanta', flexiona: 'guia.flexiona' };
+/** Reemplaza {A}, {T} y {t} según haya teclado o no (para textos que ya vienen armados, como el `sub` de la señal). */
+export const conTecla = (txt, tactil, l = idiomaActual()) => { const k = teclasDe(l, tactil); return txt.replace('{A}', k.A).replace('{T}', k.T).replace('{t}', k.t); };

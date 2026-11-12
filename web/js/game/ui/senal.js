@@ -3,19 +3,23 @@
 // para PERFECTO), la cuenta 3-2-1, la tecla dibujada, el paso («2 de 3») y la palabra del último toque. Mientras la
 // ventana de la señal no abrió el círculo va apagado: un toque ahí no cuenta («todavía no»).
 // Solo DOM: lo que muestra sale de senal() en controles.js, que es lo mismo que leen las pruebas y los bots.
+import { t } from '../i18n/t.js';
+import { conTecla } from './mensajes.js';
 const HTML = `<div class="s-paso"></div><div class="s-verbo"></div>
 <div class="s-aro"><i class="s-franja"></i><i class="s-franja s-perf"></i><i class="s-fijo"></i><i class="s-cierra"></i><b class="s-cuenta"></b><div class="s-teclas"><kbd class="tecla"></kbd><kbd class="tecla"></kbd><kbd class="tecla"></kbd></div><div class="s-avance"><b></b><i></i></div></div>
 <div class="s-sub"></div><div class="s-pal"></div>`;
 
 export class Senal {
-  /** @param {HTMLElement} el  @param {boolean} tactil  sin teclado: la tecla dibujada dice TOCÁ */
+  /** @param {HTMLElement} el  @param {boolean} tactil  sin teclado: la tecla dibujada dice TOCA */
   constructor(el, tactil = false) {
     this.el = el; el.innerHTML = HTML; this.tactil = tactil; this.clave = null; this.pal = null;
     const q = s => el.querySelector(s); this.paso = q('.s-paso'); this.verbo = q('.s-verbo'); this.cierra = q('.s-cierra'); this.sub = q('.s-sub'); this.palEl = q('.s-pal'); this.avance = q('.s-avance b'); this.piso = q('.s-avance i'); this.subTxt = this.subBase = '';
     [this.franja, this.franjaP] = el.querySelectorAll('.s-franja'); this.cuenta = q('.s-cuenta'); this.franjaDe = null; this.cuentaTxt = null;
     this.setTactil(tactil);
   }
-  setTactil(t) { this.tactil = t; for (const k of this.el.querySelectorAll('.tecla')) k.textContent = t ? 'TOCÁ' : 'ESPACIO'; }
+  setTactil(v) { this.tactil = v; for (const k of this.el.querySelectorAll('.tecla')) k.textContent = t(v ? 'tecla.toca' : 'tecla.espacio'); }
+  /** Cambió el idioma: la tecla dibujada y, en el próximo cuadro, el verbo y la línea de abajo. */
+  repintar() { this.setTactil(this.tactil); this.clave = null; this.subTxt = null; }
   ocultar() { if (!this.el.hidden) { this.el.hidden = true; this.clave = null; this.pal = null; this.palEl.textContent = ''; } }
   /**
    * @param {object|null} s   resultado de senal()   @param {number} now  ms del intento
@@ -29,12 +33,12 @@ export class Senal {
     const clave = s ? s.clave + '|' + s.tipo : '';
     if (clave !== this.clave) {
       this.clave = clave; el.dataset.tipo = s ? s.tipo : 'nada'; el.dataset.gesto = s?.gesto || ''; el.dataset.largo = s && s.verbo.length > 12 ? '1' : '';      // «APRETÁ Y MANTENÉ» no entra a tamaño completo
-      this.paso.textContent = s && s.paso ? `${s.paso} de ${s.de}` : ''; this.verbo.textContent = s ? s.verbo : '';
-      this.subBase = s && s.sub ? s.sub.replace('{T}', this.tactil ? 'la pantalla' : 'ESPACIO').replace('Apretá la pantalla', 'Tocá la pantalla') : ''; this.subTxt = null;
+      this.paso.textContent = s && s.paso ? t('practica.paso', { n: s.paso, de: s.de }) : ''; this.verbo.textContent = s ? s.verbo : '';
+      this.subBase = s && s.sub ? conTecla(s.sub, this.tactil) : ''; this.subTxt = null;
     }
     // toque libre con plazo: en los últimos 10 s (5 en los hombros) la línea de abajo cuenta lo que queda
     const queda = s && s.tipo === 'libre' && s.vence ? s.vence - now : Infinity, apuro = queda <= (s && s.clave === 'flexiona' ? 5000 : 10000);
-    const sub = apuro ? `¡Quedan ${Math.max(0, Math.ceil(queda / 1000))} s! ${this.tactil ? 'Tocá la pantalla' : 'Apretá ESPACIO'}` : this.subBase;
+    const sub = apuro ? t('senal.quedan', { s: Math.max(0, Math.ceil(queda / 1000)), tactil: this.tactil }) : this.subBase;
     if (sub !== this.subTxt) { this.subTxt = sub; this.sub.textContent = sub; el.classList.toggle('apuro', apuro); }
     let oro = false, cuenta = '', abierta = true;
     if (s && s.tipo === 'cierre') {

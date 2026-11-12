@@ -6,6 +6,7 @@
 // núcleo espera. Soltar la tecla no significa nada, la subida es asistida y la fijación y la bajada son automáticas.
 import { simular } from '../sim/attempt.js';
 import { TENSION, FACIL } from '../sim/rules.js';
+import { t } from './i18n/t.js';
 
 const INF = 2147483647;
 /** Rebote de tecla y demora de la bajada automática tras la chicharra. */
@@ -110,7 +111,8 @@ export const PASOS = { s: 3, c: 6 };
  *   tipo 'espera'  no se toca            · 'libre'  cuando quieras
  *        'cierre'  en `objetivo` (ms del intento): el círculo arranca en `desde`, es perfecto a ±`perf` y vale hasta ±`lim`
  *        'empuja'  toques repetidos; `avance` 0..1 · 'auto' lo hace solo
- *   `gesto` (Clásico): 'baja' apretar, 'sube' soltar, 'mantiene' no soltar. `{T}` en los textos es la tecla.
+ *   `gesto` (Clásico): 'baja' apretar, 'sube' soltar, 'mantiene' no soltar. `verbo` y `sub` salen del diccionario del idioma
+ *   actual (i18n/t.js); `{A}` en `sub` es la tecla, y la resuelve quien dibuja (Senal).
  */
 export function senal(m, now, ctl = 'c') {
   if (!m || m.res) return null;
@@ -118,39 +120,39 @@ export function senal(m, now, ctl = 'c') {
   // `bien`: borde de BIEN (± ms); `lim`: hasta cuándo vale el toque; `abre` (Fácil): desde cuándo vale (antes, «todavía no»)
   const cierre = (clave, verbo, paso, objetivo, desde, w, sub, gesto) => ({ clave, verbo, sub, paso, de, tipo: 'cierre', objetivo, desde, perf: w.p, bien: w.g, lim: w.L ?? w.l, abre: f ? abre(m) : objetivo - (w.A ?? w.l), gesto });
   switch (m.fase) {
-    case 'acomodo': return { clave: 'prep', verbo: 'PREPARATE', tipo: 'espera' };
+    case 'acomodo': return { clave: 'prep', verbo: t('senal.prep'), tipo: 'espera' };
     case 'tension': case 'hombros': {
       const j = m.fase === 'hombros';
       if (now < M.ign) {
-        if (!M.amagues.length) return { clave: 'respira', verbo: j ? 'RESPIRÁ' : 'PREPARATE', tipo: 'espera' };
+        if (!M.amagues.length) return { clave: 'respira', verbo: t(j ? 'senal.respira' : 'senal.prep'), tipo: 'espera' };
         const quedan = FACIL.amagues - M.amagues.length;
-        return { clave: 'amague', verbo: 'AMAGUE', sub: !f ? 'muy temprano: de nuevo' : quedan > 0 ? 'muy temprano · esperá el círculo' : 'muy temprano · otro más y es fallo', tipo: 'espera' };
+        return { clave: 'amague', verbo: t('senal.amague'), sub: t(!f ? 'senal.amague_pro' : quedan > 0 ? 'senal.amague_sub' : 'senal.amague_ultimo'), tipo: 'espera' };
       }
       // `vence`: instante en que se acaba el tiempo para este toque libre (el reloj del llamado, o los 8 s en los hombros)
-      if (f) return j ? { clave: 'flexiona', verbo: '¡FLEXIONÁ!', sub: 'Apretá {T} para el envión', paso: 4, de, tipo: 'libre', vence: M.tDev }
-        : { clave: 'tira', verbo: '¡TIRÁ!', sub: 'Apretá {T} para empezar el levantamiento', paso: 1, de, tipo: 'libre', vence: c.reloj || undefined };
+      if (f) return j ? { clave: 'flexiona', verbo: t('senal.flexiona'), sub: t('senal.flexiona_sub', { A: '{A}' }), paso: 4, de, tipo: 'libre', vence: M.tDev }
+        : { clave: 'tira', verbo: t('senal.tira'), sub: t('senal.tira_sub', { A: '{A}' }), paso: 1, de, tipo: 'libre', vence: c.reloj || undefined };
       // Clásico: el anillo respira; los llenos caen en t0 + k·per
       const k = Math.max(1, Math.ceil((now - c.cal - M.t0 - TENSION.buena) / m.per));      // el lleno más cercano que todavía vale
       const obj = M.t0 + k * m.per + c.cal;
-      return { clave: j ? 'aprieta2' : 'aprieta', verbo: 'APRETÁ Y MANTENÉ', sub: 'con el anillo lleno', tipo: 'cierre', objetivo: obj, desde: obj - m.per, perf: TENSION.perfecta, lim: TENSION.buena, gesto: 'baja', vence: j ? M.tDev : undefined };
+      return { clave: j ? 'aprieta2' : 'aprieta', verbo: t('senal.aprieta'), sub: t('senal.aprieta_sub'), tipo: 'cierre', objetivo: obj, desde: obj - m.per, perf: TENSION.perfecta, lim: TENSION.buena, gesto: 'baja', vence: j ? M.tDev : undefined };
     }
-    case 'tiron': return f ? cierre('explota', '¡EXPLOTÁ!', 2, M.tx + c.cal, M.tp, M.w) : cierre('suelta', '¡SOLTÁ!', 0, M.tx + c.cal, M.tp, M.w, 'cuando la barra llega a la línea', 'sube');
-    case 'flexion': return f ? cierre('arriba', '¡ARRIBA!', 5, M.tx + c.cal, M.tp, M.w) : cierre('suelta2', '¡SOLTÁ!', 0, M.tx + c.cal, M.tp, M.w, 'en el fondo de la flexión', 'sube');
+    case 'tiron': return f ? cierre('explota', t('senal.explota'), 2, M.tx + c.cal, M.tp, M.w) : cierre('suelta', t('senal.suelta'), 0, M.tx + c.cal, M.tp, M.w, t('senal.suelta_sub'), 'sube');
+    case 'flexion': return f ? cierre('arriba', t('senal.arriba'), 5, M.tx + c.cal, M.tp, M.w) : cierre('suelta2', t('senal.suelta'), 0, M.tx + c.cal, M.tp, M.w, t('senal.suelta2_sub'), 'sube');
     case 'vuelo': case 'empuje':
       if (M.tq || M.tFallo < INF) return null;
-      return f ? cierre(m.fase === 'vuelo' ? 'recibi' : 'recibi2', '¡RECIBÍ!', m.fase === 'vuelo' ? 3 : 6, M.tc + c.cal, M.tr, M.wr) : cierre(m.fase === 'vuelo' ? 'recibe' : 'recibe2', '¡APRETÁ!', 0, M.tc + c.cal, M.tr, M.wr, 'para recibir', 'baja');
+      return f ? cierre(m.fase === 'vuelo' ? 'recibi' : 'recibi2', t('senal.recibi'), m.fase === 'vuelo' ? 3 : 6, M.tc + c.cal, M.tr, M.wr) : cierre(m.fase === 'vuelo' ? 'recibe' : 'recibe2', t('senal.recibe_pro'), 0, M.tc + c.cal, M.tr, M.wr, t('senal.recibe_pro_sub'), 'baja');
     case 'pelea': case 'traba': {
       const p = M.pelea, avance = p.modo === 'pelea' && p.P < 1000000 ? p.P / 1000000 : p.L === null ? 1 : p.L / 1000000;
       // `piso` (Fácil): lo que el avance tiene que llevar de ventaja; si lo alcanza, la barra se cae
       const piso = f && p.modo === 'pelea' && p.P < 1000000 ? Math.max(0, Math.min(1, (now - p.t0 - FACIL.plazoMs) * FACIL.ritmo / 1000000)) : 0;
-      return { clave: 'empuja', verbo: '¡EMPUJÁ!', sub: f ? 'tocá rápido: que no te alcance el rojo' : 'tocá repetido, sin pasarte de la franja', tipo: 'empuja', avance, piso, desde: p.t0 };
+      return { clave: 'empuja', verbo: t('senal.empuja'), sub: t(f ? 'senal.empuja_sub' : 'senal.empuja_pro_sub'), tipo: 'empuja', avance, piso, desde: p.t0 };
     }
-    case 'post': return f ? { clave: 'aguanta', verbo: 'AGUANTÁ', sub: 'no toques nada', tipo: 'auto' } : { clave: 'deja', verbo: m.n > 0 ? 'DEJÁ APRETADO' : 'APRETÁ Y MANTENÉ', sub: 'hasta la chicharra', tipo: m.n > 0 ? 'auto' : 'libre', gesto: m.n > 0 ? 'mantiene' : 'baja' };
+    case 'post': return f ? { clave: 'aguanta', verbo: t('senal.aguanta'), sub: t('senal.aguanta_sub'), tipo: 'auto' } : { clave: 'deja', verbo: t(m.n > 0 ? 'senal.deja' : 'senal.aprieta'), sub: t('senal.deja_sub'), tipo: m.n > 0 ? 'auto' : 'libre', gesto: m.n > 0 ? 'mantiene' : 'baja' };
     case 'fijacion': {
       const x = m.fij, ya = x.firme && now >= x.tb;
-      if (f) return ya ? { clave: 'abajo', verbo: '¡ABAJO!', sub: 'baja solo', tipo: 'auto' } : { clave: 'aguanta', verbo: 'AGUANTÁ', sub: 'no toques nada', tipo: 'auto' };
-      if (ya) return { clave: 'abajo', verbo: '¡SOLTÁ!', sub: 'sonó la chicharra', tipo: 'libre', gesto: 'sube', objetivo: x.tb + CAPA.bajaMs };
-      return x.abajo ? { clave: 'deja', verbo: 'DEJÁ APRETADO', sub: 'hasta la chicharra', tipo: 'auto', gesto: 'mantiene' } : { clave: 'apoya', verbo: 'APRETÁ Y MANTENÉ', sub: 'hasta la chicharra', tipo: 'libre', gesto: 'baja' };
+      if (f) return ya ? { clave: 'abajo', verbo: t('senal.abajo'), sub: t('senal.abajo_sub'), tipo: 'auto' } : { clave: 'aguanta', verbo: t('senal.aguanta'), sub: t('senal.aguanta_sub'), tipo: 'auto' };
+      if (ya) return { clave: 'abajo', verbo: t('senal.suelta'), sub: t('senal.abajo_pro_sub'), tipo: 'libre', gesto: 'sube', objetivo: x.tb + CAPA.bajaMs };
+      return x.abajo ? { clave: 'deja', verbo: t('senal.deja'), sub: t('senal.deja_sub'), tipo: 'auto', gesto: 'mantiene' } : { clave: 'apoya', verbo: t('senal.aprieta'), sub: t('senal.deja_sub'), tipo: 'libre', gesto: 'baja' };
     }
     default: return null;
   }

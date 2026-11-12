@@ -1,5 +1,6 @@
 // Ayudas del intento, pegadas a la barra (docs/JUEGO.md, sección 8.2): anillo de tensión, línea de potencia, anillo de
 // recepción, palabra del gesto y medidores de pelea y de traba. Se leen por posición y por trama, no solo por color.
+import { t } from '../i18n/t.js';
 const F = "'Saira Condensed','Arial Narrow',sans-serif";
 export class Ayudas {
   constructor(canvas) { this.cv = canvas; this.g = canvas.getContext('2d'); this.w = this.h = 0; this.sucio = false; canvas.style.visibility = 'hidden'; }
@@ -49,9 +50,9 @@ export class Ayudas {
       g.fillStyle = '#39d98a'; g.fillRect(x, top, W, bot - top); g.fillStyle = '#fff'; g.fillRect(x - u * .3, top - 1.5, W + u * .6, 3); g.fillRect(x - u * .3, bot - 1.5, W + u * .6, 3);
       // avance y temblor
       g.fillStyle = '#1a2040'; g.fillRect(x + W + u * .5, y0, u * .5, H); g.fillStyle = '#35e6d6'; g.fillRect(x + W + u * .5, y0 + H * (1 - p.P), u * .5, H * p.P);
-      g.font = `700 ${u * .85}px ${F}`; g.fillStyle = p.T > .5 ? '#ff6a5e' : '#93a0cc'; g.fillText(p.T > .05 ? `TEMBLOR ${Math.round(p.T * 100)}` : 'PELEA', x + W / 2, y0 + H + u);
-    } else { g.fillStyle = '#35e6d6'; g.fillRect(x, Y(p.L * 1000), W, y0 + H - Y(p.L * 1000)); g.fillStyle = '#fff'; g.fillRect(x - u * .3, y0 - 1.5, W + u * .6, 3); g.font = `700 ${u * .85}px ${F}`; g.fillText('TRABÁ', x + W / 2, y0 + H + u); }
-    if (p.L !== null && p.modo === 'pelea' && p.L < 1) { g.font = `700 ${u * .85}px ${F}`; g.fillStyle = '#ffd23f'; g.fillText(`CODOS ${Math.round(p.L * 100)}`, x + W / 2, y0 - u * .8); }
+      g.font = `700 ${u * .85}px ${F}`; g.fillStyle = p.T > .5 ? '#ff6a5e' : '#93a0cc'; g.fillText(p.T > .05 ? t('medidor.temblor', { n: Math.round(p.T * 100) }) : t('medidor.empuje'), x + W / 2, y0 + H + u);
+    } else { g.fillStyle = '#35e6d6'; g.fillRect(x, Y(p.L * 1000), W, y0 + H - Y(p.L * 1000)); g.fillStyle = '#fff'; g.fillRect(x - u * .3, y0 - 1.5, W + u * .6, 3); g.font = `700 ${u * .85}px ${F}`; g.fillText(t('medidor.brazos'), x + W / 2, y0 + H + u); }
+    if (p.L !== null && p.modo === 'pelea' && p.L < 1) { g.font = `700 ${u * .85}px ${F}`; g.fillStyle = '#ffd23f'; g.fillText(t('medidor.brazos_n', { n: Math.round(p.L * 100) }), x + W / 2, y0 - u * .8); }
     const ya = Y(p.aguja); g.fillStyle = '#fff'; g.beginPath(); g.moveTo(x - u * .2, ya); g.lineTo(x - u * 1.4, ya - u * .7); g.lineTo(x - u * 1.4, ya + u * .7); g.fill();
   }
 }

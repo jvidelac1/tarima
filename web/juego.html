@@ -9,19 +9,21 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="color-scheme" content="dark">
-<title>Tarima · Mundial Tarima 2026</title>
+<title>Tarima · Halterofilia a un botón</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="css/juego.css">
+<link rel="stylesheet" href="css/bienvenida.css">
 <script type="importmap">
 { "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/addons/" } }
 </script>
 </head>
 <body>
+<noscript><p style="padding:2em;font:16px/1.5 system-ui,sans-serif;color:#f2f4ff">Tarima necesita JavaScript activado. · Tarima needs JavaScript turned on.</p></noscript>
 <div id="escena">
   <canvas id="gl" aria-label="Transmisión 3D del levantamiento"></canvas>
   <canvas id="ayudas" aria-hidden="true"></canvas>
   <div id="tv">
-    <div class="bug"><b id="ev-titulo">Mundial Tarima 2026</b><span id="ev-sub">Final · 90 kg</span></div>
+    <div class="bug"><b id="ev-titulo">Final Tarima · Pretemporada</b><span id="ev-sub">Categoría hasta 90 kg</span></div>
     <div class="relojbox"><div class="luces" id="luces" aria-label="Decisión de los jueces"><i></i><i></i><i></i></div><div class="reloj" id="reloj">0:30</div></div>
     <div class="etiqueta" id="etiqueta" hidden></div>
     <div class="cartel" id="cartel" hidden></div>
@@ -40,10 +42,10 @@
   </div>
   <div id="capa"></div>
   <button id="pausa" hidden aria-label="Pausa" title="Pausa (Esc)">II</button>
-  <button id="saltar" hidden tabindex="-1">Saltear tutorial <kbd class="tecla ch">ESC</kbd></button>
+  <button id="saltar" hidden tabindex="-1">Saltar práctica <kbd class="tecla ch">ESC</kbd></button>
   <div id="sobre" hidden></div>
-  <div id="sinfoco" hidden>El juego no está recibiendo el teclado · hacé clic acá</div>
-  <div id="msg">Cargando…</div>
+  <div id="sinfoco" hidden>El juego no recibe el teclado · haz clic aquí</div>
+  <div id="msg">Tarima</div>
 </div>
 <div id="zona" aria-label="Zona de toque del levantamiento"><span id="zona-txt">Toca</span></div>
 <div id="girar" role="alertdialog" aria-labelledby="girar-t" aria-describedby="girar-s">
