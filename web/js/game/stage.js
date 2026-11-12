@@ -482,7 +482,7 @@ export class Escena {
     const piezas = L => [...L.inner.map(p => p.kg), 'c', ...L.outer.map(p => p.kg)], peso = x => (x === 'c' ? COLLAR_KG : x);
     const A = piezas(L0), B = piezas(L1); let p = 0; while (p < A.length && p < B.length && A[p] === B[p]) p++;
     const sale = A.length - p, entra = B.length - p; if (!sale && !entra) return null;
-    const DS = .26, DE = .32, LEJOS = .55, T1 = sale * DS + .1, kg0 = this.kg, kg1r = L1.total;
+    const DS = .2, DE = .25, LEJOS = .55, T1 = sale * DS + .1, kg0 = this.kg, kg1r = L1.total;
     const suave = x => { const t = Math.min(1, Math.max(0, x)); return 1 - (1 - t) * (1 - t); };
     let viejas = this.barbell.sides.map(sd => sd.load.children.map(o => ({ o, x: o.position.x }))), nuevas = null, t = -1;
     const en = tt => {

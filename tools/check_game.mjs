@@ -120,7 +120,7 @@ async function corrida(via) {
         if (g.tipo === 'libre') { await av(150); await toque(); continue; }
         if (g.tipo === 'cierre') {
           const k = g.clave + g.desde;
-          if (I.seDetiene || hecho === k || (g.clave === 'explota' && o.sinExplotar?.(llamado))) { await av(manual ? 30 : 15); continue; }
+          if (I.seDetiene || hecho === k || (g.clave === 'explota' && o.sinExplotar?.(llamado)) || (g.clave === 'recibi' && o.sinRecibir?.(llamado))) { await av(manual ? 30 : 15); continue; }
           await ir(g.objetivo); await toque(); hecho = k; continue;
         }
         if (g.tipo === 'empuja') { if (s.ahora - ultToque >= (o.empujeCada || 150)) { await toque(); ultToque = s.ahora; } else await av(manual ? 16 : 10); continue; }
@@ -216,9 +216,10 @@ async function corrida(via) {
   if (!await pulsa(`.pesista[data-id="${tactil ? 'brenner' : 'ventura'}"]`) || !await pulsa('.nivel[data-n="normal"]')) mal('no se pudo elegir pesista y nivel');
   if (tactil) await pulsa('#btn-otro');      // táctil: saltea el tutorial (lo juega después, con el reloj verdadero)
   const envion = tactil ? () => 'split' : clave => (/intento 1/.test(clave) ? 'split' : /intento 2/.test(clave) ? 'squat' : 'power');
-  // con teclado, en el tercer arranque no se toca la explosión a propósito: tiene que ser un fallo, con su corte y su línea
-  const sinExplotar = tactil ? null : clave => /Arranque · intento 3/.test(clave);
-  const fin = await jugar(s => s.pantalla === 'fin', true, { cambia: true, envion, sinExplotar });
+  // con teclado, en el tercer arranque no se toca la explosión a propósito: tiene que ser un fallo, con su corte y su línea;
+  // y en el tercer dos tiempos no se toca el ¡RECIBÍ! de la cargada: un fallo con explosión, que tiene repetición
+  const sinExplotar = tactil ? null : clave => /Arranque · intento 3/.test(clave), sinRecibir = tactil ? null : clave => /Dos tiempos · intento 3/.test(clave);
+  const fin = await jugar(s => s.pantalla === 'fin', true, { cambia: true, envion, sinExplotar, sinRecibir });
   const r = await J(() => ({ registro: JUEGO.registro, tabla: JUEGO.E.p.tabla().map(f => `${f.id}:${f.s}+${f.c}=${f.total}#${f.puesto ?? '-'}`).join(' '), monitor: JUEGO.E.monitor, visitados: JUEGO.E.visitados, cal: JUEGO.E.cfg.cal, propios: JUEGO.E.propios || [],
     modelos: Object.keys(JUEGO.escena.atletas).sort().join(','), mios: JUEGO.E.p.at[JUEGO.E.yo].s.concat(JUEGO.E.p.at[JUEGO.E.yo].c).map(x => `${x.kg}${x.res === 'valido' ? '✓' : '✗' + (x.causa || '')}`).join(' ') }));
   const seg = (Date.now() - t0) / 1000;
@@ -228,7 +229,12 @@ async function corrida(via) {
   if (seg > 90) notas.push(`${tag} la partida tardó ${seg.toFixed(0)} s`);
   if (r.registro.ctl !== 'f') mal(`el registro no quedó en Fácil (ctl ${r.registro.ctl})`);
   if (tactil && !r.visitados.includes('rival')) mal('final completa: no se mostró ningún intento de un rival');
-  for (const e of ESTADOS.concat(tactil ? [] : ['tutorial', 'guiado']).filter(e => !(tactil && e === 'resumen'))) if (!r.visitados.includes(e)) mal(`no se visitó el estado «${e}»`);
+  // la repetición es solo de los fallos: con el dedo los seis salen válidos y no tiene que haber ninguna
+  for (const e of ESTADOS.concat(tactil ? [] : ['tutorial', 'guiado']).filter(e => !(tactil && (e === 'resumen' || e === 'repeticion')))) if (!r.visitados.includes(e)) mal(`no se visitó el estado «${e}»`);
+  { const fl = r.propios.filter(x => x.pantalla !== 'guiado'), conRep = fl.filter(x => x.rep);
+    if (conRep.some(x => x.res === 'valido')) mal(`un levantamiento válido tuvo repetición: ${JSON.stringify(conRep)}`);
+    if (!tactil && !fl.some(x => x.rep && x.res !== 'valido')) mal(`el dos tiempos sin ¡RECIBÍ! no tuvo repetición: ${JSON.stringify(fl)}`);
+    console.log(`${tag} repeticiones: ${conRep.map(x => `${x.res}:${x.causa}`).join(' ') || 'ninguna'} (solo los fallos con explosión)`); }
   const rc = recalcular(r.registro, datos);
   if (!rc.ok) mal(`el registro exportado no recalcula: ${rc.error}`); else if (resumen(rc.tabla) !== r.tabla) mal(`recalculado «${resumen(rc.tabla)}», en pantalla «${r.tabla}»`);
   if (r.modelos !== 'brenner,ventura') mal(`modelos en memoria: ${r.modelos}`);
@@ -237,8 +243,8 @@ async function corrida(via) {
   if (r.monitor.manosMax > .16) mal(`la barra se separó de las manos: ${(r.monitor.manosMax * 1000).toFixed(0)} mm`);
   console.log(`${tag} barra: mínimo ${(r.monitor.barraMin * 1000).toFixed(1)} mm · manos a barra, máximo ${(r.monitor.manosMax * 1000).toFixed(0)} mm · ${r.monitor.cuadros} cuadros medidos · altura máxima por pantalla: ${Object.entries(r.monitor.alto).map(([k, v]) => `${k} ${v.toFixed(2)} m`).join(', ')}`);
   for (const v of ['¡TIRÁ!', '¡EXPLOTÁ!', '¡RECIBÍ!', '¡EMPUJÁ!', 'AGUANTÁ', '¡ABAJO!', '¡FLEXIONÁ!', '¡ARRIBA!']) if (!vistas.has(v)) mal(`no apareció la señal «${v}»`);
-  // el que toca cada señal en su momento tiene que levantar todo (salvo el fallo a propósito)
-  const esperado = tactil ? 6 : 5, validos = (r.mios.match(/✓/g) || []).length;
+  // el que toca cada señal en su momento tiene que levantar todo (salvo los dos fallos a propósito)
+  const esperado = tactil ? 6 : 4, validos = (r.mios.match(/✓/g) || []).length;
   if (validos < esperado) mal(`tocando cada señal en su momento salieron ${validos} válidos de ${esperado}: ${r.mios}`);
   if (!tactil) {
     if (!clicProbado) mal('no se llegó a probar el clic en el escenario');
