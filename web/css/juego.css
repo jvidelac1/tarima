@@ -71,7 +71,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 .s-cierra{border:calc(var(--v)*.5) solid var(--teal);will-change:transform}
 .s-teclas{position:relative;display:flex;gap:.35em;font-size:calc(var(--v)*1.15)}
 .s-teclas .tecla:nth-child(n+2){display:none}
-.s-avance{display:none;position:absolute;left:8%;right:8%;bottom:calc(var(--v)*1.1);height:calc(var(--v)*1);background:#1a2040;border:1px solid var(--line)}
+.s-avance{display:none;position:absolute;left:-26%;right:-26%;bottom:calc(var(--v)*.7);height:calc(var(--v)*1.8);background:#1a2040;border:1px solid var(--line)}
 .s-avance b{display:block;height:100%;width:0;background:var(--teal)}
 .s-avance i{position:absolute;left:0;top:0;height:100%;width:0;background:repeating-linear-gradient(135deg,var(--red) 0 4px,#7a1d1a 4px 8px);border-right:2px solid #fff}
 .senal.apuro .s-sub{color:var(--gold);font-weight:700}
@@ -108,6 +108,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
   .s-fijo,.s-cierra{width:calc(var(--v)*6.8);height:calc(var(--v)*6.8);margin:calc(var(--v)*-3.4) 0 0 calc(var(--v)*-3.4)}
   .tecla{text-shadow:none}
   .s-teclas{font-size:calc(var(--v)*1)}
+  .s-avance{left:3%;right:3%;bottom:calc(var(--v)*1.2);height:calc(var(--v)*1.5)}
   .s-paso{grid-area:paso}.s-verbo{grid-area:verbo;font-size:calc(var(--v)*3.1)}.s-sub{grid-area:sub}.s-pal{grid-area:pal;font-size:calc(var(--v)*1.8)}
   .guia{bottom:auto;top:calc(var(--u)*6.5 + var(--st));font-size:calc(var(--u)*1.5)}
 }
