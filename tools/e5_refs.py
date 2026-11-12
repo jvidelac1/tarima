@@ -38,6 +38,15 @@ espalda pintada sobre el pecho. Por eso la indicación v2 nombra la vista y solo
 ensanchar nada, y cada intento se mira en la hoja de control antes de darlo por bueno (`descartar` saca los que no sirven).
 Con dos imágenes de entrada (frente repintado y render crudo de la vista) la silueta se conserva (IoU 0,97 a 0,99) pero Qwen
 casi copia el render crudo: en orden `plan` no se ve cambio de musculatura. `vistas --una` repinta la vista sola, como el frente.
+
+MEDIDO el 12-nov-2026 en la RTX 4090 (ComfyUI 0.45.0, 40 pasos, CFG 4, 1024x1024), con 29 intentos:
+  - una imagen de entrada: 65 a 97 s (hasta 120 s con otro proceso usando la placa); dos imágenes: 157 a 169 s. VRAM pico 21,4 a 22,0 GB.
+  - con denoise 1 Qwen cambia la silueta cuando «corrige» la anatomía (frente con brazos arriba: IoU 0,87 y 0,90) y 3 de 9
+    intentos cambiaron la pose o el encuadre. Con --denoise 0.8 ninguno de 13 cambió la pose; 12 midieron 0,94 a 0,99 y uno 0,90.
+  - lo que conserva la silueta repinta poco: quita los textos, marca pectoral y abdomen bajo la malla y algo el deltoides. La
+    receta que quedó: frente y vistas con una imagen, --denoise 0.8 (0.6 en el frente de fin_bust), indicación v5.
+  - nombrar algo para prohibirlo lo hace aparecer («no belt» dio una banda en la cintura; el tatuaje nombrado en la vista
+    derecha apareció en el brazo derecho): lo prohibido va en la negativa.
 """
 import argparse, json, os, shutil, subprocess, sys, time
 import numpy as np
