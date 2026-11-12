@@ -118,7 +118,7 @@ export const KG_MAX = 260;
  *                TEMPRANO o TARDE
  *   vueloMm      con holgura entera, mm de altura y de desvío que la barra puede perder de más en el vuelo con un toque en
  *                TEMPRANO o TARDE sin caerse (un toque en PERFECTO o BIEN no la pierde nunca)
- *   amagues      amagues permitidos por movimiento; el siguiente toque anticipado es fallo (desde el 13-nov la capa no
+ *   amagues      amagues permitidos por movimiento; el siguiente toque anticipado es fallo (desde el 12-nov, tarde la capa no
  *                deja pasar toques anticipados: queda para registros armados a mano)
  *   perdidaLibre mm de altura perdida que no suman exigencia (el borde de BIEN): PERFECTO y BIEN piden el mismo empuje
  *   porMm        de ahí al límite, milésimas de exigencia por mm (TEMPRANO y TARDE sí cuestan)
