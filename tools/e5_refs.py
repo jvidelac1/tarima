@@ -50,12 +50,12 @@ SEM = {'rest_bust': 2100, 'fin_bust': 2200, 'fin_full': 2300}
 NVISTA = {'front': 1, 'left': 2, 'back': 3, 'right': 4}
 DENOISE = 1.0     # --denoise: menos de 1 parte del render crudo con ruido (conserva más la silueta y cambia menos la forma)
 
-V_IND = 2      # versión de las indicaciones (queda anotada en cada intento)
+V_IND = 3      # versión de las indicaciones (queda anotada en cada intento); v3 = v2 sin nombrar el cinturón en el busto
 QUIEN = ('the same fictional adult male weightlifter with accurate, clearly readable muscle anatomy of an elite 81 kg class '
          'weightlifter, lean and athletic, not a bodybuilder')
 NO_ENSANCHAR = 'Do not make the arms, shoulders, neck, torso or legs wider or thicker than they are, and do not move the hands.'
 ROPA = {'bust': 'the same red sleeveless one-piece weightlifting singlet with off-white trim, with the same cut as now, completely '
-                'plain: no text, no lettering, no belt',
+                'plain: no text, no lettering',       # sin nombrar el cinturón: «no belt» en la indicación hizo aparecer una banda en la cintura (va en la negativa)
         'full': 'the same red sleeveless one-piece weightlifting singlet with off-white trim, with the same cut as now, completely '
                 'plain: no text, no lettering; keep the brown leather belt, the dark blue knee sleeves, the white socks and the white '
                 'shoes exactly as they are'}
@@ -103,7 +103,7 @@ def p_una(vista, juego):
     """Una sola imagen (el render crudo de la vista), como el frente: con dos imágenes Qwen casi copia el render."""
     return (f'{MIRA[vista]} Keep the exact outline, pose, framing and camera of the figure, and keep the background pure solid black. '
             f'Repaint only the surface of the body so that it reads as {QUIEN}: {anat(vista, juego)}. {NO_ENSANCHAR} '
-            f'He wears {ROPA[juego.split("_")[1]]}, and no band at the waist. Same head, beard, hair, skin tone, white wrist wraps, and the '
+            f'He wears {ROPA[juego.split("_")[1]]}. Same head, beard, hair, skin tone, white wrist wraps, and the '
             'black armband tattoo only where it is now. Realistic skin. Soft even studio lighting, no cast shadows, no rim light.')
 
 
