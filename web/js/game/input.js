@@ -19,7 +19,7 @@ export const reloj = {
  * falta), 'tarde' (la barra ya se perdió), 'termino' (el intento ya cerró), 'pausa', 'mouse' (el clic no es un gesto).
  */
 export const toques = {
-  total: 0, aceptados: 0, descartados: 0, ultimos: [], abierto: null, alCambiar: null, contexto: null,
+  total: 0, aceptados: 0, descartados: 0, motivos: {}, ultimos: [], abierto: null, alCambiar: null, contexto: null,
   /** Una pulsación nueva (no una repetición del sistema). `t`: instante del evento en el reloj del juego. */
   nuevo(t, via, tecla) {
     const T = this.abierto = { n: ++this.total, t: Math.round(t), via, tecla, ok: null, motivo: '', donde: this.contexto?.() || '', vivo: performance.now() };
@@ -31,10 +31,18 @@ export const toques = {
    */
   resolver(ok, motivo = '', sigue = false) {
     const T = this.abierto; if (!T || !T.vivo || performance.now() - T.vivo > 1500) return;
-    if (T.ok !== null) this[T.ok ? 'aceptados' : 'descartados']--;
-    T.ok = !!ok; T.motivo = motivo; this[ok ? 'aceptados' : 'descartados']++; if (!sigue) T.vivo = 0; this.alCambiar?.(T, 'resuelto');
+    if (T.ok !== null) { this[T.ok ? 'aceptados' : 'descartados']--; if (!T.ok) this.motivos[T.motivo] = (this.motivos[T.motivo] || 1) - 1; }
+    T.ok = !!ok; T.motivo = motivo; this[ok ? 'aceptados' : 'descartados']++; if (!ok) this.motivos[motivo] = (this.motivos[motivo] || 0) + 1; if (!sigue) T.vivo = 0; this.alCambiar?.(T, 'resuelto');
   },
   suelta() { this.alCambiar?.(this.abierto, 'sube'); },
+  /** Foto de los contadores, para restar después (cuántos toques y descartes por motivo hubo en un tramo). */
+  foto() { return { total: this.total, aceptados: this.aceptados, descartados: this.descartados, motivos: { ...this.motivos } }; },
+  /** Lo que pasó desde `f` (foto()): {toques, aceptados, descartados, desc_<motivo>…}, todo números (va a las métricas). */
+  desde(f) {
+    const o = { toques: this.total - f.total, aceptados: this.aceptados - f.aceptados, descartados: this.descartados - f.descartados };
+    for (const [k, v] of Object.entries(this.motivos)) { const d = v - (f.motivos[k] || 0); if (d > 0) o['desc_' + k] = d; }
+    return o;
+  },
   /**
    * Inicio de la ráfaga a la que pertenece la pulsación del instante `t`: hacia atrás, mientras entre una y la anterior
    * haya menos de `hueco` ms. Sirve para no saltear una pantalla con toques que venían del levantamiento (el que machaca
@@ -98,7 +106,8 @@ export class Boton {
     };
     this._ku = e => { if (esTecla(e) && (!enCampo(e) || this.contactos.has('k' + (e.code || e.key)))) { sube('k' + (e.code || e.key), e); toques.suelta(); } };
     this._pd = e => {
-      if (!this.activo || (e.pointerType === 'mouse' && e.button !== 0) || e.target.closest?.('button,input,select,textarea,label,a,.panel,[contenteditable]')) return;
+      // un panel con botones o campos es para tocar esos botones; uno sin nada que tocar («Toca para seguir») cuenta como toque
+      if (!this.activo || (e.pointerType === 'mouse' && e.button !== 0) || e.target.closest?.('button,input,select,textarea,label,a,[contenteditable]') || e.target.closest?.('.panel')?.querySelector('button,input,textarea,select,a')) return;
       const via = e.pointerType === 'mouse' ? 'mouse' : 'tactil'; e.preventDefault(); toques.nuevo(reloj.deEvento(e), via, via === 'mouse' ? 'CLIC' : 'TOQUE'); baja('p' + e.pointerId, e, via);
     };
     this._pu = e => { if (this.contactos.has('p' + e.pointerId)) { sube('p' + e.pointerId, e); toques.suelta(); } };

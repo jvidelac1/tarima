@@ -9,6 +9,9 @@
   --sl:env(safe-area-inset-left,0px);--sr:env(safe-area-inset-right,0px);--sb:env(safe-area-inset-bottom,0px);--st:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;overscroll-behavior:none}
+body{height:100dvh}
+/* todo el juego vive en #app: en un teléfono en vertical se gira entero 90° (html.rotado, telefono.js) */
+#app{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
 [hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;flex-direction:column;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 #escena{position:relative;flex:1;min-height:0;overflow:hidden;background:#000;container-type:size;--u:clamp(9px,1.7cqh,17px)}
@@ -16,12 +19,12 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 #ayudas{pointer-events:none}
 #zona{display:none}
 @media (pointer:coarse) and (orientation:portrait){
-  #escena{flex:0 0 60%}
-  #zona{display:flex;flex:1;align-items:center;justify-content:center;padding-bottom:var(--sb);background:radial-gradient(ellipse at 50% 0,#101a44 0,#05081a 75%);border-top:2px solid var(--line);font-family:var(--display);font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);touch-action:none}
-  #zona.on{background:radial-gradient(ellipse at 50% 0,#17307a 0,#081033 75%);color:var(--ink)}
+  :where(html:not(.rotado)) #escena{flex:0 0 60%}
+  :where(html:not(.rotado)) #zona{display:flex;flex:1;align-items:center;justify-content:center;padding-bottom:var(--sb);background:radial-gradient(ellipse at 50% 0,#101a44 0,#05081a 75%);border-top:2px solid var(--line);font-family:var(--display);font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);touch-action:none}
+  :where(html:not(.rotado)) #zona.on{background:radial-gradient(ellipse at 50% 0,#17307a 0,#081033 75%);color:var(--ink)}
   /* los paneles usan toda la pantalla: el botón táctil no hace falta mientras hay un panel abierto */
-  #capa{position:fixed;inset:0;padding-bottom:calc(8px + var(--sb));z-index:5}
-  .panel{max-height:100%}
+  :where(html:not(.rotado)) #capa{position:fixed;inset:0;padding-bottom:calc(8px + var(--sb));z-index:5}
+  :where(html:not(.rotado)) .panel{max-height:100%}
 }
 #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:20px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);pointer-events:none;background:radial-gradient(ellipse at center,#0a1030 0,#03050c 70%)}
 #tv{position:absolute;inset:0;pointer-events:none;font-family:var(--display);text-transform:uppercase}
@@ -122,18 +125,18 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 .guia{position:absolute;left:50%;bottom:calc(var(--u)*5.6);transform:translateX(-50%);width:max-content;max-width:min(94cqw,calc(var(--u)*48));text-align:center;background:rgba(6,14,48,.94);border-bottom:calc(var(--u)*.3) solid var(--gold);padding:calc(var(--u)*.6) calc(var(--u)*1.2);font-family:var(--body);font-weight:600;text-transform:none;font-size:calc(var(--u)*1.45);line-height:1.3;color:var(--ink)}
 @media (orientation:portrait){
   /* vertical: la señal va en dos columnas (aro a la izquierda, texto a la derecha), centrada al pie del escenario */
-  .senal{--v:calc(var(--u)*1.15);left:50%;top:auto;bottom:calc(var(--u)*5.2);transform:translateX(-50%);width:min(94cqw,calc(var(--v)*33));background:rgba(6,14,48,.6);text-shadow:0 1px 6px #020814;display:grid;grid-template-columns:auto 1fr;grid-template-areas:"aro paso" "aro verbo" "aro sub" "aro pal";align-items:center;justify-items:center;column-gap:calc(var(--v)*.6);padding:calc(var(--v)*.4) calc(var(--v)*.7)}
-  .s-aro,.senal[data-tipo=espera] .s-aro,.senal[data-tipo=auto] .s-aro,.senal[data-tipo=nada] .s-aro,.senal[data-tipo=empuja] .s-aro{grid-area:aro;width:calc(var(--v)*11.4);height:calc(var(--v)*11)}
-  .s-aro{--d:calc(var(--v)*6.8)}
-  .s-fijo,.s-cierra{width:calc(var(--v)*6.8);height:calc(var(--v)*6.8);margin:calc(var(--v)*-3.4) 0 0 calc(var(--v)*-3.4)}
-  .tecla{text-shadow:none}
-  .s-teclas{font-size:calc(var(--v)*1)}
-  .s-avance{left:3%;right:3%;bottom:calc(var(--v)*1.2);height:calc(var(--v)*1.5)}
-  .s-paso{grid-area:paso}.s-verbo{grid-area:verbo;font-size:calc(var(--v)*3.1)}.s-sub{grid-area:sub}.s-pal{grid-area:pal;font-size:calc(var(--v)*1.8)}
-  .guia{bottom:auto;top:calc(var(--u)*6.5 + var(--st));font-size:calc(var(--u)*1.5)}
+  :where(html:not(.rotado)) .senal{--v:calc(var(--u)*1.15);left:50%;top:auto;bottom:calc(var(--u)*5.2);transform:translateX(-50%);width:min(94cqw,calc(var(--v)*33));background:rgba(6,14,48,.6);text-shadow:0 1px 6px #020814;display:grid;grid-template-columns:auto 1fr;grid-template-areas:"aro paso" "aro verbo" "aro sub" "aro pal";align-items:center;justify-items:center;column-gap:calc(var(--v)*.6);padding:calc(var(--v)*.4) calc(var(--v)*.7)}
+  :where(html:not(.rotado)) .s-aro,:where(html:not(.rotado)) .senal[data-tipo=espera] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=auto] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=nada] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=empuja] .s-aro{grid-area:aro;width:calc(var(--v)*11.4);height:calc(var(--v)*11)}
+  :where(html:not(.rotado)) .s-aro{--d:calc(var(--v)*6.8)}
+  :where(html:not(.rotado)) .s-fijo,:where(html:not(.rotado)) .s-cierra{width:calc(var(--v)*6.8);height:calc(var(--v)*6.8);margin:calc(var(--v)*-3.4) 0 0 calc(var(--v)*-3.4)}
+  :where(html:not(.rotado)) .tecla{text-shadow:none}
+  :where(html:not(.rotado)) .s-teclas{font-size:calc(var(--v)*1)}
+  :where(html:not(.rotado)) .s-avance{left:3%;right:3%;bottom:calc(var(--v)*1.2);height:calc(var(--v)*1.5)}
+  :where(html:not(.rotado)) .s-paso{grid-area:paso}:where(html:not(.rotado)) .s-verbo{grid-area:verbo;font-size:calc(var(--v)*3.1)}:where(html:not(.rotado)) .s-sub{grid-area:sub}:where(html:not(.rotado)) .s-pal{grid-area:pal;font-size:calc(var(--v)*1.8)}
+  :where(html:not(.rotado)) .guia{bottom:auto;top:calc(var(--u)*6.5 + var(--st));font-size:calc(var(--u)*1.5)}
   /* vertical: abajo están la señal y el zócalo; el acuse va arriba a la derecha, debajo del reloj */
-  .acuse{bottom:auto;top:calc(var(--u)*8.6 + var(--st));flex-direction:row-reverse}
-  .acuse b{text-align:right}
+  :where(html:not(.rotado)) .acuse{bottom:auto;top:calc(var(--u)*8.6 + var(--st));flex-direction:row-reverse}
+  :where(html:not(.rotado)) .acuse b{text-align:right}
 }
 #sobre{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(2,4,12,.72)}
 
@@ -219,71 +222,98 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
   #sobre .panel{max-height:100%}
 }
 /* de costado: el escenario ocupa toda la pantalla y el botón flota abajo a la derecha (a la izquierda con html.zurdo) */
-@media (pointer:coarse) and (orientation:landscape){
-  :root{--boton:clamp(96px,29vh,150px);--bm:14px}
-  #zona{display:flex;position:fixed;z-index:4;right:calc(var(--sr) + var(--bm));bottom:calc(var(--sb) + var(--bm));width:var(--boton);height:var(--boton);border-radius:50%;align-items:center;justify-content:center;padding:10px;text-align:center;overflow:hidden;
+  :root:where(.horiz){--boton:clamp(96px,calc(var(--app-h,100vh)*.29),150px);--bm:14px}
+  :where(html.horiz) #zona{display:flex;position:fixed;z-index:4;right:calc(var(--sr) + var(--bm));bottom:calc(var(--sb) + var(--bm));width:var(--boton);height:var(--boton);border-radius:50%;align-items:center;justify-content:center;padding:10px;text-align:center;overflow:hidden;
     font-family:var(--display);font-weight:800;font-size:calc(var(--boton)*.16);line-height:1;letter-spacing:.03em;text-transform:uppercase;color:#fff;text-shadow:0 1px 5px #000;
     background:radial-gradient(circle at 50% 35%,rgba(53,230,214,.26),rgba(6,14,48,.5) 72%);border:3px solid rgba(242,244,255,.6);box-shadow:0 6px 0 rgba(2,4,12,.55),inset 0 0 18px rgba(53,230,214,.2);
     touch-action:none;-webkit-user-select:none;user-select:none;transition:transform 50ms,box-shadow 50ms}
-  #zona.on,#zona.hunde{transform:translateY(5px) scale(.95);border-color:var(--teal);background:radial-gradient(circle at 50% 40%,rgba(53,230,214,.6),rgba(10,40,90,.62) 75%);box-shadow:0 1px 0 rgba(2,4,12,.55),inset 0 0 26px rgba(53,230,214,.5)}
-  html.zurdo #zona{right:auto;left:calc(var(--sl) + var(--bm))}
+  :where(html.horiz) #zona.on,:where(html.horiz) #zona.hunde{transform:translateY(5px) scale(.95);border-color:var(--teal);background:radial-gradient(circle at 50% 40%,rgba(53,230,214,.6),rgba(10,40,90,.62) 75%);box-shadow:0 1px 0 rgba(2,4,12,.55),inset 0 0 26px rgba(53,230,214,.5)}
+  html:where(.horiz).zurdo #zona{right:auto;left:calc(var(--sl) + var(--bm))}
   /* sin botón mientras hay un panel con botones, la pausa, la carga o un campo con el teclado abierto: ahí se tocan otros
      botones. Un panel sin botones («Toca para seguir») deja el botón a la vista y se corre para no quedar debajo. */
-  body:has(#capa > .panel button) #zona,body:has(#sobre:not([hidden])) #zona,body:has(#msg:not([hidden])) #zona,html.escribiendo #zona{display:none}
-  #capa{position:fixed;inset:0;z-index:5;padding:calc(6px + var(--st)) calc(8px + var(--sr)) calc(6px + var(--sb)) calc(8px + var(--sl))}
-  body:has(#capa > .panel):not(:has(#capa > .panel button)) #capa{padding-right:calc(var(--boton) + var(--bm)*2 + var(--sr))}
-  html.zurdo body:has(#capa > .panel):not(:has(#capa > .panel button)) #capa{padding-right:calc(8px + var(--sr));padding-left:calc(var(--boton) + var(--bm)*2 + var(--sl))}
+  :where(html.horiz) body:has(#capa > .panel button) #zona,:where(html.horiz) body:has(#sobre:not([hidden])) #zona,:where(html.horiz) body:has(#msg:not([hidden])) #zona,html:where(.horiz).escribiendo #zona{display:none}
+  :where(html.horiz) #capa{position:fixed;inset:0;z-index:5;padding:calc(6px + var(--st)) calc(8px + var(--sr)) calc(6px + var(--sb)) calc(8px + var(--sl))}
+  :where(html.horiz) body:has(#capa > .panel):not(:has(#capa > .panel button)) #capa{padding-right:calc(var(--boton) + var(--bm)*2 + var(--sr))}
+  html:where(.horiz).zurdo body:has(#capa > .panel):not(:has(#capa > .panel button)) #capa{padding-right:calc(8px + var(--sr));padding-left:calc(var(--boton) + var(--bm)*2 + var(--sl))}
   /* con el teclado de pantalla, el panel usa solo lo que queda visible y arranca arriba */
-  html.escribiendo #capa{top:var(--vvy,0px);bottom:auto;height:var(--vvh,100%);align-items:flex-start}
-}
+  html:where(.horiz).escribiendo #capa{top:var(--vvy,0px);bottom:auto;height:var(--vvh,100%);align-items:flex-start}
 /* teléfono de costado (360 a 430 px de alto): todo más compacto, y la señal del lado contrario al botón */
-@media (pointer:coarse) and (orientation:landscape) and (max-height:600px){
-  #escena{--u:clamp(8.5px,2.45cqh,11px)}
-  .bug,.etiqueta,.zocalo{left:calc(var(--u)*1.2 + var(--sl))}
-  .senal{--v:calc(var(--u)*.88);left:calc(var(--u)*1.2 + var(--sl));right:auto;top:calc(var(--u)*7.6 + var(--st));transform:none}
-  html.zurdo .senal{left:auto;right:calc(var(--u)*1.2 + var(--sr))}
-  .acuse{right:calc(var(--boton) + var(--bm)*2 + var(--sr));bottom:calc(var(--u)*1.2 + var(--sb))}
-  html.zurdo .acuse{right:calc(var(--u)*1.2 + var(--sr))}
-  .zocalo{bottom:calc(var(--u)*1.2 + var(--sb));max-width:calc(100% - var(--boton) - var(--bm)*2 - var(--u)*18 - var(--sl) - var(--sr))}
-  html.zurdo .zocalo{left:calc(var(--boton) + var(--bm)*2 + var(--sl))}
-  .guia{bottom:calc(var(--u)*6.4 + var(--sb));max-width:calc(100% - 2*(var(--u)*23 + var(--sl) + var(--sr)));font-size:calc(var(--u)*1.4)}
-  .veredicto{max-width:min(70cqw,calc(var(--u)*50))}
+  :where(html.horiz.bajo) #escena{--u:clamp(8.5px,2.45cqh,11px)}
+  :where(html.horiz.bajo) .bug,:where(html.horiz.bajo) .etiqueta,:where(html.horiz.bajo) .zocalo{left:calc(var(--u)*1.2 + var(--sl))}
+  :where(html.horiz.bajo) .senal{--v:calc(var(--u)*.88);left:calc(var(--u)*1.2 + var(--sl));right:auto;top:calc(var(--u)*7.6 + var(--st));transform:none}
+  html:where(.horiz.bajo).zurdo .senal{left:auto;right:calc(var(--u)*1.2 + var(--sr))}
+  :where(html.horiz.bajo) .acuse{right:calc(var(--boton) + var(--bm)*2 + var(--sr));bottom:calc(var(--u)*1.2 + var(--sb))}
+  html:where(.horiz.bajo).zurdo .acuse{right:calc(var(--u)*1.2 + var(--sr))}
+  :where(html.horiz.bajo) .zocalo{bottom:calc(var(--u)*1.2 + var(--sb));max-width:calc(100% - var(--boton) - var(--bm)*2 - var(--u)*18 - var(--sl) - var(--sr))}
+  html:where(.horiz.bajo).zurdo .zocalo{left:calc(var(--boton) + var(--bm)*2 + var(--sl))}
+  :where(html.horiz.bajo) .guia{bottom:calc(var(--u)*6.4 + var(--sb));max-width:calc(100% - 2*(var(--u)*23 + var(--sl) + var(--sr)));font-size:calc(var(--u)*1.4)}
+  :where(html.horiz.bajo) .veredicto{max-width:min(70cqw,calc(var(--u)*50))}
   /* paneles: entran en 360 px de alto; si no, se desplaza el panel, nunca la página */
-  .panel{padding:10px 14px;max-width:min(96cqw,760px)}
-  .panel h1{font-size:clamp(20px,6.2cqh,28px)}
-  .panel h2{font-size:clamp(14px,4.4cqh,18px);margin-bottom:.3em}
-  .panel p,.pasos li{font-size:clamp(12px,3.6cqh,14px);margin:.3em 0}
-  .panel p.chica,.nota{font-size:clamp(11px,3.2cqh,12px)}
-  .reglas{font-size:clamp(12px,3.6cqh,14px);line-height:1.45}
-  button{font-size:clamp(13px,3.9cqh,15px);min-height:40px;padding:.45em .9em}
-  .fila{margin:.35em 0}
-  .pasos,.pesistas{gap:6px;margin:.4em 0}
-  .panel p{line-height:1.32}
-  .pesista{padding:.4em .55em}
-  .pesista .b{height:.75em;margin-bottom:.3em}
-  .kgsel output{font-size:clamp(26px,9cqh,38px)}
-  .podio{margin:.4em 0}.podio .p1{padding-bottom:2.2em}.podio .p2{padding-bottom:1.3em}.podio .p3{padding-bottom:.6em}
-  .pulso{width:clamp(56px,19cqh,88px);margin:.3em auto}
-  table.tabla{font-size:clamp(12px,3.6cqh,14px)}
-  .panel .pie{margin:.4em -14px -10px;padding:6px 14px}
+  :where(html.horiz.bajo) .panel{padding:10px 14px;max-width:min(96cqw,760px)}
+  :where(html.horiz.bajo) .panel h1{font-size:clamp(20px,6.2cqh,28px)}
+  :where(html.horiz.bajo) .panel h2{font-size:clamp(14px,4.4cqh,18px);margin-bottom:.3em}
+  :where(html.horiz.bajo) .panel p,:where(html.horiz.bajo) .pasos li{font-size:clamp(12px,3.6cqh,14px);margin:.3em 0}
+  :where(html.horiz.bajo) .panel p.chica,:where(html.horiz.bajo) .nota{font-size:clamp(11px,3.2cqh,12px)}
+  :where(html.horiz.bajo) .reglas{font-size:clamp(12px,3.6cqh,14px);line-height:1.45}
+  :where(html.horiz.bajo) button{font-size:clamp(13px,3.9cqh,15px);min-height:40px;padding:.45em .9em}
+  :where(html.horiz.bajo) .fila{margin:.35em 0}
+  :where(html.horiz.bajo) .pasos,:where(html.horiz.bajo) .pesistas{gap:6px;margin:.4em 0}
+  :where(html.horiz.bajo) .panel p{line-height:1.32}
+  :where(html.horiz.bajo) .pesista{padding:.4em .55em}
+  :where(html.horiz.bajo) .pesista .b{height:.75em;margin-bottom:.3em}
+  :where(html.horiz.bajo) .kgsel output{font-size:clamp(26px,9cqh,38px)}
+  :where(html.horiz.bajo) .podio{margin:.4em 0}:where(html.horiz.bajo) .podio .p1{padding-bottom:2.2em}:where(html.horiz.bajo) .podio .p2{padding-bottom:1.3em}:where(html.horiz.bajo) .podio .p3{padding-bottom:.6em}
+  :where(html.horiz.bajo) .pulso{width:clamp(56px,19cqh,88px);margin:.3em auto}
+  :where(html.horiz.bajo) table.tabla{font-size:clamp(12px,3.6cqh,14px)}
+  :where(html.horiz.bajo) .panel .pie{margin:.4em -14px -10px;padding:6px 14px}
   /* el podio con sus botones: la tabla completa ya se vio un momento antes (sin botones); acá quedan el podio y los botones */
-  .panel.podio-panel:has(button) .tabla{display:none}
+  :where(html.horiz.bajo) .panel.podio-panel:has(button) .tabla{display:none}
   /* el panel del llamado va al costado: el pesista queda a la vista */
-  .panel.lado{align-self:center;margin-left:auto;margin-right:0;max-width:min(54cqw,440px)}
-}
+  :where(html.horiz.bajo) .panel.lado{align-self:center;margin-left:auto;margin-right:0;max-width:min(54cqw,440px)}
 /* teléfono en vertical: «Gira el teléfono» con un dibujo, encima de todo */
-@media (pointer:coarse) and (orientation:portrait) and (max-width:600px){
-  #girar{display:flex;position:fixed;inset:0;z-index:50;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:calc(24px + var(--st)) calc(24px + var(--sr)) calc(24px + var(--sb)) calc(24px + var(--sl));
-    background:radial-gradient(ellipse at 50% 40%,#0d1640 0,#03050c 75%);text-align:center;touch-action:none}
-  #girar svg{width:min(46vw,180px);height:auto;overflow:visible}
-  #girar b{font-family:var(--display);font-weight:800;font-size:30px;line-height:1.05;letter-spacing:.04em;text-transform:uppercase;color:var(--ink)}
-  #girar span{font-size:16px;line-height:1.4;color:var(--mute);max-width:20em}
-  #girar .tel{transform-box:fill-box;transform-origin:center}
-  @media (prefers-reduced-motion:no-preference){
-    #girar .tel{animation:girar 2.4s cubic-bezier(.6,0,.3,1) infinite}
-    #girar .flecha{animation:flecha 2.4s ease-in-out infinite}
-  }
-  @media (prefers-reduced-motion:reduce){#girar .tel{transform:rotate(-90deg)}}
-}
+/* (el aviso «Gira el teléfono» ya no existe: en vertical el contenido se gira solo, ver html.rotado) */
 @keyframes girar{0%,22%{transform:rotate(0)}48%,82%{transform:rotate(-90deg)}100%{transform:rotate(0)}}
 @keyframes flecha{0%,22%{opacity:1}40%,85%{opacity:.15}100%{opacity:1}}
+
+/* ---------- teléfono en vertical: el contenido se gira 90° y se juega con el teléfono acostado (pedido del dueño del 12-nov:
+   con la rotación trabada no hacía falta abrir el centro de control). Medidas y áreas seguras las pone telefono.js. ---------- */
+html.rotado{--sl:env(safe-area-inset-top,0px);--st:env(safe-area-inset-right,0px);--sr:env(safe-area-inset-bottom,0px);--sb:env(safe-area-inset-left,0px)}
+html.rotado #app{position:fixed;left:0;top:0;flex:none;width:var(--app-w,100vh);height:var(--app-h,100vw);transform-origin:0 0;transform:translateX(var(--app-tx,100vw)) rotate(90deg)}
+
+/* ---------- turno de un rival y marcador ---------- */
+.turno{position:absolute;left:50%;top:calc(var(--u)*5 + var(--st));transform:translateX(-50%);display:flex;align-items:center;gap:.7em;background:rgba(6,14,48,.92);border-bottom:calc(var(--u)*.3) solid var(--c,var(--gold));padding:calc(var(--u)*.45) calc(var(--u)*1.1);max-width:min(92cqw,calc(var(--u)*46));white-space:nowrap}
+.turno i{width:1.8em;height:1.15em;flex:none}
+.turno b{font-weight:800;font-size:calc(var(--u)*1.5);letter-spacing:.05em;color:#fff}
+.turno span{font-family:var(--body);text-transform:none;font-size:calc(var(--u)*1.05);color:var(--mute);overflow:hidden;text-overflow:ellipsis}
+.marcador{position:absolute;left:calc(var(--u)*1.2 + var(--sl));top:calc(var(--u)*4.4 + var(--st));background:rgba(6,14,48,.88);border-left:calc(var(--u)*.28) solid var(--c,var(--teal));padding:calc(var(--u)*.3) calc(var(--u)*.8);display:flex;flex-direction:column;max-width:46%}
+.marcador b{font-weight:800;font-size:calc(var(--u)*1.05);letter-spacing:.05em;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.marcador span{font-weight:700;font-size:calc(var(--u)*.95);letter-spacing:.05em;color:var(--gold)}
+body:has(.etiqueta:not([hidden])) .marcador{top:calc(var(--u)*7 + var(--st))}
+/* durante el turno de un rival no hay botón de levantar ni señal: tocar solo saltea (y lo dice el cartel) */
+html.turno-rival #zona,html.turno-rival #senal,html.turno-rival #acuse{display:none!important}
+
+/* ---------- campo de texto en el teléfono: un editor arriba de lo visible, derecho, con «Listo» ---------- */
+#editor{position:fixed;left:0;right:0;top:var(--vvy,0px);z-index:60;background:#080d1e;border-bottom:3px solid var(--teal);padding:calc(10px + env(safe-area-inset-top,0px)) calc(12px + env(safe-area-inset-right,0px)) 10px calc(12px + env(safe-area-inset-left,0px));box-shadow:0 10px 30px rgba(0,0,0,.6)}
+#editor label span{display:block;font-family:var(--display);font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--teal);font-size:16px;margin-bottom:6px}
+#editor .fila{flex-wrap:nowrap;margin:0}
+#editor input{flex:1;min-width:0;font:inherit;font-family:var(--body);font-size:20px;color:var(--ink);background:#0d1533;border:1px solid var(--line);border-bottom:2px solid var(--teal);border-radius:0;padding:.45em .6em;-webkit-appearance:none;appearance:none}
+#editor button{min-height:48px;font-size:17px}
+html.editando #app{visibility:hidden}
+
+/* ---------- aviso para instalar en el iPhone (pantalla completa) ---------- */
+#instalar{position:fixed;z-index:55;left:50%;top:calc(8px + env(safe-area-inset-top,0px));transform:translateX(-50%);display:flex;align-items:center;gap:12px;width:max-content;max-width:min(94%,560px);background:#0d1640;border:1px solid var(--teal);padding:8px 10px 8px 14px;font-size:15px;line-height:1.35;color:var(--ink);box-shadow:0 6px 20px rgba(0,0,0,.5)}
+#instalar button{min-height:40px;flex:none}
+
+/* ---------- teléfono de costado: menos texto mientras se juega, un solo mensaje a la vez, señal más grande ---------- */
+:where(html.horiz.bajo) .senal{--v:calc(var(--u)*1)}
+:where(html.horiz.bajo) .s-franja{border-color:rgba(255,196,40,.42)}
+:where(html.horiz.bajo) .s-franja.s-perf{border-color:rgba(255,214,90,.7)}
+:where(html.horiz.bajo) .s-fijo{border-width:calc(var(--v)*.55)}
+:where(html.horiz.bajo) .s-cierra{border-width:calc(var(--v)*.65)}
+:where(html.horiz.bajo) .senal:not(.apuro) .s-sub{display:none}
+:where(html.horiz.bajo) .bug span{display:none}
+:where(html.horiz.bajo) body:has(#veredicto:not([hidden])) :is(#rival,#etiqueta,#guia,#marcador),
+:where(html.horiz.bajo) body:has(#turno:not([hidden])) #rival,
+:where(html.horiz.bajo) body:has(#senal:not([hidden])) #rival{display:none}
+:where(html.horiz.bajo) .panel.lado :is(p.frase,p.reloj){display:none}
+:where(html.horiz.bajo) .veredicto small{font-size:max(13px,calc(var(--u)*1.25))}

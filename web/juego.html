@@ -10,7 +10,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="color-scheme" content="dark">
 <title>Tarima · Halterofilia a un botón</title>
-<link rel="icon" href="data:,">
+<link rel="icon" href="iconos/icono-192.png" type="image/png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="iconos/icono-180.png">
+<meta name="apple-mobile-web-app-title" content="Tarima">
 <link rel="stylesheet" href="css/juego.css">
 <link rel="stylesheet" href="css/bienvenida.css">
 <script type="importmap">
@@ -19,6 +22,7 @@
 </head>
 <body>
 <noscript><p style="padding:2em;font:16px/1.5 system-ui,sans-serif;color:#f2f4ff">Tarima necesita JavaScript activado. · Tarima needs JavaScript turned on.</p></noscript>
+<div id="app">
 <div id="escena">
   <canvas id="gl" aria-label="Transmisión 3D del levantamiento"></canvas>
   <canvas id="ayudas" aria-hidden="true"></canvas>
@@ -31,6 +35,8 @@
     <div class="senal" id="senal" hidden aria-live="off"></div>
     <div class="guia" id="guia" hidden></div>
     <div class="rival" id="rival" hidden></div>
+    <div class="turno" id="turno" hidden aria-live="polite"></div>
+    <div class="marcador" id="marcador" hidden aria-live="polite"></div>
     <div class="acuse" id="acuse" hidden aria-hidden="true"><kbd class="tecla"></kbd><b></b></div>
     <pre class="depura" id="depura" hidden></pre>
     <div class="zocalo" id="zocalo" hidden>
@@ -48,20 +54,9 @@
   <div id="msg">Tarima</div>
 </div>
 <div id="zona" aria-label="Zona de toque del levantamiento"><span id="zona-txt">Toca</span></div>
-<div id="girar" role="alertdialog" aria-labelledby="girar-t" aria-describedby="girar-s">
-  <svg viewBox="0 0 160 160" aria-hidden="true">
-    <path class="flecha" d="M38 30 A62 62 0 0 1 132 62" fill="none" stroke="#35e6d6" stroke-width="6" stroke-linecap="round"/>
-    <path class="flecha" d="M120 52 L134 64 L138 46" fill="none" stroke="#35e6d6" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-    <g class="tel">
-      <rect x="54" y="34" width="52" height="96" rx="9" fill="#0d1533" stroke="#f2f4ff" stroke-width="5"/>
-      <rect x="61" y="46" width="38" height="70" rx="2" fill="#16245a"/>
-      <circle cx="80" cy="123" r="3" fill="#f2f4ff"/>
-      <circle cx="88" cy="100" r="8" fill="none" stroke="#ffd23f" stroke-width="3"/>
-    </g>
-  </svg>
-  <b id="girar-t">Gira el teléfono</b>
-  <span id="girar-s">Tarima se juega de costado.</span>
+<div id="instalar" hidden role="status"><span id="instalar-t"></span><button id="instalar-ok" type="button">OK</button></div>
 </div>
+<div id="editor" hidden><label for="editor-campo"><span id="editor-t"></span></label><div class="fila"><input id="editor-campo" autocomplete="off"><button class="ir" id="editor-listo" type="button">Listo</button></div></div>
 <script type="module" src="js/game/telefono.js"></script>
 <script type="module" src="js/game/main.js"></script>
 </body>
