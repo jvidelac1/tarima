@@ -20,7 +20,8 @@ Uso:
   .venv/bin/python tools/sheet.py --shots out/arte/shots --ciega 7 --tags A,B,B2 --planos P01-P04 --out out/arte/ciega.png
       hoja A CIEGAS para revisores, solo en arcilla: en cada plano las versiones van en orden mezclado (distinto en cada
       fila, fijo para la misma semilla) y rotuladas con letras (X, Y, Z; con más versiones se suman W y V), sin encabezado
-      de build ni imágenes objetivo. Escribe la hoja, las celdas sueltas a tamaño real en <out sin extensión>_celdas/
+      de build ni imágenes objetivo, y con el panel de telemetría tapado (sus decimales cambian de un build a otro).
+      Escribe la hoja, las celdas sueltas a tamaño real en <out sin extensión>_celdas/
       (P01_X.png, ...) y la clave en <out sin extensión>_clave.json: la clave NO se le da al revisor.
   .venv/bin/python tools/sheet.py --shots out/arte/shots --diff A A2 [--max 1.0]
       porcentaje de píxeles distintos entre dos versiones, por plano y en total (determinismo de la captura); sale con 1
@@ -231,6 +232,9 @@ def a_ciegas(clay, tags, planos, meta, runs, out, cell, semilla):
         for letra, t in clave[p].items():
             # copia a tamaño real con nombre neutro: se vuelve a codificar para que no quede ningún dato del archivo original
             im = Image.open(clay[t][p]).convert('RGB')
+            # la telemetría de la gráfica (tiempo y velocidades con dos decimales) cambia apenas de un build a otro y permitiría
+            # reconocer la misma versión de un plano a otro: se tapa el panel (abajo a la derecha en las capturas de shots.mjs)
+            ImageDraw.Draw(im).rectangle((round(im.width * .853), round(im.height * .652), round(im.width * .993), round(im.height * .878)), fill=BAR)
             rotulo(ImageDraw.Draw(im), (0, 0), f'{letra} · {p}', f)
             dst = os.path.join(celdas, f'{p}_{letra}.png')
             im.save(dst)
