@@ -41,7 +41,9 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          # 24 trae npm 11, el mismo con el que se armó worker/package-lock.json: con el npm 10 de Node 22, `npm ci`
+          # pide dependencias opcionales de wasm (@emnapi/*) que no están en el lock.
+          node-version: 24
           cache: npm
           cache-dependency-path: |
             package-lock.json
@@ -49,9 +51,9 @@ jobs:
 
       - name: Dependencias
         run: |
+          mkdir -p out/logs
           npm ci
           npm --prefix worker ci
-          mkdir -p out/logs
 
       - name: Cliente, métricas y Functions sin red (servidor_test)
         if: ${{ !cancelled() }}
@@ -68,7 +70,7 @@ jobs:
       - name: Empaquetado sin desplegar (Worker --dry-run y Functions de Pages)
         if: ${{ !cancelled() }}
         run: |
-          { (cd worker && npx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker")
+          { (cd worker && node_modules/.bin/wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker")
             mkdir -p "$RUNNER_TEMP/pages"
             worker/node_modules/.bin/wrangler pages functions build --outdir "$RUNNER_TEMP/pages/out" --output-routes-path "$RUNNER_TEMP/pages/_routes.json"
             cat "$RUNNER_TEMP/pages/_routes.json"
