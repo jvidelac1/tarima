@@ -2,7 +2,7 @@
 Uso (en el pod, cada comando con `flock /root/blender.lock` adelante; rutas relativas a la raíz del repo):
   .venv/bin/python blender/detail.py align  <nombre> <malla.glb> [--pose fin] [--decimate 300000] [--out webv/B/models/prop_fin.glb]
                                             [--json out/arte/gen/align_fin.json] [--ejes] [--espejo] [--tex] [--verdad sint.json]
-  .venv/bin/python blender/detail.py relief <nombre> <malla.glb> [--out out/arte/detail_<nombre>.npz] [--limite 0.012] [--tope 0.006] [--suave 0.02]
+  .venv/bin/python blender/detail.py relief <nombre> <malla.glb> [--out out/arte/detail_<nombre>.npz] [--limite 0.012] [--tope 0.006] [--suave 0.02] [--grueso 0.03]
   .venv/bin/python blender/detail.py heat   <nombre> <malla.glb> [--pose fin] [--out out/arte/gen/armup_error.png] [--rango 0.010] [--zona busto]
   .venv/bin/python blender/detail.py sint   <nombre> --out out/arte/seco/sint_fin.glb [--pose fin] [--escala 0.37] [--giro 25]
                                             [--tras 0.4,-0.25,0.15] [--ruido 0.001] [--ruido-en atleta] [--inflar 0.003] [--busto]
@@ -15,7 +15,7 @@ align   Importa el GLB, lleva al personaje a la pose pedida con out/<nombre>/s4.
         traslación, matriz, error mediano y cobertura. Líneas a mirar: `ALIGN ...`.
 relief  Alinea igual, pero contra el reposo, y mide por vértice del cuerpo cuánto hay que moverlo sobre su normal para llegar a la malla
         generada: rayo en los dos sentidos con límite, máscara por hueso dominante (brazo, antebrazo, hombro, Spine1, Spine2, cuello; fuera
-        cabeza, manos y zona del cinturón), promedio izquierda-derecha, suavizado y recorte. Guarda posición, normal, desplazamiento y máscara
+        cabeza, manos y zona del cinturón), promedio izquierda-derecha, paso alto (resta la parte gruesa), recorte y suavizado. Guarda posición, normal, desplazamiento y máscara
         en un .npz. Líneas a mirar: `RELIEF ...`.
 heat    Mapa de distancia con signo entre nuestra malla deformada en la pose y la malla generada (rojo: la generada queda por fuera, nos
         falta volumen; azul: queda por dentro, nos sobra). Hoja de cuatro vistas, JSON por hueso y .npz por vértice.
@@ -273,19 +273,44 @@ def cmd_relief(a):
         if dist<.004*K and j!=i:
             pares+=1; v=[x for x,o in ((d[i],ok[i]),(d[j],ok[j])) if o]
             if v: d2[i]=sum(v)/len(v); ok2[i]=True
+    # paso alto (--grueso, sigma en metros; 0 lo apaga): se resta el desplazamiento promediado a escala de varios centímetros, que es
+    # error de alineación, de pose y de proporción y no músculo (puerta de E6: 3,9 mm RMS de los 4,9 de G1, y 3,3 en el control G0, que
+    # debería dar cero). El promedio se hace contra una muestra de los vértices medidos (un campo suave no necesita más) y solo con los que
+    # miran para el mismo lado. Va antes del recorte: si no, el tope de 6 mm se lo come el error grueso.
+    grueso=np.zeros(len(P)); okf=ok2.astype(float)
+    if a.grueso>0:
+        sg=a.grueso*K; med=np.nonzero(ok2)[0]; rng=np.random.default_rng(a.semilla); sub=med if len(med)<=a.muestra else np.sort(rng.choice(med,a.muestra,replace=False))
+        kg=KDTree(len(sub))
+        for k,i in enumerate(sub.tolist()): kg.insert(P[i].tolist(),k)
+        kg.balance(); rg=2.5*sg; Ns=Nn[sub]; ds=d2[sub]
+        for i,p in enumerate(P.tolist()):
+            nb=kg.find_range(p,rg)
+            if not nb: continue
+            j=np.fromiter((x[1] for x in nb),int,len(nb)); r=np.fromiter((x[2] for x in nb),float,len(nb)); g=np.exp(-.5*(r/sg)**2)*(Ns[j]@Nn[i]>0); sw=g.sum()
+            if sw>1e-9: grueso[i]=(g*ds[j]).sum()/sw
+    rms=lambda v:float(np.sqrt(np.mean(np.square(v)))*1000) if len(v) else 0.
+    fino=np.clip(d2-grueso,-tope,tope); partes=dict(total_rms_mm=rms(d2[ok2]),grueso_rms_mm=rms(grueso[ok2]),fino_rms_mm=rms((d2-grueso)[ok2]),fino_recortado=float((np.abs((d2-grueso)[ok2])>tope).mean()) if ok2.any() else 0.)
+    print(f"RELIEF partes (antes de suavizar y de la máscara): total {partes['total_rms_mm']:.2f} mm RMS · gruesa (sigma {a.grueso*K*100:.1f} cm) {partes['grueso_rms_mm']:.2f} · fina {partes['fino_rms_mm']:.2f} · fracción de la fina que pasa el tope {partes['fino_recortado']*100:.1f} %",flush=True)
+    d2=fino
     # suavizado gaussiano sobre los vecinos que miran para el mismo lado, solo con los vértices medidos
-    d3=np.zeros(len(P)); rad=2.5*sig; okf=ok2.astype(float)
+    d3=np.zeros(len(P)); rad=2.5*sig
     for i,p in enumerate(P.tolist()):
         nb=kd.find_range(p,rad); j=np.fromiter((x[1] for x in nb),int,len(nb)); r=np.fromiter((x[2] for x in nb),float,len(nb))
         g=np.exp(-.5*(r/sig)**2)*okf[j]*(Nn[j]@Nn[i]>0); sw=g.sum()
         if sw>1e-9: d3[i]=(g*d2[j]).sum()/sw
     df=np.clip(d3,-tope,tope)*ws
+    # asimetría que queda (debería ser casi cero: el promedio con el espejo va antes): diferencia RMS entre cada vértice y su par
+    asim=[]
+    for i,p in enumerate(P.tolist()):
+        _,j,dist=kd.find((-p[0],p[1],p[2]))
+        if dist<.004*K and j!=i: asim.append(df[i]-df[j])
+    partes.update(final_rms_mm=rms(df[ws>.5]),asimetria_rms_mm=rms(np.array(asim)),grueso_sigma_m=a.grueso*K)
     out=a.out or os.path.join(ROOT,'out','arte',f'detail_{a.nombre}.npz'); os.makedirs(os.path.dirname(os.path.abspath(out)),exist_ok=True)
     meta=dict(nombre=a.nombre,entrada=a.glb,blend=S.blend,K=K,limite=L,tope=tope,suave=a.suave*K,vertices=int(len(sop)),medidos=int(ok.sum()),pares_simetricos=pares,alineacion=info,
-              max_mm=float(df.max()*1000),min_mm=float(df.min()*1000),por_hueso=por_grupo(dom[sop],df),crudo_por_hueso=por_grupo(dom[sop],crudo),huesos=list(MASK_BONES))
+              max_mm=float(df.max()*1000),min_mm=float(df.min()*1000),partes=partes,por_hueso=por_grupo(dom[sop],df),crudo_por_hueso=por_grupo(dom[sop],crudo),huesos=list(MASK_BONES))
     np.savez_compressed(out,co=P.astype(np.float32),no=Nn.astype(np.float32),d=df.astype(np.float32),w=ws.astype(np.float32),crudo=crudo.astype(np.float32),meta=np.array(json.dumps(meta,ensure_ascii=False)))
     json.dump(meta,open(os.path.splitext(out)[0]+'.json','w',encoding='utf-8'),ensure_ascii=False,indent=1)
-    print(f"RELIEF {a.nombre}: {len(sop)} vértices en la zona, {int(ok.sum())} con medida ({ok.mean()*100:.1f} %), {pares} con par simétrico · desplazamiento máx {df.max()*1000:+.2f} / {df.min()*1000:+.2f} mm (tope {tope*1000:.1f})")
+    print(f"RELIEF {a.nombre}: {len(sop)} vértices en la zona, {int(ok.sum())} con medida ({ok.mean()*100:.1f} %), {pares} con par simétrico · desplazamiento máx {df.max()*1000:+.2f} / {df.min()*1000:+.2f} mm (tope {tope*1000:.1f}) · final {partes['final_rms_mm']:.2f} mm RMS en la zona · asimetría {partes['asimetria_rms_mm']:.2f} mm RMS")
     for g,v in meta['por_hueso'].items(): c=meta['crudo_por_hueso'].get(g,{}); print(f"RELIEF   {g:9s} n={v['n']:6d} final: mediana {v['mediana']:+.2f} mm (p5 {v['p5']:+.2f}, p95 {v['p95']:+.2f}) · crudo: mediana {c.get('mediana',float('nan')):+.2f} mm")
     print('RELIEF salida',out)
 
@@ -398,7 +423,8 @@ def main():
         if glb: q.add_argument('glb'); q.add_argument('--ejes',action='store_true',help='probar las seis orientaciones de la malla generada'); q.add_argument('--espejo',action='store_true',help='espejar la malla generada en X antes de alinear')
         q.add_argument('--semilla',type=int,default=7)
     q=sub.add_parser('align'); comun(q); q.add_argument('--pose',default='fin'); q.add_argument('--decimate',type=int,default=300000); q.add_argument('--out'); q.add_argument('--json'); q.add_argument('--tex',action='store_true',help='conservar materiales y texturas del GLB'); q.add_argument('--verdad',help='JSON de `sint` para comparar'); q.set_defaults(f=cmd_align)
-    q=sub.add_parser('relief'); comun(q); q.add_argument('--out'); q.add_argument('--limite',type=float,default=.012,help='largo del rayo (m)'); q.add_argument('--tope',type=float,default=.006,help='recorte final (m)'); q.add_argument('--suave',type=float,default=.02,help='ancho a media altura del suavizado (m)'); q.add_argument('--trabajo',type=int,default=800000,help='tope de triángulos de la malla generada para medir'); q.set_defaults(f=cmd_relief)
+    q=sub.add_parser('relief'); comun(q); q.add_argument('--out'); q.add_argument('--limite',type=float,default=.012,help='largo del rayo (m)'); q.add_argument('--tope',type=float,default=.006,help='recorte final (m)'); q.add_argument('--suave',type=float,default=.02,help='ancho a media altura del suavizado (m)'); q.add_argument('--trabajo',type=int,default=800000,help='tope de triángulos de la malla generada para medir')
+    q.add_argument('--grueso',type=float,default=.03,help='sigma (m) del promedio que se resta antes de recortar (paso alto); 0 lo apaga'); q.add_argument('--muestra',type=int,default=6000,help='vértices medidos que se usan para ese promedio'); q.set_defaults(f=cmd_relief)
     q=sub.add_parser('heat'); comun(q); q.add_argument('--pose',default='fin'); q.add_argument('--out'); q.add_argument('--rango',type=float,default=.010,help='distancia que satura el color (m)'); q.add_argument('--limite',type=float,default=.03,help='distancia máxima de búsqueda (m)'); q.add_argument('--zona',choices=('busto','cuerpo'),default='busto'); q.add_argument('--res',type=int,default=800); q.add_argument('--trabajo',type=int,default=800000); q.set_defaults(f=cmd_heat)
     q=sub.add_parser('sint'); comun(q,False); q.add_argument('--out',required=True); q.add_argument('--pose',default='fin'); q.add_argument('--escala',type=float,default=.37); q.add_argument('--giro',type=float,default=25.); q.add_argument('--tras',default='0.4,-0.25,0.15'); q.add_argument('--ruido',type=float,default=.001); q.add_argument('--ruido-en',dest='ruido_en',choices=('atleta','gen'),default='atleta'); q.add_argument('--inflar',type=float,default=0.); q.add_argument('--busto',action='store_true',help='solo de la cadera hacia arriba'); q.set_defaults(f=cmd_sint)
     q=sub.add_parser('cmp'); q.add_argument('nombre'); q.add_argument('a'); q.add_argument('b'); q.set_defaults(f=cmd_cmp)
