@@ -12,6 +12,9 @@ Uso (en el pod, desde la raíz del repo, con ComfyUI en 127.0.0.1:8188 y sin Ble
   .venv/bin/python tools/e5_refs.py cerrar          arma out/arte/refs_gen/<nombre>.png (RGBA) y resumen.json; lo que no
                                                     llegó al objetivo queda con el render crudo y así se anota
   .venv/bin/python tools/e5_refs.py medir <repintada.png> <cruda.png>      mide un par suelto
+  .venv/bin/python tools/e5_refs.py descartar <nombre> <semilla> <motivo>   marca un intento como descartado a ojo (no se elige más)
+  .venv/bin/python tools/e5_refs.py hoja [<nombre> ...]                     hoja de control por imagen en refs_gen/hojas: cruda,
+                                                    repintada y diferencia de silueta (rojo = sobra, azul = falta) por intento
   .venv/bin/python tools/e5_refs.py objetivo T_A_s1 T_B_s2 T_C_s1          copia las candidatas elegidas a out/arte/target
                                                     a 1600x900 (las seis quedan en out/arte/target/candidatas)
 Opciones: --umbral 16 (canal mayor a partir del cual un píxel es del atleta)  --iou 0.92  --personaje ventura
@@ -26,6 +29,10 @@ Medida. Máscara cruda = alfa del render >= 128. Máscara repintada = canal mayo
 huecos interiores (silueta exterior): el pelo, la barba y las rodilleras son casi negros y sin relleno contarían como fondo.
 También se informa el IoU sin rellenar. Fondo = lo que queda a más de 24 px de la silueta cruda: se informa el percentil 99
 y el máximo del canal mayor y la fracción de píxeles por encima de 24; «limpio» es p99 <= 10 y fracción <= 0,05 %.
+
+El número no alcanza: la indicación v1 del frente (lista de músculos de frente y de espalda juntos) dio IoU 0,918 con la
+espalda pintada sobre el pecho. Por eso la indicación v2 nombra la vista y solo los músculos que se ven desde ahí, pide no
+ensanchar nada, y cada intento se mira en la hoja de control antes de darlo por bueno (`descartar` saca los que no sirven).
 """
 import argparse, json, os, shutil, subprocess, sys, time
 import numpy as np
@@ -37,35 +44,64 @@ PUENTES = {'@Switch (Model)': 'on_false', '@Switch (CFG)': 'on_false', '@Switch 
 SEM = {'rest_bust': 2100, 'fin_bust': 2200, 'fin_full': 2300}
 NVISTA = {'front': 1, 'left': 2, 'back': 3, 'right': 4}
 
-ANAT = ('clearly separated anterior, lateral and posterior deltoid heads, defined biceps and triceps, dense forearms, '
-        'full pectorals, serratus anterior, wide latissimus dorsi, thick trapezius')
-ROPA = ('a plain red sleeveless one-piece weightlifting singlet with off-white trim, completely plain: no text, no lettering, '
-        'no belt')
-P_FRENTE = ('Keep the exact silhouette, pose, framing and camera of the figure, and keep the background pure solid black. '
-            'Repaint the figure as the same fictional adult male weightlifter with the anatomy of an elite weightlifter: '
-            f'{ANAT}. Realistic skin with clearly readable muscle shapes. He wears {ROPA}. Same face, beard, hair, skin tone, '
-            'white wrist wraps and black armband tattoo on the same arm; keep everything else unchanged. '
-            'Soft even studio lighting, no cast shadows, no rim light.')
-LADO = {'left': ('his left side', 'left side', 'lateral and posterior deltoid heads, triceps, biceps, forearm, serratus anterior, latissimus dorsi'),
-        'back': ('behind', 'back', 'posterior deltoids, trapezius, rhomboids, latissimus dorsi, triceps, spinal erectors'),
-        'right': ('his right side', 'right side', 'lateral and posterior deltoid heads, triceps, biceps, forearm, serratus anterior, latissimus dorsi')}
+V_IND = 2      # versión de las indicaciones (queda anotada en cada intento)
+QUIEN = ('the same fictional adult male weightlifter with accurate, clearly readable muscle anatomy of an elite 81 kg class '
+         'weightlifter, lean and athletic, not a bodybuilder')
+NO_ENSANCHAR = 'Do not make the arms, shoulders, neck, torso or legs wider or thicker than they are, and do not move the hands.'
+ROPA = {'bust': 'the same red sleeveless one-piece weightlifting singlet with off-white trim, with the same cut as now, completely '
+                'plain: no text, no lettering, no belt',
+        'full': 'the same red sleeveless one-piece weightlifting singlet with off-white trim, with the same cut as now, completely '
+                'plain: no text, no lettering; keep the brown leather belt, the dark blue knee sleeves, the white socks and the white '
+                'shoes exactly as they are'}
+# Solo lo que se ve desde cada vista y en cada pose (rest = brazos abiertos hacia abajo, fin = brazos arriba).
+ANAT = {
+    ('front', 'rest'): 'anterior and lateral deltoid heads clearly separated, defined biceps, the outer edge of the triceps, dense '
+                       'forearms with brachioradialis, collarbones, the upper trapezius slope beside the neck, pectorals and abdominals '
+                       'reading through the tight fabric',
+    ('front', 'fin'): 'deltoids wrapping over the shoulders of the raised arms, defined biceps and triceps along the upper arms, dense '
+                      'forearms, modeled armpits with the edge of the latissimus dorsi and the serratus anterior below them, pectorals '
+                      'pulled upward and abdominals reading through the tight fabric',
+    ('side', 'rest'): 'lateral and posterior deltoid heads, the horseshoe of the triceps, biceps and brachialis, dense forearm, the '
+                      'chest and the shoulder blade reading through the tight fabric',
+    ('side', 'fin'): 'deltoid, triceps and biceps of the raised arm, dense forearm, modeled armpit, the latissimus dorsi sweeping down '
+                     'from the armpit, serratus anterior, the chest and the upper back reading through the tight fabric',
+    ('back', 'rest'): 'posterior deltoid heads, thick trapezius, rhomboids and shoulder blades, wide latissimus dorsi, the horseshoe of '
+                      'the triceps, spinal erectors reading through the tight fabric',
+    ('back', 'fin'): 'posterior deltoids, triceps of the raised arms, thick trapezius, shoulder blades rotated upward, wide latissimus '
+                     'dorsi sweeping down from the armpits, spinal erectors reading through the tight fabric'}
+LADO = {'left': ('his left side', 'left side'), 'back': ('behind', 'back'), 'right': ('his right side', 'right side')}
+
+
+def anat(vista, juego):
+    return ANAT[('side' if vista in ('left', 'right') else vista, juego.split('_')[0])]
+
+
+def p_frente(juego):
+    return ('This is a front view: the face and the chest face the camera. Keep the exact outline, pose, framing and camera of the '
+            f'figure, and keep the background pure solid black. Repaint only the surface of the body so that it reads as {QUIEN}: '
+            f'{anat("front", juego)}. {NO_ENSANCHAR} He wears {ROPA[juego.split("_")[1]]}. Same face, beard, hair, skin tone, white '
+            'wrist wraps and black armband tattoo on the same arm. Realistic skin. Soft even studio lighting, no cast shadows, no rim light.')
+
+
 NEG = ('text, letters, numbers, logo, brand name, watermark, belt, flag, national emblem, celebrity, famous athlete, '
        'real person likeness, extra fingers, fused fingers, deformed hands, extra limbs, waxy skin, plastic skin, cartoon, anime, '
        'illustration, blurry, low resolution, gray background, gradient background, floor, cast shadow, rim light')
 
 
-def p_vista(vista, orden):
-    desde, nombre, musc = LADO[vista]
+def p_vista(vista, orden, juego):
+    desde, nombre = LADO[vista]; musc, ropa = anat(vista, juego), ROPA[juego.split('_')[1]]
+    cara = 'The face is not visible from behind. ' if vista == 'back' else ''
     if orden == 'plan':      # imagen 1 = frente repintado, imagen 2 = render crudo de la vista
         return ('Picture 1 is the character reference, seen from the front. Picture 2 is a render of the same character seen from '
-                f'{desde}. Repaint Picture 2 as the character of Picture 1: same skin, same elite weightlifter muscle definition '
-                f'({musc}), {ROPA}, same soft even studio lighting. Keep the exact silhouette, pose, framing and camera of Picture 2 '
-                f'and its pure solid black background. Keep the armband tattoo only where Picture 2 shows it. The result is the {nombre} '
-                'view of Picture 2, not the front view.')
+                f'{desde}. Repaint only the surface of the body in Picture 2 so that it reads as the character of Picture 1, {QUIEN}: '
+                f'{musc}. Same skin and same soft even studio lighting as Picture 1. {NO_ENSANCHAR} He wears {ropa}. {cara}'
+                'Keep the exact outline, pose, framing and camera of Picture 2 and its pure solid black background. Keep the armband '
+                f'tattoo only where Picture 2 shows it. The result is the {nombre} view of Picture 2, not the front view.')
     return (f'Picture 1 is a render of a character seen from {desde}. Picture 2 shows the same character from the front, repainted '
-            'in the final look. Repaint Picture 1 with the look of Picture 2: same skin, same elite weightlifter muscle definition '
-            f'({musc}), {ROPA}, same soft even studio lighting. Keep the exact silhouette, pose, framing and camera of Picture 1 and '
-            f'its pure solid black background. Keep the armband tattoo only where Picture 1 shows it. The result is the {nombre} view.')
+            f'in the final look. Repaint only the surface of the body in Picture 1 so that it reads as the character of Picture 2, {QUIEN}: '
+            f'{musc}. Same skin and same soft even studio lighting as Picture 2. {NO_ENSANCHAR} He wears {ropa}. {cara}'
+            'Keep the exact outline, pose, framing and camera of Picture 1 and its pure solid black background. Keep the armband '
+            f'tattoo only where Picture 1 shows it. The result is the {nombre} view.')
 
 
 def ruta(*p): return os.path.join(ROOT, *p)
@@ -160,16 +196,18 @@ def lote(nombre, plan_de, a):
         semilla = base + 10 * k; t0 = time.time()
         sal = correr(nombre, semilla, plan_de())
         d, _ = medir(ruta(sal), ruta(REFS, nombre + '.png'), a.umbral)
-        d.update(ronda=k, semilla=semilla, archivo=sal, orden=getattr(a, 'orden', None), segundos=round(time.time() - t0, 1))
+        d.update(ronda=k, semilla=semilla, archivo=sal, orden=getattr(a, 'orden', None), indicacion_v=V_IND, segundos=round(time.time() - t0, 1))
         hechos.append(d); json.dump(hechos, open(ruta(GEN, 'qwen', nombre + '.intentos.json'), 'w'), indent=1)
         print(f"MED {nombre} s{semilla} IoU {d['iou']:.4f} (sin rellenar {d['iou_sin_rellenar']:.4f}, techo {d['iou_techo_del_metodo']:.4f}) "
               f"área x{d['area_relativa']:.3f} fondo p99 {d['fondo_p99']:.0f} máx {d['fondo_max']} >24: {d['fondo_sobre_24_pct']} % "
               f"{'limpio' if d['fondo_limpio'] else 'SUCIO'} · {d['segundos']} s", flush=True)
+        hoja(nombre)
         if d['iou'] >= a.iou and d['fondo_limpio']: break
     return mejor(hechos)
 
 
 def mejor(hechos):
+    hechos = [h for h in hechos if not h.get('descartada')]
     if not hechos: return None
     limpios = [h for h in hechos if h['fondo_limpio']] or hechos
     return max(limpios, key=lambda h: h['iou'])
@@ -184,8 +222,8 @@ def cmd_frente(a):
     for juego in a.juegos:
         nombre = f'{a.personaje}_{juego}_front'
         m = lote(nombre, lambda: {'plantilla': 'image_qwen_image_edit_2511_int8', 'puentes': PUENTES,
-                                  'trabajos': [{'indicacion': P_FRENTE, 'negativa': NEG, 'imagenes': [entrada(nombre)]}]}, a)
-        print(f"FRENTE {nombre}: queda s{m['semilla']} con IoU {m['iou']:.4f}", flush=True)
+                                  'trabajos': [{'indicacion': p_frente(juego), 'negativa': NEG, 'imagenes': [entrada(nombre)]}]}, a)
+        print(f"FRENTE {nombre}: queda s{m['semilla']} con IoU {m['iou']:.4f}" if m else f"FRENTE {nombre}: sin intentos válidos", flush=True)
 
 
 def cmd_vistas(a):
@@ -199,8 +237,8 @@ def cmd_vistas(a):
                                       'agregar': {'ref2': {'class_type': 'LoadImage', 'inputs': {'image': ''}},
                                                   'ref2s': {'class_type': 'FluxKontextImageScale', 'inputs': {'image': ['ref2', 0]}}},
                                       'fijos': {'TextEncodeQwenImageEditPlus.image2': ['ref2s', 0]},
-                                      'trabajos': [{'indicacion': p_vista(vista, a.orden), 'negativa': NEG, 'imagenes': im}]}, a)
-            print(f"VISTA {nombre}: queda s{m['semilla']} con IoU {m['iou']:.4f}", flush=True)
+                                      'trabajos': [{'indicacion': p_vista(vista, a.orden, juego), 'negativa': NEG, 'imagenes': im}]}, a)
+            print(f"VISTA {nombre}: queda s{m['semilla']} con IoU {m['iou']:.4f}" if m else f"VISTA {nombre}: sin intentos válidos", flush=True)
 
 
 def cmd_cerrar(a):
@@ -215,11 +253,49 @@ def cmd_cerrar(a):
                 e = {'origen': 'qwen', 'semilla': m['semilla'], 'de': m['archivo'], 'iou': d['iou'], 'fondo_p99': d['fondo_p99'], 'fondo_max': d['fondo_max']}
             else:
                 shutil.copyfile(crudo, dst)
-                e = {'origen': 'cruda', 'motivo': 'descartada a ojo' if fuerza and m else ('sin intentos' if not m else f"mejor IoU {m['iou']:.4f}, fondo {'limpio' if m['fondo_limpio'] else 'sucio'}")}
-            e['intentos'] = [{k: h[k] for k in ('semilla', 'iou', 'iou_sin_rellenar', 'area_relativa', 'fondo_p99', 'fondo_max', 'fondo_limpio', 'orden', 'segundos')} for h in hechos]
+                e = {'origen': 'cruda', 'motivo': 'descartada a ojo' if fuerza and m else ('sin intentos' if not hechos else 'todos los intentos descartados a ojo' if not m else f"mejor IoU {m['iou']:.4f}, fondo {'limpio' if m['fondo_limpio'] else 'sucio'}")}
+            e['intentos'] = [{k: h.get(k) for k in ('semilla', 'iou', 'iou_sin_rellenar', 'area_relativa', 'fondo_p99', 'fondo_max', 'fondo_limpio', 'orden', 'indicacion_v', 'segundos', 'descartada')} for h in hechos]
             res['imagenes'][nombre] = e
             print(f"{nombre}: {e['origen']}" + (f" s{e['semilla']} IoU {e['iou']:.4f}" if e['origen'] == 'qwen' else f" ({e['motivo']})"))
     json.dump(res, open(ruta(GEN, 'resumen.json'), 'w'), ensure_ascii=False, indent=1)
+
+
+def cmd_descartar(a):
+    nombre, semilla, motivo = a.resto[0], int(a.resto[1]), ' '.join(a.resto[2:]) or 'descartada a ojo'
+    hechos = intentos_de(nombre); n = 0
+    for h in hechos:
+        if h['semilla'] == semilla: h['descartada'] = motivo; n += 1
+    if not n: sys.exit(f'{nombre} no tiene un intento con semilla {semilla}')
+    json.dump(hechos, open(ruta(GEN, 'qwen', nombre + '.intentos.json'), 'w'), ensure_ascii=False, indent=1)
+    m = mejor(hechos); print(f"{nombre} s{semilla} descartada ({motivo}); queda " + (f"s{m['semilla']} IoU {m['iou']:.4f}" if m else 'sin intentos válidos'))
+
+
+def hoja(nombre, lado=512):
+    """Una fila por intento: render crudo, repintada y diferencia de silueta (rojo = la repintada sobra, azul = falta)."""
+    hechos = intentos_de(nombre)
+    if not hechos: return None
+    crudo = ruta(REFS, nombre + '.png'); filas = []
+    cr = Image.open(ruta(entrada(nombre))).convert('RGB').resize((lado, lado), Image.LANCZOS)
+    ar = rellenar(np.asarray(Image.open(crudo).convert('RGBA'))[..., 3] >= 128)
+    for h in hechos:
+        d, m = medir(ruta(h['archivo']), crudo, h.get('umbral', 16))
+        g = Image.open(ruta(h['archivo'])).convert('RGB')
+        dif = np.zeros(ar.shape + (3,), 'uint8'); dif[ar & m] = 70; dif[m & ~ar] = (255, 40, 40); dif[ar & ~m] = (60, 120, 255)
+        fila = Image.new('RGB', (lado * 3, lado + 22), (20, 20, 20))
+        for k, im in enumerate([cr, g.resize((lado, lado), Image.LANCZOS), Image.fromarray(dif).resize((lado, lado), Image.LANCZOS)]): fila.paste(im, (k * lado, 22))
+        ImageDraw.Draw(fila).text((6, 5), f"{nombre} s{h['semilla']} v{h.get('indicacion_v', 1)} IoU {h['iou']:.4f} area x{h['area_relativa']:.3f} fondo p99 {h['fondo_p99']:.0f}"
+                                  + (' DESCARTADA: ' + h['descartada'] if h.get('descartada') else ''), fill=(255, 255, 255))
+        filas.append(fila)
+    out = Image.new('RGB', (lado * 3, sum(f.size[1] for f in filas))); y = 0
+    for f in filas: out.paste(f, (0, y)); y += f.size[1]
+    dst = ruta(GEN, 'hojas', nombre + '.jpg'); os.makedirs(os.path.dirname(dst), exist_ok=True); out.save(dst, quality=88)
+    return dst
+
+
+def cmd_hoja(a):
+    nombres = a.resto or [f'{a.personaje}_{j}_{v}' for j in a.juegos for v in ['front', 'left', 'back', 'right']]
+    for n in nombres:
+        d = hoja(n); print(d or f'{n}: sin intentos')
 
 
 def cmd_objetivo(a):
@@ -236,7 +312,7 @@ def cmd_objetivo(a):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
-    ap.add_argument('cmd', choices=['frente', 'vistas', 'cerrar', 'medir', 'objetivo']); ap.add_argument('resto', nargs='*')
+    ap.add_argument('cmd', choices=['frente', 'vistas', 'cerrar', 'medir', 'objetivo', 'descartar', 'hoja']); ap.add_argument('resto', nargs='*')
     ap.add_argument('--juegos', default='rest_bust,fin_bust,fin_full'); ap.add_argument('--vistas', default='left,back,right')
     ap.add_argument('--orden', default='plan', choices=['plan', 'inverso']); ap.add_argument('--intentos', type=int, default=3)
     ap.add_argument('--umbral', type=int, default=16); ap.add_argument('--iou', type=float, default=0.92)
@@ -245,4 +321,4 @@ if __name__ == '__main__':
     a = ap.parse_args(); a.juegos = a.juegos.split(','); a.vistas = a.vistas.split(','); a.crudas = [x for x in a.crudas.split(',') if x]
     if a.cmd == 'medir':
         d, _ = medir(a.resto[0], a.resto[1], a.umbral); print(json.dumps(d, indent=1))
-    else: {'frente': cmd_frente, 'vistas': cmd_vistas, 'cerrar': cmd_cerrar, 'objetivo': cmd_objetivo}[a.cmd](a)
+    else: {'frente': cmd_frente, 'vistas': cmd_vistas, 'cerrar': cmd_cerrar, 'objetivo': cmd_objetivo, 'descartar': cmd_descartar, 'hoja': cmd_hoja}[a.cmd](a)
