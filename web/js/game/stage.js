@@ -280,7 +280,7 @@ export class Escena {
         const medio = () => { const rt = hornear(A.tarima, 1.2, 1.2, 8, 0, THREE.FloatType), b = new Float32Array(8 * 8 * 4); r.readRenderTargetPixels(rt, 0, 0, 8, 8, b); rt.dispose(); const c = new THREE.Color(); for (let i = 0; i < 64; i++) { c.r += b[i * 4] / 64; c.g += b[i * 4 + 1] / 64; c.b += b[i * 4 + 2] / 64; } return c; };
         const k = this.lighting.key, I = k.intensity, con = medio(); k.intensity = 0; const sin = medio(); k.intensity = I;
         const lum = c => .2126 * c.r + .7152 * c.g + .0722 * c.b, a = lum(tonoJS(con)), b = lum(tonoJS(sin));
-        if (a > 1e-4 && Number.isFinite(b)) op = Math.min(.9, Math.max(.1, 1 - b / a));
+        if (a > 1e-4 && Number.isFinite(b)) { this.opacidadCruda = +(1 - b / a).toFixed(3); op = Math.min(.9, Math.max(.1, 1 - b / a)); }
       }
       const tarima = A.tarima, esc = A.escenario, origT = tarima.material, origE = esc.material;
       const basico = (rt, nombre) => new THREE.MeshBasicMaterial({ name: nombre, map: rt.texture });
