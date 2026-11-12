@@ -1,6 +1,6 @@
 # Relevo — Tarima
 
-Estado al 11 de noviembre de 2026. Este documento es para retomar el trabajo, con o sin agente.
+Estado al 11 de noviembre de 2026; la sección de la etapa 2 (dirección de arte) es del 12 de noviembre. Este documento es para retomar el trabajo, con o sin agente.
 
 ## Qué es
 
@@ -185,17 +185,98 @@ El plan por etapas, con el criterio de terminado de cada una, dónde corre cada 
 
 Resumen: (0) preparar el Mac alquilado y la sesión cloud, (1) juego mínimo jugable en cloud, (2) prueba de dirección de arte con decisión del usuario, (3) atletas definitivos, (4) movimiento contra video y fallos animados, (5) online, (6) pulido.
 
-## Etapa 2, dirección de arte: malla generada (E7) y relieve generado (E8), 12-nov
+## Etapa 2, dirección de arte (11 y 12-nov)
 
-Corrido en el pod con GPU; nada de esto entró a `web/` ni a `out/`. Capturas en `out/arte/shots`, hojas en `out/arte/comparacion_ventura_AB.png` y `_AB_arcilla.png`.
+Prueba para que el usuario elija una imagen objetivo y con qué versión del personaje se sigue. Corrió en un pod alquilado con una RTX 4090 (rama `arte`); **nada de esto entró a `web/` ni a `out/<nombre>/`**: cada variante tiene su carpeta (`out_C`, `out_B`, `out_B3`, `webv/<versión>`) y lo demás está en `out/arte`. El paquete con todo (`arte.tgz`, 829 MB: `out/arte`, los `finish.log` de las variantes y los GLB de `webv`) se bajó del pod; `out/` no está en git. Solo se trabajó con Ventura.
 
-- **Arcilla de espaldas.** `tools/shots.mjs --clay` baja los contraluces (el cálido a 0,25 y la luz de pelo a 0,15): de espaldas lavaban el relieve. Las `A_clay_*` se recapturaron con ese cambio; las anteriores quedaron en `out/arte/shots/antes_luces/`. Las `C_clay_*` son de antes y no se comparan con estas.
+**Falta la decisión del usuario.** Se decide con dos hojas: `out/arte/comparacion_ventura.png` (materiales del juego) y `comparacion_ventura_arcilla.png`, las dos con las tres imágenes objetivo arriba. Para revisores hay una hoja a ciegas en `out/arte/ciega/` (clave aparte, en `out/arte/ciega_clave/`).
+
+### Versiones comparadas
+
+| Versión | Qué es | Dónde | Resultado |
+|---|---|---|---|
+| A | Build actual, línea de base | `web/` | Referencia. Defectos conocidos con los brazos arriba: manchas claras y pliegue quebrado en la axila |
+| B | Malla generada G3 (imagen a 3D, brazos arriba), estática, colgada con `--prop` | `webv/B/models/prop_fin.glb` | Más definición en brazos, hombros y pecho, pero trae ropa y cinturón en relieve, otra cara y el tronco facetado. Referencia de forma, no personaje |
+| B2 | Relieve de la malla generada G1 sumado a nuestra malla: tope 6 mm, suavizado 2 cm | `out_B`, `webv/B2` | `CHK` 0. Marca más que A, con bultos en hombro y clavícula y un escalón junto a la columna |
+| B3 | Lo mismo con tope 4,5 mm y suavizado 3 cm | `out_B3`, `webv/B3` | `CHK` 0. A ojo de un solo agente, la mejor: gana a A en reposo, brazos arriba, tirón y espalda; en el rack casi empata |
+| C | Más músculo por targets de MPFB (`TARIMA_VARIANT=C`) | `out_C`, `webv/C` | **Descartada.** `CHK` 0, pero el brazo cambia entre -0,4 y +1,8 % (se pedía +6 %) y a tamaño de juego no se distingue de A |
+
+B2 y B3 mueven la búsqueda del rack: la barra contra el hombro cambia 3 mm o menos, pero el codo queda hasta 1,5 cm más adentro en tres de las seis líneas `rack` (el criterio era 5 mm). Sin decidir si se acepta.
+
+### Herramientas nuevas
+
+Cada script tiene el uso completo en su cabecera. En el pod: `TARIMA_ANGLE=vulkan` para Chrome y `flock /root/blender.lock` delante de todo comando de Blender.
+
+| Herramienta | Para qué | Uso mínimo |
+|---|---|---|
+| `tools/shots.mjs` | Planos fijos P01 a P16 de una versión, deterministas (reloj manual, azar sembrado). `--clay` arcilla, `--mask` máscaras por segmento, `--prop=<glb>` malla estática en lugar del atleta. Anota en `shots.json` cámara, commit y sha256 y fecha de los GLB | `node tools/shots.mjs --web=webv/B2 --tag=B2 [--clay] --out=out/arte/shots` |
+| `tools/sheet.py` | Hoja comparativa: una fila por plano, una columna por versión, imágenes objetivo arriba. El encabezado dice de qué build salió cada columna (carpeta, GLB con sha256 corto y fecha, commit de la captura). Avisa (`AVISO`) cámaras o luces de arcilla distintas y GLB posterior a la captura. `--diff A A2` mide determinismo. `--ciega <semilla>` arma la hoja a ciegas | `.venv/bin/python tools/sheet.py --shots out/arte/shots --target out/arte/target --tags A,B,B2,B3,C --out out/arte/comparacion_ventura.png` |
+| `tools/widths.py` | Ancho de brazo y de hombros en píxeles sobre las máscaras de `--mask` | ver cabecera |
+| `blender/refs.py` | 16 renders de referencia del personaje (reposo y brazos arriba, entero y busto, 4 vistas) con `cams.json` | `.venv/bin/python blender/refs.py ventura` |
+| `tools/comfy_run.mjs` | Lotes de ComfyUI por HTTP con semilla fija; deja un JSON por salida (indicación, semilla, modelos con sha256, segundos, VRAM pico). Recetas en `tools/arte_trabajos/` | `node tools/comfy_run.mjs --trabajos=tools/arte_trabajos/e5_objetivo.json` |
+| `tools/e5_refs.py` | Repinta las referencias con Qwen-Image-Edit y mide el IoU de silueta contra el render crudo; `cerrar`, `fichas`, `hoja`, `objetivo` | `.venv/bin/python tools/e5_refs.py vistas --una` |
+| `blender/gen_turn.py` | Turno en arcilla (4 vistas, luz rasante) de una malla generada, más su textura | `.venv/bin/python blender/gen_turn.py out/arte/gen/G1.glb` |
+| `tools/e6_log.py` | Arma `out/arte/gen/gen_log.csv` (modelo, entradas, segundos, VRAM, triángulos, alineación) | `python3 tools/e6_log.py` |
+| `blender/detail.py` | `align` (alinea una malla generada al personaje), `relief` (mide su relieve por vértice, con paso alto), `heat` (mapa de error con signo), `sint` y `cmp` (pruebas en seco) | `.venv/bin/python blender/detail.py relief ventura out/arte/gen/G1.glb --suave 0.03 --tope 0.0045 --out out/arte/detail_ventura_suave.npz` |
+| `TARIMA_DETAIL=<npz>` | El build suma ese relieve en `geo.anatomy`; sin la variable la malla sale idéntica (0 vértices cambian) | `TARIMA_DETAIL=out/arte/detail_ventura_suave.npz TARIMA_OUT=out_B3 TARIMA_WEB=webv/B3 FAST=1 ./build.sh ventura` |
+| `TARIMA_VARIANT=C`, `TARIMA_VARIANT_MIX` | Variante con más músculo por targets (solo Ventura). Descartada | `TARIMA_VARIANT=C TARIMA_OUT=out_C TARIMA_WEB=webv/C FAST=1 ./build.sh ventura` |
+| `tools/arte_instalar.sh` | Instala ComfyUI y los 11 pesos en otro pod. **Nunca se ejecutó**: en este pod ComfyUI v0.45.0 ya estaba en `/opt/comfy` | ver cabecera |
+
+Plantillas de ComfyUI usadas: `image_qwen_image_edit_2511_int8` y `3d_pixal3d_multi_views`. Sentido de las vistas confirmado con la textura de G1: `left` de `refs.py` (cámara en +X, ve el lado izquierdo del personaje) es el `left` del nodo multivista; el tatuaje queda en el brazo izquierdo, sin espejar.
+
+### Resultado de cada experimento
+
+- **E0, pruebas en seco.** `detail.py align` recupera una similitud conocida con 0,41 mm de error mediano; `relief` contra los brazos inflados 3 mm da +2,95 mm en el brazo y 0 en el resto; el enganche `TARIMA_DETAIL` no cambia nada sin la variable.
+- **E2, planos.** 16 capturas de A y 12 en arcilla, sin errores de consola. Dos corridas del mismo build difieren en 0,000 % de los píxeles (máximo 1/255). P03 se reencuadró respecto del plan para centrar el pliegue de la axila trasera.
+- **E3, referencias.** 16 renders de 1024x1024 con alfa. El criterio de alto de silueta igual dentro de 1 px entre vistas **no se cumple** (25 a 42 px de diferencia): es la perspectiva, y lo medido coincide con lo previsto dentro de 1,1 px. El busto da 1,45 a 1,69 veces más detalle, no el doble.
+- **E4, variante C.** Descartada (tabla de arriba). Hombros +1,6 a +3,2 %, todo por separación de articulaciones (`shW` 0,426 a 0,444 m), que además corre el agarre de cargada de 0,567 a 0,585 m. No se investigó por qué el target de brazo mueve tan poco.
+- **E5, imágenes objetivo y referencias repintadas** (Qwen-Image-Edit-2511 sobre `A_P01` y sobre los renders de E3). Tres objetivo en `out/arte/target`: `T_A_s2` (casi fotorreal), `T_B_s1` (realismo estilizado) y `T_C_s1` (más estilizado, brazos y hombros más gruesos). A y B casi no se distinguen (A suma poros, sudor y vello); en las tres el texto chico de la gráfica sale degradado. El revisor recomienda `T_B_s1`: mantiene las proporciones de P01 (no toca siluetas, holguras ni rack) y su lectura depende de volúmenes y sombras; `T_C_s1` obligaría a revalidar `check()` y el rack. Las 12 referencias repintadas (`out/arte/refs_gen`) pasan el IoU de silueta (0,933 a 0,990, objetivo 0,92), pero repintan poco: pectoral, abdomen y deltoides en los frentes, espaldas casi lisas, y tres de las doce son casi el render crudo. Receta que quedó: una sola imagen de entrada (el render crudo de esa vista), denoise 0,8, indicación v5; el método de dos imágenes (frente repintado más render crudo) se descartó. Hicieron falta 29 intentos para 12 imágenes (el tope pactado era 2 reintentos por imagen).
+- **E6, mallas generadas** G0 a G5 en `out/arte/gen` (700.000 triángulos, 42 a 45 MB cada una), con turno en arcilla y `gen_log.csv`. G0 (multivista con los renders crudos, control): no devuelve nuestra forma (3,9 mm de mediana contra un objetivo de 3) y sale facetada. **G1** (multivista con reposo repintado): la única lisa y con anatomía útil en brazos y tronco. G2 y G3 (brazos arriba): brazos aceptables, tronco facetado. G4 (Pixal3D de una vista) y G5 (TRELLIS.2 de una vista): 13 mm de mediana, cambian la pose e inventan la espalda; la multivista aporta. El relieve fino de G1 mide 2,08 mm RMS y el del control G0 1,97: **la ventaja de G1 está probada a ojo (lisa contra facetada), no en milímetros.**
+- **E7 (malla generada estática) y E8 (relieve generado):** en detalle más abajo.
+- **E9, hojas y paquete.** Hojas finales con A, B, B2, B3 y C, sin ningún `AVISO`. C se recapturó en arcilla con las luces nuevas y B3 con materiales en los 12 planos. B solo tiene arcilla en P01, P02, P03, P04 y P07. La hoja a ciegas mezcla las versiones en cada plano (P01 a P04, P08, P10 y P11). `out/arte/pesos.sha256` lista los 11 pesos.
+
+### E7 y E8 en detalle
+
+Capturas en `out/arte/shots`.
+
+- **Arcilla de espaldas.** `tools/shots.mjs --clay` baja los contraluces (el cálido a 0,25 y la luz de pelo a 0,15): de espaldas lavaban el relieve. Las `A_clay_*` se recapturaron con ese cambio; las anteriores quedaron en `out/arte/shots/antes_luces/`. Las `C_clay_*` se recapturaron con las luces nuevas en E9 (las viejas también quedaron en `antes_luces/`).
 - **B (E7): la malla generada G3, estática**, en `webv/B/models/prop_fin.glb` (300.000 triángulos, alineada a 4,25 mm de mediana). `--prop` funciona: queda en el lugar del atleta, con la barra en las manos y sin el atleta original. Tiene más definición en brazos, hombros y pecho que A, pero trae la malla de competencia, sus tirantes y el cinturón en relieve y una cara caricaturesca. Sirve como referencia de forma, no como personaje. En P03 la axila trasera queda en sombra detrás del tirante: no se puede decir que se lea como anatomía.
 - **B2 y B3 (E8): relieve de G1 (reposo) sumado a nuestra malla** con `blender/detail.py relief` y `TARIMA_DETAIL`. `relief` ahora resta la parte gruesa del desplazamiento (`--grueso`, sigma 3 cm) antes de recortar: de 6,19 mm RMS, 4,65 eran error de alineación y proporción y 3,03 relieve fino. B2: tope 6 mm y suavizado 2 cm (`out/arte/detail_ventura.npz`, `out_B`, `webv/B2`). B3: tope 4,5 mm y suavizado 3 cm (`detail_ventura_suave.npz`, `out_B3`, `webv/B3`).
 - Los dos builds dan `CHK ventura cuadros con superposición: 0` sin tocar `check()`, y el GLB pesa lo mismo que A (11,11 MB). La búsqueda del rack sí se mueve: la barra contra el hombro cambia 3 mm o menos, pero el codo queda hasta 1,5 cm más adentro en tres de las seis líneas `rack` (el criterio era 5 mm).
 - A ojo, en arcilla: B3 se lee mejor que A en reposo (P11), con los brazos arriba (P01), en el tirón (P10) y de espaldas (P04); en el rack (P08) casi no cambia. B2 marca más, pero deja bultos en hombro y clavícula y un escalón al costado de la columna. Es lectura de un solo agente: no hubo orden a ciegas de dos revisores.
 - **Estimación, sin referencia:** el trapecio, la zona escapular y los erectores de B2 y B3 los puso el generador (las vistas de espalda repintadas eran casi lisas). Hay que compararlos con cuadros de video antes de darlos por buenos.
 - El relieve se mide en reposo y se deforma con la piel: con los brazos arriba no corrige la axila (las manchas claras y el pliegue quebrado de la axila están igual en A, B2 y B3). `out/arte/gen/armup_error.png` (A contra G2, brazos arriba) es el objetivo de forma para `corr_armUp_*`: nos falta volumen en clavícula, deltoides posterior y tríceps y nos sobra en el dorsal bajo la axila. El mapa de B2 (`armup_error_B2.png`) es casi igual: el relieve fino no acerca la forma gruesa.
+
+### Tiempos y memoria de video medidos (RTX 4090, 24 GB)
+
+| Paso | Tiempo | VRAM pico de la placa |
+|---|---|---|
+| `shots.mjs`, 16 planos con materiales / 12 en arcilla | 23 a 24 s / 18 s | no medida |
+| Build `FAST=1` de Ventura, 12 hilos | 782 a 839 s (make 2 min, finish 11 min) | no medida |
+| `refs.py`, 16 renders con OptiX | 61 a 63 s | no medida |
+| Qwen-Image-Edit, imagen objetivo de 1360x768 | 66 a 80 s (117 s la primera, con carga de modelos) | 21,4 a 22,0 GB (23,6 la primera) |
+| Qwen-Image-Edit, referencia de 1024x1024 | 65 a 120 s con una imagen de entrada; 157 a 169 s con dos | 21,6 GB |
+| Pixal3D multivista a 1536 | 77 a 88 s (119 s la primera) | 8,6 a 11,6 GB |
+| Pixal3D de una vista / TRELLIS.2 a 1536 | 88 s / 62 s | 12,7 / 11,4 GB |
+| `gen_turn.py`, turno de una malla | 51 a 55 s | no medida |
+| `detail.py relief` / `heat` | 1 min / 1 min por malla | no medida |
+
+La VRAM pico es la de toda la placa mientras corría el trabajo: incluye lo que usaban otros procesos (había un Chrome de otro equipo). `out/arte/tiempos.txt` tiene cada corrida con inicio y fin; suma unos 255 minutos anotados, con tramos superpuestos entre agentes. El pod costaba USD 0,92 por hora.
+
+### Sin probar o sin cerrar
+
+- **Orden a ciegas por dos revisores.** Los criterios de E7 y E8 lo pedían; solo hay la lectura de un agente. La hoja y la clave ya están.
+- Búsqueda inversa de las caras de las imágenes objetivo: no se hizo (no se subió nada a servicios externos); la revisión fue a ojo. Las caras generadas no entran al juego.
+- Copia del LICENSE de cada modelo: en el pod solo estaba el de ComfyUI (`out/arte/comfy/LICENSE_ComfyUI`); hay que bajarlos de sus repositorios antes de usar algo generado en el juego.
+- El corrimiento del codo en el rack de B2 y B3 (hasta 1,5 cm) y el escalón junto a la columna de B2 no están investigados.
+- La axila con los brazos arriba no mejora con relieve medido en reposo: queda para `corr_armUp_*` y huesos `aux_` en la etapa 3, con `out/arte/gen/armup_error.png` como objetivo.
+- No se probó un mapa de normales sacado de la malla generada; solo relieve por vértice.
+- No se regeneró G3 con referencias repintadas más fuerte ni se midió el piso del método alineando nuestra malla contra sí misma.
+- No se enmascaró la zona bajo el ombligo ni se bajó el peso del relieve en `Spine1` y `Spine2` (lo sugirió el revisor); no hay plano dedicado al abdomen bajo.
+- `shots.mjs --mask` no corre con `--prop` (la malla estática no tiene pesos): B no se midió en anchos. B no se capturó con materiales.
+- `detail.py`: sin probar `--ejes` con una malla que venga con otro eje arriba, `--tex`, `heat --zona cuerpo` y mallas de más de 800.000 triángulos.
+- Brenner: nada de la etapa 2 se corrió con él (solo P15 y P16 de A como control).
+- El build de A no se rehízo entero para comparar `poses.json` byte a byte tras agregar las variables; sí se comprobó que malla, rig, mapas y texturas salen idénticos hasta `s3b.blend`.
 
 ## Decisiones tomadas en el camino
 
