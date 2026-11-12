@@ -68,8 +68,21 @@ function partida({ seg, frac, mp = 1.5, tope = 1.78, hz = 75 }) {
 }
 // carga ajena entre los 10 y los 50 s: pierde lo mismo a cualquier resolución
 { const r = partida({ seg: 110, frac: (mp, t) => (t > 10 && t < 50 ? .25 : 0) });
-  ok(r.bajadas === 1 && r.minimo > 1 && r.g.historia.some(h => h.motivo.startsWith('carga ajena')), `carga ajena: baja una vez, ve que no sirvió y la deshace (bajadas ${r.bajadas}, mínimo ${r.minimo.toFixed(2)} MP; ${r.serie.join(', ')})`);
+  ok(r.bajadas <= 2 && r.minimo > 1.5 * .85 ** 3 * .99 && r.g.historia.some(h => h.motivo.startsWith('carga ajena') && h.pasos === 3), `carga ajena: baja una racha de tres escalones como mucho, ve que no sirvió y la deshace entera (bajadas ${r.bajadas}, mínimo ${r.minimo.toFixed(2)} MP; ${r.serie.join(', ')})`);
   ok(r.mp >= 1.5 && r.g.nivel <= 0, `carga ajena: al terminar vuelve a la resolución de la calibración o más (${r.mp.toFixed(2)} MP, nivel ${r.g.nivel})`); }
+// costo propio que necesita dos o tres escalones y pierde poco (se pide de a uno): bajar uno no cambia lo que se pierde,
+// y eso no es carga ajena (antes bajaba y deshacía cada 65 s sin arreglar nada)
+for (const [n, lim] of [[2, 1.2], [3, 1.0]]) {
+  const r = partida({ seg: 240, frac: mp => (mp > lim ? .06 : 0) }), fin = r.serie.slice(-1)[0] || '';
+  ok(r.mp <= lim && !r.g.historia.some(h => h.motivo.startsWith('carga ajena')), `costo propio de ${n} escalones con pocas pérdidas: llega a ${r.mp.toFixed(2)} MP (≤ ${lim}) sin tomarlo por carga ajena (${r.serie.join(', ')})`);
+  ok(fin.includes('-'), `costo propio de ${n} escalones: termina abajo, no en una subida (${fin})`);
+}
+// una subida pendiente (hay un intento en curso) se cancela si mientras tanto se pierden refrescos
+{ const g = new Gobernador(75); g.nivel = 1; corre(g, 21, () => 13.33); const pidio = g.pide && g.sube;
+  corre(g, 3, k => (k % 20 === 0 ? 26.67 : 13.33), 2, 40000); ok(pidio && !(g.pide && g.sube), `subida pendiente cancelada al perder refrescos (pidió ${pidio}, pide ${g.pide}, sube ${g.sube}, ${g.motivo})`); }
+// la calibración es la nueva referencia: lo que hizo el gobernador en el menú no cuenta
+{ const g = new Gobernador(75); g.nivel = 2; g.ultimo = { sube: false, t: 0, frac: .3, pasos: 2, nivel: 0, acum: 2, frac0: .3 }; g.tope = true; g.calibrado(1000);
+  ok(g.nivel === 0 && g.ultimo === null && !g.tope && !g.pide, 'calibrado(): nivel 0 y sin historia previa'); }
 // costo propio: cuesta 4 ms + 8 ms/MP en 13,3 ms; se pierde en proporción a lo que pasa del 90 % del período
 const propio = (fijo, porMP) => mp => Math.max(0, (fijo + porMP * mp - 12) / 6.7);
 { const r = partida({ seg: 120, frac: propio(4, 8) });

@@ -139,6 +139,12 @@ export const SUBIR_MS = 5000, SUBIR_ARRIBA_MS = 20000, SUBIR_MAX_MS = 120000;
 /** Cuánto dura la sospecha de carga ajena (ms): pasado eso, se vuelve a probar si bajar sirve. */
 export const AJENA_MS = 60000;
 /**
+ * Escalones que tiene que bajar una racha antes de concluir que el problema es ajeno (0,85³: 39 % menos de píxeles). Con
+ * uno solo no alcanza: si el costo propio necesita dos escalones y se pierde poco (se pide un escalón por vez), bajar uno
+ * no cambia lo que se pierde y el gobernador lo tomaba por carga ajena para siempre (bajaba y deshacía cada 65 s).
+ */
+export const ESCALAR = 3;
+/**
  * Gobernador. La meta es no perder ningún refresco: mira los cuadros dibujados en ventanas de 1 s y cuenta los refrescos
  * perdidos (intervalos de dos períodos o más) y el tiempo de hilo principal por cuadro. Una ventana es mala si pierde dos
  * refrescos o más, o si el hilo principal solo ya se lleva el 92 % del período.
@@ -146,9 +152,11 @@ export const AJENA_MS = 60000;
  * resultado(hecho, now).
  * - Baja con dos ventanas malas entre las últimas cuatro, o con una sola que pierda la quinta parte de los refrescos
  *   (1 a 3 escalones según cuánto se pierde).
- * - Carga ajena: si después de bajar se pierde casi lo mismo (más de dos tercios de lo de antes), los píxeles no eran el
- *   problema (otra app o el compositor ocupan la placa): pide deshacer esa bajada y no baja más mientras siga así
- *   (`ajena`, hasta AJENA_MS o hasta tres ventanas limpias seguidas).
+ * - Carga ajena: si después de bajar se pierde casi lo mismo (más de dos tercios de lo de antes), baja otro escalón hasta
+ *   que la racha sume ESCALAR; si con eso tampoco cambia, los píxeles no eran el problema (otra app o el compositor ocupan
+ *   la placa): pide deshacer la racha entera y no baja más mientras siga así (`ajena`, hasta AJENA_MS o hasta tres
+ *   ventanas limpias seguidas).
+ * - Una subida pendiente (esperando que termine un intento) se cancela si mientras tanto se pierden refrescos.
  * - Sube de a un escalón después de SUBIR_MS sin perder un solo refresco (y con el hilo principal por debajo del 80 %),
  *   mientras esté por debajo de lo que dejó la calibración; por encima, después de SUBIR_ARRIBA_MS. Si una subida pierde
  *   refrescos en los 15 s siguientes, se deshace y la espera para volver a probar se duplica (hasta SUBIR_MAX_MS).
@@ -190,7 +198,9 @@ export class Gobernador {
     this.limpioMs = limpia ? this.limpioMs + v.t : 0;
     if (this.ajena && (now - this.tAjena > AJENA_MS || (limpia && this.limpioMs >= 2900))) { this.ajena = false; this.motivo = now - this.tAjena > AJENA_MS ? 'se vuelve a probar si bajar sirve' : 'la máquina se liberó'; }
     const pasos = frac > .45 ? 3 : frac > .2 ? 2 : 1;
-    if (this.pide) { if (!this.sube) this.pasos = Math.max(this.pasos, pasos); }      // ya pidió y todavía no se pudo aplicar (hay un intento en curso)
+    // ya pidió y todavía no se pudo aplicar (hay un intento en curso): una bajada pendiente crece; una subida pendiente
+    // (salvo la que deshace una bajada por carga ajena) se cancela si mientras tanto se pierden refrescos
+    if (this.pide) { if (!this.sube) this.pasos = Math.max(this.pasos, pasos); else if (mala && !this._deshace) { this.pide = this.sube = false; this.pasos = 1; this.motivo = 'subida pendiente cancelada: perdió refrescos'; } }
     else if (frac >= .2 || this.malas.filter(Boolean).length >= 2) this._mal(frac, pasos, now);
     else if (!this.ajena && !this.tope && limpia && this.limpioMs >= (this.nivel > 0 ? this.espera : this.esperaArriba)) this._pedir(true, 1, this.nivel > 0 ? 'la máquina está libre: vuelve hacia la calibración' : 'la máquina está libre: prueba un escalón más', frac);
     this._vaciar();
@@ -205,12 +215,20 @@ export class Gobernador {
     }
     if (this.ajena || this.piso) { this.ignoradas++; return; }
     // bajar no cambió lo que se pierde: no es el costo del juego. Se deshace esa bajada y no se baja más por ahora.
-    if (u && !u.sube && !u.deshace && now - u.t < AJENA_MS && frac > u.frac * .67) {
-      this.ajena = true; this.tAjena = now; this._pedir(true, u.pasos, 'carga ajena: bajar no cambió lo que se pierde', frac); this._deshace = true; return;
+    // Antes de concluirlo, la racha de bajadas llega a ESCALAR escalones (un escalón solo puede no alcanzar al costo
+    // propio), y se deshace la racha entera.
+    if (u && !u.sube && !u.deshace && now - u.t < AJENA_MS && frac > u.frac0 * .67) {
+      if (u.acum < ESCALAR) { this._pedir(false, Math.min(pasos, ESCALAR - u.acum), 'bajar no alcanzó: baja otro escalón', frac); this._sigue = true; return; }
+      this.ajena = true; this.tAjena = now; this._pedir(true, u.acum, 'carga ajena: bajar no cambió lo que se pierde', frac); this._deshace = true; return;
     }
     this._pedir(false, pasos, 'pierde refrescos', frac);
   }
-  _pedir(sube, pasos, motivo, frac) { this.pide = true; this.sube = sube; this.pasos = pasos; this.motivo = motivo; this._frac = frac; this._deshace = false; }
+  _pedir(sube, pasos, motivo, frac) { this.pide = true; this.sube = sube; this.pasos = pasos; this.motivo = motivo; this._frac = frac; this._deshace = false; this._sigue = false; }
+  /**
+   * La calibración dejó una resolución nueva (main.js, al terminar calibrar): esa es la referencia del nivel 0. Lo que el
+   * gobernador haya hecho antes (en el menú) no cuenta.
+   */
+  calibrado(now, ms = 1500) { this.nivel = 0; this.ultimo = null; this.tope = this.piso = this.ajena = false; this.espera = SUBIR_MS; this.esperaArriba = SUBIR_ARRIBA_MS; this.calentar(now, ms); }
   /**
    * main.js avisa qué pasó con el pedido: `hecho` si cambió algo (false: no había más para bajar o para subir).
    * Empieza el calentamiento: los cuadros de los próximos 2,5 s no cuentan.
@@ -219,7 +237,9 @@ export class Gobernador {
     if (!this.pide) return; const sube = this.sube, pasos = this.pasos;
     if (hecho) {
       const nivel = this.nivel; this.nivel += sube ? -pasos : pasos;
-      this.ultimo = { sube, t: now, frac: this._frac, pasos, nivel, deshace: !!this._deshace };
+      // racha de bajadas: `acum` escalones desde la primera, que perdía `frac0`
+      const u = this.ultimo, sigue = !sube && this._sigue && u && !u.sube;
+      this.ultimo = { sube, t: now, frac: this._frac, pasos, nivel, deshace: !!this._deshace, acum: sigue ? u.acum + pasos : pasos, frac0: sigue ? u.frac0 : this._frac };
       if (sube) this.piso = false; else this.tope = false;
       this.historia.push({ t: Math.round(now), sube, pasos, nivel: this.nivel, motivo: this.motivo }); if (this.historia.length > 40) this.historia.shift();
     } else if (sube) this.tope = true;            // ya está a la resolución de la pantalla y con sombras
