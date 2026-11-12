@@ -3,7 +3,8 @@
 //    solo con toques (el botón táctil para levantar, los botones de los paneles con el dedo), con el reloj inyectado. En
 //    cada pantalla nueva, una captura y una revisión: la página no se desplaza, nada se sale de la pantalla ni de las áreas
 //    seguras, el botón no tapa la señal, el zócalo ni el acuse, la señal no tapa el zócalo, y los paneles entran sin
-//    cortar texto (si un panel necesita desplazarse, falla). Varios dedos a la vez cuentan como varios toques.
+//    cortar texto (si un panel necesita desplazarse, falla). Varios dedos a la vez cuentan como varios toques. También
+//    844 × 340: el iPhone en Safari con la barra de direcciones a la vista (el iPhone no deja pantalla completa).
 //  - Campos: en un campo de texto (nombre, mail), Espacio y Enter son del campo: el juego no los toma como toques ni
 //    activa botones, y el texto llega entero.
 //  - Mano izquierda (?mano=izq): el botón va a la izquierda sin tapar nada.
@@ -38,6 +39,8 @@ const CASOS = [
   { nombre: 'iphone_844x390', w: 844, h: 390, dpr: 3, seguras: { top: 0, right: 47, bottom: 21, left: 47 }, partida: true, campos: true, dedos: true },
   { nombre: 'android_667x375', w: 667, h: 375, dpr: 2, partida: true },
   { nombre: 'zurdo_740x360', w: 740, h: 360, dpr: 3, url: '&mano=izq', hastaIntentos: 2 },
+  // iPhone en Safari de costado, con la barra de direcciones a la vista: quedan unos 340 px de alto
+  { nombre: 'safari_844x340', w: 844, h: 340, dpr: 3, seguras: { top: 0, right: 47, bottom: 21, left: 47 }, hastaIntentos: 2 },
   { nombre: 'vertical_390x844', w: 390, h: 844, dpr: 3, vertical: true },
 ];
 
@@ -156,7 +159,7 @@ async function correr(C) {
     const desp = await J(() => ({ total: JUEGO.toques.total, valor: document.activeElement?.value, foco: document.activeElement?.tagName, pantalla: JUEGO.estado().pantalla, sobre: JUEGO.estado().sobre, firma: document.querySelector('#capa .panel')?.innerHTML.length }));
     await foto('campo_con_teclado');
     console.log(`${tag} campo de texto${propio ? ' del juego' : ' de prueba'}: «${desp.valor}», toques ${antes.total} → ${desp.total}, escribiendo ${esc.clase}, botón ${esc.zona}, letra ${esc.fs} px`);
-    if (desp.total !== antes.total) mal(`escribir en un campo contó ${desp.total - antes.total} toques del levantamiento (input.js)`);
+    if (desp.foco === 'INPUT' && desp.total !== antes.total) mal(`escribir en un campo contó ${desp.total - antes.total} toques del levantamiento (input.js)`);
     if (desp.valor !== 'Ana María  h') mal(`en un campo de texto se escribió «${desp.valor}» en lugar de «Ana María  h»: el juego se come teclas (main.js, alTeclado: falta \`if (enCampo(e)) return;\`)`);
     if (desp.pantalla !== antes.pantalla || desp.sobre || desp.foco !== 'INPUT') mal(`Espacio, H o Enter en un campo activaron el juego (pantalla ${antes.pantalla} → ${desp.pantalla}, sobre ${desp.sobre}, foco ${desp.foco}): main.js, alTeclado, tiene que ignorar los campos`);
     if (!esc.clase) mal('con el foco en un campo no se marca html.escribiendo');
@@ -168,7 +171,7 @@ async function correr(C) {
   }
 
   // ---------- la partida ----------
-  const vistas = new Set(), pantallas = new Set(); let firma = '', dedosProbados = false, nIntentos = 0, ultToque = 0, hecho = '', revisadas = 0;
+  const vistas = new Set(), pantallas = new Set(); let firma = '', dedosProbados = false, campoSolo = false, nIntentos = 0, ultToque = 0, hecho = '', revisadas = 0;
   const hasta = s => s.pantalla === 'fin' || (C.hastaIntentos && nIntentos >= C.hastaIntentos);
   for (let n = 0; n < 60000; n++) {
     const s = await J(() => JUEGO.estado());
@@ -194,6 +197,16 @@ async function correr(C) {
         if (t1 - t0 !== 2) mal(`dos dedos a la vez contaron ${t1 - t0} toques (se esperaban 2)`); else console.log(`${tag} dos dedos a la vez: 2 toques`);
         ultToque = s.ahora; continue;
       }
+      if (C.campos && !campoSolo && I.parado) {      // un campo sin panel abierto: solo input.js decide (main.js no toca teclas sin panel)
+        campoSolo = true; const t0 = await J(() => JUEGO.toques.total);
+        await J(() => { const i = document.createElement('input'); i.id = 'prueba-campo2'; i.type = 'text'; i.style.cssText = 'position:fixed;left:30%;top:40%;z-index:20;width:40%'; document.body.append(i); });
+        await page.locator('#prueba-campo2').tap(); await page.keyboard.type('a b@c.de '); await page.keyboard.press('Enter');
+        const x = await J(() => ({ total: JUEGO.toques.total, valor: document.getElementById('prueba-campo2').value, intento: JUEGO.estado().intento?.entradas }));
+        await J(() => { document.getElementById('prueba-campo2').remove(); document.activeElement?.blur?.(); });
+        console.log(`${tag} campo sin panel (input.js solo): «${x.valor}», toques ${t0} → ${x.total}`);
+        if (x.total !== t0 || x.valor !== 'a b@c.de ') mal(`con el foco en un campo, Espacio o Enter contaron como toques o se perdieron (input.js): «${x.valor}», toques ${t0} → ${x.total}`);
+        continue;
+      }
       if (I.parado) { await av(80); await toque(); continue; }
       if (g.tipo === 'libre') { await av(150); await toque(); continue; }
       if (g.tipo === 'cierre') { const k = g.clave + g.desde; if (I.seDetiene || hecho === k) { await av(30); continue; } await ir(g.objetivo); await toque(); hecho = k; continue; }
@@ -213,6 +226,7 @@ async function correr(C) {
   if (!enBoton) mal('ningún toque cayó sobre el botón táctil');
   if (C.partida && (fin.propios.filter(x => / valido/.test(x)).length < 3)) mal(`tocando cada señal en su momento salieron pocos válidos: ${fin.propios.join(' · ')}`);
   if (C.dedos && !dedosProbados) mal('no se llegó a probar dos dedos a la vez');
+  if (C.campos && !campoSolo) mal('no se llegó a probar un campo sin panel');
   await foto('final'); await ctx.close();
 }
 
