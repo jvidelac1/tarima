@@ -118,7 +118,9 @@ export class Intento {
     M.des = desvioExplosion(e, w) + this.varDesvio[j ? 1 : 0];
     M.perdida = (30 - ae) + (TENSION.mm.perfecta - at);
     const tope = TOPE_DESVIO[M.k] + (j && !c.domina ? NO_DOMINA.desvio : 0);
-    if (M.alt < ALTURA_MIN) { M.tFallo = t + 150; M.causaFallo = 'sin_altura'; }
+    // en Fácil, un toque que salió PERFECTO o BIEN no pierde la barra en el vuelo: lo que falte se paga en la subida
+    if (c.ctl === 'f' && Math.abs(e) <= w.g) { /* sigue */ }
+    else if (M.alt < ALTURA_MIN) { M.tFallo = t + 150; M.causaFallo = 'sin_altura'; }
     else if (M.des > tope) { M.tFallo = M.tc; M.causaFallo = 'adelante'; }
     else if (M.des < -tope && M.mov !== 'c') { M.tFallo = M.tc; M.causaFallo = 'atras'; }
     this.gestos.push({ g: 'explosion', mov: M.mov, e, pal: palabra(e, w) });

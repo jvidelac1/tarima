@@ -90,11 +90,21 @@ async function recorrido(via) {
   await hasta(() => JUEGO.estado().pantalla === 'practica' && JUEGO.estado().panel); await page.waitForTimeout(900); await foto('practica1_panel');
   await ok(); await intento('falla', { sin: 'explota' }); await veredicto('falla_veredicto');
   await hasta(() => JUEGO.estado().pantalla === 'practica' && JUEGO.estado().panel); await page.waitForTimeout(900); await foto('falla_reintentar');
-  await ok(); await intento('practica1', { mitad: true }); await veredicto('practica1_veredicto');
+  // Una práctica hasta que salga válida: si la máquina se atrasa con una captura y el toque llega tarde, el juego ofrece
+  // «Reintentar» y el recorrido lo usa (sin fotos a medio cerrar), en vez de seguir de largo con los nombres corridos.
+  const practica = async (tag, o) => {
+    for (let k = 0; k < 4; k++) {
+      await ok(); await intento(k ? `${tag}_reintento${k}` : tag, k ? {} : o); await veredicto(k ? `${tag}_reintento${k}_veredicto` : `${tag}_veredicto`);
+      await hasta(() => JUEGO.estado().panel && ['practica', 'tutorial'].includes(JUEGO.estado().pantalla)); await page.waitForTimeout(900);
+      if (!/Reintentar/.test(await page.evaluate(() => document.querySelector('#capa .panel')?.textContent || ''))) return;
+      console.log(`     ${tag}: no salió válida; se reintenta`); await foto(`${tag}_reintentar`);
+    }
+  };
+  await practica('practica1', { mitad: true });
   // práctica 2: dos tiempos, con un toque tarde en la recepción de arriba
-  await hasta(() => JUEGO.estado().pantalla === 'practica' && JUEGO.estado().panel); await page.waitForTimeout(900); await foto('practica2_panel');
-  await ok(); await intento('practica2', { mitad: true, atraso: 150 }); await veredicto('practica2_veredicto');
-  await hasta(() => JUEGO.estado().pantalla === 'tutorial' && JUEGO.estado().panel); await page.waitForTimeout(900); await foto('tutorial_listo');
+  await foto('practica2_panel');
+  await practica('practica2', { mitad: true, atraso: 150 });
+  await hasta(() => JUEGO.estado().pantalla === 'tutorial' && JUEGO.estado().panel); await foto('tutorial_listo');
   // la final: presentación, panel del llamado y el primer intento
   await ok(); await hasta(() => JUEGO.estado().pantalla === 'presentacion' && JUEGO.estado().panel); await page.waitForTimeout(900); await foto('presentacion');
   if (!tel) { await page.keyboard.press('ArrowRight'); await page.waitForTimeout(150); }

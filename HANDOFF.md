@@ -214,7 +214,7 @@ Especificación: [docs/CONTROLES.md](docs/CONTROLES.md). Lo que quedó hecho:
 
 - **Teclado en el levantamiento.** Espacio (Enter hace lo mismo). El clic del mouse no hace gestos en ningún nivel (la prueba verifica que un clic en el escenario no agrega entradas). En teléfono, el dedo sobre la zona táctil.
 - **Fácil, por defecto: una señal, un toque.** Arranque: ¡TIRÁ! (cuando quieras), ¡EXPLOTÁ!, ¡RECIBÍ!; ¡EMPUJÁ! tocando rápido si la subida se traba; fijación y bajada automáticas. Dos tiempos: además ¡FLEXIONÁ!, ¡ARRIBA!, ¡RECIBÍ!. No hay que mantener ni soltar.
-- **Capa de traducción** (`web/js/game/controles.js`, pura): mira la fase del núcleo en el instante del toque y lo convierte en apretar o soltar. El núcleo sigue recibiendo lo mismo de siempre. En Fácil cambia tres cosas, detrás de `ctx.ctl === 'f'`: ventanas por 2 (`FACIL.ancho` en `rules.js`), el tirón anticipado es amague y la tensión es siempre buena. `ctl` va en la cabecera del registro y entra solo en el contexto de la persona: **los rivales juegan con las reglas de Clásico y `tools/sim_ref.json` no cambió**. Las referencias de Fácil están en `tools/sim_ref_facil.json`.
+- **Capa de traducción** (`web/js/game/controles.js`, pura): mira la fase del núcleo en el instante del toque y lo convierte en apretar o soltar. El núcleo sigue recibiendo lo mismo de siempre. En Fácil, detrás de `ctx.ctl === 'f'`: ventanas por 2 (`FACIL.ancho` en `rules.js`), el tirón anticipado es amague (dos por movimiento), la tensión es siempre buena y la subida tiene reglas propias (ver «Corrección» más abajo y `docs/CONTROLES.md`, sección 4). `ctl` va en la cabecera del registro y entra solo en el contexto de la persona: **los rivales juegan con las reglas de Clásico y `tools/sim_ref.json` no cambió**. Las referencias de Fácil están en `tools/sim_ref_facil.json`.
 - **Señal fija** (`#senal`, `ui/senal.js`): verbo en imperativo, aro fijo con un círculo que se cierra, la tecla dibujada (ESPACIO, o TOCÁ en teléfono) y el paso («2 de 3»). A la derecha del pesista en horizontal; al pie del escenario en vertical. Después de cada toque, PERFECTO, BIEN, TEMPRANO o TARDE en el mismo lugar. Clásico usa la misma señal con sus verbos y conserva anillo, línea y medidor.
 - **Línea de fallo** (`ui/mensajes.js`, `explicar()`): debajo de «Intento fallado», qué pasó y qué hacer («No tocaste ¡EXPLOTÁ! Tocá ESPACIO cuando el círculo se cierra.»). También en la repetición y en el panel de reintento del tutorial.
 - **Tutorial guiado** (Fácil, la primera vez; después el inicio ofrece «Repetir tutorial»): panel con tres reglas, un arranque en cámara lenta que se detiene en cada toque y no se puede fallar, y dos prácticas a velocidad real (arranque y dos tiempos) con «Reintentar». En Clásico quedan el metrónomo y las tres prácticas de antes.
@@ -222,29 +222,42 @@ Especificación: [docs/CONTROLES.md](docs/CONTROLES.md). Lo que quedó hecho:
 - **Pantalla de inicio**: tres pasos con la tecla dibujada en lugar de la oración, y el selector «Controles: Fácil · Clásico».
 - **Error corregido**: en el calentamiento el pesista no se movía (`poseDe()` tomaba el instante 0 de confirmación como «sin confirmar»). La prueba ahora mide que la barra suba también en el tutorial.
 
+**Corrección después de la verificación independiente (11-nov).** La verificación jugó el rediseño y encontró tres problemas graves; los tres se reprodujeron con sus propios scripts antes de tocar nada, y se corrigieron:
+
+- **El reloj corría sobre el panel del llamado y anulaba el intento.** En Fácil el panel ya no gasta reloj: arranca cuando el jugador confirma, el panel lo dice y la señal cuenta los últimos 10 s («¡Quedan 7 s! Apretá ESPACIO»). La práctica 2 del tutorial lleva ese mismo reloj. La línea del nulo dice qué tecla faltó. En Clásico el reloj sigue corriendo sobre el panel, y el panel ahora lo avisa.
+- **La subida perdida pedía 12 s de toques, muchas veces después de BIEN.** Cambió la subida de Fácil en el núcleo (todo detrás de `ctx.ctl === 'f'`, constantes en `FACIL` de `rules.js`): PERFECTO y BIEN piden el mismo empuje; la subida siempre pide toques (unos 3 por segundo) y **se corta sola** cuando el avance queda atrás de un piso rojo que sube 25 % por segundo (se ve en la barra de avance); empujar de más no hace temblar; un toque en PERFECTO o BIEN no pierde la barra en el vuelo. La línea de fallo nombra el toque y los milisegundos («Tocaste ¡EXPLOTÁ! 260 ms tarde…») y, si las palabras fueron buenas, dice que faltó ritmo en ¡EMPUJÁ!.
+- **El arranque guiado se podía fallar con Brenner tocando lento.** El reloj guiado corre 250 ms por toque en vez de 400 (`GUIADO.porToque`, en `controles.js`). `sim_test` lo verifica con los tres pesistas y toques de 100 ms a 3 s; `check_game` lo juega con Brenner y un toque cada 600 ms.
+- **Tocar a ciegas con ritmo acertaba 25 a 74 %.** Ahora hay dos amagues por movimiento (el tercero es fallo) y la subida pide ritmo: la peor de catorce maneras de tocar sin mirar da menos de 4 %, y entró al criterio de `play_human`.
+- **¡ARRIBA! se cerraba en 0,36 a 0,42 s.** En Fácil la flexión dura 0,6 s (`FACIL.cierreMs`).
+- `tools/sim_ref_facil.json` se regeneró porque cambiaron las reglas de Fácil. `tools/sim_ref.json` no cambió: Clásico y los rivales juegan igual que antes.
+
 Medido (`node tools/play_human.mjs --info`, 2000 intentos por casilla, aperturas al 88 a 92 %, los tres pesistas, Fácil con tijera). Los bots miran solo la señal y tocan a `objetivo + 40 ms + error` con error de campana:
 
 | Bot | Arranque | Dos tiempos | Meta |
 |---|---|---|---|
-| Casual (desvío 80 ms) | 99,4 % | 99,7 % | 85 % o más |
-| Flojo (desvío 160 ms) | 68,8 % | 73,7 % | 50 % o más |
-| Al azar (instantes de Poisson; el peor de cinco ritmos medios, 250 a 1200 ms) | 5,5 % | 4,5 % | Menos de 10 % |
-| Los mismos bots en Clásico, casual y flojo (informativo) | 22,6 % y 26,4 % | 14,8 % y 11,9 % | — |
+| Casual (desvío 80 ms) | 100,0 % | 100,0 % | 85 % o más |
+| Flojo (desvío 160 ms) | 87,6 % | 91,2 % | 50 % o más |
+| A ciegas: el peor de catorce (Poisson con cinco ritmos, uniformes, metrónomos, campana, machacar) | 3,6 % | 3,8 % | Menos de 10 % |
+| Todo en el borde de BIEN y un toque cada 250 ms en ¡EMPUJÁ!, 88 a 100 % | 360 de 360 | | Todos |
+| Los mismos bots en Clásico, casual y flojo (informativo, sin cambios) | 22,6 % y 26,4 % | 14,8 % y 11,9 % | — |
 
-- `tools/sim_test.mjs` pasa entero sin tocar `tools/sim_ref.json`: Clásico no cambió.
-- `tools/check_game.mjs` en el pod (RTX 4090): partida completa en Fácil por teclado sin mouse (tutorial incluido, con un fallo a propósito para ver su línea) y otra por toques en 390 × 844; arranque guiado y práctica con el reloj verdadero; pausa y ayuda; metrónomo y una práctica en Clásico. Sin errores de consola.
-- `tools/primera.mjs`: 129 capturas (62 de escritorio, 59 de teléfono emulado y 8 de Clásico) miradas todas el 11-nov, en hojas de contacto. De ahí salieron dos arreglos: «APRETÁ Y MANTENÉ» se salía de la caja de la señal en Clásico, y en RESPIRÁ aparecía «TODAVÍA NO» por los toques de cola de ¡EMPUJÁ!.
+- **Subidas falladas** del casual y del flojo, 88 a 103 %: mediana 2,0 s, percentil 90 5,0 s, máxima 5,5 s (antes: 12,0 s de mediana y unos 65 toques). Sin tocar, la subida se corta entre 1,5 y 2,7 s.
+- **Más kilos** (fuera del criterio): casual 100 % al 95 %, 95 % y 94 % al 100 %, 81 % y 73 % al 103 %; flojo 81 % y 80 % al 95 %, 55 % y 43 % al 100 %, 27 % y 15 % al 103 %.
+- **La final entera** con las opciones que vienen puestas y rivales amistosos (250 partidas por pesista, con el medidor de la verificación): el casual gana el oro 28 a 42 % de las veces; el flojo levanta 86 a 93 % de sus intentos (antes 54 a 69 %), oro 24 a 28 %, sin marca 0 a 0,4 % (antes 3,6 a 9,6 %).
+- `tools/sim_test.mjs` pasa entero sin tocar `tools/sim_ref.json`.
+- `tools/check_game.mjs` en el pod (RTX 4090 por `launchOptions()`): partida completa en Fácil por teclado sin mouse (tutorial incluido, con un fallo a propósito para ver su línea) y otra por toques en 390 × 844; arranque guiado y práctica con el reloj verdadero; pausa y ayuda; metrónomo y una práctica en Clásico; y la corrida «lento» (guiado con Brenner y un toque cada 600 ms, panel del llamado 40 s abierto sin gastar reloj, nulo por reloj con su línea). Sin errores de consola.
+- `tools/primera.mjs`: capturas de jugador nuevo en escritorio, teléfono emulado y Clásico, miradas el 11-nov después de la corrección (en escritorio siguen hasta el nulo por reloj, una subida perdida por tocar lento y el primer dos tiempos de la final). El círculo de ¡EXPLOTÁ! se cierra en 0,73 a 0,82 s, el de ¡RECIBÍ! en 0,74 s, el de ¡ARRIBA! en 0,6 s y el de ¡RECIBÍ! de arriba en 0,55 a 0,62 s.
 
 **Lo que no está medido o es estimación:**
 
-- **Ninguna persona jugó el rediseño.** Los bots son un modelo (error de campana, ritmo de toques elegido a mano: uno cada 180 ± 35 ms el casual, 230 ± 60 ms el flojo). La prueba real es que el usuario complete el tutorial.
+- **Ninguna persona jugó el rediseño.** Los bots son un modelo (error de campana, ritmo de toques elegido a mano: uno cada 180 ± 35 ms el casual, 230 ± 60 ms el flojo). La prueba real es que el usuario complete el tutorial y una final.
+- **El ritmo que pide ¡EMPUJÁ! está elegido con bots.** Pasa el que toca cada 350 ms (99,9 %), a medias el de 400 ms (79 %) y no pasa el de 450 ms (17 %). No se midió a qué ritmo toca una persona cuando lee «tocá rápido»; si es más lento, se baja `FACIL.minEmpuje` (con 150 el de 450 ms pasa 88 %, y el que toca a ciegas con intervalos de 150 a 900 ms sube a 12 a 17 %). El que toca demasiado lento tarda unos 5 s en perder la subida, porque venía avanzando.
+- **Por encima del techo BIEN no alcanza.** Al 103 %, con todo en BIEN hace falta tocar cada 180 ms, y Marangi ni así. La línea dice «tocá más rápido; si no alcanza, pedí menos kilos».
+- **En las aperturas TEMPRANO y TARDE casi no cuestan** (se levanta igual tocando rápido); cuestan del 95 % para arriba.
 - **Teléfono real**: solo emulación táctil en Chrome. En vertical la señal va sobre el pie del escenario y tapa en parte las piernas del pesista en la recepción; no se probó si con el pulgar apoyado se lee.
-- **«Al azar» depende de la definición.** Con instantes de Poisson da menos de 6 %. Un bot que toca a ciegas con ritmo parejo acierta más: 27 % con intervalos uniformes de 150 a 900 ms, y 68 % en arranque con un metrónomo exacto de 750 ms (0 % con 500 y con 1000 ms). Es consecuencia de que el primer toque sea libre y el levantamiento tenga ritmo fijo; no se encontró una regla que lo evite sin bajar al flojo de 50 %.
-- **Fácil con más kilos no está ajustado** (no es parte del criterio): casual 88 % y 91 % al 95 % del techo y 36 % y 39 % al 100 %; flojo 32 % y 36 % al 95 %. Casi todos los fallos son en la subida. Como el segundo y el tercer intento suben 4 y 3 kg, a un jugador flojo la final se le pone difícil después de la apertura.
-- **Sin tocar en ¡EMPUJÁ! casi no se levanta nada** (casual 6 % y 7 %): toda la jugabilidad de Fácil depende de que esa señal se entienda. Tiene parada propia en el tutorial.
-- **El que sigue tocando rápido después de ¡EMPUJÁ!** en la cargada: hasta 0,7 s de más no cambia nada; con 0,5 a 1 s de más el casual baja a 82 % en dos tiempos (el toque de más arranca la flexión). No hay protección para eso.
-- **En Fácil el jugador tiene el doble de ventana que los rivales**: la final es más fácil de ganar. La dificultad se regula con el nivel de rivales; no se midió cuánto.
-- **Dibujo con errores grandes**: con los límites anchos de Fácil el tirón puede seguir hasta 0,28 s de clip más allá de `Segundo tirón` antes del toque. Las capturas tienen toques justos y uno tarde; no se miró un toque en el borde del límite.
+- **El que sigue tocando rápido después de ¡EMPUJÁ!** en la cargada: hasta 0,7 s de más no cambia nada; con 0,5 a 1 s de más el casual baja a 95 % en dos tiempos (el toque de más arranca la flexión, y ahora hay 0,6 s para el siguiente).
+- **En Fácil el jugador tiene ventanas más anchas y una subida más simple que los rivales**, que juegan con las reglas de Clásico. Con rivales amistosos el oro sale 24 a 42 % de las veces con las opciones que vienen puestas; con rivales normales y difíciles no se midió.
+- **Dibujo con errores grandes**: con los límites anchos de Fácil el tirón puede seguir hasta 0,28 s de clip más allá de `Segundo tirón` antes del toque, y la flexión del envión dura 0,6 s (más lenta que en Clásico). Se miró en capturas con toques justos y uno tarde; no un toque en el borde del límite.
 - **El registro guarda la salida de la capa, no las teclas**, y no se subió la versión de reglas (está atada a `sim.json`). Con servidor: subir versión y separar la tabla por `ctl`.
 - No se midieron cuadros por segundo del juego.
 

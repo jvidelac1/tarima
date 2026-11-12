@@ -7,7 +7,7 @@
 //            750 ± 80 ms y machacar cada 120–200 ms.
 // Criterio (aperturas al 88 a 92 % del techo, Fácil, envión de tijera): casual ≥ 85 %, flojo ≥ 50 %, a ciegas < 10 %.
 // Además, la subida: una subida fallada no puede durar más que el tope de Fácil, y con todos los toques en BIEN y un toque
-// cada 250 ms en ¡EMPUJÁ! se levanta siempre hasta el 97 % (la palabra no contradice a la subida).
+// cada 250 ms en ¡EMPUJÁ! se levanta siempre hasta el 100 % (la palabra no contradice a la subida).
 // Cada intento se recalcula con simular() y tiene que dar lo mismo. Sale con error si el criterio no se cumple.
 // Uso: node tools/play_human.mjs [--n=2000] [--imin=8800 --imax=9200] [--info]   (--info agrega filas que no son criterio:
 //   cada manera de tocar a ciegas, envión de la casa, seguir tocando después de ¡EMPUJÁ!, no tocar o tocar lento en ¡EMPUJÁ!,
@@ -159,9 +159,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   for (const [nombre, prox] of CIEGOS) { const x = medir((c, s) => jugarCiego(c, prox, s), 'f', tijera); if (INFO) fila(`  a ciegas, ${nombre}`, x); for (const lev of ['s', 'c']) if (x[lev].pct > peor[lev].pct) peor[lev] = { ...x[lev], causas: nombre }; }
   fila(`Fácil · a ciegas (peor de ${CIEGOS.length})`, peor, `meta < ${META.azar} %`);
   for (const lev of ['s', 'c']) if (peor[lev].pct >= META.azar) mal.push(`a ciegas en ${nom(lev)}: ${peor[lev].pct.toFixed(1)} % con ${peor[lev].causas} (meta menos de ${META.azar} %)`);
-  // la palabra no contradice a la subida: todos los toques en el borde de BIEN y un toque cada 250 ms levantan siempre hasta el 97 %
+  // la palabra no contradice a la subida: todos los toques en el borde de BIEN y un toque cada 250 ms levantan siempre hasta el 100 %
   { let n = 0, v = 0; const malos = [];
-    for (const id of ATL) for (const lev of ['s', 'c']) for (const I of [8800, 9200, 9500, 9700]) for (const sg of [-1, 1]) for (let k = 0; k < 6; k++) {
+    for (const id of ATL) for (const lev of ['s', 'c']) for (const I of [8800, 9200, 9500, 9700, 10000]) for (const sg of [-1, 1]) for (let k = 0; k < 6; k++) {
       const ctx = ctxDe(id, lev, 'split', I, mezclar(k, 5 + I), 'f'), f = datos.atletas[id], w = g => ventanas(I, g, { tec: f.attrs.tec, temple: 0, primera: false, ancho: FACIL.ancho }).g - 2;
       // del lado temprano, el tirón no puede soltarse antes de la rodilla (eso es un amague por regla): se queda 140 ms antes como mucho
       const ex = g => (sg < 0 ? -Math.min(w(g), 140) : w(g));
@@ -169,7 +169,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       if (res.gestos.some(g => g.pal !== 'bien' && g.pal !== 'perfecto')) throw new Error('el jugador de BIEN recibió ' + res.gestos.map(g => g.pal).join(' '));
       if (res.res === 'valido') v++; else if (malos.length < 3) malos.push(`${id} ${nom(lev)} ${I / 100} % ${sg < 0 ? 'temprano' : 'tarde'}: ${res.res} ${res.causa}`);
     }
-    console.log(`${'Fácil · todo en el borde de BIEN, toque cada 250 ms'.padEnd(38)} ${v} de ${n} válidos (88 a 97 %, los tres, temprano y tarde)   meta: todos`);
+    console.log(`${'Fácil · todo en el borde de BIEN, toque cada 250 ms'.padEnd(38)} ${v} de ${n} válidos (88 a 100 %, los tres, temprano y tarde)   meta: todos`);
     if (v < n) mal.push(`con todos los toques en BIEN no se levanta siempre: ${v} de ${n} (${malos.join(' · ')})`); }
   if (INFO) {
     console.log('— informativo (no es criterio) —');

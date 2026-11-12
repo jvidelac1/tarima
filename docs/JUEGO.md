@@ -44,7 +44,7 @@ Todo tramo en que el jugador no hace nada se puede saltear con un toque. La **re
 
 Ciclo de cada intento propio (35 a 45 segundos):
 
-1. **Llamado.** Placa con nombre, intento y kilos; arranca el reloj. Se abre el único panel de kilos (sección 6.3).
+1. **Llamado.** Placa con nombre, intento y kilos; arranca el reloj. Se abre el único panel de kilos (sección 6.3). En Fácil el reloj arranca recién al confirmar el panel ([CONTROLES.md](CONTROLES.md), sección 4).
 2. **Intento.** Se juega con el botón (sección 3).
 3. **Decisión.** Las tres luces se encienden de a una.
 4. **Reacción.** Festejo o lamento, y repetición lenta.
@@ -61,7 +61,7 @@ Todo panel que aparece queda bloqueado 400 ms y los kilos se confirman con un bo
 
 **Las teclas, los gestos, la señal en pantalla, el tutorial y los textos están en [CONTROLES.md](CONTROLES.md), que reemplaza a esta sección en todo eso.** Resumen:
 
-- **Fácil** (por defecto): cada gesto es **un toque** de la tecla en el momento de la señal. Arranque: ¡TIRÁ!, ¡EXPLOTÁ!, ¡RECIBÍ!; si la subida se traba, ¡EMPUJÁ! tocando rápido; la fijación y la bajada son automáticas. Dos tiempos: tres toques más, ¡FLEXIONÁ!, ¡ARRIBA!, ¡RECIBÍ!. Una capa de traducción (`web/js/game/controles.js`) convierte cada toque en el apretar o soltar que espera el núcleo; las ventanas son el doble de anchas y el tirón anticipado es un amague.
+- **Fácil** (por defecto): cada gesto es **un toque** de la tecla en el momento de la señal. Arranque: ¡TIRÁ!, ¡EXPLOTÁ!, ¡RECIBÍ!; en la subida, ¡EMPUJÁ! tocando rápido (aparece siempre y se corta sola si el avance se queda atrás); la fijación y la bajada son automáticas. Dos tiempos: tres toques más, ¡FLEXIONÁ!, ¡ARRIBA!, ¡RECIBÍ!. Una capa de traducción (`web/js/game/controles.js`) convierte cada toque en el apretar o soltar que espera el núcleo; las ventanas son el doble de anchas, el tirón anticipado es un amague (dos por movimiento) y PERFECTO y BIEN piden el mismo empuje.
 - **Clásico**: el esquema de esta sección y de las secciones 3.3 a 4.1, sin cambios: un botón lógico con cuatro gestos (apretar, mantener, soltar y tocar repetido).
 
 | | Botón | Notas |
@@ -827,7 +827,7 @@ El informe incluye además dos jugadores que no deberían ganar:
   - Juega además, con el reloj verdadero, el arranque guiado del tutorial y una práctica por cada vía, y prueba la pausa (Esc) y la ayuda (H). En Clásico juega el metrónomo y un intento de práctica.
   - Verifica que no haya errores de consola ni pedidos externos, que se visiten todos los estados, que todo panel abra con foco visible en su botón principal, que un clic en el escenario no agregue entradas, que la señal se vea entera y no tape el zócalo, que la barra nunca quede bajo la tarima ni separada de las manos y que suba también en el tutorial, y que el registro exportado dé la misma tabla al recalcularlo.
   - El navegador sale de `tools/browser.mjs` (`launchOptions()`): placa real si la hay, software si no. No mide cuadros por segundo.
-- **`tools/play_human.mjs`**, sin navegador: el criterio de jugabilidad de [CONTROLES.md](CONTROLES.md), sección 9. Bots con error humano que solo miran la señal (casual 85 % o más, flojo 50 % o más) y un bot que toca al azar (menos de 10 %), en aperturas y en Fácil. Sale con error si no se cumple.
+- **`tools/play_human.mjs`**, sin navegador: el criterio de jugabilidad de [CONTROLES.md](CONTROLES.md), sección 9. Bots con error humano que solo miran la señal (casual 85 % o más, flojo 50 % o más) y catorce maneras de tocar a ciegas (la peor, menos de 10 %), en aperturas y en Fácil; además, con todo en BIEN se levanta siempre hasta el 100 % y ninguna subida fallada pasa del tope. Sale con error si no se cumple.
 - **`tools/primera.mjs`**: capturas de lo que ve un jugador nuevo (inicio, cada parada del tutorial, cada señal a velocidad real, una línea de fallo), en escritorio, teléfono y Clásico, en `out/primera/`. Es para mirarlas: la pregunta es si alguien que no conoce el juego entiende qué tocar y cuándo.
 
 ### 9.8 Riesgos
