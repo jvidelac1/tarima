@@ -1,6 +1,6 @@
 // Textos de los correos y de las páginas del Worker (docs/MVP.md 4.5, «Mails y páginas del Worker»), en español neutro
 // (decisión del dueño del 12 de noviembre: tuteo, sin voseo; «correo» y «enlace», no «mail» ni «link») y en inglés.
-// Sin la frase de «nunca vas a pagar…»: queda fuera hasta que el dueño defina la monetización.
+// Sin la promesa pública sobre pagos: queda fuera hasta que el dueño defina la monetización.
 import { escHtml } from './reglas.js';
 
 export const TEXTOS = {

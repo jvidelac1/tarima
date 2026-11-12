@@ -1,0 +1,4 @@
+posthog-js 1.441.2 (npm, publicado el 28 de octubre de 2026)
+Archivo: dist/module.js (ESM, sin dependencias externas), sin la línea de sourceMappingURL.
+Se carga solo si /api/estado devuelve la clave pública (web/js/game/analitica.js).
+sha256 del original: ba99025706b1375d55828d24e51cdab5203cc292c431dd447d4636945c4c431f

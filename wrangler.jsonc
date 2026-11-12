@@ -1,0 +1,23 @@
+// Proyecto de Cloudflare Pages «tarimagame» (https://tarimagame.pages.dev): sirve web/ como sitio estático y, con las
+// Functions de functions/, pasa /api/*, /qx/*, /baja y /confirmar al Worker «tarima» (worker/) por una service binding.
+// El Worker no tiene dirección pública: solo se llega a él por acá.
+//
+// Documentación (consultada el 12 de noviembre de 2026):
+// - Configuración de Pages con Wrangler: https://developers.cloudflare.com/pages/functions/wrangler-configuration/
+//   («pages_build_output_dir» es obligatorio y marca el archivo como de Pages; «services» se declara igual que en un
+//   Worker y no se hereda entre entornos).
+// - Bindings de Pages Functions, «Service bindings»: https://developers.cloudflare.com/pages/functions/bindings/
+//   (la Function llama al Worker con `context.env.<BINDING>.fetch(request)`).
+// - Service bindings en la configuración de Workers: https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
+//
+// Lo publica tools/desplegar.sh (`wrangler pages deploy`), después del Worker. Este archivo pasa a ser la fuente de la
+// configuración del proyecto: esos campos ya no se editan en el panel.
+{
+  "$schema": "./worker/node_modules/wrangler/config-schema.json",
+  "name": "tarimagame",
+  "pages_build_output_dir": "./web",
+  "compatibility_date": "2026-10-30",
+  "services": [
+    { "binding": "TARIMA", "service": "tarima" }
+  ]
+}
