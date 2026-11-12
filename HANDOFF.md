@@ -262,6 +262,51 @@ Medido (`node tools/play_human.mjs --info`, 2000 intentos por casilla, aperturas
 - **El registro guarda la salida de la capa, no las teclas**, y no se subió la versión de reglas (está atada a `sim.json`). Con servidor: subir versión y separar la tabla por `ctl`.
 - Cuadros por segundo del juego: medidos el 12-nov en el pod, no en la Mac (ver la sección que sigue).
 
+### Emoción: caídas, festejo, carga animada y plano del llamado (12-nov, noche, rama `demo`)
+
+El usuario pidió «emoción (ayudantes cambiándole peso), ver cómo un pesista falla (se cae, se queda, no sube el clean, o el jerk falla, el snatch)». Sin modelos ni animaciones nuevas de Blender: todo con las poses de `poses.json`, la barra procedural y sonido por código. **Nada de esto corre durante el intento**: empieza cuando el núcleo ya dio el resultado. El núcleo, el registro y `tools/sim_ref*.json` no cambiaron.
+
+- **El final del intento** (`web/js/game/caida.js`, `armarFinal()` y `dibujarFinal()` en `main.js`). Según la causa del núcleo y el movimiento, cinco escenas:
+  - `bajo`: tirón sin altura o anticipado, con la barra entre la rodilla y el pecho.
+  - `hombros`: «devuelve la barra», o la flexión del envión que no sale.
+  - `sentado`: cargada perdida (aplastado, la pierde en el fondo, barra adelante). Se queda sentado 0,8 s y suelta la barra adelante.
+  - `arriba`: arranque o envión perdido con la barra por encima de la cabeza. En «barra adelante» la barra sale adelante y la raíz salta 14 cm atrás; en «barra atrás», la barra sale hacia atrás y la raíz da 20 cm adelante.
+  - `bajada`: válido o nulo de jueces. Sostiene la barra arriba (0,7 s en el válido y 0,35 en el nulo) y la deja caer adelante.
+
+  La barra se suelta **antes** de que el cuerpo se mueva. Cae con gravedad, rebota con un coeficiente de 0,32, pierde velocidad horizontal en cada golpe, rueda con resistencia y no sale de la tarima. Usa paso fijo de 1/240 s, así que la repetición la vuelve a calcular igual. El pesista sostiene la pose del final y después se mezcla en línea recta hacia `Parado` con `athlete.setMix()`, una opción nueva de `athlete.js` que el visor no usa. **Estas secuencias son una aproximación hecha en el visor y no pasaron por `check()` de Blender.** No se inventaron rotaciones de huesos: solo hay mezclas entre muestras del clip y un corrimiento de la raíz de hasta 20 cm.
+- **Decisión** (`decision()`): todo va en una sola línea de tiempo que se saltea entera con Espacio, después de 0,6 s (1,2 s si hay línea de fallo).
+  - En un fallo, la cámara sigue la barra con el plano `caida` (`PLANOS` en `stage.js`). Suenan el golpe de goma con el traqueteo de las mangas y el «¡ohhh!» de la tribuna. Las luces rojas se prenden de a una.
+  - En un válido, se prenden las luces blancas de a una mientras sostiene la barra. En la segunda suena la ovación, con aplausos sueltos (más fuerte en los intentos de medalla). Después la deja caer, la cámara la sigue y gira hacia el público.
+- **Repetición**: el levantamiento va a un tercio de la velocidad (antes, un cuarto). Si se perdió, después viene la caída a media velocidad, con el motivo en una línea.
+- **Cambio de carga** (`carga()` y `escena.cambioDeCarga()`): primer plano de la manga con la tarima vacía.
+  - Las piezas que cambian salen deslizando, de afuera hacia adentro. El collarín también sale si hay que tocar un disco de adentro. Después entran las nuevas y el collarín cierra con un golpe metálico.
+  - Los kilos del cartel cambian a medida que salen y entran las piezas.
+  - `precalentar()` deja hecho y dibujado un disco de cada clase, así que la animación no crea texturas ni compila sombreadores en la partida.
+  - **Los ayudantes humanos necesitan modelo y animación propios y quedan para la etapa de arte.** No se simularon con el modelo de un pesista.
+- **Plano del llamado**: el primerísimo plano de la cara se reemplazó por un plano americano (`PLANOS.medio`). La cámara se corre para que el pesista quede en la parte del lienzo que deja libre el panel: a la izquierda en escritorio, arriba en vertical (`encuadreLibre()`).
+- **Ritmo**: el veredicto sale a 1 s del final (antes, más de 2 s después de las luces). El resumen de un rival dura 2,6 s (antes 3,4 s), los avisos de cambio 1,1 s (antes 1,3 s) y «desplazado» 1,8 s (antes 2,2 s). Todo se saltea con Espacio.
+- **Pruebas**:
+  - `tools/caida_test.mjs` (sin navegador): cada causa tiene escena; la barra nunca pasa debajo de la tarima ni sale de ella, queda quieta en menos de 3 s, cada rebote es menor que el anterior y da lo mismo al repetir.
+  - `tools/check_escenas.mjs` (con navegador): arma las 23 escenas en los dos modelos, mide cuadro a cuadro la holgura entre la barra y el cuerpo, prueba la carga animada y el plano del llamado, y deja capturas en `out/escenas/`.
+  - Las dos corren en Actions.
+
+**Medido** (Actions, run 43265823178 sobre a17032d, dibujo por software):
+
+- `check_escenas`: 46 finales (23 escenas por 2 modelos), cero cuadros BAD.
+  - **Criterio**: el cuerpo se aproxima con cápsulas gruesas (tronco 13 cm, muslo 7,5 cm…). En la pose del final, que es una fase de `poses.json` validada en Blender, la barra apoyada en los hombros o rozando la cadera ya da holgura negativa contra esas cápsulas: hasta −2,4 cm en el rack de la cargada. Por eso un cuadro es BAD si la barra atraviesa un segmento **más** de lo que lo atravesaba en esa pose, con 5 mm de margen.
+  - La primera corrida, con el criterio de «holgura negativa a secas», marcó 13 cuadros: todos en el primer o segundo cuadro después de soltar, con la barra todavía en la pose validada.
+  - Después de soltar, la holgura mínima es de 4,3 cm (los antebrazos en la bajada del válido, 0,25 s después de soltar). En las caídas desde arriba va de 6 a 40 cm.
+- Capturas miradas: arranque con barra adelante, barra atrás en tijera, cargada aplastado, envión devuelto, tirón sin altura, válidos, carga 140 → 151 y plano del llamado a 1745 × 845 y a 390 × 844. La barra cae adelante y lejos de las rodillas, y el pesista queda de pie detrás.
+- Carga: 140 → 143 entra un disco por lado (0,5 s). 140 → 151 salen 3 piezas y entran 4 (2,2 s). 151 → 146 salen 2 y entra 1 (1,0 s). Los kilos terminan en el número pedido.
+- `check_game`, `check_fluidez --tutorial` y las capturas de partida: en verde con las esperas nuevas.
+
+**Lo que no está hecho o no se midió:**
+
+- **No se miró en movimiento ni en una placa**: solo cuadros sueltos por software y números. Falta ver en la Mac si la mezcla lineal hacia `Parado` se ve como pararse o como un «morph» (las piernas pasan en línea recta de la sentadilla a de pie), si el salto de la raíz se lee como salto o como patinar, y cómo suena todo. No se midió ningún cuadro por segundo de estas escenas. Son posteriores al intento, pero dibujan con la sombra al día en cada cuadro.
+- **No hay reacción del pesista** (festejo, lamento, «se cae» de espaldas): no hay poses para eso en `poses.json`. Después de soltar, siempre vuelve a `Parado`. Va con la pista de arte (JUEGO.md, sección 10), igual que los ayudantes.
+- La mezcla toma la pose del último cuadro dibujado. En un fallo en medio de la pelea, la repetición pasa de un salto del final del levantamiento a la caída.
+- Las holguras se miden con cápsulas sobre los huesos, no con las mallas. Una mano o un antebrazo puede rozar la barra en el primer cuarto de segundo después de soltar sin que la prueba lo vea (los brazos se miden desde 0,25 s).
+
 ### Jugabilidad y entrada en Fácil: entrada tolerante (12-nov, tarde, rama `demo`)
 
 El usuario jugó tres veces y dijo: «difícil de acertar el momento donde tocar», «a veces no agarra bien el space, entonces toco mucho space y no levanta, es raro». El orquestador midió en su Mac que, tras ¡RECIBÍ!, 12 toques seguidos se descartaron por «espera» antes de que apareciera ¡EMPUJÁ! y el levantamiento se perdió. El objetivo de esta vuelta: que el que juega por primera vez, toca con poca precisión o machaca Espacio levante las aperturas, y que tocar bien se premie con más kilos posibles. Especificación al día en [docs/CONTROLES.md](docs/CONTROLES.md) (secciones 1.1, 2, 3, 4, 5 y 9).
@@ -513,8 +558,8 @@ gh workflow run pruebas.yml -R jvidelac1/tarima --ref demo           # a pedido
 - **Interrupciones** (pestaña oculta, toque cancelado): los contactos se levantan y nada más. No está la política de repetir el intento. La pausa (Esc o el botón «II») existe solo fuera del intento propio.
 - **Calentamiento**: en Fácil, el tutorial guiado (sin reloj; reemplaza al metrónomo, con corrección de atraso de 0 ms en teclado y 40 ms en táctil). En Clásico, metrónomo y tres prácticas (dos livianas y una pesada con exigencia de 98 %); la práctica pesada no fuerza la traba de codos y las prácticas llevan un reloj de 25 s para que nadie quede trabado.
 - **Envión que viene elegido**: en Fácil, la tijera para los tres (con el squat de Ventura el bot flojo baja de 74 % a 62 %); en Clásico, el primero de la ficha.
-- **Sin retratos en el podio**: el podio 2D usa bandera y nombre para los tres. El primer plano de cara del llamado se usa con Ventura y Brenner, no con Marangi (comparte la cara de Brenner).
-- **Cambio de carga**: corte a la cenital con cartel; los discos no se deslizan.
+- **Sin retratos en el podio**: el podio 2D usa bandera y nombre para los tres. El llamado ya no usa el primer plano de cara (desde el 12-nov, plano americano para los tres).
+- **Cambio de carga**: desde el 12-nov, primer plano de la manga con los discos deslizándose y la tarima vacía; sin ayudantes (etapa de arte).
 - **Tope de 30 cuadros fuera del intento propio e imagen congelada detrás de los paneles**: hechos. El escalón «móvil» existe (`game/perf.js`) y es el que se elige con puntero táctil; **sin medir**.
 - El tablero 3D de la arena sigue diciendo «TARIMA OPEN» (sale de `config.js`, que no se toca); la gráfica del juego dice «Mundial Tarima 2026».
 
@@ -546,7 +591,7 @@ Porcentaje de válidos · meta. Jugadores simulados con error típico de 25, 40 
 - Extraer `stage.js` del visor y verificarlo con GPU; política de interrupciones; simular el resto de la final cuando el jugador queda sin marca.
 - Códigos de país: ARX y NVK siguen en la gráfica y en las mallas hasta la etapa 3; Pelagia usa PEL. Búsqueda uno por uno antes de publicar (JUEGO.md, sección 6.1).
 - Marangi es el modelo de Brenner con la tela de color plano (`#7a1626`). **No se revisó en captura si el relieve de «BRENNER» se lee**: mirarlo con GPU; si se lee, limitarlo a planos laterales.
-- Todo lo de la etapa 4 (fallos, festejos, ayudantes y bajadas animados) hoy es corte y texto, como define la sección 11.2.
+- Etapa 4: fallos y bajadas tienen desde el 12-nov una aproximación en el visor (barra que cae, pesista que vuelve a `Parado`; ver «Emoción»). Siguen faltando las reacciones del pesista (festejo, lamento) y los ayudantes, que necesitan animaciones y modelo nuevos. Mirar en la Mac si la mezcla lineal hacia `Parado` se ve bien.
 
 ## Contratos entre Blender y el visor
 

@@ -527,7 +527,7 @@ async function presentacion(p, cfg, errMedio) {
 /**
  * Dónde queda libre el lienzo con el panel abierto: a la izquierda si el panel va al costado, arriba si va al pie. Devuelve el
  * centro de esa parte ({x, y} en fracción del lienzo) y la distancia del plano americano para que entre de las rodillas
- * para arriba (1,4 m de alto y 1 m de ancho) en esa parte.
+ * para arriba (1,6 m de alto y 1 m de ancho) en esa parte.
  */
 function encuadreLibre() {
   const pn = $('capa').querySelector('.panel'), c = $('gl').getBoundingClientRect(); if (!c.width || !c.height) return null;
@@ -537,7 +537,7 @@ function encuadreLibre() {
     if (izq > .4) x1 = izq; else if (arr > .25) y1 = arr;
   }
   const fov = 22, tg = 2 * Math.tan(fov / 2 * Math.PI / 180), asp = c.width / c.height;
-  return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, dAbs: Math.max(1.4 / (tg * (y1 - y0)), 1 / (tg * asp * (x1 - x0))) };
+  return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, dAbs: Math.max(1.6 / (tg * (y1 - y0)), 1 / (tg * asp * (x1 - x0))) };
 }
 
 /** Panel único del llamado propio: kilos (fichas y ajuste fino), envión, La cuenta, frase del entrenador y Confirmar. */

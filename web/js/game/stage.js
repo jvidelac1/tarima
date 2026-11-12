@@ -126,7 +126,7 @@ export const CAM = Object.fromEntries(CAMERAS.map((c, i) => [c.key, i]));
  */
 export const PLANOS = {
   medio: { key: 'medio', at: ['Neck', 'Hips'], up: -.05, d: 2.05, az: .5, el: .05, fov: 22 },
-  caida: { key: 'caida', at: [], up: 0, dAbs: 4.0, az: .72, el: .14, fov: 30, punto: 'caida' },
+  caida: { key: 'caida', at: [], up: 0, dAbs: 4.6, az: .72, el: .14, fov: 30, punto: 'caida' },
   manga: { key: 'manga', at: [], up: 0, dAbs: 1.45, az: 1.05, el: .2, fov: 30, punto: 'manga' },
 };
 
