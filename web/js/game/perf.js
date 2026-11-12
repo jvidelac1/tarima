@@ -7,13 +7,17 @@
 import { QUALITY } from '../config.js';
 
 /** Debajo de «baja»: pensado para un teléfono. Valores iniciales sin medir en un teléfono real. */
-export const MOVIL = { label: 'Móvil', dpr: 1.5, maxPixels: 1280 * 720, msaa: 2, shadow: 512, shadowR: 4.5, shadow2: 0, ao: 0, aoScale: .5, dof: 0, dofSamples: 0, bloom: false, smaa: false, crowd: .3, beams: false, aniso: 2, tex: 1024 };
+export const MOVIL = { label: 'Móvil', dpr: 1.5, maxPixels: 1280 * 720, msaa: 2, shadow: 512, shadowR: 4.5, shadow2: 0, ao: 0, aoScale: .5, dof: 0, dofSamples: 0, bloom: false, smaa: false, crowd: .3, beams: false, aniso: 2, tex: 1024, directo: true };
 /**
- * Calidades del juego: las del visor (config.js, que no se toca) con dos diferencias. El juego nunca usa el desenfoque de
- * movimiento de la barra (no reserva sus destinos) y en «Baja» la sombra va en un mapa de 768 con la misma penumbra en
- * centímetros (lighting.js la pasa a texeles): 44 % menos de píxeles en la pasada de sombra y en su desenfoque.
+ * Calidades del juego: las del visor (config.js, que no se toca) con estas diferencias.
+ * - «Baja» y «Móvil» van por el camino directo (stage.js): una sola pasada al lienzo con el MSAA del lienzo y el tono y el
+ *   color dentro de los materiales. Es lo que más bajó el costo fijo en el banco del usuario (de 9,3 a 4,3 ms en la M1 Pro).
+ *   `msaa` queda para la variante «con post» del banco (la Baja de antes).
+ * - En «Baja» la sombra va en un mapa de 512 con la misma penumbra en centímetros (lighting.js la pasa a texeles), y en
+ *   todas solo proyectan sombra el pesista y la barra (stage.js).
+ * - El juego nunca usa el desenfoque de movimiento de la barra (no reserva sus destinos).
  */
-export const PRESET = { movil: MOVIL, baja: { ...QUALITY.baja, shadow: 768 }, media: { ...QUALITY.media, mblur: 0 }, alta: { ...QUALITY.alta, mblur: 0 } };
+export const PRESET = { movil: MOVIL, baja: { ...QUALITY.baja, shadow: 512, directo: true }, media: { ...QUALITY.media, mblur: 0 }, alta: { ...QUALITY.alta, mblur: 0 } };
 /** Fracción del período de la pantalla que puede costar un cuadro: el resto es margen para no perder un refresco. */
 export const MARGEN = .85;
 /** Cada escalón que baja el gobernador deja esta fracción de los píxeles. */

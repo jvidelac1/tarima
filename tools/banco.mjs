@@ -2,7 +2,7 @@
 //   node tools/banco.mjs            el banco de medición (juego.html?banco=1): imprime la tabla y guarda window.BANCO
 //   node tools/banco.mjs --juego    abre el juego dibujando, empieza una partida y espera a que termine la calibración de
 //                                   calidad (precalentado de programas y decisión de megapíxeles); guarda JUEGO.calidad
-// Opciones: --ancho=1745 --alto=845 (ventana)  --limite=84 (segundos del banco)  --solo=baja,media  --variantes=sombras,luces
+// Opciones: --ancho=1745 --alto=845 (ventana)  --limite=115 (segundos del banco)  --solo=baja,media  --variantes=sombras,luces  --vueltas=3  --mp=0.5,1.5  --n=10
 //           --pesista=ventura  --lastre=18 (solo --juego: ms artificiales por megapíxel)  --json=archivo  --headed
 // Falla (exit 1) si la página tira un error, si el banco anota errores o si la calibración no llegó a decidir.
 // OJO: sin placa (GitHub Actions, contenedor) Chrome dibuja por software y LOS TIEMPOS NO DICEN NADA: ahí esto solo prueba
@@ -13,13 +13,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { launchOptions, isSoftware } from './browser.mjs';
+import { launchOptions, isSoftware, angleBackend } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1], tiene = k => process.argv.includes(`--${k}`);
-const JUEGO = tiene('juego'), ANCHO = +(arg('ancho') || 1745), ALTO = +(arg('alto') || 845), LIMITE = +(arg('limite') || 84), SALIDA = arg('json') || path.join(ROOT, 'out', 'banco', JUEGO ? 'juego.json' : 'banco.json');
+const JUEGO = tiene('juego'), ANCHO = +(arg('ancho') || 1745), ALTO = +(arg('alto') || 845), LIMITE = +(arg('limite') || 115), SALIDA = arg('json') || path.join(ROOT, 'out', 'banco', JUEGO ? 'juego.json' : 'banco.json');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
 const server = http.createServer((req, res) => {
   const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname), file = path.join(WEB, rel);
@@ -38,7 +38,9 @@ const guardar = o => { fs.mkdirSync(path.dirname(path.resolve(SALIDA)), { recurs
 const problemas = [];
 try {
   if (!JUEGO) {
-    const q = ['banco=1', `limite=${LIMITE}`, ...['solo', 'variantes', 'pesista'].filter(k => arg(k)).map(k => `${k}=${arg(k)}`)].join('&');
+    // por software un cuadro a 1,5 MP tarda segundos: medidas chicas y dos vueltas alcanzan para probar que el banco corre entero
+    const soft = angleBackend() === 'swiftshader' && !arg('mp') ? ['mp=0.06,0.18', 'n=4', 'vueltas=2'] : [];
+    const q = ['banco=1', `limite=${LIMITE}`, ...soft, ...['solo', 'variantes', 'pesista', 'mp', 'n', 'vueltas'].filter(k => arg(k)).map(k => `${k}=${arg(k)}`)].join('&');
     await page.goto(`${base}juego.html?${q}`, { waitUntil: 'load' });
     let ult = '';
     for (const t0 = Date.now(); ;) {
@@ -51,13 +53,18 @@ try {
     const B = await page.evaluate(() => JSON.parse(JSON.stringify(window.BANCO)));
     await page.screenshot({ path: SALIDA.replace(/\.json$/, '') + '.png' }).catch(() => null);
     guardar(B);
-    console.log(`\nBanco de medición · ${B.gl} · ventana ${(B.ventana || []).join(' × ')} · pantalla ${n(B.hz)} Hz (período ${n(B.periodoMs)} ms) · a su resolución ${n(B.nativoMP)} MP · ${B.variantes.length} variantes en ${n(B.duracionS, 1)} s`);
+    console.log(`\nBanco de medición · ${B.gl} · ventana ${(B.ventana || []).join(' × ')} · pantalla ${n(B.hz)} Hz (período ${n(B.periodoMs)} ms) · a su resolución ${n(B.nativoMP)} MP · ${(B.calidades || []).length} calidades y ${B.variantes.length} variantes en ${n(B.duracionS, 1)} s`);
     if (isSoftware(B.gl)) console.log('DIBUJO POR SOFTWARE: los tiempos de esta tabla no dicen nada de ninguna placa. Solo prueba que el banco corre.');
-    console.log(`${'variante'.padEnd(58)}${['fijo', 'por MP', 'a 1 MP', 'MP cta', 'MP real', 'pierde', 'ahorro', '%', 'llam', 'triáng'].map(x => x.padStart(8)).join('')}`);
-    for (const v of B.variantes) console.log(`${(v.nombre + (v.error ? ' · ERROR' : '')).slice(0, 57).padEnd(58)}${[n(v.fijoMs), n(v.porMPms), n(v.ms1MP), n(v.mpModelo), n(v.mpReal), n(v.mpFalla), n(v.ahorroMs), n(v.ahorroPct, 1), v.llamadas ?? '—', v.triangulos ? Math.round(v.triangulos / 1000) + 'k' : '—'].map(x => String(x).padStart(8)).join('')}`);
+    const fila = (nombre, cols) => console.log(`${nombre.slice(0, 57).padEnd(58)}${cols.map(x => String(x).padStart(9)).join('')}`), marca = v => (v.ruidosa ? ' · ruidosa' : '') + (v.error ? ' · ERROR' : '');
+    fila('calidad', ['vueltas', 'fijo', 'por MP', 'a 1 MP', 'rango', 'vs Baja', 'MP cta', 'MP real', 'pierde', 'llam', 'triáng']);
+    for (const v of B.calidades || []) fila(v.nombre + marca(v), [v.vueltas, n(v.fijoMs), n(v.porMPms), n(v.ms1MP), `${n(v.ms1MPmin, 1)}-${n(v.ms1MPmax, 1)}`, n(v.vsBajaMs), n(v.mpModelo), n(v.mpReal), n(v.mpFalla), v.llamadas ?? '—', v.triangulos ? Math.round(v.triangulos / 1000) + 'k' : '—']);
+    fila('variante de Baja', ['vueltas', 'a 1 MP', 'ahorro', 'rango', '%', 'fijo', 'por MP', 'llam', 'triáng', 'progr+']);
+    for (const v of B.variantes) fila(v.nombre + marca(v), [v.vueltas, n(v.ms1MP), n(v.ahorroMs), `${n(v.ahorroMin, 1)}..${n(v.ahorroMax, 1)}`, n(v.ahorroPct, 1), n(v.ahorroFijoMs), n(v.ahorroPorMPms), v.llamadas ?? '—', v.triangulos ? Math.round(v.triangulos / 1000) + 'k' : '—', v.programasSobrantes ?? '—']);
+    if (B.deriva) console.log(`deriva de la completa: ${n(B.deriva.primeraMs)} → ${n(B.deriva.ultimaMs)} ms a 1 MP (${n(B.deriva.cambioPct, 1)} %) · programas ${B.programasAlEmpezar} → ${B.programasAlTerminar} · mallas fijas de la arena: ${B.mallasFijas ? `${B.mallasFijas.antes} → ${B.mallasFijas.despues}` : '—'}`);
+    for (const v of B.variantes) if (v.programasSobrantes) problemas.push(`banco: ${v.id} dejó ${v.programasSobrantes} programas compilados al deshacerse`);
     for (const x of B.notas) console.log('nota: ' + x);
     for (const x of B.errores) problemas.push('banco: ' + x.split('\n')[0]);
-    if (!B.variantes.length) problemas.push('el banco no midió ninguna variante');
+    if (!B.variantes.length || !(B.calidades || []).length) problemas.push('el banco no midió ninguna variante o ninguna calidad');
   } else {
     await page.goto(`${base}juego.html?semilla=20261112&depura=1${arg('lastre') ? '&lastre=' + arg('lastre') : ''}`, { waitUntil: 'load' });
     await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 180000 });
