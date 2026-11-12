@@ -265,6 +265,8 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
   .pulso{width:clamp(56px,19cqh,88px);margin:.3em auto}
   table.tabla{font-size:clamp(12px,3.6cqh,14px)}
   .panel .pie{margin:.4em -14px -10px;padding:6px 14px}
+  /* el podio con sus botones: la tabla completa ya se vio un momento antes (sin botones); acá quedan el podio y los botones */
+  .panel.podio-panel:has(button) .tabla{display:none}
   /* el panel del llamado va al costado: el pesista queda a la vista */
   .panel.lado{align-self:center;margin-left:auto;margin-right:0;max-width:min(54cqw,440px)}
 }

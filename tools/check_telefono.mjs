@@ -227,6 +227,8 @@ async function correr(C) {
   if (C.partida && (fin.propios.filter(x => / valido/.test(x)).length < 3)) mal(`tocando cada señal en su momento salieron pocos válidos: ${fin.propios.join(' · ')}`);
   if (C.dedos && !dedosProbados) mal('no se llegó a probar dos dedos a la vez');
   if (C.campos && !campoSolo) mal('no se llegó a probar un campo sin panel');
+  // la última pantalla (el podio con sus botones) también se revisa
+  if (fin.s.pantalla === 'fin') { await av(3000); await revisar('fin (podio con botones)'); }
   await foto('final'); await ctx.close();
 }
 
