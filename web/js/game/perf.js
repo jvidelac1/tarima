@@ -151,7 +151,7 @@ const MP_1080 = 2.07;
  * @param {object} io
  * @param {number} io.periodo  ms por cuadro de la meta
  * @param {string} io.clave    calidad de partida
- * @param {boolean} [io.telefono]  puntero grueso (teléfono o tableta); falso: computadora
+ * @param {boolean} [io.telefono]  puntero grueso (teléfono o tableta); falso: computadora. Sin el dato: teléfono si arranca en «Móvil»
  * @param {number} [io.cssMP]  megapíxeles del lienzo en píxeles CSS (densidad 1): el piso del teléfono
  * @param {() => number} io.techo             megapíxeles del lienzo a la densidad de la pantalla, con la calidad en uso
  * @param {(mp:number) => {mp:number, ms:number}} io.medir  dibuja a esa resolución (aunque pase la de la pantalla) y devuelve los MP reales y el costo
@@ -162,7 +162,7 @@ const MP_1080 = 2.07;
  * @returns {Promise<{clave:string, mp:number, piso:number, mitad:boolean, periodo:number, p80:number|null, primera:object, elegida:object, pruebas:object[], verificacion:object[]}>}
  */
 export async function decidirCalidad(io) {
-  const pruebas = [], verificacion = [], r2 = x => Math.round(x * 100) / 100, tel = !!io.telefono; let clave = io.clave, p80 = null, periodo = io.periodo, mitad = false;
+  const pruebas = [], verificacion = [], r2 = x => Math.round(x * 100) / 100, tel = io.telefono ?? io.clave === 'movil'; let clave = io.clave, p80 = null, periodo = io.periodo, mitad = false;
   const medir = () => {
     const techo = Math.min(io.techo(), TECHO_MP), a = Math.max(.2, Math.min(.5, techo * .3)), b = Math.max(a * 2, Math.min(techo, 1.6)), m = [io.medir(a), io.medir(b)], mod = ajustar(m[0], m[1]), sost = mpSostenible(mod, periodo);
     const r = { calidad: clave, periodo: r2(periodo), techo: r2(techo), medidas: m.map(x => ({ ...x, mp: r2(x.mp), ms: r2(x.ms) })), fijo: r2(mod.fijo), porMP: r2(mod.porMP), sostiene: Number.isFinite(sost) ? r2(sost) : 99, modelo: mod };
