@@ -284,10 +284,22 @@ describe('lista de espera', () => {
     expect((await pedirPartida(b, ip)).j.estado).toBe('ok');
     expect((await pedirPartida(uuid(), ip)).j.motivo).toBe('ip');
 
+    // Otro dispositivo con el mismo mail: liga la misma fila, pero la respuesta es la de un alta (no revela que ya
+    // estaba) y no toca lo guardado: un tercero no puede activar las novedades de nadie.
     const otro = uuid();
-    const r2 = await alta('juana.perez+tarima@buendominio.com', { dispositivo: otro });
-    expect(r2.j).toMatchObject({ estado: 'ya_estaba', lista_id: r.j.lista_id, confirmar: false });
+    const r2 = await alta('juana.perez+tarima@buendominio.com', { dispositivo: otro, novedades: false });
+    expect(r2.j).toMatchObject({ estado: 'nuevo', lista_id: r.j.lista_id, confirmar: false });
     expect((await pedirPartida(otro, nuevaIp())).j.fuente).toBe('lista');
+    // Solo el mismo dispositivo, ya ligado, recibe 'ya_estaba'.
+    expect((await alta('juana.perez+tarima@buendominio.com', { dispositivo: otro })).j.estado).toBe('ya_estaba');
+  });
+
+  it('un mail que ya estaba no cambia el consentimiento ni las novedades', async () => {
+    const r = await alta('sin-novedades@buendominio.com', { novedades: false });
+    const r2 = await alta('sin-novedades@buendominio.com', { novedades: true, consentimiento: '2026-11-a' });
+    expect(r2.j).toMatchObject({ estado: 'nuevo', lista_id: r.j.lista_id });
+    const fila = await env.DB.prepare('SELECT novedades, consentimiento_en, creado FROM lista WHERE id = ?').bind(r.j.lista_id).first();
+    expect(fila.novedades).toBe(0);
   });
 
   it('el nombre inválido se descarta sin error y el de por defecto no se guarda', async () => {
@@ -322,7 +334,7 @@ describe('lista de espera', () => {
     const e = () => E({ MAIL_DESDE: 'hola@tarima.test', EMAIL: { send: async m => { enviados.push(m); return { messageId: 'x' }; } } });
     const linkDe = (m, ruta) => m.text.match(new RegExp(`https://tarima\\.test${ruta}\\?t=[0-9a-f.]+(?:&v=f)?`))[0];
 
-    it('manda la confirmación con baja de un clic; /confirmar confirma una vez', async () => {
+    it('manda la confirmación con baja de un clic; GET muestra el botón y solo POST confirma', async () => {
       enviados.length = 0;
       const r = await alta('confirma@buendominio.com', { e: e(), nombre: 'Leo', idioma: 'en' });
       expect(r.j).toMatchObject({ estado: 'nuevo', confirmar: true });
@@ -332,13 +344,61 @@ describe('lista de espera', () => {
       expect(m.text).toContain('Hi Leo.');
       expect(m.headers['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
       expect(m.headers['List-Unsubscribe']).toMatch(/^<https:\/\/tarima\.test\/baja\?t=[0-9a-f]{32}\.[0-9a-f]{40}>$/);
-      const c = await llamar(linkDe(m, '/confirmar').slice(ORIGEN.length), null, { metodo: 'GET', ct: null, origin: null, e: e() });
+      const ruta = linkDe(m, '/confirmar').slice(ORIGEN.length);
+      const confirmado = async () => (await env.DB.prepare('SELECT confirmado_en FROM lista WHERE id = ?').bind(r.j.lista_id).first()).confirmado_en;
+      // Un escáner de links hace GET: no confirma.
+      const g = await llamar(ruta, null, { metodo: 'GET', ct: null, origin: null, e: e() });
+      expect(g.status).toBe(200);
+      expect(g.res.headers.get('referrer-policy')).toBe('no-referrer');
+      const html = await g.res.text();
+      expect(html).toContain('method="post"');
+      expect(html).toContain('Confirm your spot on the Tarima list?');
+      expect(await confirmado()).toBeNull();
+      const c = await llamar('/confirmar', 't=' + new URL(ORIGEN + ruta).searchParams.get('t'), { ct: 'application/x-www-form-urlencoded', e: e() });
       expect(c.status).toBe(200);
-      expect(c.res.headers.get('referrer-policy')).toBe('no-referrer');
       expect(await c.res.text()).toContain('Done! Your spot is confirmed.');
-      expect((await env.DB.prepare('SELECT confirmado_en FROM lista WHERE id = ?').bind(r.j.lista_id).first()).confirmado_en).toBeGreaterThan(0);
+      expect(await confirmado()).toBeGreaterThan(0);
+      expect(await (await llamar(ruta, null, { metodo: 'GET', ct: null, origin: null, e: e() })).res.text()).toContain('Done! Your spot is confirmed.');
       const malo = await llamar('/confirmar?t=' + 'a'.repeat(32) + '.' + 'b'.repeat(40), null, { metodo: 'GET', ct: null, origin: null });
       expect(malo.status).toBe(400);
+    });
+
+    it('el mismo mail desde otro dispositivo: misma respuesta que un alta, un mail por día y sin revelar nada', async () => {
+      enviados.length = 0;
+      const r = await alta('repite@buendominio.com', { e: e(), idioma: 'es' });
+      expect(enviados.map(m => m.subject)).toEqual(['Confirma tu lugar en Tarima']);
+      // Sin confirmar: se vuelve a mandar la confirmación.
+      const r2 = await alta('repite@buendominio.com', { e: e() });
+      expect(r2.j).toEqual({ estado: 'nuevo', lista_id: r.j.lista_id, confirmar: true });
+      expect(enviados.map(m => m.subject)).toEqual(['Confirma tu lugar en Tarima', 'Confirma tu lugar en Tarima']);
+      // El mismo día no sale otro mail, pero la respuesta no cambia.
+      expect((await alta('repite@buendominio.com', { e: e() })).j).toEqual({ estado: 'nuevo', lista_id: r.j.lista_id, confirmar: true });
+      expect(enviados).toHaveLength(2);
+      // Confirmado: otro día sale el aviso de «ya estabas», no otra confirmación.
+      await env.DB.prepare('UPDATE lista SET confirmado_en = 1 WHERE id = ?').bind(r.j.lista_id).run();
+      await env.DB.prepare('DELETE FROM limites').run();
+      await alta('repite@buendominio.com', { e: e() });
+      expect(enviados.at(-1).subject).toBe('Ya estás en la lista de Tarima');
+      expect(enviados.at(-1).headers['List-Unsubscribe']).toMatch(/\/baja\?t=/);
+    });
+
+    it('la baja de un clic con token válido no tiene límite por IP; los tokens malos sí', async () => {
+      enviados.length = 0;
+      const ip = nuevaIp();
+      const links = [];
+      for (let k = 0; k < 12; k++) {
+        await alta(`masiva${k}@buendominio.com`, { e: e() });
+        links.push(enviados.at(-1).headers['List-Unsubscribe'].slice(1, -1).slice(ORIGEN.length));
+      }
+      for (const link of links) {
+        const p = await llamar(link, 'List-Unsubscribe=One-Click', { metodo: 'POST', ct: 'application/x-www-form-urlencoded', origin: null, ip });
+        expect(p.status).toBe(200);
+      }
+      expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM lista WHERE email LIKE 'masiva%'").first()).n).toBe(0);
+      const malos = [];
+      for (let k = 0; k < 11; k++) malos.push((await llamar('/baja?t=' + 'a'.repeat(32) + '.' + 'c'.repeat(40), null, { metodo: 'GET', ct: null, origin: null, ip })).status);
+      expect(malos.slice(0, 10).every(s => s === 400)).toBe(true);
+      expect(malos[10]).toBe(429);
     });
 
     it('baja: GET muestra el botón, POST de un clic borra la fila y el dispositivo sigue libre', async () => {
@@ -407,6 +467,22 @@ describe('banderas de PostHog', () => {
     const r2 = await llamar('/api/estado', { dispositivo: a }, { ip, e });
     expect(r2.j.flags).toMatchObject({ 'muro-partidas-gratis': '1', 'muro-texto': 'b', 'invitacion-podio1': 'on' });
   });
+  it('GRATIS manda mientras PostHog no asigne la bandera, y el valor por defecto no queda pegado', async () => {
+    const ip = nuevaIp(), a = uuid();
+    // PostHog responde, pero la bandera todavía no existe en el proyecto.
+    flagsRespuesta = { flags: { 'muro-texto': { enabled: true, variant: 'b' } } };
+    const r = await llamar('/api/estado', { dispositivo: a }, { ip, e: E({ POSTHOG_KEY: 'phc_prueba', GRATIS: '1' }) });
+    expect(r.j.quedan).toBe(1);
+    expect(r.j.flags['muro-partidas-gratis']).toBe('1');
+    const d = await codigoDispositivo(env, a);
+    expect(JSON.parse((await env.DB.prepare('SELECT flags FROM dispositivos WHERE d = ?').bind(d).first()).flags)).toEqual({ 'muro-texto': 'b' });
+    // El dueño cambia GRATIS: vale enseguida, también para este dispositivo.
+    const r2 = await llamar('/api/estado', { dispositivo: a }, { ip, e: E({ POSTHOG_KEY: 'phc_prueba', GRATIS: '2' }) });
+    expect(r2.j.quedan).toBe(2);
+    expect(r2.j.flags['muro-texto']).toBe('b');
+    // Sin clave de PostHog, GRATIS también vale.
+    expect((await llamar('/api/estado', { dispositivo: uuid() }, { ip: nuevaIp(), e: E({ GRATIS: '1' }) })).j.quedan).toBe(1);
+  });
   it('si PostHog falla, valen los valores por defecto', async () => {
     const r = await llamar('/api/estado', { dispositivo: uuid() }, { ip: nuevaIp(), e: E({ POSTHOG_KEY: 'phc_prueba' }) });
     expect(r.j.flags['muro-partidas-gratis']).toBe('2');
@@ -430,6 +506,9 @@ describe('proxy de PostHog en /qx', () => {
   it('deja pasar una clave phc_ y manda los estáticos a us-assets', async () => {
     await llamar('/qx/flags?v=2', '{}', { headers: { authorization: 'Bearer phc_abc' } });
     expect(salidas.at(-1).headers.get('authorization')).toBe('Bearer phc_abc');
+    // Una clave personal (phx_) no pasa: el proxy no da acceso a la API privada.
+    await llamar('/qx/api/projects/', null, { metodo: 'GET', ct: null, headers: { authorization: 'Bearer phx_secreta' } });
+    expect(salidas.at(-1).headers.get('authorization')).toBeNull();
     const a = await llamar('/qx/static/array.js', null, { metodo: 'GET', ct: null });
     expect(await a.res.text()).toBe('/* array.js */');
     expect(salidas.at(-1).url.href).toBe('https://us-assets.i.posthog.com/static/array.js');
@@ -442,7 +521,7 @@ describe('limpieza diaria y registros', () => {
     await env.DB.batch(['dispositivos', 'partidas', 'encuestas', 'lista', 'limites'].map(t => env.DB.prepare(`DELETE FROM ${t}`)));
     await env.DB.batch([
       env.DB.prepare("INSERT INTO dispositivos (d, creado, ultimo) VALUES ('viejo', ?1, ?1), ('reciente', ?2, ?2)").bind(ahora - 200 * dia, ahora - 40 * dia),
-      env.DB.prepare("INSERT INTO dispositivos (d, creado, ultimo, lista_id) VALUES ('anotado', ?1, ?1, 'L')").bind(ahora - 400 * dia),
+      env.DB.prepare("INSERT INTO dispositivos (d, creado, ultimo, lista_id) VALUES ('anotado', ?1, ?3, 'L'), ('anotado-viejo', ?1, ?2, 'L')").bind(ahora - 400 * dia, ahora - 181 * dia, ahora - 10 * dia),
       env.DB.prepare("INSERT INTO partidas (d, i, en, fuente) VALUES ('viejo', 'iii', ?1, 'gratis'), ('reciente', 'iii', ?2, 'gratis'), ('reciente', 'jjj', ?3, 'gratis')").bind(ahora - 200 * dia, ahora - 40 * dia, ahora - dia),
       env.DB.prepare("INSERT INTO encuestas (d, i, en) VALUES ('reciente', 'iii', ?1)").bind(ahora - 31 * dia),
       env.DB.prepare(`INSERT INTO lista (id, email, idioma, consentimiento_version, consentimiento_en, creado, confirmado_en) VALUES

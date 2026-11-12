@@ -34,8 +34,8 @@ No hace falta cuenta de Cloudflare ni internet: todo corre en Miniflare y las sa
 ```bash
 cd worker
 npm ci                       # la primera vez
-npm test                     # 32 pruebas en el runtime de Workers (vitest + @cloudflare/vitest-plugin)
-npm run test:reglas          # 124 controles de la regla pura en Node (igual a: node tools/worker_test.mjs)
+npm test                     # 36 pruebas en el runtime de Workers (vitest + @cloudflare/vitest-plugin)
+npm run test:reglas          # 127 controles de la regla pura en Node (igual a: node tools/worker_test.mjs)
 ```
 
 Para probar el juego contra el Worker en la máquina (opcional, levanta un servidor):
@@ -118,6 +118,14 @@ Para ver los registros: `npx wrangler tail` o la pestaña Logs del Worker. No ll
   - Con GET, muestra el botón.
   - Con POST, da de baja. Acepta el token en la URL (el «un clic» del RFC 8058, con cuerpo `List-Unsubscribe=One-Click`) o en el formulario.
   - No pide `Origin`, porque lo mandan los proveedores de correo.
+- **`/confirmar`.** Igual que la baja: GET muestra el botón «Sí, confirmar» y POST (con `t` en el formulario o en la URL) confirma. Así un escáner de links no confirma un mail que anotó otra persona.
+- **Límite de `/baja` y `/confirmar`.** Solo cuentan los tokens que no valen (10 por hora por IP). Un token válido nunca recibe 429: los proveedores de correo mandan la baja de un clic desde pocas IP compartidas.
+- **`/api/anotar` con un mail que ya estaba.**
+  - Para un dispositivo que no estaba ligado a ese mail, la respuesta es la misma que un alta nueva (`estado: 'nuevo'`, el mismo `confirmar`), para no revelar quién está en la lista. `ya_estaba` solo vuelve si ese mismo dispositivo ya estaba ligado.
+  - Sale un mail, como mucho uno por día por dirección: otra vez la confirmación si todavía no se confirmó, o el aviso «Ya estás en la lista» si ya se confirmó.
+  - No se toca nada de lo guardado: ni el consentimiento ni `novedades`. En el MVP no se verifica la propiedad del mail, así que un tercero no puede anotar a nadie en las novedades.
+- **Banderas y `GRATIS`.** En D1 solo se guarda lo que PostHog asignó. Mientras la bandera `muro-partidas-gratis` no exista o no responda, manda la variable `GRATIS`, y su valor por defecto nunca queda pegado.
+- **Limpieza.** Los dispositivos se borran a los 180 días sin jugar, estén o no en la lista (lo que promete la página de privacidad). Quien vuelve después pone el mismo mail y recupera el juego libre.
 - **Trampa para bots en `/api/anotar`.** El formulario tiene que llevar un campo escondido `web` (fuera de la vista y con `tabindex=-1` y `autocomplete=off`) que se manda vacío. Si llega con algo, el Worker responde como un alta normal y no guarda nada.
 - **Errores extra.**
   - `/api/encuesta` devuelve 400 `{error:'formato'}` si alguna respuesta no es un código válido, si viene «nada» con otra opción o si `q5` pasa de 280 caracteres. Las 4 primeras sin contestar siguen dando `incompleta`.

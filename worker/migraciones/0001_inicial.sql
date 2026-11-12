@@ -1,12 +1,13 @@
 -- Base D1 `tarima` (docs/MVP.md 5.5). Se aplica con: npx wrangler d1 migrations apply tarima --remote
 -- Ninguna columna guarda una IP ni el id del navegador en claro: `d` e `i` son HMAC con secretos del Worker.
 
--- Un navegador. d = HMAC(SECRETO_DISPOSITIVO, uuid). Se borra a los 180 días sin finales si no está en la lista.
+-- Un navegador. d = HMAC(SECRETO_DISPOSITIVO, uuid). Se borra a los 180 días sin finales, esté o no en la lista.
 CREATE TABLE dispositivos (
   d TEXT PRIMARY KEY,
   creado INTEGER NOT NULL,
   ultimo INTEGER NOT NULL,          -- última final pedida (o el alta)
   lista_id TEXT,                    -- se conserva aunque la persona se dé de baja: el juego libre no se pierde
+                                    -- (hasta los 180 días sin jugar, como todo dispositivo)
   encuesta_en INTEGER,
   flags TEXT,                       -- JSON con el valor de cada bandera para este dispositivo
   flags_en INTEGER

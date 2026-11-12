@@ -121,14 +121,18 @@ const metricas = env => env.POSTHOG_KEY
   : null;
 
 // Banderas del dispositivo: se refrescan cada 24 h; las de experimento quedan fijas una vez asignadas.
+// Devuelve `flags` (lo que ve el juego, con los valores por defecto) y `asignadas` (solo lo que vino de PostHog:
+// es lo que se guarda y lo único que pisa la configuración del Worker).
 async function banderas(env, ctx, dev, ahora) {
   let guardadas = null;
   try { guardadas = dev.flags ? JSON.parse(dev.flags) : null; } catch { guardadas = null; }
-  if (guardadas && dev.flags_en > ahora - R.REFRESCO_FLAGS) return R.combinarBanderas(guardadas, null);
+  const defectos = { 'muro-partidas-gratis': String(R.config(env, {}).gratis) };
+  const armar = asignadas => ({ asignadas, flags: R.combinarBanderas(asignadas, null, defectos) });
+  if (guardadas && dev.flags_en > ahora - R.REFRESCO_FLAGS) return armar(R.banderasAsignadas(guardadas, null));
   const resp = await evaluarBanderas(env, 'd_' + dev.d.slice(0, 16));
-  const flags = R.combinarBanderas(guardadas, resp);
-  if (resp) ctx.waitUntil(D.guardarBanderas(env.DB, dev.d, flags, ahora).catch(e => log('error', { msg: 'banderas_guardar', tipo: e?.name })));
-  return flags;
+  const asignadas = R.banderasAsignadas(guardadas, resp);
+  if (resp) ctx.waitUntil(D.guardarBanderas(env.DB, dev.d, asignadas, ahora).catch(e => log('error', { msg: 'banderas_guardar', tipo: e?.name })));
+  return armar(asignadas);
 }
 
 // ---------- API ----------
@@ -152,8 +156,8 @@ async function situacion({ request, env, ctx, b, i, ahora }) {
   const uuid = dispositivoDe(request, b);
   const d = await codigoDispositivo(env, uuid);
   const dev = await D.asegurarDispositivo(env.DB, d, ahora);
-  const flags = await banderas(env, ctx, dev, ahora);
-  const cfg = R.config(env, flags);
+  const { flags, asignadas } = await banderas(env, ctx, dev, ahora);
+  const cfg = R.config(env, asignadas);
   const c = await D.contar(env.DB, d, i, ahora);
   const dec = R.decidir({ anotado: !!dev.lista_id, encuesta: !!dev.encuesta_en, usadas_d: c.usadas_d, usadas_i: c.usadas_i, encuestas_i: c.encuestas_i, cfg });
   const contexto = { pais: paisDe(request), previas: c.usadas_d, dias: R.diasDesde(dev.creado, ahora) };
@@ -205,7 +209,7 @@ async function anotar({ request, env, ctx, url, b, ahora }) {
 
   const uuid = dispositivoDe(request, b);
   const d = await codigoDispositivo(env, uuid);
-  await D.asegurarDispositivo(env.DB, d, ahora);
+  const dev = await D.asegurarDispositivo(env.DB, d, ahora);
   const idi = R.idioma(b.idioma);
 
   let fila = await D.buscarEmail(env.DB, email);
@@ -216,20 +220,28 @@ async function anotar({ request, env, ctx, url, b, ahora }) {
       id, email, nombre: R.normalizarNombre(b.nombre), idioma: idi, pais: paisDe(request),
       novedades: b.novedades === true, consentimiento: b.consentimiento, ahora,
     });
-    fila = nuevo ? { id, idioma: idi, nombre: R.normalizarNombre(b.nombre) } : await D.buscarEmail(env.DB, email);
+    fila = nuevo ? { id, idioma: idi, nombre: R.normalizarNombre(b.nombre), confirmado_en: null } : await D.buscarEmail(env.DB, email);
     if (!fila) throw new ErrorHttp(503, 'servidor');
-  } else if (b.novedades === true) {
-    await D.activarNovedades(env.DB, fila.id);
   }
-  await D.ligarDispositivo(env.DB, d, fila.id);
+  // Un mail que ya está en la lista no cambia nada de lo guardado: ni el consentimiento ni las novedades. En el MVP
+  // no se verifica que el mail sea de quien lo escribe, así que un tercero no puede sumar a nadie a las novedades.
+  const yaLigado = dev.lista_id === fila.id;
+  await D.ligarDispositivo(env.DB, d, fila.id, ahora);
 
-  let confirmar = false;
-  if (nuevo && puedeMandarMail(env)) {
-    confirmar = true;
-    ctx.waitUntil(mailConfirmar(env, url.origin, email, fila));
+  // Para no revelar quién está en la lista, un dispositivo nuevo recibe la misma respuesta con un mail nuevo o con
+  // uno que ya estaba, y en los dos casos sale un mail: la confirmación (alta nueva o todavía sin confirmar) o el
+  // aviso de «ya estabas», como mucho uno por día para el mismo mail. 'ya_estaba' solo vuelve si este mismo
+  // dispositivo ya estaba ligado a ese mail, que no le cuenta nada nuevo.
+  const confirmar = !yaLigado && puedeMandarMail(env);
+  if (confirmar) {
+    if (nuevo) ctx.waitUntil(mailConfirmar(env, url.origin, email, fila));
+    else if (await D.dentroDelLimite(env.DB, { regla: 'mail', i: fila.id, max: 1, periodo: R.DIA, ahora })) {
+      ctx.waitUntil(fila.confirmado_en ? mailYaEstaba(env, url.origin, email, fila) : mailConfirmar(env, url.origin, email, fila));
+    }
   }
-  log('info', { msg: 'anotar', estado: nuevo ? 'nuevo' : 'ya_estaba', confirmar });
-  return json({ estado: nuevo ? 'nuevo' : 'ya_estaba', lista_id: fila.id, confirmar }, 200, setCookie(uuid));
+  const estado = yaLigado ? 'ya_estaba' : 'nuevo';
+  log('info', { msg: 'anotar', estado, alta: nuevo, confirmar });
+  return json({ estado, lista_id: fila.id, confirmar }, 200, setCookie(uuid));
 }
 
 async function encuesta({ request, env, ctx, b, i, ahora }) {
@@ -289,11 +301,14 @@ async function exportar(request, env, url) {
 
 // ---------- páginas de la baja y la confirmación ----------
 
-async function prepararPagina(request, env, regla) {
+// Las páginas de /baja y /confirmar solo cuentan para el límite los tokens que no valen: adivinar uno es imposible
+// (128 bits de id y 160 de firma), y un límite sobre los válidos frenaría la baja de un clic, que los proveedores de
+// correo mandan desde pocas IP compartidas.
+async function tokenDePagina(request, env, regla, tk, tipo) {
   verificarSecretos(env);
-  const ahora = ahoraS();
-  await limitar(env, regla, await codigoIp(env, R.prefijoIp(ipDe(request))), ahora);
-  return ahora;
+  const id = await leerToken(env, tk, tipo);
+  if (!id) await limitar(env, regla, await codigoIp(env, R.prefijoIp(ipDe(request))), ahoraS());
+  return id;
 }
 
 function paginaError(request, status, error) {
@@ -306,7 +321,6 @@ const paginaTokenInvalido = request => pagina(idiomaPagina(request), l => ({ tit
 
 async function paginaBaja(request, env, ctx, url) {
   if (request.method !== 'GET' && request.method !== 'POST') throw new ErrorHttp(405, 'metodo');
-  await prepararPagina(request, env, 'baja');
   let tk = url.searchParams.get('t'), via = url.searchParams.get('v') === 'f' ? 'formulario' : 'mail';
   if (request.method === 'POST') {
     const form = new URLSearchParams(await leerCuerpo(request));
@@ -314,7 +328,7 @@ async function paginaBaja(request, env, ctx, url) {
     if (form.get('v') === 'f') via = 'formulario';
     if (form.get('List-Unsubscribe') === 'One-Click') via = 'mail';
   }
-  const id = await leerToken(env, tk, 'baja');
+  const id = await tokenDePagina(request, env, 'baja', tk, 'baja');
   if (!id) return paginaTokenInvalido(request);
   const fila = await D.buscarLista(env.DB, id);
   const idi = idiomaPagina(request, fila?.idioma);
@@ -335,17 +349,29 @@ async function paginaBaja(request, env, ctx, url) {
   return pagina(idi, l => ({ titulo: t(l, 'baja.ok'), html: '<p><a class="b" href="/">' + t(l, 'confirmado.volver') + '</a></p>' }));
 }
 
+// GET muestra un botón y POST confirma, como en la baja: los escáneres de links del correo (de empresas y de algunos
+// proveedores) abren cada link con GET, y con eso confirmarían solos un mail que anotó un tercero.
 async function paginaConfirmar(request, env, ctx, url) {
-  if (request.method !== 'GET') throw new ErrorHttp(405, 'metodo');
-  const ahora = await prepararPagina(request, env, 'confirmar');
-  const id = await leerToken(env, url.searchParams.get('t'), 'confirmar');
+  if (request.method !== 'GET' && request.method !== 'POST') throw new ErrorHttp(405, 'metodo');
+  let tk = url.searchParams.get('t');
+  if (request.method === 'POST') tk = new URLSearchParams(await leerCuerpo(request)).get('t') || tk;
+  const id = await tokenDePagina(request, env, 'confirmar', tk, 'confirmar');
   const fila = id && (await D.buscarLista(env.DB, id));
   if (!fila) return paginaTokenInvalido(request);
-  if (await D.confirmar(env.DB, id, ahora)) {
+  const idi = idiomaPagina(request, fila.idioma);
+  if (request.method === 'GET' && !fila.confirmado_en) {
+    return pagina(idi, l => ({
+      titulo: t(l, 'confirmar.pregunta'),
+      html: `<form method="post" action="/confirmar"><input type="hidden" name="t" value="${tk}"><button type="submit">${t(l, 'confirmar.boton')}</button></form>`,
+      extra: '',
+    }));
+  }
+  const ahora = ahoraS();
+  if (request.method === 'POST' && (await D.confirmar(env.DB, id, ahora))) {
     log('info', { msg: 'mail_confirmado' });
     ctx.waitUntil(capturar(env, { event: 'mail_confirmado', distinct_id: id, properties: {} }));
   }
-  return pagina(idiomaPagina(request, fila.idioma), l => ({
+  return pagina(idi, l => ({
     titulo: t(l, 'confirmado.texto'),
     html: '<p><a class="b" href="/">' + t(l, 'confirmado.volver') + '</a></p>',
   }));
@@ -375,6 +401,14 @@ async function mailConfirmar(env, origen, email, fila) {
   const nombre = fila.nombre || t(idi, 'nombre.defecto');
   const m = armarMail(idi, { cuerpo: t(idi, 'mail.confirmar.cuerpo', { nombre }), boton: t(idi, 'mail.confirmar.boton'), link, baja });
   await enviar(env, { to: email, subject: t(idi, 'mail.confirmar.asunto'), ...m, baja });
+}
+
+// Para un mail que ya estaba confirmado y se usó desde otro dispositivo (docs/MVP.md 5.5, «Revisión»).
+async function mailYaEstaba(env, origen, email, fila) {
+  const idi = fila.idioma === 'es' ? 'es' : 'en';
+  const baja = `${origen}/baja?t=${await token(env, fila.id, 'baja')}`;
+  const m = armarMail(idi, { cuerpo: t(idi, 'mail.ya.cuerpo'), boton: t(idi, 'mail.ya.boton'), link: `${origen}/`, baja });
+  await enviar(env, { to: email, subject: t(idi, 'mail.ya.asunto'), ...m, baja });
 }
 
 async function mailBaja(env, origen, email, fila) {

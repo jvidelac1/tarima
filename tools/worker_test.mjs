@@ -189,6 +189,9 @@ igual(R.combinarBanderas({ 'muro-partidas-gratis': '1', 'muro-texto': 'b', graba
   { 'muro-partidas-gratis': '1', 'muro-texto': 'b', 'invitacion-podio1': 'on', grabacion: 'off' }, 'pegajosas fijas, las demás se refrescan');
 igual(R.combinarBanderas(null, { 'muro-texto': { variant: 'zzz' } })['muro-texto'], 'a', 'variante desconocida: por defecto');
 igual(R.combinarBanderas({ grabacion: 'muestra' }, null).grabacion, 'muestra', 'sin respuesta: queda lo guardado');
+igual(R.banderasAsignadas(null, { 'muro-texto': { variant: 'b' } }), { 'muro-texto': 'b' }, 'solo se guarda lo que asignó PostHog, nunca un valor por defecto');
+igual(R.combinarBanderas({}, null, { 'muro-partidas-gratis': '1' })['muro-partidas-gratis'], '1', 'el por defecto puede salir de GRATIS');
+igual(R.config({ GRATIS: '1' }, R.banderasAsignadas(null, {})).gratis, 1, 'sin bandera asignada, GRATIS manda');
 
 igual(['=1+1', '+a', '-a', '@a', 'a,b', 'di"jo', null, 7].map(R.celdaCsv), ["'=1+1", "'+a", "'-a", "'@a", '"a,b"', '"di""jo"', '', '7'], 'CSV');
 igual(R.escHtml(`<a href="x">'&`), '&lt;a href=&quot;x&quot;&gt;&#39;&amp;', 'escape HTML');

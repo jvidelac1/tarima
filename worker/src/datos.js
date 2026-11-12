@@ -59,8 +59,8 @@ export async function registrarEncuesta(db, { d, i, ahora }) {
 
 export const buscarEmail = (db, email) => db.prepare('SELECT id, idioma, nombre, confirmado_en FROM lista WHERE email = ?1').bind(email).first();
 export const buscarLista = (db, id) => db.prepare('SELECT id, idioma, nombre, confirmado_en FROM lista WHERE id = ?1').bind(id).first();
-export const ligarDispositivo = (db, d, lista_id) => db.prepare('UPDATE dispositivos SET lista_id = ?2 WHERE d = ?1').bind(d, lista_id).run();
-export const activarNovedades = (db, id) => db.prepare('UPDATE lista SET novedades = 1 WHERE id = ?1').bind(id).run();
+export const ligarDispositivo = (db, d, lista_id, ahora) =>
+  db.prepare('UPDATE dispositivos SET lista_id = ?2, ultimo = MAX(ultimo, ?3) WHERE d = ?1').bind(d, lista_id, ahora).run();
 
 export async function altaLista(db, f) {
   const r = await db.prepare(`INSERT INTO lista (id, email, nombre, idioma, pais, novedades, consentimiento_version, consentimiento_en, creado)
@@ -83,7 +83,9 @@ export async function limpiar(db, ahora) {
     ['ip_partidas', db.prepare('UPDATE partidas SET i = NULL WHERE i IS NOT NULL AND en <= ?1').bind(ahora - VENTANA_IP)],
     ['ip_encuestas', db.prepare('UPDATE encuestas SET i = NULL WHERE i IS NOT NULL AND en <= ?1').bind(ahora - VENTANA_IP)],
     ['partidas', db.prepare('DELETE FROM partidas WHERE en <= ?1').bind(ahora - RETENCION)],
-    ['dispositivos', db.prepare('DELETE FROM dispositivos WHERE lista_id IS NULL AND ultimo <= ?1').bind(ahora - RETENCION)],
+    // Todos, también los ligados a la lista: la página de privacidad promete 180 días sin jugar. Quien vuelve después
+    // pone el mismo mail y recupera el juego libre.
+    ['dispositivos', db.prepare('DELETE FROM dispositivos WHERE ultimo <= ?1').bind(ahora - RETENCION)],
     ['encuestas', db.prepare('DELETE FROM encuestas WHERE d NOT IN (SELECT d FROM dispositivos)')],
     ['sin_confirmar', db.prepare('DELETE FROM lista WHERE confirmado_en IS NULL AND creado <= ?1').bind(ahora - SIN_CONFIRMAR)],
     ['limites', db.prepare('DELETE FROM limites WHERE hasta <= ?1').bind(ahora)],

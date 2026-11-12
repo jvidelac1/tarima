@@ -16,7 +16,8 @@ export async function proxy(request, env, ctx) {
 
   const h = new Headers(request.headers);
   for (const k of QUITAR) h.delete(k);
-  if (!/^Bearer ph[csx]_/.test(h.get('authorization') ?? '')) h.delete('authorization');
+  // Solo la clave pública del proyecto (docs/MVP.md 6.2): el proxy no es un pasaje a la API privada de PostHog.
+  if (!/^Bearer phc_/.test(h.get('authorization') ?? '')) h.delete('authorization');
   const tieneCuerpo = request.method !== 'GET' && request.method !== 'HEAD';
   const r = await fetch(`https://${env.POSTHOG_HOST || 'us.i.posthog.com'}${camino}`, {
     method: request.method,

@@ -5,7 +5,12 @@ import { escHtml } from './reglas.js';
 export const TEXTOS = {
   es: {
     'mail.confirmar.asunto': 'Confirma tu lugar en Tarima',
-    'mail.confirmar.cuerpo': 'Hola, {nombre}. Toca el botón para confirmar tu lugar en la lista de acceso anticipado de Tarima. Si no fuiste tú, ignora este mail: no te volveremos a escribir.',
+    'mail.confirmar.cuerpo': 'Hola, {nombre}. Toca el botón para confirmar tu lugar en la lista de acceso anticipado de Tarima. Si no fuiste tú, ignora este mail: si no se confirma, borramos tu dirección a los 30 días.',
+    'mail.ya.asunto': 'Ya estás en la lista de Tarima',
+    'mail.ya.cuerpo': 'Alguien, probablemente tú, puso este mail en Tarima desde otro dispositivo. Ya estabas en la lista de acceso anticipado: ese dispositivo quedó con juego libre y no cambiamos nada más. Si no fuiste tú, no tienes que hacer nada.',
+    'mail.ya.boton': 'Ir a Tarima',
+    'confirmar.pregunta': '¿Confirmas tu lugar en la lista de Tarima?',
+    'confirmar.boton': 'Sí, confirmar',
     'mail.confirmar.boton': 'Confirmar',
     'mail.pie': 'Recibes este mail porque te anotaste en Tarima. Para darte de baja: {link}',
     'mail.baja.asunto': 'Tu link para darte de baja de Tarima',
@@ -24,7 +29,12 @@ export const TEXTOS = {
   },
   en: {
     'mail.confirmar.asunto': 'Confirm your spot in Tarima',
-    'mail.confirmar.cuerpo': "Hi {nombre}. Tap the button to confirm your spot on Tarima's early access list. If this wasn't you, ignore this email: we won't write again.",
+    'mail.confirmar.cuerpo': "Hi {nombre}. Tap the button to confirm your spot on Tarima's early access list. If this wasn't you, just ignore this email: unconfirmed addresses are deleted after 30 days.",
+    'mail.ya.asunto': "You're already on the Tarima list",
+    'mail.ya.cuerpo': "Someone, probably you, entered this email in Tarima on another device. You were already on the early access list: that device now has unlimited play, and nothing else changed. If this wasn't you, there's nothing you need to do.",
+    'mail.ya.boton': 'Go to Tarima',
+    'confirmar.pregunta': 'Confirm your spot on the Tarima list?',
+    'confirmar.boton': 'Yes, confirm',
     'mail.confirmar.boton': 'Confirm',
     'mail.pie': "You're getting this because you joined Tarima. Unsubscribe: {link}",
     'mail.baja.asunto': 'Your link to leave the Tarima list',

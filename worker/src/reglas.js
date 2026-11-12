@@ -230,19 +230,32 @@ export const BANDERAS = {
 export const banderasPorDefecto = () => Object.fromEntries(Object.entries(BANDERAS).map(([k, b]) => [k, b.defecto]));
 
 /**
- * Combina lo que respondió PostHog (/flags?v=2, campo `flags`) con lo guardado.
- * Las pegajosas guardadas no cambian; lo que no viene o no es un valor válido toma el valor por defecto.
+ * Las banderas que PostHog asignó de verdad a este dispositivo (ahora o antes): es lo único que se guarda y lo único
+ * que pisa la configuración del Worker. Las pegajosas guardadas no cambian. Un valor por defecto nunca se guarda: si
+ * se guardara, quedaría pegado aunque después cambie la variable GRATIS o se cree la bandera en PostHog.
  */
-export function combinarBanderas(guardadas, respuesta) {
+export function banderasAsignadas(guardadas, respuesta) {
   const out = {};
   for (const [k, b] of Object.entries(BANDERAS)) {
-    if (b.pegajosa && guardadas && b.valores.includes(guardadas[k])) { out[k] = guardadas[k]; continue; }
+    const g = guardadas && b.valores.includes(guardadas[k]) ? guardadas[k] : null;
+    if (b.pegajosa && g) { out[k] = g; continue; }
     const f = respuesta?.[k];
     let v = null;
     if (f && typeof f === 'object') v = typeof f.variant === 'string' ? f.variant : f.enabled === true ? 'on' : f.enabled === false ? 'off' : null;
-    if (!b.valores.includes(v)) v = guardadas && b.valores.includes(guardadas[k]) ? guardadas[k] : b.defecto;
-    out[k] = v;
+    if (b.valores.includes(v)) out[k] = v;
+    else if (g) out[k] = g;
   }
+  return out;
+}
+
+/**
+ * Valor de cada bandera para el juego: lo asignado por PostHog y, si no hay, el valor por defecto
+ * (`defectos` permite que el por defecto salga de la configuración del Worker, por ejemplo GRATIS).
+ */
+export function combinarBanderas(guardadas, respuesta, defectos = {}) {
+  const asignadas = banderasAsignadas(guardadas, respuesta);
+  const out = {};
+  for (const [k, b] of Object.entries(BANDERAS)) out[k] = asignadas[k] ?? (typeof defectos[k] === 'string' ? defectos[k] : b.defecto);
   return out;
 }
 
