@@ -109,7 +109,7 @@ async function correr(C) {
       const caja = el => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
       const cruza = (a, b) => a.l < b.r - 1 && a.r > b.l + 1 && a.t < b.b - 1 && a.b > b.t + 1;
       const o = { scroll: se.scrollWidth > W + 1 || se.scrollHeight > H + 1 || scrollX !== 0 || scrollY !== 0, fuera: [], seguras: [], cruces: [], panel: null, zona: ve($('zona')) };
-      const ids = ['zona', 'senal', 'zocalo', 'acuse', 'guia', 'veredicto', 'cartel', 'rival', 'etiqueta', 'pausa', 'saltar'], B = {};
+      const ids = ['zona', 'senal', 'zocalo', 'acuse', 'guia', 'veredicto', 'cartel', 'rival', 'etiqueta', 'pausa', 'ayudab', 'sonidob', 'saltar'], B = {};
       for (const id of ids) if (ve($(id))) B[id] = caja($(id));
       for (const k of ['bug', 'relojbox']) { const el = document.querySelector('.' + k); if (ve(el)) B[k] = caja(el); }
       for (const [id, b] of Object.entries(B)) {
@@ -117,7 +117,7 @@ async function correr(C) {
         // lo que se toca o se lee no va debajo de la muesca ni de la barra de inicio (el veredicto y el cartel van centrados)
         if (!['veredicto', 'cartel'].includes(id) && (b.l < seg.left - 1 || b.r > W - seg.right + 1 || b.b > H - seg.bottom + 1)) o.seguras.push(id);
       }
-      for (const [a, b] of [['zona', 'senal'], ['zona', 'zocalo'], ['zona', 'acuse'], ['zona', 'guia'], ['zona', 'rival'], ['zona', 'pausa'], ['zona', 'saltar'], ['senal', 'zocalo'], ['senal', 'guia'], ['senal', 'etiqueta'], ['senal', 'bug'], ['zocalo', 'acuse'], ['guia', 'zocalo'], ['acuse', 'guia']])
+      for (const [a, b] of [['zona', 'senal'], ['zona', 'zocalo'], ['zona', 'acuse'], ['zona', 'guia'], ['zona', 'rival'], ['zona', 'pausa'], ['zona', 'saltar'], ['zona', 'sonidob'], ['sonidob', 'pausa'], ['sonidob', 'bug'], ['sonidob', 'senal'], ['ayudab', 'relojbox'], ['senal', 'zocalo'], ['senal', 'guia'], ['senal', 'etiqueta'], ['senal', 'bug'], ['zocalo', 'acuse'], ['guia', 'zocalo'], ['acuse', 'guia']])
         if (B[a] && B[b] && cruza(B[a], B[b])) o.cruces.push(`${a}/${b}`);
       const pn = document.querySelector('#capa .panel') || (ve($('sobre')) ? $('sobre').querySelector('.panel') : null);
       if (pn) {
