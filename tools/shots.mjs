@@ -77,7 +77,7 @@ function writeIndex(run) {
   const file = path.join(OUT, 'shots.json'); let old = {};
   try { old = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* primera corrida */ }
   const corridas = old.corridas || {};
-  if (run) { const prev = corridas[run.tag]; corridas[run.tag] = { ...run, planos: { ...(ONLY && prev ? prev.planos : {}), ...run.planos } }; }
+  if (run) { const prev = corridas[run.tag]; corridas[run.tag] = { ...run, glb: { ...(ONLY && prev ? prev.glb : {}), ...run.glb }, planos: { ...(ONLY && prev ? prev.planos : {}), ...run.planos } }; }
   const doc = { condiciones: CONDICIONES, primeros_planos_nuevos: EXTRA_SHOTS, planos: PLANOS.map(p => ({ ...p, levantamiento: LIFT[p.lift] + (p.lift === 'c' ? ' ' + JERK[p.jerk] : ''), camara: p.shot ? `primer plano «${p.shot}»` : `cámara fija ${p.cam}` })), corridas };
   fs.mkdirSync(OUT, { recursive: true }); fs.writeFileSync(file, JSON.stringify(doc, null, 1) + '\n'); return file;
 }
@@ -239,6 +239,10 @@ try {
   }
 } catch (e) { problems.push(`shots: ${e.message}`); }
 await browser.close(); server.close();
+// De qué GLB salió cada captura (sha256 y fecha del archivo): tools/sheet.py lo pone en el encabezado de la columna.
+const glbInfo = f => { try { return { archivo: path.relative(ROOT, f), sha256: crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex'), fecha: fs.statSync(f).mtime.toISOString() }; } catch { return null; } };
+run.glb = Object.fromEntries([...new Set(todo.map(p => p.who))].map(w => [w, glbInfo(path.join(WEB, 'models', w + '.glb'))]).filter(x => x[1]));
+if (PROP && glbInfo(PROP)) run.glb.prop = glbInfo(PROP);
 run.segundos = Math.round((Date.now() - t0) / 1000); run.problemas = problems; run.avisos = [...new Set(warnings)];
 const index = writeIndex(run);
 console.log(`${Object.keys(run.planos).length}/${todo.length} capturas en ${path.relative(process.cwd(), OUT) || '.'} · ${run.segundos} s · ${path.relative(process.cwd(), index)}`);
