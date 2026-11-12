@@ -105,7 +105,8 @@ for (const [k0, k1] of [[140, 143], [140, 151], [151, 146]]) {
   const fin = await page.evaluate(t => window.JUEGO.test.cargaEn(t), A.dur + 1);
   if (fin.kg !== k1) problemas.push(`carga ${k0} → ${k1}: termina en ${fin.kg} kg`);
   console.log(`carga ${k0} → ${k1}: ${A.sale} piezas salen y ${A.entra} entran por lado, ${A.dur.toFixed(2)} s; kilos a la vista: ${[...new Set(kgs)].join(' → ')}`);
-  if (FOTOS) for (const [i, f] of [[1, .15], [2, .5], [3, .8]]) { await page.evaluate(t => window.JUEGO.test.cargaEn(t, true), A.dur * f); await foto(`carga_${k0}_${k1}_${i}`); }
+  // la animación no vuelve atrás en el tiempo (cargaEn de antes ya la dejó en el final): se arma de nuevo para las capturas
+  if (FOTOS) { await page.evaluate(([a, b]) => window.JUEGO.test.carga(a, b), [k0, k1]); for (const [i, f] of [[1, .15], [2, .5], [3, .8]]) { await page.evaluate(t => window.JUEGO.test.cargaEn(t, true), A.dur * f); await foto(`carga_${k0}_${k1}_${i}`); } }
 }
 
 // plano del llamado: el pesista a la vista con el panel al costado (escritorio) o al pie (teléfono)

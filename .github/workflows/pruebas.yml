@@ -83,12 +83,20 @@ jobs:
         timeout-minutes: 15
         run: node tools/check_fluidez.mjs --tutorial --capturas=out/capturas --json=out/capturas/fluidez.json 2>&1 | tee out/logs/capturas.log
 
+      # Revisión de experiencia: un jugador nuevo que no saltea nada entre levantamientos (cuánto espera y en qué), un
+      # fallo machacando Espacio, y capturas a 1745x845 de cada momento en out/recorrido. No decide el resultado.
+      - name: Recorrido de un jugador nuevo (check_recorrido, no bloquea)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        timeout-minutes: 20
+        run: node tools/check_recorrido.mjs 2>&1 | tee out/logs/check_recorrido.log
+
       - name: Resumen
         if: ${{ always() }}
         run: |
           {
             echo "### Pruebas del juego (dibujo por software: no mide cuadros por segundo)"
-            for f in sim_test play_human caida_test check_escenas check_game check_fluidez capturas; do
+            for f in sim_test play_human caida_test check_escenas check_game check_fluidez capturas check_recorrido; do
               echo; echo "**$f**"; echo '```'
               if [ -f "out/logs/$f.log" ]; then tail -n 14 "out/logs/$f.log"; else echo "(no corrió)"; fi
               echo '```'
