@@ -53,7 +53,9 @@ jobs:
         run: |
           mkdir -p out/logs
           npm ci
-          npm --prefix worker ci
+          # `npm ci` en Linux pide dependencias opcionales de wasm (@emnapi/*) que el lock armado en macOS no trae;
+          # `npm install` respeta las versiones del lock y agrega solo eso.
+          npm --prefix worker install --no-audit --no-fund
 
       - name: Cliente, métricas y Functions sin red (servidor_test)
         if: ${{ !cancelled() }}

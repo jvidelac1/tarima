@@ -101,6 +101,11 @@ async function pagina(o = {}) {
   // posthog-js descarta los eventos de navegadores que se anuncian como robots («HeadlessChrome»): en producción es lo que
   // se quiere; acá se usa el agente de un Chrome común para ver qué manda.
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: 'es-AR', userAgent: AGENTE, ...o });
+  // Además mira navigator.webdriver (true bajo Playwright) y las marcas de userAgentData («HeadlessChrome»).
+  await ctx.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false, configurable: true });
+    Object.defineProperty(Navigator.prototype, 'userAgentData', { get: () => undefined, configurable: true });
+  });
   const page = await ctx.newPage();
   page.on('pageerror', e => mal(`pageerror: ${e.message}`));
   page.on('console', m => { if (m.type() === 'error') mal(`console.error: ${m.text()} (${m.location()?.url || ''})`); });
