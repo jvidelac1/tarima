@@ -3,11 +3,18 @@
 // - La calidad se decide antes del primer intento (main.js, calibrar): cuánto cuesta un cuadro con el pesista moviéndose,
 //   a dos resoluciones, y de ahí cuántos megapíxeles entran en el 85 % del período de la pantalla.
 // - Dentro de la partida no se recompila nada: bajar un escalón es dibujar menos píxeles y, al final, apagar las sombras
-//   (sus programas quedan compilados desde la carga). Nunca sube solo y nunca cambia con un intento en curso.
+//   (sus programas quedan compilados desde la carga). Nunca cambia con un intento en curso.
+// - El gobernador no baja por carga ajena: si bajar no cambia lo que se pierde, deshace esa bajada y espera; cuando la
+//   máquina está libre un rato, vuelve a subir de a un escalón.
 import { QUALITY } from '../config.js';
 
 /** Debajo de «baja»: pensado para un teléfono. Valores iniciales sin medir en un teléfono real. */
-export const MOVIL = { label: 'Móvil', dpr: 1.5, maxPixels: 1280 * 720, msaa: 2, shadow: 512, shadowR: 4.5, shadow2: 0, ao: 0, aoScale: .5, dof: 0, dofSamples: 0, bloom: false, smaa: false, crowd: .3, beams: false, aniso: 2, tex: 1024, directo: true };
+/**
+ * Escena barata por píxel (stage.js, setBarato): piso con la luz horneada, haces de una cara y cortos en colores de
+ * pantalla, y los tres contraluces como término del material del pesista y la barra. Solo con el camino directo.
+ */
+export const BARATO = Object.freeze({ piso: true, haces: true, bordes: 'material' });
+export const MOVIL = { label: 'Móvil', dpr: 1.5, maxPixels: 1280 * 720, msaa: 2, shadow: 512, shadowR: 4.5, shadow2: 0, ao: 0, aoScale: .5, dof: 0, dofSamples: 0, bloom: false, smaa: false, crowd: .3, beams: false, aniso: 2, tex: 1024, directo: true, barato: BARATO };
 /**
  * Calidades del juego: las del visor (config.js, que no se toca) con estas diferencias.
  * - «Baja» y «Móvil» van por el camino directo (stage.js): una sola pasada al lienzo con el MSAA del lienzo y el tono y el
@@ -17,7 +24,7 @@ export const MOVIL = { label: 'Móvil', dpr: 1.5, maxPixels: 1280 * 720, msaa: 2
  *   todas solo proyectan sombra el pesista y la barra (stage.js).
  * - El juego nunca usa el desenfoque de movimiento de la barra (no reserva sus destinos).
  */
-export const PRESET = { movil: MOVIL, baja: { ...QUALITY.baja, shadow: 512, directo: true }, media: { ...QUALITY.media, mblur: 0 }, alta: { ...QUALITY.alta, mblur: 0 } };
+export const PRESET = { movil: MOVIL, baja: { ...QUALITY.baja, shadow: 512, directo: true, barato: BARATO }, media: { ...QUALITY.media, mblur: 0 }, alta: { ...QUALITY.alta, mblur: 0 } };
 /** Fracción del período de la pantalla que puede costar un cuadro: el resto es margen para no perder un refresco. */
 export const MARGEN = .85;
 /** Cada escalón que baja el gobernador deja esta fracción de los píxeles. */
@@ -127,26 +134,47 @@ export async function decidirCalidad(io) {
   return { clave, mp, p80, primera, elegida: r, pruebas, verificacion };
 }
 
+/** Tiempo limpio (sin perder ningún refresco) antes de subir un escalón, en ms: hasta lo que dejó la calibración, y por encima. */
+export const SUBIR_MS = 5000, SUBIR_ARRIBA_MS = 20000, SUBIR_MAX_MS = 120000;
+/** Cuánto dura la sospecha de carga ajena (ms): pasado eso, se vuelve a probar si bajar sirve. */
+export const AJENA_MS = 60000;
 /**
  * Gobernador. La meta es no perder ningún refresco: mira los cuadros dibujados en ventanas de 1 s y cuenta los refrescos
  * perdidos (intervalos de dos períodos o más) y el tiempo de hilo principal por cuadro. Una ventana es mala si pierde dos
- * refrescos o más, o si el hilo principal solo ya se lleva el 92 % del período. Pide bajar con dos ventanas malas entre las últimas
- * cuatro, o con una sola que pierda la quinta parte de los refrescos. Solo pide: el cambio lo aplica main.js cuando no hay
- * un intento en curso. `pasos`: cuántos escalones conviene bajar de una vez (1 a 3, según cuánto se pierde). `quieto`: dejó
- * de pedir porque dos bajadas seguidas no cambiaron lo que se pierde.
+ * refrescos o más, o si el hilo principal solo ya se lleva el 92 % del período.
+ * Solo pide (`pide`, con `sube` y `pasos`); main.js aplica el pedido cuando no hay un intento en curso y avisa con
+ * resultado(hecho, now).
+ * - Baja con dos ventanas malas entre las últimas cuatro, o con una sola que pierda la quinta parte de los refrescos
+ *   (1 a 3 escalones según cuánto se pierde).
+ * - Carga ajena: si después de bajar se pierde casi lo mismo (más de dos tercios de lo de antes), los píxeles no eran el
+ *   problema (otra app o el compositor ocupan la placa): pide deshacer esa bajada y no baja más mientras siga así
+ *   (`ajena`, hasta AJENA_MS o hasta tres ventanas limpias seguidas).
+ * - Sube de a un escalón después de SUBIR_MS sin perder un solo refresco (y con el hilo principal por debajo del 80 %),
+ *   mientras esté por debajo de lo que dejó la calibración; por encima, después de SUBIR_ARRIBA_MS. Si una subida pierde
+ *   refrescos en los 15 s siguientes, se deshace y la espera para volver a probar se duplica (hasta SUBIR_MAX_MS).
  * El costo de la placa no se ve desde acá (los intervalos llegan en múltiplos del período): el margen del 85 % sobre el
  * costo del cuadro lo pone la calibración, que lo mide antes de jugar.
  */
 export class Gobernador {
-  constructor(hz) { this.fijar(hz); this.v = { t: 0, n: 0, dup: 0, cb: 0, d: [] }; this.malas = []; this.hasta = 0; this.pide = false; this.pasos = 1; this.fps = 0; this.ult = null; this.previa = null; this.tPrevia = 0; this.inutiles = 0; this.quieto = false; }
+  constructor(hz) {
+    this.fijar(hz); this.v = { t: 0, n: 0, dup: 0, cb: 0, d: [] }; this.malas = []; this.hasta = 0; this.pide = false; this.sube = false; this.pasos = 1; this.fps = 0; this.ult = null;
+    this.nivel = 0;            // escalones por debajo de lo que dejó la calibración (negativo: por encima)
+    this.limpioMs = 0;         // tiempo seguido sin perder refrescos
+    this.espera = SUBIR_MS; this.esperaArriba = SUBIR_ARRIBA_MS;
+    this.ajena = false; this.tAjena = 0; this.ignoradas = 0; this.tope = false; this.piso = false; this.ultimo = null; this.motivo = ''; this._frac = 0; this.historia = [];
+  }
+  /** Compatibilidad: «quieto» era dejar de bajar porque bajar no servía. */
+  get quieto() { return this.ajena; }
   /** Cambia la frecuencia de pantalla con la que se juzga. */
   fijar(hz) { this.hz = hz; this.paso = pasoDe(hz); this.meta = metaDe(hz); this.periodo = 1000 / this.meta; }
   _vaciar() { const v = this.v; v.t = v.n = v.dup = v.cb = 0; v.d.length = 0; }
   /** Descarta lo medido hasta dentro de `ms`: después de cargar o de cambiar de calidad los primeros cuadros no cuentan. */
-  calentar(now, ms = 2500) { this.hasta = now + ms; this._vaciar(); this.malas = []; this.pide = false; this.pasos = 1; }
+  calentar(now, ms = 2500) { this.hasta = now + ms; this._vaciar(); this.malas = []; this.pide = false; this.sube = false; this.pasos = 1; this.limpioMs = 0; }
+  /** Estado para mirar desde la consola (JUEGO.calidad.gobernador). */
+  get estado() { return { nivel: this.nivel, ajena: this.ajena, ignoradas: this.ignoradas, tope: this.tope, piso: this.piso, limpioS: Math.round(this.limpioMs / 100) / 10, esperaS: this.espera / 1000, esperaArribaS: this.esperaArriba / 1000, motivo: this.motivo, historia: this.historia.slice(-8) }; }
   /**
    * @param {number} ms tiempo desde el cuadro dibujado anterior  @param {number} now  @param {number} cb ms de hilo principal de este cuadro
-   * @returns {boolean} hay que bajar
+   * @returns {boolean} hay un pedido (bajar o, con `sube`, subir)
    */
   cuadro(ms, now, cb = 0) {
     const v = this.v;
@@ -157,18 +185,46 @@ export class Gobernador {
     this.fps = fps; this.ult = { fps: Math.round(fps * 10) / 10, perdidos: v.dup, cuadros: v.n, hilo: Math.round(hilo * 10) / 10 };
     // casi todos los cuadros llegan antes del período: la pantalla es más rápida de lo que se midió (la ventana cambió de monitor)
     if (med < this.periodo * .9 && rapidos > v.n * .8) { this.fijar(Math.round(100000 * this.paso / med) / 100); this._vaciar(); this.malas = []; return this.pide; }
-    this.malas.push(v.dup >= 2 || hilo > this.periodo * .92); if (this.malas.length > 4) this.malas.shift();
+    const mala = v.dup >= 2 || hilo > this.periodo * .92, limpia = v.dup === 0 && hilo < this.periodo * .8;
+    this.malas.push(mala); if (this.malas.length > 4) this.malas.shift();
+    this.limpioMs = limpia ? this.limpioMs + v.t : 0;
+    if (this.ajena && (now - this.tAjena > AJENA_MS || (limpia && this.limpioMs >= 2900))) { this.ajena = false; this.motivo = now - this.tAjena > AJENA_MS ? 'se vuelve a probar si bajar sirve' : 'la máquina se liberó'; }
     const pasos = frac > .45 ? 3 : frac > .2 ? 2 : 1;
-    if (this.pide) this.pasos = Math.max(this.pasos, pasos);      // ya pidió y todavía no se pudo aplicar (hay un intento en curso)
-    else if (!this.quieto && (frac >= .2 || this.malas.filter(Boolean).length >= 2)) {
-      // Si después de bajar se pierde casi lo mismo que antes, los píxeles no eran el problema (otra cosa ocupa la máquina):
-      // a la segunda bajada seguida que no sirve, el gobernador deja de pedir y la imagen no se sigue ablandando en vano.
-      if (now - this.tPrevia > 60000) { this.previa = null; this.inutiles = 0; }
-      this.inutiles = this.previa !== null && frac > this.previa * .67 ? this.inutiles + 1 : 0; this.previa = frac; this.tPrevia = now; this.malas = [];
-      if (this.inutiles >= 2) this.quieto = true; else { this.pide = true; this.pasos = pasos; }
-    }
+    if (this.pide) { if (!this.sube) this.pasos = Math.max(this.pasos, pasos); }      // ya pidió y todavía no se pudo aplicar (hay un intento en curso)
+    else if (frac >= .2 || this.malas.filter(Boolean).length >= 2) this._mal(frac, pasos, now);
+    else if (!this.ajena && !this.tope && limpia && this.limpioMs >= (this.nivel > 0 ? this.espera : this.esperaArriba)) this._pedir(true, 1, this.nivel > 0 ? 'la máquina está libre: vuelve hacia la calibración' : 'la máquina está libre: prueba un escalón más', frac);
     this._vaciar();
     return this.pide;
+  }
+  _mal(frac, pasos, now) {
+    const u = this.ultimo; this.malas = [];
+    // una subida que no aguantó: se deshace y la próxima prueba espera el doble
+    if (u && u.sube && !u.deshace && now - u.t < 15000) {
+      if (u.nivel > 0) this.espera = Math.min(SUBIR_MAX_MS, this.espera * 2); else this.esperaArriba = Math.min(SUBIR_MAX_MS, this.esperaArriba * 2);
+      this._pedir(false, 1, 'la subida no aguantó', frac); this._deshace = true; return;
+    }
+    if (this.ajena || this.piso) { this.ignoradas++; return; }
+    // bajar no cambió lo que se pierde: no es el costo del juego. Se deshace esa bajada y no se baja más por ahora.
+    if (u && !u.sube && !u.deshace && now - u.t < AJENA_MS && frac > u.frac * .67) {
+      this.ajena = true; this.tAjena = now; this._pedir(true, u.pasos, 'carga ajena: bajar no cambió lo que se pierde', frac); this._deshace = true; return;
+    }
+    this._pedir(false, pasos, 'pierde refrescos', frac);
+  }
+  _pedir(sube, pasos, motivo, frac) { this.pide = true; this.sube = sube; this.pasos = pasos; this.motivo = motivo; this._frac = frac; this._deshace = false; }
+  /**
+   * main.js avisa qué pasó con el pedido: `hecho` si cambió algo (false: no había más para bajar o para subir).
+   * Empieza el calentamiento: los cuadros de los próximos 2,5 s no cuentan.
+   */
+  resultado(hecho, now) {
+    if (!this.pide) return; const sube = this.sube, pasos = this.pasos;
+    if (hecho) {
+      const nivel = this.nivel; this.nivel += sube ? -pasos : pasos;
+      this.ultimo = { sube, t: now, frac: this._frac, pasos, nivel, deshace: !!this._deshace };
+      if (sube) this.piso = false; else this.tope = false;
+      this.historia.push({ t: Math.round(now), sube, pasos, nivel: this.nivel, motivo: this.motivo }); if (this.historia.length > 40) this.historia.shift();
+    } else if (sube) this.tope = true;            // ya está a la resolución de la pantalla y con sombras
+    else this.piso = true;                        // ya está en el piso de resolución y sin sombras
+    this.calentar(now);
   }
 }
 
