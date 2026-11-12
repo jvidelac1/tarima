@@ -211,7 +211,7 @@ Parámetros de `juego.html`: `?semilla=N` (primera partida reproducible), `?q=mo
 
 ### Controles (11-nov, rama `demo`)
 
-Especificación: [docs/CONTROLES.md](docs/CONTROLES.md). Lo que quedó hecho:
+Especificación: [docs/CONTROLES.md](docs/CONTROLES.md). Lo que quedó hecho (la entrada y la subida de Fácil cambiaron el 12-nov a la tarde: ver «Jugabilidad y entrada en Fácil» más abajo; lo de amagues y piso de exigencia de esta sección ya no rige):
 
 - **Teclado en el levantamiento.** Espacio (Enter hace lo mismo). El clic del mouse no hace gestos en ningún nivel (la prueba verifica que un clic en el escenario no agrega entradas). En teléfono, el dedo sobre la zona táctil.
 - **Fácil, por defecto: una señal, un toque.** Arranque: ¡TIRÁ! (cuando quieras), ¡EXPLOTÁ!, ¡RECIBÍ!; ¡EMPUJÁ! tocando rápido si la subida se traba; fijación y bajada automáticas. Dos tiempos: además ¡FLEXIONÁ!, ¡ARRIBA!, ¡RECIBÍ!. No hay que mantener ni soltar.
@@ -261,6 +261,41 @@ Medido (`node tools/play_human.mjs --info`, 2000 intentos por casilla, aperturas
 - **Dibujo con errores grandes**: con los límites anchos de Fácil el tirón puede seguir hasta 0,28 s de clip más allá de `Segundo tirón` antes del toque, y la flexión del envión dura 0,6 s (más lenta que en Clásico). Se miró en capturas con toques justos y uno tarde; no un toque en el borde del límite.
 - **El registro guarda la salida de la capa, no las teclas**, y no se subió la versión de reglas (está atada a `sim.json`). Con servidor: subir versión y separar la tabla por `ctl`.
 - Cuadros por segundo del juego: medidos el 12-nov en el pod, no en la Mac (ver la sección que sigue).
+
+### Jugabilidad y entrada en Fácil: entrada tolerante (12-nov, tarde, rama `demo`)
+
+El usuario jugó tres veces y dijo: «difícil de acertar el momento donde tocar», «a veces no agarra bien el space, entonces toco mucho space y no levanta, es raro». El orquestador midió en su Mac que, tras ¡RECIBÍ!, 12 toques seguidos se descartaron por «espera» antes de que apareciera ¡EMPUJÁ! y el levantamiento se perdió. El objetivo de esta vuelta: que el que juega por primera vez, toca con poca precisión o machaca Espacio levante las aperturas, y que tocar bien se premie con más kilos posibles. Especificación al día en [docs/CONTROLES.md](docs/CONTROLES.md) (secciones 1.1, 2, 3, 4, 5 y 9).
+
+**Qué cambió (solo Fácil y solo la persona; Clásico y los rivales igual, `tools/sim_ref.json` sin tocar):**
+
+- **Entrada tolerante** (`controles.js`, `abre()`): cada señal con círculo vale de 300 ms antes del cierre (`FACIL.abreMs`; en el tirón, además, no antes de la rodilla) a 330 ms después (`FACIL.limMin`, o el límite si es más ancho), a cualquier peso. Un toque antes no llega al núcleo: motivo `temprano`, acuse TODAVÍA NO, la señal sigue esperando y vale el primer toque de adentro. Ya no hay amagues ni «tirón anticipado» ni «la pierde en el fondo» por tocar antes de tiempo (el núcleo conserva esas reglas para registros armados a mano).
+- **La subida**: desde la recepción todo toque empuja (antes, los que llegaban antes de que arrancara la subida se descartaban por `espera`: es el caso que midió el orquestador), y vale mientras la barra no está arriba (antes se descartaban como `sobra` los que «ya alcanzaban»). En los pesos livianos **la barra sube sola** (hasta 0,3 por segundo: unos 2,3 s sin tocar contra 1,3 s tocando); la ayuda se apaga entre el 92 y el 96 % del techo. Se quitó el piso de exigencia que obligaba a tocar 3 por segundo.
+- **Curva de dificultad** (`rules.js`, `holgura(I)`): ventanas de PERFECTO y BIEN al doble hasta el 92 %, bajan en línea recta hasta 1,15 en el 100 %. Con holgura, TEMPRANO y TARDE tienen 40 mm más de margen en el vuelo (`vueloMm`), y la traba de codos se cuenta desde que llega la barra (no desde el toque temprano).
+- **Señal** (`ui/senal.js`, `juego.css`): el círculo se cierra a ritmo parejo; va gris hasta que abre la ventana; la franja dorada marca BIEN (y una más clara, PERFECTO) en la escala del círculo; cuenta 3-2-1 en tercios parejos arriba de la tecla. El acuse dice TODAVÍA NO (`main.js`), sin tapar la palabra del toque recién calificado.
+- **Pruebas**: `tools/play_human.mjs` con bots nuevos y criterio nuevo (abajo); `tools/sim_test.mjs` prueba la entrada tolerante, que los toques entre la recepción y el arranque de la subida cuentan, la subida sola en aperturas (más lenta que tocando) y la cortada cerca del techo. `tools/sim_ref_facil.json` regenerado (cambian 2 de 9 partidas de referencia).
+
+**Medido** (`node tools/play_human.mjs --info`, 2000 intentos por casilla, los tres pesistas; tabla completa en CONTROLES.md, sección 9). Columnas: arranque · dos tiempos con tijera · power · squat.
+
+| Bot | Aperturas (88 a 92 %) | Meta | Al 100 % | Meta |
+|---|---|---|---|---|
+| Machacador (6 a 8 toques por s, sin mirar) | 96,7 · 99,8 · 97,5 · 98,1 % | ≥ 80 % | 2,0 · 0 · 0 · 0 % | ≤ 25 % |
+| Casual (desvío 80 ms) | 100 · 100 · 100 · 100 % | ≥ 95 % | 64,3 · 52,3 · 41,5 · 53,4 % | 35 a 70 % |
+| Flojo (desvío 160 ms) | 94,0 · 91,5 · 91,5 · 91,1 % | ≥ 80 % | | |
+| Distraído (un toque por señal, 250 ms tarde, uno solo en ¡EMPUJÁ!) | 89,2 · 94,3 · 94,3 · 83,0 % | ≥ 70 % | | |
+| No toca | 0 % | 0 % | | |
+| Casual con 3 toques por s en ¡EMPUJÁ! | 100 % | ≥ 95 % | | |
+
+- En el medio: machacador 37 a 95 % al 95 % y 1 a 51 % al 97 %; casual 98 a 100 % y 84 a 96 %. El distraído con un solo toque en ¡EMPUJÁ! cae a 0 % desde el 95 % (si toca 3 por segundo, 86 a 95 % en aperturas).
+- `sim_test` y `play_human` en verde en la Mac (sin navegador). Clásico, casual y flojo: 22,6 y 26,4 % en arranque, iguales que antes.
+- **Actions**: la primera corrida (run 43255069855) falló en `check_game`: la línea del arranque sin explosión decía «Tocaste ¡EXPLOTÁ! tarde» porque el toque con que la prueba saltea el veredicto (a más de 500 ms del final) contaba como toque tardío. Ahora solo cuenta como tardío un toque descartado en los 400 ms después del final (`decision()` en `main.js`). Con eso, run 43257731276 en verde: `check_game` (teclado 152✓ 157✓ 160✗ a propósito con «No tocaste ¡EXPLOTÁ!», 190✓ 195✓ 198✓; táctil 6 de 6; «lento» válido), `check_fluidez --tutorial` (80 Espacio enviados y recibidos, 42 aceptados y 12 descartados con motivo dentro del intento: 4 espera, 4 rebote, 4 sobra) y el banco (run 43257731004). En las capturas por software la franja se ve como un anillo dorado alrededor del aro; la cuenta no salió en ninguna (las fotos se sacan cerca del cierre).
+
+**Lo que no está medido o no cumple:**
+
+- **Ninguna persona lo jugó y la señal nueva no se vio en una placa**: solo en las capturas por software de Actions (ver la corrida abajo, si existe). La franja y la cuenta son DOM y CSS; no se midió si se leen a 75 Hz ni si la cuenta de 3 tiempos en 0,6 a 0,8 s es demasiado rápida para leer.
+- **Machacar ahora levanta las aperturas**, que era lo pedido. El criterio viejo («a ciegas menos de 10 %») se quitó. Entre el 92 y el 95 % el machacador todavía levanta casi tanto como el casual: la diferencia aparece al 97 %.
+- **El caso exacto de los 12 toques en «espera» no se reprodujo con su registro**: con la capa de antes, después de la recepción se descartaban por `espera` los toques hasta el arranque de la subida (lo que faltaba del vuelo si la recepción fue temprana, más 126 a 141 ms de amortiguación en la cargada o 538 a 595 ms de fondo en el squat: cerca de 1 s en el peor caso, unos 10 toques a ritmo de machacar). Ese descarte ya no existe; no se midió en su máquina.
+- **La final entera contra rivales con estas reglas no se midió** (antes: oro 24 a 42 % de las veces). Con más pesos levantables es probable que suba.
+- **Lo que pasa después de un toque TODAVÍA NO de la persona no queda en el registro** (el registro guarda la salida de la capa). Los bots de la prueba sí vuelven a tocar.
 
 ### Fluidez, entrada y tutorial (12-nov, rama `demo`)
 
@@ -506,7 +541,7 @@ Porcentaje de válidos · meta. Jugadores simulados con error típico de 25, 40 
 - Decidir si hace falta un selector de gráficos en pantalla (hoy `?q=media`) y si el gobernador tiene que poder volver a subir (hoy solo baja; la calibración sí puede elegir una calidad más alta al cargar).
 - Rehacer `tools/primera.mjs` sobre el tutorial nuevo, o borrarlo y dejar `check_fluidez --capturas`.
 - Pruebas en Actions: `workflow_dispatch` y el flujo viven solo en `demo`; al fusionar a `main` revisar el filtro de ramas. Falta una prueba del gobernador que corra sin placa (hoy `--gobernador` necesita dibujar de verdad).
-- Balance de Fácil por encima de la apertura (95 % y 100 %) y contra rivales; decidir si el segundo y el tercer intento tienen que ser tan exigentes en la subida.
+- Jugabilidad de Fácil (entrada tolerante, 12-nov): que el usuario lo juegue y mirar si la cuenta 3-2-1 y la franja se leen; medir la final contra rivales con las reglas nuevas; decidir si entre el 92 y el 95 % el machacador tiene que levantar menos (`FACIL.abreMs` más grande lo baja, a costa de más TEMPRANO en aperturas).
 - Segunda vuelta de balance de Clásico: squat, 106 %, casual al 90 y 95 %, Ventura rival y gasto de Resto.
 - Extraer `stage.js` del visor y verificarlo con GPU; política de interrupciones; simular el resto de la final cuando el jugador queda sin marca.
 - Códigos de país: ARX y NVK siguen en la gráfica y en las mallas hasta la etapa 3; Pelagia usa PEL. Búsqueda uno por uno antes de publicar (JUEGO.md, sección 6.1).

@@ -44,7 +44,7 @@ export function traducir(m, t, v, ctl) {
       // en los 450 ms de RESPIRÁ el toque suele ser la cola de ¡EMPUJÁ!: no cuenta (y no dice «todavía no»); después de un amague sí se avisa
       if (t < M.ign) return no('espera', M.amagues.length ? 'espera' : null);
       return { ent: m.n > 0 ? [[t, 0], [t, 1]] : [[t, 1]], aviso: null };
-    // Entrada tolerante (13-nov): un toque antes de que abra la ventana de la señal no la gasta ni arruina el intento.
+    // Entrada tolerante (12-nov, tarde): un toque antes de que abra la ventana de la señal no la gasta ni arruina el intento.
     // No llega al núcleo, la señal sigue esperando y vale el primer toque que cae adentro. Tocar de más no castiga.
     case 'tiron': case 'flexion':
       if (t - M.tp < CAPA.reboteMs) return no('rebote', 'rebote');
