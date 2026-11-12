@@ -84,7 +84,7 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
 
     <h2>Finales gratis</h2>
     <p>Para contar tus finales gratis guardamos un identificador al azar de tu navegador. Va en el almacenamiento del sitio y en una cookie técnica (<code>tdv</code>), que solo se usa para hablar con nuestro servidor y dura 180 días.</p>
-    <p>En el servidor no guardamos ese identificador ni tu dirección IP. Guardamos un código que sale de pasar cada uno por una clave secreta (HMAC). De la IP se usa la dirección entera en IPv4 y el prefijo /64 en IPv6. Con ese código no se puede recuperar la IP.</p>
+    <p>En el servidor no guardamos ese identificador ni tu dirección IP. Guardamos un código que sale de pasar cada uno por una clave secreta (HMAC). De la IP se usa la dirección entera en IPv4 y el prefijo /64 en IPv6. Sin esa clave, que solo tiene el servidor, no se puede volver del código a la IP.</p>
     <p>El código de la IP se borra a los 30 días. El del dispositivo, a los 180 días sin jugar. Lo hacemos por interés legítimo: que las finales gratis sean de verdad limitadas.</p>
 
     <h2>Lista de espera</h2>
@@ -138,7 +138,7 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
 
     <h2>Free finals</h2>
     <p>To count your free finals we store a random ID for your browser. It lives in site storage and in a technical cookie (<code>tdv</code>), used only to talk to our server, which lasts 180 days.</p>
-    <p>On the server we store neither that ID nor your IP address. We store a code made by running each one through a secret key (HMAC). For the IP we use the full address on IPv4 and the /64 prefix on IPv6. The IP can't be recovered from that code.</p>
+    <p>On the server we store neither that ID nor your IP address. We store a code made by running each one through a secret key (HMAC). For the IP we use the full address on IPv4 and the /64 prefix on IPv6. Without that key, which only the server has, the code can't be turned back into the IP.</p>
     <p>The IP code is deleted after 30 days. The device code, after 180 days without play. Legal basis: our legitimate interest in keeping free finals actually limited.</p>
 
     <h2>Waitlist</h2>
