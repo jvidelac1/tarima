@@ -9,6 +9,7 @@
     "check": "node tools/check_viewer.mjs",
     "sim": "node tools/build_sim_data.mjs",
     "test:sim": "node tools/sim_test.mjs",
+    "test:fluidez": "node tools/perf_test.mjs",
     "balance": "node tools/balance.mjs --rivales",
     "check:juego": "node tools/check_game.mjs",
     "check:fluidez": "node tools/check_fluidez.mjs --tutorial"

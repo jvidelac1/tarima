@@ -1,0 +1,78 @@
+# Humo de la fluidez del juego con el 3D dibujándose (por software): el flujo «Pruebas del juego» abre el juego con
+# `?dibujo=0`, así que ahí nunca corren el precalentado de programas, la calibración de calidad ni el banco de medición.
+# Este flujo los corre de punta a punta en SwiftShader para atrapar errores de código. LOS TIEMPOS NO DICEN NADA: lo que
+# cuesta la escena se mide con `juego.html?banco=1` en una máquina con placa (HANDOFF, «Banco de medición»).
+# No bloquea nada: es un flujo aparte, que solo corre cuando cambia el código del juego o estas herramientas.
+name: Banco y calibración (humo por software)
+
+on:
+  push:
+    branches: [demo]
+    paths:
+      - 'web/js/**'
+      - 'web/juego.html'
+      - 'tools/banco.mjs'
+      - 'tools/perf_test.mjs'
+      - 'tools/browser.mjs'
+      - '.github/workflows/banco.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  humo:
+    name: Lógica de fluidez, banco y calibración (dibujo por software)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TARIMA_ANGLE: swiftshader
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Dependencias
+        run: npm ci
+
+      - name: Chrome
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || true)"
+          if [ -z "$CHROME" ]; then
+            wget -q -O "$RUNNER_TEMP/chrome.deb" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+            sudo apt-get update -q && sudo apt-get install -y -q "$RUNNER_TEMP/chrome.deb"
+            CHROME="$(command -v google-chrome)"
+          fi
+          "$CHROME" --version
+          echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
+          mkdir -p out/logs out/banco
+
+      - name: Lógica de fluidez sin navegador (perf_test)
+        if: ${{ !cancelled() }}
+        run: node tools/perf_test.mjs 2>&1 | tee out/logs/perf_test.log
+
+      - name: Calibración de calidad con el juego dibujando (banco --juego)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 12
+        run: node tools/banco.mjs --juego --ancho=960 --alto=540 --json=out/banco/juego.json 2>&1 | tee out/logs/banco_juego.log
+
+      - name: Banco de medición entero (banco)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 20
+        run: node tools/banco.mjs --ancho=960 --alto=540 --limite=420 --json=out/banco/banco.json 2>&1 | tee out/logs/banco.log
+
+      - name: Resultado como artefacto
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: banco-out
+          path: out/
+          if-no-files-found: warn
+          retention-days: 14

@@ -6,7 +6,8 @@
 // de verdad (requestAnimationFrame, con la pantalla): la mayor resolución que no pierde ningún refresco.
 // Variantes: la escena completa en cada calidad, y sobre «Baja» quitando de a una cosa por vez. Cada variante se compila
 // antes de medir y se descartan los primeros cuadros. Al terminar muestra una tabla y deja todo en `window.BANCO` (JSON,
-// con `listo: true`). Termina antes de los 90 s contados desde que se abrió la página (`?limite=segundos` lo acorta).
+// con `listo: true`). Termina antes de los 90 s contados desde que se abrió la página (`?limite=segundos` lo acorta, o lo
+// alarga para probarlo en una máquina sin placa).
 // Otros parámetros: `?pesista=ventura|brenner`, `?solo=baja,media` (calidades), `?variantes=sombras,luces` (solo esas).
 // Cómo leer las columnas: HANDOFF.md, «Banco de medición».
 import * as THREE from 'three';
@@ -59,7 +60,7 @@ export async function correrBanco({ escena, cargas, hz, params, msg }) {
 }
 
 async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
-  const LIMITE = Math.max(10, Math.min(88, +params.get('limite') || 84)) * 1000, queda = ms => performance.now() + ms < LIMITE;
+  const LIMITE = Math.max(10, Math.min(600, +params.get('limite') || 84)) * 1000, queda = ms => performance.now() + ms < LIMITE;
   const lista = k => (params.get(k) || '').split(',').map(x => x.trim()).filter(Boolean), SOLO = lista('solo'), CUALES = lista('variantes');
   decir('cargando los modelos'); await Promise.all(cargas);
   const id = PLANTEL[params.get('pesista')] ? params.get('pesista') : 'brenner';
