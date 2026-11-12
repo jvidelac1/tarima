@@ -42,14 +42,14 @@ try {
   if (FOTOS) {
     await page.goto(`${base}juego.html?banco=1&fotos=1${arg('pesista') ? '&pesista=' + arg('pesista') : ''}`, { waitUntil: 'load' });
     await page.waitForFunction(() => (window.BANCO_FOTOS && window.BANCO_FOTOS.listo) || (window.BANCO && window.BANCO.listo), null, { timeout: 300000 });
-    const info = await page.evaluate(() => ({ lista: window.BANCO_FOTOS ? window.BANCO_FOTOS.lista.map(f => f.nombre) : [], errores: window.BANCO.errores, sombra: window.BANCO_FOTOS?.opacidadSombra, gl: (() => { const g = window.JUEGO?.escena?.renderer.getContext(), x = g && g.getExtension('WEBGL_debug_renderer_info'); return x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : '?'; })() }));
+    const info = await page.evaluate(() => ({ lista: window.BANCO_FOTOS ? window.BANCO_FOTOS.lista.map(f => f.nombre) : [], errores: window.BANCO.errores, sombra: window.BANCO_FOTOS?.opacidadSombra, cruda: window.BANCO_FOTOS?.opacidadCruda, gl: (() => { const g = window.JUEGO?.escena?.renderer.getContext(), x = g && g.getExtension('WEBGL_debug_renderer_info'); return x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : '?'; })() }));
     for (const e of info.errores) problemas.push('fotos: ' + e.split('\n')[0]);
     fs.mkdirSync(FOTOS, { recursive: true });
     for (let i = 0; i < info.lista.length; i++) {
       const nombre = await page.evaluate(async i => { const n = window.BANCO_FOTOS.poner(i); await new Promise(r => requestAnimationFrame(() => r())); return n; }, i);
       await page.screenshot({ path: path.join(FOTOS, nombre + '.png') }); console.log(`  ${nombre}.png`);
     }
-    console.log(`${info.gl} · ${info.lista.length} fotos en ${FOTOS} · opacidad de la sombra en la tarima: ${info.sombra}`);
+    console.log(`${info.gl} · ${info.lista.length} fotos en ${FOTOS} · opacidad de la sombra en la tarima: ${info.sombra} (calculada ${info.cruda})`);
     if (!info.lista.length) problemas.push('no hubo fotos');
   } else if (!JUEGO) {
     // por software un cuadro a 1,5 MP tarda segundos: medidas chicas y dos vueltas alcanzan para probar que el banco corre entero
