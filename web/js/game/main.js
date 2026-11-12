@@ -6,7 +6,7 @@ import { Escena } from './stage.js';
 import { poseDe, poseParado, marcas, tramo } from './sequence.js';
 import { armarCaida, poseCaida } from './caida.js';
 import { PLANTEL, ENVIONES, LEV, ETIQUETAS, GUIONES } from './roster.js';
-import { Registrador, Gobernador, calidadInicial, medirRefresco, decidirCalidad, pasoDe, metaDe, nombreDe, PRESET, PASO, PISO_MP, MARGEN } from './perf.js';
+import { Registrador, Gobernador, calidadInicial, medirRefresco, decidirCalidad, pasoDe, metaDe, nombreDe, PRESET, PASO, PISO_MP, MARGEN, TECHO_MP } from './perf.js';
 import { sonido } from './audio.js';
 import { Ayudas } from './ui/ayudas.js';
 import { Senal } from './ui/senal.js';
@@ -69,7 +69,7 @@ function tic(pintar, tRaf = null) {
   const marca = tRaf ?? now, ms = marca - E.ultDibujo; perf.cuadro(ms, seguido && E.seguido, E.intento?.m?.fase || ''); E.ultDibujo = marca; E.forzar = false;
   if (LASTRE) { const fin = performance.now() + LASTRE * escena.megapixeles; while (performance.now() < fin); }
   // el gobernador mira solo el dibujo continuo, y la calidad no cambia con un intento en curso (propio o de un rival) ni en la repetición
-  if (gov && seguido && E.seguido && gov.cuadro(ms, now, performance.now() - c0) && !E.intento && E.pantalla !== 'repeticion') { if (!bajar(gov.pasos, 1000 / gov.fps)) { gov.pide = false; gov.quieto = true; } }
+  if (gov && seguido && E.seguido && gov.cuadro(ms, now, performance.now() - c0) && !E.intento && E.pantalla !== 'repeticion') gov.resultado((gov.sube ? subir : bajar)(gov.pasos, 1000 / gov.fps), reloj.ahora());
   if (gov && gov.hz !== C.hz) fijarHz(gov.hz);      // el gobernador vio que la pantalla es más rápida de lo medido
 }
 // En pantallas de más de 90 Hz se dibuja en uno de cada dos refrescos (C.paso), para que los cuadros salgan parejos.
@@ -92,7 +92,22 @@ function bajar(pasos, ms, donde = '') {
   }
   if (!hecho) return false;
   nombrar(); C.cambios.push({ de, a: C.nombre, ms: Math.round(ms * 10) / 10, pantalla: donde || (E.pantalla === 'intento' ? 'fin del intento' : E.pantalla), enIntento: !!E.intento, t: Math.round(performance.now()) });
-  gov?.calentar(reloj.ahora()); E.forzar = true; return true;
+  E.forzar = true; return true;      // el gobernador empieza a calentar en resultado()
+}
+/**
+ * Sube `pasos` escalones sin compilar nada (el gobernador vio la máquina libre, o deshace una bajada que no sirvió):
+ * primero vuelven las sombras, después 15 % más de píxeles por escalón, hasta la resolución de la pantalla.
+ */
+function subir(pasos, ms) {
+  const de = C.nombre, tope = Math.min(escena.nativoMP, TECHO_MP); let hecho = false;
+  for (let k = 0; k < pasos; k++) {
+    if (!C.sombras) { C.sombras = true; escena.setSombras(true); hecho = true; continue; }
+    const mp = escena.megapixeles; if (!(mp > 0) || mp >= tope * .985) break;
+    escena.setTope(Math.min(tope, mp / PASO) * 1e6); hecho = true;
+  }
+  if (!hecho) return false;
+  nombrar(); C.cambios.push({ de, a: C.nombre, ms: Math.round(ms * 10) / 10, pantalla: E.pantalla, enIntento: !!E.intento, t: Math.round(performance.now()), sube: true, motivo: gov?.motivo || '' });
+  E.forzar = true; return true;
 }
 /** Intervalos (ms) entre `n` cuadros seguidos del navegador mientras se dibuja, sin contar los primeros `calienta`. null si no hay cuadros. */
 function cadencia(n, calienta = 10) {
@@ -755,7 +770,7 @@ function holgura(tb) {
 // ---------- API para la prueba automática y la depuración ----------
 const ceder = () => new Promise(r => { const c = new MessageChannel(); c.port1.onmessage = () => r(); c.port2.postMessage(0); });
 window.JUEGO = {
-  E, perf, reloj, toques, get calidad() { return { nombre: C.nombre, auto: C.auto, clave: C.clave, sombras: C.sombras, hz: C.hz, meta: +metaDe(C.hz).toFixed(2), paso: C.paso, periodo: +(1000 / metaDe(C.hz)).toFixed(2), medido: C.medido, cambios: C.cambios, megapixeles: escena ? +escena.megapixeles.toFixed(2) : 0, nativo: escena ? +escena.nativoMP.toFixed(2) : 0, ventana: gov ? gov.ult : null, quieto: gov ? gov.quieto : false, calibracion: C.calibracion }; }, pausa: abrirSobre, seguir: cerrarSobre, get escena() { return escena; }, get registro() { return E.registro; }, PLAN,
+  E, perf, reloj, toques, get calidad() { return { nombre: C.nombre, auto: C.auto, clave: C.clave, sombras: C.sombras, hz: C.hz, meta: +metaDe(C.hz).toFixed(2), paso: C.paso, periodo: +(1000 / metaDe(C.hz)).toFixed(2), medido: C.medido, cambios: C.cambios, megapixeles: escena ? +escena.megapixeles.toFixed(2) : 0, nativo: escena ? +escena.nativoMP.toFixed(2) : 0, ventana: gov ? gov.ult : null, quieto: gov ? gov.quieto : false, gobernador: gov ? gov.estado : null, calibracion: C.calibracion }; }, pausa: abrirSobre, seguir: cerrarSobre, get escena() { return escena; }, get registro() { return E.registro; }, PLAN,
   /** Lo que la prueba necesita para jugar por la vía real de entrada: pantalla, y del intento en curso, fase y próximo objetivo. */
   estado() {
     const I = E.intento, pn = $('capa').firstElementChild, act = document.activeElement;
