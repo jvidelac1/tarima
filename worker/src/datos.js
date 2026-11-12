@@ -72,6 +72,13 @@ export async function altaLista(db, f) {
 export const confirmar = async (db, id, ahora) =>
   (await db.prepare('UPDATE lista SET confirmado_en = ?2 WHERE id = ?1 AND confirmado_en IS NULL').bind(id, ahora).run()).meta.changes === 1;
 
+/** Anota cuándo salió el primer correo de confirmación (desde ahí corren los 30 días para confirmar). */
+export const confirmacionMandada = (db, id, ahora) =>
+  db.prepare('UPDATE lista SET confirmar_mandado_en = COALESCE(confirmar_mandado_en, ?2) WHERE id = ?1').bind(id, ahora).run();
+
+/** Dispositivo sin crearlo (null si no existe). */
+export const buscarDispositivo = (db, d) => db.prepare('SELECT d, lista_id FROM dispositivos WHERE d = ?1').bind(d).first();
+
 export const borrarDeLista = async (db, id) => (await db.prepare('DELETE FROM lista WHERE id = ?1').bind(id).run()).meta.changes === 1;
 
 export const exportarLista = async db => (await db.prepare(`SELECT id, email, nombre, idioma, pais, novedades, consentimiento_version,
@@ -87,7 +94,10 @@ export async function limpiar(db, ahora) {
     // pone el mismo mail y recupera el juego libre.
     ['dispositivos', db.prepare('DELETE FROM dispositivos WHERE ultimo <= ?1').bind(ahora - RETENCION)],
     ['encuestas', db.prepare('DELETE FROM encuestas WHERE d NOT IN (SELECT d FROM dispositivos)')],
-    ['sin_confirmar', db.prepare('DELETE FROM lista WHERE confirmado_en IS NULL AND creado <= ?1').bind(ahora - SIN_CONFIRMAR)],
+    // Solo las altas a las que se les mandó el correo de confirmación hace más de 30 días: sin envío de correos
+    // (sin dominio propio) ninguna alta se borra por no confirmar.
+    ['sin_confirmar', db.prepare(`DELETE FROM lista WHERE confirmado_en IS NULL AND confirmar_mandado_en IS NOT NULL
+      AND confirmar_mandado_en <= ?1`).bind(ahora - SIN_CONFIRMAR)],
     ['limites', db.prepare('DELETE FROM limites WHERE hasta <= ?1').bind(ahora)],
   ];
   const r = await db.batch(pasos.map(p => p[1]));

@@ -1,5 +1,7 @@
-// Worker de Tarima (docs/MVP.md 5.5). Sirve web/ y responde /api/*, /qx/* (proxy de PostHog), /baja y /confirmar.
-// Los secretos NO van acá: se cargan con `npx wrangler secret put` (ver worker/README.md).
+// Worker «tarima» (docs/MVP.md 5.5): responde /api/*, /qx/* (proxy de PostHog), /baja y /confirmar.
+// NO tiene dirección pública: ni workers.dev, ni direcciones de vista previa, ni rutas. Le llegan los pedidos solo por la
+// service binding del proyecto de Pages «tarimagame» (../wrangler.jsonc y ../functions/), que sirve web/ y le pasa esas
+// rutas. Los secretos NO van acá: los carga tools/desplegar.sh con `wrangler secret put` (ver worker/README.md).
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "tarima",
@@ -7,21 +9,15 @@
   "compatibility_date": "2026-10-30",
   "compatibility_flags": ["nodejs_compat"],
 
-  "assets": {
-    "directory": "../web",
-    "binding": "ASSETS",
-    // Sin redirecciones mágicas: /juego.html y /privacidad.html se sirven tal cual, como con el servidor de Python.
-    "html_handling": "none",
-    "not_found_handling": "none",
-    "run_worker_first": ["/", "/api/*", "/qx/*", "/qx", "/baja", "/confirmar"]
-  },
+  // Sin dirección pública: la dirección workers.dev de la cuenta no tiene que aparecer en ningún lado.
+  "workers_dev": false,
+  "preview_urls": false,
 
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "tarima",
-      // Reemplazar por el id que devuelve `npx wrangler d1 create tarima` (no es un secreto).
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "9e2c28f3-67de-4cc6-a278-2d0e5f34e055",
       "migrations_dir": "migraciones"
     }
   ],
@@ -32,7 +28,8 @@
     { "name": "LIMITE", "namespace_id": "4101", "simple": { "limit": 40, "period": 10 } }
   ],
 
-  // Limpieza diaria: códigos de IP a los 30 días, partidas y dispositivos a los 180, altas sin confirmar a los 30.
+  // Limpieza diaria: códigos de IP a los 30 días, partidas y dispositivos a los 180, y las altas que recibieron el
+  // correo de confirmación y no confirmaron en 30 días (sin envío de correos no se borra ninguna alta).
   "triggers": { "crons": ["17 4 * * *"] },
 
   // Email Sending: para activarlo, sacar el comentario y poner MAIL_DESDE con una casilla del dominio verificado.
@@ -48,7 +45,11 @@
     "ENCUESTA_ID": "",
     "ENCUESTA_PREGUNTAS": "",
     "MAIL_DESDE": "",
-    "TURNSTILE": "0"
+    "TURNSTILE": "0",
+    // La IP y el país del visitante llegan en x-tarima-ip y x-tarima-pais, que pone la Function de Pages (pisando lo
+    // que mande el navegador). Solo es seguro porque este Worker no tiene dirección pública: si algún día se le agrega
+    // una ruta o workers.dev, esto va en "0".
+    "CONFIAR_PAGES": "1"
   },
 
   // Registros propios en JSON y sin datos personales. Los registros automáticos de cada pedido y las trazas quedan

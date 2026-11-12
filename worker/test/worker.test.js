@@ -65,12 +65,20 @@ const pedirPartida = (dispositivo, ip, o = {}) => llamar('/api/partida', { dispo
 const RESP_OK = { q1: ['sedes', 'pesista_propio'], q2: ['nada'], q3: 'telefono', q4: 'cosmeticos', q5: 'Más rivales <b>y</b> sedes' };
 
 describe('sitio', () => {
-  it('/ sirve juego.html y el resto de web/ tal cual', async () => {
-    const r = await llamar('/', null, { metodo: 'GET' });
-    expect(r.status).toBe(200);
-    expect(await r.res.text()).toMatch(/<html/i);
-    const css = await llamar('/juego.html', null, { metodo: 'GET' });
-    expect(css.status).toBe(200);
+  it('el sitio lo sirve Pages: el Worker no tiene assets y lo que no es suyo da 404', async () => {
+    expect(env.ASSETS).toBeUndefined();
+    for (const ruta of ['/', '/juego.html', '/privacidad.html']) expect((await llamar(ruta, null, { metodo: 'GET', ct: null })).status).toBe(404);
+  });
+  it('detrás de Pages cuenta la IP de x-tarima-ip, y sin CONFIAR_PAGES la ignora', async () => {
+    const real = nuevaIp(), falsa = nuevaIp();
+    const a = uuid(), b = uuid(), c = uuid();
+    // Tres dispositivos desde la misma IP real, cada uno con otra cf-connecting-ip (la de Pages): la IP real llega al tope.
+    for (const x of [a, b, c]) { for (let k = 0; k < 2; k++) await pedirPartida(x, nuevaIp(), { headers: { 'x-tarima-ip': real } }); }
+    expect((await pedirPartida(uuid(), nuevaIp(), { headers: { 'x-tarima-ip': real } })).j.motivo).toBe('ip');
+    // Sin confianza, la cabecera no cuenta: vale cf-connecting-ip.
+    expect((await pedirPartida(uuid(), falsa, { headers: { 'x-tarima-ip': real }, e: E({ CONFIAR_PAGES: '0' }) })).j.estado).toBe('ok');
+    const r = await llamar('/api/estado', {}, { ip: nuevaIp(), headers: { 'x-tarima-pais': 'UY' } });
+    expect(r.j.contexto.pais).toBe('UY');
   });
   it('una ruta de la API que no existe da 404 en JSON', async () => {
     const r = await llamar('/api/nada', {});
@@ -246,7 +254,7 @@ describe('encuesta', () => {
 describe('lista de espera', () => {
   const alta = (email, o = {}) => llamar('/api/anotar', {
     dispositivo: o.dispositivo ?? uuid(), sesion: 's', email, nombre: o.nombre, idioma: o.idioma ?? 'es',
-    aviso: o.aviso ?? true, novedades: o.novedades ?? false, consentimiento: o.consentimiento ?? '2026-11-a', web: o.web,
+    aviso: o.aviso ?? true, novedades: o.novedades ?? false, consentimiento: o.consentimiento ?? '2026-11-b', web: o.web,
   }, { ip: o.ip ?? nuevaIp(), e: o.e, cookie: o.cookie });
 
   it('rechaza formato, aviso, descartables y dominios sin correo', async () => {
@@ -255,6 +263,8 @@ describe('lista de espera', () => {
     expect((await alta('hola@sitio.com/x')).j).toEqual({ error: 'formato' });
     expect((await alta('hola@buendominio.com', { aviso: false })).j).toEqual({ error: 'aviso' });
     expect((await alta('hola@buendominio.com', { consentimiento: '2020-01-a' })).j).toEqual({ error: 'aviso' });
+    // La versión anterior del texto se sigue aceptando.
+    expect((await alta('version-a@buendominio.com', { consentimiento: '2026-11-a' })).j.estado).toBe('nuevo');
     expect((await alta('hola@mailinator.com')).j).toEqual({ error: 'descartable' });
     expect((await alta('hola@sub.yopmail.com')).j).toEqual({ error: 'descartable' });
     expect((await alta('hola@noexiste-abc.com')).j).toEqual({ error: 'dominio' });
@@ -274,7 +284,7 @@ describe('lista de espera', () => {
     expect(r.j).toMatchObject({ estado: 'nuevo', confirmar: false });
     expect(r.j.lista_id).toMatch(/^[0-9a-f]{32}$/);
     const fila = await env.DB.prepare('SELECT * FROM lista WHERE id = ?').bind(r.j.lista_id).first();
-    expect(fila).toMatchObject({ email: 'juana.perez+tarima@buendominio.com', nombre: 'Juana Pérez', idioma: 'es', novedades: 1, consentimiento_version: '2026-11-a', confirmado_en: null });
+    expect(fila).toMatchObject({ email: 'juana.perez+tarima@buendominio.com', nombre: 'Juana Pérez', idioma: 'es', novedades: 1, consentimiento_version: '2026-11-b', confirmado_en: null, confirmar_mandado_en: null });
 
     expect((await llamar('/api/estado', { dispositivo: a }, { ip })).j).toMatchObject({ puede: true, lista: true, lista_id: r.j.lista_id, quedan: null });
     for (let k = 0; k < 4; k++) expect((await pedirPartida(a, ip)).j).toMatchObject({ estado: 'ok', fuente: 'lista', quedan: null });
@@ -312,6 +322,22 @@ describe('lista de espera', () => {
     const r = await alta('bot@buendominio.com', { web: 'http://spam' });
     expect(r.j.estado).toBe('nuevo');
     expect(await env.DB.prepare('SELECT id FROM lista WHERE email = ?').bind('bot@buendominio.com').first()).toBeNull();
+  });
+
+  it('baja desde la privacidad sin envío de correos: solo borra el dispositivo que anotó ese correo', async () => {
+    const a = uuid(), ajeno = uuid();
+    const r = await alta('mia@buendominio.com', { dispositivo: a });
+    const fila = () => env.DB.prepare('SELECT id FROM lista WHERE id = ?').bind(r.j.lista_id).first();
+    // Otro dispositivo (o nadie) no la borra, y la respuesta es la misma.
+    const x = await llamar('/api/baja', { email: 'mia@buendominio.com', dispositivo: ajeno }, { ip: nuevaIp() });
+    const y = await llamar('/api/baja', { email: 'mia@buendominio.com' }, { ip: nuevaIp() });
+    expect([x.status, x.j, y.status, y.j]).toEqual([202, {}, 202, {}]);
+    expect(await fila()).not.toBeNull();
+    // El que la anotó, sí (por la cookie técnica o por el cuerpo), y sigue con juego libre.
+    const z = await llamar('/api/baja', { email: 'MIA@buendominio.com' }, { ip: nuevaIp(), cookie: `tdv=${a}` });
+    expect([z.status, z.j]).toEqual([202, {}]);
+    expect(await fila()).toBeNull();
+    expect((await pedirPartida(a, nuevaIp())).j.fuente).toBe('lista');
   });
 
   it('5 altas por hora por IP', async () => {
@@ -354,6 +380,8 @@ describe('lista de espera', () => {
       expect(html).toContain('method="post"');
       expect(html).toContain('Confirm your spot on the Tarima list?');
       expect(await confirmado()).toBeNull();
+      // El correo salió: desde ahora corren los 30 días para confirmar.
+      expect((await env.DB.prepare('SELECT confirmar_mandado_en FROM lista WHERE id = ?').bind(r.j.lista_id).first()).confirmar_mandado_en).toBeGreaterThan(0);
       const c = await llamar('/confirmar', 't=' + new URL(ORIGEN + ruta).searchParams.get('t'), { ct: 'application/x-www-form-urlencoded', e: e() });
       expect(c.status).toBe(200);
       expect(await c.res.text()).toContain('Done! Your spot is confirmed.');
@@ -409,6 +437,8 @@ describe('lista de espera', () => {
       const g = await llamar(link, null, { metodo: 'GET', ct: null, origin: null });
       const html = await g.res.text();
       expect(html).toContain('¿Te damos de baja de la lista de Tarima?');
+      // Sin la promesa de «nunca vas a pagar»: queda fuera hasta que el dueño defina la monetización.
+      expect(html).not.toMatch(/pagar|never pay/i);
       expect(html).toContain('method="post"');
       expect(await env.DB.prepare('SELECT id FROM lista WHERE id = ?').bind(r.j.lista_id).first()).not.toBeNull();
       const p = await llamar(link, 'List-Unsubscribe=One-Click', { metodo: 'POST', ct: 'application/x-www-form-urlencoded', origin: null });
@@ -426,13 +456,19 @@ describe('lista de espera', () => {
       const y = await llamar('/api/baja', { email: 'PIDE-BAJA@buendominio.com' }, { ip: nuevaIp(), e: e() });
       expect([x.status, x.j, y.status, y.j]).toEqual([202, {}, 202, {}]);
       expect(enviados).toHaveLength(1);
-      expect(enviados[0].subject).toBe('Tu link para darte de baja de Tarima');
+      expect(enviados[0].subject).toBe('Tu enlace para darte de baja de Tarima');
       const link = linkDe(enviados[0], '/baja');
       expect(link).toContain('&v=f');
       const p = await llamar(link.slice(ORIGEN.length), 't=' + new URL(link).searchParams.get('t') + '&v=f', { ct: 'application/x-www-form-urlencoded', origin: ORIGEN, e: E({ POSTHOG_KEY: 'phc_x' }) });
       expect(await p.res.text()).toContain('te dimos de baja');
       const ev = JSON.parse(salidas.find(s => s.url.pathname === '/i/v0/e/').cuerpo);
       expect(ev).toMatchObject({ event: 'baja', properties: { via: 'formulario', $process_person_profile: false } });
+    });
+
+    it('el correo que no se pudo mandar no hace correr los 30 días', async () => {
+      const malo = E({ MAIL_DESDE: 'hola@tarima.test', EMAIL: { send: async () => { throw new Error('rebote'); } } });
+      const r = await alta('no-salio@buendominio.com', { e: malo });
+      expect((await env.DB.prepare('SELECT confirmar_mandado_en FROM lista WHERE id = ?').bind(r.j.lista_id).first()).confirmar_mandado_en).toBeNull();
     });
   });
 
@@ -494,14 +530,14 @@ describe('proxy de PostHog en /qx', () => {
   it('reenvía a us.i.posthog.com sin cookies ni IP y sin credenciales ajenas', async () => {
     const r = await llamar('/qx/e/?ip=0&ver=1', '{"batch":[]}', {
       ip: '203.0.113.77', ct: 'text/plain',
-      headers: { cookie: 'tdv=abc', 'x-forwarded-for': '203.0.113.77', 'x-real-ip': '203.0.113.77', authorization: 'Basic abc' },
+      headers: { cookie: 'tdv=abc', 'x-forwarded-for': '203.0.113.77', 'x-real-ip': '203.0.113.77', authorization: 'Basic abc', 'x-tarima-ip': '203.0.113.77', 'x-tarima-pais': 'AR' },
     });
     expect(r.status).toBe(200);
     expect(r.res.headers.get('set-cookie')).toBeNull();
     const s = salidas.at(-1);
     expect(s.url.href).toBe('https://us.i.posthog.com/e/?ip=0&ver=1');
     expect(s.cuerpo).toBe('{"batch":[]}');
-    for (const h of ['cookie', 'x-forwarded-for', 'x-real-ip', 'cf-connecting-ip', 'authorization']) expect(s.headers.get(h)).toBeNull();
+    for (const h of ['cookie', 'x-forwarded-for', 'x-real-ip', 'cf-connecting-ip', 'authorization', 'x-tarima-ip', 'x-tarima-pais']) expect(s.headers.get(h)).toBeNull();
   });
   it('deja pasar una clave phc_ y manda los estáticos a us-assets', async () => {
     await llamar('/qx/flags?v=2', '{}', { headers: { authorization: 'Bearer phc_abc' } });
@@ -524,8 +560,11 @@ describe('limpieza diaria y registros', () => {
       env.DB.prepare("INSERT INTO dispositivos (d, creado, ultimo, lista_id) VALUES ('anotado', ?1, ?3, 'L'), ('anotado-viejo', ?1, ?2, 'L')").bind(ahora - 400 * dia, ahora - 181 * dia, ahora - 10 * dia),
       env.DB.prepare("INSERT INTO partidas (d, i, en, fuente) VALUES ('viejo', 'iii', ?1, 'gratis'), ('reciente', 'iii', ?2, 'gratis'), ('reciente', 'jjj', ?3, 'gratis')").bind(ahora - 200 * dia, ahora - 40 * dia, ahora - dia),
       env.DB.prepare("INSERT INTO encuestas (d, i, en) VALUES ('reciente', 'iii', ?1)").bind(ahora - 31 * dia),
-      env.DB.prepare(`INSERT INTO lista (id, email, idioma, consentimiento_version, consentimiento_en, creado, confirmado_en) VALUES
-        ('s1', 'a@x.com', 'es', 'v', ?1, ?1, NULL), ('s2', 'b@x.com', 'es', 'v', ?1, ?1, ?2), ('s3', 'c@x.com', 'es', 'v', ?2, ?2, NULL)`).bind(ahora - 31 * dia, ahora - dia),
+      // s1: le llegó la confirmación hace 31 días y no confirmó (se borra). s2: confirmó. s3: confirmación reciente.
+      // s4: vieja y sin confirmar, pero nunca se le mandó el correo (sin dominio no hay correos): no se borra.
+      env.DB.prepare(`INSERT INTO lista (id, email, idioma, consentimiento_version, consentimiento_en, creado, confirmado_en, confirmar_mandado_en) VALUES
+        ('s1', 'a@x.com', 'es', 'v', ?1, ?1, NULL, ?1), ('s2', 'b@x.com', 'es', 'v', ?1, ?1, ?2, ?1), ('s3', 'c@x.com', 'es', 'v', ?2, ?2, NULL, ?2),
+        ('s4', 'd@x.com', 'es', 'v', ?3, ?3, NULL, NULL)`).bind(ahora - 31 * dia, ahora - dia, ahora - 300 * dia),
       env.DB.prepare("INSERT INTO limites (k, n, hasta) VALUES ('x', 1, ?1)").bind(ahora - 10),
     ]);
     const ctx = createExecutionContext();
@@ -535,7 +574,7 @@ describe('limpieza diaria y registros', () => {
     expect((await col('SELECT d FROM dispositivos ORDER BY d')).map(x => x.d)).toEqual(['anotado', 'reciente']);
     expect(await col('SELECT d, i FROM partidas ORDER BY en')).toEqual([{ d: 'reciente', i: null }, { d: 'reciente', i: 'jjj' }]);
     expect(await col('SELECT i FROM encuestas')).toEqual([{ i: null }]);
-    expect((await col('SELECT id FROM lista ORDER BY id')).map(x => x.id)).toEqual(['s2', 's3']);
+    expect((await col('SELECT id FROM lista ORDER BY id')).map(x => x.id)).toEqual(['s2', 's3', 's4']);
     expect(await col('SELECT k FROM limites')).toEqual([]);
   });
 

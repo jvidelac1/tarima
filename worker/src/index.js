@@ -1,5 +1,6 @@
-// Worker de Tarima (docs/MVP.md 5.5): sirve web/ como sitio, lleva la cuenta de las finales gratis, la lista de espera,
-// el desbloqueo por encuesta y el proxy de PostHog. Ningún registro incluye mail, IP ni dispositivo.
+// Worker de Tarima (docs/MVP.md 5.5): lleva la cuenta de las finales gratis, la lista de espera, el desbloqueo por
+// encuesta y el proxy de PostHog. El sitio (web/) lo sirve Cloudflare Pages, que le pasa /api/*, /qx/*, /baja y
+// /confirmar por una service binding (../functions/). Ningún registro incluye correo, IP ni dispositivo.
 import * as R from './reglas.js';
 import * as D from './datos.js';
 import { DESCARTABLES } from './descartables.js';
@@ -36,13 +37,16 @@ export default {
     const p = url.pathname;
     try {
       if (p === PREFIJO || p.startsWith(PREFIJO + '/')) return await proxy(request, env, ctx);
-      if (p === '/' && (request.method === 'GET' || request.method === 'HEAD')) {
-        return env.ASSETS.fetch(new Request(new URL('/juego.html', url), request));
-      }
       if (p.startsWith('/api/')) return await api(request, env, ctx, url);
       if (p === '/baja') return await paginaBaja(request, env, ctx, url);
       if (p === '/confirmar') return await paginaConfirmar(request, env, ctx, url);
-      return env.ASSETS.fetch(request);
+      // El sitio lo sirve Pages. Si alguna vez se le da al Worker una carpeta de assets (por ejemplo para probar solo
+      // con `wrangler dev`), la sirve; si no, todo lo demás no existe acá.
+      if (env.ASSETS) {
+        const pedido = p === '/' && (request.method === 'GET' || request.method === 'HEAD') ? new Request(new URL('/juego.html', url), request) : request;
+        return env.ASSETS.fetch(pedido);
+      }
+      return new Response('No encontrado', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
     } catch (e) {
       if (e instanceof ErrorHttp) return p.startsWith('/api/') ? json({ error: e.error }, e.status) : paginaError(request, e.status, e.error);
       log('error', { msg: 'error_interno', ruta: p, tipo: e?.name || 'Error' });
@@ -91,8 +95,15 @@ async function leerJson(request, url) {
   return b;
 }
 
-const ipDe = request => request.headers.get('cf-connecting-ip') || '';
-const paisDe = request => { const c = request.cf?.country; return typeof c === 'string' && /^[A-Z0-9]{2}$/.test(c) ? c : null; };
+// IP y país del visitante. Detrás de la service binding de Pages llegan en x-tarima-ip y x-tarima-pais, que pone la
+// Function (../functions/_reenviar.js) pisando lo que mande el navegador; solo se les cree con CONFIAR_PAGES=1, que es
+// seguro porque este Worker no tiene dirección pública (wrangler.jsonc).
+const confiaPages = env => env?.CONFIAR_PAGES === '1';
+const ipDe = (request, env) => (confiaPages(env) && request.headers.get('x-tarima-ip')) || request.headers.get('cf-connecting-ip') || '';
+const paisDe = (request, env) => {
+  const c = (confiaPages(env) && request.headers.get('x-tarima-pais')) || request.cf?.country;
+  return typeof c === 'string' && /^[A-Z0-9]{2}$/.test(c) ? c : null;
+};
 
 function cookieTdv(request) {
   const c = request.headers.get('cookie') || '';
@@ -146,7 +157,7 @@ async function api(request, env, ctx, url) {
   const b = await leerJson(request, url);
   verificarSecretos(env);
   const ahora = ahoraS();
-  const i = await codigoIp(env, R.prefijoIp(ipDe(request)));
+  const i = await codigoIp(env, R.prefijoIp(ipDe(request, env)));
   await limitar(env, ruta === 'baja' ? 'baja_api' : ruta, i, ahora);
   return m({ request, env, ctx, url, b, i, ahora });
 }
@@ -160,7 +171,7 @@ async function situacion({ request, env, ctx, b, i, ahora }) {
   const cfg = R.config(env, asignadas);
   const c = await D.contar(env.DB, d, i, ahora);
   const dec = R.decidir({ anotado: !!dev.lista_id, encuesta: !!dev.encuesta_en, usadas_d: c.usadas_d, usadas_i: c.usadas_i, encuestas_i: c.encuestas_i, cfg });
-  const contexto = { pais: paisDe(request), previas: c.usadas_d, dias: R.diasDesde(dev.creado, ahora) };
+  const contexto = { pais: paisDe(request, env), previas: c.usadas_d, dias: R.diasDesde(dev.creado, ahora) };
   return { uuid, d, dev, flags, cfg, c, dec, contexto };
 }
 
@@ -217,7 +228,7 @@ async function anotar({ request, env, ctx, url, b, ahora }) {
   if (!fila) {
     const id = idAzar(16);
     nuevo = await D.altaLista(env.DB, {
-      id, email, nombre: R.normalizarNombre(b.nombre), idioma: idi, pais: paisDe(request),
+      id, email, nombre: R.normalizarNombre(b.nombre), idioma: idi, pais: paisDe(request, env),
       novedades: b.novedades === true, consentimiento: b.consentimiento, ahora,
     });
     fila = nuevo ? { id, idioma: idi, nombre: R.normalizarNombre(b.nombre), confirmado_en: null } : await D.buscarEmail(env.DB, email);
@@ -258,7 +269,7 @@ async function encuesta({ request, env, ctx, b, i, ahora }) {
   if (!(await D.registrarEncuesta(env.DB, { d, i: anotado ? null : i, ahora }))) throw new ErrorHttp(409, 'ya_respondida');
 
   const sesion = typeof b.sesion === 'string' && /^[\w.:-]{1,200}$/.test(b.sesion) ? b.sesion : 'enc_' + crypto.randomUUID();
-  ctx.waitUntil(mandarEncuesta(env, { r: v.r, sesion, idioma: R.idioma(b.idioma), pais: paisDe(request) }));
+  ctx.waitUntil(mandarEncuesta(env, { r: v.r, sesion, idioma: R.idioma(b.idioma), pais: paisDe(request, env) }));
   return json({ estado: 'ok', bono: anotado ? 0 : cfg.bono }, 200, setCookie(uuid));
 }
 
@@ -272,11 +283,23 @@ async function mandarEncuesta(env, { r, sesion, idioma, pais }) {
   });
 }
 
-async function bajaApi({ env, ctx, url, b }) {
+// Baja desde la página de privacidad. Responde siempre lo mismo, para no revelar quién está en la lista.
+// - Si este dispositivo está ligado a ese correo (lo anotó desde acá), se borra ya: es la misma prueba de que el correo
+//   es suyo que alcanzó para anotarlo, y sin envío de correos es la única baja posible sin escribir al contacto.
+// - Si no, y hay envío de correos, le llega el enlace de baja.
+async function bajaApi({ request, env, ctx, url, b }) {
   const email = R.normalizarEmail(b.email);
   if (email) {
     const fila = await D.buscarEmail(env.DB, email);
-    if (fila && puedeMandarMail(env)) ctx.waitUntil(mailBaja(env, url.origin, email, fila));
+    if (fila) {
+      const dev = await D.buscarDispositivo(env.DB, await codigoDispositivo(env, dispositivoDe(request, b)));
+      if (dev?.lista_id === fila.id) {
+        if (await D.borrarDeLista(env.DB, fila.id)) {
+          log('info', { msg: 'baja', via: 'dispositivo' });
+          ctx.waitUntil(capturar(env, { event: 'baja', distinct_id: 'baja_' + crypto.randomUUID(), properties: { via: 'formulario', $process_person_profile: false } }));
+        }
+      } else if (puedeMandarMail(env)) ctx.waitUntil(mailBaja(env, url.origin, email, fila));
+    }
   }
   return json({}, 202);
 }
@@ -286,7 +309,7 @@ async function exportar(request, env, url) {
   if (request.method !== 'GET') throw new ErrorHttp(405, 'metodo');
   verificarSecretos(env);
   const ahora = ahoraS();
-  await limitar(env, 'exportar', await codigoIp(env, R.prefijoIp(ipDe(request))), ahora);
+  await limitar(env, 'exportar', await codigoIp(env, R.prefijoIp(ipDe(request, env))), ahora);
   const m = (request.headers.get('authorization') || '').match(/^Bearer (.+)$/);
   if (!m || !(await igualSeguro(m[1], env.EXPORTAR_CLAVE))) return json({ error: 'no_autorizado' }, 401);
   const filas = await D.exportarLista(env.DB);
@@ -307,7 +330,7 @@ async function exportar(request, env, url) {
 async function tokenDePagina(request, env, regla, tk, tipo) {
   verificarSecretos(env);
   const id = await leerToken(env, tk, tipo);
-  if (!id) await limitar(env, regla, await codigoIp(env, R.prefijoIp(ipDe(request))), ahoraS());
+  if (!id) await limitar(env, regla, await codigoIp(env, R.prefijoIp(ipDe(request, env))), ahoraS());
   return id;
 }
 
@@ -400,7 +423,8 @@ async function mailConfirmar(env, origen, email, fila) {
   const baja = `${origen}/baja?t=${await token(env, fila.id, 'baja')}`;
   const nombre = fila.nombre || t(idi, 'nombre.defecto');
   const m = armarMail(idi, { cuerpo: t(idi, 'mail.confirmar.cuerpo', { nombre }), boton: t(idi, 'mail.confirmar.boton'), link, baja });
-  await enviar(env, { to: email, subject: t(idi, 'mail.confirmar.asunto'), ...m, baja });
+  // Los 30 días para confirmar corren desde el primer correo que salió de verdad.
+  if (await enviar(env, { to: email, subject: t(idi, 'mail.confirmar.asunto'), ...m, baja })) await D.confirmacionMandada(env.DB, fila.id, ahoraS());
 }
 
 // Para un mail que ya estaba confirmado y se usó desde otro dispositivo (docs/MVP.md 5.5, «Revisión»).

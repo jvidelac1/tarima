@@ -4,7 +4,7 @@
 export const PREFIJO = '/qx';
 
 // Encabezados que pueden llevar la IP del visitante o credenciales: no salen hacia PostHog.
-const QUITAR = ['cookie', 'x-forwarded-for', 'x-real-ip', 'true-client-ip', 'cf-connecting-ip', 'cf-connecting-ipv6', 'cf-ipcountry', 'cf-ray', 'cf-visitor', 'cf-worker', 'forwarded', 'x-forwarded-host', 'x-forwarded-proto', 'cdn-loop'];
+const QUITAR = ['cookie', 'x-tarima-ip', 'x-tarima-pais', 'x-forwarded-for', 'x-real-ip', 'true-client-ip', 'cf-connecting-ip', 'cf-connecting-ipv6', 'cf-ipcountry', 'cf-ray', 'cf-visitor', 'cf-worker', 'forwarded', 'x-forwarded-host', 'x-forwarded-proto', 'cdn-loop'];
 
 // Proxy según https://posthog.com/docs/advanced/proxy/cloudflare, con una diferencia a propósito: no se agrega
 // X-Forwarded-For, para que PostHog no reciba la IP (el país llega como propiedad `pais`).

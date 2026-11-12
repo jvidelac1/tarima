@@ -1,31 +1,31 @@
-// Textos de los mails y de las páginas del Worker (docs/MVP.md 4.5, «Mails y páginas del Worker»), en español neutro
-// (decisión del dueño del 12 de noviembre: sin voseo) y en inglés.
+// Textos de los correos y de las páginas del Worker (docs/MVP.md 4.5, «Mails y páginas del Worker»), en español neutro
+// (decisión del dueño del 12 de noviembre: tuteo, sin voseo; «correo» y «enlace», no «mail» ni «link») y en inglés.
+// Sin la frase de «nunca vas a pagar…»: queda fuera hasta que el dueño defina la monetización.
 import { escHtml } from './reglas.js';
 
 export const TEXTOS = {
   es: {
     'mail.confirmar.asunto': 'Confirma tu lugar en Tarima',
-    'mail.confirmar.cuerpo': 'Hola, {nombre}. Toca el botón para confirmar tu lugar en la lista de acceso anticipado de Tarima. Si no fuiste tú, ignora este mail: si no se confirma, borramos tu dirección a los 30 días.',
+    'mail.confirmar.cuerpo': 'Hola, {nombre}. Toca el botón para confirmar tu lugar en la lista de acceso anticipado de Tarima. Si no fuiste tú, ignora este correo: si no se confirma, borramos tu dirección a los 30 días.',
     'mail.ya.asunto': 'Ya estás en la lista de Tarima',
-    'mail.ya.cuerpo': 'Alguien, probablemente tú, puso este mail en Tarima desde otro dispositivo. Ya estabas en la lista de acceso anticipado: ese dispositivo quedó con juego libre y no cambiamos nada más. Si no fuiste tú, no tienes que hacer nada.',
+    'mail.ya.cuerpo': 'Alguien, probablemente tú, escribió este correo en Tarima desde otro dispositivo. Ya estabas en la lista de acceso anticipado: ese dispositivo quedó con juego libre y no cambiamos nada más. Si no fuiste tú, no tienes que hacer nada.',
     'mail.ya.boton': 'Ir a Tarima',
     'confirmar.pregunta': '¿Confirmas tu lugar en la lista de Tarima?',
     'confirmar.boton': 'Sí, confirmar',
     'mail.confirmar.boton': 'Confirmar',
-    'mail.pie': 'Recibes este mail porque te anotaste en Tarima. Para darte de baja: {link}',
-    'mail.baja.asunto': 'Tu link para darte de baja de Tarima',
-    'mail.baja.cuerpo': 'Pediste darte de baja de la lista de Tarima. Toca el botón para confirmarlo. Si no fuiste tú, ignora este mail.',
+    'mail.pie': 'Recibes este correo porque te anotaste en Tarima. Para darte de baja: {link}',
+    'mail.baja.asunto': 'Tu enlace para darte de baja de Tarima',
+    'mail.baja.cuerpo': 'Pediste darte de baja de la lista de Tarima. Toca el botón para confirmarlo. Si no fuiste tú, ignora este correo.',
     'mail.baja.boton': 'Darme de baja',
     'nombre.defecto': 'Debutante',
     'confirmado.texto': '¡Listo! Tu lugar está confirmado.',
     'confirmado.volver': 'Volver al juego',
     'baja.pregunta': '¿Te damos de baja de la lista de Tarima?',
     'baja.boton': 'Sí, darme de baja',
-    'baja.ok': 'Listo: te dimos de baja y borramos tu mail. Puedes seguir jugando.',
-    'baja.token_invalido': 'Ese link ya no sirve. Pide uno nuevo desde la página de privacidad.',
+    'baja.ok': 'Listo: te dimos de baja y borramos tu correo. Puedes seguir jugando.',
+    'baja.token_invalido': 'Ese enlace ya no sirve. Pide uno nuevo desde la página de privacidad.',
     'pagina.limite': 'Demasiados intentos. Prueba de nuevo en un rato.',
     'pagina.error': 'Algo falló. Prueba de nuevo en un rato.',
-    'marca.promesa': 'Nunca vas a pagar para levantar más.',
   },
   en: {
     'mail.confirmar.asunto': 'Confirm your spot in Tarima',
@@ -49,7 +49,6 @@ export const TEXTOS = {
     'baja.token_invalido': 'That link no longer works. Request a new one from the privacy page.',
     'pagina.limite': 'Too many tries. Try again in a bit.',
     'pagina.error': 'Something broke. Try again in a bit.',
-    'marca.promesa': "You'll never pay to lift more.",
   },
 };
 
@@ -80,7 +79,7 @@ export function pagina(idi, cuerpo, { status = 200 } = {}) {
   const html = `<!doctype html><html lang="${idi}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex"><title>Tarima · ${escHtml(a.titulo)}</title><style>${CSS}</style></head>
 <body><main><div class="c"><h1>${escHtml(a.titulo)}</h1>${a.html}<div class="otro" lang="${otro}"><strong>${escHtml(b.titulo)}</strong>${b.extra ? ' ' + b.extra : ''}</div></div>
-<p class="marca">Tarima · ${escHtml(t(idi, 'marca.promesa'))}</p></main></body></html>`;
+<p class="marca">Tarima</p></main></body></html>`;
   return new Response(html, {
     status,
     headers: {

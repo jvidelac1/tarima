@@ -1,12 +1,14 @@
 // Reglas puras del Worker de Tarima (docs/MVP.md, sección 5.5). Sin fetch, sin D1, sin reloj ni azar:
 // todo lo que depende del tiempo o de la base entra como argumento. Se prueban en Node con tools/worker_test.mjs.
 
-export const CONSENTIMIENTO = '2026-11-a';
-export const VERSIONES_CONSENTIMIENTO = new Set([CONSENTIMIENTO]);
+// Versión del texto de privacidad que acepta quien se anota. 2026-11-b: sin borrado por no confirmar mientras no haya
+// correos, contacto pendiente y el HMAC de la IP explicado (web/privacidad.html). La «a» se sigue aceptando.
+export const CONSENTIMIENTO = '2026-11-b';
+export const VERSIONES_CONSENTIMIENTO = new Set(['2026-11-a', CONSENTIMIENTO]);
 export const DIA = 86400;            // segundos
 export const VENTANA_IP = 30 * DIA;  // cuenta por IP y retención del código de IP
 export const RETENCION = 180 * DIA;  // partidas y dispositivos sin lista
-export const SIN_CONFIRMAR = 30 * DIA;
+export const SIN_CONFIRMAR = 30 * DIA; // desde que salió el correo de confirmación
 export const PASE_DURA = 3 * 3600;
 export const REFRESCO_FLAGS = DIA;
 
