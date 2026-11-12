@@ -51,6 +51,14 @@ const CAMPOS_NOMBRE = ['nombre', 'editor-campo'];
 const normal = s => String(s ?? '').normalize('NFC').replace(/\s+/g, ' ').trim().toLocaleLowerCase();
 
 /**
+ * El nombre tal como lo muestra el juego: solo letras (de cualquier idioma), espacios, guion y apóstrofo, la misma regla
+ * que `limpiarNombre` de main.js (sin el tope de largo: si se pasa, el juego muestra el nombre de siempre). Lo que se
+ * escribe en el campo («Juan.», «Lucía 🙂») y lo que aparece en el título («Juan», «Lucía») pueden ser distintos.
+ */
+export const LETRA_DE_NOMBRE = /[\p{L}\p{M} '’-]/u;
+export const nombreVisible = s => [...String(s ?? '').normalize('NFC')].filter(c => LETRA_DE_NOMBRE.test(c)).join('').replace(/\s+/g, ' ').trim();
+
+/**
  * Texto de la página tal como va a la grabación: tapado con «*» si tiene una «@» (un correo) o alguno de los nombres
  * (el guardado o el que se está escribiendo, de 2 letras o más); si no, igual. Los campos los tapa maskAllInputs.
  */
@@ -240,7 +248,7 @@ export function crearAnalitica(o = {}) {
   function nombresDelJugador() {
     const doc = ventana?.document;
     const out = [local.get('tarima.nombre'), ...CAMPOS_NOMBRE.map(id => { try { return doc?.getElementById(id)?.value; } catch { return null; } })];
-    return out.map(normal).filter(x => [...x].length >= 2);
+    return [...new Set(out.flatMap(x => [normal(x), normal(nombreVisible(x))]))].filter(x => [...x].length >= 2);
   }
 
   const activa = () => estado === 'activa';

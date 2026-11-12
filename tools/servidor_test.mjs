@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearServidor, expDelPase, pareceCorreo, sugerirCorreo, CONSENTIMIENTO } from '../web/js/game/servidor.js';
-import { crearAnalitica, limpiarProps, fuenteTrafico, proporcionGrabacion, taparTexto, taparAtributo, BLOQUEO_GRABACION, BANDERAS } from '../web/js/game/analitica.js';
+import { crearAnalitica, nombreVisible, limpiarProps, fuenteTrafico, proporcionGrabacion, taparTexto, taparAtributo, BLOQUEO_GRABACION, BANDERAS } from '../web/js/game/analitica.js';
 import { reenviar } from '../functions/_reenviar.js';
 import { onRequest as raiz } from '../functions/index.js';
 import { VERSIONES_CONSENTIMIENTO } from '../worker/src/reglas.js';
@@ -411,6 +411,26 @@ igual([fuenteTrafico('?utm_source=Amigos'), fuenteTrafico('?c=abc'), fuenteTrafi
     const f = x.cfg().session_recording.maskTextFn;
     const textos = ['Elige tu pesista, Ana', 'BRENDA · 120 kg', 'Hola de nuevo, Lucía', 'Arranque · 2.º intento', 'te anotaste: a@b.com'];
     igual(textos.map(t => f(t)), textos.map((t, i) => (i === 3 ? t : tapado(t))), 'maskTextFn tapa el nombre guardado, el que se escribe y los correos');
+  }
+  {
+    // Lo que se escribe puede llevar signos que el título no muestra (limpiarNombre los quita): «Juan.» → «Juan».
+    const limpiarDeMain = (() => {
+      const src = fs.readFileSync(path.join(ROOT, 'web/js/game/main.js'), 'utf8');
+      const m = src.match(/function limpiarNombre\(s\) \{[\s\S]*?\n\}/);
+      return m ? new Function(`${m[0]}; return limpiarNombre;`)() : null;
+    })();
+    ok(!!limpiarDeMain, 'se encontró limpiarNombre en main.js');
+    for (const escrito of ['Juan.', 'Juan5', 'Ana_', 'María!', 'Lucía 🙂', 'Ñandú—', 'O’Neil 9']) {
+      const visto = limpiarDeMain(escrito);
+      igual(nombreVisible(escrito), visto, `nombreVisible sigue la regla de limpiarNombre de main.js («${escrito}»)`);
+      for (const campo of ['nombre', 'editor-campo']) {
+        const campos = { [campo]: { value: escrito } };
+        const x = armar({ grabacion: 'todas', documento: { getElementById: id => campos[id] || null } });
+        await x.a.iniciar({ estado: x.est });
+        const f = x.cfg().session_recording.maskTextFn;
+        for (const t of [`Elige tu pesista, ${visto}`, `${visto.toUpperCase()} · 120 kg`]) igual(f(t), tapado(t), `«${escrito}» en #${campo}: «${t}» tapado`);
+      }
+    }
   }
   {
     // tercio: una tirada por carga; < 1/3 graba.

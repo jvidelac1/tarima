@@ -167,7 +167,9 @@ const q = new URLSearchParams(location.search);
 const c = document.getElementById('gl').getContext('2d'); c.fillStyle = '#e33'; c.fillRect(0, 0, 128, 72);
 document.getElementById('saludo').textContent = 'Hola de nuevo, ' + (localStorage.getItem('tarima.nombre') || '');
 const inp = document.getElementById('nombre');
-inp.addEventListener('input', () => { document.getElementById('pesista-t').textContent = 'Elige tu pesista, ' + inp.value; });
+// El título muestra el nombre limpio, como el juego (limpiarNombre de main.js): «Wilfredo.» → «Wilfredo».
+const limpiar = v => [...v.normalize('NFC')].filter(c => /[\p{L}\p{M} '’-]/u.test(c)).join('').replace(/\s+/g, ' ').trim();
+inp.addEventListener('input', () => { document.getElementById('pesista-t').textContent = 'Elige tu pesista, ' + limpiar(inp.value); });
 window.__mut = 0;
 new MutationObserver(r => { window.__mut += r.length; }).observe(document.getElementById('senal'), { subtree: true, attributes: true });
 window.__animar = ms => new Promise(res => {
@@ -343,7 +345,10 @@ async function paginaGrabacion({ flag, azar = 0, medicion = true }) {
   ok(g.activa && g.grabando && g.grabador(), `todas: graba y el grabador sale del propio sitio (activa ${g.activa}, grabando ${g.grabando})`);
   // clic (para PostHog es una interacción), el nombre letra por letra (el título lo sigue), correo y respuesta libre
   await g.page.click('#jugar');
-  await g.page.type('#nombre', ESCRITO, { delay: 40 });
+  // con un punto y un emoji al final: el campo dice «Wilfredo. 🙂», el título «Wilfredo» (tiene que salir tapado igual)
+  await g.page.type('#nombre', ESCRITO + '.', { delay: 40 });
+  await g.page.waitForTimeout(400);
+  await g.page.type('#nombre', ' 🙂', { delay: 40 });
   await g.page.fill('#correo', CORREO);
   await g.page.fill('#q5', LIBRE);
   await g.page.waitForTimeout(300);
