@@ -17,8 +17,8 @@ const v = new THREE.Vector3(), v2 = new THREE.Vector3();
 export const CAM = Object.fromEntries(CAMERAS.map((c, i) => [c.key, i]));
 
 export class Escena {
-  constructor(canvas, Q, { reduceMotion = false } = {}) {
-    this.canvas = canvas; this.Q = Q; this.reduceMotion = reduceMotion;
+  constructor(canvas, Q, { reduceMotion = false, escala = 1 } = {}) {
+    this.canvas = canvas; this.Q = Q; this.escala = escala; this.reduceMotion = reduceMotion;
     const r = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
     r.toneMapping = THREE.NoToneMapping; r.shadowMap.enabled = true; r.shadowMap.type = THREE.VSMShadowMap; r.shadowMap.autoUpdate = false;
     this.scene = new THREE.Scene(); this.scene.background = new THREE.Color('#070b16'); this.scene.fog = new THREE.FogExp2('#0b1226', .015);
@@ -38,9 +38,23 @@ export class Escena {
   }
   resize() {
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight, Q = this.Q; if (!w || !h) return;
-    const pr = Math.min(window.devicePixelRatio || 1, Q.dpr, Math.sqrt(Q.maxPixels / (w * h)));
+    const pr = Math.min(window.devicePixelRatio || 1, Q.dpr, Math.sqrt(Q.maxPixels / (w * h))) * this.escala;      // escala: escalón de resolución del gobernador
     this.renderer.setPixelRatio(pr); this.renderer.setSize(w, h, false); this.rig.setAspect(w / h); this.post.setSize(w, h, pr); this.vertical = h > w; this.sombra = 4;
   }
+  /**
+   * Cambia de calidad sin recargar: pases de post, sombras, público y resolución. No reconstruye geometría ni texturas.
+   * Rehacer los pases compila shaders (un tirón): quien llama elige el momento (nunca en medio de un intento).
+   */
+  setCalidad(Q, escala = 1) {
+    const otra = Q !== this.Q; this.Q = Q; this.escala = escala;
+    if (otra) {
+      this.arena.setQuality(Q); this.lighting.setQuality(Q); this.post.dispose();
+      this.post = new Post(this.renderer, this.scene, this.rig.camera, Q); this.post.reduceMotion = this.reduceMotion; this.post.motionObject = this.barbell.group; this.post.bokehObject = this.arena.bokeh;
+    }
+    this.resize();
+  }
+  /** Megapíxeles que se dibujan por cuadro. */
+  get megapixeles() { const g = this.renderer.getContext(); return g.drawingBufferWidth * g.drawingBufferHeight / 1e6; }
   /** Carga (una sola vez) el modelo que usa un pesista. Los dos modelos quedan en memoria. */
   cargar(id) {
     const mod = PLANTEL[id].modelo;

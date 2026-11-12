@@ -13,7 +13,8 @@ const INF = 2147483647;
  * empujar de más no hace temblar (sección 4), así que el margen es ancho: solo evita gastar Resto en toques que ya no suman.
  */
 export const CAPA = { reboteMs: 60, bajaMs: 150, margen: 200, trabaMargen: 150 };
-const NADA = { ent: [], aviso: null };
+/** Un toque que no llega al núcleo siempre lleva `motivo`: 'espera' (todavía no), 'rebote', 'sobra' (no hace falta), 'tarde' (ya se perdió) o 'termino'. */
+const no = (motivo, aviso = null) => ({ ent: [], aviso, motivo });
 
 /**
  * Eventos que la capa agrega sola en Fácil. `m` es la máquina avanzada hasta ahora. Los instantes son fijos (no dependen
@@ -28,33 +29,34 @@ export function automaticos(m, ctl) {
 }
 
 /**
- * Una tecla (v = 1 baja, 0 sube) en el instante t, con `m` avanzada hasta t. Devuelve los eventos para el núcleo y un
- * aviso para la presentación: 'espera' (todavía no se puede), 'rebote', 'sobra' (toque de subida que no hace falta).
+ * Una tecla (v = 1 baja, 0 sube) en el instante t, con `m` avanzada hasta t. Devuelve los eventos para el núcleo, un
+ * aviso para la presentación ('espera': todavía no se puede, 'rebote', 'sobra': toque de subida que no hace falta) y, si el
+ * toque no llegó al núcleo, el `motivo` (ningún toque se descarta sin decir por qué).
  */
 export function traducir(m, t, v, ctl) {
-  if (m.res) return NADA;
-  if (ctl !== 'f') return v ? { ent: [[t, 1]], aviso: null } : m.n > 0 ? { ent: [[t, 0]], aviso: null } : NADA;
-  if (!v) return NADA;
+  if (m.res) return no('termino');
+  if (ctl !== 'f') return v ? { ent: [[t, 1]], aviso: null } : m.n > 0 ? { ent: [[t, 0]], aviso: null } : no('sobra');
+  if (!v) return no('sobra');
   const M = m.M;
   switch (m.fase) {
     case 'tension': case 'hombros':
-      // en los 450 ms de RESPIRÁ el toque suele ser la cola de ¡EMPUJÁ!: se descarta sin decir nada; después de un amague sí se avisa
-      if (t < M.ign) return { ent: [], aviso: M.amagues.length ? 'espera' : null };
+      // en los 450 ms de RESPIRÁ el toque suele ser la cola de ¡EMPUJÁ!: no cuenta (y no dice «todavía no»); después de un amague sí se avisa
+      if (t < M.ign) return no('espera', M.amagues.length ? 'espera' : null);
       return { ent: m.n > 0 ? [[t, 0], [t, 1]] : [[t, 1]], aviso: null };
     case 'tiron': case 'flexion':
-      if (t - M.tp < CAPA.reboteMs) return { ent: [], aviso: 'rebote' };
+      if (t - M.tp < CAPA.reboteMs) return no('rebote', 'rebote');
       return { ent: [[t, 0]], aviso: null };
     case 'vuelo': case 'empuje':
-      if (M.tq || M.tFallo < INF) return NADA;
-      if (t - M.tr < CAPA.reboteMs) return { ent: [], aviso: 'rebote' };
+      if (M.tq) return no('sobra'); if (M.tFallo < INF) return no('tarde');
+      if (t - M.tr < CAPA.reboteMs) return no('rebote', 'rebote');
       return { ent: [[t, 1]], aviso: null };
     case 'pelea': case 'traba': {
-      const p = M.pelea; if (t < p.t0) return NADA;
+      const p = M.pelea; if (t < p.t0) return no('espera');
       const util = (p.modo === 'pelea' && p.P < 1000000 && p.aguja < p.exiAhora + CAPA.margen) || (!p.trabado && p.E < p.exiTraba + CAPA.trabaMargen);
-      return util ? { ent: [[t, 1], [t, 0]], aviso: null } : { ent: [], aviso: 'sobra' };
+      return util ? { ent: [[t, 1], [t, 0]], aviso: null } : no('sobra', 'sobra');
     }
-    case 'acomodo': return { ent: [], aviso: 'espera' };
-    default: return NADA;
+    case 'acomodo': return no('espera', 'espera');
+    default: return no('sobra');      // AGUANTÁ y ¡ABAJO!: no hay que tocar nada
   }
 }
 
@@ -69,13 +71,14 @@ export function alDia(ctx, conf, ent, t, ctl) {
 /**
  * Una tecla del jugador sobre el intento en vivo: recalcula hasta el instante de la tecla, la traduce y agrega lo que
  * corresponda a `ent`. El instante nunca es anterior al último evento registrado.
- * @returns {{t:number, aviso:string|null, n:number}} instante usado, aviso de la capa y cuántos eventos se agregaron
+ * @returns {{t:number, aviso:string|null, n:number, motivo:string|null}} instante usado, aviso de la capa, cuántos eventos
+ *   se agregaron y, si no se agregó ninguno, por qué
  */
 export function tocar(ctx, conf, ent, t, v, ctl) {
   t = Math.max(t, ent.length ? ent[ent.length - 1][0] : 0, conf ?? 0);
   const m = alDia(ctx, conf, ent, t, ctl), r = traducir(m, t, v, ctl);
   for (const e of r.ent) ent.push(e);
-  return { t, aviso: r.aviso, n: r.ent.length };
+  return { t, aviso: r.aviso, n: r.ent.length, motivo: r.ent.length ? null : r.motivo || 'espera' };
 }
 
 /** Pasos con número de cada levantamiento en Fácil. */

@@ -7,14 +7,21 @@ function tono(f0, f1, dur, tipo = 'sine', vol = .2) {
   o.type = tipo; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur); o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + dur + .02);
 }
-function ruido(dur, vol = .25, corte = 900) {
-  if (!listo()) return; const n = Math.floor(ctx.sampleRate * dur), b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0);
+// Los búferes de ruido se generan una vez por duración (al activar el sonido, con un panel abierto), no en medio del intento.
+const ruidos = new Map();
+function bufer(dur) {
+  let b = ruidos.get(dur); if (b) return b;
+  const n = Math.floor(ctx.sampleRate * dur), d = (b = ctx.createBuffer(1, n, ctx.sampleRate)).getChannelData(0);
   for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n) ** 2;
+  ruidos.set(dur, b); return b;
+}
+function ruido(dur, vol = .25, corte = 900) {
+  if (!listo()) return; const b = bufer(dur);
   const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(); s.buffer = b; f.type = 'lowpass'; f.frequency.value = corte; g.gain.value = vol; s.connect(f).connect(g).connect(ctx.destination); s.start();
 }
 const vibra = ms => { try { navigator.vibrate?.(ms); } catch { /* sin vibración */ } };
 export const sonido = {
-  activar: listo,
+  activar() { const ok = listo(); if (ok && !ruidos.size) for (const d of [.08, .1, .12, .3, .6, 1.2]) bufer(d); return ok; },
   tic() { tono(1200, 900, .05, 'square', .08); },
   despegue() { ruido(.12, .15, 500); vibra(10); },
   explosion(perfecta) { ruido(.1, .2, 1400); if (perfecta) vibra(20); },

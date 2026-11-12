@@ -2,17 +2,20 @@
 // recepción, palabra del gesto y medidores de pelea y de traba. Se leen por posición y por trama, no solo por color.
 const F = "'Saira Condensed','Arial Narrow',sans-serif";
 export class Ayudas {
-  constructor(canvas) { this.cv = canvas; this.g = canvas.getContext('2d'); this.w = this.h = 0; }
+  constructor(canvas) { this.cv = canvas; this.g = canvas.getContext('2d'); this.w = this.h = 0; this.sucio = false; canvas.style.visibility = 'hidden'; }
   _medir() { const w = this.cv.clientWidth, h = this.cv.clientHeight, d = Math.min(2, devicePixelRatio || 1); if (w !== this.w || h !== this.h) { this.w = w; this.h = h; this.cv.width = Math.round(w * d); this.cv.height = Math.round(h * d); } this.g.setTransform(d, 0, 0, d, 0, 0); }
-  /** Vacía el lienzo reiniciándolo: tras varios cuadros de solo borrar, un búfer viejo puede volver a mostrarse. */
-  limpiar() { if (this.sucio === false) return; this.sucio = false; this.w = this.h = 0; this.cv.width = this.cv.width; }
+  /**
+   * Vacía el lienzo y lo saca de la composición. No lo reinicia (`width = width` lo realoja entero, y eso pasaba en medio
+   * del intento cada vez que las ayudas aparecían o se iban): oculto, un búfer viejo no puede volver a mostrarse.
+   */
+  limpiar() { if (!this.sucio) return; this.sucio = false; this.g.setTransform(1, 0, 0, 1, 0, 0); this.g.clearRect(0, 0, this.cv.width, this.cv.height); this.cv.style.visibility = 'hidden'; }
   /**
    * @param {object} a  bar {x,y} · anillo 0..1 (lleno en 1) · linea {y} y lineaLejos (0..1: cuánto falta) · rec 0..1 (cuánto falta para la recepción)
    *                    · palabra {txt, edad s, mal} · pelea {aguja, exi, franja, roja, P, T, L, modo} en milésimas y 0..1
    */
   dibujar(a) {
     if (!(a.anillo !== undefined || a.linea || a.rec !== undefined || (a.palabra && a.palabra.edad < 1.1) || a.pelea)) return this.limpiar();
-    this.sucio = true; this._medir(); this.g.clearRect(0, 0, this.w, this.h); const g = this.g, u = Math.max(9, Math.min(17, this.h * .017)), bx = a.bar?.x ?? this.w / 2, by = a.bar?.y ?? this.h / 2;
+    if (!this.sucio) { this.sucio = true; this.cv.style.visibility = ''; } this._medir(); this.g.clearRect(0, 0, this.w, this.h); const g = this.g, u = Math.max(9, Math.min(17, this.h * .017)), bx = a.bar?.x ?? this.w / 2, by = a.bar?.y ?? this.h / 2;
     g.lineCap = 'round'; g.textAlign = 'center'; g.textBaseline = 'middle';
     if (a.anillo !== undefined) {
       const R = u * 3.2, lleno = a.anillo > .9;

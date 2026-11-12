@@ -1,6 +1,10 @@
 // Capturas de lo que ve un jugador nuevo (docs/CONTROLES.md, sección 8): inicio, cada parada del tutorial guiado, cada
 // señal a velocidad real, una línea de fallo, la pausa y la ayuda, en escritorio (teclado) y en teléfono (toques).
 // Corre con el reloj verdadero y dibujando. Uso: node tools/primera.mjs [--out=out/primera] [--only=escritorio|telefono|clasico]
+// OJO (12-nov): este recorrido es el del tutorial anterior (panel, guiado y dos prácticas). El tutorial ahora es un solo
+// levantamiento guiado sin paneles, así que este script no pasa de ahí y hay que rehacerlo. Mientras tanto, las capturas
+// salen de `node tools/check_fluidez.mjs --cpu=1 --tutorial --capturas=out/capturas` (una por señal, por toque y por panel).
+if (!process.argv.includes('--igual')) { console.log('tools/primera.mjs quedó atrás del tutorial nuevo: usar tools/check_fluidez.mjs --capturas=DIR (o --igual para correrlo de todos modos)'); process.exit(2); }
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';

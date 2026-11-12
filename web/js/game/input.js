@@ -13,29 +13,71 @@ export const reloj = {
 };
 
 /**
+ * Registro de toques: toda pulsación de Espacio o Enter (y todo dedo o clic sobre el escenario) queda anotada como aceptada
+ * o descartada con su motivo, y se avisa a quien dibuja el acuse en pantalla. Ningún toque se pierde en silencio.
+ * Motivos de descarte: 'espera' (todavía no hay nada que tocar), 'rebote' (segundo toque pegado al anterior), 'sobra' (no hace
+ * falta), 'tarde' (la barra ya se perdió), 'termino' (el intento ya cerró), 'pausa', 'mouse' (el clic no es un gesto).
+ */
+export const toques = {
+  total: 0, aceptados: 0, descartados: 0, ultimos: [], abierto: null, alCambiar: null, contexto: null,
+  /** Una pulsación nueva (no una repetición del sistema). `t`: instante del evento en el reloj del juego. */
+  nuevo(t, via, tecla) {
+    const T = this.abierto = { n: ++this.total, t: Math.round(t), via, tecla, ok: null, motivo: '', donde: this.contexto?.() || '', vivo: performance.now() };
+    this.ultimos.push(T); if (this.ultimos.length > 16) this.ultimos.shift(); this.alCambiar?.(T, 'baja'); return T;
+  },
+  /**
+   * Qué pasó con la última pulsación. Se puede corregir (Espacio sobre un botón queda «aceptado» y, si el panel todavía
+   * estaba bloqueado, el botón lo cambia a descartado). `sigue`: queda abierta a esa corrección.
+   */
+  resolver(ok, motivo = '', sigue = false) {
+    const T = this.abierto; if (!T || !T.vivo || performance.now() - T.vivo > 1500) return;
+    if (T.ok !== null) this[T.ok ? 'aceptados' : 'descartados']--;
+    T.ok = !!ok; T.motivo = motivo; this[ok ? 'aceptados' : 'descartados']++; if (!sigue) T.vivo = 0; this.alCambiar?.(T, 'resuelto');
+  },
+  suelta() { this.alCambiar?.(this.abierto, 'sube'); },
+};
+
+/**
  * Entrada del levantamiento: barra espaciadora (o Enter) y dedos sobre la zona táctil o el escenario. Cada tecla y cada
  * puntero es un contacto; quien escucha recibe (t, 1, vía) cuando se apoya uno y (t, 0, vía) cuando se levanta. La vía es
  * 'teclado', 'tactil' o 'mouse': el clic del mouse se informa (saltea esperas) pero NO vale como gesto del levantamiento.
- * La repetición automática de la tecla se ignora. Si la página pierde visibilidad o el sistema cancela un toque, los
- * contactos se levantan.
+ * La repetición automática de la tecla no es un toque nuevo (la tecla sigue apoyada). Si la página pierde visibilidad o el
+ * sistema cancela un toque, los contactos se levantan; y si llega una pulsación nueva de una tecla que figuraba apoyada
+ * (se perdió su `keyup`), se levanta antes de volver a apoyarla: no se descarta.
+ * Cada pulsación se anota en `toques`; quien escucha la resuelve (aceptada, o descartada con motivo). Sin nadie
+ * escuchando, queda descartada con 'espera'.
  */
 export class Boton {
   /** @param {HTMLElement[]} zonas elementos que reciben punteros */
   constructor(zonas) {
     this.contactos = new Map(); this.oye = null; this.via = 'teclado'; this.activo = true;
-    const baja = (id, e, via) => { if (this.contactos.has(id)) return; this.contactos.set(id, via); this.via = via; this.oye?.(reloj.deEvento(e), 1, via); };
     const sube = (id, e) => { const via = this.contactos.get(id); if (via === undefined) return; this.contactos.delete(id); this.oye?.(reloj.deEvento(e), 0, via); };
-    this._kd = e => {
-      if (e.code !== 'Space' && e.code !== 'Enter') return;
-      if (e.defaultPrevented || e.target.closest?.('button,input,select,a')) return;      // sobre un botón manda el botón
-      e.preventDefault(); if (e.repeat || !this.activo) return; baja('k' + e.code, e, 'teclado');
+    const baja = (id, e, via) => {
+      if (this.contactos.has(id)) sube(id, e);
+      this.contactos.set(id, via); this.via = via; this.oye?.(reloj.deEvento(e), 1, via);
+      if (toques.abierto && toques.abierto.ok === null) toques.resolver(false, 'espera');      // nadie lo tomó
     };
-    this._ku = e => { if (e.code === 'Space' || e.code === 'Enter') sube('k' + e.code, e); };
-    this._pd = e => { if (!this.activo || (e.pointerType === 'mouse' && e.button !== 0) || e.target.closest?.('button,input,select,a,.panel')) return; e.preventDefault(); baja('p' + e.pointerId, e, e.pointerType === 'mouse' ? 'mouse' : 'tactil'); };
-    this._pu = e => sube('p' + e.pointerId, e);
+    const esTecla = e => e.code === 'Space' || e.code === 'Enter';
+    // en captura y antes que el teclado de los paneles: la pulsación queda anotada (y con acuse) pase lo que pase después
+    this._k0 = e => { if (esTecla(e) && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) toques.nuevo(reloj.deEvento(e), 'teclado', e.code === 'Space' ? 'ESPACIO' : 'ENTER'); };
+    this._kd = e => {
+      if (!esTecla(e)) return;
+      const T = toques.abierto, pend = !e.repeat && T && T.ok === null;
+      // sobre un botón manda el botón (o ya lo activó el teclado del panel): cuenta como aceptado salvo que el botón diga otra cosa
+      if (e.defaultPrevented || e.target.closest?.('button,input,select,a')) { if (pend) toques.resolver(true, 'boton', true); return; }
+      e.preventDefault(); if (e.repeat) return;
+      if (!this.activo) { if (pend) toques.resolver(false, 'pausa'); return; }
+      baja('k' + e.code, e, 'teclado');
+    };
+    this._ku = e => { if (esTecla(e)) { sube('k' + e.code, e); toques.suelta(); } };
+    this._pd = e => {
+      if (!this.activo || (e.pointerType === 'mouse' && e.button !== 0) || e.target.closest?.('button,input,select,a,.panel')) return;
+      const via = e.pointerType === 'mouse' ? 'mouse' : 'tactil'; e.preventDefault(); toques.nuevo(reloj.deEvento(e), via, via === 'mouse' ? 'CLIC' : 'TOQUE'); baja('p' + e.pointerId, e, via);
+    };
+    this._pu = e => { if (this.contactos.has('p' + e.pointerId)) { sube('p' + e.pointerId, e); toques.suelta(); } };
     this._todo = e => { for (const id of [...this.contactos.keys()]) sube(id, e); };
     this._vis = () => { if (document.visibilityState !== 'visible') this._todo(null); };
-    addEventListener('keydown', this._kd); addEventListener('keyup', this._ku);
+    addEventListener('keydown', this._k0, true); addEventListener('keydown', this._kd); addEventListener('keyup', this._ku);
     for (const z of zonas) { z.addEventListener('pointerdown', this._pd); z.addEventListener('contextmenu', e => e.preventDefault()); }
     addEventListener('pointerup', this._pu); addEventListener('pointercancel', this._pu); addEventListener('blur', this._todo); document.addEventListener('visibilitychange', this._vis);
   }
