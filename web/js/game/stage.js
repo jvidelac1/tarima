@@ -378,6 +378,9 @@ export class Escena {
     // discos nuevos en medio de la partida y así no crea texturas ni compila nada (las caras se dibujan en un lienzo 2D)
     const muestra = new THREE.Group(); PLATES.forEach((p, i) => { const d = this.barbell._plate(p); d.position.x = .7 + i * .03; muestra.add(d); }); muestra.add(this.barbell._collar());
     this.barbell.sides[1].inner.add(muestra);
+    // con el parche de bordes antes de compilarse: three no recompila un material ya compilado si después cambia su
+    // customProgramCacheKey, y los discos que el cambio de carga arme con estos materiales saldrían sin contraluz
+    muestra.traverse(o => { if (o.isMesh) [].concat(o.material).forEach(conBorde); });
     const compilar = con => {
       this.sombras = con; this._sombras(); r.setRenderTarget(this.directo ? null : this.post.sceneRT);
       try { return r.compileAsync(this.scene, cam); } finally { r.setRenderTarget(null); this.sombras = antes; this._sombras(); }
