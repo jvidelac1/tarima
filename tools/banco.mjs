@@ -2,7 +2,9 @@
 //   node tools/banco.mjs            el banco de medición (juego.html?banco=1): imprime la tabla y guarda window.BANCO
 //   node tools/banco.mjs --juego    abre el juego dibujando, empieza una partida y espera a que termine la calibración de
 //                                   calidad (precalentado de programas y decisión de megapíxeles); guarda JUEGO.calidad
-// Opciones: --ancho=1745 --alto=845 (ventana)  --limite=115 (segundos del banco)  --solo=baja,media  --variantes=sombras,luces  --vueltas=3  --mp=0.5,1.5  --n=10
+//   node tools/banco.mjs --fotos=dir  fotos de «Baja» como era antes de abaratarla y como es ahora, con cada cámara del
+//                                   juego y el mismo cuadro del arranque (juego.html?banco=1&fotos=1): dir/<cámara>_<antes|ahora>.png
+// Opciones: --ancho=1745 --alto=845 (ventana)  --limite=125 (segundos del banco)  --solo=baja,media  --variantes=sombras,luces  --vueltas=3  --mp=0.5,1.5  --n=10
 //           --pesista=ventura  --lastre=18 (solo --juego: ms artificiales por megapíxel)  --json=archivo  --headed
 // Falla (exit 1) si la página tira un error, si el banco anota errores o si la calibración no llegó a decidir.
 // OJO: sin placa (GitHub Actions, contenedor) Chrome dibuja por software y LOS TIEMPOS NO DICEN NADA: ahí esto solo prueba
@@ -19,7 +21,7 @@ const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1], tiene = k => process.argv.includes(`--${k}`);
-const JUEGO = tiene('juego'), ANCHO = +(arg('ancho') || 1745), ALTO = +(arg('alto') || 845), LIMITE = +(arg('limite') || 115), SALIDA = arg('json') || path.join(ROOT, 'out', 'banco', JUEGO ? 'juego.json' : 'banco.json');
+const FOTOS = arg('fotos'), JUEGO = tiene('juego'), ANCHO = +(arg('ancho') || 1745), ALTO = +(arg('alto') || 845), LIMITE = +(arg('limite') || 125), SALIDA = arg('json') || path.join(ROOT, 'out', 'banco', JUEGO ? 'juego.json' : 'banco.json');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
 const server = http.createServer((req, res) => {
   const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname), file = path.join(WEB, rel);
@@ -37,7 +39,19 @@ const n = (x, d = 2) => (typeof x === 'number' && Number.isFinite(x) ? x.toFixed
 const guardar = o => { fs.mkdirSync(path.dirname(path.resolve(SALIDA)), { recursive: true }); fs.writeFileSync(SALIDA, JSON.stringify(o, null, 1)); };
 const problemas = [];
 try {
-  if (!JUEGO) {
+  if (FOTOS) {
+    await page.goto(`${base}juego.html?banco=1&fotos=1${arg('pesista') ? '&pesista=' + arg('pesista') : ''}`, { waitUntil: 'load' });
+    await page.waitForFunction(() => (window.BANCO_FOTOS && window.BANCO_FOTOS.listo) || (window.BANCO && window.BANCO.listo), null, { timeout: 300000 });
+    const info = await page.evaluate(() => ({ lista: window.BANCO_FOTOS ? window.BANCO_FOTOS.lista.map(f => f.nombre) : [], errores: window.BANCO.errores, sombra: window.BANCO_FOTOS?.opacidadSombra, cruda: window.BANCO_FOTOS?.opacidadCruda, gl: (() => { const g = window.JUEGO?.escena?.renderer.getContext(), x = g && g.getExtension('WEBGL_debug_renderer_info'); return x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : '?'; })() }));
+    for (const e of info.errores) problemas.push('fotos: ' + e.split('\n')[0]);
+    fs.mkdirSync(FOTOS, { recursive: true });
+    for (let i = 0; i < info.lista.length; i++) {
+      const nombre = await page.evaluate(async i => { const n = window.BANCO_FOTOS.poner(i); await new Promise(r => requestAnimationFrame(() => r())); return n; }, i);
+      await page.screenshot({ path: path.join(FOTOS, nombre + '.png') }); console.log(`  ${nombre}.png`);
+    }
+    console.log(`${info.gl} · ${info.lista.length} fotos en ${FOTOS} · opacidad de la sombra en la tarima: ${info.sombra} (calculada ${info.cruda})`);
+    if (!info.lista.length) problemas.push('no hubo fotos');
+  } else if (!JUEGO) {
     // por software un cuadro a 1,5 MP tarda segundos: medidas chicas y dos vueltas alcanzan para probar que el banco corre entero
     const soft = angleBackend() === 'swiftshader' && !arg('mp') ? ['mp=0.06,0.18', 'n=4', 'vueltas=2'] : [];
     const q = ['banco=1', `limite=${LIMITE}`, ...soft, ...['solo', 'variantes', 'pesista', 'mp', 'n', 'vueltas'].filter(k => arg(k)).map(k => `${k}=${arg(k)}`)].join('&');
@@ -63,6 +77,10 @@ try {
     if (B.deriva) console.log(`deriva de la completa: ${n(B.deriva.primeraMs)} → ${n(B.deriva.ultimaMs)} ms a 1 MP (${n(B.deriva.cambioPct, 1)} %) · programas ${B.programasAlEmpezar} → ${B.programasAlTerminar} · mallas fijas de la arena: ${B.mallasFijas ? `${B.mallasFijas.antes} → ${B.mallasFijas.despues}` : '—'}`);
     for (const v of B.variantes) if (v.programasSobrantes) problemas.push(`banco: ${v.id} dejó ${v.programasSobrantes} programas compilados al deshacerse${v.sobrantesDe ? ` (${v.sobrantesDe.join('; ')})` : ''}`);
     const internos = B.variantes.filter(v => v.programasInternos).map(v => `${v.quita} ${v.programasInternos}`); if (internos.length) console.log(`programas internos de three que quedan (pasada de sombra, no se usan): ${internos.join(', ')}`);
+    for (const t of B.tandas || []) console.log(`pantalla ${t.momento.padEnd(9)} control ${t.controlAntes?.perdidos ?? '—'}/${t.controlAntes?.cuadros ?? '—'} y ${t.controlDespues?.perdidos ?? '—'}/${t.controlDespues?.cuadros ?? '—'} perdidos · Baja sin perder hasta ${n(t.mpReal)} MP, pierde desde ${n(t.mpFalla)} · sondas: ${t.sondas.map(x => `${x.mp} MP ${x.perdidos ?? '—'}/${x.cuadros}`).join(', ')}`);
+    if (B.resultado) { if (B.resultado.controlPierde) console.log('CONTROL: ' + B.resultado.textoControl); console.log(B.resultado.texto); if (B.resultado.textoPantalla) console.log(B.resultado.textoPantalla); }
+    else problemas.push('el banco no dio el resultado en lenguaje llano');
+    if (!(B.tandas || []).length) problemas.push('el banco no hizo ninguna tanda con la pantalla');
     for (const x of B.notas) console.log('nota: ' + x);
     for (const x of B.errores) problemas.push('banco: ' + x.split('\n')[0]);
     if (!B.variantes.length || !(B.calidades || []).length) problemas.push('el banco no midió ninguna variante o ninguna calidad');

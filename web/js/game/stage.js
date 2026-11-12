@@ -19,7 +19,7 @@ import { CameraRig, CAMERAS, SHOTS } from '../cameras.js';
 import { BarTrace } from '../trace.js';
 import { Athlete } from '../athlete.js';
 import { Timeline } from '../timeline.js';
-import { PLATE_R } from '../config.js';
+import { PLATE_R, PLATES, loadout, COLLAR_KG } from '../config.js';
 import { PLANTEL } from './roster.js';
 import { aplicarEsfuerzo } from './effort.js';
 import { tramo } from './sequence.js';
@@ -117,8 +117,79 @@ export function juntarFijos(raiz, fuera) {
   return { antes, despues };
 }
 
+// ---------- escena barata por píxel («Baja» y «Móvil»: Q.barato) ----------
+// El banco del usuario (M1 Pro) decía que a 1 MP lo caro era por píxel: la arena (casi todo el piso con material físico y
+// ocho luces), los haces de luz y los tres contraluces. Q.barato = { piso, haces, bordes } cambia eso solo en el juego:
+// - piso: la tarima y la alfombra del escenario con su luz horneada en una textura (todas las luces, vistas desde arriba,
+//   al construir la escena) y un material sin luces; la sombra del pesista y la barra va en una capa que solo oscurece.
+// - haces: 'no' no los dibuja. En el camino directo el tono se aplica a cada capa que se suma, y el tono del juego deja en
+//   negro todo lo que valga menos de 0,0158: los haces (0,035 a 0,05 en el foco, menos hacia abajo) no movían ni un píxel en
+//   las seis cámaras del juego (fotos del banco en Actions), pero se pagaban enteros. 'cortos': una cara con el brillo de
+//   las dos, cortados donde dejan de verse y en colores de pantalla (por si se los quiere volver a ver con otra curva).
+// - bordes: 'material' saca de la escena los tres contraluces y los pone como término del material del pesista y de la barra
+//   (la misma cuenta de un foco, sin sombra); 'luces' es como el visor; 'no' los apaga (variante del banco).
+
+/** Tono de los haces en colores de pantalla: d(x) = A · max(x − X0, 0)^P imita a tonoJS por canal (error menor a 0,03). */
+export const CURVA_HAZ = { A: 1.0467, X0: .0158, P: .36 };
+const HAZ_FS = /* glsl */`uniform vec3 uColor; uniform float uStrength; varying vec3 vN; varying vec3 vV; varying float vT;
+void main(){
+	float edge = pow( abs( dot( normalize( vN ), normalize( vV ) ) ), 2.2 ); float fall = pow( clamp( vT, 0.0, 1.0 ), 1.6 );
+	vec3 c = uColor * uStrength * edge * fall;
+	#if defined( TONE_MAPPING )
+	gl_FragColor = vec4( 2.0 * ${CURVA_HAZ.A.toFixed(4)} * pow( max( c - ${CURVA_HAZ.X0.toFixed(4)}, 0.0 ), vec3( ${CURVA_HAZ.P.toFixed(3)} ) ), 1.0 );
+	#else
+	gl_FragColor = vec4( 2.0 * c, 1.0 );
+	#endif
+}`;
+/**
+ * Cono de haz corto: el mismo cono que el de la arena (vértice en el foco, radio 0,09 → 1 a lo largo de 1), cortado en
+ * `corte` del largo. En `uv.y` va el brillo del cono entero (vT^1,6) por un desvanecido que llega a cero en el corte, ya
+ * pasado por la raíz 1,6 (el sombreador vuelve a elevar). La parte de abajo, la más ancha, no se veía: con el tono del
+ * camino directo todo lo que suma menos de CURVA_HAZ.X0 sale negro, y pasada la mitad del largo el haz más fuerte (0,05)
+ * ya no llega (vT^1,6 · 0,05 < 0,0158 desde t ≈ 0,51). Cortado en 0,56, con el desvanecido recién desde 0,5, queda el
+ * 31 % del área y la misma imagen.
+ */
+export function conoCorto(corte = .56, desde = .5, anillos = 8) {
+  const g = new THREE.CylinderGeometry(.09, .09 + (1 - .09) * corte, corte, 28, anillos, true); g.translate(0, -corte / 2, 0);
+  const uv = g.attributes.uv, s = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  for (let i = 0; i < uv.count; i++) { const t = (1 - uv.getY(i)) * corte, f = Math.pow(1 - t, 1.6) * (1 - s(desde, corte, t)); uv.setY(i, Math.pow(f, 1 / 1.6)); }
+  return g;
+}
+/** Los contraluces como término del material: los materiales con este parche y el estado (prendido o no). */
+const BORDE = { on: false, u: null, mats: new Set() };
+const BORDE_PARS = 'uniform vec3 uBordePos[ 3 ]; uniform vec3 uBordeDir[ 3 ]; uniform vec3 uBordeCol[ 3 ]; uniform vec2 uBordeCono[ 3 ];';
+// la misma cuenta que un SpotLight de three sin sombra (getSpotLightInfo con decaimiento 0), en espacio de vista
+const BORDE_FS = `
+	for ( int i = 0; i < 3; i ++ ) {
+		directLight.direction = normalize( ( viewMatrix * vec4( uBordePos[ i ], 1.0 ) ).xyz - geometryPosition );
+		float bordeAt = smoothstep( uBordeCono[ i ].x, uBordeCono[ i ].y, dot( directLight.direction, normalize( ( viewMatrix * vec4( uBordeDir[ i ], 0.0 ) ).xyz ) ) );
+		directLight.color = uBordeCol[ i ] * bordeAt; directLight.visible = bordeAt > 0.0;
+		if ( bordeAt > 0.0 ) RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );
+	}`;
+/** Pone el parche de bordes en un material con luces (encadenado al onBeforeCompile que ya tenga). Sin efecto mientras BORDE.on sea false. */
+function conBorde(m) {
+  if (!m || !m.isMeshStandardMaterial || BORDE.mats.has(m)) return; BORDE.mats.add(m);
+  const antes = m.onBeforeCompile, propia = m.customProgramCacheKey !== THREE.Material.prototype.customProgramCacheKey, clave = m.customProgramCacheKey;
+  m.onBeforeCompile = function (sh, r) {
+    antes.call(this, sh, r); if (!BORDE.on) return;
+    Object.assign(sh.uniforms, BORDE.u);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <lights_pars_begin>', '#include <lights_pars_begin>\n' + BORDE_PARS).replace('#include <lights_fragment_maps>', BORDE_FS + '\n#include <lights_fragment_maps>');
+  };
+  m.customProgramCacheKey = function () { return (propia ? clave.call(this) : antes.toString()) + (BORDE.on ? '|borde' : ''); };
+}
+
 const v = new THREE.Vector3(), v2 = new THREE.Vector3();
 export const CAM = Object.fromEntries(CAMERAS.map((c, i) => [c.key, i]));
+/**
+ * Planos propios del juego (el visor no los ve). `medio`: plano americano del pesista que se prepara en el llamado (de las
+ * rodillas para arriba). `caida`: sigue el punto medio entre la cadera y la barra suelta. `manga`: la manga derecha de la
+ * barra de cerca, para el cambio de carga. `punto` (función) reemplaza a los huesos; `dAbs` es la distancia en metros.
+ */
+export const PLANOS = {
+  medio: { key: 'medio', at: ['Neck', 'Hips'], up: -.05, d: 2.05, az: .5, el: .05, fov: 22 },
+  caida: { key: 'caida', at: [], up: 0, dAbs: 4.6, az: .72, el: .14, fov: 30, punto: 'caida' },
+  manga: { key: 'manga', at: [], up: 0, dAbs: 1.45, az: 1.05, el: .2, fov: 30, punto: 'manga' },
+};
 
 export class Escena {
   constructor(canvas, Q, { reduceMotion = false } = {}) {
@@ -149,7 +220,88 @@ export class Escena {
     this.resize(); this.lighting.bake(r, [this.barbell.group, this.trace.group]);
     // después de hornear el entorno (que la ve igual): la arena fija en pocas mallas
     const A = this.arena; this.fijos = juntarFijos(A.group, new Set([A.impostors, A.crowd, A.bokeh, A.flashMesh, ...A.beamMeshes, ...(A.lamps || [])].filter(Boolean)));
+    this.barato = null; this.setBarato(Q.barato);
     new ResizeObserver(() => this.resize()).observe(canvas);
+  }
+  /**
+   * Escena barata por píxel (ver arriba, Q.barato). `B`: {piso, haces, bordes} o null (como el visor). Cambia programas:
+   * solo en la carga (setCalidad) o en el banco, seguido de precalentar o compilar. Lo caro (hornear) se hace una vez.
+   */
+  setBarato(B) {
+    this.barato = B || null; const P = this._barato ||= this._prepararBarato(), A = this.arena, L = this.lighting;
+    const piso = !!(B && B.piso && P.piso), haces = (B && B.haces) || false, bordes = (B && B.bordes) || 'luces';
+    if (P.piso) { const p = P.piso; p.tarima.material = piso ? p.matT : p.origT; p.esc.material = piso ? p.matE : p.origE; p.sombra.visible = piso; }
+    const cortos = haces === 'cortos', ver = haces !== 'no' && !!this.Q.beams;
+    A.beamMeshes.forEach((m, i) => { m.material = cortos ? P.haces[i] : P.hacesOrig[i]; m.geometry = cortos ? P.cono : P.conoOrig; m.visible = ver; });
+    for (const l of [L.rimA, L.rimB, L.hair]) l.visible = bordes === 'luces';
+    const on = bordes === 'material'; if (on !== BORDE.on) { BORDE.on = on; for (const m of BORDE.mats) m.needsUpdate = true; }
+    this.sombra = 4;
+  }
+  /** Materiales que la escena tiene guardados para otro modo de setBarato (fuera de la escena ahora): para que el banco libere sus programas. */
+  get materialesAparte() {
+    const P = this._barato; if (!P) return []; const o = [...P.haces, ...P.hacesOrig];
+    if (P.piso) o.push(...P.piso.origT, ...P.piso.origE, ...P.piso.matT, ...P.piso.matE, P.piso.sombra.material);
+    return [...new Set(o)];
+  }
+  /** Una sola vez: hornea el piso, arma los haces cortos y los uniforms de los bordes. Con los contraluces prendidos. */
+  _prepararBarato() {
+    const A = this.arena, L = this.lighting, rims = [L.rimA, L.rimB, L.hair], vis = rims.map(l => l.visible);
+    rims.forEach(l => { l.visible = true; });
+    BORDE.u ||= {
+      uBordePos: { value: rims.map(l => l.position.clone()) }, uBordeDir: { value: rims.map(l => l.position.clone().sub(l.target.position).normalize()) },
+      uBordeCol: { value: rims.map(l => new THREE.Vector3(l.color.r, l.color.g, l.color.b).multiplyScalar(l.intensity)) }, uBordeCono: { value: rims.map(l => new THREE.Vector2(Math.cos(l.angle), Math.cos(l.angle * (1 - l.penumbra)))) },
+    };
+    this.barbell.group.traverse(o => { if (o.isMesh) [].concat(o.material).forEach(conBorde); });
+    const hacesOrig = A.beamMeshes.map(m => m.material);
+    const haces = hacesOrig.map(o => new THREE.ShaderMaterial({ name: 'haz barato', vertexShader: o.vertexShader, fragmentShader: HAZ_FS, uniforms: { uColor: o.uniforms.uColor, uStrength: o.uniforms.uStrength }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.FrontSide, fog: false }));
+    let piso = null; try { piso = this._hornearPiso(); } catch (e) { console.warn('piso horneado:', e); }
+    rims.forEach((l, i) => { l.visible = vis[i]; });
+    return { hacesOrig, haces, conoOrig: A.beamMeshes[0]?.geometry, cono: conoCorto(), piso };
+  }
+  /**
+   * Luz horneada de la tarima (4 × 4 m) y de la alfombra del escenario (13 × 11 m): se dibuja cada una sola, desde arriba
+   * con una cámara ortográfica que cubre justo su cara de arriba (las UV de esa cara de la caja van igual que la imagen), a
+   * un destino lineal de media precisión: el color de salida del material físico con todas las luces y el entorno, sin
+   * tono ni sombras. En el juego esa cara usa un material sin luces con esa textura. La sombra del pesista y la barra va en
+   * una lámina con ShadowMaterial apenas arriba de la tarima, con la opacidad que sale de hornear el centro con y sin la
+   * clave. Devuelve null si la placa no puede dibujar en media precisión (queda el piso de siempre).
+   */
+  _hornearPiso() {
+    const r = this.renderer, A = this.arena, ext = r.extensions;
+    if (!A.tarima || !A.escenario || !(ext.has('EXT_color_buffer_float') || ext.has('EXT_color_buffer_half_float'))) return null;
+    const ocultos = []; this.scene.traverse(o => { if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.visible) { o.visible = false; ocultos.push(o); } });
+    const aniso = Math.min(this.Q.aniso || 4, r.capabilities.getMaxAnisotropy()), fondo = this.scene.background;
+    const hornear = (malla, ancho, largo, px, y, tipo = THREE.HalfFloatType, x0 = 0, z0 = 0) => {
+      const media = tipo === THREE.HalfFloatType, h = Math.max(1, Math.round(px * largo / ancho));
+      const rt = new THREE.WebGLRenderTarget(px, h, { type: tipo, generateMipmaps: media, minFilter: media ? THREE.LinearMipmapLinearFilter : THREE.NearestFilter, magFilter: media ? THREE.LinearFilter : THREE.NearestFilter, depthBuffer: true });
+      rt.texture.anisotropy = aniso; rt.texture.name = 'luz horneada';
+      const cam = new THREE.OrthographicCamera(-ancho / 2, ancho / 2, largo / 2, -largo / 2, .05, 2); cam.up.set(0, 0, -1); cam.position.set(x0, y + .5, z0); cam.lookAt(x0, y, z0); cam.updateMatrixWorld();
+      malla.visible = true; r.shadowMap.needsUpdate = true;      // la sombra se rehace sin nadie que la proyecte: sale sin sombras
+      r.setRenderTarget(rt); r.render(this.scene, cam); r.setRenderTarget(null); malla.visible = false;
+      return rt;
+    };
+    let res;
+    try {
+      this.scene.background = null;
+      const tT = hornear(A.tarima, 4, 4, this.Q.tex <= 1024 ? 1024 : 2048, 0), tE = hornear(A.escenario, 13, 11, 512, -.1);
+      // opacidad de la sombra: cuánto baja el color de pantalla en el centro de la tarima sin la luz clave
+      let op = .45;
+      if (ext.has('EXT_color_buffer_float')) {
+        const medio = () => { const rt = hornear(A.tarima, 1.2, 1.2, 8, 0, THREE.FloatType), b = new Float32Array(8 * 8 * 4); r.readRenderTargetPixels(rt, 0, 0, 8, 8, b); rt.dispose(); const c = new THREE.Color(); for (let i = 0; i < 64; i++) { c.r += b[i * 4] / 64; c.g += b[i * 4 + 1] / 64; c.b += b[i * 4 + 2] / 64; } return c; };
+        const k = this.lighting.key, I = k.intensity, con = medio(); k.intensity = 0; const sin = medio(); k.intensity = I;
+        const lum = c => .2126 * c.r + .7152 * c.g + .0722 * c.b, a = lum(tonoJS(con)), b = lum(tonoJS(sin));
+        if (a > 1e-4 && Number.isFinite(b)) { this.opacidadCruda = +(1 - b / a).toFixed(3); op = Math.min(.9, Math.max(.1, 1 - b / a)); }
+      }
+      const tarima = A.tarima, esc = A.escenario, origT = tarima.material, origE = esc.material;
+      const basico = (rt, nombre) => new THREE.MeshBasicMaterial({ name: nombre, map: rt.texture });
+      const matT = origT.slice(), matE = origE.slice(); matT[2] = basico(tT, 'tarima horneada'); matE[2] = basico(tE, 'alfombra horneada');
+      const sombra = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), new THREE.ShadowMaterial({ name: 'sombra en la tarima', opacity: op, fog: false, depthWrite: false, toneMapped: false }));
+      sombra.rotation.x = -Math.PI / 2; sombra.position.y = .0015; sombra.receiveShadow = true; sombra.renderOrder = -1; sombra.visible = false; sombra.name = 'sombra en la tarima'; this.scene.add(sombra);
+      res = { tarima, esc, origT, origE, matT, matE, sombra, opacidad: +op.toFixed(3), texturas: [tT, tE] };
+    } finally {
+      this.scene.background = fondo; for (const o of ocultos) o.visible = true; r.shadowMap.needsUpdate = true; this.sombra = 4;
+    }
+    return res;
   }
   _post(Q) {
     const p = this.post = new Post(this.renderer, this.scene, this.rig.camera, Q); p.reduceMotion = this.reduceMotion; p.motionObject = this.barbell.group; p.bokehObject = this.arena.bokeh;
@@ -168,6 +320,7 @@ export class Escena {
   /** Copias de sombra de las piezas de la barra que no la tienen (setLoad arma discos nuevos). */
   _sombraBarra() {
     this.barbell.group.traverse(o => {
+      if (o.isMesh) [].concat(o.material).forEach(conBorde);      // discos nuevos: con el parche de bordes antes de compilarse
       if (!o.isMesh || o.userData.sombra || o.layers.mask === 1 << CAPA_SOMBRA || !o.castShadow) return;
       const p = new THREE.Mesh(copiaDeSombra(o.geometry), SOMBRA_MAT); p.name = 'sombra'; p.layers.set(CAPA_SOMBRA); p.castShadow = true; p.receiveShadow = false; p.frustumCulled = o.frustumCulled;
       o.add(p); o.userData.sombra = p;
@@ -202,7 +355,7 @@ export class Escena {
    * Rehace los pases y puede cambiar los programas de todos los materiales: solo durante la carga, seguido de precalentar().
    */
   setCalidad(Q) {
-    if (Q !== this.Q) { this.Q = Q; this.arena.setQuality(Q); this.lighting.setQuality(Q); this.post.dispose(); this._post(Q); this._sombras(); this.directo = !!Q.directo; this._modo(); }
+    if (Q !== this.Q) { this.Q = Q; this.arena.setQuality(Q); this.lighting.setQuality(Q); this.post.dispose(); this._post(Q); this._sombras(); this.directo = !!Q.directo; this._modo(); this.setBarato(Q.barato); }
     this.tope = Q.maxPixels; this.libre = false; this.resize();
   }
   _sombras() { const L = this.lighting, Q = this.Q; L.key.castShadow = this.sombras && Q.shadow > 0; L.key2.castShadow = this.sombras && Q.shadow2 > 0; }
@@ -221,6 +374,13 @@ export class Escena {
    */
   async precalentar() {
     const r = this.renderer, cam = this.rig.camera, haySombra = this.Q.shadow > 0, antes = this.sombras;
+    // un disco de cada clase y un collarín, a la vista mientras se compila y se dibuja: el cambio de carga animado arma
+    // discos nuevos en medio de la partida y así no crea texturas ni compila nada (las caras se dibujan en un lienzo 2D)
+    const muestra = new THREE.Group(); PLATES.forEach((p, i) => { const d = this.barbell._plate(p); d.position.x = .7 + i * .03; muestra.add(d); }); muestra.add(this.barbell._collar());
+    this.barbell.sides[1].inner.add(muestra);
+    // con el parche de bordes antes de compilarse: three no recompila un material ya compilado si después cambia su
+    // customProgramCacheKey, y los discos que el cambio de carga arme con estos materiales saldrían sin contraluz
+    muestra.traverse(o => { if (o.isMesh) [].concat(o.material).forEach(conBorde); });
     const compilar = con => {
       this.sombras = con; this._sombras(); r.setRenderTarget(this.directo ? null : this.post.sceneRT);
       try { return r.compileAsync(this.scene, cam); } finally { r.setRenderTarget(null); this.sombras = antes; this._sombras(); }
@@ -234,7 +394,7 @@ export class Escena {
       this.trace.setCount(2); this.trace.group.visible = true;
       for (const con of [!antes, antes]) { if (con && !haySombra) continue; this.sombras = con; this._sombras(); r.shadowMap.needsUpdate = true; this._dibujar(0); }
     } finally {
-      at.forEach((a, i) => { a.root.visible = vis[i]; }); this.trace.setCount(0); this.trace.group.visible = traza; this.sombras = antes; this._sombras();
+      at.forEach((a, i) => { a.root.visible = vis[i]; }); this.trace.setCount(0); this.trace.group.visible = traza; this.sombras = antes; this._sombras(); muestra.removeFromParent();
     }
     this.sombra = 4; this.cuadro(0, true);      // el último cuadro dibujado es el de verdad
   }
@@ -242,7 +402,7 @@ export class Escena {
   cargar(id) {
     const mod = PLANTEL[id].modelo;
     return this.cargas[mod] ||= Athlete.load(mod, this.poses[mod], { aniso: Math.min(this.Q.aniso || 4, this.renderer.capabilities.getMaxAnisotropy()), maxTex: this.Q.tex })
-      .then(a => { a.root.visible = false; a.root.traverse(o => { if (o.isMesh && o.castShadow) o.layers.enable(CAPA_SOMBRA); }); this.scene.add(a.root); this.atletas[mod] = a; return a; });
+      .then(a => { a.root.visible = false; a.root.traverse(o => { if (o.isMesh && o.castShadow) o.layers.enable(CAPA_SOMBRA); if (o.isMesh) [].concat(o.material).forEach(conBorde); }); this.scene.add(a.root); this.atletas[mod] = a; return a; });
   }
   /** Pone en escena a un pesista (o a nadie, con null). Marangi comparte la instancia de Brenner con la tela de color plano. */
   async mostrar(id) {
@@ -286,20 +446,91 @@ export class Escena {
     const g = pose.base + pose.s, i = Math.floor(g); a.setPair(i, i + 1, g - i);
     a.barWorld(v); if (pose.primero) this._tl(lev).barFix(pose.tau, v);
     if (v.y < PLATE_R) v.y = PLATE_R;
+    if (this.barbell.group.rotation.x) this.barbell.group.rotation.x = 0;      // venía rodando (barra suelta)
     this.barbell.setPosition(v); this.barY = v.y; this.barZ = v.z; this.rig.barY = v.y; this.rig.barAhead = v.y; this.rig.headY = a.boneWorld('Head', v2).y + .14;
     if (dt > 0 && dt < .1) { const acc = (v.y - 2 * this._py[0] + this._py[1]) / (dt * dt); this.barbell.step(dt, v.y, acc); } else this.barbell.settle(v.y);
     this._py[1] = dt > 0 ? this._py[0] : v.y; this._py[0] = v.y; this.sombra = 3;
   }
+  /**
+   * El pesista en una mezcla de poses del clip (caídas y bajadas, game/caida.js): {i, j, u} la pose de partida, `k` la de
+   * destino con peso `w`, y la raíz corrida `dz`, `dy` (m). No mueve la barra: después del fallo la barra va suelta.
+   */
+  posarMezcla(p) {
+    const a = this.activo; if (!a) return;
+    aplicarEsfuerzo(a, 0, 0, true); a.root.position.z += p.dz || 0; a.root.position.y += p.dy || 0;
+    a.setMix(p.i, p.j, p.u, p.k, p.w); this.rig.headY = a.boneWorld('Head', v2).y + .14; this.sombra = 3;
+  }
+  /**
+   * Barra suelta en {y, z, ang} (m y radianes: rueda sobre su eje). Con `dt` la flexión de la barra sigue la aceleración
+   * del centro (en el aire, los extremos se enderezan; contra la tarima, el golpe la hace vibrar); sin `dt`, quieta.
+   */
+  barraSuelta(b, dt = 0) {
+    v.set(0, b.y, b.z); this.barbell.setPosition(v); this.barbell.group.rotation.x = b.ang || 0;
+    this.barY = b.y; this.barZ = b.z; this.rig.barY = b.y; this.rig.barAhead = b.y;
+    if (dt > 0 && dt < .1) { const acc = (b.y - 2 * this._py[0] + this._py[1]) / (dt * dt); this.barbell.step(dt, b.y, acc); } else this.barbell.settle(b.y);
+    this._py[1] = dt > 0 ? this._py[0] : b.y; this._py[0] = b.y; this.sombra = 3;
+  }
+  /**
+   * Cambio de carga animado, con la barra en la tarima: salen por la manga las piezas que cambian, de la de afuera hacia
+   * adentro (el collarín también, si hay que tocar un disco de adentro); después entran las nuevas, de adentro hacia afuera,
+   * y el collarín cierra. Los dos lados a la vez. No crea geometría, materiales ni texturas: precalentar() dejó un disco de
+   * cada clase hecho. Devuelve null si no cambia nada, o {dur, en(t)} donde en(t) acomoda las piezas y devuelve
+   * {kg: lo que hay cargado en ese instante, llegadas: piezas que ya entraron, salidas: piezas que ya empezaron a salir}.
+   */
+  cambioDeCarga(kg1) {
+    const L0 = loadout(this.kg), L1 = loadout(kg1);
+    const piezas = L => [...L.inner.map(p => p.kg), 'c', ...L.outer.map(p => p.kg)], peso = x => (x === 'c' ? COLLAR_KG : x);
+    const A = piezas(L0), B = piezas(L1); let p = 0; while (p < A.length && p < B.length && A[p] === B[p]) p++;
+    const sale = A.length - p, entra = B.length - p; if (!sale && !entra) return null;
+    const DS = .26, DE = .32, LEJOS = .55, T1 = sale * DS + .1, kg0 = this.kg, kg1r = L1.total;
+    const suave = x => { const t = Math.min(1, Math.max(0, x)); return 1 - (1 - t) * (1 - t); };
+    let viejas = this.barbell.sides.map(sd => sd.load.children.map(o => ({ o, x: o.position.x }))), nuevas = null, t = -1;
+    const en = tt => {
+      if (tt < t) tt = t; t = tt; let kg = kg0, llegadas = 0, salidas = 0;
+      for (let k = 0; k < sale; k++) {
+        const i = A.length - 1 - k, u = (tt - k * DS) / DS; if (u <= 0) continue; salidas++; kg -= 2 * peso(A[i]);
+        if (viejas) for (const lado of viejas) { const q = lado[i]; if (!q) continue; q.o.position.x = q.x + LEJOS * suave(u); q.o.visible = u < 1; }
+      }
+      if (tt >= T1) {
+        if (!nuevas) { this.setCarga(kg1); viejas = null; nuevas = this.barbell.sides.map(sd => sd.load.children.map(o => ({ o, x: o.position.x }))); }
+        kg = kg0 - 2 * A.slice(p).reduce((s, x) => s + peso(x), 0);
+        for (let k = 0; k < entra; k++) {
+          const i = p + k, u = (tt - T1 - k * DE) / DE;
+          for (const lado of nuevas) { const q = lado[i]; if (!q) continue; q.o.visible = u > 0; q.o.position.x = q.x + LEJOS * (1 - suave(u)); }
+          if (u >= 1) { llegadas++; kg += 2 * peso(B[i]); }
+        }
+      }
+      this.sombra = 3; return { kg: tt >= T1 + entra * DE ? kg1r : Math.round(kg), llegadas, salidas };
+    };
+    en(0); return { dur: T1 + entra * DE + .05, en, sale, entra };
+  }
+  /** Altura del centro de la barra apoyada en la tarima con la carga de ahora. */
+  get pisoBarra() { return Math.max(.05, this.barbell.plateR); }
   /** Distancia (m) entre el centro de la barra dibujada y el punto medio de las manos: para la prueba automática. */
   manosBarra() { const a = this.activo; if (!a) return 0; a.midWorld(['LeftHand', 'RightHand'], v2); const b = this.barbell.group.position; return Math.hypot(v2.y - b.y, v2.z - b.z); }
   /** Altura (m) de la barra en una muestra global del clip (para las líneas de ayuda). */
   alturaMuestra(g) { return this.activo?.barPos[g]?.y ?? 0; }
-  camara(clave) { this.plano = null; this.rig.setShot(null); this.rig.cut(CAM[clave] ?? 0); }
-  primerPlano(clave) { const sh = SHOTS.find(s => s.key === clave) || null; this.plano = sh; if (sh) this._apuntar(); this.rig.setShot(sh); }
+  camara(clave) { this.plano = null; this.encuadre = null; this.rig.setShot(null); this.rig.cut(CAM[clave] ?? 0); }
+  /**
+   * Primer plano por clave (SHOTS del visor o PLANOS del juego). `encuadre`: {x, y} fracción del lienzo (desde arriba a la
+   * izquierda) donde tiene que quedar el sujeto, para dejarlo en la parte libre cuando un panel tapa un costado o el pie.
+   */
+  primerPlano(clave, encuadre = null) {
+    const base = PLANOS[clave] || SHOTS.find(s => s.key === clave) || null, h = this.P?.h || 1.75;
+    const dAbs = encuadre?.dAbs || base?.dAbs, sh = base && dAbs ? { ...base, d: dAbs / h } : base;
+    this.plano = sh; this.encuadre = encuadre; this.rig.setShot(sh); if (sh) this._apuntar();      // setShot primero: el corrimiento usa el ángulo del plano
+  }
   _apuntar() {
-    const a = this.activo, sh = this.plano; if (!a || !sh) return;
-    const huesos = sh.at.filter(k => k !== 'Bar'), nb = sh.at.length - huesos.length; a.midWorld(huesos, v2).multiplyScalar(huesos.length);
-    if (nb) v2.add(this.barbell.group.position); this.rig.shotAt.copy(v2.multiplyScalar(1 / sh.at.length)); this.rig.shotAt.y += sh.up * this.P.h;
+    const a = this.activo, sh = this.plano; if (!sh) return;
+    if (sh.punto === 'manga') v2.copy(this.barbell.group.position).add(v.set(.92, .02, 0));
+    else if (sh.punto === 'caida') { if (a) a.boneWorld('Hips', v2); else v2.set(0, 1, 0); v2.lerp(this.barbell.group.position, .5); v2.x = 0; v2.y = Math.max(.85, v2.y); }
+    else { if (!a) return; const huesos = sh.at.filter(k => k !== 'Bar'), nb = sh.at.length - huesos.length; a.midWorld(huesos, v2).multiplyScalar(huesos.length); if (nb) v2.add(this.barbell.group.position); v2.multiplyScalar(1 / sh.at.length); v2.y += sh.up * this.P.h; }
+    const e = this.encuadre;
+    if (e) {      // el blanco de la cámara se corre para que el sujeto quede en (x, y) del lienzo
+      const R = this.rig, vh = 2 * sh.d * R.height * R.zoom * Math.tan(THREE.MathUtils.degToRad(sh.fov) / 2), vw = vh * R.camera.aspect;
+      v2.x += Math.cos(R.az) * (.5 - e.x) * vw; v2.z -= Math.sin(R.az) * (.5 - e.x) * vw; v2.y += (e.y - .5) * vh;
+    }
+    this.rig.shotAt.copy(v2);
   }
   /** Punto de la barra en píxeles CSS del lienzo (para las ayudas pegadas a la barra). `y`: otra altura en metros. */
   pantalla(y = this.barY, x = 0) {

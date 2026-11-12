@@ -262,6 +262,51 @@ Medido (`node tools/play_human.mjs --info`, 2000 intentos por casilla, aperturas
 - **El registro guarda la salida de la capa, no las teclas**, y no se subió la versión de reglas (está atada a `sim.json`). Con servidor: subir versión y separar la tabla por `ctl`.
 - Cuadros por segundo del juego: medidos el 12-nov en el pod, no en la Mac (ver la sección que sigue).
 
+### Emoción: caídas, festejo, carga animada y plano del llamado (12-nov, noche, rama `demo`)
+
+El usuario pidió «emoción (ayudantes cambiándole peso), ver cómo un pesista falla (se cae, se queda, no sube el clean, o el jerk falla, el snatch)». Sin modelos ni animaciones nuevas de Blender: todo con las poses de `poses.json`, la barra procedural y sonido por código. **Nada de esto corre durante el intento**: empieza cuando el núcleo ya dio el resultado. El núcleo, el registro y `tools/sim_ref*.json` no cambiaron.
+
+- **El final del intento** (`web/js/game/caida.js`, `armarFinal()` y `dibujarFinal()` en `main.js`). Según la causa del núcleo y el movimiento, cinco escenas:
+  - `bajo`: tirón sin altura o anticipado, con la barra entre la rodilla y el pecho.
+  - `hombros`: «devuelve la barra», o la flexión del envión que no sale.
+  - `sentado`: cargada perdida (aplastado, la pierde en el fondo, barra adelante). Se queda sentado 0,8 s y suelta la barra adelante.
+  - `arriba`: arranque o envión perdido con la barra por encima de la cabeza. En «barra adelante» la barra sale adelante y la raíz salta 14 cm atrás; en «barra atrás», la barra sale hacia atrás y la raíz da 20 cm adelante.
+  - `bajada`: válido o nulo de jueces. Sostiene la barra arriba (0,7 s en el válido y 0,35 en el nulo) y la deja caer adelante.
+
+  La barra se suelta **antes** de que el cuerpo se mueva. Cae con gravedad, rebota con un coeficiente de 0,32, pierde velocidad horizontal en cada golpe, rueda con resistencia y no sale de la tarima. Usa paso fijo de 1/240 s, así que la repetición la vuelve a calcular igual. El pesista sostiene la pose del final y después se mezcla en línea recta hacia `Parado` con `athlete.setMix()`, una opción nueva de `athlete.js` que el visor no usa. **Estas secuencias son una aproximación hecha en el visor y no pasaron por `check()` de Blender.** No se inventaron rotaciones de huesos: solo hay mezclas entre muestras del clip y un corrimiento de la raíz de hasta 20 cm.
+- **Decisión** (`decision()`): todo va en una sola línea de tiempo que se saltea entera con Espacio, después de 0,6 s (1,2 s si hay línea de fallo).
+  - En un fallo, la cámara sigue la barra con el plano `caida` (`PLANOS` en `stage.js`). Suenan el golpe de goma con el traqueteo de las mangas y el «¡ohhh!» de la tribuna. Las luces rojas se prenden de a una.
+  - En un válido, se prenden las luces blancas de a una mientras sostiene la barra. En la segunda suena la ovación, con aplausos sueltos (más fuerte en los intentos de medalla). Después la deja caer, la cámara la sigue y gira hacia el público.
+- **Repetición**: el levantamiento va a un tercio de la velocidad (antes, un cuarto). Si se perdió, después viene la caída a media velocidad, con el motivo en una línea.
+- **Cambio de carga** (`carga()` y `escena.cambioDeCarga()`): primer plano de la manga con la tarima vacía.
+  - Las piezas que cambian salen deslizando, de afuera hacia adentro. El collarín también sale si hay que tocar un disco de adentro. Después entran las nuevas y el collarín cierra con un golpe metálico.
+  - Los kilos del cartel cambian a medida que salen y entran las piezas.
+  - `precalentar()` deja hecho y dibujado un disco de cada clase, así que la animación no crea texturas ni compila sombreadores en la partida.
+  - **Los ayudantes humanos necesitan modelo y animación propios y quedan para la etapa de arte.** No se simularon con el modelo de un pesista.
+- **Plano del llamado**: el primerísimo plano de la cara se reemplazó por un plano americano (`PLANOS.medio`). La cámara se corre para que el pesista quede en la parte del lienzo que deja libre el panel: a la izquierda en escritorio, arriba en vertical (`encuadreLibre()`).
+- **Ritmo**: el veredicto sale a 1 s del final (antes, más de 2 s después de las luces). El resumen de un rival dura 2,6 s (antes 3,4 s), los avisos de cambio 1,1 s (antes 1,3 s) y «desplazado» 1,8 s (antes 2,2 s). Todo se saltea con Espacio.
+- **Pruebas**:
+  - `tools/caida_test.mjs` (sin navegador): cada causa tiene escena; la barra nunca pasa debajo de la tarima ni sale de ella, queda quieta en menos de 3 s, cada rebote es menor que el anterior y da lo mismo al repetir.
+  - `tools/check_escenas.mjs` (con navegador): arma las 23 escenas en los dos modelos, mide cuadro a cuadro la holgura entre la barra y el cuerpo, prueba la carga animada y el plano del llamado, y deja capturas en `out/escenas/`.
+  - Las dos corren en Actions.
+
+**Medido** (Actions, dibujo por software: run 43265823178 sobre a17032d, y run 43267950535 sobre 3e48a23 con los encuadres más abiertos, los dos en verde):
+
+- `check_escenas`: 46 finales (23 escenas por 2 modelos), cero cuadros BAD.
+  - **Criterio**: el cuerpo se aproxima con cápsulas gruesas (tronco 13 cm, muslo 7,5 cm…). En la pose del final, que es una fase de `poses.json` validada en Blender, la barra apoyada en los hombros o rozando la cadera ya da holgura negativa contra esas cápsulas: hasta −2,4 cm en el rack de la cargada. Por eso un cuadro es BAD si la barra atraviesa un segmento **más** de lo que lo atravesaba en esa pose, con 5 mm de margen.
+  - La primera corrida, con el criterio de «holgura negativa a secas», marcó 13 cuadros: todos en el primer o segundo cuadro después de soltar, con la barra todavía en la pose validada.
+  - Después de soltar, la holgura mínima es de 4,3 cm (los antebrazos en la bajada del válido, 0,25 s después de soltar). En las caídas desde arriba va de 6 a 40 cm.
+- Capturas miradas: arranque con barra adelante, barra atrás en tijera, cargada aplastado, envión devuelto, tirón sin altura, válidos, carga 140 → 151 y plano del llamado a 1745 × 845 y a 390 × 844. La barra cae adelante y lejos de las rodillas, y el pesista queda de pie detrás.
+- Carga: 140 → 143 entra un disco por lado (0,5 s). 140 → 151 salen 3 piezas y entran 4 (2,2 s). 151 → 146 salen 2 y entra 1 (1,0 s). Los kilos terminan en el número pedido.
+- `check_game`, `check_fluidez --tutorial` y las capturas de partida: en verde con las esperas nuevas.
+
+**Lo que no está hecho o no se midió:**
+
+- **No se miró en movimiento ni en una placa**: solo cuadros sueltos por software y números. Falta ver en la Mac si la mezcla lineal hacia `Parado` se ve como pararse o como un «morph» (las piernas pasan en línea recta de la sentadilla a de pie), si el salto de la raíz se lee como salto o como patinar, y cómo suena todo. No se midió ningún cuadro por segundo de estas escenas. Son posteriores al intento, pero dibujan con la sombra al día en cada cuadro.
+- **No hay reacción del pesista** (festejo, lamento, «se cae» de espaldas): no hay poses para eso en `poses.json`. Después de soltar, siempre vuelve a `Parado`. Va con la pista de arte (JUEGO.md, sección 10), igual que los ayudantes.
+- La mezcla toma la pose del último cuadro dibujado. En un fallo en medio de la pelea, la repetición pasa de un salto del final del levantamiento a la caída.
+- Las holguras se miden con cápsulas sobre los huesos, no con las mallas. Una mano o un antebrazo puede rozar la barra en el primer cuarto de segundo después de soltar sin que la prueba lo vea (los brazos se miden desde 0,25 s).
+
 ### Jugabilidad y entrada en Fácil: entrada tolerante (12-nov, tarde, rama `demo`)
 
 El usuario jugó tres veces y dijo: «difícil de acertar el momento donde tocar», «a veces no agarra bien el space, entonces toco mucho space y no levanta, es raro». El orquestador midió en su Mac que, tras ¡RECIBÍ!, 12 toques seguidos se descartaron por «espera» antes de que apareciera ¡EMPUJÁ! y el levantamiento se perdió. El objetivo de esta vuelta: que el que juega por primera vez, toca con poca precisión o machaca Espacio levante las aperturas, y que tocar bien se premie con más kilos posibles. Especificación al día en [docs/CONTROLES.md](docs/CONTROLES.md) (secciones 1.1, 2, 3, 4, 5 y 9).
@@ -287,6 +332,7 @@ El usuario jugó tres veces y dijo: «difícil de acertar el momento donde tocar
 
 - En el medio: machacador 37 a 95 % al 95 % y 1 a 51 % al 97 %; casual 98 a 100 % y 84 a 96 %. El distraído con un solo toque en ¡EMPUJÁ! cae a 0 % desde el 95 % (si toca 3 por segundo, 86 a 95 % en aperturas).
 - `sim_test` y `play_human` en verde en la Mac (sin navegador). Clásico, casual y flojo: 22,6 y 26,4 % en arranque, iguales que antes.
+- **Actions**: la primera corrida (run 43255069855) falló en `check_game`: la línea del arranque sin explosión decía «Tocaste ¡EXPLOTÁ! tarde» porque el toque con que la prueba saltea el veredicto (a más de 500 ms del final) contaba como toque tardío. Ahora solo cuenta como tardío un toque descartado en los 400 ms después del final (`decision()` en `main.js`). Con eso, run 43257731276 en verde: `check_game` (teclado 152✓ 157✓ 160✗ a propósito con «No tocaste ¡EXPLOTÁ!», 190✓ 195✓ 198✓; táctil 6 de 6; «lento» válido), `check_fluidez --tutorial` (80 Espacio enviados y recibidos, 42 aceptados y 12 descartados con motivo dentro del intento: 4 espera, 4 rebote, 4 sobra) y el banco (run 43257731004). En las capturas por software la franja se ve como un anillo dorado alrededor del aro; la cuenta no salió en ninguna (las fotos se sacan cerca del cierre).
 
 **Lo que no está medido o no cumple:**
 
@@ -476,6 +522,59 @@ Actions, por software (SwiftShader; los tiempos no valen, cuentan las llamadas y
 - **«Programas» no vuelve exactamente al valor del principio**: los de los materiales de la escena sí, pero quedan los internos de la pasada de sombra de three (unos 28 por software). No se usan.
 - **El primerísimo plano de la cara** en el panel del llamado propio (`escena.primerPlano('cara')` en `main.js`) no se tocó: no es de esta parte.
 
+### Fluidez, cuarta vuelta: control de la máquina, gobernador que sube y escena barata por píxel (12-nov, rama `fluidez2`)
+
+**Punto de partida: la segunda corrida del banco en la Mac del usuario** (M1 Pro, 75,08 Hz, 13,32 ms, ventana 1745 × 845, densidad 1,1, 1,78 MP; iCloud Drive subiendo 1,3 GB durante la corrida):
+
+- «Baja completa» a 1 MP: mediana 10,6 ms, mínimo 6,2 ms (antes 14,5): el camino directo sirvió. Fijo 5,95 ms, 4,3 ms por MP.
+- El costo de la misma escena se duplicó durante la corrida (12,6 → 25,2 ms a 1 MP).
+- La búsqueda con pantalla, hecha al final, perdió medio cuadro (26,7 ms) casi igual a 1,7, 1,0, 0,6 y 0,37 MP con 1 ms de hilo principal; recién a 0,22 MP dio 13,9. No escala con la resolución: no es costo por píxel del juego.
+- Ahorros a 1 MP: sin arena 38 % (casi todo por píxel), sin haces 25 % (3,55 ms/MP), sin pesista 20 %, solo clave y sala 18 %, barra 13 %, piso difuso 12 %, contraluces 12 % (estable), sombras 11 %; público, bruma, normales de detalle y pelo cerca de 0. Malla completa del pesista: 12 % más cara. Anisotropía 1: 7 % **más** cara (raro, ver abajo).
+
+**1. Banco v3** (`web/js/game/banco.js`, `tools/banco.mjs`; `BANCO.version` 3, límite 125 s):
+
+- **Control de la máquina**: el mismo lienzo, a la resolución de la pantalla, con cuadros de verdad y sin dibujar nada (solo se limpia), 40 cuadros. Si pierde dos refrescos o más, la máquina o el compositor no dan. Va en `BANCO.tandas[i].controlAntes` y `controlDespues`.
+- **Tandas con la pantalla al principio, en el medio y al final** (antes era una sola búsqueda, al final): control, búsqueda de «Baja completa» (hasta 4 sondas, empezando por lo que sostuvo la tanda anterior) y control otra vez. La del medio va entre dos vueltas de variantes. En la fila de «Baja completa», `mpReal` y `mpFalla` son la mediana de las tres; cada una está en `BANCO.tandas`.
+- **Arriba de la tabla, en lenguaje llano** (`BANCO.resultado`): «Calidad que elegiría el juego en esta máquina: Baja a X MP, con Z % de margen (un cuadro de A ms en 13,32)», con la misma `decidirCalidad` de la calibración sobre las rectas medidas (mediana de las vueltas, y otra vez con la medida más limpia). Debajo, lo que sostuvo cada tanda con la pantalla. Si algún control perdió refrescos, primero, en rojo: «Esta máquina pierde cuadros aun sin dibujar nada: cerrá otras apps…».
+- **Variantes**: nuevas `antes` (la Baja de antes de esta vuelta: piso con luces, haces y contraluces como luces), `antesPiso`, `antesHaces`, `antesBordes` (cada parte por separado; su «ahorro» negativo es lo que ahorra esa parte) y `anisoIgual` (control de `aniso`). Ya no corren por defecto las que dieron cerca de cero o eran comprobación (`sombra1024`, `publico`, `velos`, `segundo`, `detalle`, `pelo`): `?variantes=todas` las agrega. `contraluces` y `luces` apagan también el término de borde del material. `piso` ahora es «lo que queda de la arena con luces, con material difuso».
+- **Fotos**: `juego.html?banco=1&fotos=1` y `node tools/banco.mjs --fotos=dir`: Baja como era antes de esta vuelta, como es ahora y ahora con los haces de antes, con seis cámaras del juego (`3/4`, `lado`, `rev`, `baja`, `jib` y el primer plano `arriba`), el mismo cuadro del arranque con 140 kg. El flujo «Banco y calibración» las sube en `banco-out` (`banco/fotos/*.png`).
+
+**2. Gobernador que no baja por carga ajena y vuelve a subir** (`Gobernador` en `perf.js`; en `main.js` solo `subir()` y la línea que aplica el pedido):
+
+- Baja como antes (dos ventanas malas de cuatro, o una que pierde la quinta parte). Si después de bajar se pierde más de dos tercios de lo de antes, baja otro escalón hasta que la racha sume tres (`ESCALAR`, 39 % menos de píxeles); si con eso tampoco cambia, **los píxeles no eran el problema**: pide deshacer la racha entera y no baja más (`ajena`) hasta que pasen 60 s o haya 3 s limpios seguidos. (Revisión: con un solo escalón, un costo propio que necesitaba dos escalones y perdía poco se tomaba por carga ajena para siempre: bajaba y deshacía cada 65 s sin arreglar nada. Lo reprodujo `perf_test` y ahora lo cubre.)
+- Una subida pendiente (esperando que termine un intento) se cancela si mientras tanto se pierden refrescos. Al terminar la calibración el gobernador vuelve al nivel 0 (`calibrado()`): lo que haya hecho en el menú no cuenta.
+- **Sube** de a un escalón después de 5 s sin perder un solo refresco (hilo principal bajo el 80 %) mientras esté por debajo de lo que dejó la calibración, y después de 20 s por encima (hasta la resolución de la pantalla). Primero vuelven las sombras si se habían apagado. Si una subida pierde refrescos en los 15 s siguientes, se deshace y la espera se duplica (hasta 120 s).
+- Igual que antes: nada cambia con un intento en curso ni en la repetición, y nada se recompila. `JUEGO.calidad.gobernador` dice el nivel (escalones debajo de la calibración), si sospecha carga ajena, las esperas y los últimos cambios con su motivo; cada subida queda en `JUEGO.calidad.cambios` con `sube: true` y `motivo`.
+- `perf_test` lo prueba en partidas simuladas: carga ajena de 40 s que pierde lo mismo a cualquier resolución (baja una racha de tres escalones como mucho, la deshace entera y termina en la resolución de la calibración o más), costo propio de dos y tres escalones que pierde poco (llega abajo y no lo toma por carga ajena), subida pendiente cancelada, costo propio (baja hasta donde entra y las subidas que no aguantan se espacian 5, 10, 20, 40 s), y una escena que se alivia a los 30 s (vuelve a subir hasta la calibración).
+
+**3. Escena barata por píxel en Baja y Móvil** (`Q.barato` en `PRESET`, `Escena.setBarato()` en `stage.js`; el visor no cambia: `arena.js` solo expone `tarima` y `escenario`):
+
+- **Piso con la luz horneada**: al construir la escena, la tarima (1024 × 1024) y la alfombra del escenario (512 × 433) se dibujan solas desde arriba, con una cámara ortográfica que cubre su cara de arriba, a un destino lineal de media precisión: el color de salida del material físico con las ocho luces y el entorno, sin tono, sin niebla y sin sombras. En el juego esas caras usan un `MeshBasicMaterial` con esa textura (sin ninguna luz). La sombra del pesista y la barra va en una lámina `ShadowMaterial` apenas arriba de la tarima; su opacidad sale de hornear el centro con y sin la clave y pasarlo por el tono, con un mínimo de 0,1. En Actions la cuenta dio 0,019 (la clave cambia poco el color de pantalla de una tarima tan iluminada, por la compresión del AgX), menos de lo que se ve en la foto de antes; quedó el mínimo, 0,1, y recortadas lado a lado (cenital y 3/4) la sombra de antes y la de ahora se ven igual. Pendiente: medirla contra una foto sin pesista en vez de a ojo. Lo que cambia: el brillo especular que depende de la vista (la alfombra de rugosidad 0,93 tenía un reflejo de color hacia el fondo en las cámaras rasantes) y el relieve fino de la alfombra. Si la placa no puede dibujar en media precisión queda el piso de siempre.
+- **Sin haces**: en el camino directo el tono se aplica a cada capa que se suma, y el tono del juego deja en **negro** todo lo que vale menos de 0,0158 (tonoJS); los haces valen 0,035 a 0,05 en el foco y menos hacia abajo. En las fotos del banco en Actions (run 43264193551), la imagen con los haces de antes y sin ellos dio una diferencia media de 0,00 en las seis cámaras (como mucho 6 niveles sobre 255 en unos pocos píxeles de la cámara 3/4). O sea: desde el camino directo (tercera vuelta) los haces ya no se veían en Baja, y costaban un cuarto del cuadro en la Mac. `haces: 'cortos'` queda armado (una cara con el brillo de las dos, cortados al 56 % donde dejan de verse, en colores de pantalla con `CURVA_HAZ`, que sigue a tonoJS con error menor a 0,03) por si se los quiere volver a ver con otra curva.
+- **Contraluces como término del material**: los tres contraluces salen de la escena (todos los materiales con luces dejan de evaluarlos) y en el pesista y la barra se suman con la misma cuenta de un foco de three sin sombra (posición, cono y penumbra, `RE_Direct`), encadenado al `onBeforeCompile` que ya tuvieran. En el pesista y la barra la imagen no cambia (diferencia cero en las fotos); los jueces, la magnesiera, el truss y los bordes de la tarima pierden el contraluz (más oscuros, se nota en el juez de la izquierda en la cámara lateral). (Revisión, al rebasar sobre el cambio de carga animado de `demo`: los discos de muestra que `precalentar()` compila llevan el parche antes de compilarse; three no recompila un material ya compilado si después cambia su `customProgramCacheKey`, y los discos nuevos de clases que no estaban en la carga inicial habrían salido sin contraluz.)
+- Comparación en Actions (por software, run 43262317209; `banco/fotos`): diferencia media entre antes y ahora de 1 a 4 niveles sobre 255 según la cámara (3/4: 2,4; lateral: 2,7; reversa: 2,9; frontal: 1,0; cenital: 4,0; primer plano: 1,2), ahora apenas más oscuro (1 a 2 niveles de luminancia). Las capturas de la partida (`pruebas-out`, `capturas/`) se ven igual que las de la corrida 43250745124.
+
+**4. El caso raro de la anisotropía.** No encontré un error en la variante: la textura se cambia en la placa y se restituye igual, y three no pierde la cuenta de lo que tiene enlazado. Ahora la variante restituye a mano la textura enlazada en la unidad activa y dice cuántas texturas tocó. Hay dos sospechas que el banco nuevo separa: (a) la posición: `aniso` era la última de la vuelta, justo después de `piso`, que compila y suelta materiales (ANGLE en Metal libera programas de forma diferida y eso puede caer en la medida de al lado); ahora va tercera, después de dos variantes que no compilan; (b) el mecanismo: `anisoIgual` hace exactamente lo mismo (texParameter sobre las mismas texturas) sin cambiar el valor. Si `anisoIgual` también sale más cara, el costo es del cambio de estado en ANGLE y no del filtrado; si `aniso` sale cerca de cero, era la posición; si `aniso` sigue 7 % más cara y `anisoIgual` en cero, el filtro isotrópico de verdad cuesta más en la M1 (y la anisotropía 4 queda).
+
+**Qué tiene que mirar el orquestador en el Chrome del usuario** (pestaña a la vista, unos 2 minutos sin tocar nada, la máquina como la usa siempre, con la app de Claude abierta):
+
+1. `juego.html?banco=1`, y al terminar «Copiar el JSON». Arriba de todo: si aparece la franja roja del control, la máquina pierde cuadros sin dibujar nada; anotar en cuál tanda (`BANCO.tandas[i].controlAntes.perdidos`). Después, la línea verde: la calidad, los MP y el margen que elegiría el juego.
+2. «Baja completa»: `ms1MPmin` (la medida más limpia). **Meta de esta vuelta: 6 ms o menos a 1 MP** (antes 6,2 de mínimo y 10,6 de mediana), para que la resolución nativa (1,78 MP) entre en el 85 % de 13,3 ms con margen aun con algo de carga.
+3. Variantes `antes`, `antesPiso`, `antesHaces`, `antesBordes`: su «ahorro» negativo es lo que ahorra cada parte en la M1. `aniso` y `anisoIgual` para cerrar el caso raro.
+4. Las tres tandas (`BANCO.tandas`): `mpReal` de cada una y si el control perdió al lado. Si la búsqueda pierde a todas las resoluciones y el control también, es la máquina.
+5. Una partida en `juego.html?depura=1`, mirando `JUEGO.calidad.gobernador` y `JUEGO.calidad.cambios`: con otra app cargando la placa tiene que bajar una racha de tres escalones como mucho (unos segundos), deshacerla («carga ajena») y volver a subir cuando la máquina se libera. **Mirar la imagen**: el piso, la sombra en la tarima y los contraluces del pesista tienen que verse como antes.
+
+**Cómo se probó.** Sin navegador en esta máquina: `node tools/perf_test.mjs` (71 comprobaciones; gobernador en partidas simuladas, banco v3 simulado con deriva, ruido y una máquina que pierde cuadros sin dibujar: el control lo detecta y la tabla lo pone primero; la curva de los haces contra tonoJS; el cono corto) y `node tools/sim_test.mjs`: verdes. Actions, por software (los tiempos no valen; cuentan que corra entero, las llamadas y las fotos): «Banco y calibración» en verde (runs 43260047059, 43262317209 y 43264193551: 4 calidades, 16 variantes en dos vueltas, tres tandas con los controles en 0 de 40, fotos). Llamadas de dibujo de «Baja completa»: 171 (antes 182: doce haces menos y una lámina de sombra más). Programas: 101 al empezar y 134 al terminar, todos internos de la pasada de sombra de three; `programasSobrantes` en 0 en las 16 variantes. «Pruebas del juego»: la primera corrida de la rama (43260054351) cayó en `check_game` por la línea del toque tardío, que venía de la base (`demo` también estaba en rojo ahí); con `demo` mezclada, 43262310275 y 43265558237 (último commit) en verde; «Banco y calibración» sobre el último commit: 43265565087, verde.
+
+**Lo que no está medido o no cumple:**
+
+- **Nada de esto se midió en una placa.** La meta de 6 ms a 1 MP es para el banco del punto anterior. Por software, el costo de las variantes no dice nada.
+- **Las sondas con pantalla por software no dan cuadros** (cada cuadro tarda más de un segundo): en Actions las tandas solo prueban que el código corre; el control sí (0 perdidos de 40).
+- **El especular del piso** queda fijo (horneado desde arriba): con cámaras rasantes, la alfombra pierde un reflejo de color hacia el fondo. A simple vista no se nota en las cámaras del juego; en la cenital sí, apenas.
+- **Los haces no se ven en Baja desde la tercera vuelta** (camino directo). En Media y Alta, con post, sí. Si se los quiere de vuelta en Baja hace falta otra curva para lo que se suma (que tenga en cuenta el fondo), y entonces vuelven a costar.
+- **La opacidad de la sombra en la tarima** se calcula al cargar con una lectura de un destino de 8 × 8 en coma flotante, pero hoy manda el mínimo (0,1; ver arriba). Sin `EXT_color_buffer_float` queda 0,45 (no se probó en una placa así: ahí la sombra saldría más marcada que antes).
+- **El gobernador puede probar subir** por encima de la calibración: en una máquina justa eso son unos segundos de cuadros perdidos cada vez más espaciados (20, 40, 80, 120 s). Si molesta, `SUBIR_ARRIBA_MS` más alto.
+
 ### Pruebas en GitHub Actions (12-nov, rama `demo`)
 
 Ya no hay pod ni máquina con navegador para las pruebas: corren en GitHub Actions (`.github/workflows/pruebas.yml`, repo público, `ubuntu-latest`, Node 22, Chrome 156 del runner) en cada push a `demo`. Pasos: `sim_test`, `play_human`, `check_game` y `check_fluidez --tutorial`; cada uno corre aunque falle el anterior. Unos 12 minutos.
@@ -512,8 +611,8 @@ gh workflow run pruebas.yml -R jvidelac1/tarima --ref demo           # a pedido
 - **Interrupciones** (pestaña oculta, toque cancelado): los contactos se levantan y nada más. No está la política de repetir el intento. La pausa (Esc o el botón «II») existe solo fuera del intento propio.
 - **Calentamiento**: en Fácil, el tutorial guiado (sin reloj; reemplaza al metrónomo, con corrección de atraso de 0 ms en teclado y 40 ms en táctil). En Clásico, metrónomo y tres prácticas (dos livianas y una pesada con exigencia de 98 %); la práctica pesada no fuerza la traba de codos y las prácticas llevan un reloj de 25 s para que nadie quede trabado.
 - **Envión que viene elegido**: en Fácil, la tijera para los tres (con el squat de Ventura el bot flojo baja de 74 % a 62 %); en Clásico, el primero de la ficha.
-- **Sin retratos en el podio**: el podio 2D usa bandera y nombre para los tres. El primer plano de cara del llamado se usa con Ventura y Brenner, no con Marangi (comparte la cara de Brenner).
-- **Cambio de carga**: corte a la cenital con cartel; los discos no se deslizan.
+- **Sin retratos en el podio**: el podio 2D usa bandera y nombre para los tres. El llamado ya no usa el primer plano de cara (desde el 12-nov, plano americano para los tres).
+- **Cambio de carga**: desde el 12-nov, primer plano de la manga con los discos deslizándose y la tarima vacía; sin ayudantes (etapa de arte).
 - **Tope de 30 cuadros fuera del intento propio e imagen congelada detrás de los paneles**: hechos. El escalón «móvil» existe (`game/perf.js`) y es el que se elige con puntero táctil; **sin medir**.
 - El tablero 3D de la arena sigue diciendo «TARIMA OPEN» (sale de `config.js`, que no se toca); la gráfica del juego dice «Mundial Tarima 2026».
 
@@ -545,7 +644,7 @@ Porcentaje de válidos · meta. Jugadores simulados con error típico de 25, 40 
 - Extraer `stage.js` del visor y verificarlo con GPU; política de interrupciones; simular el resto de la final cuando el jugador queda sin marca.
 - Códigos de país: ARX y NVK siguen en la gráfica y en las mallas hasta la etapa 3; Pelagia usa PEL. Búsqueda uno por uno antes de publicar (JUEGO.md, sección 6.1).
 - Marangi es el modelo de Brenner con la tela de color plano (`#7a1626`). **No se revisó en captura si el relieve de «BRENNER» se lee**: mirarlo con GPU; si se lee, limitarlo a planos laterales.
-- Todo lo de la etapa 4 (fallos, festejos, ayudantes y bajadas animados) hoy es corte y texto, como define la sección 11.2.
+- Etapa 4: fallos y bajadas tienen desde el 12-nov una aproximación en el visor (barra que cae, pesista que vuelve a `Parado`; ver «Emoción»). Siguen faltando las reacciones del pesista (festejo, lamento) y los ayudantes, que necesitan animaciones y modelo nuevos. Mirar en la Mac si la mezcla lineal hacia `Parado` se ve bien.
 
 ## Contratos entre Blender y el visor
 
