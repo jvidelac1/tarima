@@ -268,7 +268,7 @@ export default {
   'explica.atras.gen': 'Tocaste {verbo} tarde y la barra se fue atrás. {T} apenas el círculo llega al aro.',
   'explica.fondo.temprano': 'Tocaste ¡ATRÁPALA! antes de tiempo. Un toque por señal: espera el círculo.',
   'explica.fondo.tardio': 'Tocaste ¡ATRÁPALA! tarde: la barra ya se había caído. {T} {cuando}, no después.',
-  'explica.fondo': 'No atrapaste la barra. {T} ¡ATRÁPALA! {cuando}.',
+  'explica.fondo': 'No atrapaste la barra. En ¡ATRÁPALA!, {t} {cuando}.',
   'explica.empuje.sin_toques': 'Estaba pesada y no empujaste. En ¡EMPUJA!, {t} rápido muchas veces.',
   'explica.empuje.destiempo': 'Tocaste {verbo} {cuanto} y la barra quedó más pesada: no alcanzó el empuje. {T} {cuando}.',
   'explica.empuje.ritmo': 'Los toques venían bien: faltó empuje. En ¡EMPUJA!, {t} más rápido.',

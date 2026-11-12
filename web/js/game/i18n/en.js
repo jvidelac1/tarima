@@ -258,7 +258,7 @@ export default {
   'explica.atras.gen': 'You hit {verbo} late and the bar drifted back. {T} as soon as the circle hits the ring.',
   'explica.fondo.temprano': 'You hit CATCH! too soon. One tap per signal: wait for the circle.',
   'explica.fondo.tardio': 'You hit CATCH! late: the bar had already dropped. {T} {cuando}, not after.',
-  'explica.fondo': "You didn't catch the bar. {T} CATCH! {cuando}.",
+  'explica.fondo': "You didn't catch the bar. On CATCH!, {t} {cuando}.",
   'explica.empuje.sin_toques': "It was heavy and you didn't push. On PUSH!, {t} fast, many times.",
   'explica.empuje.destiempo': 'You hit {verbo} {cuanto} and the bar got heavier: not enough push. {T} {cuando}.',
   'explica.empuje.ritmo': 'Your taps were good: you needed more push. On PUSH!, {t} faster.',

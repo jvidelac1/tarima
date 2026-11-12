@@ -66,7 +66,7 @@ function ledWallCanvas(w, h) {
       const x = sx ? w * .975 : w * .025; g.textAlign = sx ? 'right' : 'left';
       g.fillStyle = sx ? 'rgba(20,10,8,.55)' : 'rgba(6,10,30,.55)'; g.fillRect(sx ? w * .71 : 0, h * .07, w * .29, h * .38);
       g.font = `800 ${h * .2}px ${DISPLAY}`; g.fillStyle = '#f6f3ea'; g.fillText(EVENT.title, x, h * .2);
-      g.font = `700 ${h * .075}px ${DISPLAY}`; g.fillStyle = sx ? '#ffd23f' : '#6ff0e2'; g.fillText(sx ? `${EVENT.session.toUpperCase()} · ${EVENT.year}` : 'HALTEROFILIA', x, h * .37);
+      g.font = `700 ${h * .075}px ${DISPLAY}`; g.fillStyle = sx ? '#ffd23f' : '#6ff0e2'; g.fillText(sx ? EVENT.session.toUpperCase() : 'HALTEROFILIA', x, h * .37);      // sin año: el evento es ficticio y no lleva fecha
       drawLogo(g, sx ? w * .87 : w * .13, h * .68, h * .15, sx ? 'rgba(255,214,120,.85)' : 'rgba(150,235,255,.85)');
     }
     g.fillStyle = 'rgba(255,210,63,.9)'; g.fillRect(0, h * .925, w, h * .012); g.fillStyle = 'rgba(246,243,234,.75)'; g.fillRect(0, h * .95, w, h * .006);
@@ -76,7 +76,7 @@ function ledWallCanvas(w, h) {
 function bannerCanvas(w, h) {
   return makeCanvas(w, h, g => {
     g.fillStyle = '#161a2c'; g.fillRect(0, 0, w, h); g.textBaseline = 'middle'; g.textAlign = 'center';
-    for (let i = 0; i < 4; i++) { const cx = w * (i + .5) / 4; drawLogo(g, cx - w * .085, h / 2, h * .26, '#35e6d6'); g.font = `800 ${h * .56}px ${DISPLAY}`; g.fillStyle = '#fff'; g.fillText(`${EVENT.title} ${EVENT.year}`, cx + w * .02, h * .54); }
+    for (let i = 0; i < 4; i++) { const cx = w * (i + .5) / 4; drawLogo(g, cx - w * .085, h / 2, h * .26, '#35e6d6'); g.font = `800 ${h * .56}px ${DISPLAY}`; g.fillStyle = '#fff'; g.fillText(EVENT.title, cx + w * .02, h * .54); }
     g.fillStyle = '#ffd23f'; g.fillRect(0, 0, w, h * .06); g.fillRect(0, h * .94, w, h * .06);
   });
 }
