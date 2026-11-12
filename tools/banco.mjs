@@ -77,6 +77,7 @@ try {
     for (const v of k.verificacion || []) console.log(`  verificación a ${v.mp} MP: ${v.cuadros} cuadros, ${v.perdidos} refrescos perdidos, mediana ${v.p50} ms, máximo ${v.max} ms`);
     console.log(`  cambios anotados: ${c.cambios.length ? c.cambios.map(x => `${x.de} → ${x.a} (${x.ms} ms, ${x.pantalla})`).join(' · ') : 'ninguno'}`);
     if (k.error) problemas.push('la calibración falló: ' + k.error.split('\n')[0]);
+    if (k.gl) problemas.push('WebGL dio un error durante la carga o la calibración: 0x' + k.gl.toString(16));
     if (!k.pruebas || !k.pruebas.length) problemas.push('la calibración no midió ninguna calidad');
     for (const e of o.erroresJuego.slice(0, 5)) problemas.push('juego: ' + e.split('\n')[0]);
   }

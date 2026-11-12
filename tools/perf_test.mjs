@@ -87,7 +87,7 @@ if (!process.argv.includes('--sin-banco')) {
   grupo.add(new THREE.Mesh(new THREE.BoxGeometry(), [new THREE.MeshStandardMaterial(), new THREE.MeshBasicMaterial()]), new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial({ map: new THREE.Texture() })), new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.MeshBasicMaterial({ map: hazeTex })));
   const pelo = new THREE.Mesh(new THREE.BoxGeometry(), Object.assign(new THREE.MeshStandardMaterial(), { name: 'Hair' }));
   const uno = { root: new THREE.Group(), meshes: [pelo], hairDepth: new THREE.Mesh() }, otro = { root: new THREE.Group(), meshes: [] }; scene.add(uno.root, otro.root);
-  const gl = { getExtension: () => null, getParameter: () => 'simulada', TEXTURE_2D: 1, texParameterf() {} }, final0 = {};
+  const gl = { getExtension: () => null, getParameter: () => "simulada", getError: () => 0, TEXTURE_2D: 1, texParameterf() {} }, final0 = {};
   const E = {
     Q: null, canvas: { clientWidth: 1745, clientHeight: 845 }, vertical: false, lodFijo: null, directo: false, sombra: 0, scene, lighting: L, barbell: { group: new THREE.Group() }, rig: { camera: new THREE.PerspectiveCamera() }, atletas: { uno, otro }, activo: null,
     arena: { group: grupo, hazeTex, impostors: new THREE.Group(), crowd: new THREE.Group(), beamMeshes: [new THREE.Mesh()], bokeh: new THREE.Group(), flashMesh: new THREE.Group() },

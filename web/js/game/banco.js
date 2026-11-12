@@ -44,6 +44,7 @@ export const COLUMNAS = {
   triangulos: 'Triángulos de un cuadro (incluye la pasada de sombra).',
   mallasEsqueleto: 'Mallas con esqueleto que de verdad se dibujan (las de un modelo oculto no cuentan).',
   programas: 'Programas de sombreado compilados en ese momento.',
+  errorGL: 'Si aparece: WebGL dio un error mientras se medía esa variante (código en hexadecimal). Ese número no vale.',
   msaa: 'Muestras de MSAA del destino de la escena durante la medida (el banco no las baja a 2 con densidad alta, como sí hace el juego).',
 };
 
@@ -117,6 +118,8 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
     }
     return { mpReal: lo, mpFalla: hi, sondas };
   };
+  /** Vacía la cola de errores de WebGL y devuelve el último como texto (null si no había). Un error acá es un defecto del banco o de la escena. */
+  const errorGL = () => { let e, ult = 0, k = 0; while ((e = gl.getError()) && k++ < 16) ult = e; return ult ? '0x' + ult.toString(16) : null; };
   const ocultar = objs => { const o = objs.filter(Boolean), antes = o.map(x => x.visible); o.forEach(x => { x.visible = false; }); return () => o.forEach((x, i) => { x.visible = antes[i]; }); };
 
   // ---------- variantes ----------
@@ -154,7 +157,8 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
       { id: 'luces', nombre: 'solo la clave y la luz de sala (seis luces menos)', compila: true, poner: () => ocultar([L.key2, L.stage, L.wash, L.rimA, L.rimB, L.hair]) },
       { id: 'final', nombre: 'pase final sin tono ni corrección de color (copia)', poner: () => { const p = escena.post, o = p.finalMat; p.finalMat = copia; return () => { p.finalMat = o; }; } },
       { id: 'msaa2', nombre: 'MSAA de 2 muestras', poner: () => { msaa = 2; return () => { msaa = null; }; } },
-      { id: 'msaa0', nombre: 'sin MSAA', poner: () => { msaa = 0; return () => { msaa = null; }; } },
+      // sin MSAA la escena se dibuja en el mismo destino cuya profundidad tienen enlazada los puntos de luz: se sacan para no formar un lazo
+      { id: 'msaa0', nombre: 'sin MSAA (y sin puntos de luz)', poner: () => { msaa = 0; const ver = ocultar([A.bokeh]); return () => { msaa = null; ver(); }; } },
       { id: 'directo', nombre: 'directo al lienzo (sin destino HDR, MSAA ni pase final)', compila: true, poner: () => { escena.directo = true; return () => { escena.directo = false; }; } },
       { id: 'segundo', nombre: 'sin el segundo modelo en la escena (ya está oculto)', poner: () => { const otros = Object.values(escena.atletas).filter(a => a !== escena.activo); otros.forEach(a => escena.scene.remove(a.root)); return () => otros.forEach(a => escena.scene.add(a.root)); } },
       { id: 'pesista', nombre: 'sin pesista', poner: () => ocultar([escena.activo.root]) },
@@ -182,7 +186,7 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
   const medir = async (def, clave, base) => {
     const v = { id: base ? `${clave}-${def.id}` : clave, nombre: base ? `${PRESET[clave].label} ${def.nombre}` : `${PRESET[clave].label} completa`, calidad: clave, quita: base ? def.id : null };
     decir(`${B.variantes.length + 1} · ${v.nombre}`); await unCuadro();
-    let deshacer = null;
+    let deshacer = null; const previo = errorGL(); if (previo) B.errores.push(`antes de ${v.id}: error de WebGL ${previo}`);
     try {
       deshacer = def.poner ? def.poner() : null;
       if (def.compila) await compilar();
@@ -193,6 +197,7 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
       if (m.length === 3) v.desvio1MP = num(m[1].ms - (mod.fijo + mod.porMP * m[1].mp), 2);
       if (base && base.ms1MP) Object.assign(v, { ahorroMs: num(base.ms1MP - v.ms1MP, 2), ahorroPct: num((base.ms1MP - v.ms1MP) / base.ms1MP * 100, 1), ahorroFijoMs: num(base.fijoMs - v.fijoMs, 2), ahorroPorMPms: num(base.porMPms - v.porMPms, 2) });
       if (!base && queda(8000)) Object.assign(v, await buscar(mpSostenible(mod, periodo, 1)));
+      const eg = errorGL(); if (eg) { v.errorGL = eg; B.errores.push(`${v.id}: error de WebGL ${eg}`); }
     } catch (e) { v.error = String(e.stack || e); B.errores.push(`${v.id}: ${e}`); console.error(e); }
     finally { try { if (deshacer) deshacer(); } catch (e) { B.errores.push(`${v.id} (deshacer): ${e}`); } }
     B.variantes.push(v); return v;
@@ -205,6 +210,7 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
     if (!queda(12000)) { B.notas.push(`Sin tiempo para «${PRESET[clave].label}» y lo que sigue.`); break; }
     decir(`compilando ${PRESET[clave].label}`); await unCuadro();
     escena.setCalidad(PRESET[clave]); await escena.precalentar();
+    { const eg = errorGL(); if (eg) B.errores.push(`al poner ${clave}: error de WebGL ${eg}`); }
     const base = bases[clave] = await medir({}, clave, null);
     for (const def of MENOS[clave]) {
       if (CUALES.length && !CUALES.includes(def.id)) continue;
