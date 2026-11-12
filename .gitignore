@@ -10,3 +10,6 @@ out_*/
 # Worker: secretos locales y estado de wrangler
 worker/.dev.vars*
 worker/.wrangler/
+
+# Pages: estado local de `wrangler pages dev`
+/.wrangler/

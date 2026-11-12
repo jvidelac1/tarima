@@ -1,0 +1,112 @@
+# Servidor y publicación: el Worker (runtime de Workers en Miniflare), la regla pura, el cliente del juego, las Functions
+# de Pages, las métricas sin cookies con navegador, y el empaquetado del Worker y de las Functions sin desplegar nada
+# (no usa credenciales de Cloudflare: --dry-run y `pages functions build` son locales).
+name: Servidor y publicación
+
+on:
+  push:
+    branches: [mvp, demo]
+    paths:
+      - 'worker/**'
+      - 'functions/**'
+      - 'wrangler.jsonc'
+      - 'web/js/game/servidor.js'
+      - 'web/js/game/analitica.js'
+      - 'web/privacidad.html'
+      - 'web/vendor/posthog/**'
+      - 'tools/servidor_test.mjs'
+      - 'tools/worker_test.mjs'
+      - 'tools/check_analitica.mjs'
+      - 'tools/desplegar.sh'
+      - '.github/workflows/servidor.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  servidor:
+    name: Worker, cliente, Functions y métricas
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARIMA_ANGLE: swiftshader
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
+
+      - name: Dependencias
+        run: |
+          npm ci
+          npm --prefix worker ci
+          mkdir -p out/logs
+
+      - name: Cliente, métricas y Functions sin red (servidor_test)
+        if: ${{ !cancelled() }}
+        run: node tools/servidor_test.mjs 2>&1 | tee out/logs/servidor_test.log
+
+      - name: Regla pura del Worker (worker_test)
+        if: ${{ !cancelled() }}
+        run: node tools/worker_test.mjs 2>&1 | tee out/logs/worker_test.log
+
+      - name: Worker en el runtime de Workers (vitest)
+        if: ${{ !cancelled() }}
+        run: npm --prefix worker test 2>&1 | tee out/logs/worker_vitest.log
+
+      - name: Empaquetado sin desplegar (Worker --dry-run y Functions de Pages)
+        if: ${{ !cancelled() }}
+        run: |
+          { (cd worker && npx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker")
+            mkdir -p "$RUNNER_TEMP/pages"
+            worker/node_modules/.bin/wrangler pages functions build --outdir "$RUNNER_TEMP/pages/out" --output-routes-path "$RUNNER_TEMP/pages/_routes.json"
+            cat "$RUNNER_TEMP/pages/_routes.json"
+            bash -n tools/desplegar.sh && echo "desplegar.sh: sintaxis bien"; } 2>&1 | tee out/logs/empaquetado.log
+
+      - name: Chrome
+        if: ${{ !cancelled() }}
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || true)"
+          if [ -z "$CHROME" ]; then
+            wget -q -O "$RUNNER_TEMP/chrome.deb" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+            sudo apt-get update -q && sudo apt-get install -y -q "$RUNNER_TEMP/chrome.deb"
+            CHROME="$(command -v google-chrome)"
+          fi
+          echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
+
+      - name: Métricas sin cookies y privacidad, con navegador (check_analitica)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 8
+        run: node tools/check_analitica.mjs 2>&1 | tee out/logs/check_analitica.log
+
+      - name: Resumen
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Servidor y publicación"
+            for f in servidor_test worker_test worker_vitest empaquetado check_analitica; do
+              echo; echo "**$f**"; echo '```'
+              if [ -f "out/logs/$f.log" ]; then tail -n 30 "out/logs/$f.log"; else echo "(no corrió)"; fi
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Registros y capturas como artefacto
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: servidor-out
+          path: out/
+          if-no-files-found: warn
+          retention-days: 14
