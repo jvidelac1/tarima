@@ -117,7 +117,7 @@ r = await caso({ hz: 60, nativo: .74, clave: 'movil', costos: { movil: [6, 14] }
   { const g = S.conoCorto(), uv = g.attributes.uv, pos = g.attributes.position; let arriba = 0, abajo = 1, bajo = 0;
     for (let i = 0; i < uv.count; i++) { const y = pos.getY(i); if (y > -1e-6) arriba = Math.max(arriba, uv.getY(i)); if (y < -.56 + 1e-6) abajo = Math.min(abajo, uv.getY(i)); bajo = Math.min(bajo, y); }
     ok(Math.abs(arriba - 1) < 1e-6 && abajo < 1e-6 && Math.abs(bajo + .56) < 1e-6, `haz corto: brillo entero en el foco, cero en el corte, 56 % del largo (${arriba.toFixed(2)}, ${abajo.toFixed(2)}, ${bajo.toFixed(2)})`); }
-  ok(PRESET.baja.barato && PRESET.movil.barato && PRESET.baja.barato.piso && PRESET.baja.barato.bordes === 'material' && !PRESET.media.barato && !PRESET.alta.barato, 'escena barata en Baja y Móvil, no en Media ni Alta');
+  ok(PRESET.baja.barato && PRESET.movil.barato && PRESET.baja.barato.piso && PRESET.baja.barato.bordes === 'material' && PRESET.baja.barato.haces === 'no' && !PRESET.media.barato && !PRESET.alta.barato, 'escena barata en Baja y Móvil, no en Media ni Alta');
   const g = new THREE.Group(), m1 = new THREE.MeshStandardMaterial(), m2 = new THREE.MeshBasicMaterial({ transparent: true }), fuera = new THREE.Mesh(new THREE.BoxGeometry(), m1);
   for (let i = 0; i < 5; i++) { const o = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 3), m1); o.position.set(i, i * .5, -i); o.rotation.y = i; g.add(o); }
   const sub = new THREE.Group(); sub.position.set(10, 0, 0); sub.scale.setScalar(2); g.add(sub, fuera); sub.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), m1), new THREE.Mesh(new THREE.PlaneGeometry(1, 1), m2), new THREE.Mesh(new THREE.PlaneGeometry(1, 1), m2));
@@ -139,7 +139,7 @@ if (!process.argv.includes('--sin-banco')) {
   // y el camino con post (la variante «post») suma 2 ms fijos y 3 ms/MP. `deriva`: la máquina se va cargando (hasta +30 %).
   // La escena barata (setBarato) ahorra por píxel: el piso horneado 1,5 ms/MP y los haces cortos 1 ms/MP; los contraluces
   // como luces cuestan 1,5 ms/MP (rimA visible) y como término del material del pesista 0,3 ms/MP.
-  const caro = () => { const b = est.barato; return (b && b.piso ? 0 : 1.5) + (b && b.haces ? 0 : 1) + (b && b.bordes === 'material' ? .3 : 0); };
+  const caro = () => { const b = est.barato; return (b && b.piso ? 0 : 1.5) + (b && b.haces === 'no' ? 0 : b && b.haces === 'cortos' ? .3 : 1) + (b && b.bordes === 'material' ? .3 : 0); };
   const costo = () => (2.5 + (est.sombras ? 1.5 : 0) + (E.Q && E.Q.ao ? 4 : 0) + (est.directo ? 0 : 2) + mp * ((est.directo ? 3 : 6) + (L.rimA.visible ? 1.5 : 0) + caro())) * (1 + deriva);
   // Pantalla simulada con reloj propio: un cuadro por período, y un cuadro que cuesta más que el período pierde refrescos.
   // `est.ajena`: otra app ocupa la máquina y uno de cada `ajena` cuadros se pierde aunque no se dibuje nada

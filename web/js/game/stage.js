@@ -122,8 +122,10 @@ export function juntarFijos(raiz, fuera) {
 // ocho luces), los haces de luz y los tres contraluces. Q.barato = { piso, haces, bordes } cambia eso solo en el juego:
 // - piso: la tarima y la alfombra del escenario con su luz horneada en una textura (todas las luces, vistas desde arriba,
 //   al construir la escena) y un material sin luces; la sombra del pesista y la barra va en una capa que solo oscurece.
-// - haces: cada cono dibuja una sola cara (con el brillo de las dos), termina donde ya casi no se veía y sale en colores de
-//   pantalla con una curva que imita el tono: sin AgX por fragmento en cada capa que se suma.
+// - haces: 'no' no los dibuja. En el camino directo el tono se aplica a cada capa que se suma, y el tono del juego deja en
+//   negro todo lo que valga menos de 0,0158: los haces (0,035 a 0,05 en el foco, menos hacia abajo) no movían ni un píxel en
+//   las seis cámaras del juego (fotos del banco en Actions), pero se pagaban enteros. 'cortos': una cara con el brillo de
+//   las dos, cortados donde dejan de verse y en colores de pantalla (por si se los quiere volver a ver con otra curva).
 // - bordes: 'material' saca de la escena los tres contraluces y los pone como término del material del pesista y de la barra
 //   (la misma cuenta de un foco, sin sombra); 'luces' es como el visor; 'no' los apaga (variante del banco).
 
@@ -217,9 +219,10 @@ export class Escena {
    */
   setBarato(B) {
     this.barato = B || null; const P = this._barato ||= this._prepararBarato(), A = this.arena, L = this.lighting;
-    const piso = !!(B && B.piso && P.piso), haces = !!(B && B.haces), bordes = (B && B.bordes) || 'luces';
+    const piso = !!(B && B.piso && P.piso), haces = (B && B.haces) || false, bordes = (B && B.bordes) || 'luces';
     if (P.piso) { const p = P.piso; p.tarima.material = piso ? p.matT : p.origT; p.esc.material = piso ? p.matE : p.origE; p.sombra.visible = piso; }
-    A.beamMeshes.forEach((m, i) => { m.material = haces ? P.haces[i] : P.hacesOrig[i]; m.geometry = haces ? P.cono : P.conoOrig; });
+    const cortos = haces === 'cortos', ver = haces !== 'no' && !!this.Q.beams;
+    A.beamMeshes.forEach((m, i) => { m.material = cortos ? P.haces[i] : P.hacesOrig[i]; m.geometry = cortos ? P.cono : P.conoOrig; m.visible = ver; });
     for (const l of [L.rimA, L.rimB, L.hair]) l.visible = bordes === 'luces';
     const on = bordes === 'material'; if (on !== BORDE.on) { BORDE.on = on; for (const m of BORDE.mats) m.needsUpdate = true; }
     this.sombra = 4;

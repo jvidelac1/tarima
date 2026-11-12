@@ -103,15 +103,15 @@ async function fotos(B, { escena, cargas, params, msg, decir }) {
   decir('cargando los modelos'); await Promise.all(cargas);
   const id = PLANTEL[params.get('pesista')] ? params.get('pesista') : 'brenner';
   await escena.mostrar(id); escena.setCarga(140, 's'); msg.hidden = true; escena.setCalidad(PRESET.baja);
-  // «sinhaces»: como ahora pero sin los haces, para ver cuánto se ven los haces en el camino directo
-  const modos = [['antes', null], ['ahora', PRESET.baja.barato], ['sinhaces', PRESET.baja.barato]], camaras = ['3/4', 'lado', 'rev', 'baja', 'jib', 'arriba'];
-  decir('compilando'); for (const [, b] of modos.slice(0, 2)) { escena.setBarato(b); await escena.precalentar(); }
+  // «conhaces»: como ahora pero con los haces de antes, para ver cuánto se ven los haces en el camino directo
+  const modos = [['antes', null], ['ahora', PRESET.baja.barato], ['conhaces', { ...PRESET.baja.barato, haces: false }]], camaras = ['3/4', 'lado', 'rev', 'baja', 'jib', 'arriba'];
+  decir('compilando'); for (const [, b] of modos) { escena.setBarato(b); await escena.precalentar(); }
   const lista = camaras.flatMap(c => modos.map(([m]) => ({ camara: c, modo: m, nombre: `${c.replace('/', '-')}_${m}` })));
   const T = +(params.get('t') || 1.3);
   window.BANCO_FOTOS = {
     lista, listo: true, opacidadSombra: escena._barato?.piso?.opacidad ?? null,
     poner(i) {
-      const f = lista[i]; escena.setBarato(modos.find(([m]) => m === f.modo)[1]); escena.arena.beamMeshes.forEach(m => { m.visible = f.modo !== 'sinhaces' && !!escena.Q.beams; });
+      const f = lista[i]; escena.setBarato(modos.find(([m]) => m === f.modo)[1]);
       if (f.camara === 'arriba') escena.primerPlano('arriba'); else escena.camara(f.camara);
       escena.setTope(escena.nativoMP * 1e6); escena.bucle(T, 0); escena.sombra = 4;
       for (let k = 0; k < 3; k++) escena.cuadro(k ? 0 : 5, true);      // la cámara llega a su lugar antes del cuadro de la foto
@@ -253,7 +253,8 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
     { id: 'post', nombre: 'con destino HDR, MSAA 4 y pase final (el camino de antes)', compila: true, poner: () => { escena.setDirecto(false); return () => escena.setDirecto(true); } },
     { id: 'antes', nombre: 'como antes de abaratar: piso con luces, haces enteros y contraluces como luces', compila: true, poner: barato(() => null) },
     { id: 'antesPiso', nombre: 'tarima y alfombra con luces (sin la luz horneada)', compila: true, poner: barato(p => p && { ...p, piso: false }) },
-    { id: 'antesHaces', nombre: 'haces enteros, de dos caras y con tono por fragmento', compila: true, poner: barato(p => p && { ...p, haces: false }) },
+    { id: 'antesHaces', nombre: 'con los haces de antes (enteros, de dos caras y con tono por fragmento)', compila: true, poner: barato(p => p && { ...p, haces: false }) },
+    { id: 'hacesCortos', defecto: false, nombre: 'con haces cortos de una cara en colores de pantalla', compila: true, poner: barato(p => p && { ...p, haces: 'cortos' }) },
     { id: 'antesBordes', nombre: 'contraluces como luces de la escena', compila: true, poner: barato(p => p && { ...p, bordes: 'luces' }) },
     { id: 'sombra1024', defecto: false, nombre: 'sombra en un mapa de 1024 (más cara)', poner: sombraDe(1024) },
     { id: 'publico', defecto: false, nombre: 'sin público', poner: () => ocultar([A.impostors, A.crowd]) },
