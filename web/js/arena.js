@@ -210,13 +210,13 @@ export class Arena {
     const wood = woodMaps(tex, aniso);
     const top = new THREE.MeshStandardMaterial({ ...wood, color: new THREE.Color(.74, .74, .74), roughness: 1, metalness: 0, envMapIntensity: .5 }); top.normalScale.set(.7, .7);
     const edge = new THREE.MeshStandardMaterial({ color: new THREE.Color('#12285f'), roughness: .5, envMapIntensity: .4 });
-    add(new THREE.Mesh(new THREE.BoxGeometry(4, .1, 4), [edge, edge, top, edge, edge, edge]), 'rc').position.y = -.05;
+    this.tarima = add(new THREE.Mesh(new THREE.BoxGeometry(4, .1, 4), [edge, edge, top, edge, edge, edge]), 'rc'); this.tarima.position.y = -.05;
 
     // escenario elevado y piso de la arena
     const carpetN = normalFromHeight(noiseCanvas(256, 64, 3, 2), 2.5, { aniso: 4 }); carpetN.repeat.set(26, 22);
     const carpet = new THREE.MeshStandardMaterial({ color: new THREE.Color('#262933'), roughness: .93, normalMap: carpetN, envMapIntensity: .3 });
     const skirt = new THREE.MeshStandardMaterial({ color: new THREE.Color('#0c0d12'), roughness: .9 });
-    const stage = add(new THREE.Mesh(new THREE.BoxGeometry(13, STAGE_Y - FLOOR_Y, 11), [skirt, skirt, carpet, skirt, skirt, skirt]), 'rc'); stage.position.set(0, (STAGE_Y + FLOOR_Y) / 2, 0);
+    const stage = add(new THREE.Mesh(new THREE.BoxGeometry(13, STAGE_Y - FLOOR_Y, 11), [skirt, skirt, carpet, skirt, skirt, skirt]), 'rc'); stage.position.set(0, (STAGE_Y + FLOOR_Y) / 2, 0); this.escenario = stage;
     const floorMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#17181d') });   // piso de sala: gris, nunca negro
     const floor = add(new THREE.Mesh(new THREE.PlaneGeometry(90, 90), floorMat)); floor.rotation.x = -Math.PI / 2; floor.position.y = FLOOR_Y;
     // canto iluminado del escenario (escalón)
