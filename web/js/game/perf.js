@@ -10,10 +10,10 @@ import { QUALITY } from '../config.js';
 
 /** Debajo de «baja»: pensado para un teléfono. Valores iniciales sin medir en un teléfono real. */
 /**
- * Escena barata por píxel (stage.js, setBarato): piso con la luz horneada, haces de una cara y cortos en colores de
- * pantalla, y los tres contraluces como término del material del pesista y la barra. Solo con el camino directo.
+ * Escena barata por píxel (stage.js, setBarato): piso con la luz horneada, sin haces (en el camino directo no se veían) y
+ * los tres contraluces como término del material del pesista y la barra. Solo con el camino directo.
  */
-export const BARATO = Object.freeze({ piso: true, haces: true, bordes: 'material' });
+export const BARATO = Object.freeze({ piso: true, haces: 'no', bordes: 'material' });
 export const MOVIL = { label: 'Móvil', dpr: 1.5, maxPixels: 1280 * 720, msaa: 2, shadow: 512, shadowR: 4.5, shadow2: 0, ao: 0, aoScale: .5, dof: 0, dofSamples: 0, bloom: false, smaa: false, crowd: .3, beams: false, aniso: 2, tex: 1024, directo: true, barato: BARATO };
 /**
  * Calidades del juego: las del visor (config.js, que no se toca) con estas diferencias.
