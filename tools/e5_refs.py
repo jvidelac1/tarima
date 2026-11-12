@@ -294,6 +294,17 @@ def cmd_cerrar(a):
             res['imagenes'][nombre] = e
             print(f"{nombre}: {e['origen']}" + (f" s{e['semilla']} IoU {e['iou']:.4f}" if e['origen'] == 'qwen' else f" ({e['motivo']})"))
     json.dump(res, open(ruta(GEN, 'resumen.json'), 'w'), ensure_ascii=False, indent=1)
+    # hoja final: por juego, una fila con los renders crudos y otra con lo que quedó (sobre negro)
+    lado = 400; hf = Image.new('RGB', (lado * 4, (lado * 2 + 20) * len(a.juegos)), (20, 20, 20)); dr = ImageDraw.Draw(hf)
+    for j, juego in enumerate(a.juegos):
+        y = j * (lado * 2 + 20)
+        for k, vista in enumerate(['front', 'left', 'back', 'right']):
+            nombre = f'{a.personaje}_{juego}_{vista}'; e = res['imagenes'][nombre]
+            for fila, f in enumerate([ruta(REFS, nombre + '.png'), ruta(GEN, nombre + '.png')]):
+                im = Image.open(f).convert('RGBA'); neg = Image.new('RGBA', im.size, (0, 0, 0, 255)); neg.alpha_composite(im)
+                hf.paste(neg.convert('RGB').resize((lado, lado), Image.LANCZOS), (k * lado, y + 20 + fila * lado))
+            dr.text((k * lado + 6, y + 4), f"{juego} {vista}: " + (f"qwen s{e['semilla']} IoU {e['iou']:.3f}" if e['origen'] == 'qwen' else 'CRUDA'), fill=(255, 255, 255))
+    hf.save(ruta(GEN, 'hoja_final.jpg'), quality=90); print(f'{GEN}/hoja_final.jpg (arriba el render crudo, abajo lo que quedó)')
 
 
 def cmd_descartar(a):
