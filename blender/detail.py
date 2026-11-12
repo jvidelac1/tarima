@@ -85,6 +85,10 @@ def cercanos(bvh,P,dmax=None):
 def importar(path,espejo=False):
     """Importa un GLB y lo deja como un solo objeto de malla con la transformación aplicada (marco de mundo de Blender)."""
     if not os.path.exists(path): raise SystemExit('No encuentro '+path)
+    # El importador reutiliza el grupo de nodos 'glTF Material Output' si ya existe; el de s4.blend es de otra versión y no tiene las
+    # entradas que busca (KeyError 'Iridescence Factor' con el primer GLB con material). Se lo aparta de nombre: el .blend no se guarda.
+    for ng in list(bpy.data.node_groups):
+        if ng.name in ('glTF Material Output','glTF Settings'): ng.name+='.previo'
     antes={o.name for o in bpy.data.objects}; bpy.ops.import_scene.gltf(filepath=os.path.abspath(path)); bpy.context.view_layer.update()
     nuevos=[o for o in bpy.data.objects if o.name not in antes]; ms=[o for o in nuevos if o.type=='MESH' and len(o.data.polygons)]
     if not ms: raise SystemExit('El GLB no trae mallas: '+path)
