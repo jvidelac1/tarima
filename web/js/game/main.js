@@ -156,7 +156,7 @@ const pasosHTML = (ctl, T) => `<ol class="pasos">${pasos(ctl, T).map(([n, txt], 
 const MENUS = '<p class="chica">Menús: flechas y ENTER · H ayuda · ESC pausa</p>';
 
 // ---------- acuse de cada toque ----------
-const MOTIVOS = { espera: 'ESPERÁ', rebote: 'REBOTE', sobra: 'SOBRA', tarde: 'TARDE', termino: 'TERMINÓ', pausa: 'PAUSA', mouse: 'TECLADO' };
+const MOTIVOS = { espera: 'ESPERÁ', temprano: 'TODAVÍA NO', rebote: 'REBOTE', sobra: 'SOBRA', tarde: 'TARDE', termino: 'TERMINÓ', pausa: 'PAUSA', mouse: 'TECLADO' };
 /**
  * La tecla dibujada (abajo a la derecha, y la de la señal) se hunde con cada pulsación, sea o no el momento; si el toque
  * no sirvió, al lado sale el motivo en una palabra. Si la ventana pierde el teclado, un cartel lo dice.
@@ -269,7 +269,8 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
         } else x = Math.round(tEv - t0);
         const r = tocar(ctx, conf, ent, x, v, ctl);
         if (guia && r.n) { R.vb = r.t; R.tb = tEv; R.tope = Infinity; R.clave = null; }      // el toque suelta el reloj
-        if (facil && v && r.aviso === 'espera') decir('TODAVÍA NO', { floja: true });
+        // «todavía no»: la ventana de la señal no abrió (no gasta la señal). No tapa la palabra del toque anterior recién salida
+        if (facil && v && (r.aviso === 'espera' || r.aviso === 'temprano') && !(pal && pal.nota && reloj.ahora() - palT < 900)) decir('TODAVÍA NO', { floja: true });
         if (!v) return;
         if (!r.n) return no(r.motivo);
         if (toques.abierto && sAhora && sAhora.tipo === 'cierre') { const e = r.t - sAhora.objetivo; toques.abierto.nota = `${sAhora.verbo} ${e >= 0 ? '+' : '−'}${Math.abs(e)} ms`; } else if (toques.abierto && sAhora) toques.abierto.nota = sAhora.verbo;
@@ -309,7 +310,7 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
         const g = m.gestos[m.gestos.length - 1], W = PALABRAS[g.pal]; visto.gestos = m.gestos.length;
         // en Fácil, TEMPRANO y TARDE van en ámbar si el levantamiento sigue; el rojo queda para el fallo
         // en Fácil la palabra lleva el verbo del toque que califica: cuando ya se ve la señal siguiente no se confunde con ella
-        decir((facil ? (g.g === 'recepcion' ? '¡RECIBÍ! ' : g.mov === 'j' ? '¡ARRIBA! ' : '¡EXPLOTÁ! ') : '') + W.txt + (!facil && g.pal === 'bien' ? ` ${g.e > 0 ? '+' : '−'}${Math.abs(g.e)} ms` : ''), facil ? { floja: !!W.floja && !g.fuera, mal: !!g.fuera } : { mal: !!W.floja });
+        decir((facil ? (g.g === 'recepcion' ? '¡RECIBÍ! ' : g.mov === 'j' ? '¡ARRIBA! ' : '¡EXPLOTÁ! ') : '') + W.txt + (!facil && g.pal === 'bien' ? ` ${g.e > 0 ? '+' : '−'}${Math.abs(g.e)} ms` : ''), { nota: true, ...(facil ? { floja: !!W.floja && !g.fuera, mal: !!g.fuera } : { mal: !!W.floja }) });
         if (g.g === 'explosion') sonido.explosion(g.pal === 'perfecto');
       }
       if (m.amagues > visto.amagues) { visto.amagues = m.amagues; if (propio) decir('MUY TEMPRANO', { floja: true }); }

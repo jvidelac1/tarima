@@ -1,8 +1,10 @@
 // La señal (docs/CONTROLES.md, sección 5): siempre en el mismo lugar, dice qué tocar y cuándo. Verbo en imperativo, aro
-// fijo con un círculo que se cierra sobre él, la tecla dibujada, el paso («2 de 3») y la palabra del último toque.
+// fijo con un círculo que se cierra sobre él a ritmo parejo, la franja dorada donde el toque sale BIEN (y una más clara
+// para PERFECTO), la cuenta 3-2-1, la tecla dibujada, el paso («2 de 3») y la palabra del último toque. Mientras la
+// ventana de la señal no abrió el círculo va apagado: un toque ahí no cuenta («todavía no»).
 // Solo DOM: lo que muestra sale de senal() en controles.js, que es lo mismo que leen las pruebas y los bots.
 const HTML = `<div class="s-paso"></div><div class="s-verbo"></div>
-<div class="s-aro"><i class="s-fijo"></i><i class="s-cierra"></i><div class="s-teclas"><kbd class="tecla"></kbd><kbd class="tecla"></kbd><kbd class="tecla"></kbd></div><div class="s-avance"><b></b><i></i></div></div>
+<div class="s-aro"><i class="s-franja"></i><i class="s-franja s-perf"></i><i class="s-fijo"></i><i class="s-cierra"></i><b class="s-cuenta"></b><div class="s-teclas"><kbd class="tecla"></kbd><kbd class="tecla"></kbd><kbd class="tecla"></kbd></div><div class="s-avance"><b></b><i></i></div></div>
 <div class="s-sub"></div><div class="s-pal"></div>`;
 
 export class Senal {
@@ -10,6 +12,7 @@ export class Senal {
   constructor(el, tactil = false) {
     this.el = el; el.innerHTML = HTML; this.tactil = tactil; this.clave = null; this.pal = null;
     const q = s => el.querySelector(s); this.paso = q('.s-paso'); this.verbo = q('.s-verbo'); this.cierra = q('.s-cierra'); this.sub = q('.s-sub'); this.palEl = q('.s-pal'); this.avance = q('.s-avance b'); this.piso = q('.s-avance i'); this.subTxt = this.subBase = '';
+    [this.franja, this.franjaP] = el.querySelectorAll('.s-franja'); this.cuenta = q('.s-cuenta'); this.franjaDe = null; this.cuentaTxt = null;
     this.setTactil(tactil);
   }
   setTactil(t) { this.tactil = t; for (const k of this.el.querySelectorAll('.tecla')) k.textContent = t ? 'TOCÁ' : 'ESPACIO'; }
@@ -33,13 +36,28 @@ export class Senal {
     const queda = s && s.tipo === 'libre' && s.vence ? s.vence - now : Infinity, apuro = queda <= (s && s.clave === 'flexiona' ? 5000 : 10000);
     const sub = apuro ? `¡Quedan ${Math.max(0, Math.ceil(queda / 1000))} s! ${this.tactil ? 'Tocá la pantalla' : 'Apretá ESPACIO'}` : this.subBase;
     if (sub !== this.subTxt) { this.subTxt = sub; this.sub.textContent = sub; el.classList.toggle('apuro', apuro); }
-    let oro = false;
+    let oro = false, cuenta = '', abierta = true;
     if (s && s.tipo === 'cierre') {
-      // de 1,6 veces el aro (cuando arranca) a 1 en el objetivo; después sigue achicándose hasta el límite
-      const falta = s.objetivo - now, total = Math.max(1, s.objetivo - s.desde), k = o.parado ? 1 : falta >= 0 ? 1 + .6 * Math.min(1, falta / total) : 1 - .3 * Math.min(1, -falta / Math.max(1, s.lim));
+      // a ritmo parejo: de 1,6 veces el aro (cuando arranca) a 1 en el objetivo, y sigue achicándose igual de rápido hasta el límite
+      const falta = s.objetivo - now, total = Math.max(1, s.objetivo - s.desde), vel = .6 / total, k = o.parado ? 1 : Math.max(.4, 1 + vel * Math.min(falta, total));
+      abierta = o.parado || s.abre === undefined || now >= s.abre;
       oro = o.parado || Math.abs(falta) <= s.perf;
-      this.cierra.style.transform = `scale(${k.toFixed(3)})`; this.cierra.style.opacity = (falta >= 0 ? .45 + .55 * (1 - Math.min(1, falta / total)) : 1).toFixed(2);
+      this.cierra.style.transform = `scale(${k.toFixed(3)})`; this.cierra.style.opacity = abierta ? '1' : (.3 + .25 * (1 - Math.min(1, falta / total))).toFixed(2);
+      // la franja de BIEN (y la de PERFECTO) en la misma escala que el círculo: el toque sale bien mientras el borde la cruza
+      const fk = `${s.desde}|${s.objetivo}`;
+      if (fk !== this.franjaDe) {
+        this.franjaDe = fk;
+        const banda = (el, w) => {
+          const antes = Math.min(w, Math.max(0, s.objetivo - Math.max(s.abre ?? -Infinity, s.desde))), ko = Math.min(1.6, 1 + vel * antes), ki = Math.max(.4, 1 - vel * w);
+          el.hidden = !(w > 0); el.style.setProperty('--ko', ko.toFixed(3)); el.style.setProperty('--kb', ((ko - ki) / 2).toFixed(3));
+        };
+        banda(this.franja, s.bien ?? 0); banda(this.franjaP, s.perf ?? 0);
+      }
+      // cuenta 3-2-1 en tercios parejos del cierre; en el objetivo, nada (el aro se pone dorado)
+      if (!o.parado && falta > 0) cuenta = String(Math.min(3, Math.ceil(falta / (total / 3))));
     }
+    if (cuenta !== this.cuentaTxt) { this.cuentaTxt = cuenta; this.cuenta.textContent = cuenta; if (cuenta) { this.cuenta.classList.remove('late'); void this.cuenta.offsetWidth; this.cuenta.classList.add('late'); } }
+    el.classList.toggle('cerrada', !abierta);
     if (s && s.tipo === 'empuja') { this.avance.style.width = `${Math.round(Math.max(0, Math.min(1, s.avance)) * 100)}%`; this.piso.style.width = `${Math.round((s.piso || 0) * 100)}%`; }
     el.classList.toggle('oro', oro); el.classList.toggle('parado', !!o.parado);
     const txt = vivo ? vivo.txt : '';
