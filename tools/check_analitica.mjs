@@ -1,13 +1,23 @@
-// Prueba con navegador de las métricas y la privacidad (docs/MVP.md 6.1 y 5.2). Corre en GitHub Actions (flujo «Pruebas
-// del juego»); no hace falta GPU. Uso: node tools/check_analitica.mjs
+// Prueba con navegador de las métricas, la grabación de sesión y la privacidad (docs/MVP.md 6.1, 6.6 y 5.2). Corre en
+// GitHub Actions (flujo «Servidor y publicación»); no hace falta GPU. Uso: node tools/check_analitica.mjs
 //  1. Con un Worker falso en el mismo servidor (/api/estado con clave pública, /qx/* que anota lo que llega):
 //     posthog-js vendorizado arranca, manda los eventos por /qx (nunca a un dominio de PostHog), identifica con lista_id,
 //     y después de todo no queda ninguna cookie ni clave de almacenamiento con «ph_» (posthog-js también usa nombres como
 //     __ph_opt_in_out_<clave>).
 //  2. Sin clave: PostHog ni se descarga.
-//  3. web/privacidad.html: idioma (?lang=, botones), responsable y contacto completos (sin marcadores), interruptor de la medición (manda
+//  3. web/privacidad.html: idioma (?lang=, botones), responsable y contacto completos (sin marcadores), la grabación de
+//     sesión explicada en los dos idiomas, interruptor de la medición (manda
 //     medicion_desactivada por /qx y deja tarima.medicion=0), formulario de baja contra /api/baja, y sin la promesa de pago.
 //  4. A 390x844 (teléfono parado) y a 844x390 (acostado) la privacidad no se desplaza de costado.
+//  5. Grabación de sesión (docs/MVP.md 6.6), en una página de prueba con campos, el nombre del jugador en pantalla, un
+//     lienzo y una «señal» que cambia en cada cuadro: con `grabacion=todas` se graba por /qx/s/ (grabador del propio
+//     sitio, sin pedir nada a PostHog), los campos, el nombre y los correos van tapados, el texto de la interfaz se lee,
+//     el lienzo y la señal quedan como cajas vacías (ni imagen ni una mutación por cuadro). Muestreo: `off` no descarga el
+//     grabador, `tercio` graba según el sorteo, y con la medición desactivada no hay ni PostHog.
+//  6. El juego de verdad (?dibujo=0) hasta el final del primer intento propio, con y sin grabación: mutaciones del DOM,
+//     eventos del grabador, cuadros y tareas largas DURANTE el intento. Falla si el grabador manda más de
+//     MAX_MUT_S mutaciones por segundo en el intento o si el nombre del jugador aparece en la grabación. Los cuadros se
+//     informan (con dibujo por software no dicen mucho) y se comparan las dos corridas.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,12 +29,15 @@ import { launchOptions } from './browser.mjs';
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.woff2': 'font/woff2' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.woff2': 'font/woff2', '.glb': 'model/gltf-binary', '.png': 'image/png', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.bin': 'application/octet-stream' };
 const CLAVE = 'phc_PruebaDeCheckAnalitica123';
 const AGENTE = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
 const LISTA_ID = 'c'.repeat(32);
+const MAX_MUT_S = 10;                 // mutaciones por segundo que manda el grabador durante un intento, como mucho
+const NOMBRE = 'Zoraida', ESCRITO = 'Wilfredo', CORREO = 'secreto@ejemplo.com', LIBRE = 'respuesta libre muy secreta';
 
 let conClave = true;
+let flagGrab = 'off';                 // bandera `grabacion` que devuelve /api/estado
 const llegadas = [];   // lo que recibió /qx
 const bajas = [];
 
@@ -41,6 +54,23 @@ function eventosDe(req, cuerpo) {
   } catch { return [{ event: '(no se pudo leer)', props: {}, txt: String(txt).slice(0, 80) }]; }
 }
 
+// Eventos de rrweb de los $snapshot que llegaron a /qx/s/. posthog-js comprime con gzip (en cadenas latin1) el cuerpo de
+// las instantáneas completas y los campos de las mutaciones (cv 2024-10): acá se abren.
+const abrirGz = x => (typeof x === 'string' ? JSON.parse(zlib.gunzipSync(Buffer.from(x, 'latin1')).toString('utf8')) : x);
+function abrirRrweb(e) {
+  if (!e || typeof e !== 'object' || !e.cv) return e;
+  try {
+    if (e.type === 2) return { ...e, data: abrirGz(e.data) };
+    if (e.type === 3 && e.data) { const d = { ...e.data }; for (const k of ['texts', 'attributes', 'removes', 'adds']) d[k] = abrirGz(d[k]); return { ...e, data: d }; }
+  } catch { return { ...e, ilegible: true }; }
+  return e;
+}
+const rrwebDe = desde => llegadas.slice(desde).filter(l => l.ruta.startsWith('/qx/s')).flatMap(l => l.eventos)
+  .filter(e => e.event === '$snapshot').flatMap(e => [].concat(e.props.$snapshot_data || e.props.$snapshot_items || [])).map(abrirRrweb);
+// Nodos serializados de una instantánea completa (para mirar lienzos y bloqueos).
+function nodos(n, out = []) { if (n && typeof n === 'object') { out.push(n); for (const c of n.childNodes || []) nodos(c, out); } return out; }
+const esMutacion = e => e.type === 3 && e.data?.source === 0;
+
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   const cuerpo = [];
@@ -51,15 +81,17 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': 'tdv=aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee; Path=/api; HttpOnly; SameSite=Strict' });
       res.end(JSON.stringify({
         dispositivo: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', puede: true, quedan: null, lista: true, lista_id: LISTA_ID, encuesta_disponible: true,
-        flags: { 'muro-partidas-gratis': '2', 'muro-texto': 'b', 'invitacion-podio1': 'on', grabacion: 'off' },
+        flags: { 'muro-partidas-gratis': '2', 'muro-texto': 'b', 'invitacion-podio1': 'on', grabacion: flagGrab },
         contexto: { pais: 'UY', previas: 1, dias: '0' },
         metricas: conClave ? { clave: CLAVE, host: '/qx', ui: 'https://us.posthog.com', encuesta: 'encuesta-prueba' } : null,
       }));
       return;
     }
     if (u.pathname === '/api/baja') { bajas.push(JSON.parse(b.toString('utf8') || '{}')); res.writeHead(202, { 'content-type': 'application/json' }); res.end('{}'); return; }
+    if (u.pathname === '/api/partida') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ estado: 'ok', fuente: 'local', pase: null, quedan: null })); return; }
+    if (u.pathname.startsWith('/api/')) { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{}'); return; }
     if (u.pathname.startsWith('/qx/')) {
-      llegadas.push({ ruta: u.pathname, eventos: req.method === 'POST' ? eventosDe(req, b) : [], cookie: req.headers.cookie || '' });
+      llegadas.push({ ruta: u.pathname, eventos: req.method === 'POST' ? eventosDe(req, b) : [], cookie: req.headers.cookie || '', bytes: b.length });
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(u.pathname.startsWith('/qx/flags') ? '{"flags":{}}' : '{"status":1}');
       return;
@@ -80,6 +112,39 @@ a.identificar('${LISTA_ID}');
 a.ev('anotar_ok', { estado: 'nuevo', pantalla: 'muro', finales_previas: 2 });
 a.encuestaVista({ con_premio: true });
 window.__sesion = a.idSesion();
+window.__listo = true;
+</script>`);
+      return;
+    }
+    if (u.pathname === '/__grabacion.html') {
+      // Como la bienvenida del juego: el título sigue al nombre mientras se escribe, saludo con el nombre guardado,
+      // campos de correo y respuesta libre, un lienzo y una señal que cambia dos estilos por cuadro.
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      res.end(`<!doctype html><meta charset="utf-8"><title>grabación</title><link rel="icon" href="data:,">
+<style>#senal{position:fixed;top:8px;right:8px;width:90px;height:90px;background:#123}#gl{width:128px;height:72px}</style>
+<h1 id="pesista-t">Elige tu pesista</h1><p id="ui">Juega la final contra dos rivales</p><p id="saludo"></p>
+<label>Nombre <input id="nombre" type="text" maxlength="20"></label><label>Correo <input id="correo" type="email"></label>
+<textarea id="q5" rows="2"></textarea><canvas id="gl" width="128" height="72"></canvas>
+<div id="senal"><div class="cierra">TIRA</div></div><button id="jugar" type="button">Jugar</button>
+<script type="module">
+import { crearServidor } from './js/game/servidor.js';
+import { crearAnalitica } from './js/game/analitica.js';
+const q = new URLSearchParams(location.search);
+const c = document.getElementById('gl').getContext('2d'); c.fillStyle = '#e33'; c.fillRect(0, 0, 128, 72);
+document.getElementById('saludo').textContent = 'Hola de nuevo, ' + (localStorage.getItem('tarima.nombre') || '');
+const inp = document.getElementById('nombre');
+inp.addEventListener('input', () => { document.getElementById('pesista-t').textContent = 'Elige tu pesista, ' + inp.value; });
+window.__mut = 0;
+new MutationObserver(r => { window.__mut += r.length; }).observe(document.getElementById('senal'), { subtree: true, attributes: true });
+window.__animar = ms => new Promise(res => {
+  const el = document.querySelector('#senal .cierra'), t0 = performance.now(); let n = 0;
+  const f = t => { const k = Math.max(0, t - t0) / ms; el.style.transform = 'scale(' + (1 + k).toFixed(3) + ')'; el.style.opacity = (1 - k / 2).toFixed(2); n++; if (t - t0 < ms) requestAnimationFrame(f); else res(n); };
+  requestAnimationFrame(f);
+});
+const s = crearServidor(), a = crearAnalitica({ azar: () => Number(q.get('azar') ?? 0) });
+const e = await s.estado({ idioma: 'es' });
+window.__activa = await a.iniciar({ estado: e, idioma: 'es', idioma_origen: 'url', version: 'prueba', pantalla: 'bienvenida' });
+window.__grabando = a.grabando();
 window.__listo = true;
 </script>`);
       return;
@@ -121,8 +186,10 @@ async function rastros(ctx, page) {
 }
 
 // ---- 1. con clave ----
+const pedidos1 = [];
 {
   const { ctx, page } = await pagina();
+  page.on('request', r => pedidos1.push(r.url()));
   await page.goto(base + '__prueba.html');
   await page.waitForFunction(() => window.__listo === true, null, { timeout: 20000 });
   ok(await page.evaluate(() => window.__activa) === true, 'con clave, PostHog arranca');
@@ -146,6 +213,7 @@ async function rastros(ctx, page) {
   ok(eventos.every(e => !e.clave || e.clave === CLAVE), 'los eventos van con la clave pública del proyecto');
   ok(llegadas.every(l => !/ph_/.test(l.cookie)), 'no viajan cookies de PostHog');
   ok(!llegadas.some(l => /^\/qx\/(static|array)\//.test(l.ruta)), 'no se descargan scripts extra de PostHog');
+  ok(!llegadas.some(l => /^\/qx\/s\//.test(l.ruta)) && !pedidos1.some(u => /lazy-recorder/.test(u)), 'grabacion=off: ni grabador ni grabación');
   if (!nombres.length) notas.push('rutas que llegaron a /qx: ' + llegadas.map(l => l.ruta).join(' '));
   await ctx.close();
 }
@@ -180,6 +248,12 @@ async function rastros(ctx, page) {
   ok(/16 años/.test(await page.locator('article[lang=es]').innerText()), 'edad mínima de 16 en español');
   ok(/Estados Unidos/.test(await page.locator('article[lang=es]').innerText()) && /HMAC/.test(html) && /tdv/.test(html), 'PostHog en EE. UU., HMAC de la IP y cookie técnica');
   ok(!/\bvos\b|tenés|podés|querés|anotate|escribinos/i.test(await page.locator('article[lang=es]').innerText()), 'español sin voseo');
+  {
+    const es = await page.locator('article[lang=es] [data-grabacion]').innerText(), en = await page.locator('article[lang=en] [data-grabacion]').textContent();
+    ok(/una de cada tres/.test(es) && /3D/.test(es) && /tapados/.test(es) && /correo/.test(es) && /one in three/.test(en) && /3D/.test(en) && /blanked out/.test(en),
+      'la privacidad explica la grabación en los dos idiomas: proporción, sin 3D y campos tapados');
+    ok(/2026-11-c/.test(await page.locator('article[lang=es] .version').innerText()), 'la privacidad está en la versión 2026-11-c');
+  }
   await page.click('article[lang=es] [data-medicion-boton]');
   ok(await page.evaluate(() => localStorage.getItem('tarima.medicion')) === '0', 'el interruptor apaga la medición');
   ok(/desactivada/.test(await page.locator('article[lang=es] [data-medicion-valor]').innerText()), 'el interruptor dice «desactivada»');
@@ -210,6 +284,165 @@ for (const vp of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
   fs.mkdirSync(path.join(ROOT, 'out', 'analitica'), { recursive: true });
   await page.screenshot({ path: path.join(ROOT, 'out', 'analitica', `privacidad_${vp.width}x${vp.height}.png`) });
   await ctx.close();
+}
+
+// ---- 5. grabación de sesión en una página de prueba ----
+const sinRastros = async (ctx, page, que) => {
+  const r = await rastros(ctx, page);
+  ok(!r.cookies.some(n => /ph_/i.test(n)) && !r.claves.some(k => /ph_|rrweb/i.test(k)), `${que}: sin cookies ni almacenamiento de PostHog (${[...r.cookies, ...r.claves].join(', ') || 'nada'})`);
+};
+async function paginaGrabacion({ flag, azar = 0, medicion = true }) {
+  flagGrab = flag;
+  const { ctx, page } = await pagina();
+  const pedidos = [];
+  page.on('request', r => pedidos.push(r.url()));
+  await ctx.addInitScript(([n, m]) => { try { localStorage.setItem('tarima.nombre', n); if (!m) localStorage.setItem('tarima.medicion', '0'); } catch { /* nada */ } }, [NOMBRE, medicion]);
+  const desde = llegadas.length;
+  await page.goto(base + `__grabacion.html?azar=${azar}`);
+  await page.waitForFunction(() => window.__listo === true, null, { timeout: 20000 });
+  const r = await page.evaluate(() => ({ activa: window.__activa, grabando: window.__grabando }));
+  return { ctx, page, pedidos, desde, ...r, grabador: () => pedidos.some(u => /vendor\/posthog\/lazy-recorder\.js/.test(u)) };
+}
+{
+  const g = await paginaGrabacion({ flag: 'todas', azar: 0.99 });
+  ok(g.activa && g.grabando && g.grabador(), `todas: graba y el grabador sale del propio sitio (activa ${g.activa}, grabando ${g.grabando})`);
+  // clic (para PostHog es una interacción), el nombre letra por letra (el título lo sigue), correo y respuesta libre
+  await g.page.click('#jugar');
+  await g.page.type('#nombre', ESCRITO, { delay: 40 });
+  await g.page.fill('#correo', CORREO);
+  await g.page.fill('#q5', LIBRE);
+  await g.page.waitForTimeout(300);
+  const t0 = Date.now();
+  const cuadros = await g.page.evaluate(ms => window.__animar(ms), 3000);
+  const t1 = Date.now();
+  const crudas = await g.page.evaluate(() => window.__mut);
+  await g.page.waitForTimeout(3500);
+  await g.page.evaluate(() => { document.dispatchEvent(new Event('visibilitychange')); window.dispatchEvent(new Event('pagehide')); });
+  await g.page.waitForTimeout(1500);
+  await sinRastros(g.ctx, g.page, 'con grabación');
+  const ev = rrwebDe(g.desde), todo = JSON.stringify(ev);
+  const completas = ev.filter(e => e.type === 2 && !e.ilegible);
+  ok(completas.length > 0 && ev.some(e => e.type === 4), `llegó la grabación por /qx/s/ (${ev.length} eventos de rrweb, ${completas.length} instantáneas completas)`);
+  ok(!ev.some(e => e.ilegible), 'la prueba pudo abrir todos los eventos comprimidos');
+  for (const [txt, que] of [[NOMBRE, 'el nombre guardado'], [ESCRITO, 'el nombre que se escribe'], [CORREO, 'el correo'], ['secreto@', 'el correo (parte)'], [LIBRE, 'la respuesta libre']]) ok(!todo.includes(txt), `${que} no aparece en la grabación`);
+  ok(todo.includes('Juega la final contra dos rivales') && todo.includes('Jugar'), 'el texto de la interfaz se lee en la grabación');
+  ok(!/rr_dataURL|data:image\//.test(todo), 'ni un cuadro del lienzo en la grabación');
+  const n = completas.flatMap(e => nodos(e.data?.node));
+  const lienzos = n.filter(x => x.tagName === 'canvas');
+  ok(lienzos.length > 0 && lienzos.every(x => x.attributes?.rr_width && !x.attributes?.id), `el lienzo queda como caja vacía (${JSON.stringify(lienzos.map(x => x.attributes))})`);
+  ok(!todo.includes('TIRA') && !n.some(x => x.attributes?.id === 'senal'), 'la señal queda como caja vacía (bloqueada)');
+  const mutAnim = ev.filter(e => esMutacion(e) && e.timestamp >= t0 && e.timestamp <= t1);
+  ok(mutAnim.length <= 3, `la señal que cambia en cada cuadro no llega al grabador: ${crudas} mutaciones del DOM en ${cuadros} cuadros, ${mutAnim.length} eventos de mutación grabados`);
+  ok(!llegadas.slice(g.desde).some(l => /^\/qx\/(static|array|flags|decide)/.test(l.ruta)), `no se pide nada más a PostHog (${[...new Set(llegadas.slice(g.desde).map(l => l.ruta))].join(' ')})`);
+  await g.ctx.close();
+}
+{
+  const g = await paginaGrabacion({ flag: 'tercio', azar: 0.5 });
+  ok(g.activa && !g.grabando && !g.grabador(), `tercio con sorteo 0,5: mide sin grabar ni descargar el grabador (grabando ${g.grabando})`);
+  await g.ctx.close();
+}
+{
+  const g = await paginaGrabacion({ flag: 'tercio', azar: 0.2 });
+  ok(g.activa && g.grabando && g.grabador(), `tercio con sorteo 0,2: graba (grabando ${g.grabando})`);
+  await g.ctx.close();
+}
+{
+  const g = await paginaGrabacion({ flag: 'off', azar: 0 });
+  ok(g.activa && !g.grabando && !g.grabador(), 'off: mide sin grabar ni descargar el grabador');
+  await g.ctx.close();
+}
+{
+  const g = await paginaGrabacion({ flag: 'todas', azar: 0, medicion: false });
+  await g.page.waitForTimeout(1500);
+  ok(!g.activa && !g.grabando && !g.grabador() && !g.pedidos.some(u => /vendor\/posthog|\/qx\//.test(u)) && llegadas.length === g.desde, 'medición desactivada: ni PostHog ni grabador ni nada a /qx, aunque la bandera diga todas');
+  await g.ctx.close();
+}
+
+// ---- 6. el juego de verdad: costo de la grabación durante el intento ----
+async function interactuarJuego(page) {
+  const J = fn => page.evaluate(fn);
+  const dormir = ms => new Promise(r => setTimeout(r, ms));
+  const espacio = async () => { await page.keyboard.down('Space'); await dormir(35); await page.keyboard.up('Space'); };
+  let tA = null, tB = null, ultSalto = 0, clic = false, hecho = '';
+  const t0 = Date.now();
+  for (;;) {
+    if (Date.now() - t0 > 4 * 60000) { mal('juego: no se llegó al final del primer intento propio en 4 minutos'); break; }
+    const s = await J(() => { const e = JUEGO.estado(); e.propios = (JUEGO.E.propios || []).length; return e; });
+    if (s.errores.length) { mal('juego: ' + s.errores[0]); break; }
+    const I = s.intento;
+    if (I && I.propio) { if (tA === null) tA = Date.now(); }
+    else if (tA !== null && tB === null) tB = Date.now();
+    if (tB !== null && s.propios >= 1) break;
+    if (I && I.propio && s.modo !== 'panel') {
+      const g = I.senal;
+      if (!g) { await dormir(8); continue; }
+      if (g.tipo === 'libre') { await dormir(200); await espacio(); continue; }
+      if (g.tipo === 'cierre') { const kk = g.clave + g.desde; if (I.seDetiene || hecho === kk) { await dormir(8); continue; } const falta = g.objetivo - s.ahora - 25; if (falta > 0) await dormir(Math.min(falta, 2000)); await espacio(); hecho = kk; continue; }
+      if (g.tipo === 'empuja') { for (let i = 0; i < 6; i++) { await espacio(); await dormir(40); } continue; }
+      await dormir(10); continue;
+    }
+    if (s.panel && !s.sobre) {
+      // el primer botón con el ratón (para PostHog es una interacción), después con Enter como la otra prueba
+      if (!clic && await page.locator('#capa .panel button.ir:not(:disabled)').count()) { clic = true; await dormir(400); await page.locator('#capa .panel button.ir:not(:disabled)').first().click(); await dormir(300); continue; }
+      const P = await J(() => { const ir = document.querySelector('#capa .panel button.ir:not(:disabled)'); return { ir: !!ir, foco: document.activeElement === ir }; });
+      if (P.ir) { await dormir(400); if (!P.foco) await J(() => document.querySelector('#capa .panel button.ir:not(:disabled)')?.focus()); await page.keyboard.press('Enter'); await dormir(300); continue; }
+    }
+    if (['rival', 'decision', 'repeticion', 'repeticion_rival', 'carga', 'desplazado'].includes(s.pantalla) && Date.now() - ultSalto > 1500) { await espacio(); ultSalto = Date.now(); continue; }
+    await dormir(30);
+  }
+  return { tA, tB };
+}
+const pct = (xs, p) => { if (!xs.length) return 0; const o = [...xs].sort((a, b) => a - b); return o[Math.min(o.length - 1, Math.floor(p * o.length))]; };
+async function partida(flag) {
+  flagGrab = flag;
+  const { ctx, page } = await pagina();
+  await ctx.addInitScript(n => {
+    try { if (!sessionStorage.getItem('__t')) { localStorage.setItem('tarima.tutorial', '1'); localStorage.setItem('tarima.jugadas', '1'); localStorage.setItem('tarima.visto.tarjeta', '1'); localStorage.setItem('tarima.nombre', n); sessionStorage.setItem('__t', '1'); } } catch { /* nada */ }
+    // mutaciones del DOM (lo que observa el grabador), cuadros y tareas largas, con la hora del reloj de pared
+    window.__mut = []; window.__raf = []; window.__lt = [];
+    const desc = x => { const el = x.nodeType === 1 ? x : x.parentElement; const c = el?.closest?.('[id]'); return (c ? '#' + c.id : el?.tagName || '?'); };
+    new MutationObserver(rs => { const t = Date.now(); for (const r of rs) window.__mut.push([t, desc(r.target) + ' ' + r.type + (r.attributeName ? ':' + r.attributeName : '')]); })
+      .observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+    const f = t => { window.__raf.push(performance.timeOrigin + t); requestAnimationFrame(f); }; requestAnimationFrame(f);
+    try { new PerformanceObserver(l => { for (const e of l.getEntries()) window.__lt.push([performance.timeOrigin + e.startTime, e.duration]); }).observe({ type: 'longtask', buffered: true }); } catch { /* sin longtask */ }
+  }, NOMBRE);
+  const desde = llegadas.length;
+  await page.goto(base + 'juego.html?lang=es&dibujo=0&q=baja&semilla=20261112', { waitUntil: 'load' });
+  await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 90000 });
+  const { tA, tB } = await interactuarJuego(page);
+  await page.waitForTimeout(3500);
+  await page.evaluate(() => { document.dispatchEvent(new Event('visibilitychange')); window.dispatchEvent(new Event('pagehide')); });
+  await page.waitForTimeout(1500);
+  const m = await page.evaluate(([a, b]) => ({
+    mut: window.__mut.filter(x => x[0] >= a && x[0] <= b).map(x => x[1]),
+    raf: window.__raf.filter(t => t >= a && t <= b),
+    lt: window.__lt.filter(x => x[0] >= a && x[0] <= b).map(x => x[1]),
+  }), [tA ?? 0, tB ?? 0]);
+  const ev = rrwebDe(desde);
+  const seg = Math.max(0.001, ((tB ?? 0) - (tA ?? 0)) / 1000);
+  const dt = m.raf.slice(1).map((t, i) => t - m.raf[i]);
+  const quien = {}; for (const d of m.mut) quien[d] = (quien[d] || 0) + 1;
+  const r = {
+    flag, seg, ev, bytes: llegadas.slice(desde).filter(l => l.ruta.startsWith('/qx/s')).reduce((a, l) => a + l.bytes, 0),
+    mutDom: m.mut.length, top: Object.entries(quien).sort((a, b) => b[1] - a[1]).slice(0, 6),
+    mutGrab: ev.filter(e => esMutacion(e) && e.timestamp >= tA && e.timestamp <= tB).length,
+    cuadros: m.raf.length, p50: pct(dt, 0.5), p95: pct(dt, 0.95), lentos: dt.filter(x => x > 33).length, lt: m.lt.length, ltMs: Math.round(m.lt.reduce((a, b) => a + b, 0)),
+  };
+  console.log(`  juego, grabacion=${flag}: intento de ${seg.toFixed(1)} s · ${r.mutDom} mutaciones del DOM (${(r.mutDom / seg).toFixed(0)}/s; ${r.top.map(([k, v]) => `${k} ${v}`).join(', ')}) · ` +
+    `al grabador ${r.mutGrab} (${(r.mutGrab / seg).toFixed(1)}/s) · cuadros ${r.cuadros}, p50 ${r.p50.toFixed(1)} ms, p95 ${r.p95.toFixed(1)} ms, >33 ms ${r.lentos} · tareas largas ${r.lt} (${r.ltMs} ms) · /qx/s/ ${(r.bytes / 1024).toFixed(1)} KB en toda la carga`);
+  await ctx.close();
+  return r;
+}
+{
+  const con = await partida('todas');
+  const sin = await partida('off');
+  const todo = JSON.stringify(con.ev);
+  ok(con.ev.some(e => e.type === 2), 'juego: con grabacion=todas la carga se graba');
+  ok(!sin.ev.length, 'juego: con grabacion=off no se graba nada');
+  ok(!todo.includes(NOMBRE), `juego: el nombre del jugador no aparece en la grabación`);
+  ok(!/rr_dataURL|data:image\//.test(todo), 'juego: ni un cuadro del 3D en la grabación');
+  ok(con.mutGrab / con.seg <= MAX_MUT_S, `juego: durante el intento el grabador recibe ${(con.mutGrab / con.seg).toFixed(1)} mutaciones por segundo (tope ${MAX_MUT_S}; el DOM tuvo ${(con.mutDom / con.seg).toFixed(0)}/s)`);
+  notas.push(`juego: cuadros durante el intento con grabación p95 ${con.p95.toFixed(1)} ms, >33 ms ${con.lentos}, tareas largas ${con.lt}; sin grabación p95 ${sin.p95.toFixed(1)} ms, >33 ms ${sin.lentos}, tareas largas ${sin.lt}`);
 }
 
 await browser.close();

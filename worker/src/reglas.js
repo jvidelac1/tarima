@@ -2,9 +2,10 @@
 // todo lo que depende del tiempo o de la base entra como argumento. Se prueban en Node con tools/worker_test.mjs.
 
 // Versión del texto de privacidad que acepta quien se anota. 2026-11-b: sin borrado por no confirmar mientras no haya
-// correos, contacto pendiente y el HMAC de la IP explicado (web/privacidad.html). La «a» se sigue aceptando.
-export const CONSENTIMIENTO = '2026-11-b';
-export const VERSIONES_CONSENTIMIENTO = new Set(['2026-11-a', CONSENTIMIENTO]);
+// correos, contacto pendiente y el HMAC de la IP explicado (web/privacidad.html). 2026-11-c: grabación de sesión de la
+// página en una parte de las visitas. La «a» y la «b» se siguen aceptando (páginas del juego viejas en caché).
+export const CONSENTIMIENTO = '2026-11-c';
+export const VERSIONES_CONSENTIMIENTO = new Set(['2026-11-a', '2026-11-b', CONSENTIMIENTO]);
 export const DIA = 86400;            // segundos
 export const VENTANA_IP = 30 * DIA;  // cuenta por IP y retención del código de IP
 export const RETENCION = 180 * DIA;  // partidas y dispositivos sin lista
@@ -226,7 +227,8 @@ export const BANDERAS = {
   'muro-partidas-gratis': { valores: ['1', '2'], defecto: '2', pegajosa: true },
   'muro-texto': { valores: ['a', 'b'], defecto: 'a', pegajosa: true },
   'invitacion-podio1': { valores: ['on', 'off'], defecto: 'on' },
-  'grabacion': { valores: ['off', 'muestra'], defecto: 'off' },
+  // Grabación de sesión (docs/MVP.md 6.6): qué parte de las cargas se graba. Se cambia en PostHog sin publicar.
+  'grabacion': { valores: ['off', 'tercio', 'todas'], defecto: 'tercio' },
 };
 
 export const banderasPorDefecto = () => Object.fromEntries(Object.entries(BANDERAS).map(([k, b]) => [k, b.defecto]));

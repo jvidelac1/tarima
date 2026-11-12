@@ -2,3 +2,8 @@ posthog-js 1.441.2 (npm, publicado el 28 de octubre de 2026)
 Archivo: dist/module.js (ESM, sin dependencias externas), sin la línea de sourceMappingURL.
 Se carga solo si /api/estado devuelve la clave pública (web/js/game/analitica.js).
 sha256 del original: ba99025706b1375d55828d24e51cdab5203cc292c431dd447d4636945c4c431f
+
+Archivo: dist/lazy-recorder.js (grabador de sesión: rrweb e initSessionRecording, lo que posthog-js pediría a
+/static/lazy-recorder.js), del mismo paquete y sin la línea de sourceMappingURL. Lo carga analitica.js con una etiqueta
+<script> solo en las cargas que se graban (bandera `grabacion`, docs/MVP.md 6.6), antes de posthog.init.
+sha256 del original: 65dc171be15ed5d8785f2eea18d8f2071754c291a9d5970caf66750226b3820e

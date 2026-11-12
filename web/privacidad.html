@@ -1,8 +1,9 @@
 <!doctype html>
 <!--
-  Privacidad de Tarima (docs/MVP.md 5.2), en español neutro y en inglés. Versión 2026-11-b: es la que manda el juego al
+  Privacidad de Tarima (docs/MVP.md 5.2), en español neutro y en inglés. Versión 2026-11-c: es la que manda el juego al
   anotarse (CONSENTIMIENTO en web/js/game/servidor.js). Si cambia lo que dice este texto, subir la versión en los dos
   lugares y agregarla a VERSIONES_CONSENTIMIENTO en worker/src/reglas.js.
+  2026-11-c (12-nov-2026): grabación de sesión de la página en una parte de las visitas (docs/MVP.md 6.6).
 
   Datos del responsable completados el 12-nov-2026 (Juan C. Videla, Argentina, contacto por mail).
 -->
@@ -68,7 +69,7 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
   <!-- ================================ ESPAÑOL ================================ -->
   <article lang="es" data-idioma="es">
     <h1>Privacidad de Tarima</h1>
-    <p class="version">Versión 2026-11-b · 12 de noviembre de 2026</p>
+    <p class="version">Versión 2026-11-c · 12 de noviembre de 2026</p>
 
     <p>Responsable: Juan C. Videla,
       Argentina.
@@ -92,6 +93,8 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
     <p>Usamos PostHog (PostHog Inc., Estados Unidos) como encargado para medir cómo se juega: qué pantallas se ven, cuántas finales se terminan y dónde se deja de jugar. Los datos se alojan en la nube de PostHog en Estados Unidos. La transferencia desde Europa está cubierta por el acuerdo de tratamiento de datos de PostHog, con las cláusulas contractuales tipo de la Comisión Europea.</p>
     <p>Los datos pasan primero por nuestro propio sitio, que no le reenvía tu IP a PostHog. No usamos cookies de medición ni guardamos nada en tu navegador para esto. No le mandamos a PostHog tu nombre, tu correo, tu IP ni el identificador de tu navegador. Si te anotas, tus partidas quedan ligadas a un número interno de la lista, nunca a tu correo.</p>
     <p>Para probar variantes del juego (por ejemplo, el texto de una pantalla) usamos un código que sale del de tu dispositivo. Es un seudónimo y entra en el mismo interés legítimo de las finales gratis.</p>
+    <p data-grabacion>En una parte de las visitas, elegidas al azar (por defecto, una de cada tres), también grabamos cómo se usa la página, para ver dónde se traba la gente: los paneles, los botones y los textos del juego, y dónde tocas o haces clic. No grabamos la imagen 3D del levantamiento ni lo que escribes: los campos (tu nombre, tu correo y la respuesta libre de la encuesta) quedan tapados en la grabación, igual que cualquier texto de la pantalla que tenga tu nombre o un correo.</p>
+    <p>La grabación es parte de la medición: la procesa PostHog en Estados Unidos, pasa por el mismo camino sin tu IP y no guarda nada en tu navegador. Si desactivas la medición, tampoco se graba.</p>
     <div class="caja estado-medicion">
       <p data-medicion-texto>Medición anónima: <b data-medicion-valor>activada</b></p>
       <button type="button" class="boton secundario" data-medicion-boton>Desactivar</button>
@@ -122,7 +125,7 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
   <!-- ================================ ENGLISH ================================ -->
   <article lang="en" data-idioma="en" hidden>
     <h1>Tarima privacy</h1>
-    <p class="version">Version 2026-11-b · November 12, 2026</p>
+    <p class="version">Version 2026-11-c · November 12, 2026</p>
 
     <p>Controller: Juan C. Videla,
       Argentina.
@@ -146,6 +149,8 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
     <p>We use PostHog (PostHog Inc., United States) as a processor to measure how the game is played: which screens are seen, how many finals are finished and where people stop playing. Data is hosted in PostHog's US cloud. Transfers from Europe are covered by PostHog's data processing agreement, which includes the European Commission's standard contractual clauses.</p>
     <p>Data goes through our own site first, which doesn't forward your IP to PostHog. We use no measurement cookies and store nothing in your browser for this. We never send PostHog your name, email, IP or browser ID. If you join the list, your games are linked to an internal list number, never to your email.</p>
     <p>To test variants of the game (for example, the text on a screen) we use a code derived from your device's code. It's a pseudonym, covered by the same legitimate interest as free finals.</p>
+    <p data-grabacion>On some visits, picked at random (one in three by default), we also record how the page is used, to see where people get stuck: the game's panels, buttons and text, and where you tap or click. We don't record the 3D picture of the lift or what you type: fields (your name, your email and the survey's free-text answer) are blanked out in the recording, and so is any on-screen text that contains your name or an email.</p>
+    <p>Recording is part of measurement: PostHog processes it in the United States, it goes through the same route without your IP, and it stores nothing in your browser. If you turn measurement off, nothing is recorded.</p>
     <div class="caja estado-medicion">
       <p data-medicion-texto>Anonymous measurement: <b data-medicion-valor>on</b></p>
       <button type="button" class="boton secundario" data-medicion-boton>Turn off</button>

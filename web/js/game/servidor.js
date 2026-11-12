@@ -18,7 +18,7 @@
 //   con la cuenta en localStorage (`tarima.sim`) para que sobreviva a una recarga. `?gratis=1` cambia las 2 por 1.
 // Fuera de localhost esos dos modos no existen.
 
-export const CONSENTIMIENTO = '2026-11-b';     // versión de web/privacidad.html; el Worker acepta también la «a»
+export const CONSENTIMIENTO = '2026-11-c';     // versión de web/privacidad.html; el Worker acepta también la «a» y la «b»
 
 const CLAVES = {
   dispositivo: 'tarima.dispositivo',
@@ -321,7 +321,7 @@ export function crearServidor(o = {}) {
     const cupo = gratis + (s.encuesta ? 2 : 0);
     const quedan = s.lista ? null : Math.max(0, cupo - s.usadas);
     const guardar = () => local.set(CLAVES.sim, JSON.stringify(s));
-    const flags = { 'muro-partidas-gratis': String(gratis), 'muro-texto': params.get('texto') === 'b' ? 'b' : 'a', 'invitacion-podio1': 'on', grabacion: 'off' };
+    const flags = { 'muro-partidas-gratis': String(gratis), 'muro-texto': params.get('texto') === 'b' ? 'b' : 'a', 'invitacion-podio1': 'on', grabacion: 'tercio' };
     const contexto = { pais: null, previas: s.usadas, dias: '0' };
     const ok = j => Promise.resolve({ status: 200, j });
     if (ruta === '/api/estado') {

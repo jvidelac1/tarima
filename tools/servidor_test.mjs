@@ -3,14 +3,15 @@
 //     historia limpia (docs/MVP.md 7, endurecimiento 1), 429 y 503, reanudar una final una sola vez, lista, encuesta,
 //     baja, modo sin API en localhost y `?muro=firme`.
 //  2. web/js/game/analitica.js con un PostHog falso: no-op sin clave, cola antes de iniciar, configuración sin cookies,
-//     identify con lista_id, banderas, propiedades sin datos personales, interruptor de la privacidad.
+//     identify con lista_id, banderas, propiedades sin datos personales, interruptor de la privacidad, y la grabación de
+//     sesión (6.6): sorteo por la bandera `grabacion`, sin lienzo, campos y nombre tapados, nada sin medición.
 //  3. Las Functions de Pages (functions/): pasan /api/* al Worker con la IP y el país en cabeceras propias, y «/» muestra
 //     el juego.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearServidor, expDelPase, pareceCorreo, sugerirCorreo, CONSENTIMIENTO } from '../web/js/game/servidor.js';
-import { crearAnalitica, limpiarProps, fuenteTrafico } from '../web/js/game/analitica.js';
+import { crearAnalitica, limpiarProps, fuenteTrafico, proporcionGrabacion, taparTexto, BLOQUEO_GRABACION, BANDERAS } from '../web/js/game/analitica.js';
 import { reenviar } from '../functions/_reenviar.js';
 import { onRequest as raiz } from '../functions/index.js';
 import { VERSIONES_CONSENTIMIENTO } from '../worker/src/reglas.js';
@@ -56,8 +57,13 @@ const base = o => crearServidor({ host: 'liftinggame.pages.dev', buscar: '', esp
 
 // ---------- 1. servidor.js ----------
 
-igual(CONSENTIMIENTO, '2026-11-b', 'versión del consentimiento');
+igual(CONSENTIMIENTO, '2026-11-c', 'versión del consentimiento');
 ok(VERSIONES_CONSENTIMIENTO.has(CONSENTIMIENTO), 'el Worker acepta la versión que manda el juego');
+ok(['2026-11-a', '2026-11-b'].every(v => VERSIONES_CONSENTIMIENTO.has(v)), 'el Worker sigue aceptando las versiones anteriores');
+{
+  const priv = fs.readFileSync(path.join(ROOT, 'web/privacidad.html'), 'utf8');
+  ok((priv.match(new RegExp(`class="version">(Versión|Version) ${CONSENTIMIENTO} `, 'g')) || []).length === 2, 'la privacidad muestra la misma versión en los dos idiomas');
+}
 ok(pareceCorreo('ana@ejemplo.com') && !pareceCorreo('ana@ejemplo') && !pareceCorreo('ana ejemplo.com') && !pareceCorreo('a@b.c'), 'pareceCorreo');
 igual(sugerirCorreo('ana@gmial.com'), 'ana@gmail.com', 'sugerencia gmial');
 igual(sugerirCorreo('ana@hotmail.con'), 'ana@hotmail.com', 'sugerencia .con');
@@ -207,7 +213,7 @@ igual(expDelPase('basura'), null, 'pase inválido');
   const r = await s.anotar({ email: ' Ana@Ejemplo.com ', nombre: 'Rookie', idioma: 'es', novedades: true, sesion: 'ph_abc' });
   igual([r.ok, r.estado, r.confirmar], [true, 'nuevo', false], 'alta');
   const c = w.pedidos[0].cuerpo;
-  igual([c.email, c.aviso, c.novedades, c.consentimiento, c.nombre, c.web, c.sesion], ['Ana@Ejemplo.com', true, true, '2026-11-b', undefined, '', 'ph_abc'], 'cuerpo del alta (sin el nombre por defecto)');
+  igual([c.email, c.aviso, c.novedades, c.consentimiento, c.nombre, c.web, c.sesion], ['Ana@Ejemplo.com', true, true, CONSENTIMIENTO, undefined, '', 'ph_abc'], 'cuerpo del alta (sin el nombre por defecto)');
   igual(s.copia(), { muro: false, quedan: null, lista: true, motivo: null }, 'anotado: juego libre en la copia');
   igual((await s.anotar({ email: 'ana@ejemplo.com' })).error, 'descartable', 'error del Worker');
   igual((await s.anotar({ email: 'ana@ejemplo.com' })).error, 'limite', '429');
@@ -242,7 +248,8 @@ igual(expDelPase('basura'), null, 'pase inválido');
 function posthogFalso() {
   const ph = { llamadas: [], init(k, c) { this.llamadas.push(['init', k, c]); }, register(p) { this.llamadas.push(['register', p]); },
     capture(e, p, o) { this.llamadas.push(['capture', e, p, o]); }, identify(id) { this.llamadas.push(['identify', id]); },
-    get_distinct_id() { return 'ph_distinto'; }, set_config(c) { this.llamadas.push(['set_config', c]); } };
+    get_distinct_id() { return 'ph_distinto'; }, set_config(c) { this.llamadas.push(['set_config', c]); },
+    stopSessionRecording() { this.llamadas.push(['stopSessionRecording']); } };
   return ph;
 }
 const ventanaFalsa = (o = {}) => ({ location: { search: o.search ?? '', origin: 'https://liftinggame.pages.dev' }, matchMedia: () => ({ matches: true }), navigator: o.navigator, addEventListener() {} });
@@ -264,7 +271,7 @@ igual([fuenteTrafico('?utm_source=Amigos'), fuenteTrafico('?c=abc'), fuenteTrafi
 {
   // Con clave: configuración sin cookies, súper propiedades, cola en orden, identify antes del evento.
   const ph = posthogFalso(), v = ventanaFalsa({ search: '?c=xyz' }), sesion = new Mem();
-  const a = crearAnalitica({ ventana: v, local: new Mem(), sesion, cargar: async () => ph });
+  const a = crearAnalitica({ ventana: v, local: new Mem(), sesion, cargar: async () => ph, azar: () => 0.99 });
   a.ev('juego_abierto', { carga_ms: 12, pantalla_inicial: 'bienvenida' });
   a.visita('bienvenida');
   igual(await a.iniciar({ estado: { ...ESTADO, lista_id: 'a'.repeat(32) }, idioma: 'es', idioma_origen: 'navegador', version: 'mvp-1' }), true, 'con clave arranca');
@@ -311,6 +318,84 @@ igual([fuenteTrafico('?utm_source=Amigos'), fuenteTrafico('?c=abc'), fuenteTrafi
   a.activarMedicion();
   igual(a.medicionActivada(), true, 'activar otra vez');
   ok(!sesion.keys().some(k => /ph_/.test(k)) && !local.keys().some(k => /ph_/.test(k)), 'ninguna clave con ph_ en el almacenamiento');
+}
+
+// ---------- 2b. grabación de sesión (docs/MVP.md 6.6) ----------
+{
+  igual([proporcionGrabacion('off'), proporcionGrabacion('tercio'), proporcionGrabacion('todas'), proporcionGrabacion('muestra'), proporcionGrabacion(undefined)], [0, 1 / 3, 1, 0, 0], 'proporción por bandera');
+  igual(BANDERAS.grabacion, 'tercio', 'un tercio por defecto en el cliente');
+  const tapado = t => t.replace(/\S/g, '*');
+  igual([taparTexto('Elige tu pesista, Ana', ['ana']), taparTexto('Jugar', ['ana']), taparTexto('Escribe a ana@x.com', []), taparTexto('ANA PÉREZ gana', ['ana pérez'])],
+    [tapado('Elige tu pesista, Ana'), 'Jugar', tapado('Escribe a ana@x.com'), tapado('ANA PÉREZ gana')], 'taparTexto: nombre y correos tapados, lo demás en claro');
+  ok(/\bcanvas\b/.test(BLOQUEO_GRABACION) && /#senal\b/.test(BLOQUEO_GRABACION), 'bloqueo: los lienzos y la señal del intento');
+
+  // Arma una analítica con PostHog y grabador falsos. `orden` anota qué se cargó y cuándo se llamó init.
+  const armar = ({ grabacion, azar = () => 0, local = new Mem(), falla = false, documento = null, search = '' } = {}) => {
+    const ph = posthogFalso(), orden = [];
+    const ini = ph.init; ph.init = function (k, c) { orden.push('init'); return ini.call(this, k, c); };
+    const v = { ...ventanaFalsa({ search }), document: documento };
+    let tiradas = 0;
+    const a = crearAnalitica({ ventana: v, local, sesion: new Mem(), cargar: async () => { orden.push('posthog'); return ph; },
+      cargarGrabador: async () => { orden.push('grabador'); if (falla) throw new Error('no'); }, azar: () => { tiradas++; return azar(); } });
+    const est = { ...ESTADO, flags: grabacion === undefined ? { 'muro-texto': 'b' } : { 'muro-texto': 'b', grabacion } };
+    return { a, ph, v, orden, est, tiradas: () => tiradas, cfg: () => ph.llamadas.find(l => l[0] === 'init')?.[2], reg: () => ph.llamadas.find(l => l[0] === 'register')?.[1] };
+  };
+  {
+    const x = armar({ grabacion: 'off' });
+    igual(await x.a.iniciar({ estado: x.est }), true, 'off: la medición arranca igual');
+    igual([x.orden, x.cfg().disable_session_recording, x.a.grabando(), x.reg().grabada, x.v._POSTHOG_REMOTE_CONFIG], [['posthog', 'init'], true, false, false, undefined], 'off: sin grabador ni grabación');
+  }
+  {
+    const x = armar({ grabacion: 'todas', azar: () => 0.999 });
+    await x.a.iniciar({ estado: x.est });
+    const c = x.cfg();
+    igual([x.orden.at(-1), x.orden.includes('grabador'), c.disable_session_recording, x.a.grabando(), x.reg().grabada, x.reg()['$feature/grabacion']], ['init', true, false, true, true, 'todas'], 'todas: el grabador se carga antes de init y se graba');
+    const sr = c.session_recording;
+    igual([sr.maskAllInputs, sr.captureCanvas.recordCanvas, sr.blockSelector, sr.maskTextSelector, sr.recordHeaders, sr.recordBody, c.enable_recording_console_log, c.advanced_disable_flags, c.disable_external_dependency_loading],
+      [true, false, BLOQUEO_GRABACION, '*', false, false, false, true, true], 'todas: campos tapados, sin lienzo, sin red ni consola, sin pedidos extra a PostHog');
+    const rc = x.v._POSTHOG_REMOTE_CONFIG?.phc_PRUEBA123?.config;
+    igual([rc?.sessionRecording?.endpoint, rc?.sessionRecording?.recordCanvas, rc?.hasFeatureFlags], ['/s/', false, false], 'todas: configuración de la grabación puesta a mano (sin pedirla a PostHog)');
+    x.a.desactivarMedicion();
+    igual([x.ph.llamadas.some(l => l[0] === 'stopSessionRecording'), x.a.grabando()], [true, false], 'desactivar la medición corta la grabación');
+  }
+  {
+    // El nombre: el guardado y el que se está escribiendo en la bienvenida o en el editor del teléfono.
+    const campos = { nombre: { value: '  Ana  ' }, 'editor-campo': { value: 'Lucía' } };
+    const x = armar({ grabacion: 'todas', local: new Mem({ 'tarima.nombre': 'Brenda' }), documento: { getElementById: id => campos[id] || null } });
+    await x.a.iniciar({ estado: x.est });
+    const f = x.cfg().session_recording.maskTextFn;
+    const textos = ['Elige tu pesista, Ana', 'BRENDA · 120 kg', 'Hola de nuevo, Lucía', 'Arranque · 2.º intento', 'te anotaste: a@b.com'];
+    igual(textos.map(t => f(t)), textos.map((t, i) => (i === 3 ? t : tapado(t))), 'maskTextFn tapa el nombre guardado, el que se escribe y los correos');
+  }
+  {
+    // tercio: una tirada por carga; < 1/3 graba.
+    const si = armar({ grabacion: 'tercio', azar: () => 0.2 }), no = armar({ grabacion: 'tercio', azar: () => 0.5 }), def = armar({ azar: () => 0.1 });
+    for (const x of [si, no, def]) await x.a.iniciar({ estado: x.est });
+    await si.a.iniciar({ estado: si.est });
+    igual([si.a.grabando(), no.a.grabando(), no.orden.includes('grabador'), def.a.grabando(), si.tiradas()], [true, false, false, true, 1], 'tercio: se sortea una vez por carga');
+    let grabadas = 0; const N = 3000;
+    for (let i = 0; i < N; i++) {
+      const a = crearAnalitica({ ventana: ventanaFalsa(), local: new Mem(), sesion: new Mem(), cargar: async () => posthogFalso(), cargarGrabador: async () => {} });
+      await a.iniciar({ estado: { ...ESTADO, flags: { grabacion: 'tercio' } } });
+      if (a.grabando()) grabadas++;
+    }
+    ok(grabadas / N > 0.3 && grabadas / N < 0.367, `tercio: con Math.random se graban ${grabadas} de ${N}`);
+  }
+  {
+    // Sin medición no hay grabación (ni se descarga el grabador), aunque la bandera diga todas.
+    for (const [o, msg] of [[{ local: new Mem({ 'tarima.medicion': '0' }) }, 'medición desactivada'], [{ search: '?metricas=0' }, '?metricas=0']]) {
+      const x = armar({ grabacion: 'todas', ...o });
+      igual([await x.a.iniciar({ estado: x.est }), x.orden, x.a.grabando()], [false, [], false], `${msg}: ni PostHog ni grabador`);
+    }
+    const x = armar({ grabacion: 'todas' });
+    await x.a.iniciar({ estado: { ...x.est, metricas: null } });
+    igual([x.orden, x.a.grabando()], [[], false], 'sin clave: ni PostHog ni grabador');
+  }
+  {
+    // Si el grabador no carga, la medición sigue sin grabación.
+    const x = armar({ grabacion: 'todas', falla: true });
+    igual([await x.a.iniciar({ estado: x.est }), x.cfg().disable_session_recording, x.a.grabando(), x.reg().grabada, x.v._POSTHOG_REMOTE_CONFIG], [true, true, false, false, undefined], 'grabador que no carga: medición sin grabación');
+  }
 }
 
 // ---------- 3. Functions de Pages ----------

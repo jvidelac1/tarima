@@ -110,7 +110,7 @@ describe('estado y cookie', () => {
     expect(r.res.headers.get('cache-control')).toBe('no-store');
     expect(r.j).toMatchObject({ puede: true, quedan: 2, lista: false, encuesta_disponible: true, metricas: null });
     expect(r.j.contexto).toMatchObject({ previas: 0, dias: '0' });
-    expect(r.j.flags).toEqual({ 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'off' });
+    expect(r.j.flags).toEqual({ 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio' });
     expect(r.j.dispositivo).toMatch(/^[0-9a-f-]{36}$/);
     const c = r.res.headers.get('set-cookie');
     expect(c).toContain(`tdv=${r.j.dispositivo}`);
@@ -254,7 +254,7 @@ describe('encuesta', () => {
 describe('lista de espera', () => {
   const alta = (email, o = {}) => llamar('/api/anotar', {
     dispositivo: o.dispositivo ?? uuid(), sesion: 's', email, nombre: o.nombre, idioma: o.idioma ?? 'es',
-    aviso: o.aviso ?? true, novedades: o.novedades ?? false, consentimiento: o.consentimiento ?? '2026-11-b', web: o.web,
+    aviso: o.aviso ?? true, novedades: o.novedades ?? false, consentimiento: o.consentimiento ?? '2026-11-c', web: o.web,
   }, { ip: o.ip ?? nuevaIp(), e: o.e, cookie: o.cookie });
 
   it('rechaza formato, aviso, descartables y dominios sin correo', async () => {
@@ -284,7 +284,7 @@ describe('lista de espera', () => {
     expect(r.j).toMatchObject({ estado: 'nuevo', confirmar: false });
     expect(r.j.lista_id).toMatch(/^[0-9a-f]{32}$/);
     const fila = await env.DB.prepare('SELECT * FROM lista WHERE id = ?').bind(r.j.lista_id).first();
-    expect(fila).toMatchObject({ email: 'juana.perez+tarima@buendominio.com', nombre: 'Juana Pérez', idioma: 'es', novedades: 1, consentimiento_version: '2026-11-b', confirmado_en: null, confirmar_mandado_en: null });
+    expect(fila).toMatchObject({ email: 'juana.perez+tarima@buendominio.com', nombre: 'Juana Pérez', idioma: 'es', novedades: 1, consentimiento_version: '2026-11-c', confirmado_en: null, confirmar_mandado_en: null });
 
     expect((await llamar('/api/estado', { dispositivo: a }, { ip })).j).toMatchObject({ puede: true, lista: true, lista_id: r.j.lista_id, quedan: null });
     for (let k = 0; k < 4; k++) expect((await pedirPartida(a, ip)).j).toMatchObject({ estado: 'ok', fuente: 'lista', quedan: null });
@@ -492,7 +492,7 @@ describe('banderas de PostHog', () => {
     const ip = nuevaIp(), a = uuid();
     flagsRespuesta = { flags: { 'muro-partidas-gratis': { key: 'muro-partidas-gratis', enabled: true, variant: '1' }, 'muro-texto': { enabled: true, variant: 'b' }, 'invitacion-podio1': { enabled: false } }, errorsWhileComputingFlags: false };
     const r = await llamar('/api/estado', { dispositivo: a }, { ip, e });
-    expect(r.j.flags).toEqual({ 'muro-partidas-gratis': '1', 'muro-texto': 'b', 'invitacion-podio1': 'off', grabacion: 'off' });
+    expect(r.j.flags).toEqual({ 'muro-partidas-gratis': '1', 'muro-texto': 'b', 'invitacion-podio1': 'off', grabacion: 'tercio' });
     expect(r.j.quedan).toBe(1);
     const pedido = salidas.find(s => s.url.pathname === '/flags');
     expect(pedido.url.search).toBe('?v=2');

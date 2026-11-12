@@ -11,6 +11,11 @@
 // - Las banderas (6.5) las evalúa el Worker: llegan en /api/estado y se pasan como bootstrap y como `$feature/<bandera>`.
 // - La encuesta va por la API de Surveys: el juego manda `survey shown` y `survey dismissed`; `survey sent` lo manda el
 //   Worker con las respuestas (5.4).
+// - Grabación de sesión (6.6): solo en una parte de las cargas, según la bandera `grabacion` (off · tercio · todas),
+//   decidido una vez por carga, que con la persistencia en memoria es una sesión de PostHog. Graba la página (paneles,
+//   botones, textos, toques), nunca el lienzo 3D; los campos van tapados y el texto que tenga el nombre del jugador o
+//   una «@» también. Los nodos que cambian en cada cuadro (la señal del intento) quedan fuera (BLOQUEO_GRABACION).
+//   Sin medición no hay grabación. El grabador (web/vendor/posthog/lazy-recorder.js) se descarga solo si se graba.
 //
 // Uso (lo conecta main.js):
 //   import { analitica } from './analitica.js';
@@ -27,7 +32,34 @@ export const EVENTOS = new Set([
   'medicion_desactivada', 'error_juego',
 ]);
 
-export const BANDERAS = { 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'off' };
+export const BANDERAS = { 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio' };
+
+/** Qué parte de las cargas se graba según la bandera `grabacion` (worker/src/reglas.js). Un valor desconocido no graba. */
+export const GRABACION = { off: 0, tercio: 1 / 3, todas: 1 };
+export const proporcionGrabacion = v => (typeof v === 'string' && Object.hasOwn(GRABACION, v) ? GRABACION[v] : 0);
+
+/**
+ * Lo que la grabación no mira (se ve como una caja vacía del mismo tamaño): los lienzos (el 3D y las ayudas) y los nodos
+ * que cambian en cada cuadro durante el intento (#senal: escala, opacidad y anillos por cuadro; #acuse y #depura).
+ * Así el grabador no procesa una mutación por cuadro mientras se levanta.
+ */
+export const BLOQUEO_GRABACION = 'canvas, #senal, #acuse, #depura';
+
+/** Campos de la página cuyo valor es el nombre del jugador mientras lo escribe (bienvenida y editor del teléfono). */
+const CAMPOS_NOMBRE = ['nombre', 'editor-campo'];
+
+const normal = s => String(s ?? '').normalize('NFC').replace(/\s+/g, ' ').trim().toLocaleLowerCase();
+
+/**
+ * Texto de la página tal como va a la grabación: tapado con «*» si tiene una «@» (un correo) o alguno de los nombres
+ * (el guardado o el que se está escribiendo, de 2 letras o más); si no, igual. Los campos los tapa maskAllInputs.
+ */
+export function taparTexto(texto, nombres = []) {
+  const t = String(texto ?? '');
+  const n = normal(t);
+  if (n.includes('@') || nombres.some(x => x && n.includes(x))) return t.replace(/\S/g, '*');
+  return t;
+}
 
 const PROHIBIDAS = /^(nombre|name|email|mail|correo|ip|\$ip|dispositivo|device|lista_id|telefono|phone)$/i;
 const CLAVE_PUBLICA = 'tarima.clave_publica';   // sessionStorage: solo para mandar `medicion_desactivada` desde la privacidad
@@ -73,11 +105,14 @@ export function crearAnalitica(o = {}) {
   const buscar = o.buscar ?? ventana?.location?.search ?? '';
   const origen = o.origen ?? ventana?.location?.origin ?? '';
   const ahora = o.ahora || (() => Date.now());
+  const azar = o.azar || Math.random;
+  const cargarGrabador = o.cargarGrabador || (() => scriptGrabador(ventana));
 
   let estado = 'esperando';   // esperando | activa | apagada
   let ph = null;
   let flags = { ...BANDERAS };
   let anonimo = null;
+  let grabar = false;
   const cola = [];
   const avisados = new Set();
 
@@ -128,8 +163,12 @@ export function crearAnalitica(o = {}) {
     if (estado !== 'esperando') return estado === 'activa';
     if (!clave || apagadaPorUsuario() || !ventana) { apagar(); return false; }
     sesion.set(CLAVE_PUBLICA, clave);
+    // Grabación: se sortea una vez por carga. El grabador va antes de init (si no, posthog-js lo pediría a /static/).
+    const p = proporcionGrabacion(flags.grabacion);
+    grabar = p > 0 && azar() < p;
     try {
-      ph = await cargar();
+      [ph] = await Promise.all([cargar(), grabar ? cargarGrabador().catch(() => { grabar = false; }) : null]);
+      if (grabar) configGrabacionRemota(ventana, clave);
       const banderasProps = Object.fromEntries(Object.entries(flags).map(([k, v]) => [`$feature/${k}`, String(v)]));
       ph.init(clave, {
         api_host: origen + (m.host || '/qx'),
@@ -138,21 +177,24 @@ export function crearAnalitica(o = {}) {
         person_profiles: 'identified_only',
         autocapture: false, capture_pageview: false, capture_pageleave: true,
         rageclick: false, capture_dead_clicks: false, capture_heatmaps: false, capture_performance: false,
-        capture_exceptions: false, disable_session_recording: true, disable_surveys: true,
+        capture_exceptions: false, disable_session_recording: !grabar, disable_surveys: true,
         disable_surveys_automatic_display: true, disable_web_experiments: true, disable_product_tours: true,
         disable_conversations: true, disable_external_dependency_loading: true,
         advanced_disable_flags: true, advanced_disable_decide: true, advanced_disable_feature_flags: true,
         bootstrap: { featureFlags: flags },
         mask_all_text: true, mask_all_element_attributes: true, save_referrer: false,
+        enable_recording_console_log: false,
+        session_recording: opcionesGrabacion(() => nombresDelJugador()),
       });
       ph.register(limpiarProps({
         idioma, idioma_origen, version,
         tactil: !!(ventana.matchMedia && ventana.matchMedia('(pointer: coarse)').matches),
         pais: est?.contexto?.pais ?? null, previas: est?.contexto?.previas ?? null, dias: est?.contexto?.dias ?? null,
-        fuente_trafico: fuenteTrafico(buscar), pantalla, ...banderasProps,
+        fuente_trafico: fuenteTrafico(buscar), pantalla, grabada: grabar, ...banderasProps,
       }));
       estado = 'activa';
     } catch {
+      grabar = false;
       apagar();
       return false;
     }
@@ -167,13 +209,24 @@ export function crearAnalitica(o = {}) {
     return true;
   }
 
-  /** Sin medición en esta carga (los eventos siguen yendo a window.JUEGO.eventos). */
+  /** Sin medición en esta carga (los eventos siguen yendo a window.JUEGO.eventos). Corta la grabación si había. */
   function apagar() {
+    if (grabar && ph) { try { ph.stopSessionRecording(); } catch { /* nada */ } }
+    grabar = false;
     estado = 'apagada';
     cola.length = 0;
   }
 
+  /** Nombres que no pueden quedar en claro en la grabación: el guardado y el que se está escribiendo. */
+  function nombresDelJugador() {
+    const doc = ventana?.document;
+    const out = [local.get('tarima.nombre'), ...CAMPOS_NOMBRE.map(id => { try { return doc?.getElementById(id)?.value; } catch { return null; } })];
+    return out.map(normal).filter(x => [...x].length >= 2);
+  }
+
   const activa = () => estado === 'activa';
+  /** true si esta carga se graba (sorteada, con medición y con el grabador cargado). */
+  const grabando = () => estado === 'activa' && grabar;
   const bandera = nombre => flags[nombre] ?? BANDERAS[nombre] ?? null;
 
   /** Id para el campo `sesion` del Worker: el de PostHog si hay medición, si no uno al azar de esta carga. */
@@ -239,9 +292,59 @@ export function crearAnalitica(o = {}) {
 
   return {
     get estado() { return estado; },
-    ev, identificar, visita, iniciar, apagar, activa, bandera, idSesion, encuestaVista, encuestaCerrada, consentir,
+    ev, identificar, visita, iniciar, apagar, activa, grabando, bandera, idSesion, encuestaVista, encuestaCerrada, consentir,
     desactivarMedicion, activarMedicion, medicionActivada, instalarErrores,
   };
+}
+
+/**
+ * Opciones de `session_recording` de posthog-js. Lo del cliente gana sobre lo que diga el proyecto de PostHog, así que
+ * aunque alguien prenda ahí el lienzo o afloje el enmascarado, acá sigue apagado y tapado.
+ */
+export function opcionesGrabacion(nombres = () => []) {
+  return {
+    maskAllInputs: true,                          // mail, nombre, respuesta libre: siempre «***»
+    maskTextSelector: '*',                        // todo texto pasa por maskTextFn…
+    maskTextFn: texto => taparTexto(texto, nombres()),   // …que tapa solo lo del jugador
+    blockSelector: BLOQUEO_GRABACION,
+    captureCanvas: { recordCanvas: false },       // nunca el 3D: le quitaría fluidez al juego
+    recordHeaders: false, recordBody: false,      // nada de la red
+    recordCrossOriginIframes: false,
+    collectFonts: false,
+  };
+}
+
+/**
+ * Configuración «remota» de la grabación puesta a mano antes de init. Con advanced_disable_flags posthog-js no pide la
+ * configuración del proyecto; la toma de window._POSTHOG_REMOTE_CONFIG (como el array.js de cada proyecto). Sin flags
+ * ni compresión extra, sin consola, sin red y sin lienzo. Las grabaciones van a /qx/s/.
+ */
+export function configGrabacionRemota(ventana, clave) {
+  if (!ventana) return;
+  const previo = ventana._POSTHOG_REMOTE_CONFIG && typeof ventana._POSTHOG_REMOTE_CONFIG === 'object' ? ventana._POSTHOG_REMOTE_CONFIG : {};
+  ventana._POSTHOG_REMOTE_CONFIG = {
+    ...previo,
+    [clave]: { config: {
+      hasFeatureFlags: false, capturePerformance: false, autocapture_opt_out: true, heatmaps: false, surveys: false,
+      sessionRecording: { endpoint: '/s/', recordCanvas: false, consoleLogRecordingEnabled: false, networkPayloadCapture: { recordHeaders: false, recordBody: false } },
+    } },
+  };
+}
+
+/** Carga web/vendor/posthog/lazy-recorder.js con una etiqueta <script> (define rrweb e initSessionRecording). */
+function scriptGrabador(ventana) {
+  return new Promise((ok, mal) => {
+    const ext = ventana?.__PosthogExtensions__;
+    if (ext?.rrweb?.record && ext?.initSessionRecording) { ok(); return; }
+    const doc = ventana?.document;
+    if (!doc) { mal(new Error('sin documento')); return; }
+    const s = doc.createElement('script');
+    s.src = new URL('../../vendor/posthog/lazy-recorder.js', import.meta.url).href;
+    s.async = true;
+    s.onload = () => (ventana.__PosthogExtensions__?.initSessionRecording ? ok() : mal(new Error('grabador incompleto')));
+    s.onerror = () => mal(new Error('grabador'));
+    (doc.head || doc.documentElement).appendChild(s);
+  });
 }
 
 // La instancia del juego (en el navegador). En node, `analitica` es null y las pruebas usan crearAnalitica().
