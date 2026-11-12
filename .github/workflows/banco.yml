@@ -68,6 +68,13 @@ jobs:
         timeout-minutes: 20
         run: node tools/banco.mjs --ancho=960 --alto=540 --limite=420 --json=out/banco/banco.json 2>&1 | tee out/logs/banco.log
 
+      # Fotos de «Baja» como era antes de abaratarla y como es ahora, con cada cámara del juego (mismo cuadro del arranque).
+      # Por software: sirven para comparar el aspecto, no el costo.
+      - name: Fotos de Baja antes y ahora (banco --fotos)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 12
+        run: node tools/banco.mjs --fotos=out/banco/fotos --ancho=1280 --alto=620 2>&1 | tee out/logs/banco_fotos.log
+
       - name: Resultado como artefacto
         if: ${{ always() }}
         uses: actions/upload-artifact@v6
