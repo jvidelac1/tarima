@@ -50,7 +50,7 @@ SEM = {'rest_bust': 2100, 'fin_bust': 2200, 'fin_full': 2300}
 NVISTA = {'front': 1, 'left': 2, 'back': 3, 'right': 4}
 DENOISE = 1.0     # --denoise: menos de 1 parte del render crudo con ruido (conserva más la silueta y cambia menos la forma)
 
-V_IND = 3      # versión de las indicaciones (queda anotada en cada intento); v3 = v2 sin nombrar el cinturón en el busto
+V_IND = 4      # versión de las indicaciones (queda anotada en cada intento); v3 = v2 sin nombrar el cinturón en el busto; v4 = tatuaje por vista y sin estrías
 QUIEN = ('the same fictional adult male weightlifter with accurate, clearly readable muscle anatomy of an elite 81 kg class '
          'weightlifter, lean and athletic, not a bodybuilder')
 NO_ENSANCHAR = 'Do not make the arms, shoulders, neck, torso or legs wider or thicker than they are, and do not move the hands.'
@@ -103,8 +103,18 @@ def p_una(vista, juego):
     """Una sola imagen (el render crudo de la vista), como el frente: con dos imágenes Qwen casi copia el render."""
     return (f'{MIRA[vista]} Keep the exact outline, pose, framing and camera of the figure, and keep the background pure solid black. '
             f'Repaint only the surface of the body so that it reads as {QUIEN}: {anat(vista, juego)}. {NO_ENSANCHAR} '
-            f'He wears {ROPA[juego.split("_")[1]]}. Same head, beard, hair, skin tone, white wrist wraps, and the '
-            'black armband tattoo only where it is now. Realistic skin. Soft even studio lighting, no cast shadows, no rim light.')
+            f'He wears {ROPA[juego.split("_")[1]]}. Same head, beard, hair, skin tone and white wrist wraps. {TATUAJE[vista]}'
+            'Realistic smooth skin, muscles defined without striations or veins. Soft even studio lighting, no cast shadows, no rim light.')
+
+
+# El tatuaje está solo en el brazo izquierdo. Nombrarlo en la vista derecha hizo aparecer una banda negra en el brazo derecho,
+# y «only where it is now» lo borró en la izquierda: se pide conservarlo donde se ve y en la derecha va a la negativa.
+TATUAJE = {'left': 'Keep the black armband tattoo on the upper arm exactly as it is. ',
+           'back': 'Keep the black armband tattoo exactly as it is, on that arm only. ', 'right': ''}
+
+
+def neg_de(vista):
+    return NEG + ', muscle striations, veins' + (', tattoo, armband, black band on the arm' if vista == 'right' else '')
 
 
 def p_vista(vista, orden, juego):
@@ -255,7 +265,7 @@ def cmd_vistas(a):
             if a.una:
                 a.orden = 'una'
                 plan_de = lambda: {'plantilla': 'image_qwen_image_edit_2511_int8', 'puentes': PUENTES,
-                                   'trabajos': [{'indicacion': p_una(vista, juego), 'negativa': NEG, 'imagenes': [cr]}]}
+                                   'trabajos': [{'indicacion': p_una(vista, juego), 'negativa': neg_de(vista), 'imagenes': [cr]}]}
             else:
                 im = {'41': fr, 'ref2': cr} if a.orden == 'plan' else {'41': cr, 'ref2': fr}
                 plan_de = lambda: {'plantilla': 'image_qwen_image_edit_2511_int8', 'puentes': PUENTES,
