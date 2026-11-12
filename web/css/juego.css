@@ -257,6 +257,9 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
   button{font-size:clamp(13px,3.9cqh,15px);min-height:40px;padding:.45em .9em}
   .fila{margin:.35em 0}
   .pasos,.pesistas{gap:6px;margin:.4em 0}
+  .panel p{line-height:1.32}
+  .pesista{padding:.4em .55em}
+  .pesista .b{height:.75em;margin-bottom:.3em}
   .kgsel output{font-size:clamp(26px,9cqh,38px)}
   .podio{margin:.4em 0}.podio .p1{padding-bottom:2.2em}.podio .p2{padding-bottom:1.3em}.podio .p3{padding-bottom:.6em}
   .pulso{width:clamp(56px,19cqh,88px);margin:.3em auto}
