@@ -7,6 +7,9 @@
 //   --out=<carpeta>   destino de las capturas y de shots.json (lista de planos + datos de cada corrida)
 //   --clay            material de arcilla gris en las mallas del atleta; oculta pelo, barba, cejas y pestañas. Solo P01 a P12.
 //                     (gris oscuro 0x303030: con las luces de la sala un gris medio se quema y aplana el relieve)
+//                     Baja los contraluces: de espaldas (P03, P04) los dos contraluces y la luz de pelo quedan del lado de la
+//                     cámara, casi parejos, y lavaban el relieve. Queda el contraluz frío como clave de la espalda; el cálido
+//                     baja a 0,25 y la luz de pelo a 0,15 (LUCES_ARCILLA). Vale para todos los planos de la corrida de arcilla.
 //   --mask            máscaras para medir, sin post: el atleta solo, sobre negro, con color plano por segmento según el hueso que
 //                     más pesa en cada vértice (rojo = brazo, verde = antebrazo y mano, azul = resto); oculta el pelo como la
 //                     arcilla. Tres imágenes por plano: <tag>_mask_P01.png (lo que se ve), <tag>_maskb_P01.png (los brazos solos,
@@ -64,6 +67,8 @@ const PLANOS = [
   { id: 'P15', who: 'brenner', lift: 'c', jerk: 'split', fase: FINAL, shot: 'arriba', arcilla: false, nota: 'Control del otro biotipo.' },
   { id: 'P16', who: 'brenner', lift: 's', fase: '^Recuperación', cam: 2, arcilla: false, nota: 'Control del otro biotipo, figura entera.' },
 ];
+// Factor de intensidad en arcilla de las luces que quedan detrás del atleta (z < 0 en lighting.js), por signo de x.
+const LUCES_ARCILLA = { izquierda: 1, derecha: .25, centro: .15 };
 const LIFT = { c: 'dos tiempos', s: 'arranque' }, JERK = { split: 'con tijera', power: 'power jerk', squat: 'squat jerk' };
 const CONDICIONES = { ancho: W, alto: H, dpr: 1, query: `?${QUERY}&who=<atleta>`, kilos: 'por defecto', reloj: 'manual (TARIMA.manualClock)', camara: 'sin deriva (prefers-reduced-motion y rig.reduceMotion)', azar: 'Math.random sembrado en la página de captura', grafica: 'visible salvo --no-gfx' };
 
@@ -129,6 +134,15 @@ try {
     for (const s of extra) if (!A.SHOTS.some(x => x.key === s.key)) A.SHOTS.push(s);
     if (!gfx) { const st = document.createElement('style'); st.textContent = '.gfx{display:none!important}'; document.head.appendChild(st); }
   }, [EXTRA_SHOTS, GFX]);
+  if (CLAY) {
+    run.luces_arcilla = await page.evaluate(k => {
+      const out = [];
+      TARIMA.scene.traverse(o => { if (!o.isSpotLight || o.position.z >= 0) return; const f = o.position.x < -.5 ? k.izquierda : o.position.x > .5 ? k.derecha : k.centro, i0 = o.intensity; o.intensity = i0 * f; out.push({ pos: o.position.toArray(), antes: i0, ahora: +o.intensity.toFixed(3) }); });
+      return out;
+    }, LUCES_ARCILLA);
+    console.log(`luces de arcilla: ${run.luces_arcilla.map(l => `${l.antes} -> ${l.ahora}`).join(' · ')}`);
+    if (run.luces_arcilla.length !== 3) problems.push(`arcilla: esperaba 3 luces traseras y hay ${run.luces_arcilla.length}`);
+  }
 
   for (const p of todo) {
     const info = await page.evaluate(async ([p, clay, prop, mask]) => {
