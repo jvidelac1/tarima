@@ -1,0 +1,27 @@
+{
+ "nota": "E6, G4 (Pixal3D de una vista) y G5 (TRELLIS.2) con el frente repintado de rest_bust; ver e6_una_vista.ejemplo.json.",
+ "plantilla": "3d_pixal3d_trellis2_image_to_model",
+ "fijos": {
+  "@Switch: Remove background.switch": false
+ },
+ "trabajos": [
+  {
+   "salida": "out/arte/gen/G4.glb",
+   "imagenes": [
+    "out/arte/refs_gen/ventura_rest_bust_front.png"
+   ],
+   "set": {
+    "@Boolean (Switch to Trellis2).value": false
+   }
+  },
+  {
+   "salida": "out/arte/gen/G5.glb",
+   "imagenes": [
+    "out/arte/refs_gen/ventura_rest_bust_front.png"
+   ],
+   "set": {
+    "@Boolean (Switch to Trellis2).value": true
+   }
+  }
+ ]
+}

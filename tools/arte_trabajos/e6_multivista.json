@@ -1,0 +1,90 @@
+{
+ "nota": "E6, Pixal3D multivista con cuatro vistas sueltas (ver e6_multivista.ejemplo.json). G0 = renders crudos de rest_bust (control: tiene que devolver nuestra propia forma); G1 a G3 = vistas repintadas de E5 (rest_bust, fin_bust, fin_full). Semillas de la plantilla (56, 43, 42, 42). Si falta memoria a 1536: e6_multivista_1024.json.",
+ "plantilla": "3d_pixal3d_multi_views",
+ "quitar": [
+  "SaveImageAdvanced"
+ ],
+ "agregar": {
+  "v_front": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": ""
+   }
+  },
+  "v_left": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": ""
+   }
+  },
+  "v_back": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": ""
+   }
+  },
+  "v_right": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": ""
+   }
+  }
+ },
+ "fijos": {
+  "Pixal3DMultiViewConditioning.front": [
+   "v_front",
+   0
+  ],
+  "Pixal3DMultiViewConditioning.left": [
+   "v_left",
+   0
+  ],
+  "Pixal3DMultiViewConditioning.back": [
+   "v_back",
+   0
+  ],
+  "Pixal3DMultiViewConditioning.right": [
+   "v_right",
+   0
+  ],
+  "Pixal3DMultiViewConditioning.fov": 20
+ },
+ "trabajos": [
+  {
+   "salida": "out/arte/gen/G0.glb",
+   "imagenes": {
+    "v_front": "out/arte/refs/ventura_rest_bust_front.png",
+    "v_left": "out/arte/refs/ventura_rest_bust_left.png",
+    "v_back": "out/arte/refs/ventura_rest_bust_back.png",
+    "v_right": "out/arte/refs/ventura_rest_bust_right.png"
+   }
+  },
+  {
+   "salida": "out/arte/gen/G1.glb",
+   "imagenes": {
+    "v_front": "out/arte/refs_gen/ventura_rest_bust_front.png",
+    "v_left": "out/arte/refs_gen/ventura_rest_bust_left.png",
+    "v_back": "out/arte/refs_gen/ventura_rest_bust_back.png",
+    "v_right": "out/arte/refs_gen/ventura_rest_bust_right.png"
+   }
+  },
+  {
+   "salida": "out/arte/gen/G2.glb",
+   "imagenes": {
+    "v_front": "out/arte/refs_gen/ventura_fin_bust_front.png",
+    "v_left": "out/arte/refs_gen/ventura_fin_bust_left.png",
+    "v_back": "out/arte/refs_gen/ventura_fin_bust_back.png",
+    "v_right": "out/arte/refs_gen/ventura_fin_bust_right.png"
+   }
+  },
+  {
+   "salida": "out/arte/gen/G3.glb",
+   "imagenes": {
+    "v_front": "out/arte/refs_gen/ventura_fin_full_front.png",
+    "v_left": "out/arte/refs_gen/ventura_fin_full_left.png",
+    "v_back": "out/arte/refs_gen/ventura_fin_full_back.png",
+    "v_right": "out/arte/refs_gen/ventura_fin_full_right.png"
+   }
+  }
+ ]
+}
