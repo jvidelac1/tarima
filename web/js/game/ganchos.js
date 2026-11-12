@@ -7,6 +7,9 @@
 //
 // Todo lo que reciben es dato, nunca el nombre del jugador (el nombre no viaja en las métricas: sección 3).
 export const ganchos = {
+  /** true si quien reemplaza `ev` ya anota cada evento en window.JUEGO.eventos (main.js entonces no lo repite). */
+  registra: false,
+
   /**
    * Evento de métricas (sección 6.3). main.js ya lo deja además en window.JUEGO.eventos para las pruebas.
    * @param {string} nombre  @param {object} props  sin nombre, mail, IP ni dispositivo

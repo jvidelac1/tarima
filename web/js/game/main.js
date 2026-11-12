@@ -54,9 +54,8 @@ fijarIdioma(detectarIdioma({ lang: params.get('lang'), guardado: guardado.get('t
  * reemplazó la analítica, lo lleva ella (en el mismo arreglo), para no anotar dos veces.
  */
 const EVENTOS = Array.isArray(window.JUEGO?.eventos) ? window.JUEGO.eventos : (window.JUEGO = { ...(window.JUEGO || {}), eventos: [] }).eventos;
-const evDeFabrica = ganchos.ev;
 function ev(nombre, props = {}) {
-  if (ganchos.ev === evDeFabrica) EVENTOS.push({ ev: nombre, props, t: Math.round(performance.now()) });
+  if (!ganchos.registra) EVENTOS.push({ ev: nombre, props, t: Math.round(performance.now()) });
   try { ganchos.ev(nombre, props); } catch (e) { console.warn('ganchos.ev:', e); }
 }
 /** Nombre de 2 a 14 caracteres: letras (de cualquier idioma), espacios, guion y apóstrofo. Lo demás se quita. '' si no alcanza. */
@@ -995,7 +994,7 @@ async function cierre(p) {
 /** P9 · el muro, por el gancho. true: puede jugar otra final (se vuelve a pedir el pase). */
 async function mostrarMuro(origen, r = {}) {
   E.forzar = true; let sigue = false;
-  try { sigue = !!await ganchos.muro({ origen, motivo: r.motivo, encuesta_disponible: !!r.encuesta_disponible, nombre: nombreJugador(), capa: $('capa'), t }); } catch (e) { console.warn('ganchos.muro:', e); }
+  try { sigue = !!await ganchos.muro({ origen, motivo: r.motivo, encuesta_disponible: r.encuesta_disponible, nombre: nombreJugador(), capa: $('capa'), t }); } catch (e) { console.warn('ganchos.muro:', e); }
   capa.quitar(); return sigue;
 }
 

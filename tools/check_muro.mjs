@@ -27,7 +27,7 @@ const SOLO = arg('solo'), HEADED = process.argv.includes('--headed');
 fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT, { recursive: true });
 const problemas = [], notas = [];
 const browser = await chromium.launch(launchOptions({ headed: HEADED }));
-const CORREO = { en: 'player.one@example.com', es: 'ana.prueba@example.com' };
+const CORREO = { en: 'player.one@pruebas-tarima.com', es: 'ana.prueba@pruebas-tarima.com' };      // example.com está en la lista de descartables del Worker
 
 async function escenario(L) {
   const tactil = L === 'es', D = L === 'es' ? ES : EN, tag = `[${L}]`, dir = path.join(OUT, L); fs.mkdirSync(dir, { recursive: true });

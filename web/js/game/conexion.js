@@ -13,7 +13,7 @@ import { analitica } from './analitica.js';
 import { t, esc, idiomaActual, alCambiarIdioma, IDIOMAS } from './i18n/t.js';
 
 const guardado = { get: k => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* sin almacenamiento */ } } };
-const S = { estado: null, quedan: null, lista: false, reanudar: null, previas: 0, gratis: 2, pantalla: () => '', cambiarIdioma: null };
+const S = { estado: null, quedan: null, lista: false, reanudar: null, previas: 0, gratis: 2, encuesta: false, pantalla: () => '', cambiarIdioma: null };
 const encuestaHecha = () => guardado.get('tarima.encuesta') === '1';
 
 /** Selector ES · EN dentro de un panel (el clic lo atiende main.js para todas las pantallas). */
@@ -118,7 +118,7 @@ function encuesta(capa, { conPremio }) {
         const r = await servidor.encuesta({ r: { q1: R.q1, q2: R.q2, q3: R.q3, q4: R.q4, ...(R.q5.trim() ? { q5: R.q5.trim().slice(0, 280) } : {}) }, idioma: idiomaActual(), sesion: analitica.idSesion() });
         btn.disabled = false;
         if (r.ok) {
-          fin = true; quitar(); guardado.set('tarima.encuesta', '1');
+          fin = true; quitar(); guardado.set('tarima.encuesta', '1'); S.encuesta = false;
           analitica.ev('encuesta_enviada', { con_premio: r.bono > 0 });
           if (r.bono > 0) S.quedan = (S.quedan || 0) + r.bono;
           panel(capa, `<h2>${t(r.bono > 0 ? 'encuesta.ok' : 'encuesta.ok_anotado')}</h2>`, 'chico');
@@ -141,7 +141,8 @@ function encuesta(capa, { conPremio }) {
 async function muro(info) {
   const capa = info.capa, motivo = info.motivo || 'dispositivo';
   for (;;) {
-    const disponible = !!info.encuesta_disponible && !encuestaHecha();
+    // en el podio no hay respuesta nueva del servidor: vale lo último que dijo (al cargar o en el último pase)
+    const disponible = !!(info.encuesta_disponible ?? S.encuesta) && !encuestaHecha();
     const soloMail = !disponible && (encuestaHecha() || S.previas > S.gratis);
     const variante = analitica.bandera('muro-texto') === 'b' ? 'b' : 'a';
     analitica.ev('muro_visto', { motivo, caminos: disponible ? 'mail+encuesta' : 'mail', origen: info.origen || 'podio', variante_texto: variante, previas: S.previas });
@@ -196,7 +197,7 @@ async function pedirPase(info) {
     const r = await servidor.pedirPase({ idioma: idiomaActual() });
     if (r.estado === 'ok') { S.lista = r.fuente === 'lista'; S.quedan = S.lista ? null : r.quedan ?? null; if (Number.isFinite(r.n)) S.previas = r.n; return r; }
     if (r.estado === 'sin_servidor') return { estado: 'ok', fuente: r.fuente, sinServidor: true };
-    if (r.estado === 'muro') { S.quedan = 0; return r; }
+    if (r.estado === 'muro') { S.quedan = 0; S.encuesta = !!r.encuesta_disponible; return r; }
     // 'error': no se regala ninguna final (endurecimiento 1 de la sección 7): se dice y se ofrece probar de nuevo
     const otra = await new Promise(res => {
       let fin = false;
@@ -244,7 +245,7 @@ async function arranque(o) {
   try { e = await servidor.estado({ idioma: o.idioma }); } catch { e = null; }
   S.estado = e;
   if (e) {
-    S.lista = !!e.lista; S.quedan = e.lista ? null : e.quedan ?? null; S.previas = e.contexto?.previas ?? 0;
+    S.lista = !!e.lista; S.quedan = e.lista ? null : e.quedan ?? null; S.previas = e.contexto?.previas ?? 0; S.encuesta = !!e.encuesta_disponible;
     const g = Number(e.flags?.['muro-partidas-gratis']); if (g > 0) S.gratis = g;
   }
   try { await analitica.iniciar({ estado: e || {}, idioma: o.idioma, idioma_origen: o.idioma_origen, version: o.version, pantalla: S.pantalla() }); } catch { /* la medición nunca frena el juego */ }
@@ -255,6 +256,7 @@ async function arranque(o) {
 }
 
 ganchos.ev = (nombre, props) => analitica.ev(nombre, props);
+ganchos.registra = true;      // analitica.ev ya anota cada evento en window.JUEGO.eventos: main.js no lo repite
 ganchos.visita = n => analitica.visita(n);
 ganchos.estado = () => (S.estado || S.lista || S.quedan !== null ? { quedan: S.lista ? Infinity : S.quedan, anotado: S.lista } : null);
 ganchos.quedan = () => (S.lista ? Infinity : S.quedan);
