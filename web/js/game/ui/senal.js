@@ -25,7 +25,7 @@ export class Senal {
     const el = this.el; el.hidden = false;
     const clave = s ? s.clave + '|' + s.tipo : '';
     if (clave !== this.clave) {
-      this.clave = clave; el.dataset.tipo = s ? s.tipo : 'nada'; el.dataset.gesto = s?.gesto || '';
+      this.clave = clave; el.dataset.tipo = s ? s.tipo : 'nada'; el.dataset.gesto = s?.gesto || ''; el.dataset.largo = s && s.verbo.length > 12 ? '1' : '';      // «APRETÁ Y MANTENÉ» no entra a tamaño completo
       this.paso.textContent = s && s.paso ? `${s.paso} de ${s.de}` : ''; this.verbo.textContent = s ? s.verbo : '';
       this.sub.textContent = s && s.sub ? s.sub.replace('{T}', this.tactil ? 'la pantalla' : 'ESPACIO').replace('Apretá la pantalla', 'Tocá la pantalla') : '';
     }

@@ -35,7 +35,8 @@ export function traducir(m, t, v, ctl) {
   const M = m.M;
   switch (m.fase) {
     case 'tension': case 'hombros':
-      if (t < M.ign) return { ent: [], aviso: 'espera' };
+      // en los 450 ms de RESPIRÁ el toque suele ser la cola de ¡EMPUJÁ!: se descarta sin decir nada; después de un amague sí se avisa
+      if (t < M.ign) return { ent: [], aviso: M.amagues.length ? 'espera' : null };
       return { ent: m.n > 0 ? [[t, 0], [t, 1]] : [[t, 1]], aviso: null };
     case 'tiron': case 'flexion':
       if (t - M.tp < CAPA.reboteMs) return { ent: [], aviso: 'rebote' };

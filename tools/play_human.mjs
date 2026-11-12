@@ -5,7 +5,8 @@
 //   al azar  toca sin mirar la señal, en instantes de Poisson (mínimo 100 ms entre toques); vale el peor de cinco ritmos.
 // Criterio (aperturas al 88 a 92 % del techo, Fácil, envión de tijera): casual ≥ 85 %, flojo ≥ 50 %, al azar < 10 %.
 // Cada intento se recalcula con simular() y tiene que dar lo mismo. Sale con error si el criterio no se cumple.
-// Uso: node tools/play_human.mjs [--n=2000] [--imin=8800 --imax=9200] [--info]   (--info agrega filas que no son criterio)
+// Uso: node tools/play_human.mjs [--n=2000] [--imin=8800 --imax=9200] [--info]   (--info agrega filas que no son criterio:
+//   envión de la casa, seguir tocando después de ¡EMPUJÁ!, no tocar en ¡EMPUJÁ!, prácticas del tutorial, Clásico y toques a ciegas con ritmo)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,16 +41,20 @@ function sesion(ctx, ctl, conf) {
   };
 }
 
-/** Bot que mira la señal: un toque por señal en Fácil. */
+/** Bot que mira la señal: un toque por señal en Fácil. `o.sinEmpujar`: no toca en la subida. `o.cola` [ms, ms]: sigue tocando ese rato después de ¡EMPUJÁ!. */
 export function jugarSenal(ctx, B, sem, o = {}) {
   const r = new Azar(mezclar(sem, 11)), S = sesion(ctx, 'f', 1000 + r.ent(1500)), m = S.m;
-  let clave = '', plan = Infinity, toques = 0;
+  let clave = '', plan = Infinity, toques = 0, tipo = '', cola = null;
   for (let g = 0; !m.res && g < 400000; g++) {
     const s = senal(m, m.t, 'f'), k = s ? s.clave + ':' + (s.desde ?? '') : '';
     if (k !== clave) {      // apareció una señal nueva: el bot decide una sola vez cuándo va a tocar
-      clave = k; toques = 0;
+      // una persona que venía tocando rápido no frena en seco: sigue tocando a su ritmo durante `cola` ms
+      if (tipo === 'empuja' && toques && o.cola) cola = { hasta: m.t + r.entre(o.cola[0], o.cola[1]), prox: plan };
+      clave = k; toques = 0; tipo = s ? s.tipo : '';
       plan = !s ? Infinity : s.tipo === 'libre' ? m.t + r.entre(B.reac[0], B.reac[1]) : s.tipo === 'cierre' ? Math.max(m.t + 1, s.objetivo + B.lag + r.campana(B.sd)) : s.tipo === 'empuja' && !o.sinEmpujar ? Math.max(m.t, s.desde) + B.pelea.reac : Infinity;
     }
+    if (cola && cola.prox > cola.hasta) cola = null;
+    if (cola && cola.prox <= m.t + PASO) { S.tecla(Math.max(cola.prox, m.t)); cola.prox = m.t + Math.max(100, B.pelea.per + r.campana(B.pelea.jit)); continue; }
     if (plan <= m.t + PASO) {
       S.tecla(Math.max(plan, m.t)); toques++;
       plan = s && s.tipo === 'empuja' ? m.t + Math.max(100, B.pelea.per + r.campana(B.pelea.jit)) : Infinity;
@@ -130,6 +135,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (INFO) {
     console.log('— informativo (no es criterio) —');
     for (const b of ['casual', 'flojo']) fila(`Fácil · ${b} · envión de la casa`, medir((c, s) => jugarSenal(c, BOTS[b], s), 'f', casa));
+    // el que venía tocando rápido en ¡EMPUJÁ! y no frena a tiempo: en la cargada, después de quedar de pie hay cerca de 1 s en que los toques no cuentan
+    for (const [x, y] of [[300, 700], [500, 1000]]) for (const bb of ['casual', 'flojo']) fila(`Fácil · ${bb} · sigue tocando ${x}–${y} ms`, medir((c, s) => jugarSenal(c, BOTS[bb], s, { cola: [x, y] }), 'f', tijera));
     fila('Fácil · casual · sin tocar en ¡EMPUJÁ!', medir((c, s) => jugarSenal(c, BOTS.casual, s, { sinEmpujar: true }), 'f', tijera));
     fila('Fácil · casual · práctica del tutorial', medir((c, s) => jugarSenal(c, BOTS.casual, s), 'f', tijera, { I: 8000, primera: true, reloj: 0, exiFija: exigenciaTabla(9000) }));
     fila('Fácil · flojo · práctica del tutorial', medir((c, s) => jugarSenal(c, BOTS.flojo, s), 'f', tijera, { I: 8000, primera: true, reloj: 0, exiFija: exigenciaTabla(9000) }));

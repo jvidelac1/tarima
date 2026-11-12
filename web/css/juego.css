@@ -81,6 +81,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 .senal.oro .s-fijo,.senal.oro .s-cierra{border-color:var(--gold)}
 .senal.oro .s-verbo,.senal[data-tipo=libre] .s-verbo,.senal[data-tipo=empuja] .s-verbo{color:var(--gold)}
 .senal[data-tipo=espera] .s-verbo,.senal[data-tipo=auto] .s-verbo{color:var(--mute);font-size:calc(var(--v)*2.6)}
+.senal[data-largo="1"] .s-verbo{font-size:calc(var(--v)*2.3)}
 .senal[data-tipo=espera] .s-teclas,.senal[data-tipo=auto] .s-teclas,.senal[data-tipo=nada] .s-teclas{opacity:.22}
 .senal[data-tipo=espera],.senal[data-tipo=auto]{border-top-color:var(--line)}
 .senal[data-tipo=empuja] .s-teclas .tecla{display:inline-block;font-size:.8em;padding:.42em .5em .5em}
