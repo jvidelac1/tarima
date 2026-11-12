@@ -1,4 +1,4 @@
-// Proyecto de Cloudflare Pages «tarimagame» (https://tarimagame.pages.dev): sirve web/ como sitio estático y, con las
+// Proyecto de Cloudflare Pages «liftinggame» (https://liftinggame.pages.dev): sirve web/ como sitio estático y, con las
 // Functions de functions/, pasa /api/*, /qx/*, /baja y /confirmar al Worker «tarima» (worker/) por una service binding.
 // El Worker no tiene dirección pública: solo se llega a él por acá.
 //
@@ -14,7 +14,7 @@
 // configuración del proyecto: esos campos ya no se editan en el panel.
 {
   "$schema": "./worker/node_modules/wrangler/config-schema.json",
-  "name": "tarimagame",
+  "name": "liftinggame",
   "pages_build_output_dir": "./web",
   "compatibility_date": "2026-10-30",
   "services": [

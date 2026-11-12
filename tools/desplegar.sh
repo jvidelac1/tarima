@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Publica Tarima en Cloudflare: primero el Worker «tarima» (migraciones de D1, código y secretos), después el sitio en
-# Pages «tarimagame» (web/ + functions/, con la service binding TARIMA → tarima). Ver worker/README.md, «Publicar».
+# Pages «liftinggame» (web/ + functions/, con la service binding TARIMA → tarima). Ver worker/README.md, «Publicar».
 #
 #   tools/desplegar.sh --seco         solo lo local: pruebas, Worker --dry-run y Functions; no toca la cuenta
 #   tools/desplegar.sh                publica de verdad (pide confirmación antes de tocar la cuenta)
@@ -11,7 +11,7 @@
 #   TARIMA_DATOS     carpeta con posthog.json (por defecto ~/tarima-datos). La clave pública nunca se imprime.
 #   RAMA_PRODUCCION  rama de producción del proyecto de Pages. Si no está, se le pregunta a la API de Cloudflare con la
 #                    sesión de wrangler; si eso falla, se usa «main» con un aviso.
-#   SITIO            dirección pública para la comprobación final (por defecto https://tarimagame.pages.dev).
+#   SITIO            dirección pública para la comprobación final (por defecto https://liftinggame.pages.dev).
 #
 # Secretos del Worker: SECRETO_IP, SECRETO_DISPOSITIVO, SECRETO_PASE y SECRETO_BAJA se generan con openssl SOLO si
 # todavía no existen (cambiarlos después de abrir le devuelve las finales gratis a todos y rompe los enlaces de baja).
@@ -23,8 +23,8 @@ set -euo pipefail
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 W="$RAIZ/worker/node_modules/.bin/wrangler"
 DATOS="${TARIMA_DATOS:-$HOME/tarima-datos}"
-SITIO="${SITIO:-https://tarimagame.pages.dev}"
-PROYECTO=tarimagame
+SITIO="${SITIO:-https://liftinggame.pages.dev}"
+PROYECTO=liftinggame
 WORKER=tarima
 SECO=0; SI=0; PRUEBAS=1
 for a in "$@"; do

@@ -756,7 +756,7 @@ Los campos `{responsable}`, `{país}` y `{contacto}` los completa el dueño (dec
 
 ### 5.5 Contrato del servidor
 
-**Cambio del 12 de noviembre (decisión del dueño):** el sitio lo sirve Cloudflare Pages («tarimagame», https://tarimagame.pages.dev) y le pasa `/api/*`, `/qx/*`, `/baja` y `/confirmar` al Worker «tarima», sin dirección pública, por una service binding (`functions/` y `wrangler.jsonc` de la raíz; ver `worker/README.md`). Lo que sigue sobre assets y `run_worker_first` describe el diseño anterior.
+**Cambio del 12 de noviembre (decisión del dueño):** el sitio lo sirve Cloudflare Pages («liftinggame», https://liftinggame.pages.dev) y le pasa `/api/*`, `/qx/*`, `/baja` y `/confirmar` al Worker «tarima», sin dirección pública, por una service binding (`functions/` y `wrangler.jsonc` de la raíz; ver `worker/README.md`). Lo que sigue sobre assets y `run_worker_first` describe el diseño anterior.
 
 Es un solo Worker de Cloudflare con assets estáticos, D1 y el límite de pedidos de Workers (`ratelimit`). Va en `worker/` (`wrangler.jsonc`, `src/index.js`, `src/reglas.js`, `schema.sql`) y sirve `web/` como sitio. `/` reescribe a `juego.html`, y el visor no se enlaza. `run_worker_first` se aplica a `/api/*`, `/qx/*`, `/baja` y `/confirmar`. Las reglas de la cuenta van puras en `src/reglas.js`, sin `fetch` ni D1, para probarlas en Node con una base en memoria (`tools/worker_test.mjs`).
 

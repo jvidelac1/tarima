@@ -1,6 +1,6 @@
 // Worker «tarima» (docs/MVP.md 5.5): responde /api/*, /qx/* (proxy de PostHog), /baja y /confirmar.
 // NO tiene dirección pública: ni workers.dev, ni direcciones de vista previa, ni rutas. Le llegan los pedidos solo por la
-// service binding del proyecto de Pages «tarimagame» (../wrangler.jsonc y ../functions/), que sirve web/ y le pasa esas
+// service binding del proyecto de Pages «liftinggame» (../wrangler.jsonc y ../functions/), que sirve web/ y le pasa esas
 // rutas. Los secretos NO van acá: los carga tools/desplegar.sh con `wrangler secret put` (ver worker/README.md).
 {
   "$schema": "./node_modules/wrangler/config-schema.json",

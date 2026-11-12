@@ -52,7 +52,7 @@ function workerFalso(respuestas) {
   return { fetch, pedidos };
 }
 const sinEspera = async () => {};
-const base = o => crearServidor({ host: 'tarimagame.pages.dev', buscar: '', esperar: sinEspera, local: new Mem(), sesion: new Mem(), ...o });
+const base = o => crearServidor({ host: 'liftinggame.pages.dev', buscar: '', esperar: sinEspera, local: new Mem(), sesion: new Mem(), ...o });
 
 // ---------- 1. servidor.js ----------
 
@@ -192,7 +192,7 @@ igual(expDelPase('basura'), null, 'pase inválido');
   igual((await s.anotar({ email: 'x@noexiste.com' })).error, 'dominio', 'simulado: error de dominio');
   igual((await s.anotar({ email: 'ana@ejemplo.com' })).estado, 'nuevo', 'simulado: anotarse');
   igual((await s.pedirPase({})).fuente, 'lista', 'simulado: juego libre');
-  const fuera = base({ host: 'tarimagame.pages.dev', buscar: '?muro=firme', fetch: workerFalso({}).fetch });
+  const fuera = base({ host: 'liftinggame.pages.dev', buscar: '?muro=firme', fetch: workerFalso({}).fetch });
   igual(fuera.modo, 'servidor', '?muro=firme no vale fuera de localhost');
 }
 
@@ -245,7 +245,7 @@ function posthogFalso() {
     get_distinct_id() { return 'ph_distinto'; }, set_config(c) { this.llamadas.push(['set_config', c]); } };
   return ph;
 }
-const ventanaFalsa = (o = {}) => ({ location: { search: o.search ?? '', origin: 'https://tarimagame.pages.dev' }, matchMedia: () => ({ matches: true }), navigator: o.navigator, addEventListener() {} });
+const ventanaFalsa = (o = {}) => ({ location: { search: o.search ?? '', origin: 'https://liftinggame.pages.dev' }, matchMedia: () => ({ matches: true }), navigator: o.navigator, addEventListener() {} });
 const ESTADO = { metricas: { clave: 'phc_PRUEBA123', host: '/qx', ui: 'https://us.posthog.com', encuesta: 'enc-1' }, flags: { 'muro-texto': 'b' }, contexto: { pais: 'AR', previas: 1, dias: '0' } };
 
 igual(limpiarProps({ nombre: 'Ana', email: 'a@b.com', ip: '1.2.3.4', dispositivo: 'x', n: 1, ok: true, txt: 'ana@b.com', obj: {}, pantalla: 'muro' }), { n: 1, ok: true, pantalla: 'muro' }, 'propiedades sin datos personales');
@@ -271,7 +271,7 @@ igual([fuenteTrafico('?utm_source=Amigos'), fuenteTrafico('?c=abc'), fuenteTrafi
   const [, clave, cfg] = ph.llamadas.find(l => l[0] === 'init');
   igual(clave, 'phc_PRUEBA123', 'clave pública');
   igual([cfg.persistence, cfg.person_profiles, cfg.api_host, cfg.autocapture, cfg.capture_pageview, cfg.capture_pageleave, cfg.disable_session_recording, cfg.disable_surveys, cfg.advanced_disable_flags, cfg.disable_external_dependency_loading],
-    ['memory', 'identified_only', 'https://tarimagame.pages.dev/qx', false, false, true, true, true, true, true], 'configuración de posthog.init');
+    ['memory', 'identified_only', 'https://liftinggame.pages.dev/qx', false, false, true, true, true, true, true], 'configuración de posthog.init');
   igual(cfg.bootstrap.featureFlags['muro-texto'], 'b', 'banderas del Worker como bootstrap');
   const reg = ph.llamadas.find(l => l[0] === 'register')[1];
   igual([reg.idioma, reg.tactil, reg.pais, reg.previas, reg.fuente_trafico, reg['$feature/muro-texto'], reg['$feature/muro-partidas-gratis']], ['es', true, 'AR', 1, 'compartido', 'b', '2'], 'súper propiedades');
@@ -305,7 +305,7 @@ igual([fuenteTrafico('?utm_source=Amigos'), fuenteTrafico('?c=abc'), fuenteTrafi
   igual(a.medicionActivada(), true, 'medición activada por defecto');
   a.desactivarMedicion();
   igual([local.getItem('tarima.medicion'), a.medicionActivada(), beacons.length, beacons[0]?.[0], beacons[0]?.[1].event, beacons[0]?.[1].properties.$process_person_profile],
-    ['0', false, 1, 'https://tarimagame.pages.dev/qx/i/v0/e/', 'medicion_desactivada', false], 'desactivar manda el aviso y apaga');
+    ['0', false, 1, 'https://liftinggame.pages.dev/qx/i/v0/e/', 'medicion_desactivada', false], 'desactivar manda el aviso y apaga');
   a.desactivarMedicion();
   igual(beacons.length, 1, 'desactivar dos veces avisa una');
   a.activarMedicion();
@@ -317,24 +317,24 @@ igual([fuenteTrafico('?utm_source=Amigos'), fuenteTrafico('?c=abc'), fuenteTrafi
 {
   let recibido = null;
   const env = { TARIMA: { fetch: async req => { recibido = req; return new Response('{"ok":1}', { headers: { 'content-type': 'application/json' } }); } } };
-  const req = new Request('https://tarimagame.pages.dev/api/estado', {
+  const req = new Request('https://liftinggame.pages.dev/api/estado', {
     method: 'POST', body: '{"dispositivo":"x"}',
-    headers: { 'content-type': 'application/json', origin: 'https://tarimagame.pages.dev', 'cf-connecting-ip': '203.0.113.5', 'x-tarima-ip': '1.1.1.1', 'x-tarima-pais': 'ZZ' },
+    headers: { 'content-type': 'application/json', origin: 'https://liftinggame.pages.dev', 'cf-connecting-ip': '203.0.113.5', 'x-tarima-ip': '1.1.1.1', 'x-tarima-pais': 'ZZ' },
   });
   Object.defineProperty(req, 'cf', { value: { country: 'UY' } });
   const r = await reenviar({ request: req, env });
   igual(await r.json(), { ok: 1 }, 'la Function devuelve lo del Worker');
   igual([recibido.url, recibido.method, recibido.headers.get('origin'), recibido.headers.get('x-tarima-ip'), recibido.headers.get('x-tarima-pais'), await recibido.text()],
-    ['https://tarimagame.pages.dev/api/estado', 'POST', 'https://tarimagame.pages.dev', '203.0.113.5', 'UY', '{"dispositivo":"x"}'], 'la Function pasa el pedido con la IP y el país propios, no los del navegador');
-  const sinPais = new Request('https://tarimagame.pages.dev/api/estado', { method: 'POST', body: '{}', headers: { 'x-tarima-pais': 'ZZ' } });
+    ['https://liftinggame.pages.dev/api/estado', 'POST', 'https://liftinggame.pages.dev', '203.0.113.5', 'UY', '{"dispositivo":"x"}'], 'la Function pasa el pedido con la IP y el país propios, no los del navegador');
+  const sinPais = new Request('https://liftinggame.pages.dev/api/estado', { method: 'POST', body: '{}', headers: { 'x-tarima-pais': 'ZZ' } });
   await reenviar({ request: sinPais, env });
   igual([recibido.headers.get('x-tarima-pais'), recibido.headers.get('x-tarima-ip')], [null, null], 'sin datos de Cloudflare no pasa lo que inventó el navegador');
   const r503 = await reenviar({ request: sinPais, env: {} });
   igual([r503.status, await r503.json()], [503, { error: 'servidor' }], 'sin binding responde 503 en JSON (el juego lo trata como falta de red)');
   let pedido = null;
-  const r2 = await raiz({ request: new Request('https://tarimagame.pages.dev/?lang=en'), env: { ASSETS: { fetch: async q => { pedido = q; return new Response('<html>'); } } } });
+  const r2 = await raiz({ request: new Request('https://liftinggame.pages.dev/?lang=en'), env: { ASSETS: { fetch: async q => { pedido = q; return new Response('<html>'); } } } });
   igual([new URL(pedido.url).pathname, await r2.text()], ['/juego', '<html>'], '«/» muestra el juego');
-  igual((await raiz({ request: new Request('https://tarimagame.pages.dev/', { method: 'POST' }), env: {} })).status, 405, '«/» solo GET');
+  igual((await raiz({ request: new Request('https://liftinggame.pages.dev/', { method: 'POST' }), env: {} })).status, 405, '«/» solo GET');
   // Rutas: cada Function de la binding exporta onRequest; el ayudante no es una ruta.
   for (const f of ['api/[[ruta]].js', 'qx/[[ruta]].js', 'baja.js', 'confirmar.js']) {
     const m = await import(path.join(ROOT, 'functions', f));

@@ -8,10 +8,10 @@ Un Worker de Cloudflare, «tarima», **sin dirección pública** (`workers_dev` 
 - hace de proxy de PostHog en `/qx/*`, para que los bloqueadores no corten las métricas;
 - limpia la base una vez por día (Cron).
 
-El sitio (`web/`) lo sirve **Cloudflare Pages**, proyecto «tarimagame» (https://tarimagame.pages.dev). Las Functions de `../functions/` le pasan al Worker `/api/*`, `/qx/*`, `/baja` y `/confirmar` por una **service binding** (`TARIMA` → `tarima`, declarada en `../wrangler.jsonc`), así todo queda bajo `tarimagame.pages.dev` y la dirección `workers.dev` de la cuenta no aparece en ningún lado. `/` muestra `juego.html`.
+El sitio (`web/`) lo sirve **Cloudflare Pages**, proyecto «liftinggame» (https://liftinggame.pages.dev). Las Functions de `../functions/` le pasan al Worker `/api/*`, `/qx/*`, `/baja` y `/confirmar` por una **service binding** (`TARIMA` → `tarima`, declarada en `../wrangler.jsonc`), así todo queda bajo `liftinggame.pages.dev` y la dirección `workers.dev` de la cuenta no aparece en ningún lado. `/` muestra `juego.html`.
 
 ```
-navegador ──> tarimagame.pages.dev ──┬─ web/ (estático)
+navegador ──> liftinggame.pages.dev ──┬─ web/ (estático)
                                      └─ functions/  /, /api/*, /qx/*, /baja, /confirmar
                                             │ service binding TARIMA (con x-tarima-ip y x-tarima-pais)
                                             v
@@ -35,7 +35,7 @@ El contrato completo está en `docs/MVP.md`, sección 5.5. Más abajo están las
 | `src/descartables.js` | Lista corta de dominios de correo descartable |
 | `migraciones/` | Las tablas (`0001_inicial.sql` es el `schema.sql` del contrato; `0002` agrega `lista.confirmar_mandado_en`) |
 | `test/worker.test.js` | Pruebas de la API, D1, proxy, correos y limpieza, dentro del runtime de Workers |
-| `../wrangler.jsonc` | Proyecto de Pages «tarimagame»: `pages_build_output_dir = ./web` y la service binding `TARIMA` |
+| `../wrangler.jsonc` | Proyecto de Pages «liftinggame»: `pages_build_output_dir = ./web` y la service binding `TARIMA` |
 | `../functions/` | Functions de Pages: `api/[[ruta]].js`, `qx/[[ruta]].js`, `baja.js`, `confirmar.js` (pasan al Worker) e `index.js` («/» muestra el juego) |
 | `../web/js/game/servidor.js` | Cliente del juego: estado, pase, reanudar, lista, encuesta, baja |
 | `../web/js/game/analitica.js` | Métricas con posthog-js vendorizado (`../web/vendor/posthog/`), sin cookies |
@@ -90,8 +90,8 @@ Qué hace, en orden:
 3. `wrangler d1 migrations apply tarima --remote` (la base ya existe: id `9e2c28f3-67de-4cc6-a278-2d0e5f34e055`).
 4. `wrangler deploy` del Worker «tarima».
 5. Secretos: `SECRETO_IP`, `SECRETO_DISPOSITIVO`, `SECRETO_PASE` y `SECRETO_BAJA` con `openssl rand -hex 32`, **solo si no existen** (cambiarlos después de abrir le devuelve las finales gratis a todos y rompe los enlaces de baja). `EXPORTAR_CLAVE` igual, con una copia en `~/tarima-datos/exportar.clave` (modo 600). `POSTHOG_KEY` desde `posthog.json`, en cada publicación. Todo entra por la entrada estándar de `wrangler secret put`: nada en la terminal, el historial ni el repo.
-6. Lee la rama de producción del proyecto de Pages con la API de Cloudflare (o `RAMA_PRODUCCION=…`; si no la encuentra usa `main` y avisa) y corre `wrangler pages deploy web --project-name tarimagame --branch <rama>` desde la raíz, que toma `wrangler.jsonc` y `functions/`.
-7. Comprueba `https://tarimagame.pages.dev/`, `/api/estado` (crea un dispositivo de prueba en la base, que se borra solo a los 180 días) y `/privacidad.html`.
+6. Lee la rama de producción del proyecto de Pages con la API de Cloudflare (o `RAMA_PRODUCCION=…`; si no la encuentra usa `main` y avisa) y corre `wrangler pages deploy web --project-name liftinggame --branch <rama>` desde la raíz, que toma `wrangler.jsonc` y `functions/`.
+7. Comprueba `https://liftinggame.pages.dev/`, `/api/estado` (crea un dispositivo de prueba en la base, que se borra solo a los 180 días) y `/privacidad.html`.
 
 Notas:
 
@@ -99,14 +99,14 @@ Notas:
 - Con el archivo `../wrangler.jsonc`, la configuración de Pages (binding, fecha de compatibilidad) pasa a salir del repo: esos campos ya no se editan en el panel.
 - Sin los cuatro secretos la API responde 503 y el juego pasa a «sin servidor». Sin `POSTHOG_KEY`, las métricas quedan apagadas.
 - Para ver los registros: `cd worker && npx wrangler tail`, o la pestaña Logs del Worker. No llevan correo, IP ni dispositivo.
-- **Exportar la lista:** `curl -H "Authorization: Bearer $(cat ~/tarima-datos/exportar.clave)" "https://tarimagame.pages.dev/api/exportar?confirmados=1" -o lista.csv` (sin `?confirmados=1` mientras no haya correos de confirmación).
+- **Exportar la lista:** `curl -H "Authorization: Bearer $(cat ~/tarima-datos/exportar.clave)" "https://liftinggame.pages.dev/api/exportar?confirmados=1" -o lista.csv` (sin `?confirmados=1` mientras no haya correos de confirmación).
 
 ### Pasos que siguen siendo del dueño
 
 - **PostHog** (proyecto 606461, US Cloud): activar «Discard client IP data» y aceptar el DPA; crear las banderas `muro-partidas-gratis` (variantes `1` y `2`, con `2` al 100 %), `muro-texto` (`a` y `b`, con `a` al 100 %), `invitacion-podio1` (booleana, prendida) y `grabacion` (`off` y `muestra`, con `off` al 100 %); crear una encuesta de tipo **API** con las 5 preguntas, con las opciones en español exactamente como en `ENCUESTA` de `src/reglas.js`, y poner su id en `ENCUESTA_ID` y los ids de las preguntas en `ENCUESTA_PREGUNTAS` (`{"q1":"<uuid>",…}`) en `wrangler.jsonc`. Sin eso el desbloqueo por encuesta anda igual, pero las respuestas no llegan a PostHog. Sin las banderas valen los valores por defecto.
 - **Contacto, responsable y país** en `web/privacidad.html` (buscar `data-completar`).
 - **Correos** (cuando haya dominio propio): `npx wrangler email sending enable <dominio>`, SPF, DKIM y DMARC, sacar el comentario de `"send_email"` en `wrangler.jsonc`, poner `MAIL_DESDE` y publicar. Mientras tanto ninguna alta se borra por no confirmar (ver abajo).
-- **Dominio propio** (opcional): se agrega como dominio del proyecto de Pages. Hoy las métricas van por `tarimagame.pages.dev/qx`; algunos bloqueadores conocen `*.pages.dev`, pero el camino `/qx` no es de PostHog, así que en general pasan.
+- **Dominio propio** (opcional): se agrega como dominio del proyecto de Pages. Hoy las métricas van por `liftinggame.pages.dev/qx`; algunos bloqueadores conocen `*.pages.dev`, pero el camino `/qx` no es de PostHog, así que en general pasan.
 
 ## Diferencias con `docs/MVP.md` 5.5 (para quien conecta el juego)
 
