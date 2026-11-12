@@ -12,6 +12,8 @@ Uso (en el pod, desde la raíz del repo, con ComfyUI en 127.0.0.1:8188 y sin Ble
   .venv/bin/python tools/e5_refs.py vistas --una [...]   una sola imagen de entrada por vista (el render crudo), como el frente
   .venv/bin/python tools/e5_refs.py cerrar          arma out/arte/refs_gen/<nombre>.png (RGBA) y resumen.json; lo que no
                                                     llegó al objetivo queda con el render crudo y así se anota
+  .venv/bin/python tools/e5_refs.py fichas          un JSON al lado de cada referencia final (origen, semilla, indicación, modelos,
+                                                    sha256); `cerrar` ya lo hace, esto lo rehace sin tocar los PNG
   .venv/bin/python tools/e5_refs.py medir <repintada.png> <cruda.png>      mide un par suelto
   .venv/bin/python tools/e5_refs.py descartar <nombre> <semilla> <motivo>   marca un intento como descartado a ojo (no se elige más)
   .venv/bin/python tools/e5_refs.py alternativa <nombre> <semilla> <motivo> deja ese intento en refs_gen/bajo_umbral/<nombre>.png (RGBA) y lo
@@ -327,6 +329,30 @@ def cmd_cerrar(a):
                 hf.paste(neg.convert('RGB').resize((lado, lado), Image.LANCZOS), (k * lado, y + 20 + fila * lado))
             dr.text((k * lado + 6, y + 4), f"{juego} {vista}: " + (f"qwen s{e['semilla']} IoU {e['iou']:.3f}" if e['origen'] == 'qwen' else 'CRUDA'), fill=(255, 255, 255))
     hf.save(ruta(GEN, 'hoja_final.jpg'), quality=90); print(f'{GEN}/hoja_final.jpg (arriba el render crudo, abajo lo que quedó)')
+    cmd_fichas(a)
+
+
+def cmd_fichas(a):
+    """Un JSON al lado de cada referencia final (y de cada alternativa): de dónde sale, semilla, indicación, modelos y sha256.
+    No toca los PNG: lee resumen.json y la ficha que comfy_run dejó junto a la salida directa de Qwen."""
+    import hashlib
+    sha = lambda f: hashlib.sha256(open(f, 'rb').read()).hexdigest()
+    res = json.load(open(ruta(GEN, 'resumen.json')))
+    def ficha(png, e, nombre):
+        d = {'archivo': png, 'sha256': sha(ruta(png)), 'origen': e.get('origen', 'qwen'), 'render_crudo': f'{REFS}/{nombre}.png',
+             'sha256_render_crudo': sha(ruta(REFS, nombre + '.png')), 'iou': e.get('iou'), 'objetivo_iou': res['objetivo_iou']}
+        if d['origen'] == 'qwen':
+            m = json.load(open(ruta(e['de'] + '.json')))
+            d.update(de=e['de'], sha256_de=m.get('sha256'), semilla=m.get('semilla'), indicacion=m.get('indicacion'), negativa=m.get('negativa'),
+                     plantilla=(m.get('origen') or {}).get('plantilla'), parametros=m.get('parametros'), imagenes=m.get('imagenes'),
+                     modelos=m.get('modelos'), comfyui=(m.get('comfyui') or {}).get('version'), fecha=m.get('fecha'))
+        else: d['motivo'] = e.get('motivo')
+        json.dump(d, open(ruta(png + '.json'), 'w'), ensure_ascii=False, indent=1)
+    n = 0
+    for nombre, e in res['imagenes'].items():
+        ficha(f'{GEN}/{nombre}.png', e, nombre); n += 1
+        if e.get('alternativa'): ficha(e['alternativa']['archivo'], dict(e['alternativa'], origen='qwen'), nombre); n += 1
+    print(f'{n} fichas .png.json en {GEN}')
 
 
 def cmd_descartar(a):
@@ -391,7 +417,7 @@ def cmd_objetivo(a):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
-    ap.add_argument('cmd', choices=['frente', 'vistas', 'cerrar', 'medir', 'objetivo', 'descartar', 'alternativa', 'hoja']); ap.add_argument('resto', nargs='*')
+    ap.add_argument('cmd', choices=['frente', 'vistas', 'cerrar', 'fichas', 'medir', 'objetivo', 'descartar', 'alternativa', 'hoja']); ap.add_argument('resto', nargs='*')
     ap.add_argument('--juegos', default='rest_bust,fin_bust,fin_full'); ap.add_argument('--vistas', default='left,back,right')
     ap.add_argument('--orden', default='plan', choices=['plan', 'inverso']); ap.add_argument('--intentos', type=int, default=3)
     ap.add_argument('--umbral', type=int, default=16); ap.add_argument('--iou', type=float, default=0.92)
@@ -402,4 +428,4 @@ if __name__ == '__main__':
     a = ap.parse_args(); DENOISE = a.denoise; a.juegos = a.juegos.split(','); a.vistas = a.vistas.split(','); a.crudas = [x for x in a.crudas.split(',') if x]
     if a.cmd == 'medir':
         d, _ = medir(a.resto[0], a.resto[1], a.umbral); print(json.dumps(d, indent=1))
-    else: {'frente': cmd_frente, 'vistas': cmd_vistas, 'cerrar': cmd_cerrar, 'objetivo': cmd_objetivo, 'descartar': cmd_descartar, 'alternativa': cmd_alternativa, 'hoja': cmd_hoja}[a.cmd](a)
+    else: {'frente': cmd_frente, 'vistas': cmd_vistas, 'cerrar': cmd_cerrar, 'fichas': cmd_fichas, 'objetivo': cmd_objetivo, 'descartar': cmd_descartar, 'alternativa': cmd_alternativa, 'hoja': cmd_hoja}[a.cmd](a)
