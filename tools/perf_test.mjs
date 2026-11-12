@@ -16,7 +16,7 @@ const WEB = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'we
 // `three` es el vendorizado de web/vendor, igual que en el navegador (ahí lo resuelve el importmap de juego.html)
 register('data:text/javascript,' + encodeURIComponent(`const V = ${JSON.stringify(url('vendor/three/'))};
 export async function resolve(s, c, n) { if (s === 'three') return { url: V + 'build/three.module.js', shortCircuit: true }; if (s.startsWith('three/addons/')) return { url: V + 'addons/' + s.slice(13), shortCircuit: true }; return n(s, c); }`));
-const { hzDe, pasoDe, metaDe, ajustar, mpSostenible, perdidos, decidirCalidad, Gobernador, Registrador, PRESET, MARGEN, calidadInicial, nombreDe } = await import(url('js/game/perf.js'));
+const { hzDe, pasoDe, metaDe, ajustar, mpSostenible, perdidos, decidirCalidad, Gobernador, Registrador, PRESET, MARGEN, calidadInicial, nombreDe, escalones, pisoDe, PISO_MP, PISO_ESCRITORIO, URGENTE_VENTANAS } = await import(url('js/game/perf.js'));
 
 let fallas = 0, hechas = 0;
 const ok = (c, m) => { hechas++; if (!c) { fallas++; console.log('FALLA: ' + m); } };
@@ -98,25 +98,65 @@ ok(R.largos.length === 1 && R.largos[0].nota === 'vuelo' && R.resumen().inicio.n
 
 // ---------- 3. decisión de calidad ----------
 /** Máquina simulada. costos[calidad] = [fijo, porMP] en ms; `factor`: cuánto más cuesta de verdad que lo que dice la medida. */
-async function caso({ hz = 75, nativo = 1.78, costos, clave = 'baja', factor = 1, suelto = false }) {
-  const periodo = 1000 / hz, puestas = []; let q = clave, mp = 1, k = 0; const c = m => costos[q][0] + costos[q][1] * m;
-  const r = await decidirCalidad({ periodo, clave, techo: () => nativo, medir: m => ({ mp: m, ms: c(m) }), poner: async x => { q = x; puestas.push(x); }, fijar: m => (mp = Math.min(m, nativo)),
+// `telefono`: puntero grueso; `cssMP`: la pantalla a densidad 1 (piso del teléfono); `conMitad`: main.js sabe dibujar a media frecuencia.
+async function caso({ hz = 75, nativo = 1.78, costos, clave = 'baja', factor = 1, suelto = false, telefono = false, cssMP = 0, conMitad = false }) {
+  let periodo = 1000 / hz; const puestas = []; let q = clave, mp = 1, k = 0, mitades = 0; const c = m => costos[q][0] + costos[q][1] * m;
+  const r = await decidirCalidad({ periodo, clave, telefono, cssMP, techo: () => nativo, medir: m => ({ mp: m, ms: c(m) }), poner: async x => { q = x; puestas.push(x); }, fijar: m => (mp = Math.min(m, nativo)),
+    mitad: conMitad ? () => { mitades++; periodo = 2000 / hz; return periodo; } : undefined,
     cuadros: async n => Array.from({ length: n }, () => { let d = Math.max(1, Math.ceil(c(mp) * factor / periodo)) * periodo; if (suelto && k++ === 7) d = 2 * periodo; return d; }) });
-  return { ...r, puestas: puestas.join('>') };
+  return { ...r, puestas: puestas.join('>'), mitades, final: q };
 }
-let r = await caso({ costos: { baja: [3, 9], movil: [2.5, 8] } });
+// Las cuentas de la recta, sin piso que las tape (teléfono con la pantalla a densidad 1 de 0,3 MP)
+const T = { telefono: true, cssMP: .3 };
+let r = await caso({ ...T, costos: { baja: [3, 9], movil: [2.5, 8] } });
 ok(r.clave === 'baja' && Math.abs(r.mp - (1000 / 75 * MARGEN - 3) / 9) < .01 && r.verificacion.length === 1, `75 Hz, 3 ms + 9 ms/MP: Baja a ${r.mp.toFixed(2)} MP`);
-r = await caso({ hz: 60, costos: { baja: [3, 9] } }); ok(r.clave === 'baja' && Math.abs(r.mp - (1000 / 60 * MARGEN - 3) / 9) < .01, 'la misma máquina a 60 Hz sostiene más píxeles');
+r = await caso({ ...T, hz: 60, costos: { baja: [3, 9] } }); ok(r.clave === 'baja' && Math.abs(r.mp - (1000 / 60 * MARGEN - 3) / 9) < .01, 'la misma máquina a 60 Hz sostiene más píxeles');
 r = await caso({ hz: 60, costos: { baja: [1.5, 1], media: [2.5, 2.5], alta: [3, 4] } }); ok(r.clave === 'alta' && Math.abs(r.mp - 1.78) < .01, 'placa fuerte: Alta a la resolución de la pantalla');
 r = await caso({ hz: 60, costos: { baja: [1.5, 1], media: [2.5, 2.5], alta: [4, 8] } }); ok(r.clave === 'media' && r.puestas === 'media>alta>media', 'Alta no alcanza: vuelve a Media');
 r = await caso({ hz: 60, costos: { baja: [1.5, 2.5], media: [4, 8] } }); ok(r.clave === 'baja' && Math.abs(r.mp - 1.78) < .01 && r.puestas === 'media>baja', 'Media no alcanza: vuelve a Baja');
-r = await caso({ hz: 60, costos: { baja: [8, 20], movil: [6, 14] } }); ok(r.clave === 'movil' && r.mp > .3, 'máquina floja: Móvil');
-r = await caso({ hz: 60, costos: { baja: [20, 30], movil: [18, 25] } }); ok(r.clave === 'movil' && Math.abs(r.mp - .3) < .01, 'máquina muy floja: Móvil en el piso de resolución');
-r = await caso({ costos: { baja: [3, 9] }, factor: 1.3 }); ok(r.mp < .9 && r.verificacion.length === 2 && r.verificacion[1].perdidos === 0, 'la pantalla cuesta más que la cuenta: la verificación baja 15 %');
-r = await caso({ costos: { baja: [3, 9] }, suelto: true }); ok(Math.abs(r.mp - .93) < .01 && r.verificacion.length === 2, 'un refresco perdido suelto no baja la resolución');
-r = await caso({ hz: 60, nativo: 1.79, costos: { baja: [3, 20] } }); ok(r.clave === 'baja' && r.mp < 1.02 * .97, 'placa lenta simulada (18 ms/MP): queda por debajo de lo que se dibujaba antes');
+r = await caso({ ...T, hz: 60, costos: { baja: [8, 20], movil: [6, 14] } }); ok(r.clave === 'movil' && r.mp > .3, 'tableta floja que arrancó en Baja: Móvil');
+r = await caso({ ...T, hz: 60, costos: { baja: [20, 30], movil: [18, 25] } }); ok(r.clave === 'movil' && Math.abs(r.mp - .3) < .01, 'tableta muy floja: Móvil en el piso de resolución');
+r = await caso({ ...T, costos: { baja: [3, 9] }, factor: 1.3 }); ok(r.mp < .9 && r.verificacion.length === 2 && r.verificacion[1].perdidos === 0, 'la pantalla cuesta más que la cuenta: la verificación baja 15 %');
+r = await caso({ ...T, costos: { baja: [3, 9] }, suelto: true }); ok(Math.abs(r.mp - .93) < .01 && r.verificacion.length === 2, 'un refresco perdido suelto no baja la resolución');
+r = await caso({ ...T, hz: 60, nativo: 1.79, costos: { baja: [3, 20] } }); ok(r.clave === 'baja' && r.mp < 1.02 * .97, 'placa lenta simulada (18 ms/MP): queda por debajo de lo que se dibujaba antes');
 r = await caso({ hz: 60, nativo: .5, costos: { baja: [3, 9], media: [6, 30] } }); ok(r.clave === 'baja' && Math.abs(r.mp - .5) < .01, 'ventana chica: nunca más píxeles que los de la pantalla');
-r = await caso({ hz: 60, nativo: .74, clave: 'movil', costos: { movil: [6, 14] } }); ok(r.clave === 'movil', 'teléfono: se queda en Móvil');
+r = await caso({ hz: 60, nativo: .74, clave: 'movil', telefono: true, cssMP: .19, costos: { movil: [6, 14] } }); ok(r.clave === 'movil', 'teléfono: se queda en Móvil');
+
+// ---------- 3c. la calidad prefiere buena imagen (decisión del dueño) ----------
+// computadora: ni una medida floja ni una ruidosa la llevan a «Móvil», ni por debajo del 70 % de la pantalla
+const pisoMac = 1.78 * PISO_ESCRITORIO;
+r = await caso({ hz: 60, costos: { baja: [8, 20], movil: [6, 14] } }); ok(r.clave === 'baja' && !r.puestas.includes('movil') && Math.abs(r.mp - pisoMac) < .01 && Math.abs(r.piso - pisoMac) < .01, `computadora floja: sigue en Baja y en el piso de ${pisoMac.toFixed(2)} MP, nunca Móvil (${r.clave} ${r.mp.toFixed(2)} MP, puestas ${r.puestas || 'ninguna'})`);
+r = await caso({ hz: 60, costos: { baja: [20, 30], movil: [2, 1] } }); ok(r.clave === 'baja' && r.mp >= pisoMac - .01, `computadora con una medida al cargar que dice que nada entra: Baja en el piso (${r.clave} ${r.mp.toFixed(2)} MP)`);
+r = await caso({ costos: { baja: [3, 9] } }); ok(r.clave === 'baja' && Math.abs(r.mp - pisoMac) < .01 && r.verificacion.length >= 1, `computadora: 3 ms + 9 ms/MP darían 0,93 MP; queda en el piso (${r.mp.toFixed(2)} MP)`);
+r = await caso({ costos: { baja: [3, 9] }, factor: 1.6 }); ok(r.mp >= pisoMac - .01, `computadora: la verificación pierde refrescos y no baja del piso (${r.mp.toFixed(2)} MP, ${r.verificacion.length} verificaciones)`);
+r = await caso({ hz: 60, costos: { baja: [2, 4] } }); ok(r.clave === 'baja' && r.mp > pisoMac && r.mp <= 1.78, `computadora que entra: por encima del piso, hasta la pantalla (${r.mp.toFixed(2)} MP)`);
+ok(Math.abs(pisoDe({ techo: 1.78 }) - 1.246) < .01 && Math.abs(pisoDe({ techo: 9 }) - 3.7 * PISO_ESCRITORIO) < .01 && pisoDe({ techo: .2 }) === .2 && Math.abs(pisoDe({ telefono: true, techo: 1.32, cssMP: .33 }) - .33) < 1e-9 && pisoDe({ telefono: true, techo: 1, cssMP: .1 }) === PISO_MP, 'pisos: 70 % de la pantalla en computadora (hasta 3,7 MP), la pantalla a densidad 1 en teléfono');
+// teléfono (844 × 390 a densidad 2: 1,32 MP; 0,33 a densidad 1)
+const TEL = { telefono: true, clave: 'movil', nativo: 1.32, cssMP: .33 };
+r = await caso({ ...TEL, hz: 60, costos: { movil: [3, 4], baja: [3.5, 5] } }); ok(r.clave === 'baja' && r.puestas === 'baja' && Math.abs(r.mp - 1.32) < .01 && !r.mitad, `teléfono con margen: sube a Baja a la resolución de la pantalla (${r.clave} ${r.mp.toFixed(2)} MP)`);
+r = await caso({ ...TEL, hz: 60, costos: { movil: [3, 4], baja: [3.5, 5], media: [1, 1] } }); ok(!r.puestas.includes('media'), 'teléfono: nunca prueba Media');
+r = await caso({ ...TEL, hz: 60, conMitad: true, costos: { movil: [12, 20], baja: [13, 26] } }); ok(r.mitad && r.mitades === 1 && Math.abs(r.periodo - 33.33) < .01 && r.mp >= .33 - .01, `teléfono flojo a 60 Hz: 30 cuadros parejos con la pantalla a densidad 1 o más (${r.clave} ${r.mp.toFixed(2)} MP, período ${r.periodo.toFixed(1)} ms)`);
+r = await caso({ ...TEL, hz: 60, conMitad: true, costos: { movil: [4, 8] } }); ok(!r.mitad && r.mp > .5, `teléfono que sostiene 60 con buena imagen: no baja a 30 (${r.mp.toFixed(2)} MP)`);
+r = await caso({ ...TEL, hz: 90, conMitad: true, costos: { movil: [6, 8], baja: [6.5, 9] } }); ok(r.mitad && Math.abs(r.periodo - 22.22) < .01 && r.mp > 1, `teléfono de 90 Hz: 45 parejos con más imagen antes que 90 borrosos (${r.clave} ${r.mp.toFixed(2)} MP)`);
+r = await caso({ ...TEL, hz: 60, costos: { movil: [12, 20] } }); ok(!r.mitad && r.mp >= .33 - .01, 'teléfono flojo sin media frecuencia disponible: queda en el piso');
+
+// ---------- 3d. escalones del gobernador con piso ----------
+{ const P = 1.25; let q = { mp: 1.4, sombras: true };
+  q = escalones(q, { piso: P }); ok(q.hecho && Math.abs(q.mp - P) < 1e-9 && q.sombras, `bajar cerca del piso deja justo el piso (${q.mp.toFixed(2)})`);
+  q = escalones(q, { piso: P }); ok(q.hecho && q.mp === P && !q.sombras, 'en el piso: apaga las sombras');
+  const q2 = escalones(q, { piso: P }); ok(!q2.hecho && q2.mp === P, 'en el piso y sin sombras: no baja más');
+  const q3 = escalones(q, { piso: P, urgente: true }); ok(q3.hecho && q3.mp < P, 'perdiendo muchos cuadros seguidos (urgente): baja del piso');
+  const q4 = escalones({ mp: .32, sombras: false }, { piso: P, urgente: true }); ok(!q4.hecho, 'ni urgente baja de 0,3 MP');
+  const q5 = escalones({ mp: P, sombras: false }, { sube: true, pasos: 2, tope: 1.78 }); ok(q5.sombras && Math.abs(q5.mp - P / .85) < 1e-9, 'subir: primero las sombras, después 15 % más'); }
+// el gobernador en el piso: pocas pérdidas no lo mueven; muchas y sostenidas, sí (y si bajar no sirve, lo deshace)
+{ const g = new Gobernador(60); g.calentar(0, 0); let now = 0, pedUrg = 0, aplic = 0, mp = 1.25, sombras = false;
+  const vent = (seg, frac) => { for (let s = 0; s < seg; s++) for (let i = 0; i < 60; i++) { const ms = (i < 60 * frac ? 33.33 : 16.67); now += ms; if (g.cuadro(ms, now, 2)) { const urg = g.urgente; if (urg) pedUrg++; const e = escalones({ mp, sombras }, { sube: g.sube, pasos: g.pasos, piso: 1.25, urgente: urg }); if (e.hecho) { aplic++; mp = e.mp; sombras = e.sombras; } g.resultado(e.hecho, now); } } };
+  vent(12, .04); ok(mp === 1.25 && pedUrg === 0, `en el piso con pocas pérdidas no baja (${mp.toFixed(2)} MP)`);
+  vent(URGENTE_VENTANAS + 4, .3); ok(pedUrg >= 1 && mp < 1.25, `en el piso perdiendo el 30 % durante ${URGENTE_VENTANAS + 4} s: baja del piso (${mp.toFixed(2)} MP, ${pedUrg} pedidos)`);
+  const g2 = new Gobernador(60); g2.calentar(0, 0); now = 0; pedUrg = 0; mp = 1.25; sombras = false;
+  const vent2 = (seg, frac) => { for (let s = 0; s < seg; s++) for (let i = 0; i < 60; i++) { const ms = (i < 60 * frac ? 33.33 : 16.67); now += ms; if (g2.cuadro(ms, now, 2)) { const urg = g2.urgente; if (urg) pedUrg++; const e = escalones({ mp, sombras }, { sube: g2.sube, pasos: g2.pasos, piso: 1.25, urgente: urg }); if (e.hecho) { mp = e.mp; sombras = e.sombras; } g2.resultado(e.hecho, now); } } };
+  vent2(30, .3); ok(g2.ajena && mp >= 1.25 - 1e-9, `carga ajena en el piso: baja una vez, ve que no sirve y vuelve al piso (${mp.toFixed(2)} MP, ajena ${g2.ajena}, ${g2.historia.map(h => h.motivo).join(' / ')})`); }
+{ const g = new Gobernador(60, 2); ok(g.paso === 2 && Math.abs(g.periodo - 33.33) < .01 && pasoDe(60, 2) === 2 && metaDe(60, 2) === 30 && metaDe(120, 2) === 60, 'media frecuencia: 30 a 60 Hz, 60 a 120 Hz'); g.fijar(60, 1); ok(g.paso === 1, 'media frecuencia: se puede volver'); }
 
 // ---------- 3b. camino directo y arena junta (stage.js), sin placa ----------
 {

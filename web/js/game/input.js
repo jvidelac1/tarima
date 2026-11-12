@@ -38,6 +38,22 @@ export const toques = {
 };
 
 /**
+ * Un campo donde se escribe (nombre, mail, encuesta): ahí Espacio y Enter son del campo, no del juego. Con el foco en un
+ * campo, ni el botón del levantamiento ni el teclado de los paneles toman esas teclas (docs/MVP.md, sección 2, «Teléfono»).
+ */
+export function esCampo(el) {
+  if (!el || el.nodeType !== 1) return false;
+  if (el.isContentEditable) return true;
+  const t = el.tagName;
+  if (t === 'TEXTAREA' || t === 'SELECT') return true;
+  if (t !== 'INPUT') return false;
+  // casillas, radios y botones no reciben texto: Espacio los marca y eso lo resuelve el navegador
+  return !/^(checkbox|radio|button|submit|reset|range|color|file|image)$/i.test(el.type || 'text');
+}
+/** El evento de teclado viene de un campo de texto (o el foco está en uno). */
+export const enCampo = e => esCampo(e?.target) || esCampo(document.activeElement);
+
+/**
  * Entrada del levantamiento: barra espaciadora (o Enter) y dedos sobre la zona táctil o el escenario. Cada tecla y cada
  * puntero es un contacto; quien escucha recibe (t, 1, vía) cuando se apoya uno y (t, 0, vía) cuando se levanta. La vía es
  * 'teclado', 'tactil' o 'mouse': el clic del mouse se informa (saltea esperas) pero NO vale como gesto del levantamiento.
@@ -60,19 +76,19 @@ export class Boton {
     // por código físico o por carácter: un teclado remapeado que manda ' ' con otro código también vale
     const esEspacio = e => e.code === 'Space' || e.key === ' ', esTecla = e => esEspacio(e) || e.code === 'Enter' || e.key === 'Enter';
     // en captura y antes que el teclado de los paneles: la pulsación queda anotada (y con acuse) pase lo que pase después
-    this._k0 = e => { if (esTecla(e) && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) toques.nuevo(reloj.deEvento(e), 'teclado', esEspacio(e) ? 'ESPACIO' : 'ENTER'); };
+    this._k0 = e => { if (esTecla(e) && !enCampo(e) && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) toques.nuevo(reloj.deEvento(e), 'teclado', esEspacio(e) ? 'ESPACIO' : 'ENTER'); };
     this._kd = e => {
-      if (!esTecla(e)) return;
+      if (!esTecla(e) || enCampo(e)) return;
       const T = toques.abierto, pend = !e.repeat && T && T.ok === null;
       // sobre un botón manda el botón (o ya lo activó el teclado del panel): cuenta como aceptado salvo que el botón diga otra cosa
-      if (e.defaultPrevented || e.target.closest?.('button,input,select,a')) { if (pend) toques.resolver(true, 'boton', true); return; }
+      if (e.defaultPrevented || e.target.closest?.('button,input,select,textarea,label,a')) { if (pend) toques.resolver(true, 'boton', true); return; }
       e.preventDefault(); if (e.repeat) return;
       if (!this.activo) { if (pend) toques.resolver(false, 'pausa'); return; }
       baja('k' + (e.code || e.key), e, 'teclado');
     };
-    this._ku = e => { if (esTecla(e)) { sube('k' + (e.code || e.key), e); toques.suelta(); } };
+    this._ku = e => { if (esTecla(e) && (!enCampo(e) || this.contactos.has('k' + (e.code || e.key)))) { sube('k' + (e.code || e.key), e); toques.suelta(); } };
     this._pd = e => {
-      if (!this.activo || (e.pointerType === 'mouse' && e.button !== 0) || e.target.closest?.('button,input,select,a,.panel')) return;
+      if (!this.activo || (e.pointerType === 'mouse' && e.button !== 0) || e.target.closest?.('button,input,select,textarea,label,a,.panel,[contenteditable]')) return;
       const via = e.pointerType === 'mouse' ? 'mouse' : 'tactil'; e.preventDefault(); toques.nuevo(reloj.deEvento(e), via, via === 'mouse' ? 'CLIC' : 'TOQUE'); baja('p' + e.pointerId, e, via);
     };
     this._pu = e => { if (this.contactos.has('p' + e.pointerId)) { sube('p' + e.pointerId, e); toques.suelta(); } };

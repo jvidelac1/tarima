@@ -75,6 +75,14 @@ jobs:
         timeout-minutes: 20
         run: node tools/check_fluidez.mjs --tutorial --json=out/fluidez/fluidez.json 2>&1 | tee out/logs/check_fluidez.log
 
+      # Teléfono emulado (táctil): de costado en dos tamaños y con mano izquierda, jugado solo con toques, con una captura y
+      # una revisión de cada pantalla (nada cortado, nada tapado, nada debajo de la muesca), campos de texto, dos dedos a
+      # la vez, y el aviso «Gira el teléfono» en vertical. Capturas en out/telefono.
+      - name: Teléfono de costado y en vertical (check_telefono)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 25
+        run: node tools/check_telefono.mjs 2>&1 | tee out/logs/check_telefono.log
+
       # Para mirar el juego sin abrir un navegador: una captura por panel, por señal y por toque, con un cuadro del 3D
       # dibujado por software antes de cada una. Las capturas atrasan los toques, así que este paso no decide el resultado.
       - name: Capturas con el 3D dibujado (no bloquea)
@@ -96,7 +104,7 @@ jobs:
         run: |
           {
             echo "### Pruebas del juego (dibujo por software: no mide cuadros por segundo)"
-            for f in sim_test play_human caida_test check_escenas check_game check_fluidez capturas check_recorrido; do
+            for f in sim_test play_human caida_test check_escenas check_game check_telefono check_fluidez capturas check_recorrido; do
               echo; echo "**$f**"; echo '```'
               if [ -f "out/logs/$f.log" ]; then tail -n 14 "out/logs/$f.log"; else echo "(no corrió)"; fi
               echo '```'

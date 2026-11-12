@@ -2,7 +2,12 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#03050c">
+<meta name="format-detection" content="telephone=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="color-scheme" content="dark">
 <title>Tarima · Mundial Tarima 2026</title>
 <link rel="icon" href="data:,">
@@ -40,7 +45,22 @@
   <div id="sinfoco" hidden>El juego no está recibiendo el teclado · hacé clic acá</div>
   <div id="msg">Cargando…</div>
 </div>
-<div id="zona" aria-label="Zona de toque del levantamiento"><span id="zona-txt">Tocá acá</span></div>
+<div id="zona" aria-label="Zona de toque del levantamiento"><span id="zona-txt">Toca</span></div>
+<div id="girar" role="alertdialog" aria-labelledby="girar-t" aria-describedby="girar-s">
+  <svg viewBox="0 0 160 160" aria-hidden="true">
+    <path class="flecha" d="M38 30 A62 62 0 0 1 132 62" fill="none" stroke="#35e6d6" stroke-width="6" stroke-linecap="round"/>
+    <path class="flecha" d="M120 52 L134 64 L138 46" fill="none" stroke="#35e6d6" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <g class="tel">
+      <rect x="54" y="34" width="52" height="96" rx="9" fill="#0d1533" stroke="#f2f4ff" stroke-width="5"/>
+      <rect x="61" y="46" width="38" height="70" rx="2" fill="#16245a"/>
+      <circle cx="80" cy="123" r="3" fill="#f2f4ff"/>
+      <circle cx="88" cy="100" r="8" fill="none" stroke="#ffd23f" stroke-width="3"/>
+    </g>
+  </svg>
+  <b id="girar-t">Gira el teléfono</b>
+  <span id="girar-s">Tarima se juega de costado.</span>
+</div>
+<script type="module" src="js/game/telefono.js"></script>
 <script type="module" src="js/game/main.js"></script>
 </body>
 </html>

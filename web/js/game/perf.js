@@ -29,10 +29,56 @@ export const PRESET = { movil: MOVIL, baja: { ...QUALITY.baja, shadow: 512, dire
 export const MARGEN = .85;
 /** Cada escalón que baja el gobernador deja esta fracción de los píxeles. */
 export const PASO = .85;
-/** Megapíxeles mínimos: por debajo no se baja más la resolución (se apagan las sombras y ahí queda). */
+/** Megapíxeles mínimos absolutos: por debajo no se baja nunca la resolución. */
 export const PISO_MP = .3;
+/**
+ * Piso de resolución en una computadora: esta fracción de los megapíxeles de la pantalla (hasta TECHO_MP). El dueño prefiere
+ * buena imagen: ni la calibración ni el gobernador bajan de acá, salvo que se pierdan muchos cuadros de forma sostenida
+ * (Gobernador.urgente). Con 0,7 en la ventana de la Mac del dueño (1745 × 845 a densidad 1,1: 1,78 MP) son 1,25 MP.
+ */
+export const PISO_ESCRITORIO = .7;
+/** Piso en un teléfono o tableta: la pantalla a densidad 1 (por debajo, la imagen queda borrosa). */
+export const PISO_TELEFONO = 1;
+/** Ventanas de un segundo seguidas que pierden URGENTE_FRAC de los refrescos o más para bajar del piso. */
+export const URGENTE_VENTANAS = 5, URGENTE_FRAC = .1;
 /** Tope de megapíxeles del modo automático (2560 × 1440). */
 export const TECHO_MP = 3.7;
+/**
+ * Piso de resolución (MP) para la calibración y el gobernador.
+ * @param {{telefono?:boolean, techo:number, cssMP?:number}} o  `techo`: MP de la pantalla a la densidad en uso;
+ *   `cssMP`: MP de la pantalla en píxeles CSS (densidad 1)
+ */
+export function pisoDe({ telefono = false, techo, cssMP = 0 }) {
+  const t = Math.min(techo, TECHO_MP);
+  return Math.min(t, Math.max(PISO_MP, telefono ? cssMP * PISO_TELEFONO : t * PISO_ESCRITORIO));
+}
+/**
+ * Aplica `pasos` escalones a la calidad en uso, sin compilar nada (main.js, bajar y subir).
+ * - Bajar: 15 % menos de píxeles por escalón hasta el piso (el último escalón deja justo el piso); en el piso apaga las
+ *   sombras; por debajo del piso solo con `urgente` (se pierden muchos cuadros seguidos), hasta PISO_MP.
+ * - Subir: si está debajo del piso, primero vuelve al piso; después las sombras, y después 15 % más de píxeles por
+ *   escalón hasta `tope`.
+ * @param {{mp:number, sombras:boolean}} q
+ * @param {{sube?:boolean, pasos?:number, piso?:number, tope?:number, urgente?:boolean}} o
+ * @returns {{mp:number, sombras:boolean, hecho:boolean}}
+ */
+export function escalones(q, { sube = false, pasos = 1, piso = PISO_MP, tope = TECHO_MP, urgente = false } = {}) {
+  let { mp, sombras } = q, hecho = false; piso = Math.max(PISO_MP, piso);
+  if (!(mp > 0)) return { mp, sombras, hecho };
+  for (let k = 0; k < pasos; k++) {
+    if (sube) {
+      if (mp < piso * .99) { mp = Math.min(piso, mp / PASO); hecho = true; continue; }      // debajo del piso vuelve primero la resolución
+      if (!sombras) { sombras = true; hecho = true; continue; }
+      if (mp >= tope * .985) break;
+      mp = Math.min(tope, mp / PASO); hecho = true; continue;
+    }
+    if (mp > piso * 1.01) { mp = Math.max(piso, mp * PASO); hecho = true; continue; }
+    if (sombras) { if (hecho && !urgente) break; sombras = false; hecho = true; if (!urgente) break; continue; }
+    if (urgente && mp * PASO >= PISO_MP) { mp *= PASO; hecho = true; continue; }
+    break;
+  }
+  return { mp, sombras, hecho };
+}
 export const nombreDe = (Q, mp, sombras = true) => `${Q.label} ${mp.toFixed(2).replace('.', ',')} MP${sombras ? '' : ' sin sombras'}`;
 /**
  * Calidad de arranque. Con `?q=alta|media|baja|movil` queda fija (sin calibración ni gobernador); sin el parámetro es
@@ -70,9 +116,9 @@ export function medirRefresco(n = 40, sinMedir = 60) {
  * Cada cuántos refrescos dibuja el juego: en todos, o en uno de cada dos en pantallas de más de 90 Hz (120 o 144 Hz dan 60
  * o 72 cuadros parejos; dibujar «lo que salga» a 120 alterna cuadros de 8 y de 17 ms).
  */
-export const pasoDe = hz => (hz > 90 ? 2 : 1);
-/** Cuadros por segundo que se le piden al juego. */
-export const metaDe = hz => hz / pasoDe(hz);
+export const pasoDe = (hz, minimo = 1) => Math.max(minimo, hz > 90 ? 2 : 1);
+/** Cuadros por segundo que se le piden al juego. `minimo`: 2 para dibujar a media frecuencia (teléfono flojo: 30 parejos). */
+export const metaDe = (hz, minimo = 1) => hz / pasoDe(hz, minimo);
 
 /** Recta costo = fijo + porMP · megapíxeles, por dos medidas {mp, ms}. */
 export function ajustar(a, b) {
@@ -87,51 +133,73 @@ export function perdidos(intervalos, periodo) { let n = 0; for (const x of inter
 /** Resolución (MP) que tiene que sostener «Media» o «Alta» para elegirla en vez de la calidad de abajo: la de la pantalla o 1080p. */
 const MP_1080 = 2.07;
 /**
- * La decisión de calidad de antes del primer intento, separada de la escena para poder probarla sola.
+ * La decisión de calidad de antes del primer intento, separada de la escena para poder probarla sola. Prefiere buena
+ * imagen (decisión del dueño): la medición de la carga es corta y ruidosa, así que nunca baja de un piso alto por ella.
  * 1. Mide el costo de un cuadro a dos resoluciones y traza la recta costo = fijo + porMP · MP. De ahí, cuántos megapíxeles
  *    entran en el 85 % del período (`sostiene`).
- * 2. Desde «Baja»: si entra con más del doble de margen prueba «Media», y con margen sobre «Media», «Alta»; se queda con la
- *    más alta que sostenga la resolución de la pantalla (o 1080p si la pantalla es más grande). Si «Baja» no llega a medio
- *    megapíxel, pasa a «Móvil».
- * 3. Aplica esos megapíxeles (nunca más que los de la pantalla) y verifica con cuadros de verdad: si se pierde un refresco,
- *    15 % menos de píxeles y otra vez (un solo refresco perdido se mira dos veces antes de bajar).
+ * 2. Computadora (`telefono` falso): desde «Baja», si entra con más del doble de margen prueba «Media», y con margen sobre
+ *    «Media», «Alta»; se queda con la más alta que sostenga la resolución de la pantalla (o 1080p si es más grande). NUNCA
+ *    pasa a «Móvil», y la resolución no baja del piso (PISO_ESCRITORIO de la pantalla) aunque la medida diga menos: si de
+ *    verdad no da, lo corrige el gobernador después de varios segundos seguidos perdiendo cuadros.
+ * 3. Teléfono o tableta (`telefono`): desde «Móvil», si sobra margen prueba «Baja» (no más: «Media» lleva pases de pantalla
+ *    que un teléfono caliente no sostiene). Si ni así entra la pantalla a densidad 1 (el piso), y hay `mitad`, pasa a
+ *    dibujar a media frecuencia (30 cuadros parejos a 60 Hz, 45 a 90 Hz) y vuelve a decidir: 30 parejos con buena imagen
+ *    antes que 60 a los tirones o borrosos. A más de 65 Hz también pasa a la mitad si a la frecuencia entera no entra la
+ *    resolución de la pantalla.
+ * 4. Aplica esos megapíxeles (nunca más que los de la pantalla) y verifica con cuadros de verdad: si se pierde un refresco,
+ *    15 % menos de píxeles y otra vez (un solo refresco perdido se mira dos veces antes de bajar), sin bajar del piso.
  * @param {object} io
  * @param {number} io.periodo  ms por cuadro de la meta
  * @param {string} io.clave    calidad de partida
+ * @param {boolean} [io.telefono]  puntero grueso (teléfono o tableta); falso: computadora
+ * @param {number} [io.cssMP]  megapíxeles del lienzo en píxeles CSS (densidad 1): el piso del teléfono
  * @param {() => number} io.techo             megapíxeles del lienzo a la densidad de la pantalla, con la calidad en uso
  * @param {(mp:number) => {mp:number, ms:number}} io.medir  dibuja a esa resolución (aunque pase la de la pantalla) y devuelve los MP reales y el costo
  * @param {(clave:string) => Promise} io.poner  cambia de calidad y deja todo compilado
  * @param {(mp:number) => number} io.fijar     aplica el presupuesto de píxeles del juego y devuelve los MP que quedaron
  * @param {(n:number, calienta:number) => Promise<number[]|null>} io.cuadros  intervalos (ms) de n cuadros de verdad con el pesista moviéndose
- * @returns {Promise<{clave:string, mp:number, p80:number|null, primera:object, elegida:object, pruebas:object[], verificacion:object[]}>}
+ * @param {() => (number|Promise<number>)} [io.mitad]  pasa a dibujar en uno de cada dos refrescos y devuelve el período nuevo (ms)
+ * @returns {Promise<{clave:string, mp:number, piso:number, mitad:boolean, periodo:number, p80:number|null, primera:object, elegida:object, pruebas:object[], verificacion:object[]}>}
  */
 export async function decidirCalidad(io) {
-  const pruebas = [], verificacion = [], r2 = x => Math.round(x * 100) / 100; let clave = io.clave, p80 = null;
+  const pruebas = [], verificacion = [], r2 = x => Math.round(x * 100) / 100, tel = !!io.telefono; let clave = io.clave, p80 = null, periodo = io.periodo, mitad = false;
   const medir = () => {
-    const techo = Math.min(io.techo(), TECHO_MP), a = Math.max(.2, Math.min(.5, techo * .3)), b = Math.max(a * 2, Math.min(techo, 1.6)), m = [io.medir(a), io.medir(b)], mod = ajustar(m[0], m[1]), sost = mpSostenible(mod, io.periodo);
-    const r = { calidad: clave, techo: r2(techo), medidas: m.map(x => ({ ...x, mp: r2(x.mp), ms: r2(x.ms) })), fijo: r2(mod.fijo), porMP: r2(mod.porMP), sostiene: Number.isFinite(sost) ? r2(sost) : 99 };
+    const techo = Math.min(io.techo(), TECHO_MP), a = Math.max(.2, Math.min(.5, techo * .3)), b = Math.max(a * 2, Math.min(techo, 1.6)), m = [io.medir(a), io.medir(b)], mod = ajustar(m[0], m[1]), sost = mpSostenible(mod, periodo);
+    const r = { calidad: clave, periodo: r2(periodo), techo: r2(techo), medidas: m.map(x => ({ ...x, mp: r2(x.mp), ms: r2(x.ms) })), fijo: r2(mod.fijo), porMP: r2(mod.porMP), sostiene: Number.isFinite(sost) ? r2(sost) : 99, modelo: mod };
     pruebas.push(r); return r;
   };
-  const probar = async c => { await io.poner(c); clave = c; return medir(); }, alcanza = r => r.sostiene >= Math.min(r.techo, MP_1080);
+  // con la misma recta, a otro período (no hace falta volver a dibujar)
+  const aPeriodo = r => { const sost = mpSostenible(r.modelo, periodo), x = { ...r, periodo: r2(periodo), sostiene: Number.isFinite(sost) ? r2(sost) : 99 }; pruebas.push(x); return x; };
+  const probar = async c => { await io.poner(c); clave = c; return medir(); }, meta = r => Math.min(r.techo, MP_1080), alcanza = r => r.sostiene >= meta(r);
   const primera = medir(); let r = primera;
-  if (clave === 'baja') {
-    if (r.sostiene >= Math.min(r.techo, MP_1080) * 2.2) {
+  const subirTel = async () => { if (clave === 'movil' && r.sostiene >= meta(r) * 1.6) { const b = await probar('baja'); if (alcanza(b)) r = b; else { await io.poner('movil'); clave = 'movil'; } } };
+  if (!tel && clave === 'baja') {
+    if (r.sostiene >= meta(r) * 2.2) {
       const m = await probar('media');
-      if (alcanza(m)) { r = m; if (m.sostiene >= Math.min(m.techo, MP_1080) * 1.8) { const al = await probar('alta'); if (alcanza(al)) r = al; else { await io.poner('media'); clave = 'media'; } } }
+      if (alcanza(m)) { r = m; if (m.sostiene >= meta(m) * 1.8) { const al = await probar('alta'); if (alcanza(al)) r = al; else { await io.poner('media'); clave = 'media'; } } }
       else { await io.poner('baja'); clave = 'baja'; }
-    } else if (r.sostiene < .5) r = await probar('movil');
+    }
+  } else if (tel) {
+    if (clave === 'baja' && r.sostiene < .5) r = await probar('movil');
+    await subirTel();
   }
-  let mp = io.fijar(Math.max(PISO_MP, Math.min(r.techo, r.sostiene))), repetida = false;
+  const piso = () => pisoDe({ telefono: tel, techo: r.techo, cssMP: io.cssMP || 0 });
+  if (tel && io.mitad && periodo < 25 && (r.sostiene < piso() || (1000 / periodo > 65 && r.sostiene < r.techo * .8))) {
+    periodo = await io.mitad(); mitad = true; r = aPeriodo(r); await subirTel();
+  }
+  const P = piso();
+  let mp = io.fijar(Math.max(P, Math.min(r.techo, r.sostiene))), repetida = false;
   for (let k = 0; k < 5; k++) {
     const d = await io.cuadros(45, 12); if (!d || !d.length) break;
-    const dup = perdidos(d, io.periodo), o = d.slice().sort((x, y) => x - y); p80 = Math.round(o[Math.floor(o.length * .8)] * 10) / 10;
+    const dup = perdidos(d, periodo), o = d.slice().sort((x, y) => x - y); p80 = Math.round(o[Math.floor(o.length * .8)] * 10) / 10;
     verificacion.push({ mp: r2(mp), cuadros: d.length, perdidos: dup, p50: Math.round(o[o.length >> 1] * 10) / 10, max: Math.round(o[o.length - 1] * 10) / 10 });
     if (!dup) break;
     if (dup === 1 && !repetida) { repetida = true; continue; }      // uno solo puede ser de otra cosa: se mira de nuevo antes de bajar
-    if (mp * PASO < PISO_MP) break;
-    mp = io.fijar(mp * PASO); repetida = false;
+    if (mp <= P * 1.01) break;                                         // en el piso: lo que siga lo decide el gobernador
+    mp = io.fijar(Math.max(P, mp * PASO)); repetida = false;
   }
-  return { clave, mp, p80, primera, elegida: r, pruebas, verificacion };
+  const limpia = x => { const { modelo, ...resto } = x; return resto; };
+  return { clave, mp, piso: P, mitad, periodo, p80, primera: limpia(primera), elegida: limpia(r), pruebas: pruebas.map(limpia), verificacion };
 }
 
 /** Tiempo limpio (sin perder ningún refresco) antes de subir un escalón, en ms: hasta lo que dejó la calibración, y por encima. */
@@ -164,22 +232,27 @@ export const ESCALAR = 3;
  * costo del cuadro lo pone la calibración, que lo mide antes de jugar.
  */
 export class Gobernador {
-  constructor(hz) {
-    this.fijar(hz); this.v = { t: 0, n: 0, dup: 0, cb: 0, d: [] }; this.malas = []; this.hasta = 0; this.pide = false; this.sube = false; this.pasos = 1; this.fps = 0; this.ult = null;
+  constructor(hz, pasoMin = 1) {
+    this.pasoMin = pasoMin; this.fijar(hz); this.v = { t: 0, n: 0, dup: 0, cb: 0, d: [] }; this.malas = []; this.hasta = 0; this.pide = false; this.sube = false; this.pasos = 1; this.fps = 0; this.ult = null;
     this.nivel = 0;            // escalones por debajo de lo que dejó la calibración (negativo: por encima)
     this.limpioMs = 0;         // tiempo seguido sin perder refrescos
     this.espera = SUBIR_MS; this.esperaArriba = SUBIR_ARRIBA_MS;
     this.ajena = false; this.tAjena = 0; this.ignoradas = 0; this.tope = false; this.piso = false; this.ultimo = null; this.motivo = ''; this._frac = 0; this.historia = [];
+    this.seguidas = 0;         // ventanas seguidas que pierden URGENTE_FRAC o más desde el último cambio
+    this.pisoDuro = false;     // ya bajó del piso hasta PISO_MP: no hay nada más para bajar
+    this._urgente = false;
   }
+  /** El pedido en curso es bajar por debajo del piso (main.js lo pasa a escalones como `urgente`). */
+  get urgente() { return this.pide && !this.sube && this._urgente; }
   /** Compatibilidad: «quieto» era dejar de bajar porque bajar no servía. */
   get quieto() { return this.ajena; }
   /** Cambia la frecuencia de pantalla con la que se juzga. */
-  fijar(hz) { this.hz = hz; this.paso = pasoDe(hz); this.meta = metaDe(hz); this.periodo = 1000 / this.meta; }
+  fijar(hz, pasoMin = this.pasoMin || 1) { this.pasoMin = pasoMin; this.hz = hz; this.paso = pasoDe(hz, pasoMin); this.meta = metaDe(hz, pasoMin); this.periodo = 1000 / this.meta; }
   _vaciar() { const v = this.v; v.t = v.n = v.dup = v.cb = 0; v.d.length = 0; }
   /** Descarta lo medido hasta dentro de `ms`: después de cargar o de cambiar de calidad los primeros cuadros no cuentan. */
   calentar(now, ms = 2500) { this.hasta = now + ms; this._vaciar(); this.malas = []; this.pide = false; this.sube = false; this.pasos = 1; this.limpioMs = 0; }
   /** Estado para mirar desde la consola (JUEGO.calidad.gobernador). */
-  get estado() { return { nivel: this.nivel, ajena: this.ajena, ignoradas: this.ignoradas, tope: this.tope, piso: this.piso, limpioS: Math.round(this.limpioMs / 100) / 10, esperaS: this.espera / 1000, esperaArribaS: this.esperaArriba / 1000, motivo: this.motivo, historia: this.historia.slice(-8) }; }
+  get estado() { return { nivel: this.nivel, seguidas: this.seguidas, pisoDuro: this.pisoDuro, pasoMin: this.pasoMin, ajena: this.ajena, ignoradas: this.ignoradas, tope: this.tope, piso: this.piso, limpioS: Math.round(this.limpioMs / 100) / 10, esperaS: this.espera / 1000, esperaArribaS: this.esperaArriba / 1000, motivo: this.motivo, historia: this.historia.slice(-8) }; }
   /**
    * @param {number} ms tiempo desde el cuadro dibujado anterior  @param {number} now  @param {number} cb ms de hilo principal de este cuadro
    * @returns {boolean} hay un pedido (bajar o, con `sube`, subir)
@@ -195,6 +268,7 @@ export class Gobernador {
     if (med < this.periodo * .9 && rapidos > v.n * .8) { this.fijar(Math.round(100000 * this.paso / med) / 100); this._vaciar(); this.malas = []; return this.pide; }
     const mala = v.dup >= 2 || hilo > this.periodo * .92, limpia = v.dup === 0 && hilo < this.periodo * .8;
     this.malas.push(mala); if (this.malas.length > 4) this.malas.shift();
+    this.seguidas = frac >= URGENTE_FRAC ? this.seguidas + 1 : 0;
     this.limpioMs = limpia ? this.limpioMs + v.t : 0;
     if (this.ajena && (now - this.tAjena > AJENA_MS || (limpia && this.limpioMs >= 2900))) { this.ajena = false; this.motivo = now - this.tAjena > AJENA_MS ? 'se vuelve a probar si bajar sirve' : 'la máquina se liberó'; }
     const pasos = frac > .45 ? 3 : frac > .2 ? 2 : 1;
@@ -213,6 +287,12 @@ export class Gobernador {
       if (u.nivel > 0) this.espera = Math.min(SUBIR_MAX_MS, this.espera * 2); else this.esperaArriba = Math.min(SUBIR_MAX_MS, this.esperaArriba * 2);
       this._pedir(false, 1, 'la subida no aguantó', frac); this._deshace = true; return;
     }
+    // en el piso de resolución: solo se baja de ahí perdiendo muchos cuadros de forma sostenida (URGENTE_VENTANAS seguidas);
+    // si la bajada anterior por debajo del piso no cambió lo que se pierde, es carga ajena y se deshace
+    if (this.piso && !this.ajena && !this.pisoDuro && this.seguidas >= URGENTE_VENTANAS) {
+      if (u && !u.sube && u.urgente && !u.deshace && now - u.t < AJENA_MS && frac > u.frac * .67) { this.ajena = true; this.tAjena = now; this._pedir(true, u.pasos, 'carga ajena: bajar del piso no cambió lo que se pierde', frac); this._deshace = true; return; }
+      this._pedir(false, 1, 'pierde muchos cuadros seguidos: baja del piso', frac); this._urgente = true; return;
+    }
     if (this.ajena || this.piso) { this.ignoradas++; return; }
     // bajar no cambió lo que se pierde: no es el costo del juego. Se deshace esa bajada y no se baja más por ahora.
     // Antes de concluirlo, la racha de bajadas llega a ESCALAR escalones (un escalón solo puede no alcanzar al costo
@@ -223,12 +303,12 @@ export class Gobernador {
     }
     this._pedir(false, pasos, 'pierde refrescos', frac);
   }
-  _pedir(sube, pasos, motivo, frac) { this.pide = true; this.sube = sube; this.pasos = pasos; this.motivo = motivo; this._frac = frac; this._deshace = false; this._sigue = false; }
+  _pedir(sube, pasos, motivo, frac) { this.pide = true; this.sube = sube; this.pasos = pasos; this.motivo = motivo; this._frac = frac; this._deshace = false; this._sigue = false; this._urgente = false; }
   /**
    * La calibración dejó una resolución nueva (main.js, al terminar calibrar): esa es la referencia del nivel 0. Lo que el
    * gobernador haya hecho antes (en el menú) no cuenta.
    */
-  calibrado(now, ms = 1500) { this.nivel = 0; this.ultimo = null; this.tope = this.piso = this.ajena = false; this.espera = SUBIR_MS; this.esperaArriba = SUBIR_ARRIBA_MS; this.calentar(now, ms); }
+  calibrado(now, ms = 1500) { this.nivel = 0; this.ultimo = null; this.tope = this.piso = this.ajena = this.pisoDuro = false; this.seguidas = 0; this.espera = SUBIR_MS; this.esperaArriba = SUBIR_ARRIBA_MS; this.calentar(now, ms); }
   /**
    * main.js avisa qué pasó con el pedido: `hecho` si cambió algo (false: no había más para bajar o para subir).
    * Empieza el calentamiento: los cuadros de los próximos 2,5 s no cuentan.
@@ -239,12 +319,13 @@ export class Gobernador {
       const nivel = this.nivel; this.nivel += sube ? -pasos : pasos;
       // racha de bajadas: `acum` escalones desde la primera, que perdía `frac0`
       const u = this.ultimo, sigue = !sube && this._sigue && u && !u.sube;
-      this.ultimo = { sube, t: now, frac: this._frac, pasos, nivel, deshace: !!this._deshace, acum: sigue ? u.acum + pasos : pasos, frac0: sigue ? u.frac0 : this._frac };
-      if (sube) this.piso = false; else this.tope = false;
+      this.ultimo = { sube, t: now, frac: this._frac, pasos, nivel, deshace: !!this._deshace, urgente: this._urgente, acum: sigue ? u.acum + pasos : pasos, frac0: sigue ? u.frac0 : this._frac };
+      if (sube) this.piso = this.pisoDuro = false; else this.tope = false;
+      this.seguidas = 0;
       this.historia.push({ t: Math.round(now), sube, pasos, nivel: this.nivel, motivo: this.motivo }); if (this.historia.length > 40) this.historia.shift();
     } else if (sube) this.tope = true;            // ya está a la resolución de la pantalla y con sombras
-    else this.piso = true;                        // ya está en el piso de resolución y sin sombras
-    this.calentar(now);
+    else { if (this._urgente) this.pisoDuro = true; this.piso = true; }      // ya está en el piso de resolución y sin sombras
+    this._urgente = false; this.calentar(now);
   }
 }
 

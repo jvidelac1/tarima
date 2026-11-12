@@ -5,7 +5,8 @@
 //  - teclado (Fácil): partida completa SIN MOUSE con el reloj inyectado: menús con Tab, flechas y Enter; el tutorial (un
 //    arranque guiado); cada levantamiento con toques cortos de Espacio, mirando solo la señal que expone JUEGO.estado().
 //    Después, con el reloj verdadero: pausa (Esc), ayuda (H), el tutorial repetido y el primer intento de la final.
-//  - tactil (Fácil): lo mismo en tamaño de teléfono, con toques sobre la zona táctil y sobre los botones.
+//  - tactil (Fácil): lo mismo en un teléfono de costado (844 × 390: en vertical solo se ve «Gira el teléfono»), con toques
+//    sobre el botón táctil (o sobre el escenario cuando un panel con botones lo esconde) y sobre los botones.
 //  - clasico: metrónomo y un intento de práctica con el esquema de mantener y soltar.
 //  - lento (Fácil, con Brenner): el arranque guiado tocando ¡EMPUJÁ! cada 600 ms tiene que salir válido a la primera; en la
 //    final, 40 s con el panel del llamado abierto no gastan reloj; y después de confirmar, sin tocar, la señal cuenta los
@@ -47,7 +48,7 @@ const ESTADOS = ['inicio', 'presentacion', 'llamado', 'intento', 'decision', 're
 
 async function corrida(via) {
   const tactil = via === 'tactil', clasico = via === 'clasico', lento = via === 'lento', tag = `[${via}]`;
-  const ctx = await browser.newContext(tactil ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true } : { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
+  const ctx = await browser.newContext(tactil ? { viewport: { width: 844, height: 390 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true } : { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
   const page = await ctx.newPage(), cdp = tactil ? await ctx.newCDPSession(page) : null;
   page.on('console', m => { if (m.type() === 'error') problemas.push(`${tag} console.error: ${m.text()}`); });
   page.on('pageerror', e => problemas.push(`${tag} pageerror: ${e.message}`));
@@ -60,7 +61,8 @@ async function corrida(via) {
   const mal = txt => { const m = `${tag} ${txt}`; if (!problemas.includes(m)) problemas.push(m); };
 
   // ---- la vía real de entrada: tecla o dedo. Nunca el mouse (salvo para probar que no hace nada).
-  const zona = async () => { const b = await page.locator('#zona').boundingBox(); return { x: Math.round(b.x + b.width / 2), y: Math.round(b.y + b.height / 2) }; };
+  // el botón táctil; si un panel con botones lo esconde, el borde izquierdo del escenario (también recibe toques)
+  const zona = async () => { const b = await page.locator('#zona').boundingBox(); return b ? { x: Math.round(b.x + b.width / 2), y: Math.round(b.y + b.height / 2) } : { x: 4, y: Math.round((await page.viewportSize()).height / 2) }; };
   const baja = async () => { if (tactil) { const p = await zona(); await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.x, y: p.y, id: 1 }] }); } else await page.keyboard.down('Space'); };
   const sube = async () => { if (tactil) await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); else await page.keyboard.up('Space'); };
   /** Lleva el foco con Tab hasta el botón `sel` (teclado). */

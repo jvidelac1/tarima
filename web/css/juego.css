@@ -202,3 +202,82 @@ table.tabla{width:100%;border-collapse:collapse;font-family:var(--display);font-
 @media (prefers-reduced-motion:no-preference){.veredicto,.cartel,.guia{animation:entra .18s ease-out}}
 @media (max-width:560px){.pasos{grid-template-columns:1fr}.pasos li{flex-direction:row;align-items:center;gap:.7em}}
 @keyframes entra{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%)}}
+
+/* ---------- teléfono y tableta (telefono.js): de costado, botón bajo el pulgar, aviso de girar ---------- */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{-webkit-tap-highlight-color:transparent}
+/* los campos sí se tocan, se seleccionan y se escriben (el resto de la página no) */
+input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default;touch-action:manipulation}
+#girar{display:none}
+@media (pointer:coarse){
+  /* la página no se desplaza ni rebota: el cuerpo queda clavado a lo visible (con las barras de Safari también) */
+  body{position:fixed;inset:0;width:auto;height:auto}
+  /* 16 px o más: Safari no agranda la página al enfocar un campo */
+  input,textarea,select{font-size:max(16px,1em)}
+  #sobre{padding:calc(8px + var(--st)) calc(8px + var(--sr)) calc(8px + var(--sb)) calc(8px + var(--sl))}
+  #sobre .panel{max-height:100%}
+}
+/* de costado: el escenario ocupa toda la pantalla y el botón flota abajo a la derecha (a la izquierda con html.zurdo) */
+@media (pointer:coarse) and (orientation:landscape){
+  :root{--boton:clamp(96px,29vh,150px);--bm:14px}
+  #zona{display:flex;position:fixed;z-index:4;right:calc(var(--sr) + var(--bm));bottom:calc(var(--sb) + var(--bm));width:var(--boton);height:var(--boton);border-radius:50%;align-items:center;justify-content:center;padding:10px;text-align:center;overflow:hidden;
+    font-family:var(--display);font-weight:800;font-size:calc(var(--boton)*.16);line-height:1;letter-spacing:.03em;text-transform:uppercase;color:#fff;text-shadow:0 1px 5px #000;
+    background:radial-gradient(circle at 50% 35%,rgba(53,230,214,.26),rgba(6,14,48,.5) 72%);border:3px solid rgba(242,244,255,.6);box-shadow:0 6px 0 rgba(2,4,12,.55),inset 0 0 18px rgba(53,230,214,.2);
+    touch-action:none;-webkit-user-select:none;user-select:none;transition:transform 50ms,box-shadow 50ms}
+  #zona.on,#zona.hunde{transform:translateY(5px) scale(.95);border-color:var(--teal);background:radial-gradient(circle at 50% 40%,rgba(53,230,214,.6),rgba(10,40,90,.62) 75%);box-shadow:0 1px 0 rgba(2,4,12,.55),inset 0 0 26px rgba(53,230,214,.5)}
+  html.zurdo #zona{right:auto;left:calc(var(--sl) + var(--bm))}
+  /* sin botón mientras hay un panel con botones, la pausa, la carga o un campo con el teclado abierto: ahí se tocan otros
+     botones. Un panel sin botones («Toca para seguir») deja el botón a la vista y se corre para no quedar debajo. */
+  body:has(#capa > .panel button) #zona,body:has(#sobre:not([hidden])) #zona,body:has(#msg:not([hidden])) #zona,html.escribiendo #zona{display:none}
+  #capa{position:fixed;inset:0;z-index:5;padding:calc(6px + var(--st)) calc(8px + var(--sr)) calc(6px + var(--sb)) calc(8px + var(--sl))}
+  body:has(#capa > .panel):not(:has(#capa > .panel button)) #capa{padding-right:calc(var(--boton) + var(--bm)*2 + var(--sr))}
+  html.zurdo body:has(#capa > .panel):not(:has(#capa > .panel button)) #capa{padding-right:calc(8px + var(--sr));padding-left:calc(var(--boton) + var(--bm)*2 + var(--sl))}
+  /* con el teclado de pantalla, el panel usa solo lo que queda visible y arranca arriba */
+  html.escribiendo #capa{top:var(--vvy,0px);bottom:auto;height:var(--vvh,100%);align-items:flex-start}
+}
+/* teléfono de costado (360 a 430 px de alto): todo más compacto, y la señal del lado contrario al botón */
+@media (pointer:coarse) and (orientation:landscape) and (max-height:600px){
+  #escena{--u:clamp(8.5px,2.45cqh,11px)}
+  .bug,.etiqueta,.zocalo{left:calc(var(--u)*1.2 + var(--sl))}
+  .senal{--v:calc(var(--u)*.88);left:calc(var(--u)*1.2 + var(--sl));right:auto;top:calc(var(--u)*7.6 + var(--st));transform:none}
+  html.zurdo .senal{left:auto;right:calc(var(--u)*1.2 + var(--sr))}
+  .acuse{right:calc(var(--boton) + var(--bm)*2 + var(--sr));bottom:calc(var(--u)*1.2 + var(--sb))}
+  html.zurdo .acuse{right:calc(var(--u)*1.2 + var(--sr))}
+  .zocalo{bottom:calc(var(--u)*1.2 + var(--sb));max-width:calc(100% - var(--boton) - var(--bm)*2 - var(--u)*18 - var(--sl) - var(--sr))}
+  html.zurdo .zocalo{left:calc(var(--boton) + var(--bm)*2 + var(--sl))}
+  .guia{bottom:calc(var(--u)*6.4 + var(--sb));max-width:calc(100% - 2*(var(--u)*23 + var(--sl) + var(--sr)));font-size:calc(var(--u)*1.4)}
+  .veredicto{max-width:min(70cqw,calc(var(--u)*50))}
+  /* paneles: entran en 360 px de alto; si no, se desplaza el panel, nunca la página */
+  .panel{padding:10px 14px;max-width:min(96cqw,760px)}
+  .panel h1{font-size:clamp(20px,6.2cqh,28px)}
+  .panel h2{font-size:clamp(14px,4.4cqh,18px);margin-bottom:.3em}
+  .panel p,.pasos li{font-size:clamp(12px,3.6cqh,14px);margin:.3em 0}
+  .panel p.chica,.nota{font-size:clamp(11px,3.2cqh,12px)}
+  .reglas{font-size:clamp(12px,3.6cqh,14px);line-height:1.45}
+  button{font-size:clamp(13px,3.9cqh,15px);min-height:40px;padding:.45em .9em}
+  .fila{margin:.35em 0}
+  .pasos,.pesistas{gap:6px;margin:.4em 0}
+  .kgsel output{font-size:clamp(26px,9cqh,38px)}
+  .podio{margin:.4em 0}.podio .p1{padding-bottom:2.2em}.podio .p2{padding-bottom:1.3em}.podio .p3{padding-bottom:.6em}
+  .pulso{width:clamp(56px,19cqh,88px);margin:.3em auto}
+  table.tabla{font-size:clamp(12px,3.6cqh,14px)}
+  .panel .pie{margin:.4em -14px -10px;padding:6px 14px}
+  /* el panel del llamado va al costado: el pesista queda a la vista */
+  .panel.lado{align-self:center;margin-left:auto;margin-right:0;max-width:min(54cqw,440px)}
+}
+/* teléfono en vertical: «Gira el teléfono» con un dibujo, encima de todo */
+@media (pointer:coarse) and (orientation:portrait) and (max-width:600px){
+  #girar{display:flex;position:fixed;inset:0;z-index:50;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:calc(24px + var(--st)) calc(24px + var(--sr)) calc(24px + var(--sb)) calc(24px + var(--sl));
+    background:radial-gradient(ellipse at 50% 40%,#0d1640 0,#03050c 75%);text-align:center;touch-action:none}
+  #girar svg{width:min(46vw,180px);height:auto;overflow:visible}
+  #girar b{font-family:var(--display);font-weight:800;font-size:30px;line-height:1.05;letter-spacing:.04em;text-transform:uppercase;color:var(--ink)}
+  #girar span{font-size:16px;line-height:1.4;color:var(--mute);max-width:20em}
+  #girar .tel{transform-box:fill-box;transform-origin:center}
+  @media (prefers-reduced-motion:no-preference){
+    #girar .tel{animation:girar 2.4s cubic-bezier(.6,0,.3,1) infinite}
+    #girar .flecha{animation:flecha 2.4s ease-in-out infinite}
+  }
+  @media (prefers-reduced-motion:reduce){#girar .tel{transform:rotate(-90deg)}}
+}
+@keyframes girar{0%,22%{transform:rotate(0)}48%,82%{transform:rotate(-90deg)}100%{transform:rotate(0)}}
+@keyframes flecha{0%,22%{opacity:1}40%,85%{opacity:.15}100%{opacity:1}}
