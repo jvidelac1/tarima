@@ -11,6 +11,9 @@ for f in sorted(glob.glob(os.path.join(d,'G*.glb.json'))):
     m=json.load(open(f,encoding='utf-8')); g=os.path.basename(f)[:-9]; fl=m['flujo_api']; base=os.path.join(d,g)
     res=[n['inputs']['target_resolution'] for n in fl.values() if n['class_type']=='Trellis2UpsampleStage']; cond=sorted({n['class_type'] for n in fl.values() if 'Conditioning' in n['class_type']})
     unet=[x['archivo'] for x in m['modelos'] if x['clase']=='UNETLoader']
+    # La plantilla de una vista carga los dos modelos y elige con el interruptor «Switch to Trellis2»: se anota solo el que corrió.
+    sw=[n['inputs']['value'] for n in fl.values() if n['class_type']=='PrimitiveBoolean' and 'Trellis2' in n.get('_meta',{}).get('title','')]
+    if sw and len(unet)>1: unet=[u for u in unet if u.startswith('trellis_2')==bool(sw[0])]; cond=[c for c in cond if c.startswith('Trellis2')==bool(sw[0])]
     t=json.load(open(base+'_turn.json',encoding='utf-8')) if os.path.exists(base+'_turn.json') else {}; a=json.load(open(base+'_align.json',encoding='utf-8')) if os.path.exists(base+'_align.json') else {}
     rows.append(dict(id=g,fecha=m['fecha'],condicionamiento='+'.join(cond),modelo='+'.join(unet),entradas=' '.join(os.path.relpath(i['ruta'],'out/arte') for i in m['imagenes']),resolucion=res[0] if res else '',
         segundos=m['segundos'],vram_pico_mib=m['vram_pico_mib'],triangulos=t.get('triangulos',''),vertices=t.get('vertices_soldados',''),piezas=t.get('piezas',''),aristas_de_borde=t.get('aristas_de_borde',''),
