@@ -76,7 +76,7 @@ def turno(path,a):
     sc.render.engine='CYCLES'; cycles_device(sc); sc.cycles.samples=a.muestras
     try: sc.cycles.use_denoising=True; sc.view_settings.view_transform='Standard'; sc.view_settings.look='None'; sc.view_settings.exposure=0; sc.view_settings.gamma=1
     except Exception: pass
-    sc.render.film_transparent=False; sc.render.resolution_x=sc.render.resolution_y=a.res; sc.render.resolution_percentage=100; sc.render.image_settings.file_format='PNG'; sc.render.image_settings.color_mode='RGB'
+    sc.render.film_transparent=True; sc.render.resolution_x=sc.render.resolution_y=a.res; sc.render.resolution_percentage=100; sc.render.image_settings.file_format='PNG'; sc.render.image_settings.color_mode='RGBA'
     wd=bpy.data.worlds.new('turn'); wd.use_nodes=True; bg=next(n for n in wd.node_tree.nodes if n.type=='BACKGROUND'); sc.world=wd
     cam=bpy.data.objects.new('turn_cam',bpy.data.cameras.new('turn_cam')); sc.collection.objects.link(cam); cam.data.type='ORTHO'; cam.data.ortho_scale=1.08*S; cam.data.clip_start=.01*S; cam.data.clip_end=20*S; sc.camera=cam
     def luz(nm,lado,w):
@@ -89,24 +89,28 @@ def turno(path,a):
         f=dir3(az,0); cam.location=Vector(c)+f*5*S; cam.rotation_euler=(-f).to_track_quat('-Z','Y').to_euler()
         for o,daz,el,dist in ((key,-a.lado,a.alto,3.),(fill,70,10,4.)):      # daz negativo: del lado izquierdo de la imagen
             o.location=Vector(c)+dir3(az+daz,el)*dist*S; o.rotation_euler=(Vector(c)-o.location).to_track_quat('-Z','Y').to_euler()
-    def render(fn):
-        sc.render.filepath=fn; bpy.ops.render.render(write_still=True); return Image.open(fn).convert('RGB')
+    def render(fn,fondo=(26,26,30)):
+        """Renderiza con película transparente y pega sobre un fondo liso (el fondo no entra en la exposición). Devuelve la imagen y su alfa."""
+        sc.render.filepath=fn; bpy.ops.render.render(write_still=True); im=Image.open(fn).convert('RGBA'); al=np.asarray(im)[:,:,3]/255.
+        out=Image.new('RGB',im.size,fondo); out.paste(im,(0,0),im); out.save(fn); return out,al
     # ---- arcilla: solo geometría ----
     g.data.materials.clear(); g.data.materials.append(clay); bg.inputs['Color'].default_value=(1,1,1,1); bg.inputs['Strength'].default_value=.02
-    poner(0); sc.cycles.samples=8; im=np.asarray(render(os.path.join(vd,f'{nombre}_cal.png')),float)/255; os.remove(os.path.join(vd,f'{nombre}_cal.png'))
-    lum=im.mean(2); op=lum>.03; med=float(np.median(lum[op])) if op.any() else .2; lin=lambda v:v/12.92 if v<=.04045 else ((v+.055)/1.055)**2.4
+    poner(0); sc.cycles.samples=8; im,al=render(os.path.join(vd,f'{nombre}_cal.png')); os.remove(os.path.join(vd,f'{nombre}_cal.png'))
+    lum=(np.asarray(im,float)/255).mean(2); op=al>.99; med=float(np.median(lum[op])) if op.any() else .2; lin=lambda v:v/12.92 if v<=.04045 else ((v+.055)/1.055)**2.4
     sc.view_settings.exposure=float(np.clip(math.log2(lin(.42)/max(lin(med),1e-4)),-4,4)); st['exposicion']=round(sc.view_settings.exposure,2); sc.cycles.samples=a.muestras; tiles=[]
-    for vw,az in VIEWS: poner(az); tiles.append((ES[vw],render(os.path.join(vd,f'{nombre}_clay_{vw}.png'))))
-    contacto(tiles,2,base+'_turn.png',f"{nombre} · arcilla · {st['triangulos']} triángulos · {st['piezas']} piezas · {st['aristas_de_borde']} aristas de borde"); st['turn']=base+'_turn.png'
+    quemado=[]
+    for vw,az in VIEWS:
+        poner(az); im,al=render(os.path.join(vd,f'{nombre}_clay_{vw}.png')); tiles.append((ES[vw],im)); quemado.append(round(float((np.asarray(im)[al>.99].max(1)>=254).mean()*100),2))
+    st['quemado_pct']=quemado; contacto(tiles,2,base+'_turn.png',f"{nombre} · arcilla · {st['triangulos']} triángulos · {st['piezas']} piezas · {st['aristas_de_borde']} aristas de borde"); st['turn']=base+'_turn.png'
     # ---- textura con luz plana ----
     if not a.sin_tex and any(mats):
         g.data.materials.clear()
         for m in mats: g.data.materials.append(m)
         key.hide_render=fill.hide_render=True; bg.inputs['Strength'].default_value=1.; sc.view_settings.exposure=0; sc.cycles.samples=16; tiles=[]
-        for vw,az in VIEWS: poner(az); tiles.append((ES[vw],render(os.path.join(vd,f'{nombre}_tex_{vw}.png'))))
+        for vw,az in VIEWS: poner(az); tiles.append((ES[vw],render(os.path.join(vd,f'{nombre}_tex_{vw}.png'),(250,250,250))[0]))
         contacto(tiles,4,base+'_tex.png'); st['tex']=base+'_tex.png'
     st['segundos']=round(time.time()-t0,1); json.dump(st,open(base+'_turn.json','w',encoding='utf-8'),ensure_ascii=False,indent=1)
-    print(f"TURN {nombre}: exposición {st['exposicion']:+.2f} · {base}_turn.png · {st['segundos']} s",flush=True)
+    print(f"TURN {nombre}: exposición {st['exposicion']:+.2f} · quemado {st['quemado_pct']} % · {base}_turn.png · {st['segundos']} s",flush=True)
 
 def hoja(a):
     """Una misma vista de varias mallas, lado a lado, con las vistas sueltas que ya dejó el turno."""
