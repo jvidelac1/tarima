@@ -44,9 +44,10 @@ async function recorrido(via) {
   async function intento(tag, o = {}) {
     const vistas = new Set(); let ult = 0, hecho = '';
     for (let k = 0; k < 20000; k++) {
-      const s = await E(), I = s.intento; if (!I || !I.propio) { if (s.pantalla === 'decision') return; await page.waitForTimeout(30); continue; }
+      const s = await E(), I = s.intento; if (!I || !I.propio) { if (s.pantalla === 'decision') { if (o.t0) console.log(`     ${tag}: de ¡EMPUJÁ! al final del intento, ${((s.ahora - o.t0) / 1000).toFixed(1)} s`); return; } await page.waitForTimeout(30); continue; }
       const g = I.senal; if (!g) { await page.waitForTimeout(16); continue; }
       const clave = g.clave + (I.parado ? '_parado' : '');
+      if (g.tipo === 'cierre' && !I.guiado && !vistas.has(g.clave + '_ms')) { vistas.add(g.clave + '_ms'); console.log(`     ${tag}: el círculo de ${g.verbo} se cierra en ${Math.round(g.objetivo - g.desde)} ms`); }
       if (!vistas.has(clave) && (I.parado || g.tipo !== 'cierre' || !I.seDetiene)) { vistas.add(clave); if (g.tipo === 'cierre' && !I.parado) { if (o.mitad) { await irA((g.desde + g.objetivo) / 2); await foto(`${tag}_${g.clave}_cerrando`); } } else { await page.waitForTimeout(g.tipo === 'empuja' ? 60 : 250); await foto(`${tag}_${clave}`); } }
       if (I.seDetiene && g.tipo === 'cierre' && !I.parado && !vistas.has(g.clave + '_lento')) { vistas.add(g.clave + '_lento'); await page.waitForTimeout(500); await foto(`${tag}_${g.clave}_lento`); continue; }
       if (I.ctl === 'c') {      // Clásico
@@ -61,6 +62,7 @@ async function recorrido(via) {
       if (g.tipo === 'libre') { await page.waitForTimeout(900); await toque(); continue; }
       if (g.tipo === 'cierre') { const kk = g.clave + g.desde; if (I.seDetiene || hecho === kk || o.sin === g.clave) { await page.waitForTimeout(15); continue; } await irA(g.objetivo + (o.atraso || 0)); await toque(); hecho = kk; await page.waitForTimeout(110); if (!vistas.has(g.clave + '_pal')) { vistas.add(g.clave + '_pal'); await foto(`${tag}_${g.clave}_palabra`); } continue; }
       if (g.tipo === 'empuja') {
+        if (!vistas.has('t_empuja')) { vistas.add('t_empuja'); o.t0 = g.desde; }
         if (o.fotoEmpuja && !vistas.has('piso') && s.ahora - g.desde >= o.fotoEmpuja) { vistas.add('piso'); await foto(`${tag}_empuja_piso`); }
         if (s.ahora - ult >= (o.empujeCada || 160)) { await toque(); ult = s.ahora; } else await page.waitForTimeout(10); continue;
       }
