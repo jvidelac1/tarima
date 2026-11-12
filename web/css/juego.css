@@ -138,10 +138,14 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
   :where(html:not(.rotado)) .acuse{bottom:auto;top:calc(var(--u)*8.6 + var(--st));flex-direction:row-reverse}
   :where(html:not(.rotado)) .acuse b{text-align:right}
 }
-#sobre{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(2,4,12,.72)}
+#sobre{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(2,4,12,.72);overscroll-behavior:contain}
 
 #capa{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;padding:calc(8px + var(--st)) calc(8px + var(--sr)) 8px calc(8px + var(--sl))}
-.panel{pointer-events:auto;background:rgba(8,13,30,.95);border:1px solid var(--line);border-top:3px solid var(--teal);padding:clamp(10px,2.2cqh,22px);max-width:min(94cqw,760px);width:100%;max-height:100%;overflow:auto;touch-action:pan-y}
+/* Los paneles se desplazan con el dedo (pan-x pan-y: también con el contenido girado, y sin zoom), el arrastre no pasa a la
+   página al llegar al borde (overscroll-behavior) y ningún touchmove del juego los frena (telefono.js) */
+.panel{pointer-events:auto;background:rgba(8,13,30,.95);border:1px solid var(--line);border-top:3px solid var(--teal);padding:clamp(10px,2.2cqh,22px);max-width:min(94cqw,760px);width:100%;max-height:100%;overflow:auto;touch-action:pan-x pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+/* con la fila de botones pegada abajo (.pie), lo enfocado o mostrado no queda debajo de ella */
+.panel:has(>.pie){scroll-padding-bottom:5em}
 .panel.chico{max-width:min(94cqw,440px)}
 .panel.abajo{align-self:flex-end}
 /* el panel del llamado va al costado derecho cuando hay ancho: el pesista queda a la vista */
@@ -216,6 +220,9 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
 @media (pointer:coarse){
   /* la página no se desplaza ni rebota: el cuerpo queda clavado a lo visible (con las barras de Safari también) */
   body{position:fixed;inset:0;width:auto;height:auto}
+  /* de costado en el navegador (Safari o Chrome del iPhone, con su barra): el juego mide el alto que de verdad se ve
+     (visualViewport, telefono.js), así ni los paneles ni el botón quedan debajo de una barra. Instalado, es la pantalla entera */
+  html.horiz:not(.rotado):not(.escribiendo) body{bottom:auto;height:var(--vvh,100%)}
   /* 16 px o más: Safari no agranda la página al enfocar un campo */
   input,textarea,select{font-size:max(16px,1em)}
   #sobre{padding:calc(8px + var(--st)) calc(8px + var(--sr)) calc(8px + var(--sb)) calc(8px + var(--sl))}

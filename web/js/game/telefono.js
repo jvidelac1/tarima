@@ -8,9 +8,11 @@
 //   usan coordenadas, así que el 3D y la entrada no cambian. Antes se bloqueaba con «Gira el teléfono».
 // - El botón se hunde con cada dedo (varios dedos cuentan como toques: cada puntero es un contacto en input.js).
 // - Pantalla completa y orientación horizontal al tocar un botón con `data-completa` (o con telefono.pantallaCompleta()
-//   desde el manejador de un toque): Android sí. El iPhone no deja (ningún navegador: todos usan WebKit); ahí el juego se
-//   ve igual con las barras, y un aviso de una vez explica cómo instalarlo en la pantalla de inicio (manifest.webmanifest),
-//   que sí abre a pantalla completa.
+//   desde el manejador de un toque): Android sí. El iPhone no deja (ninguna página, ni en Safari ni en Chrome: todos usan
+//   WebKit, y ahí requestFullscreen no existe o se rechaza); la salida es instalarlo en la pantalla de inicio
+//   (manifest.webmanifest y las meta de Apple de juego.html), que abre sin barras. Un aviso corto y cerrable lo explica
+//   con los pasos del navegador en uso (Safari, Chrome de iOS = CriOS, u otro), una sola vez sola y cuando se pida desde
+//   Opciones. Mientras tanto, en el navegador, el juego mide el alto visible real (visualViewport, --vvh).
 // - Campos (nombre, correo, encuesta) en un teléfono: no se escribe en el panel (el teclado lo tapa y, con el contenido
 //   girado, el texto quedaría de costado). Al tocar el campo se abre un editor arriba de lo visible, derecho, grande, con
 //   «Listo»; al cerrarlo el texto vuelve al campo. input.js no toma Espacio ni Enter mientras el foco está en un campo.
@@ -18,10 +20,20 @@
 import { esCampo } from './input.js';
 
 const TXT = {
-  es: { listo: 'Listo', instalar: 'Para jugar a pantalla completa: toca Compartir y después «Agregar a inicio».', ok: 'Entendido' },
-  en: { listo: 'Done', instalar: 'To play full screen: tap Share, then “Add to Home Screen”.', ok: 'Got it' },
+  es: {
+    listo: 'Listo', ok: 'Entendido',
+    'instalar.safari': 'Pantalla completa: toca Compartir (o ··· y después Compartir), elige «Agregar a inicio» y abre Tarima desde el ícono.',
+    'instalar.chrome': 'Pantalla completa: toca Compartir en la barra de la dirección, elige «Agregar a la pantalla de inicio» y abre Tarima desde el ícono.',
+    'instalar.otro': 'Pantalla completa: abre Compartir en el menú del navegador, elige «Agregar a inicio» y abre Tarima desde el ícono.',
+  },
+  en: {
+    listo: 'Done', ok: 'Got it',
+    'instalar.safari': 'Full screen: tap Share (or ··· then Share), choose “Add to Home Screen” and open Tarima from the icon.',
+    'instalar.chrome': 'Full screen: tap Share in the address bar, choose “Add to Home Screen” and open Tarima from the icon.',
+    'instalar.otro': 'Full screen: open Share in the browser menu, choose “Add to Home Screen” and open Tarima from the icon.',
+  },
 };
-const CLAVES = { listo: 'campo.listo', instalar: 'instalar.ios', ok: 'instalar.cerrar' };
+const CLAVES = { listo: 'campo.listo', ok: 'instalar.cerrar', 'instalar.safari': 'instalar.safari', 'instalar.chrome': 'instalar.chrome', 'instalar.otro': 'instalar.otro' };
 const MQ = { tactil: '(pointer:coarse)', retrato: '(orientation:portrait)' };
 const mq = k => (typeof matchMedia === 'function' ? matchMedia(MQ[k]) : { matches: false, addEventListener() {} });
 const guardado = {
@@ -38,6 +50,10 @@ function texto(k) {
 }
 function pantallaActiva() { return document.fullscreenElement || document.webkitFullscreenElement || null; }
 const esIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+/** iPhone: ninguna página puede ponerse a pantalla completa (el iPad sí, con la API). */
+const esIPhone = () => /iPhone|iPod/.test(navigator.userAgent);
+/** Navegador de iOS, para dar los pasos de instalación que corresponden: Chrome (CriOS), otro (Firefox, Edge, Opera…) o Safari. */
+const navegadorIOS = () => { const ua = navigator.userAgent; return /CriOS\//.test(ua) ? 'chrome' : /FxiOS|EdgiOS|OPiOS|OPT\/|GSA\/|DuckDuckGo|YaBrowser|Brave/.test(ua) ? 'otro' : 'safari'; };
 const instaladaComoApp = () => navigator.standalone === true || (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches);
 
 /** Medidas de lo visible (sin las barras del navegador ni el teclado), en píxeles CSS. */
@@ -52,6 +68,10 @@ export const telefono = {
   get vertical() { return false; },
   /** Está en pantalla completa. */
   get completa() { return !!pantallaActiva(); },
+  /** iPhone o iPad en el navegador (no instalado): la pantalla completa sale instalándolo. Opciones ofrece el aviso. */
+  get instalable() { return esIOS() && !instaladaComoApp(); },
+  /** 'safari', 'chrome' u 'otro' en iOS; null fuera de iOS. */
+  get navegador() { return esIOS() ? navegadorIOS() : null; },
   /** Mano del botón: 'der' (por defecto) o 'izq'. Con argumento la cambia y la recuerda en este dispositivo. */
   mano(lado) {
     if (lado === 'izq' || lado === 'der') { guardado.set('tarima.mano', lado); document.documentElement.classList.toggle('zurdo', lado === 'izq'); }
@@ -67,6 +87,7 @@ export const telefono = {
    */
   async pantallaCompleta() {
     if (!this.tactil) return false;
+    if (esIPhone() && !instaladaComoApp()) { this.avisoInstalar(); return false; }      // ni Safari ni Chrome lo dejan en el iPhone
     const el = document.documentElement;
     try {
       if (!pantallaActiva()) {
@@ -78,11 +99,15 @@ export const telefono = {
     try { await screen.orientation?.lock?.('landscape'); } catch { /* no todos dejan fijar la orientación */ }
     this.medir(); return !!pantallaActiva();
   },
-  /** En el iPhone, una vez: cómo jugar a pantalla completa (Compartir → Agregar a inicio). Cerrable, en los dos idiomas. */
+  /**
+   * En el iPhone, una vez sola (o cuando se pide desde Opciones con `forzar`): cómo jugar a pantalla completa, con los pasos
+   * del navegador en uso. Cerrable, en los dos idiomas. Ya instalado como app no se muestra.
+   */
   avisoInstalar(forzar = false) {
     const el = document.getElementById('instalar');
-    if (!el || (!forzar && (!esIOS() || instaladaComoApp() || guardado.get('tarima.instalar') === '1'))) return false;
-    el.querySelector('#instalar-t').textContent = texto('instalar'); el.querySelector('#instalar-ok').textContent = texto('ok');
+    if (!el || instaladaComoApp() || (!forzar && (!esIOS() || guardado.get('tarima.instalar') === '1'))) return false;
+    el.dataset.navegador = navegadorIOS();
+    el.querySelector('#instalar-t').textContent = texto('instalar.' + el.dataset.navegador); el.querySelector('#instalar-ok').textContent = texto('ok');
     el.hidden = false; return true;
   },
   /** Recalcula giro, medidas y clases (lo hace solo con cada cambio de tamaño u orientación). */
@@ -128,11 +153,16 @@ export const telefono = {
     document.addEventListener('fullscreenchange', marca); document.addEventListener('webkitfullscreenchange', marca);
     $('instalar-ok')?.addEventListener('click', () => { guardado.set('tarima.instalar', '1'); $('instalar').hidden = true; });
 
-    // nada de zoom, desplazamiento, selección ni menú contextual fuera de los campos y del contenido de un panel
-    const libre = el => esCampo(el) || !!el?.closest?.('.panel,#editor');
+    // Nada de zoom, desplazamiento, selección ni menú contextual fuera de los campos y del contenido de un panel.
+    // El desplazamiento lo frena el CSS (touch-action: none en el cuerpo, pan-x pan-y en .panel, overscroll-behavior). Antes
+    // había además un touchmove con passive:false en `document`: en WebKit eso obliga a cada arrastre, también dentro de
+    // Opciones, a esperar al hilo principal antes de desplazar, y en la bienvenida ese hilo está ocupado bajando y
+    // compilando los modelos (escena.precalentar): el panel se trababa o no arrancaba. Ahora el touchmove que frena va solo
+    // sobre el lienzo y el botón, que no contienen paneles; los paneles quedan con desplazamiento del compositor.
+    const frena = e => { if (!esCampo(e.target)) e.preventDefault(); };
+    for (const el of [$('gl'), $('zona')]) el?.addEventListener('touchmove', frena, { passive: false });
     document.addEventListener('gesturestart', e => e.preventDefault());                       // pellizco en Safari
     document.addEventListener('dblclick', e => { if (!esCampo(e.target)) e.preventDefault(); }, { passive: false });
-    document.addEventListener('touchmove', e => { if (e.touches.length > 1 || !libre(e.target)) e.preventDefault(); }, { passive: false });
     document.addEventListener('contextmenu', e => { if (!esCampo(e.target)) e.preventDefault(); });
     document.addEventListener('selectstart', e => { if (!esCampo(e.target)) e.preventDefault(); });
 
