@@ -1,24 +1,25 @@
-// Textos de los mails y de las páginas del Worker (docs/MVP.md 4.5, «Mails y páginas del Worker»).
+// Textos de los mails y de las páginas del Worker (docs/MVP.md 4.5, «Mails y páginas del Worker»), en español neutro
+// (decisión del dueño del 12 de noviembre: sin voseo) y en inglés.
 import { escHtml } from './reglas.js';
 
 export const TEXTOS = {
   es: {
-    'mail.confirmar.asunto': 'Confirmá tu lugar en Tarima',
-    'mail.confirmar.cuerpo': 'Hola, {nombre}. Tocá el botón para confirmar tu lugar en la lista de acceso anticipado de Tarima. Si no fuiste vos, ignorá este mail: no te vamos a escribir más.',
+    'mail.confirmar.asunto': 'Confirma tu lugar en Tarima',
+    'mail.confirmar.cuerpo': 'Hola, {nombre}. Toca el botón para confirmar tu lugar en la lista de acceso anticipado de Tarima. Si no fuiste tú, ignora este mail: no te volveremos a escribir.',
     'mail.confirmar.boton': 'Confirmar',
-    'mail.pie': 'Recibís este mail porque te anotaste en Tarima. Darte de baja: {link}',
+    'mail.pie': 'Recibes este mail porque te anotaste en Tarima. Para darte de baja: {link}',
     'mail.baja.asunto': 'Tu link para darte de baja de Tarima',
-    'mail.baja.cuerpo': 'Pediste darte de baja de la lista de Tarima. Tocá el botón para confirmarlo. Si no fuiste vos, ignorá este mail.',
+    'mail.baja.cuerpo': 'Pediste darte de baja de la lista de Tarima. Toca el botón para confirmarlo. Si no fuiste tú, ignora este mail.',
     'mail.baja.boton': 'Darme de baja',
     'nombre.defecto': 'Debutante',
     'confirmado.texto': '¡Listo! Tu lugar está confirmado.',
     'confirmado.volver': 'Volver al juego',
     'baja.pregunta': '¿Te damos de baja de la lista de Tarima?',
     'baja.boton': 'Sí, darme de baja',
-    'baja.ok': 'Listo: te dimos de baja y borramos tu mail. Podés seguir jugando.',
-    'baja.token_invalido': 'Ese link ya no sirve. Pedí uno nuevo desde la página de privacidad.',
-    'pagina.limite': 'Demasiados intentos. Probá en un rato.',
-    'pagina.error': 'Algo falló. Probá de nuevo en un rato.',
+    'baja.ok': 'Listo: te dimos de baja y borramos tu mail. Puedes seguir jugando.',
+    'baja.token_invalido': 'Ese link ya no sirve. Pide uno nuevo desde la página de privacidad.',
+    'pagina.limite': 'Demasiados intentos. Prueba de nuevo en un rato.',
+    'pagina.error': 'Algo falló. Prueba de nuevo en un rato.',
     'marca.promesa': 'Nunca vas a pagar para levantar más.',
   },
   en: {
