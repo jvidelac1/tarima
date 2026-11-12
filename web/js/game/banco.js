@@ -122,10 +122,11 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
     const o = { llamadas: inf.render.calls, triangulos: inf.render.triangles, mallasEsqueleto: 0, programas: progs() }; inf.autoReset = auto;
     escena.scene.traverseVisible(x => { if (x.isSkinnedMesh) o.mallasEsqueleto++; }); return o;
   };
-  // Programas: lo que una variante compiló se libera al deshacerla. Three guarda por material un mapa clave → programa y no
-  // suelta los que dejó de usar; acá se sueltan los que no estaban en la foto de antes, después de un cuadro con la escena
-  // ya restituida. Si el que se suelta es el que el material tenía puesto (un pase de post que ya no se dibuja), el material
-  // queda marcado para elegir programa de nuevo la próxima vez que se use.
+  // Programas: lo que una variante compiló se libera al deshacerla. three guarda por material un mapa clave → programa y
+  // no suelta los que dejó de usar. Acá, por cada material que tenga programas que no estaban en la foto de antes, se deja
+  // en su mapa solo esos y se le avisa a three que el material se descartó: three suelta esos programas por su camino de
+  // siempre (contador de usos y caché de programas) y olvida el estado del material, que en el cuadro siguiente vuelve a
+  // tomar sus programas de siempre, ya compilados. Después de liberar hay que dibujar un cuadro (usar) antes de medir.
   const materiales = () => {
     const s = new Set(); escena.scene.traverse(o => { for (const m of [].concat(o.material || [])) s.add(m); });
     const P = escena.post; for (const m of [P.finalMat, P.mixMat, P.dofPre, P.dofBlur, P.aoBlur, P.aoMat]) if (m) s.add(m);
@@ -133,14 +134,11 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
   };
   const foto = () => { const f = new Map(); for (const m of materiales()) { const mp = r.properties.get(m).programs; f.set(m, new Set(mp ? mp.values() : [])); } return f; };
   const liberar = f => {
-    const todos = r.info.programs; if (!todos) return 0; let n = 0;
+    let n = 0;
     for (const m of materiales()) {
       const pr = r.properties.get(m), mapa = pr.programs; if (!mapa) continue; const antes = f.get(m) || new Set();
-      for (const [k, p] of [...mapa]) {
-        if (antes.has(p)) continue;
-        mapa.delete(k); p.usedTimes--; if (p === pr.currentProgram) m.needsUpdate = true;
-        if (p.usedTimes <= 0) { const i = todos.indexOf(p); if (i >= 0) todos.splice(i, 1); p.destroy(); n++; }
-      }
+      const extra = [...mapa].filter(([, p]) => !antes.has(p)); if (!extra.length) continue;
+      pr.programs = new Map(extra); m.dispatchEvent({ type: 'dispose' }); n += extra.length;
     }
     return n;
   };
@@ -200,7 +198,7 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
       const eg = errorGL(); if (eg) { v.errorGL = eg; B.errores.push(`${v.id}: error de WebGL ${eg}`); }
     } catch (e) { v.error = String(e.stack || e); B.errores.push(`${v.id}: ${e}`); console.error(e); }
     finally {
-      try { if (deshacer) deshacer(); usar(); liberar(f); } catch (e) { B.errores.push(`${v.id} (deshacer): ${e}`); }
+      try { if (deshacer) deshacer(); usar(); liberar(f); usar(); } catch (e) { B.errores.push(`${v.id} (deshacer): ${e}`); }
       const sobra = progs() - p0; v.programasSobrantes = Math.max(v.programasSobrantes || 0, sobra);
     }
     return m;
@@ -268,7 +266,7 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
     durCal = performance.now() - tv;
   }
   if (escena.Q !== PRESET.baja) await poner('baja', false);
-  { const n = liberar(fotoBaja); if (n) B.notas.push(`Al volver a Baja se liberaron ${n} programas de las otras calidades.`); }
+  { usar(); const n = liberar(fotoBaja); usar(); if (n) B.notas.push(`Al volver a Baja se liberaron ${n} programas de las otras calidades.`); }
   med1.baja.push(medida()); infoCal.baja = contar();
   for (const k of claves) {
     if (!med1[k].length) continue;
@@ -310,7 +308,7 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
   B.etapa = 'búsquedas'; const cb = B.calidades.find(c => c.id === 'baja');
   if (cb && queda(5000)) { decir('búsqueda con pantalla · Baja completa'); await unCuadro(); try { Object.assign(cb, await buscar(cb.mpModelo100 ?? 1)); } catch (e) { B.errores.push(`baja (búsqueda): ${e}`); console.error(e); } }
   else if (cb) B.notas.push('Sin tiempo para la búsqueda con cuadros de verdad.');
-  liberar(fotoBaja); B.programasAlTerminar = progs();
+  usar(); liberar(fotoBaja); usar(); B.programasAlTerminar = progs();
   if (B.programasAlTerminar > programas0) B.notas.push(`Quedaron ${B.programasAlTerminar - programas0} programas más que al empezar.`);
   // la imagen queda como en el juego
   escena.lodFijo = null; escena.setTope(Math.min(nativoMP, 2) * 1e6); escena.bucle(T0, 0); escena.cuadro(0, true);

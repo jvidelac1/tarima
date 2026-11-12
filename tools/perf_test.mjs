@@ -106,11 +106,19 @@ if (!process.argv.includes('--sin-banco')) {
   const pelo = new THREE.Mesh(new THREE.BoxGeometry(), Object.assign(new THREE.MeshStandardMaterial(), { name: 'Hair' }));
   const uno = { root: new THREE.Group(), meshes: [pelo], hairDepth: new THREE.Mesh() }, otro = { root: new THREE.Group(), meshes: [] }; uno.root.add(pelo); scene.add(uno.root, otro.root);
   const gl = { getExtension: () => null, getParameter: () => 'simulada', getError: () => 0, TEXTURE_2D: 1, texParameterf() {} };
-  // Programas simulados como los de three: por material, un mapa clave → programa; la clave depende del camino, las luces y las sombras.
-  const props = new WeakMap(), programas = [], prop = m => { let p = props.get(m); if (!p) props.set(m, p = { programs: new Map(), currentProgram: null }); return p; };
+  // Programas simulados como los de three: caché global clave → programa con contador de usos, y por material un mapa
+  // clave → programa; la clave depende del material, el camino, las luces y las sombras. Descartar un material suelta sus
+  // programas y olvida su estado, como onMaterialDispose de three.
+  const props = new WeakMap(), programas = [], cache = new Map(), prop = m => { let p = props.get(m); if (!p) props.set(m, p = {}); return p; };
   const clave = () => `${est.directo}|${L.rimA.visible}|${L.key2.visible}|${est.sombras}`;
-  const soltar = m => { const p = prop(m); for (const g of p.programs.values()) if (--g.usedTimes <= 0) { programas.splice(programas.indexOf(g), 1); g.destroy(); } p.programs.clear(); };      // como three al descartar un material
-  const usarProg = m => { const p = prop(m), k = clave(); if (!p.programs.size) m.addEventListener('dispose', () => soltar(m)); let g = p.programs.get(k); if (!g) { g = { usedTimes: 1, destroy() { this.muerto = true; } }; programas.push(g); p.programs.set(k, g); } if (g.muerto) throw new Error('programa liberado en uso'); p.currentProgram = g; };
+  const soltarProg = g => { if (--g.usedTimes === 0) { programas.splice(programas.indexOf(g), 1); cache.delete(g.cacheKey); g.destroy(); } };
+  const usarProg = m => {
+    const p = prop(m), k = m.uuid + '|' + clave();
+    if (!p.programs) { p.programs = new Map(); const h = () => { m.removeEventListener('dispose', h); for (const g of p.programs.values()) soltarProg(g); props.delete(m); }; m.addEventListener('dispose', h); }
+    let g = p.programs.get(k);
+    if (!g) { g = cache.get(k); if (g) g.usedTimes++; else { g = { usedTimes: 1, cacheKey: k, destroy() { this.muerto = true; } }; cache.set(k, g); programas.push(g); } p.programs.set(k, g); }
+    if (g.muerto) throw new Error('programa liberado en uso'); p.currentProgram = g;
+  };
   const recorrer = f => scene.traverseVisible(o => { for (const m of [].concat(o.material || [])) f(m); });
   const final0 = new THREE.ShaderMaterial();
   const E = {
@@ -144,7 +152,7 @@ if (!process.argv.includes('--sin-banco')) {
   ok(L.rimA.visible && L.key2.visible && E.directo && E.Q.directo && E.lodFijo === null && uno.root.visible && pelo.visible && otro.root.parent === scene && grupo.children[0].material[0].isMeshStandardMaterial && est.sombras, 'cada variante se deshace: la escena queda como estaba');
   ok(JSON.stringify(B).length > 2000 && !!tabla && tabla.innerHTML.includes('Banco de medición'), 'deja el JSON y la tabla');
   // con ruido: una medida de cada tanto sale el doble de cara; las afectadas se marcan ruidosas
-  { let k = 0; const c0 = E.costo; E.costo = function (o) { const r = c0.call(this, o); return ++k % 7 === 0 ? { ...r, ms: r.ms * 2 } : r; };
+  { let k = 0; const c0 = E.costo; E.costo = function (o) { const r = c0.call(this, o); return o.n > 1 && ++k % 5 === 0 ? { ...r, ms: r.ms * 2 } : r; };
     console.log = () => {}; await correrBanco({ escena: E, cargas: [Promise.resolve()], hz: 60, params: new URLSearchParams('limite=200&solo=baja&variantes=sombras,pelo,aniso'), msg: { hidden: false } }); console.log = registro; E.costo = c0;
     const R = globalThis.BANCO; ok(R.listo && R.variantes.some(v => v.ruidosa), `con ruido, marca ruidosas (${R.variantes.map(v => `${v.quita} ${v.ruidosa ? 'ruidosa' : 'limpia'}`).join(', ')})`); }
   // sin tiempo (el límite se cuenta desde que arrancó el proceso): mide menos, lo dice en una nota y termina igual
