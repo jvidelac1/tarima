@@ -15,10 +15,33 @@ Especificación del rediseño de controles de la etapa 1. Reemplaza la sección 
 | Paneles | ← → | Con selector de kilos: −1 y +1 kg. Sin selector: mueven el foco dentro de la fila |
 | Paneles | Enter (o Espacio) | Activa el botón con foco |
 | Fuera del intento | Esc | Pausa: congela el reloj inyectable (`reloj.manual`) y lo suelta al volver; el reloj del llamado no corre |
+| Tutorial | Esc (o el botón «Saltear tutorial ESC», siempre a la vista) | Saltea el tutorial en cualquier momento del levantamiento guiado |
+| Levantamiento | Tab | No hace nada: no saca el foco de la página |
 | Fuera del intento | H o ? | «Cómo se juega», tres viñetas |
 | Esperas (luces, repetición, resumen) | Espacio o Enter | Saltea |
 
 El nivel se elige en la pantalla de inicio («Controles: FÁCIL · CLÁSICO»), se guarda en `tarima.ctl` y queda fijo para toda la partida. Por defecto, Fácil.
+
+### 1.1 Ningún toque se pierde en silencio
+
+Toda pulsación de Espacio o Enter (y todo dedo o clic sobre el escenario) queda anotada en `toques` (`input.js`) como aceptada o descartada con su motivo, y tiene **acuse inmediato**: la tecla dibujada abajo a la derecha (`#acuse`) y la de la señal se hunden, sea o no el momento. Si el toque no sirvió, al lado de la tecla sale el motivo en una palabra. El instante del toque sigue saliendo del evento (`reloj.deEvento`), no del cuadro.
+
+| Dónde se descarta | Motivo (palabra en pantalla) | Por qué queda |
+|---|---|---|
+| PREPARATE, los 450 ms de RESPIRÁ, antes de que arranque ¡EMPUJÁ!, tutorial con el reloj andando | `espera` (ESPERÁ) | Todavía no hay nada que tocar. En PREPARATE y en el tutorial la señal dice además «TODAVÍA NO» |
+| Menos de 60 ms después del toque anterior (`CAPA.reboteMs`) | `rebote` (REBOTE) | Rebote de tecla: sin esto, un doble contacto gastaría el toque siguiente |
+| ¡EMPUJÁ! cuando ya alcanza, AGUANTÁ, ¡ABAJO!, ¡RECIBÍ! ya tocado | `sobra` (SOBRA) | No hace falta; en la subida evita gastar Resto |
+| ¡RECIBÍ! cuando la barra ya se perdió | `tarde` (TARDE) | El intento ya está decidido; la línea de fallo dice «tocaste tarde», no «no tocaste» |
+| Entre el final del intento y el veredicto | `termino` (TERMINÓ) | Idem |
+| Veredicto: los primeros 400 ms (1,2 s si trae línea de fallo) | `espera` | Que el toque que venía de la subida no saltee la explicación |
+| Panel recién abierto: 400 ms | `espera` | Que un toque de la pantalla anterior no elija nada |
+| Momentos de TV sin nada que tocar (carga, intento de un rival) | `espera` | No hay quien lo tome |
+| Clic del mouse sobre el escenario durante el intento | `mouse` (TECLADO) | El clic no es un gesto |
+| Pausa abierta | `pausa` | |
+
+Lo que **ya no se descarta**: la pulsación de una tecla que figuraba apoyada porque se perdió su `keyup` (antes se ignoraba; ahora se levanta y se vuelve a apoyar). La repetición automática del sistema no es un toque nuevo: la tecla sigue hundida. Si la ventana pierde el teclado (clic en la barra de direcciones, otra ventana), un cartel lo dice: «El juego no está recibiendo el teclado · hacé clic acá».
+
+`juego.html?depura=1` muestra un recuadro con el refresco de la pantalla y la meta, cuadros por segundo ofrecidos por el navegador y dibujados, milisegundos por cuadro (media y peor del último segundo), calidad en uso y cuántas veces bajó, y los últimos siete toques (aceptado con su señal y su error en ms, o descartado y por qué). Lo mismo está en `JUEGO.toques` y `JUEGO.calidad`.
 
 ## 2. Secuencia de toques
 
@@ -108,23 +131,23 @@ Todo detrás de `c.ctl === 'f'`. No cambian `VERSION`, `sim.json`, `ai.js` ni `t
 
 - **Señal** (`ui/senal.js`, elemento `#senal` dentro de `#tv`): verbo grande, aro fijo con un círculo que se cierra sobre él, la tecla dibujada (`ESPACIO`; en teléfono, `TOCÁ`) y el paso («2 de 3»). En horizontal va a la derecha del pesista, a media altura; en vertical, centrada al pie del escenario, nunca sobre la zona táctil. No se mueve con la barra.
 - El círculo empieza con el toque anterior, llega al aro en el instante objetivo, se pone dorado dentro de la ventana perfecta y sigue achicándose hasta el límite. En los pasos libres (1 y 4) no hay círculo: late la tecla.
-- **Palabra** después de cada toque, en el mismo lugar: PERFECTO y BIEN en blanco; TEMPRANO y TARDE en ámbar, porque el levantamiento sigue. El rojo queda para el fallo.
+- **Palabra** después de cada toque, en el mismo lugar y con el verbo del toque que califica («¡EXPLOTÁ! PERFECTO»), para que no se lea como nota de la señal siguiente: PERFECTO y BIEN en blanco; TEMPRANO y TARDE en ámbar, porque el levantamiento sigue. El rojo queda para el fallo.
 - **Línea de fallo** (`ui/mensajes.js`, `explicar(res, ctl)`, pura): debajo de «Intento fallado» o «Levantamiento nulo», en vez de la causa sola.
 
 | Causa del núcleo | Texto en Fácil |
 |---|---|
-| `sin_altura`, sin toque | «No tocaste la explosión. Tocá ESPACIO cuando el círculo se cierra.» |
+| `sin_altura`, sin toque | «No tocaste ¡EXPLOTÁ! Tocá ESPACIO cuando el círculo se cierra.» Si hubo un toque cuando ya era tarde: «Tocaste ¡EXPLOTÁ! tarde: el tiempo ya se había acabado. Tocá ESPACIO cuando el círculo se cierra, no después.» |
 | `sin_altura`, con toque | «Tocaste ¡EXPLOTÁ! 300 ms tarde y la barra no subió. Tocá ESPACIO cuando el círculo se cierra.» |
 | `anticipado` (tercer amague) | «Tocaste ¡EXPLOTÁ! antes de tiempo tres veces. Esperá a que el círculo se cierre sobre el aro.» |
 | `adelante` | «Tocaste ¡EXPLOTÁ! 250 ms temprano y la barra se fue adelante. Esperá a que el círculo se cierre.» |
 | `atras` | «Tocaste ¡EXPLOTÁ! 280 ms tarde y la barra se fue atrás. Tocá ESPACIO apenas se cierra el círculo.» |
 | `fondo`, temprano | «Tocaste RECIBÍ antes de tiempo. Un toque por señal: esperá el círculo.» |
-| `fondo`, tarde | «No recibiste la barra. Tocá ESPACIO cuando el círculo se cierra.» |
+| `fondo`, tarde | «No recibiste la barra. Tocá ESPACIO cuando el círculo se cierra.» Si hubo un toque cuando ya era tarde: «Tocaste ¡RECIBÍ! tarde: la barra ya se había caído. Tocá ESPACIO cuando el círculo llega al aro, no después.» |
 | `aplastado` o `codos`, menos de 3 toques en la subida | «La subida se trabó y no empujaste. Con ¡EMPUJÁ!, tocá ESPACIO rápido.» |
 | `aplastado` o `codos`, con algún toque en TEMPRANO o TARDE | «Tocaste ¡EXPLOTÁ! 260 ms tarde y la barra quedó más pesada: no alcanzó el empuje. Tocá ESPACIO cuando el círculo se cierra.» (nombra el peor toque) |
 | `aplastado` o `codos`, con todo en PERFECTO o BIEN | «Los toques venían bien: faltó empuje. En ¡EMPUJÁ!, tocá ESPACIO más rápido; si no alcanza, pedí menos kilos.» (en el tutorial, sin la última frase) |
-| `codos_blandos` | «Recibiste a destiempo y los codos quedaron blandos. Tocá RECIBÍ justo en el cierre.» |
-| `temblor`, `tiembla` | «La barra llegó desviada y tembló. Tocá la explosión más cerca del cierre.» |
+| `codos_blandos` | «Tocaste ¡RECIBÍ! 180 ms tarde y los codos quedaron blandos. Tocá un poco antes: justo cuando el círculo llega al aro.» (o «temprano» y «un poco después») |
+| `temblor`, `tiembla` | «Tocaste ¡EXPLOTÁ! 200 ms temprano: la barra llegó desviada y tembló. Tocá un poco después, justo en el cierre.» |
 | `devuelve` | «Pasaron 8 segundos con la barra en los hombros. Apretá ESPACIO para flexionar.» |
 | `reloj` | «Se acabó el reloj: corre desde que confirmás. Apretá ESPACIO apenas dice ¡TIRÁ!» En Clásico, si venció con el panel abierto: «Se acabó el reloj. Confirmá con ENTER y apretá ESPACIO antes del 0:00.» |
 
@@ -132,19 +155,18 @@ En Clásico, los mismos textos con el gesto que corresponde («soltá cuando la 
 
 ## 6. Tutorial
 
-Corre la primera vez (`tarima.tutorial` vacío) en Fácil; después el inicio ofrece «Repetir tutorial». Reemplaza al metrónomo y a las tres prácticas, que quedan solo para Clásico: en Fácil la corrección de atraso es 0 ms en teclado y 40 ms en táctil. Los tres intentos van al 80 %, sin reloj (`reloj: 0`), con `primera: true` y fuera del registro; las dos prácticas llevan exigencia guionada del 90 % para que ¡EMPUJÁ! aparezca.
+**Uno solo y corto** (12-nov; antes eran un panel, el guiado y dos prácticas: tres levantamientos antes de jugar). Corre la primera vez que se aprieta «Empezar» en Fácil; `tarima.tutorial` se guarda **al salir del inicio**, se haga o se saltee, así que recargar la página no lo repite. Después el inicio ofrece «Repetir tutorial». En Clásico quedan el metrónomo y las tres prácticas.
 
-1. **Panel.** «CÓMO SE JUEGA» · «Un toque de ESPACIO por señal. No hay que mantener ni soltar.» · «Tocá cuando el círculo se cierra sobre el aro.» · «Si dice ¡EMPUJÁ!, tocá rápido hasta quedar de pie.» Botones: «Empezar» y «Saltear tutorial».
-2. **Arranque guiado, en cámara lenta y sin fallo posible.** El reloj del intento lo lleva la presentación: avanza a la mitad de la velocidad y se detiene en cada objetivo hasta que llega el toque, que se registra en el instante exacto del objetivo (sale PERFECTO). Un toque con el reloj andando se descarta con «Todavía no». Exigencia guionada (`exiFija` del 93 %) para que la subida pida toques. Paradas y textos:
+1. **Un arranque guiado, en cámara lenta y sin fallo posible**, sin panel previo (los tres pasos ya están en el inicio). Arriba, la etiqueta «Tutorial · el juego espera cada toque» y el botón «Saltear tutorial ESC» (Esc o toque). El reloj del intento lo lleva la presentación: avanza a la mitad de la velocidad y se detiene en cada objetivo hasta que llega el toque, que se registra en el instante exacto del objetivo (sale PERFECTO). Un toque con el reloj andando se descarta con «Todavía no». Va al 80 %, sin reloj, con exigencia guionada (`exiFija` del 93 %) para que la subida pida toques, fuera del registro. Paradas y textos:
    - «1 de 3 · ¡TIRÁ! Apretá ESPACIO para empezar el levantamiento.»
    - «2 de 3 · ¡EXPLOTÁ! El círculo se cerró: tocá ESPACIO ahora.»
    - «3 de 3 · ¡RECIBÍ! Otra vez: círculo cerrado, tocá ESPACIO.»
-   - «¡EMPUJÁ! La subida se trabó. Tocá ESPACIO rápido hasta quedar de pie.» Acá el reloj solo avanza 250 ms después de cada toque (`GUIADO.porToque`): para el núcleo, hasta el jugador más lento empuja a 4 toques por segundo, que le alcanza a los tres pesistas. Con 400 ms, Brenner fallaba tocando cada 380 ms o más; `tools/sim_test.mjs` lo verifica con toques de 100 ms a 3 s.
+   - «¡EMPUJÁ! La subida se trabó. Tocá ESPACIO rápido hasta quedar de pie.» Acá el reloj solo avanza 250 ms después de cada toque (`GUIADO.porToque`): para el núcleo, hasta el jugador más lento empuja a 4 toques por segundo, que le alcanza a los tres pesistas (`tools/sim_test.mjs` lo verifica con toques de 100 ms a 3 s).
    - «AGUANTÁ. No toques nada: espera la chicharra y baja solo.» Sin parada.
-   - Cierre: «Levantamiento válido · Así se hace».
-3. **Práctica 1 de 2, arranque a velocidad real.** Panel: «Ahora a velocidad real. Tres toques: ¡TIRÁ!, ¡EXPLOTÁ!, ¡RECIBÍ!. Si se traba, ¡EMPUJÁ!» Si falla, muestra la línea de fallo y ofrece «Reintentar» (con foco) y «Seguir».
-4. **Práctica 2 de 2, dos tiempos a velocidad real.** Panel: «Dos tiempos: lo mismo, y con la barra en los hombros tres toques más.» Una sola parada, en los hombros: «4 de 6 · ¡FLEXIONÁ! con ESPACIO. Enseguida ¡ARRIBA! cuando el círculo se cierra, y ¡RECIBÍ!». Mismo reintento. **Lleva el reloj de la final** (30 s desde «Probar»), y el panel lo avisa.
-5. **Cierre.** «En la final elegís los kilos sin apuro: el reloj (0:30) arranca cuando confirmás.» · «Jugás con controles FÁCIL; en el inicio podés pasar a CLÁSICO. H repasa cómo se juega.»
+   - Cierre: «Levantamiento válido · Así se hace. Ahora, la final». Si igual fallara, no se repite: sigue a la final.
+2. **El dos tiempos se explica la primera vez que toca**, en la final y sobre la marcha (`tarima.dostiempos` vacío): el panel de ese llamado agrega «Dos tiempos: empieza igual que el arranque. Con la barra en los hombros el juego te espera: son tres toques más, ¡FLEXIONÁ!, ¡ARRIBA! y ¡RECIBÍ!», y en ese intento el reloj se detiene una vez, en los hombros (`EN_HOMBROS`), con la leyenda «4 de 6 · ¡FLEXIONÁ! Apretá ESPACIO. Enseguida ¡ARRIBA! cuando el círculo se cierra, y ¡RECIBÍ!». El resto del intento va a velocidad real y vale para la final (el registro guarda los instantes del reloj del intento, como siempre). La marca se guarda cuando el intento llegó a los hombros.
+
+Medido en el pod con un jugador que toca 450 ms después de cada parada: 14 a 15 s de «Empezar» a la presentación (8 a 9 s de levantamiento). `tools/check_fluidez.mjs --tutorial` falla si pasa de un minuto, si hay más de un levantamiento antes de jugar o si vuelve a aparecer al recargar.
 
 ## 7. Pantalla de inicio
 
@@ -173,7 +195,8 @@ En lugar de la oración de hoy, tres pasos con la tecla dibujada y, debajo, el s
 | `tools/play_human.mjs` (nuevo, sin navegador) | El criterio de la sección 9: 2000 intentos por casilla, sale con error si no se cumple. «A ciegas» es el peor de catorce maneras de tocar sin mirar. Además: con todos los toques en el borde de BIEN y uno cada 250 ms en ¡EMPUJÁ! se levanta siempre hasta el 100 %, y ninguna subida fallada pasa del tope. Cada intento se recalcula con `simular` y tiene que dar lo mismo |
 | `tools/sim_test.mjs` | Referencias de hoy sin tocar; referencias nuevas en Fácil con un jugador que pasa por la capa (`tools/sim_ref_facil.json`); en vivo contra recalculado y avance en pasos irregulares con `ctl: 'f'`; `ctl` desconocido rechazado y registro sin `ctl` igual a clásico; `explicar()` devuelve texto para toda causa y no contradice a las palabras; el tercer amague es fallo; sin empujar la subida se corta entre 1,5 y 2,7 s; el arranque guiado sale válido con los tres pesistas tocando ¡EMPUJÁ! cada 100 ms a 3 s |
 | `tools/check_game.mjs` | `launchOptions()` de `tools/browser.mjs`. Partida por teclado en Fácil con toques cortos y menús sin mouse (Tab, flechas, Enter); otra en Clásico; táctil en Fácil. Un clic en el escenario durante el intento no agrega entradas. Todo panel abre con foco en un botón. `JUEGO.estado()` expone la señal (verbo, paso, objetivo) y la prueba toca según ella. La barra sube también en el tutorial. Corrida «lento»: arranque guiado con Brenner y un toque cada 600 ms, válido a la primera; 40 s con el panel del llamado abierto no gastan reloj; sin tocar después de confirmar, la señal cuenta y sale el nulo por reloj con su línea |
-| `tools/primera.mjs` | Capturas de jugador nuevo en Fácil: inicio, cada parada del tutorial, cada señal a velocidad real y una línea de fallo, en `out/primera/`. En escritorio sigue en la final: panel del llamado 33 s abierto, nulo por reloj, una subida perdida por tocar lento y el primer dos tiempos. Anota cuánto tarda cada círculo |
+| `tools/check_fluidez.mjs` (12-nov) | En tiempo real y con teclado real: juega la final con Brenner hasta el primer dos tiempos, sin estrangular y con el procesador a 1/4 y 1/6. Falla si en algún intento se dibuja menos del 95 % de los cuadros que ofrece el navegador, si un toque que llegó a la página no figura en `JUEGO.toques`, si un descarte no tiene motivo o acuse, o si la calidad cambia con un intento en curso. `--tutorial`: el tutorial es uno, dura menos de un minuto, se saltea con Esc y no vuelve al recargar. `--gobernador`: con un costo artificial por megapíxel (`?lastre=`), la calibración baja la calidad antes del primer intento y el gobernador solo la toca entre intentos. `--capturas=DIR`: una captura por señal, toque y panel |
+| `tools/primera.mjs` | **Quedó atrás del tutorial nuevo (ver la nota al principio del archivo).** Capturas de jugador nuevo en Fácil: inicio, cada parada del tutorial, cada señal a velocidad real y una línea de fallo, en `out/primera/`. En escritorio sigue en la final: panel del llamado 33 s abierto, nulo por reloj, una subida perdida por tocar lento y el primer dos tiempos. Anota cuánto tarda cada círculo |
 
 ## 9. Medido y riesgos
 
