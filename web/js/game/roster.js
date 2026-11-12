@@ -13,6 +13,20 @@ export const PLANTEL = {
   marangi: { modelo: 'brenner', corto: 'Marangi', color: '#d8b21c', cara: false, tela: '#7a1626',
     bandera: 'linear-gradient(180deg,#0f4c81 0 50%,#d8b21c 50%)' },
 };
+/**
+ * Medidas del cuerpo de cada modelo, para que la elección se vea (pedido del dueño del 12-nov). Salen de los modelos
+ * construidos (out/<nombre>/bones_all.json, la misma tabla de «Los dos biotipos» de HANDOFF.md): estatura, fémur (cadera a
+ * rodilla) y brazo (hombro a muñeca) sobre la estatura. La movilidad no se mide en el modelo: es «alta» para quien domina
+ * el envión en sentadilla (fichas de web/data/sim.json) y «media» para los demás; es una estimación.
+ * Marangi usa el cuerpo de Brenner: el tercer cuerpo queda pendiente (necesita Blender), así que sus medidas son las mismas.
+ */
+export const CUERPO = {
+  ventura: { estatura: 1.70, femur: .23, brazos: .31, movilidad: 'alta' },
+  brenner: { estatura: 1.83, femur: .26, brazos: .33, movilidad: 'media' },
+  marangi: { estatura: 1.83, femur: .26, brazos: .33, movilidad: 'media' },
+};
+/** Fracción 0..1 de cada medida dentro del rango que se dibuja (barras de la tarjeta). */
+export const BARRA = { estatura: [1.60, 1.90], femur: [.21, .28], brazos: [.29, .35], movilidad: null };
 export const ENVIONES = { get split() { return t('envion.split'); }, get power() { return t('envion.power'); }, get squat() { return t('envion.squat'); } };
 export const LEV = { get s() { return t('lev.s'); }, get c() { return t('lev.c'); } };
 export const ETIQUETAS = { get record() { return t('etiqueta.record'); }, get todo_o_nada() { return t('etiqueta.todo_o_nada'); }, get oro() { return t('etiqueta.oro'); }, get medalla() { return t('etiqueta.medalla'); }, get frente() { return t('etiqueta.frente'); } };

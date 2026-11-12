@@ -52,4 +52,62 @@ button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px
   .glosario div{font-size:clamp(11px,3.3cqh,13px)}
   button.grande{min-height:46px}
 }
+/* lo mismo en el teléfono de costado, también con el contenido girado (html.horiz.bajo lo pone telefono.js) */
+  :where(html.horiz.bajo) .panel.bienvenida{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);column-gap:16px;align-content:start}
+  :where(html.horiz.bajo) .panel.bienvenida>*{grid-column:1}
+  :where(html.horiz.bajo) .panel.bienvenida>#pesista-t{grid-column:2;grid-row:1}
+  :where(html.horiz.bajo) .panel.bienvenida>.pesistas{grid-column:2;grid-row:2/span 4;align-self:start;margin-top:0}
+  :where(html.horiz.bajo) .panel.bienvenida>.fila,:where(html.horiz.bajo) .panel.bienvenida>.opciones{grid-column:1/-1}
+  :where(html.horiz.bajo) .panel.gana{max-width:min(96cqw,760px)}
+  :where(html.horiz.bajo) .panel.gana .reglas{margin:.2em 0;line-height:1.4}
+  :where(html.horiz.bajo) .pesistas.rivales .pesista{padding:.35em .5em}
+  :where(html.horiz.bajo) .panel.bienvenida{position:relative}
+  :where(html.horiz.bajo) .panel.bienvenida .cabeza{padding-right:0}
+  :where(html.horiz.bajo) .panel.bienvenida .idiomas{top:10px;right:14px}
+  :where(html.horiz.bajo) .panel.bienvenida .cabeza{position:static}
+  :where(html.horiz.bajo) .panel.bienvenida>#pesista-t{padding-right:6.5em}
+  :where(html.horiz.bajo) .panel.bienvenida label.nombre{margin-top:.3em}
+  :where(html.horiz.bajo) .panel.bienvenida .pesista small{font-size:.74em}
+  :where(html.horiz.bajo) .glosario div{font-size:clamp(11px,3.3cqh,13px)}
+  :where(html.horiz.bajo) button.grande{min-height:46px}
+
 @media (max-width:560px){.glosario div{flex-direction:column;gap:0}.glosario dt{flex:none}}
+/* ---------- selector ES · EN en todos los paneles (arriba a la derecha) ---------- */
+.panel{position:relative}
+.panel>.idiomas.flota{position:absolute;top:8px;right:10px;z-index:1}
+.panel:has(>.idiomas.flota)>:is(h1,h2):first-of-type{padding-right:6.6em}
+.fila.centro{justify-content:center}
+/* kilos: −5 −1 [kg] +1 +5, botones grandes para el dedo */
+.kgsel button.kg{min-width:52px;padding:.45em .7em}
+:where(html.tactil) .kgsel button.kg{min-width:58px;min-height:52px;font-size:max(17px,1em)}
+/* medidas del cuerpo en la tarjeta del pesista */
+.pesista .cuerpo{display:grid;gap:2px;margin:.35em 0 .3em}
+.pesista .med{display:grid;grid-template-columns:5.6em 1fr 3.6em;align-items:center;gap:.4em;font-size:.74em;line-height:1.2}
+.pesista .med i{font-style:normal;color:var(--mute);text-transform:uppercase;letter-spacing:.04em;font-family:var(--display);font-weight:700}
+.pesista .med em{font-style:normal;color:var(--ink);text-align:right;white-space:nowrap}
+.pesista .barra{height:.5em;background:#1a2040;position:relative}
+.pesista .barra b{position:absolute;inset:0 auto 0 0;background:var(--teal);display:block;font-size:0}
+.pesista small.conviene{color:var(--ink);opacity:.85}
+/* muro, lista, encuesta e invitación del podio */
+.panel.muro,.panel.encuesta{max-width:min(94cqw,720px)}
+.panel .muro-cuerpo{display:grid;gap:10px}
+@media (min-width:700px){.panel .muro-cuerpo:has(.camino-encuesta){grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);align-items:start}}
+.formulario label.campo{display:flex;flex-direction:column;gap:.3em;margin:.4em 0}
+.formulario label.campo span,.panel label.campo span{font-family:var(--display);font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--teal);font-size:clamp(14px,2.2cqh,18px)}
+.panel label.campo input,.panel label.campo textarea{font:inherit;font-family:var(--body);font-size:max(16px,clamp(15px,2.3cqh,18px));color:var(--ink);background:#0d1533;border:1px solid var(--line);border-bottom:2px solid var(--teal);border-radius:0;padding:.45em .7em;width:100%;-webkit-appearance:none;appearance:none}
+.panel label.campo :is(input,textarea):focus{outline:3px solid var(--gold);outline-offset:2px}
+.formulario label.casilla{display:flex;gap:.6em;align-items:flex-start;margin:.45em 0;font-size:clamp(13px,2cqh,15px);line-height:1.35;color:var(--ink);cursor:pointer}
+.formulario label.casilla input{width:22px;height:22px;flex:none;margin:0;accent-color:var(--teal)}
+.panel p.error{color:#ff8a7a;font-weight:600}
+.panel p.camino{color:var(--ink)}
+.panel .legal a,.panel a.privacidad{color:var(--teal)}
+.camino-encuesta{background:#0d1533;border:1px solid var(--line);border-left:3px solid var(--gold);padding:.6em .8em}
+.camino-encuesta p{color:var(--ink)!important}
+fieldset.pregunta{border:none;margin:.5em 0;padding:0}
+fieldset.pregunta legend{font-family:var(--display);font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--teal);font-size:clamp(14px,2.2cqh,17px);margin-bottom:.3em;padding:0}
+.opciones-q{display:flex;flex-wrap:wrap;gap:6px}
+.opciones-q button.op{text-transform:none;letter-spacing:0;font-family:var(--body);font-weight:600;font-size:clamp(13px,2cqh,15px);text-align:left}
+.invitacion{position:relative;margin-top:.6em;background:#0d1533;border:1px solid var(--line);border-left:3px solid var(--gold);padding:.6em 2.6em .6em .8em}
+.invitacion.abierta{padding-right:.8em}
+.invitacion b{display:block;color:var(--ink);font-family:var(--display);text-transform:uppercase;letter-spacing:.04em}
+.invitacion .cerrar{position:absolute;top:4px;right:4px;min-height:36px;min-width:36px;padding:0;background:none;border:none;font-size:18px}

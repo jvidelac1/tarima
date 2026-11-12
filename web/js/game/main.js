@@ -1,11 +1,11 @@
 // Juego Tarima: final de tres pesistas (docs/JUEGO.md). Entrada de juego.html: carga, flujo de la partida y bucle.
 // El resultado lo calcula el núcleo (web/js/sim/), que es una función pura de lo que el jugador tocó; acá se dibuja.
 // Etapa 1: sin animaciones ni modelos nuevos. Lo que no está animado se resuelve con cortes y con texto (sección 11.2).
-import { reloj, Boton, toques, principal, claveDe, enfocar, navegar } from './input.js';
+import { reloj, Boton, toques, principal, claveDe, enfocar, navegar, enCampo } from './input.js';
 import { Escena } from './stage.js';
 import { poseDe, poseParado, marcas, tramo } from './sequence.js';
 import { armarCaida, poseCaida } from './caida.js';
-import { PLANTEL, ENVIONES, LEV, ETIQUETAS, GUIONES } from './roster.js';
+import { PLANTEL, ENVIONES, LEV, ETIQUETAS, GUIONES, CUERPO, BARRA } from './roster.js';
 import { Registrador, Gobernador, calidadInicial, medirRefresco, decidirCalidad, pasoDe, metaDe, nombreDe, escalones, pisoDe, PRESET, PISO_MP, MARGEN, TECHO_MP } from './perf.js';
 import { sonido } from './audio.js';
 import { Ayudas } from './ui/ayudas.js';
@@ -22,6 +22,7 @@ import { EVENTO, KG_MAX, RELOJ, PLAN, exigenciaTabla } from '../sim/rules.js';
 import { t, esc, fijarIdioma, detectarIdioma, idiomaActual, fijarTactil, alCambiarIdioma, IDIOMAS } from './i18n/t.js';
 import { ganchos } from './ganchos.js';
 import { telefono } from './telefono.js';
+import { conexion } from './conexion.js';
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -29,12 +30,19 @@ const guardado = { get: k => { try { return localStorage.getItem(k); } catch { r
 const reduceMotion = matchMedia('(prefers-reduced-motion:reduce)').matches;
 const tactil = () => matchMedia('(pointer:coarse)').matches;
 const DIBUJA = params.get('dibujo') !== '0';
+/** Versión del juego para las métricas (súper propiedad `version`). */
+const VERSION_JUEGO = 'mvp-2026-11-12';
 /** Solo para la prueba del gobernador (tools/check_fluidez.mjs --lastre): ms de espera por megapíxel dibujado, como si la placa fuera lenta. */
 let LASTRE = +params.get('lastre') || 0;
 const IDS = ['ventura', 'brenner', 'marangi'];
 /** Contextura de cada pesista para las métricas (sección 6.3): el nombre del modelo no dice nada. */
 const TIPO = { ventura: 'compacto', brenner: 'largo', marangi: 'potente' };
 const GLOSARIO = ['arranque', 'dos_tiempos', 'intento', 'vale', 'total', 'energia', 'kilos'];
+/**
+ * Corrección de atraso con el dedo (ms): el núcleo mide el toque contra el objetivo + CAL_TACTIL, y el círculo se cierra en
+ * el objetivo sin corregir (controles.js, `visto`). Medido con tools/dedo_test.mjs (atraso de 60 ms del dedo y la pantalla).
+ */
+const CAL_TACTIL = 60;
 
 // ---------- idioma, nombre y eventos (docs/MVP.md, secciones 3, 4.1 y 6.3) ----------
 // El idioma se fija antes de pintar nada: ?lang= primero, después lo elegido a mano en este dispositivo y por último el navegador.
@@ -45,7 +53,7 @@ fijarIdioma(detectarIdioma({ lang: params.get('lang'), guardado: guardado.get('t
  * ({ev, props, t}) para las pruebas. Si el gancho sigue siendo el de fábrica, el registro lo lleva main.js; si lo
  * reemplazó la analítica, lo lleva ella (en el mismo arreglo), para no anotar dos veces.
  */
-const EVENTOS = (typeof window !== 'undefined' && Array.isArray(window.JUEGO?.eventos)) ? window.JUEGO.eventos : [];
+const EVENTOS = Array.isArray(window.JUEGO?.eventos) ? window.JUEGO.eventos : (window.JUEGO = { ...(window.JUEGO || {}), eventos: [] }).eventos;
 const evDeFabrica = ganchos.ev;
 function ev(nombre, props = {}) {
   if (ganchos.ev === evDeFabrica) EVENTOS.push({ ev: nombre, props, t: Math.round(performance.now()) });
@@ -76,7 +84,7 @@ const perf = new Registrador();
 const C = { auto: false, clave: '', Q: null, sombras: true, nombre: '', hz: 60, paso: 1, pasoMin: 1, piso: 0, cambios: [], calibrado: false, medido: null, calibracion: null };
 let gov = null, nRaf = 0;
 let escena = null, datos = null, ayudas = null, boton = null, enCuadro = null, senalUI = null, depura = null;
-const visita = n => { if (n !== E.pantalla) E.previa = E.pantalla; E.pantalla = n; if (!E.visitados.includes(n)) E.visitados.push(n); perf.marcar(n); };
+const visita = n => { if (n !== E.pantalla) E.previa = E.pantalla; E.pantalla = n; if (!E.visitados.includes(n)) E.visitados.push(n); perf.marcar(n); try { ganchos.visita?.(n); } catch { /* métricas */ } };
 
 // ---------- tiempo del juego: esperas sobre el reloj inyectable ----------
 const pend = [];
@@ -226,8 +234,17 @@ const clic = (panel, sel) => new Promise(res => panel.querySelectorAll(sel).forE
 const teclas = (n, T, extra = '') => `<kbd class="tecla ${extra}">${t(T ? 'tecla.toca' : 'tecla.espacio')}</kbd>`.repeat(n);
 const pasosHTML = (ctl, T) => `<ol class="pasos">${pasos(ctl, T).map(([n, txt], i) => `<li><b>${i + 1}</b><span class="tk">${teclas(n, T, n > 1 ? 'ch' : '')}</span><span>${txt}</span></li>`).join('')}</ol>`;
 const menus = () => `<p class="chica">${t('menus.teclado')}</p>`;
+/**
+ * Selector de kilos: −5 −1 [kg] +1 +5, sin salirse de [lo, hi] (los botones que se pasarían quedan deshabilitados; uno de 5
+ * que se pasaría lleva al borde). Con teclado: ← → de a 1, ↑ ↓ o Mayúscula de a 5 (alTeclado).
+ */
+const kilosHTML = (kg, lo, hi, fijo = false, extra = '') => {
+  const b = (id, d, txt, clave, dis) => `<button id="${id}" class="kg" data-d="${d}" ${dis ? 'disabled' : ''} aria-label="${esc(t(clave))}">${txt}</button>`;
+  return `<div class="fila kgsel">${b('kg-menos5', -5, '−5', 'kilos.menos5', fijo || kg <= lo)}${b('kg-menos', -1, '−1', 'kilos.menos1', fijo || kg <= lo)}<output id="kg-val">${kg}</output><span>kg</span>${b('kg-mas', 1, '+1', 'kilos.mas1', fijo || kg >= hi)}${b('kg-mas5', 5, '+5', 'kilos.mas5', fijo || kg >= hi)}${extra}</div>`;
+};
+const masKilos = (kg, d, lo, hi) => Math.max(lo, Math.min(hi, kg + d));
 /** Selector ES · EN (bienvenida y pausa). Cambia sin recargar: la pantalla actual se vuelve a pintar. */
-const idiomasHTML = () => `<div class="idiomas" role="group" aria-label="${esc(t('app.idioma'))}">${IDIOMAS.map(l => `<button class="idi" data-lang="${l}" lang="${l}" aria-pressed="${l === idiomaActual()}">${l.toUpperCase()}</button>`).join('')}</div>`;
+const idiomasHTML = (flota = false) => `<div class="idiomas${flota ? ' flota' : ''}" role="group" aria-label="${esc(t('app.idioma'))}">${IDIOMAS.map(l => `<button class="idi" data-lang="${l}" lang="${l}" aria-pressed="${l === idiomaActual()}">${l.toUpperCase()}</button>`).join('')}</div>`;
 function cambiarIdioma(l) {
   const de = idiomaActual(); if (!IDIOMAS.includes(l) || l === de) return;
   guardado.set('tarima.idioma', l); fijarIdioma(l); ev('idioma_cambiado', { de, a: l, pantalla: E.pantalla });
@@ -291,12 +308,12 @@ function cerrarSobre() {
 }
 /** Teclado de los paneles (se atiende antes que la entrada del levantamiento). */
 function alTeclado(e) {
-  if (e.ctrlKey || e.metaKey || e.altKey || !boton) return; const k = e.key;
-  // escribiendo en un campo (nombre, mail, encuesta) las letras, Espacio y las flechas ← → son del campo. Enter elige el
-  // botón principal del panel, Esc sale del campo, y ↑ ↓ y Tab mueven el foco como siempre
-  if (campo(e.target)) {
+  if (e.ctrlKey || e.metaKey || e.altKey || !boton || e.target?.closest?.('#editor')) return; const k = e.key;      // el editor de campos del teléfono atiende sus teclas
+  // escribiendo en un campo (nombre, correo, encuesta) las letras, Espacio y las flechas ← → son del campo. Enter elige el
+  // botón principal de su formulario (o del panel), Esc sale del campo, y ↑ ↓ y Tab mueven el foco como siempre
+  if (campo(e.target) || enCampo(e)) {
     const raiz = E.sobre ? $('sobre').firstElementChild : $('capa').firstElementChild;
-    if (k === 'Enter' && !e.repeat && !e.isComposing && e.target.tagName !== 'TEXTAREA') { const b = raiz && principal(raiz); if (b) { e.preventDefault(); b.click(); } }
+    if (k === 'Enter' && !e.repeat && !e.isComposing && e.target.tagName !== 'TEXTAREA') { const b = principal(e.target.closest?.('.formulario') || raiz || document.body); if (b) { e.preventDefault(); b.click(); } }
     else if (k === 'Escape') { e.preventDefault(); e.target.blur(); }
     else if ((k === 'Tab' || k === 'ArrowUp' || k === 'ArrowDown') && raiz && navegar(raiz, e)) e.preventDefault();
     return;
@@ -305,10 +322,14 @@ function alTeclado(e) {
   if (k === 'h' || k === 'H' || k === '?') { if (!E.sobre) { if (abrirSobre('ayuda')) e.preventDefault(); } else { e.preventDefault(); if (E.sobre.tipo === 'ayuda') cerrarSobre(); else pintarSobre('ayuda'); } return; }
   const raiz = E.sobre ? $('sobre').firstElementChild : $('capa').firstElementChild;
   if (!raiz) { if (k === 'Tab') e.preventDefault(); return; }      // sin panel, Espacio es del levantamiento, y Tab no saca el foco de la página
+  // kilos: ← → de a 1, ↑ ↓ (o Mayúscula con ← →) de a 5, sin salirse del rango (los botones deshabilitados no hacen nada)
+  if (raiz.querySelector('#kg-mas') && !E.sobre && (k === 'ArrowUp' || k === 'ArrowDown' || (e.shiftKey && (k === 'ArrowLeft' || k === 'ArrowRight')))) {
+    e.preventDefault(); const b = raiz.querySelector(k === 'ArrowUp' || k === 'ArrowRight' ? '#kg-mas5' : '#kg-menos5'); if (b && !b.disabled) b.click(); return;
+  }
   if (navegar(raiz, e)) { e.preventDefault(); return; }
   if (k === 'Enter' || k === ' ') {
     if (e.repeat) { e.preventDefault(); return; }      // dejar la tecla apretada no activa nada, ni acá ni en el panel que sigue
-    const act = document.activeElement; if (act && (act.tagName === 'BUTTON' || act.tagName === 'A') && raiz.contains(act)) return;      // el botón (o el enlace) con foco se activa solo
+    const act = document.activeElement; if (act && (act.tagName === 'BUTTON' || act.tagName === 'A' || (act.tagName === 'INPUT' && raiz.contains(act))) && raiz.contains(act)) return;      // el botón, el enlace o la casilla con foco se activan solos
     if (raiz.dataset.libre) return;      // en el metrónomo, Espacio es el toque
     const b = principal(raiz); if (b) { e.preventDefault(); b.focus({ preventScroll: true }); b.click(); }
   }
@@ -347,6 +368,10 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
   return new Promise(resolver => {
     const P = escena.P, ent = gestos ? gestos.ent : [], propio = !gestos, grab = [], mk = marcas(P, lev, env), ctl = propio ? ctx.ctl || 'c' : 'c', facil = propio && ctl === 'f', T = tactil();
     let conf = gestos ? gestos.conf : conf0, pal = null, palT = 0, fin = false, chic = false, camFija = false, sAhora = null, parado = false, ultTecla = -1e9, tRes = null;
+    // Un toque de ¡TIRA! que llega antes de tiempo (con PREPÁRATE en pantalla) no se pierde: queda guardado y levanta
+    // apenas aparece ¡TIRA! (si fue hace menos de GUARDA_MS). Antes se descartaba con «ESPERA» y quien tocaba una vez y esperaba
+    // no veía levantar nada («a veces toco Espacio y no se levanta»).
+    let guardadoT = null; const GUARDA_MS = 1500;
     const visto = { gestos: 0, fase: '', toques: 0, tens: null, amagues: 0, rec: null, tic: null };
     // un rival se muestra desde poco antes de agarrar la barra para tirar (no desde que se agacha), y su reloj corre más
     // rápido en las fases lentas (pelea, traba, de pie y con la barra en los hombros): ver RIVAL_RAPIDO. Se saltea al final.
@@ -368,6 +393,8 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
         if (via === 'mouse') return no('mouse');      // el clic no hace gestos del levantamiento
         if (fin) return no('termino'); if (conf === null) return no('espera');
         $('zona').classList.toggle('on', boton.apretado);
+        const mAhora = E.intento?.m;
+        if (facil && !guia && v && mAhora && !mAhora.res && (mAhora.fase === 'acomodo' || (mAhora.fase === 'tension' && Math.round(tEv - t0) < mAhora.M.ign))) { guardadoT = tEv; toques.resolver(true, 'guardado'); return; }
         let x;
         if (guia) {
           if (!v) return;
@@ -390,6 +417,10 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
       if (gestos) { vr = vr === null ? tv0 : vr + (ahora - aPrev) * (RIVAL_FASES.has(visto.fase) ? RIVAL_RAPIDO : 1); aPrev = ahora; if (saltar && todo.res) { saltar = false; vr = Math.max(vr, todo.res.t - 30); } }
       const now = guia ? Math.round(vt(ahora)) : gestos ? Math.round(vr) : Math.round(ahora - t0), m = propio ? alDia(ctx, conf, ent, now, ctl) : simular(ctx, conf, ent, now), M = m.M;
       const s = propio ? senalDe(m, now, ctl) : null; sAhora = s; let leyenda = '';
+      if (guardadoT !== null && s && s.tipo === 'libre' && s.clave === 'tira') {
+        const viejo = ahora - guardadoT > GUARDA_MS; guardadoT = null;
+        if (!viejo) { const r = tocar(ctx, conf, ent, now, 1, ctl); if (r.n) { E.guardados = (E.guardados || 0) + 1; ultTecla = ahora; } }
+      }
       if (guia) {
         let vel = guia.vel, tope = Infinity, clave = null;
         if (s && guia.para.has(s.clave)) { clave = s.clave; tope = s.tipo === 'cierre' ? s.objetivo : R.clave === clave ? R.tope : now; }
@@ -421,6 +452,7 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
         // en Fácil la palabra lleva el verbo del toque que califica: cuando ya se ve la señal siguiente no se confunde con ella
         decir((facil ? t(g.g === 'recepcion' ? 'senal.recibi' : g.mov === 'j' ? 'senal.arriba' : 'senal.explota') + ' ' : '') + t(W.clave) + (!facil && g.pal === 'bien' ? ` ${g.e > 0 ? '+' : '−'}${Math.abs(g.e)} ms` : ''), { nota: true, ...(facil ? { floja: !!W.floja && !g.fuera, mal: !!g.fuera } : { mal: !!W.floja }) });
         if (g.g === 'explosion') sonido.explosion(g.pal === 'perfecto');
+        if (propio && T && (g.pal === 'perfecto' || g.pal === 'bien') && !g.fuera) { try { navigator.vibrate?.(g.pal === 'perfecto' ? 35 : 20); } catch { /* sin vibración */ } }
       }
       if (m.amagues > visto.amagues) { visto.amagues = m.amagues; if (propio) decir(t('palabra.muy_temprano'), { floja: true }); }
       if (M && M.tc && now >= M.tc && visto.rec !== M.tc) { visto.rec = M.tc; sonido.recepcion(); }
@@ -432,7 +464,9 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
       // la señal fija (jugador) y las ayudas pegadas a la barra (Clásico y rivales)
       const edad = (ahora - palT) / 1000;
       if (propio) { senalUI.pintar(E.modo === 'panel' ? null : s, now, pal ? { ...pal, edad } : null, { parado }); guiaTxt(leyenda); const z = s && s.tipo !== 'espera' && s.tipo !== 'auto' ? s.verbo : s ? '···' : t('zona.toca'); if ($('zona-txt').textContent !== z) $('zona-txt').textContent = z; }
-      if (facil) ayudas.limpiar();
+      // las ayudas pegadas a la barra (anillo, línea, palabra) son solo del jugador en Clásico: sobre un rival se leerían como
+      // una señal de toque sobre otro pesista (pedido del dueño del 12-nov: «¿puedo controlar otro pesista?»)
+      if (facil || !propio) ayudas.limpiar();
       else if (DIBUJA && E.modo !== 'panel') {
         const A = { bar: escena.pantalla() };
         if ((m.fase === 'tension' || m.fase === 'hombros') && now >= M.ign) A.anillo = (((now - ctx.cal - M.t0) % m.per) + m.per) % m.per / m.per;
@@ -504,7 +538,7 @@ async function decision(a, lev, res, et, propio, o = {}) {
   // la línea se lee 4,2 s; si después viene la repetición (`o.rep`), que la vuelve a mostrar, acá solo 1,6 s. En un válido
   // propio no se espera a que la barra termine de rebotar (fin.dur llega a 4,3 s): luces, ovación, la cámara gira y sigue.
   // El primer NO VALE suma 1,5 s para leer cuándo vale un levantamiento.
-  const total = Math.max(tVer + (propio ? (linea ? (o.rep ? 1.6 : 4.2) : 1.9) + (primerNoVale ? 1.5 : 0) : 1.3), fin && !(propio && ok) ? fin.dur : 0);
+  const total = o.corto ? tVer + .9 : Math.max(tVer + (propio ? (linea ? (o.rep ? 1.6 : 4.2) : 1.9) + (primerNoVale ? 1.5 : 0) : 1.3), fin && !(propio && ok) ? fin.dur : 0);
   if (fin && !ok) escena.primerPlano('caida');
   const t0 = reloj.ahora(), d = [null, null, null], hito = { luz: 0, ver: false, caida: !fin || !ok, rev: false };
   const avanzar = (t, dt, vivo) => {
@@ -526,8 +560,8 @@ async function decision(a, lev, res, et, propio, o = {}) {
 /** Lo que dura la repetición de un fallo, como mucho (ms), sin contar el corte final. */
 const REP_MS = 2300;
 /** Tramo que muestra la repetición: de poco antes de la explosión a poco después de la recepción. null si no hay. */
-function tramoRepeticion(r) {
-  if (!r || !r.res || r.res.res === 'valido' || !r.m || !r.grab || !r.grab.length) return null;
+function tramoRepeticion(r, valido = false) {
+  if (!r || !r.res || (r.res.res === 'valido' && !valido) || !r.m || !r.grab || !r.grab.length) return null;
   const M = r.m.movs[r.m.movs.length - 1]; if (!M || !M.tr) return null;
   const de = M.tr - 300, a = Math.min(r.res.t, (M.tc || M.tr) + 450), cuadros = r.grab.filter(g => g.t >= de && g.t <= a);
   return cuadros.length < 4 ? null : { de, a, cuadros };
@@ -537,12 +571,12 @@ function tramoRepeticion(r) {
  * 3 veces) y en REP_MS como mucho; la caída ya se vio en vivo en el veredicto. Abajo, el motivo en una línea. Se saltea
  * con Espacio. El válido no tiene repetición: luces, ovación y seguir.
  */
-async function repeticion(lev, r, linea = '') {
-  const T = tramoRepeticion(r); if (!T) return;
+async function repeticion(lev, r, linea = '', o = {}) {
+  const T = tramoRepeticion(r, !!o.rival); if (!T) return;
   const { de, a, cuadros } = T, LENTO = Math.max(1, Math.min(3, REP_MS / (a - de))), tLev = (a - de) * LENTO;
-  visita('repeticion'); const yo = E.propios?.at(-1); if (yo) yo.rep = true;
+  if (o.rival) visita('repeticion_rival'); else { visita('repeticion'); const yo = E.propios?.at(-1); if (yo) yo.rep = true; }
   E.modo = 'intento'; escena.camara('lado'); escena.trace.buildPoints(cuadros.map(g => ({ y: g.y, z: g.z })), 1.16); escena.trace.group.visible = true;
-  veredicto(t('veredicto.repeticion'), linea || (r.res.causa ? t('causa.' + r.res.causa) : t('veredicto.camara_lenta')), true); $('veredicto').classList.add('arriba');
+  veredicto(o.titulo || t('veredicto.repeticion'), linea || (r.res.causa ? t('causa.' + r.res.causa) : t('veredicto.camara_lenta')), r.res.res !== 'valido'); $('veredicto').classList.add('arriba');
   const t0 = reloj.ahora(); let listo = false; const corte = saltable(tLev + 300, 300).then(() => { listo = true; });
   enCuadro = ahora => { const t = de + Math.min(ahora - t0, tLev) / LENTO; let k = 0; while (k + 1 < cuadros.length && cuadros[k + 1].t <= t) k++; escena.posar(cuadros[k].pose, lev); escena.trace.setCount(k); };
   await corte; enCuadro = null; if (!listo) return; escena.trace.group.visible = false; veredicto(''); escena.posar(poseParado(escena.P, lev), lev); E.modo = 'tv';
@@ -576,8 +610,8 @@ async function inicio() {
       ${params.has('c') ? `<p class="desafio">${t('bienvenida.desafio')}</p>` : ''}${q ? `<p class="quedan">${q}</p>` : ''}
       ${nombreHTML}
       <h2 id="pesista-t">${esc(t('pesista.titulo', { nombre: mostrado() }))}</h2>
-      <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b><small>${t(`pesista.${id}.alto`)} · ${t(`pesista.${id}.txt`)}</small></button>`).join('')}</div>
-      ${opciones}<div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button><button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button><button id="btn-opciones" aria-expanded="${S.opciones}">${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button><button id="btn-ayuda">${t('boton.ayuda')}</button><small class="nota legal">${T ? '' : `${t('menus.teclado')} · `}<a href="privacidad.html" target="_blank" rel="noopener">${t('app.privacidad')}</a></small></div>
+      <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b>${cuerpoHTML(id)}<small class="conviene">${t(`pesista.${id}.conviene`)}</small></button>`).join('')}</div>
+      ${opciones}<div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button><button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button><button id="btn-opciones" aria-expanded="${S.opciones}">${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button><button id="btn-ayuda">${t('boton.ayuda')}</button><small class="nota legal">${T ? '' : `${t('menus.teclado')} · `}<a href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></small></div>
       `, 'bienvenida');
     pn.querySelector('.legal a')?.addEventListener('click', () => ev('privacidad_abierta', { pantalla: E.pantalla }));
     const inp = pn.querySelector('#nombre');
@@ -607,6 +641,13 @@ async function inicio() {
     }
   }
   guardado.set('tarima.pesista', cfg.id); guardado.set('tarima.nivel', cfg.nivel); guardado.set('tarima.ctl', cfg.ctl); capa.quitar(); return cfg;
+}
+
+/** Medidas del cuerpo en la tarjeta del pesista: estatura, fémur, brazos y movilidad, con una barra cada una. */
+function cuerpoHTML(id) {
+  const C = CUERPO[id], fr = (k, v) => { const r = BARRA[k]; return r ? Math.max(.08, Math.min(1, (v - r[0]) / (r[1] - r[0]))) : v === 'alta' ? .9 : .55; };
+  const largo = (k, v) => (k === 'estatura' ? t(`pesista.${id}.alto`) : k === 'movilidad' ? t('cuerpo.' + v) : t(fr(k, v) > .5 ? (k === 'brazos' ? 'cuerpo.largos' : 'cuerpo.largo') : (k === 'brazos' ? 'cuerpo.cortos' : 'cuerpo.corto')));
+  return `<span class="cuerpo">${['estatura', 'femur', 'brazos', 'movilidad'].map(k => `<span class="med"><i>${t('cuerpo.' + k)}</i><span class="barra"><b style="width:${Math.round(fr(k, C[k]) * 100)}%"></b></span><em>${largo(k, C[k])}</em></span>`).join('')}</span>`;
 }
 
 /** Metrónomo de 8 toques: la mediana del atraso propone la corrección (0 a 100 ms), que queda fija para toda la partida. */
@@ -648,8 +689,10 @@ async function practica(cfg) {
 async function tarjeta() {
   if (guardado.get('tarima.visto.tarjeta')) return;
   visita('tarjeta');
-  const pn = capa.poner(`<h2>${t('practica.tarjeta_titulo')}</h2><p class="que">${t('practica.tarjeta')}</p><div class="fila"><button class="ir grande" id="btn-probar">${t('practica.probar')}</button></div>`, 'chico');
-  bloquear(pn); await clic(pn, '#btn-probar'); capa.quitar(); guardado.set('tarima.visto.tarjeta', '1');
+  const html = () => `${idiomasHTML(true)}<h2>${t('practica.tarjeta_titulo')}</h2><p class="que">${t('practica.tarjeta')}</p><div class="fila"><button class="ir grande" id="btn-probar">${t('practica.probar')}</button></div>`;
+  let pn = capa.poner(html(), 'chico'); bloquear(pn);
+  for (;;) { const b = await Promise.race([clic(pn, '#btn-probar'), new Promise(res => { E.repintar = () => res(null); })]); if (b) break; pn = capa.poner(html(), 'chico'); }
+  E.repintar = null; capa.quitar(); guardado.set('tarima.visto.tarjeta', '1');
 }
 
 /**
@@ -659,7 +702,7 @@ async function tarjeta() {
  */
 async function tutorial(cfg) {
   const f = datos.atletas[cfg.id], a = { id: cfg.id, f, i: E.yo };
-  const ctx = { lev: 's', I: 8000, exiFija: exigenciaTabla(9300), tec: f.attrs.tec, temple: 0, garra: f.attrs.gar, anclas: datos.modelos[f.modelo], semilla: 71, cal: cfg.cal, primera: true, domina: true, jueces: [1000, 1000, 1000], reloj: 0, ctl: 'f' };
+  const ctx = { lev: 's', I: 8000, exiFija: exigenciaTabla(9300), tec: f.attrs.tec, temple: 0, garra: f.attrs.gar, anclas: datos.modelos[f.modelo], semilla: 71, cal: cfg.cal, primera: true, domina: true, jueces: [1000, 1000, 1000], reloj: 0, ctl: 'f', ...(tactil() ? { tactil: true } : {}) };
   await escena.mostrar(cfg.id); visita('tutorial');
   escena.setCarga(Math.round(f.techo.s * .8), 's'); escena.posar(poseParado(escena.P, 's'), 's'); escena.camara(camPrincipal()); zocalo(a, { lev: 's', n: 0, kg: escena.kg }); relojLibre(); setLuces(null);
   visita('guiado'); $('etiqueta').hidden = false; $('etiqueta').textContent = t('practica.etiqueta'); $('saltar').hidden = false; ev('tutorial_inicio'); const tIni = performance.now();
@@ -680,13 +723,13 @@ async function elegirApertura(p, lev, sugerida, html) {
   const [lo, hi] = p.rangoApertura(E.yo, lev); let kg = Math.max(lo, Math.min(hi, sugerida)), abierto = false;
   for (;;) {
     const arriba = html();
-    const pn = capa.poner(`${arriba}<h2>${t(lev === 's' ? 'peso.titulo_s' : 'peso.titulo_c')}</h2>
-      <div class="fila kgsel"><button id="kg-menos" ${kg <= lo ? 'disabled' : ''} aria-label="−1 kg">−1</button><output id="kg-val">${kg}</output><span>kg</span><button id="kg-mas" ${kg >= hi ? 'disabled' : ''} aria-label="+1 kg">+1</button><button class="ir grande" id="btn-confirmar">${t('peso.boton', { kg })}</button></div>
-      <p>${t('peso.rango', { lo, hi })}${lev === 's' ? ' ' + t('peso.ayuda') : ''}</p>${tactil() ? '' : `<p class="chica">${t('peso.teclas')}</p>`}`, arriba ? 'peso con-tabla' : 'peso');
+    const pn = capa.poner(`${idiomasHTML(true)}${arriba}<h2>${t(lev === 's' ? 'peso.titulo_s' : 'peso.titulo_c')}</h2>
+      ${kilosHTML(kg, lo, hi)}<div class="fila centro"><button class="ir grande" id="btn-confirmar">${t('peso.boton', { kg })}</button></div>
+      <p>${t('peso.rango', { lo, hi })}${lev === 's' ? ' ' + t('peso.ayuda') : ''}</p>${tactil() ? '' : `<p class="chica">${t('peso.teclas5')}</p>`}`, arriba ? 'peso con-tabla' : 'peso');
     if (!abierto) { bloquear(pn); abierto = true; }      // el bloqueo es al abrir, no en cada kilo
-    const b = await Promise.race([clic(pn, '#kg-menos,#kg-mas,#btn-confirmar'), new Promise(res => { E.repintar = () => res(null); })]);
+    const b = await Promise.race([clic(pn, '.kg,#btn-confirmar'), new Promise(res => { E.repintar = () => res(null); })]);
     if (!b) continue;
-    if (b.id === 'kg-menos') kg--; else if (b.id === 'kg-mas') kg++; else break;
+    if (b.dataset.d) kg = masKilos(kg, +b.dataset.d, lo, hi); else break;
   }
   capa.quitar(); p.abrir(E.yo, lev, kg);
 }
@@ -702,7 +745,7 @@ async function presentacion(p, cfg, errMedio, primera) {
   const facil = cfg.ctl === 'f', pct = facil ? (errMedio === null ? .90 : Math.max(.88, Math.min(.93, .93 - (errMedio - 50) / 150 * .05))) : errMedio === null ? .935 : Math.max(.88, Math.min(.935, .935 - (errMedio - 30) / 60 * .055)), sug = Math.round(f.techo.s * pct);
   const forma = s => t(s > 0 ? 'forma.liviano' : s < 0 ? 'forma.pesado' : 'forma.normal');
   const rivales = p.at.filter(a => a.i !== E.yo);
-  const html = () => `${primera ? `<h2>${t('gana.titulo')}</h2><ol class="reglas"><li>${t('gana.l1')}</li><li>${t('gana.l2')}</li><li>${t('gana.l3')}</li></ol>` : ''}
+  const html = () => `${idiomasHTML(true)}${primera ? `<h2>${t('gana.titulo')}</h2><ol class="reglas"><li>${t('gana.l1')}</li><li>${t('gana.l2')}</li><li>${t('gana.l3')}</li></ol>` : ''}
     <h2>${t('gana.rivales')}</h2><div class="pesistas rivales">${rivales.map(a => `<div class="pesista"><div class="b" style="background:${PLANTEL[a.id].bandera}"></div><b>${esc(a.f.nombre)}</b><small>${t('gana.abre', { s: a.decl.s, c: a.decl.c })}</small></div>`).join('')}</div>
     ${G.tipo !== 'nada' ? `<p>${esc(GUIONES[G.tipo](G.a >= 0 ? quien(p.at[G.a]) : ''))}</p>` : ''}<p>${t('gana.forma', { s: forma(yo.forma.s), c: forma(yo.forma.c) })}</p>`;
   let pn = capa.poner(`${html()}<div class="fila"><button class="ir grande" id="btn-gana">${t('gana.seguir')}</button></div>`, 'gana');
@@ -720,10 +763,11 @@ async function presentacion(p, cfg, errMedio, primera) {
  * para arriba (1,6 m de alto y 1 m de ancho) en esa parte.
  */
 function encuadreLibre() {
-  const pn = $('capa').querySelector('.panel'), c = $('gl').getBoundingClientRect(); if (!c.width || !c.height) return null;
+  const pn = $('capa').querySelector('.panel'), gl = $('gl'), c = { width: gl.clientWidth, height: gl.clientHeight }; if (!c.width || !c.height) return null;
   let x0 = 0, x1 = 1, y0 = 0, y1 = 1;
   if (pn) {
-    const r = pn.getBoundingClientRect(), izq = (r.left - c.left) / c.width, arr = (r.top - c.top) / c.height;
+    // con offsets y no con getBoundingClientRect: con el contenido girado (teléfono en vertical) las cajas salen rotadas
+    const izq = pn.offsetLeft / c.width, arr = pn.offsetTop / c.height;
     if (izq > .4) x1 = izq; else if (arr > .25) y1 = arr;
   }
   const fov = 22, tg = 2 * Math.tan(fov / 2 * Math.PI / 180), asp = c.width / c.height;
@@ -742,7 +786,7 @@ function panelLlamado(p, L, t0, alConfirmar, corre = true) {
   const pinta = () => {
     const ms = corre ? reloj.ahora() - t0 : 0, fijo = a.cambios >= 2 || ms > L.reloj - RELOJ.cambiosHasta, T = tactil();
     const bajo = S.kg <= min, menosTit = bajo && !fijo ? ` title="${esc(t('llamado.no_baja', { kg: min }))}"` : '';
-    const kilos = `<div class="fila kgsel"><button id="kg-menos" ${fijo || bajo ? 'disabled' : ''}${menosTit} aria-label="−1 kg">−1</button><output id="kg-val">${S.kg}</output><span>kg</span><button id="kg-mas" ${fijo || S.kg >= KG_MAX ? 'disabled' : ''} aria-label="+1 kg">+1</button><button class="ir" id="btn-confirmar">${t('llamado.confirmar')}</button></div>`;
+    const kilos = kilosHTML(S.kg, min, KG_MAX, fijo, `<button class="ir" id="btn-confirmar">${t('llamado.confirmar')}</button>`).replace('id="kg-menos"', `id="kg-menos"${menosTit}`);
     const atajos = `<div class="fila">${facil ? `<span>${t('ficha.titulo')}</span>` : ''}${Object.entries(fichas).map(([k, v]) => `<button class="ficha" data-kg="${v}" ${fijo ? 'disabled' : ''} aria-pressed="${v === S.kg}">${t('ficha.' + k)} ${v}</button>`).join('')}</div>`;
     const envion = L.lev === 'c' ? `<div class="fila"><span>${t('envion.titulo')}</span>${Object.keys(ENVIONES).map(e => `<button class="envion" data-env="${e}" aria-pressed="${e === S.env}">${ENVIONES[e]}${a.f.enviones.includes(e) ? '' : ' *'}</button>`).join('')}</div>` : '';
     const noDomina = L.lev === 'c' && !a.f.enviones.includes(S.env) ? ` · ${t('envion.no_domina')}` : '';
@@ -753,14 +797,14 @@ function panelLlamado(p, L, t0, alConfirmar, corre = true) {
     // Un toque: a la vista quedan los kilos, qué dice el entrenador, qué hace falta y qué tecla va; el resto, en «Más opciones»
     const cuerpo = facil
       ? `${kilos}${antes}<p class="frase">${frase(S.kg)} ${t('llamado.mas_dificil')}${T ? '' : ` <span class="chica">(${t('llamado.teclas')})</span>`}</p>${cuenta ? `<p class="cuenta">${cuenta}</p>` : ''}
-        ${explica ? `<p class="que">${explica}</p>` : ''}<p class="que">${reloj0}</p>
+        ${explica ? `<p class="que">${explica}</p>` : ''}<p class="que reloj">${reloj0}</p>
         ${S.kg !== L.kg ? `<p class="chica">${t('llamado.cambio', { kg: L.kg })}</p>` : ''}${fijo ? `<p class="chica">${t('llamado.fijo')}</p>` : ''}
         ${S.mas ? `${atajos}${envion}<p class="chica">${pedido}${noDomina}</p>` : ''}<div class="fila"><button id="btn-mas" aria-expanded="${!!S.mas}">${t(S.mas ? 'llamado.menos_opciones' : 'llamado.mas_opciones')}</button></div>`
       : `${kilos}${antes}${atajos}${envion}<p class="frase">${frase(S.kg)}</p><p class="cuenta">${cuenta}</p><p class="que">${reloj0}${T ? '' : ` <span class="chica">(${t('llamado.teclas')})</span>`}</p>
         <p class="chica">${pedido}${fijo ? ' ' + t('llamado.cerrados') : ''}${S.kg !== L.kg ? ` · <b>${t('llamado.cambio_pro')}</b>` : ''}${noDomina}</p>`;
-    const pn = capa.poner(`<h2>${esc(t('llamado.titulo', { quien: quien(a), lev: t('lev.' + L.lev), n: L.n }))}</h2>${cuerpo}`, 'chico abajo lado');      // al costado: no tapa al pesista
+    const pn = capa.poner(`${idiomasHTML(true)}<h2>${esc(t('llamado.titulo', { quien: quien(a), lev: t('lev.' + L.lev), n: L.n }))}</h2>${cuerpo}`, 'chico abajo lado');      // al costado: no tapa al pesista
     const al = (b, fn) => { b.onclick = () => { if (activa(pn)) fn(); }; };
-    al(pn.querySelector('#kg-menos'), () => { S.kg--; pinta(); }); al(pn.querySelector('#kg-mas'), () => { S.kg++; pinta(); });
+    pn.querySelectorAll('.kg').forEach(b => al(b, () => { S.kg = masKilos(S.kg, +b.dataset.d, min, KG_MAX); pinta(); }));
     pn.querySelectorAll('.ficha').forEach(b => al(b, () => { S.kg = +b.dataset.kg; pinta(); }));
     pn.querySelectorAll('.envion').forEach(b => al(b, () => { S.env = b.dataset.env; pinta(); }));
     const mas = pn.querySelector('#btn-mas'); if (mas) al(mas, () => { S.mas = !S.mas; pinta(); });
@@ -795,14 +839,15 @@ async function llamadoPropio(p, L) {
     ctx = p.contexto(env); asegurarCalidad(); visita('intento');
     // el primer dos tiempos en Un toque se explica sobre la marcha: con la barra en los hombros el reloj espera el toque de ¡FLEXIONA!
     const primerDT = ctx.ctl === 'f' && L.lev === 'c' && !guardado.get('tarima.dostiempos');
-    E.todavias = 0;
+    E.todavias = 0; E.guardados = 0; E.fotoToques = toques.foto();
     corrida = await correrIntento(ctx, { a, lev: L.lev, env, conf0: ms, t0, guia: primerDT ? EN_HOMBROS : null });
     if (primerDT && corrida.m.movs.length > 1) guardado.set('tarima.dostiempos', '1');
   } else { env = L.lev === 'c' ? a.f.enviones[0] : undefined; ctx = p.contexto(env); corrida = { conf: null, ent: [], res: simular(ctx, null, []).res, grab: [], m: { movs: [] } }; }
   const et = p.llamado.et, x = p.resolver({ conf: corrida.conf, env, ent: corrida.ent });
   if (JSON.stringify(x.res) !== JSON.stringify(corrida.res)) E.errores.push('el resultado mostrado no coincide con el recalculado');
   const pal = k => (x.res.gestos || []).filter(g => g.pal === k).length;
-  ev('intento_propio', { final_n: E.finalN, lev: L.lev, intento: L.n, kg: kgFinal, resultado: x.res.res === 'valido' ? 'vale' : x.res.res === 'nulo' ? 'no_vale' : 'cayo', causa: x.res.causa || null, perfecto: pal('perfecto'), bien: pal('bien'), temprano: pal('temprano'), tarde: pal('tarde'), todavia_no: E.todavias || 0 });
+  ev('intento_propio', { final_n: E.finalN, lev: L.lev, intento: L.n, kg: kgFinal, resultado: x.res.res === 'valido' ? 'vale' : x.res.res === 'nulo' ? 'no_vale' : 'cayo', causa: x.res.causa || null, perfecto: pal('perfecto'), bien: pal('bien'), temprano: pal('temprano'), tarde: pal('tarde'), todavia_no: E.todavias || 0, guardados: E.guardados || 0, tactil: tactil(), ...(E.fotoToques ? toques.desde(E.fotoToques) : {}) });
+  E.fotoToques = null;
   // los cambios de kilos de los rivales salen en el recuadro desde el veredicto (sin espera aparte)
   const avisos = x.avisos.map(c => t('rival.cambia', { rival: quien(p.at[c.a]), kg: c.a_kg, de: c.de })).join(' · ');
   if (avisos) { sonido.aviso(); recuadro(avisos, p.at[x.avisos[0].a].id); }
@@ -813,34 +858,54 @@ async function llamadoPropio(p, L) {
   recuadro(null); etiqueta(null); zocalo(null);
 }
 
+/** Quién va primero ahora (índice), o null si nadie tiene marca todavía en lo que se compite (arranque o total). */
+function lider(p) { const f = p.tabla()[0]; return f && f.puesto === 1 ? f.a : null; }
 /**
- * Intento de un rival: resumido en el tablero (rápida) o entero (completa y decisivos). Entero se muestra desde que agarra
- * la barra, con la subida y la espera en los hombros más rápidas (RIVAL_RAPIDO), y Espacio lo lleva al final.
+ * Marcador siempre a la vista durante la final (pedido del dueño: «ver que estoy compitiendo contra alguien»): quién va
+ * ganando y cuántos kilos te faltan para pasarlo, o cuánta ventaja tienes. null lo esconde.
+ */
+function marcador(p) {
+  const el = $('marcador'); if (!el) return;
+  if (!p || p.fase === 'fin') { el.hidden = true; return; }
+  const tab = p.tabla(), lev = p.lev, yo = tab.find(f => f.a === E.yo), val = f => (lev === 's' ? f.s : f.total) || 0, L = tab[0];
+  if (!L || !val(L)) { el.hidden = true; return; }
+  let txt, sub = '', color = PLANTEL[p.at[L.a].id].color;
+  if (L.a === E.yo) { const seg = tab[1]; txt = t('marcador.ganas', { kg: val(L) - (seg ? val(seg) : 0) }); color = 'var(--teal)'; }
+  else if (yo && val(yo) === val(L)) txt = t('marcador.empate', { kg: val(L) });
+  else {
+    txt = t('marcador.gana', { rival: quien(p.at[L.a]) }); const C = p.cuenta(E.yo);
+    sub = lev === 'c' && !p.at[E.yo].mejor.s ? t('marcador.sin_total') : C.oro ? t('marcador.falta', { kg: C.oro }) : '';
+  }
+  el.hidden = false; el.style.setProperty('--c', color);
+  el.innerHTML = `<b>${esc(txt)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}`;
+}
+/** Cartel del turno de un rival (o null para sacarlo): con su color y su nombre; sin botón de levantar ni señal. */
+function turno(a) {
+  const el = $('turno'); document.documentElement.classList.toggle('turno-rival', !!a); if (!el) return;
+  if (!a) { el.hidden = true; return; }
+  el.hidden = false; el.style.setProperty('--c', PLANTEL[a.id].color);
+  el.innerHTML = `<i style="background:${PLANTEL[a.id].bandera}"></i><b>${esc(t('turno.rival', { rival: quien(a) }))}</b><span>${esc(t('turno.saltar', { tactil: tactil() }))}</span>`;
+}
+/**
+ * Intento de un rival, entero, como en la tele: desde poco antes de que agarre la barra, con la subida y la espera en los
+ * hombros más rápidas (RIVAL_RAPIDO), sus luces y, si falla o pasa adelante, una repetición corta. Un toque (o Espacio)
+ * lo saltea entero: lleva el intento al final, el veredicto dura lo justo y no hay repetición. Durante todo el turno se
+ * ve «Turno de X (rival)» con su color, y no hay botón de levantar ni señal de toque.
  */
 async function llamadoRival(p, L, cfg) {
-  const a = p.at[L.a], x = p.resolverIA(), decisivo = L.et.some(e => e === 'oro' || e === 'medalla'), entero = cfg.ritmo === 'completa' || decisivo;
+  void cfg;
+  const a = p.at[L.a], antes = lider(p), x = p.resolverIA(), pasa = x.res.res === 'valido' && antes !== L.a && lider(p) === L.a;
   setReloj(L.reloj); setLuces(null);
-  if (entero) {
-    visita('rival'); await escena.mostrar(a.id); escena.setCarga(L.kg, L.lev); escena.posar(poseParado(escena.P, L.lev), L.lev); escena.camara(camPrincipal()); zocalo(a, L); etiqueta(L.et);
-    // Espacio (una ráfaga nueva, pasados 400 ms) lleva al final del intento: el resultado ya está decidido
-    const ts = reloj.ahora(), oye = (t, v) => { if (!v) return; if (t - ts >= 400 && toques.rafaga(t) >= ts && E.intento) { toques.resolver(true, 'sigue'); E.intento.alFinal(); } else toques.resolver(false, 'espera'); };
-    boton.oye = oye;
-    const r = await correrIntento(x.ctx, { a, lev: L.lev, env: x.env, gestos: { conf: x.conf, ent: x.ent } });
-    if (boton.oye === oye) boton.oye = null;
-    await decision(a, L.lev, r.res, L.et, false, { fin: armarFinal(r, L.lev) });
-  } else {
-    visita('resumen'); const ok = x.res.res === 'valido', b = x.res.luces.filter(Boolean).length;
-    const pn = capa.poner(`<h2>${esc(t('llamado.titulo', { quien: quien(a), lev: t('lev.' + L.lev), n: L.n }))}</h2><div class="fila kgsel"><output>${L.kg}</output><span>kg</span><div class="luces" id="luces-r"><i></i><i></i><i></i></div><b id="res-r"></b></div>${tableroHTML(p, { yo: E.yo, sale: L.a, nombre: nombreJugador() })}<p>${t('rival.seguir', { tactil: tactil() })}</p>`);
-    const fin = saltable(2600); let listo = false; fin.then(() => { listo = true; });
-    for (let i = 0; i < 3 && !listo; i++) { await Promise.race([espera(300), fin]); if (listo || !pn.isConnected) break; pn.querySelector('#luces-r').children[i].className = x.res.luces[i] ? 'b' : 'r'; sonido.luz(x.res.luces[i]); }
-    if (pn.isConnected) {
-      [...pn.querySelector('#luces-r').children].forEach((el, i) => { el.className = x.res.luces[i] ? 'b' : 'r'; });
-      const vered = t(ok ? 'veredicto.vale' : x.res.res === 'nulo' ? 'veredicto.no_vale' : 'veredicto.cayo');
-      pn.querySelector('#res-r').textContent = x.res.causa ? t('rival.resultado', { veredicto: vered, causa: t('causa.' + x.res.causa), b }) : t('rival.resultado_sin_causa', { veredicto: vered, b });
-    }
-    await fin; capa.quitar();
-  }
-  etiqueta(null); zocalo(null);
+  visita('rival'); turno(a); await escena.mostrar(a.id); escena.setCarga(L.kg, L.lev); escena.posar(poseParado(escena.P, L.lev), L.lev); escena.camara(camPrincipal()); zocalo(a, L); etiqueta(L.et);
+  // un toque (una ráfaga nueva, pasados 400 ms) saltea el turno entero: el resultado ya está decidido
+  let salta = false; const ts = reloj.ahora(), oye = (tt, v) => { if (!v) return; if (tt - ts >= 400 && toques.rafaga(tt) >= ts && E.intento) { toques.resolver(true, 'sigue'); salta = true; E.intento.alFinal(); } else toques.resolver(false, 'espera'); };
+  boton.oye = oye;
+  const r = await correrIntento(x.ctx, { a, lev: L.lev, env: x.env, gestos: { conf: x.conf, ent: x.ent } });
+  if (boton.oye === oye) boton.oye = null;
+  await decision(a, L.lev, r.res, L.et, false, { fin: armarFinal(r, L.lev), corto: salta });
+  marcador(p);
+  if (!salta && (r.res.res !== 'valido' || pasa)) await repeticion(L.lev, r, pasa ? t('rival.pasa', { rival: quien(a) }) : '', { rival: true, titulo: t('rival.repeticion', { rival: quien(a) }) });
+  turno(null); etiqueta(null); zocalo(null);
 }
 
 /**
@@ -907,7 +972,7 @@ async function cierre(p) {
     const bloque = k => { const f = tab[k]; return f && f.total ? `<div class="p${k + 1}"><i style="background:${PLANTEL[f.id].bandera}"></i><b>${esc(corto(p.at[f.a]))}</b>${f.total} kg<br>${t('medalla.' + MED[k])}</div>` : `<div class="p${k + 1} vacio"><b>—</b>${t('podio.vacio')}</div>`; };
     const rec = []; for (const a of p.at) { const q = esc(quien(a)); if (a.mejor.s > R.s) rec.push(t('podio.record', { quien: q, lev: t('lev.s').toLowerCase(), kg: a.mejor.s })); if (a.mejor.c > R.c) rec.push(t('podio.record', { quien: q, lev: t('lev.c').toLowerCase(), kg: a.mejor.c })); if (a.mejor.s && a.mejor.c && a.mejor.s + a.mejor.c > R.t) rec.push(t('podio.record', { quien: q, lev: t('lev.t'), kg: a.mejor.s + a.mejor.c })); }
     const ms = mejor('s'), mc = mejor('c');
-    return `<h1>${t(puesto === 1 ? 'podio.oro' : puesto === 2 ? 'podio.plata' : puesto === 3 ? 'podio.bronce' : 'podio.sin_total', { nombre })}</h1><div class="podio">${bloque(1)}${bloque(0)}${bloque(2)}</div>${tableroHTML(p, { yo: E.yo, nombre: nombreJugador() })}
+    return `${idiomasHTML(true)}<h1>${t(puesto === 1 ? 'podio.oro' : puesto === 2 ? 'podio.plata' : puesto === 3 ? 'podio.bronce' : 'podio.sin_total', { nombre })}</h1><div class="podio">${bloque(1)}${bloque(0)}${bloque(2)}</div>${tableroHTML(p, { yo: E.yo, nombre: nombreJugador() })}
       <p>${t('podio.mejores', { a: ms.mejor.s ? `<b>${esc(quien(ms))} (${ms.mejor.s})</b>` : '—', c: mc.mejor.c ? `<b>${esc(quien(mc))} (${mc.mejor.c})</b>` : '—' })}</p>${rec.length ? `<p class="cuenta">${rec.join(' · ')}</p>` : ''}`;
   };
   capa.poner(arriba(), 'podio-panel'); sonido.ovacion(!!gano);
@@ -937,9 +1002,10 @@ async function mostrarMuro(origen, r = {}) {
 /** P4 · pedido del pase (ganchos.pedirPase). Si dice muro, P9; si después de él no puede jugar, null (vuelve a la bienvenida). */
 async function pedirPase(cfg, n, origen) {
   for (;;) {
-    let r = null; try { r = await ganchos.pedirPase({ n, pesista: TIPO[cfg.id], ctl: cfg.ctl, nivel: cfg.nivel, ritmo: cfg.ritmo }); } catch (e) { console.warn('ganchos.pedirPase:', e); r = { estado: 'ok', fuente: 'sin_servidor' }; }
+    let r = null; try { r = await ganchos.pedirPase({ n, pesista: TIPO[cfg.id], ctl: cfg.ctl, nivel: cfg.nivel, ritmo: cfg.ritmo, capa: $('capa') }); } catch (e) { console.warn('ganchos.pedirPase:', e); r = { estado: 'ok', fuente: 'sin_servidor' }; }
     r = r || { estado: 'ok', fuente: 'local' };
-    ev('partida_pedida', { resultado: r.estado === 'muro' ? 'muro' : r.fuente === 'sin_servidor' ? 'sin_servidor' : 'ok', fuente: r.fuente ?? null, motivo: r.motivo ?? null });
+    ev('partida_pedida', { resultado: r.estado === 'muro' ? 'muro' : r.estado === 'cancelado' ? 'error' : r.fuente === 'sin_servidor' ? 'sin_servidor' : 'ok', fuente: r.fuente ?? null, motivo: r.motivo ?? r.error ?? null });
+    if (r.estado === 'cancelado') return null;      // no hubo conexión y eligió volver al inicio
     if (r.estado !== 'muro') return r;
     visita('muro'); if (!await mostrarMuro(origen, r)) return null;
   }
@@ -951,7 +1017,7 @@ async function partida(cfg) {
   E.cfg = cfg; E.yo = IDS.indexOf(cfg.id); E.registro = null;
   const semilla = params.has('semilla') && !E.jugadas ? (+params.get('semilla') >>> 0) : (crypto.getRandomValues(new Uint32Array(1))[0] >>> 0);
   E.jugadas = (E.jugadas || 0) + 1;
-  let errMedio = null; cfg.cal = cfg.cal ?? (tactil() ? 40 : 0);
+  let errMedio = null; cfg.cal = cfg.cal ?? (tactil() ? CAL_TACTIL : 0);
   // Los dos modelos se terminan de cargar antes de jugar (venían bajando desde el inicio): leer un GLB, compilar sus shaders o
   // subir sus texturas en medio de un levantamiento es un tirón. Todo eso lo hace escena.precalentar() (arrancó en el inicio,
   // detrás del panel) y recién después se calibra la calidad.
@@ -964,14 +1030,14 @@ async function partida(cfg) {
   const n = (+guardado.get('tarima.jugadas') || 0) + 1, pase = await pedirPase(cfg, n, 'bienvenida');
   if (!pase) return 'inicio';
   E.pase = pase; E.finalN = pase.n ?? n; E.finalIniciada = false; E.tFinal0 = performance.now(); E.antes = null;
-  const p = E.p = new Partida(datos, { semilla, nivel: cfg.nivel, cal: cfg.cal, primera: cfg.primera, ctl: cfg.ctl, atletas: IDS.map((id, i) => ({ id, ctrl: i === E.yo ? 'persona' : 'juego' })) });
+  const p = E.p = new Partida(datos, { semilla, nivel: cfg.nivel, cal: cfg.cal, primera: cfg.primera, ctl: cfg.ctl, tactil: cfg.ctl === 'f' && tactil(), atletas: IDS.map((id, i) => ({ id, ctrl: i === E.yo ? 'persona' : 'juego' })) });
   await presentacion(p, cfg, errMedio, n === 1); p.empezar();
   while (p.fase !== 'fin') {
     if (p.fase === 'intervalo') { await intervalo(p); continue; }
-    const L = { ...p.llamado }, a = p.at[L.a];
+    const L = { ...p.llamado }, a = p.at[L.a]; marcador(p);
     if (a.ctrl === 'persona') { await carga(L.kg, L.lev); await llamadoPropio(p, L); } else await llamadoRival(p, L, cfg);
   }
-  E.registro = JSON.parse(JSON.stringify(p.reg));
+  marcador(null); E.registro = JSON.parse(JSON.stringify(p.reg));
   const rc = recalcular(E.registro, datos); if (!rc.ok || resumen(rc.tabla) !== resumen(p.tabla())) E.errores.push('el registro no recalcula a la misma tabla: ' + (rc.error || ''));
   return cierre(p);
 }
@@ -984,10 +1050,12 @@ function fallar(e, tipo = 'excepcion') {
 
 async function iniciar() {
   const refresco = medirRefresco();
-  pintarFijos();      // «Gira el teléfono» lo traduce telefono.js solo, mirando <html lang>, que fija fijarIdioma()
+  pintarFijos(); telefono.instalar({ t }); telefono.avisoInstalar();      // en el iPhone, una vez: cómo jugar a pantalla completa
   $('msg').textContent = t('carga.msg');
   alCambiarIdioma(() => { pintarFijos(); senalUI?.repintar(); if (E.sobre) pintarSobre(E.sobre.tipo); E.repintar?.(); });
-  ev('juego_abierto', { carga_ms: Math.round(performance.now()), pantalla_inicial: 'bienvenida' });
+  // P0: el estado del servidor (y la medición) en paralelo con los datos; el muro al cargar si corresponde
+  const origen = params.get('lang') ? 'url' : guardado.get('tarima.idioma') ? 'guardado' : 'navegador';
+  const arranque = conexion.arranque({ idioma: idiomaActual(), idioma_origen: origen, version: VERSION_JUEGO, pantalla: () => E.pantalla });
   const [poses, sim] = await Promise.all(['data/poses.json', 'data/sim.json'].map(u => fetch(u).then(r => { if (!r.ok) throw new Error(u + ': ' + r.status); return r.json(); })));
   datos = leerDatos(sim);
   await Promise.all([`800 20px 'Saira Condensed'`, `700 20px 'Saira Condensed'`, `500 20px 'Saira Condensed'`].map(f => document.fonts.load(f).catch(() => null)));
@@ -1002,11 +1070,18 @@ async function iniciar() {
   ayudas = new Ayudas($('ayudas')); senalUI = new Senal($('senal'), tactil()); boton = new Boton([$('escena'), $('zona')]);
   // «?» junto a la pausa: «Cómo se juega» con el dedo (con teclado es H)
   if (!$('ayudab')) { const ay = document.createElement('button'); ay.id = 'ayudab'; ay.hidden = true; ay.textContent = '?'; $('pausa').after(ay); ay.onclick = () => abrirSobre('ayuda'); pintarFijos(); }
+  // el selector ES · EN de cualquier panel (bienvenida, cómo se gana, kilos, llamado, intervalo, podio, muro, encuesta)
+  $('capa').addEventListener('click', e => { const b = e.target.closest?.('.idi'); if (b && b.dataset.lang) { cambiarIdioma(b.dataset.lang); $('capa').querySelector(`.idi[data-lang="${idiomaActual()}"]`)?.focus({ preventScroll: true }); } });
   addEventListener('keydown', alTeclado, true); $('pausa').onclick = () => abrirSobre('pausa'); $('saltar').onclick = () => E.saltar?.();
   ponerAcuse(); if (params.get('depura') === '1') depura = new Depura($('depura'), () => ({ perf: perf.ult, calidad: window.JUEGO.calidad, toques, pantalla: E.pantalla }));
   $('msg').hidden = true;
   ultimo = reloj.ahora(); requestAnimationFrame(bucle);
-  (async () => { let cfg = null; for (;;) { if (!cfg) cfg = await inicio(); const r = await partida(cfg); cfg = r === 'revancha' ? { ...cfg, calentar: false, primera: false } : null; } })().catch(e => fallar(e));
+  const A = await arranque;
+  ev('juego_abierto', { carga_ms: Math.round(performance.now()), pantalla_inicial: A.muro ? 'muro' : 'bienvenida' });
+  (async () => {
+    if (A.muro) { visita('muro'); await mostrarMuro('carga', A); }
+    let cfg = null; for (;;) { if (!cfg) cfg = await inicio(); const r = await partida(cfg); cfg = r === 'revancha' ? { ...cfg, calentar: false, primera: false } : null; }
+  })().catch(e => fallar(e));
 }
 
 // ---------- holguras de la escena del final (para la prueba) ----------
