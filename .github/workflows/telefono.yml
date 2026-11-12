@@ -1,0 +1,77 @@
+# Solo el teléfono, para iterar rápido: check_telefono (de costado en dos tamaños, mano izquierda, campos, dos dedos y el
+# aviso de girar en vertical) y la partida por toques de check_game. Lo mismo corre dentro de «Pruebas del juego».
+# Por software (SwiftShader): verifica lógica, toques y que nada quede cortado o tapado; no mide cuadros por segundo.
+name: Teléfono (táctil, de costado)
+
+on:
+  push:
+    branches: [mvp]
+    paths:
+      - 'web/js/game/telefono.js'
+      - 'web/js/game/input.js'
+      - 'web/css/juego.css'
+      - 'web/juego.html'
+      - 'tools/check_telefono.mjs'
+      - '.github/workflows/telefono.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  telefono:
+    name: Teléfono emulado con toques
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TARIMA_ANGLE: swiftshader
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Dependencias
+        run: npm ci
+      - name: Chrome
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || true)"
+          if [ -z "$CHROME" ]; then
+            wget -q -O "$RUNNER_TEMP/chrome.deb" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+            sudo apt-get update -q && sudo apt-get install -y -q "$RUNNER_TEMP/chrome.deb"
+            CHROME="$(command -v google-chrome)"
+          fi
+          "$CHROME" --version
+          echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
+          mkdir -p out/logs
+      - name: Teléfono de costado y en vertical (check_telefono)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 25
+        run: node tools/check_telefono.mjs 2>&1 | tee out/logs/check_telefono.log
+      - name: Partida por toques de costado (check_game --only=tactil)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 20
+        run: node tools/check_game.mjs --only=tactil 2>&1 | tee out/logs/check_game_tactil.log
+      - name: Resumen
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Teléfono (dibujo por software)"
+            for f in check_telefono check_game_tactil; do
+              echo; echo "**$f**"; echo '```'
+              if [ -f "out/logs/$f.log" ]; then tail -n 40 "out/logs/$f.log"; else echo "(no corrió)"; fi
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Capturas y registros como artefacto
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: pruebas-out
+          path: out/
+          if-no-files-found: warn
+          retention-days: 14
