@@ -1,13 +1,16 @@
 # Solo el teléfono, para iterar rápido: check_telefono (de costado en dos tamaños, mano izquierda, campos, dos dedos y el
-# aviso de girar en vertical) y la partida por toques de check_game. Lo mismo corre dentro de «Pruebas del juego».
+# aviso de girar en vertical), check_iphone (sonido, Opciones con el dedo y el aviso de pantalla completa) y la partida por toques de check_game. Lo mismo corre dentro de «Pruebas del juego».
 # Por software (SwiftShader): verifica lógica, toques y que nada quede cortado o tapado; no mide cuadros por segundo.
 name: Teléfono (táctil, de costado)
 
 on:
   push:
-    branches: [mvp]
+    branches: [mvp, telefono-pulido]
     paths:
       - 'web/js/game/telefono.js'
+      - 'web/js/game/audio.js'
+      - 'web/css/bienvenida.css'
+      - 'tools/check_iphone.mjs'
       - 'web/js/game/input.js'
       - 'web/css/juego.css'
       - 'web/juego.html'
@@ -53,6 +56,10 @@ jobs:
         if: ${{ !cancelled() }}
         timeout-minutes: 25
         run: node tools/check_telefono.mjs 2>&1 | tee out/logs/check_telefono.log
+      - name: iPhone acostado, Safari y Chrome de iOS (check_iphone)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 15
+        run: node tools/check_iphone.mjs 2>&1 | tee out/logs/check_iphone.log
       - name: Toques en tiempo real (check_toques)
         if: ${{ !cancelled() }}
         timeout-minutes: 10
@@ -66,7 +73,7 @@ jobs:
         run: |
           {
             echo "### Teléfono (dibujo por software)"
-            for f in check_telefono check_toques check_game_tactil; do
+            for f in check_telefono check_iphone check_toques check_game_tactil; do
               echo; echo "**$f**"; echo '```'
               if [ -f "out/logs/$f.log" ]; then tail -n 40 "out/logs/$f.log"; else echo "(no corrió)"; fi
               echo '```'

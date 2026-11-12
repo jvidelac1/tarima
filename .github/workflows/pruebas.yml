@@ -98,6 +98,14 @@ jobs:
         timeout-minutes: 25
         run: node tools/check_telefono.mjs 2>&1 | tee out/logs/check_telefono.log
 
+      # iPhone acostado con el agente de usuario de Safari y de Chrome de iOS: sonido desde el primer toque y con el parlante,
+      # Opciones y «Cómo se juega» desplazados con el dedo sin cortar botones, y el aviso de pantalla completa de cada
+      # navegador. Capturas en out/iphone.
+      - name: iPhone acostado (check_iphone)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 15
+        run: node tools/check_iphone.mjs 2>&1 | tee out/logs/check_iphone.log
+
       # Para mirar el juego sin abrir un navegador: una captura por panel, por señal y por toque, con un cuadro del 3D
       # dibujado por software antes de cada una. Las capturas atrasan los toques, así que este paso no decide el resultado.
       - name: Capturas con el 3D dibujado (no bloquea)
@@ -126,7 +134,7 @@ jobs:
         run: |
           {
             echo "### Pruebas del juego (dibujo por software: no mide cuadros por segundo)"
-            for f in sim_test play_human dedo_test perf_test caida_test check_escenas check_game check_toques check_telefono check_fluidez capturas check_recorrido check_recorrido_en; do
+            for f in sim_test play_human dedo_test perf_test caida_test check_escenas check_game check_toques check_telefono check_iphone check_fluidez capturas check_recorrido check_recorrido_en; do
               echo; echo "**$f**"; echo '```'
               if [ -f "out/logs/$f.log" ]; then tail -n 14 "out/logs/$f.log"; else echo "(no corrió)"; fi
               echo '```'
