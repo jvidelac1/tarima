@@ -1,5 +1,7 @@
 // Prueba automática del juego (docs/JUEGO.md, sección 9.7, y docs/CONTROLES.md, sección 8). El navegador sale de
 // tools/browser.mjs: placa real si la hay (pod con NVIDIA), software si no.
+// Por software (GitHub Actions, contenedor sin placa) verifica lo mismo: lógica, toques, paneles y tutorial; no mide cuadros
+// por segundo, y un intento a velocidad real que no sale válido queda como nota.
 //  - teclado (Fácil): partida completa SIN MOUSE con el reloj inyectado: menús con Tab, flechas y Enter; el tutorial (un
 //    arranque guiado); cada levantamiento con toques cortos de Espacio, mirando solo la señal que expone JUEGO.estado().
 //    Después, con el reloj verdadero: pausa (Esc), ayuda (H), el tutorial repetido y el primer intento de la final.
@@ -74,7 +76,7 @@ async function corrida(via) {
   if (!await J(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
   const gl = await J(() => { const g = JUEGO.escena.renderer.getContext(), e = g.getExtension('WEBGL_debug_renderer_info'); return e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : '?'; });
   console.log(`${tag} ${gl}`);
-  const vistas = new Set(), paneles = new Set(); let senalMal = 0, senalN = 0, clicProbado = false, escProbado = false;
+  const vistas = new Set(), paneles = new Set(), fotos = []; let senalMal = 0, senalN = 0, clicProbado = false, escProbado = false;
 
   /** Juega lo que haya en pantalla hasta que `hasta(estado)` sea cierto. `manual`: la prueba adelanta el reloj. */
   async function jugar(hasta, manual, o = {}) {
@@ -150,7 +152,14 @@ async function corrida(via) {
     }
     throw new Error('la prueba no avanza (pantalla ' + (await J(() => JUEGO.estado().pantalla)) + ')');
   }
-  const foto = nombre => page.screenshot({ path: path.join(OUT, `${via}_${nombre}.png`) }).catch(() => null);
+  // Sin --dibujo el juego no dibuja el 3D (?dibujo=0): antes de cada captura se fuerza un cuadro, para que la imagen sirva
+  // para mirar y para que el dibujo (sombreadores, texturas) se ejerza al menos una vez por corrida, también por software.
+  // Si ese cuadro falla, queda como error de consola y la prueba falla.
+  const foto = async nombre => {
+    if (!DIBUJO) { const t = Date.now(); await J(() => { try { window.JUEGO.escena?.cuadro?.(0, true); } catch (e) { console.error('cuadro forzado para la captura: ' + (e.stack || e)); } }).catch(() => null); fotos.push(Date.now() - t); }
+    return page.screenshot({ path: path.join(OUT, `${via}_${nombre}.png`) }).catch(() => null);
+  };
+  const cerrar = async () => { if (fotos.length) console.log(`${tag} capturas en out/game con un cuadro del 3D forzado: ${fotos.length} · ms por cuadro forzado: ${fotos.join(', ')}${isSoftware(gl) ? ' (por software: no es una medida de fluidez)' : ''}`); await ctx.close(); };
 
   await J(() => JUEGO.test.manual());
   const s0 = await J(() => JUEGO.estado());
@@ -168,7 +177,7 @@ async function corrida(via) {
     if (r.propios[0]?.res !== 'valido' || r.propios[0].ctl !== 'c') mal(`la práctica en Clásico no salió válida: ${JSON.stringify(r.propios[0])}`);
     if (!(r.alto.practica > 1.5)) mal(`en el calentamiento la barra no subió (máximo ${r.alto.practica?.toFixed(2)} m)`);
     for (const v of ['APRETÁ Y MANTENÉ', '¡SOLTÁ!', '¡APRETÁ!', 'DEJÁ APRETADO']) if (!vistas.has(v)) mal(`en Clásico no apareció la señal «${v}»`);
-    await foto('practica'); await ctx.close(); return;
+    await foto('practica'); await cerrar(); return;
   }
 
   if (lento) {
@@ -199,7 +208,7 @@ async function corrida(via) {
     console.log(`${tag} sin tocar después de confirmar: aviso «${aviso}» · ${ultimo ? `${ultimo.res}:${ultimo.causa} · «${ultimo.linea}»` : 'no terminó'}`);
     if (!aviso) mal('la señal no avisó que se acababa el reloj');
     if (!ultimo || ultimo.res !== 'nulo' || ultimo.causa !== 'reloj' || !/desde que confirmás/.test(ultimo.linea)) mal(`el nulo por reloj no salió con su línea: ${JSON.stringify(ultimo)}`);
-    await foto('reloj'); await ctx.close(); return;
+    await foto('reloj'); await cerrar(); return;
   }
 
   // ---- 1. Fácil: partida completa con el reloj inyectado, sin mouse
@@ -278,7 +287,7 @@ async function corrida(via) {
   if (real.propios[1]?.res !== 'valido') (isSoftware(gl) ? notas : problemas).push(`${tag} el primer intento de la final a velocidad real no salió válido: ${JSON.stringify(real.propios[1])}`);
   if (!tactil && !escProbado) mal('no se llegó a probar Esc dentro del intento');
   void fin;
-  await ctx.close();
+  await cerrar();
 }
 
 try {

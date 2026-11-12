@@ -4,7 +4,7 @@
 //                  swiftshader (WebGL por software) si la máquina no tiene GPU, vulkan si tiene una NVIDIA, y lo que elija
 //                  Chrome con otras GPU.
 // macOS conserva exactamente los flags de siempre. Linux sin GPU (pod, contenedor, CI) dibuja con SwiftShader: sirve para
-// lógica, consola, 404 y capturas; los fps no dicen nada del visor (ver isSoftware).
+// lógica, consola, 404 y capturas; los fps no dicen nada del visor ni del juego (ver isSoftware y rendererWebGL).
 import fs from 'node:fs';
 
 const CANDIDATES = {
@@ -38,3 +38,16 @@ export function launchOptions({ headed = false } = {}) {
 }
 // ¿El contexto WebGL salió por software? Se decide con el nombre real del renderizador (UNMASKED_RENDERER_WEBGL), no con los flags.
 export const isSoftware = renderer => /swiftshader|llvmpipe|softpipe|software/i.test(renderer || '');
+/**
+ * Nombre real del renderizador de WebGL de un navegador ya abierto, preguntado en una página en blanco: sirve para saber
+ * ANTES de cargar el juego si se dibuja por software (runner de CI, contenedor sin placa). '' si no hay WebGL.
+ */
+export async function rendererWebGL(browser) {
+  const page = await browser.newPage();
+  try {
+    return await page.evaluate(() => {
+      const c = document.createElement('canvas'), g = c.getContext('webgl2') || c.getContext('webgl'); if (!g) return '';
+      const e = g.getExtension('WEBGL_debug_renderer_info'); return String(e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : g.getParameter(g.RENDERER));
+    });
+  } catch { return ''; } finally { await page.close().catch(() => null); }
+}

@@ -16,18 +16,25 @@
 //   --gobernador  prueba del gobernador de calidad con ese lastre: arranca con 18 ms por megapíxel (la calibración tiene que
 //               bajar la calidad antes del primer intento) y en medio del primer intento lo sube a 40 (la calidad NO puede
 //               cambiar hasta que el intento termine, y después tiene que bajar).
+// MODO LÓGICA. Si el navegador dibuja por software (GitHub Actions, contenedor sin placa; ver tools/browser.mjs) los cuadros
+// por segundo no dicen nada del juego. Ahí la prueba carga el juego sin dibujar el 3D (?dibujo=0), corre solo sin
+// estrangular el procesador (salvo que se pida --cpu) y NO exige ni informa como medida los cuadros dibujados: verifica
+// toques (registro, motivo y acuse), errores de consola y el tutorial. La calibración y el gobernador de calidad no actúan
+// sin dibujo, así que tampoco se prueban ahí (--gobernador pide una placa).
+// Con --capturas, en ese modo se fuerza un cuadro del 3D antes de cada captura para que la imagen sirva para mirar.
+//   --logica   fuerza el modo lógica aunque haya placa.   --dibujar   lo impide aunque el dibujo sea por software.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { launchOptions, isSoftware } from './browser.mjs';
+import { launchOptions, isSoftware, rendererWebGL } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
-const CPUS = (arg('cpu') || '1,4,6').split(',').map(Number), Q = arg('q') || '', SEMILLA = +(arg('semilla') || 20261112), ANCHO = +(arg('ancho') || 1920), ALTO = +(arg('alto') || 930);
+const Q = arg('q') || '', SEMILLA = +(arg('semilla') || 20261112), ANCHO = +(arg('ancho') || 1920), ALTO = +(arg('alto') || 930);
 const CAPT = arg('capturas') || '', DEPURA = process.argv.includes('--depura');
 if (CAPT) fs.mkdirSync(CAPT, { recursive: true });
 const GOB = process.argv.includes('--gobernador');
@@ -41,6 +48,14 @@ const server = http.createServer((req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/`;
 const browser = await chromium.launch(launchOptions());
+// ¿se dibuja por software? Se pregunta antes de cargar el juego, porque en modo lógica el juego se abre sin dibujar el 3D.
+const GL0 = await rendererWebGL(browser);
+const LOGICA = process.argv.includes('--logica') || (isSoftware(GL0) && !process.argv.includes('--dibujar'));
+const CPUS = (arg('cpu') || (LOGICA ? '1' : '1,4,6')).split(',').map(Number);
+if (LOGICA && GOB) { console.log('--gobernador necesita dibujar con una placa: por software (modo lógica) no se puede probar'); await browser.close(); server.close(); process.exit(2); }
+if (LOGICA) console.log(`MODO LÓGICA (${GL0 || 'sin WebGL'}): el 3D no se dibuja, no se miden cuadros por segundo ni actúa el gobernador de calidad, y el procesador se prueba a ${CPUS.join(', ')}x. Se verifican toques, consola y tutorial.`);
+/** En modo lógica el juego no dibuja: un cuadro del 3D a pedido, para las capturas. Si falla queda como error de consola. */
+const cuadro3d = page => page.evaluate(() => { try { window.JUEGO.escena?.cuadro?.(0, true); } catch (e) { console.error('cuadro forzado para la captura: ' + (e.stack || e)); } }).catch(() => null);
 const dormir = ms => new Promise(r => setTimeout(r, ms));
 const problemas = [], informe = [];
 
@@ -135,7 +150,7 @@ async function abrir(ctx, cpu, guardado, extra = '') {
   page.on('console', m => { if (m.type() === 'error') errs.push('console.error: ' + m.text()); });
   page.on('pageerror', e => errs.push('pageerror: ' + e.message));
   if (guardado) await page.addInitScript(g => { try { if (!sessionStorage.getItem('__flu')) { for (const [k, v] of Object.entries(g)) localStorage.setItem(k, v); sessionStorage.setItem('__flu', '1'); } } catch { /* sin almacenamiento */ } }, guardado);
-  await page.goto(`${base}juego.html?semilla=${SEMILLA}${Q ? '&q=' + Q : ''}${LASTRE ? '&lastre=' + LASTRE : ''}${DEPURA ? '&depura=1' : ''}${extra}`, { waitUntil: 'load' });
+  await page.goto(`${base}juego.html?semilla=${SEMILLA}${Q ? '&q=' + Q : ''}${LASTRE ? '&lastre=' + LASTRE : ''}${DEPURA ? '&depura=1' : ''}${LOGICA ? '&dibujo=0' : ''}${extra}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 180000 });
   if (!await page.evaluate(() => window.JUEGO.listo)) throw new Error('el juego no inició');
   const cdp = await ctx.newCDPSession(page);
@@ -150,7 +165,7 @@ const toque = async page => { await page.keyboard.down('Space'); await dormir(35
 /** Juega lo que haya hasta que `hasta(r)` sea cierto. Devuelve cuántos Espacio mandó. */
 async function jugar(page, hasta, { minutos = 8, eti = '' } = {}) {
   let firma = '', tFirma = 0, ultSalto = 0, enviados = 0, nCapt = 0; const t0 = Date.now(), bit = [], vistas = new Set();
-  const foto = async nombre => { if (CAPT && !vistas.has(nombre) && nCapt < 60) { vistas.add(nombre); await page.screenshot({ path: path.join(CAPT, `${eti}${String(++nCapt).padStart(2, '0')}_${nombre.replace(/[^a-z0-9áéíóúñ]+/gi, '_').slice(0, 40)}.jpg`), type: 'jpeg', quality: 70 }).catch(() => null); } };
+  const foto = async nombre => { if (CAPT && !vistas.has(nombre) && nCapt < 60) { vistas.add(nombre); if (LOGICA) await cuadro3d(page); await page.screenshot({ path: path.join(CAPT, `${eti}${String(++nCapt).padStart(2, '0')}_${nombre.replace(/[^a-z0-9áéíóúñ]+/gi, '_').slice(0, 40)}.jpg`), type: 'jpeg', quality: 70 }).catch(() => null); } };
   for (;;) {
     if (Date.now() - t0 > minutos * 60000) throw new Error(`la partida no avanza (${minutos} min): ${bit.slice(-4).join(' / ')}`);
     const r = await page.evaluate(() => window.__flu.espera(120));
@@ -173,7 +188,8 @@ async function medir(cpu, gob = false) {
   const tag = gob ? '[gobernador]' : `[cpu ${cpu}x]`, ctx = await browser.newContext({ viewport: { width: ANCHO, height: ALTO }, deviceScaleFactor: 1 });
   const { page, errs } = await abrir(ctx, cpu, { 'tarima.tutorial': '1', 'tarima.pesista': 'brenner', 'tarima.jugadas': '1' });
   const info = await page.evaluate(() => { const e = JUEGO.escena, g = e.renderer.getContext(), x = g.getExtension('WEBGL_debug_renderer_info'); return { gl: x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : '?', calidad: (JUEGO.calidad ? JUEGO.calidad.nombre : e.Q.label), lienzo: `${g.drawingBufferWidth}x${g.drawingBufferHeight}`, ventana: `${innerWidth}x${innerHeight}`, toques: !!JUEGO.toques }; });
-  console.log(`${tag} ${info.gl} · calidad ${info.calidad} · lienzo ${info.lienzo} (ventana ${info.ventana})${isSoftware(info.gl) ? ' · POR SOFTWARE: los tiempos no dicen nada' : ''}`);
+  console.log(`${tag} ${info.gl} · calidad ${info.calidad} · lienzo ${info.lienzo} (ventana ${info.ventana})${LOGICA ? ' · MODO LÓGICA: sin dibujo, los cuadros no se miden' : isSoftware(info.gl) ? ' · POR SOFTWARE: los tiempos no dicen nada' : ''}`);
+  info.logica = LOGICA;
   const c0 = await control(page, 3000);
   await poner(page, { seed: SEMILLA + cpu, reac: 450, lag: 30, sd: 45, per: 170, jit: 25, fuera: !gob, doble: cpu === 1 && !gob, gob: gob ? 40 : 0 });
   await dormir(500);
@@ -185,7 +201,9 @@ async function medir(cpu, gob = false) {
   console.log(`${tag} control sin dibujar (ruido de la máquina de la prueba): al empezar ${c0.n} cuadros, p50 ${c0.p50} ms, >33 ms: ${c0.mas33} · al terminar ${c1.n} cuadros, p50 ${c1.p50} ms, >33 ms: ${c1.mas33}`);
   const out = await page.evaluate(() => { __flu.activo = false; return { lastreT: __flu.lastreT || 0, intentos: __flu.intentos.map(x => { const { I, ...r } = x; return r; }), teclas: __flu.teclas, largas: __flu.largas, fuera: __flu.fuera, cierres: __flu.cierres, propios: JUEGO.E.propios || [], errores: JUEGO.E.errores, perf: JUEGO.perf.resumen(), calidad: JUEGO.calidad ? { nombre: JUEGO.calidad.nombre, cambios: JUEGO.calidad.cambios } : null, toques: JUEGO.toques ? { total: JUEGO.toques.total } : null }; });
   const R = out.intentos.map(resumenIntento), fila = { cpu, info, control: [c0, c1], intentos: R, enviados, recibidos: out.teclas.length, calidad: out.calidad, perf: out.perf };
+  if (LOGICA) for (const x of R) { for (const k of ['ofrecidos', 'dibujados', 'pct', 'p50', 'p95', 'p99', 'max', 'mas33', 'mas50', 'lentos']) delete x[k]; x.cuadros = 'sin medir (modo lógica)'; }
   for (const x of R) {
+    if (LOGICA) { console.log(`${tag} ${x.pantalla} ${x.lev === 's' ? 'arranque' : 'dos tiempos'} ${x.seg} s → ${x.res || 'sin resultado'} · cuadros dibujados: sin medir (modo lógica)`); continue; }
     console.log(`${tag} ${x.pantalla} ${x.lev === 's' ? 'arranque' : 'dos tiempos'} ${x.seg} s → ${x.res || 'sin resultado'} · ofrecidos ${x.ofrecidos} · dibujados ${x.dibujados} (${x.pct} %) · entre cuadros p50 ${x.p50} p95 ${x.p95} p99 ${x.p99} máx ${x.max} ms · >33 ms: ${x.mas33} · >50 ms: ${x.mas50}`);
     if (x.lentos.length) console.log(`${tag}    cuadros largos: ${x.lentos.slice(0, 8).map(l => `${l.ms} ms a ${l.a} (${l.fase}/${l.senal})`).join(' · ')}`);
     if (gob) continue;
@@ -281,8 +299,9 @@ try {
   if (TUTORIAL || SOLO_TUT) await tutorial();
 } catch (e) { problemas.push('EXCEPCIÓN: ' + (e.stack || e.message)); }
 await browser.close(); server.close();
-if (arg('json')) fs.writeFileSync(arg('json'), JSON.stringify(informe, null, 1));
+if (arg('json')) { fs.mkdirSync(path.dirname(path.resolve(arg('json'))), { recursive: true }); fs.writeFileSync(arg('json'), JSON.stringify(informe, null, 1)); }
 if (problemas.length) { console.log(`\nFALLA (${problemas.length}):`); for (const p of problemas) console.log(' - ' + p); process.exit(1); }
 console.log(GOB ? '\nOK: la calibración bajó la calidad antes del primer intento, nada cambió con un intento en curso y el gobernador bajó al terminar'
   : SOLO_TUT ? '\nOK: el tutorial es un solo levantamiento, dura menos de un minuto, se saltea con Esc y no vuelve al recargar'
-    : '\nOK: en cada intento se dibujó al menos el ' + UMBRAL + ' % de los cuadros ofrecidos y ningún toque se perdió sin motivo');
+    : LOGICA ? '\nOK (modo lógica, sin dibujo: los cuadros por segundo NO se midieron): ningún toque se perdió sin motivo ni sin acuse' + (TUTORIAL ? '; el tutorial es un solo levantamiento, dura menos de un minuto, se saltea con Esc y no vuelve al recargar' : '')
+      : '\nOK: en cada intento se dibujó al menos el ' + UMBRAL + ' % de los cuadros ofrecidos y ningún toque se perdió sin motivo');

@@ -1,0 +1,96 @@
+# Pruebas del juego en cada push a `demo` (y a pedido). El runner no tiene placa: Chrome dibuja con SwiftShader (por
+# software), así que acá se verifica lógica, toques, paneles y tutorial. Los cuadros por segundo NO se miden en este flujo:
+# eso se mide en una máquina con placa (`juego.html?banco=1`, o `node tools/check_fluidez.mjs` con GPU).
+# Cómo se dispara y cómo se leen los resultados: README, sección «Pruebas en GitHub Actions».
+name: Pruebas del juego
+
+on:
+  push:
+    branches: [demo]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  pruebas:
+    name: Núcleo, partida completa y toques (dibujo por software)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TARIMA_ANGLE: swiftshader      # WebGL por software, pedido de forma explícita (tools/browser.mjs)
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Dependencias (playwright-core; three y los modelos ya están en el repo)
+        run: npm ci
+
+      - name: Chrome
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || true)"
+          if [ -z "$CHROME" ]; then
+            wget -q -O "$RUNNER_TEMP/chrome.deb" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+            sudo apt-get update -q && sudo apt-get install -y -q "$RUNNER_TEMP/chrome.deb"
+            CHROME="$(command -v google-chrome)"
+          fi
+          "$CHROME" --version
+          echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
+          mkdir -p out/logs
+          { echo "commit $GITHUB_SHA"; "$CHROME" --version; node --version; nproc; } > out/logs/entorno.txt
+
+      # Cada prueba corre aunque haya fallado la anterior: un push da el estado de las cuatro.
+      - name: Núcleo determinista (sim_test)
+        if: ${{ !cancelled() }}
+        run: node tools/sim_test.mjs 2>&1 | tee out/logs/sim_test.log
+
+      - name: Jugador humano simulado (play_human)
+        if: ${{ !cancelled() }}
+        run: node tools/play_human.mjs 2>&1 | tee out/logs/play_human.log
+
+      - name: Partida completa por teclado y por toques (check_game)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 25
+        run: node tools/check_game.mjs 2>&1 | tee out/logs/check_game.log
+
+      - name: Toques y tutorial en tiempo real (check_fluidez, modo lógica)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 20
+        run: node tools/check_fluidez.mjs --tutorial --json=out/fluidez/fluidez.json 2>&1 | tee out/logs/check_fluidez.log
+
+      # Para mirar el juego sin abrir un navegador: una captura por panel, por señal y por toque, con un cuadro del 3D
+      # dibujado por software antes de cada una. Las capturas atrasan los toques, así que este paso no decide el resultado.
+      - name: Capturas con el 3D dibujado (no bloquea)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        timeout-minutes: 15
+        run: node tools/check_fluidez.mjs --tutorial --capturas=out/capturas --json=out/capturas/fluidez.json 2>&1 | tee out/logs/capturas.log
+
+      - name: Resumen
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Pruebas del juego (dibujo por software: no mide cuadros por segundo)"
+            for f in sim_test play_human check_game check_fluidez capturas; do
+              echo; echo "**$f**"; echo '```'
+              if [ -f "out/logs/$f.log" ]; then tail -n 12 "out/logs/$f.log"; else echo "(no corrió)"; fi
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Capturas, JSON y registros como artefacto
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: pruebas-out
+          path: out/
+          if-no-files-found: warn
+          retention-days: 14
