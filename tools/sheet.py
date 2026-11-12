@@ -15,7 +15,8 @@ Uso:
       [--skip A2]           versiones que no van a la hoja (repeticiones para medir determinismo)
       [--planos P01-P16]    rango o lista (P01,P03,P07-P09)
       [--cell 800]          ancho de celda en píxeles
-      [--label B="malla generada, estática"]   texto extra del encabezado de una columna (se puede repetir)
+      [--label B="malla generada, estática"]   texto extra del encabezado de una columna (se puede repetir); con el nombre
+                            de una imagen objetivo sin extensión (--label T_B_s1="realismo estilizado") va a su rótulo
   .venv/bin/python tools/sheet.py --shots out/arte/shots --ciega 7 --tags A,B,B2 --planos P01-P04 --out out/arte/ciega.png
       hoja A CIEGAS para revisores, solo en arcilla: en cada plano las versiones van en orden mezclado (distinto en cada
       fila, fijo para la misma semilla) y rotuladas con letras (X, Y, Z; con más versiones se suman W y V), sin encabezado
@@ -181,7 +182,8 @@ def hoja(sets, tags, planos, meta, runs, targets, out, cell, labels, clay, ciega
         for i, t in enumerate(targets):
             x, y = gap + i * (tw + gap), gap * 2 + f2.size
             im.paste(fit(Image.open(t), tw, th), (x, y))
-            rotulo(d, (x, y), f'objetivo {i + 1} · {os.path.basename(t)}', f2)
+            stem = re.sub(r'\.\w+$', '', os.path.basename(t))
+            rotulo(d, (x, y), ' · '.join(s for s in (f'objetivo {i + 1}', os.path.basename(t), labels.get(stem)) if s), f2)
     for j, t in enumerate(tags):
         x = left + j * (cw + gap)
         d.text((x, top + gap), (f'Opción {t}' if ciega else f'Versión {t}') + (' · arcilla' if clay else ''), font=f3, fill=INK)
