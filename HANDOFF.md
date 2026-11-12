@@ -284,13 +284,14 @@ El usuario jugó el rediseño en su Mac (M1 Pro, Chrome, pantalla de 75 Hz) y di
 - **Tutorial**: un arranque guiado, sin panel ni prácticas; Esc o el botón «Saltear tutorial ESC» lo cortan; se anota al salir del inicio. El dos tiempos se explica en su primer llamado de la final, con una parada en los hombros (`docs/CONTROLES.md`, sección 6).
 - **Pendientes de la verificación anterior que se cerraron:** la línea de fallo dice temprano o tarde y cuánto (`codos_blandos`, `temblor`) y distingue «tocaste tarde» de «no tocaste»; la palabra de cada toque lleva su verbo («¡EXPLOTÁ! PERFECTO»); «ENVIÓN: TIJERA» ya no va sobre el pesista en Fácil; el panel del llamado en Fácil deja a la vista kilos, entrenador, cuenta y reloj (atajos de kilos, envión y cambios en «Más opciones») y va al costado derecho, sin tapar al pesista; «Techo» pasó a «Tope» y la ayuda (H) explica Tope, Resto, «jueces 2 a 1» y apertura; el inicio entra en 1280 × 720 (Rivales y Final en una fila).
 
-**Medido después** (mismo script, commit 7c98bb9, mismo pod):
+**Medido después** (mismo script, commits 7c98bb9 y 4957963, mismo pod; dos corridas completas):
 
 | | Antes (6e23160, Media) | Después (Baja, automática) |
 |---|---|---|
 | Cuadros dibujados sobre ofrecidos, en el intento, 1x · 1/4 · 1/6 | 100 % · 100 % · 100 % | 100 % · 100 % · 100 % (entre 356 y 621 cuadros por intento) |
 | Cuadros por segundo fuera del intento (registrador, `decision`) | 30 (tope) | 60 |
-| Tareas de más de 50 ms dentro de un intento, 1x · 1/4 · 1/6 | 0 · 0 · 1 (65 ms); otra corrida a 1x con `?q=baja`, 1 de 82 ms | 0 · 0 · 1 (52 ms) |
+| Tareas de más de 50 ms dentro de un intento, 1x · 1/4 · 1/6 | 0 · 0 · 1 (65 ms); otra corrida a 1x con `?q=baja`, 1 de 82 ms | 0 · 0 · 1 (52 ms) en una corrida; 0 · 0 · 8 (la peor, 124 ms) en la otra |
+| Cuadros de más de 33 ms por intento, 1x y 1/4 | 0 a 4 a 1x; 0 a 28 a 1/4 | 0 en los ocho intentos de la última corrida; 0 a 31 en la anterior (ruido del pod, ver abajo) |
 | Toques del intento descartados sin motivo | 13 a 17 de 56 a 59 | 0 (13 a 16 descartados, todos con motivo y acuse: espera 4, rebote 0 a 4, sobra 8 a 10) |
 | Toques fuera del intento sin registro | 26 | 0 (26: 14 aceptados, que saltean el resumen, el veredicto o la repetición, y 12 «esperá» en el veredicto) |
 | Levantamientos antes de jugar la primera vez | 3 | 1 (14 s de «Empezar» a la presentación con un jugador que toca a los 450 ms; 11,2 s en `check_game`) |
@@ -298,6 +299,7 @@ El usuario jugó el rediseño en su Mac (M1 Pro, Chrome, pantalla de 75 Hz) y di
 | Círculo desde que aparece hasta que cierra | — | ¡EXPLOTÁ! 0,78 a 0,84 s · ¡RECIBÍ! 0,68 a 0,75 s · ¡ARRIBA! 0,58 a 0,60 s · ¡RECIBÍ! de arriba 0,60 a 0,62 s |
 
 - **Gobernador** (`--gobernador`, con una espera artificial por megapíxel dibujado): con 18 ms/MP la calibración bajó de Baja a Baja 80 % antes del primer intento (midió 33,3 ms por cuadro); con 40 ms/MP desde la mitad del primer intento la calidad no se tocó hasta que terminó, y después bajó tres escalones (al final del intento, en la carga y al final del siguiente). En la corrida a 1/6, sin lastre, bajó solo una vez, al terminar el dos tiempos (21,6 ms por cuadro).
+- **A 1/6 de procesador el juego no sostiene 60:** el cuadro cuesta unos 3,4 ms de hilo principal, que por seis son 20 ms. Se dibuja el 100 % de lo que se ofrece, pero se ofrecen menos: en la última corrida el primer intento fue a 33 ms de mediana de punta a punta (241 cuadros en 7 s, ocho tareas largas), el gobernador bajó a Baja 80 % al terminarlo y a Móvil en la carga siguiente, y los dos intentos de después dieron 0 y 11 cuadros largos. A 1/4 no pasa. El costo es de three.js (recorrido y llamadas de dibujo), no de la lógica; no se tocó.
 - **Lo que no se movió:** en el pod la cuenta de cuadros del intento ya daba 100 % antes; lo que cambia ahí es el dibujo fuera del intento, las tareas largas y los toques. La mejora que le importa al usuario (Media a Baja en su placa) no se ve en una 4090.
 - **Ruido del pod.** Entre cuadros hay rachas de 33 ms (un refresco perdido) que no dependen del juego: una página con un solo `clear` de WebGL perdió 1 cuadro en 20 s en una corrida y 38 en otra (36 en 6 s seguidos); el juego en Media sin estrangular perdió 0, 0, 0 y 1, y en Baja 4, 0, 31 y 20 en otra corrida de la misma noche. Había otro equipo usando la máquina (carga media 4 a 14). Por eso la prueba tiene como umbral los cuadros dibujados sobre ofrecidos y las tareas largas, y no el percentil 99.
 - `tools/sim_test.mjs` y `tools/play_human.mjs` en verde sin tocar `tools/sim_ref.json`; `tools/check_game.mjs` en verde con el tutorial nuevo (ahora juega en tiempo real el guiado y el primer intento de la final).
