@@ -50,14 +50,14 @@ SEM = {'rest_bust': 2100, 'fin_bust': 2200, 'fin_full': 2300}
 NVISTA = {'front': 1, 'left': 2, 'back': 3, 'right': 4}
 DENOISE = 1.0     # --denoise: menos de 1 parte del render crudo con ruido (conserva más la silueta y cambia menos la forma)
 
-V_IND = 4      # versión de las indicaciones (queda anotada en cada intento); v3 = v2 sin nombrar el cinturón en el busto; v4 = tatuaje por vista y sin estrías
+V_IND = 5      # versión de las indicaciones (queda anotada en cada intento); v3 = v2 sin nombrar el cinturón en el busto; v4 = tatuaje por vista y sin estrías; v5 = la malla de cuerpo entero con piernas (salía como slip)
 QUIEN = ('the same fictional adult male weightlifter with accurate, clearly readable muscle anatomy of an elite 81 kg class '
          'weightlifter, lean and athletic, not a bodybuilder')
 NO_ENSANCHAR = 'Do not make the arms, shoulders, neck, torso or legs wider or thicker than they are, and do not move the hands.'
 ROPA = {'bust': 'the same red sleeveless one-piece weightlifting singlet with off-white trim, with the same cut as now, completely '
                 'plain: no text, no lettering',       # sin nombrar el cinturón: «no belt» en la indicación hizo aparecer una banda en la cintura (va en la negativa)
-        'full': 'the same red sleeveless one-piece weightlifting singlet with off-white trim, with the same cut as now, completely '
-                'plain: no text, no lettering; keep the brown leather belt, the dark blue knee sleeves, the white socks and the white '
+        'full': 'the same red sleeveless one-piece weightlifting singlet with off-white trim, with the same cut as now and with its '
+                'legs covering the thighs down to just above the knee sleeves, completely plain: no text, no lettering; keep the brown leather belt, the dark blue knee sleeves, the white socks and the white '
                 'shoes exactly as they are'}
 # Solo lo que se ve desde cada vista y en cada pose (rest = brazos abiertos hacia abajo, fin = brazos arriba).
 ANAT = {
