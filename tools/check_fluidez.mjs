@@ -191,7 +191,7 @@ async function medir(cpu, gob = false) {
   console.log(`${tag} ${info.gl} · calidad ${info.calidad} · lienzo ${info.lienzo} (ventana ${info.ventana})${LOGICA ? ' · MODO LÓGICA: sin dibujo, los cuadros no se miden' : isSoftware(info.gl) ? ' · POR SOFTWARE: los tiempos no dicen nada' : ''}`);
   info.logica = LOGICA;
   const c0 = await control(page, 3000);
-  await poner(page, { seed: SEMILLA + cpu, reac: 450, lag: 30, sd: 45, per: 170, jit: 25, fuera: !gob, doble: cpu === 1 && !gob, gob: gob ? 40 : 0 });
+  await poner(page, { seed: SEMILLA + cpu, reac: 450, lag: 30, sd: 45, per: 170, jit: 25, fuera: !gob, doble: cpu === 1 && !gob && !CAPT, gob: gob ? 40 : 0 });      // con capturas no hay toque doble: la foto estira el primero y el segundo ya no cae como rebote
   await dormir(500);
   // hasta el veredicto del primer dos tiempos propio (en la prueba del gobernador, hasta terminar el segundo intento propio)
   let visto = false; const { enviados, bit } = await jugar(page, r => { if (r.propio && (gob ? r.propios >= 1 : r.lev === 'c')) visto = true; return visto && !r.propio && r.pantalla !== 'intento' && r.pantalla !== 'decision'; }, { eti: `cpu${cpu}_` });

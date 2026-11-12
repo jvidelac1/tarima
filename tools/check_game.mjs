@@ -159,7 +159,7 @@ async function corrida(via) {
     if (!DIBUJO) { const t = Date.now(); await J(() => { try { window.JUEGO.escena?.cuadro?.(0, true); } catch (e) { console.error('cuadro forzado para la captura: ' + (e.stack || e)); } }).catch(() => null); fotos.push(Date.now() - t); }
     return page.screenshot({ path: path.join(OUT, `${via}_${nombre}.png`) }).catch(() => null);
   };
-  const cerrar = async () => { if (fotos.length) console.log(`${tag} capturas en out/game con un cuadro del 3D forzado: ${fotos.length} · ms por cuadro forzado: ${fotos.join(', ')}${isSoftware(gl) ? ' (por software: no es una medida de fluidez)' : ''}`); await ctx.close(); };
+  const cerrar = async () => { if (fotos.length) console.log(`${tag} capturas en out/game con un cuadro del 3D forzado: ${fotos.length} · ms de JavaScript de cada uno (el primero compila sombreadores; no es una medida de fluidez): ${fotos.join(', ')}`); await ctx.close(); };
 
   await J(() => JUEGO.test.manual());
   const s0 = await J(() => JUEGO.estado());

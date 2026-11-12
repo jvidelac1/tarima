@@ -71,6 +71,34 @@ Medido el 11 de noviembre de 2026. Con GPU, 0 cuadros con superposición en los 
 - **Núcleos en contenedores.** Algunos pods limitan la CPU por cuota y `nproc` muestra todos los núcleos del anfitrión. El build lee la cuota de `/sys/fs/cgroup/cpu.max`; igual conviene fijar `TARIMA_THREADS`.
 - **Prueba del visor por software.** Tarda mucho más y no exige fps, tiempos ni desenfoque de movimiento. Por defecto captura las páginas de escritorio a media densidad de píxeles; `TARIMA_SOFT_DPR=1` las deja a tamaño completo y tarda más del doble.
 
+### Pruebas en GitHub Actions
+
+`.github/workflows/pruebas.yml` corre en cada push a `demo` (y a pedido) en `ubuntu-latest`, con Node 22 y el Chrome del runner. No usa Blender ni build: los modelos y three están en el repo. Pasos: `tools/sim_test.mjs`, `tools/play_human.mjs`, `tools/check_game.mjs` y `tools/check_fluidez.mjs --tutorial`. Tarda unos 12 minutos.
+
+**El runner no tiene placa: Chrome dibuja por software (SwiftShader) y ahí no se miden cuadros por segundo.** Verifica núcleo, partida completa por teclado y por toques, registro y acuse de cada toque, paneles, consola y tutorial. La fluidez se mide solo en una máquina con placa.
+
+```bash
+gh run list -R jvidelac1/tarima --branch demo --limit 3              # últimas corridas: estado, commit e id
+gh run watch <id> -R jvidelac1/tarima --exit-status                  # esperar a que termine (sale con error si falló)
+gh run view <id> -R jvidelac1/tarima                                 # los pasos, y cuál falló
+gh run view <id> -R jvidelac1/tarima --log-failed                    # la salida del paso que falló
+gh run download <id> -R jvidelac1/tarima -n pruebas-out -D out_ci    # capturas, JSON y registros de la corrida
+gh workflow run pruebas.yml -R jvidelac1/tarima --ref demo           # a pedido, sobre la punta de demo
+gh run rerun <id> -R jvidelac1/tarima                                # repetir una corrida sobre el mismo commit
+```
+
+Lo que trae el artefacto `pruebas-out` (14 días):
+
+- `logs/*.log`: la salida completa de cada prueba (lo mismo que el log del run). La última línea dice `OK`; si no, hay un bloque `FALLÓ` o `FALLA` con la lista de problemas.
+- `game/*.png`: capturas de `check_game` (fin de la partida, ayuda, presentación, primer intento a velocidad real, Clásico, reloj).
+- `fluidez/fluidez.json`: toques enviados, recibidos, aceptados y descartados con su motivo, y el tutorial. En este modo los cuadros figuran como «sin medir».
+- `capturas/*.jpg`: una captura por panel, por señal y por toque, con el 3D dibujado. Es para mirar el juego sin abrir un navegador. Ese paso no decide el resultado, porque sacar la captura atrasa el toque y los levantamientos pueden fallar.
+
+Cómo cambian las pruebas cuando el dibujo es por software (lo detectan solas por el nombre del renderizador):
+
+- `check_fluidez` entra en **modo lógica**: abre el juego con `?dibujo=0`, corre sin estrangular el procesador y no exige ni informa cuadros dibujados. El gobernador de calidad no actúa sin dibujo, así que tampoco se prueba (`--gobernador` pide una placa). `--logica` fuerza el modo en una máquina con placa y `--dibujar` lo impide.
+- `check_game` ya corría sin dibujar. Antes de cada captura fuerza un cuadro del 3D: la imagen muestra la escena y un sombreador roto sale como error de consola y hace fallar la prueba.
+
 ## Estructura
 
 ```
@@ -90,6 +118,9 @@ tools/
   export_web.py     GLB reempaquetado, máscaras y web/data/poses.json
   verify_build.py   verifica que web/ corresponde al último build
   check_viewer.mjs  prueba automática del visor (npm install; usa el Chrome del sistema)
+  check_game.mjs, check_fluidez.mjs   pruebas del juego con navegador (corren también en GitHub Actions)
+.github/workflows/
+  pruebas.yml       pruebas del juego en cada push a demo, con dibujo por software
 web/
   index.html, css/, js/   visor (three.js r187, módulos ES)
   vendor/three/           three.js vendorizado

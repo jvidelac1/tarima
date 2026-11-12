@@ -16,6 +16,7 @@ FAST=1 ./build.sh ventura       # sin hojas de poses
 .venv/bin/python blender/pose_only.py ventura   # solo poses sobre out/ventura/s3b.blend (iteración rápida)
 node tools/check_viewer.mjs     # prueba automática del visor (consola, 404, fps, capturas en out/viewer/)
 node tools/sim_test.mjs && node tools/check_game.mjs   # pruebas del juego (núcleo y partida completa por script)
+gh run list -R jvidelac1/tarima --branch demo --limit 3   # las mismas pruebas corren en GitHub Actions en cada push a demo (ver «Pruebas en GitHub Actions»)
 cd web && python3 -m http.server 8000
 ```
 
@@ -317,6 +318,25 @@ El usuario jugó el rediseño en su Mac (M1 Pro, Chrome, pantalla de 75 Hz) y di
 - Teléfono: el acuse y el botón de saltear solo pasaron por la emulación táctil de `check_game`; no se miraron en capturas de teléfono. El inicio en teléfono vertical sigue apretado (hallazgo de la verificación anterior, sin tocar).
 - En el inicio las flechas siguen moviendo el foco sin elegir (hallazgo anterior, sin tocar).
 
+### Pruebas en GitHub Actions (12-nov, rama `demo`)
+
+Ya no hay pod ni máquina con navegador para las pruebas: corren en GitHub Actions (`.github/workflows/pruebas.yml`, repo público, `ubuntu-latest`, Node 22, Chrome 156 del runner) en cada push a `demo`. Pasos: `sim_test`, `play_human`, `check_game` y `check_fluidez --tutorial`; cada uno corre aunque falle el anterior. Unos 12 minutos.
+
+```bash
+gh run list -R jvidelac1/tarima --branch demo --limit 3              # últimas corridas: estado, commit e id
+gh run watch <id> -R jvidelac1/tarima --exit-status                  # esperar (en tramos de menos de 9 minutos si hay límite de tiempo)
+gh run view <id> -R jvidelac1/tarima --log-failed                    # la salida del paso que falló
+gh run download <id> -R jvidelac1/tarima -n pruebas-out -D out_ci    # logs/, game/*.png, fluidez/fluidez.json, capturas/*.jpg
+gh workflow run pruebas.yml -R jvidelac1/tarima --ref demo           # a pedido
+```
+
+- **El runner dibuja por software (SwiftShader) y no mide fluidez.** `check_fluidez` detecta el renderizador y entra en modo lógica: juego con `?dibujo=0`, procesador sin estrangular, y los cuadros dibujados ni se exigen ni se informan. Verifica toques (enviados, recibidos, registro, motivo y acuse), consola y tutorial. La calibración y el gobernador de calidad **no se prueban ahí** (sin dibujo no actúan); `--gobernador` sale con aviso. Con placa la prueba se comporta como antes.
+- **El dibujo sí se ejerce una vez por página**: `check_game` fuerza un cuadro del 3D antes de cada captura. Un sombreador que no compila o una excepción en `escena.cuadro()` sale como error de consola y pone el run en rojo. No detecta nada que dependa del tiempo entre cuadros.
+- **Para mirar el juego sin navegador**: el paso «Capturas con el 3D dibujado» deja en el artefacto una captura por panel, por señal y por toque (`capturas/*.jpg`, 1920 × 930, calidad Baja). No decide el resultado: sacar la captura atrasa el toque.
+- **Primera corrida** (commit c87bd02, run 43226037618): verde. `check_game` en 3 min 50 s (partida por teclado 152✓ 157✓ 160✗ a propósito, 190✓ 195✓ 198✓; por toques 6 de 6; Clásico y «lento» bien; el primer intento a velocidad real salió válido en las dos vías). `check_fluidez` en 3 min 25 s: 85 Espacio enviados y 85 recibidos, 42 aceptados y 17 descartados con motivo dentro del intento (4 espera, 4 rebote, 9 sobra), tres arranques y un dos tiempos válidos, tutorial de 13 s con un solo levantamiento.
+- **Visto en esa corrida, sin investigar:** en el paso de capturas el arranque guiado del tutorial terminó en fallo (dos luces rojas, `capturas/tut_09_decision_.jpg`). Ahí la prueba deja Espacio apretado mientras saca la foto (unos 0,3 s o más) y atrasa los toques; `sim_test` da el guiado por imposible de fallar con toques de 100 ms a 3 s, así que hay un caso (tecla sostenida o pausa larga en ¡EMPUJÁ!) que no cubre.
+- **Límites.** Nada de esto dice cuántos cuadros por segundo da el juego: eso se mide en la Mac del usuario. Chrome del runner sin pantalla entrega cuadros a 60 Hz, no a 75. No se prueba ningún teléfono real.
+
 ### En qué se aparta de docs/JUEGO.md
 
 - **`web/js/stage.js` no se extrajo de `main.js`.** El juego arma su escenario en `web/js/game/stage.js` con los mismos módulos; el visor queda intacto. Motivo: sin GPU no se puede verificar un refactor del visor. Tampoco se tocaron `timeline.js`, `barbell.js` ni `hud.js` (la secuencia, la aceleración desde la posición dibujada y la gráfica del juego viven en `game/`).
@@ -358,6 +378,7 @@ Porcentaje de válidos · meta. Jugadores simulados con error típico de 25, 40 
 - **Que el usuario vuelva a jugar en su Mac con `?depura=1`** y diga qué muestran «ofrece», «dibuja» y «calidad» durante un intento: es la medición que falta de la fluidez. Después, un teléfono real (`JUEGO.perf.resumen()` da mínimo y mediana de cuadros por tramo).
 - Decidir si hace falta un selector de gráficos en pantalla (hoy `?q=media`) y si el gobernador tiene que poder volver a subir.
 - Rehacer `tools/primera.mjs` sobre el tutorial nuevo, o borrarlo y dejar `check_fluidez --capturas`.
+- Pruebas en Actions: `workflow_dispatch` y el flujo viven solo en `demo`; al fusionar a `main` revisar el filtro de ramas. Falta una prueba del gobernador que corra sin placa (hoy `--gobernador` necesita dibujar de verdad).
 - Balance de Fácil por encima de la apertura (95 % y 100 %) y contra rivales; decidir si el segundo y el tercer intento tienen que ser tan exigentes en la subida.
 - Segunda vuelta de balance de Clásico: squat, 106 %, casual al 90 y 95 %, Ventura rival y gasto de Resto.
 - Extraer `stage.js` del visor y verificarlo con GPU; política de interrupciones; simular el resto de la final cuando el jugador queda sin marca.
