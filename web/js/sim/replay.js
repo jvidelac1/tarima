@@ -36,7 +36,7 @@ export function recalcular(reg, datos, o = {}) {
     if (!NIVELES[reg.nivel] || !entero(reg.cal) || reg.cal < 0 || reg.cal > 100 || !entero(reg.semilla)) return { ok: false, error: 'cabecera' };
     if (reg.ctl !== undefined && !CONTROLES.includes(reg.ctl)) return { ok: false, error: 'nivel de control desconocido' };
     if (!Array.isArray(reg.atletas) || !Array.isArray(reg.aperturas) || reg.aperturas.length !== 3 || !Array.isArray(reg.llamados) || reg.llamados.length > 40) return { ok: false, error: 'forma del registro' };
-    const p = new Partida(datos, { semilla: reg.semilla, nivel: reg.nivel, cal: reg.cal, primera: reg.primera, ctl: reg.ctl, atletas: reg.atletas });
+    const p = new Partida(datos, { semilla: reg.semilla, nivel: reg.nivel, cal: reg.cal, primera: reg.primera, ctl: reg.ctl, tactil: reg.tactil === true, atletas: reg.atletas });
     const abrir = lev => { p.at.forEach((a, i) => { if (a.ctrl === 'persona') p.abrir(i, lev, reg.aperturas[i][lev]); else if (reg.aperturas[i][lev] !== a.decl[lev]) throw new Error('la apertura de un rival no coincide'); }); p.empezar(); };
     abrir('s');
     for (const c of reg.llamados) {

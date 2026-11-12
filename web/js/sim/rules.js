@@ -135,6 +135,10 @@ export const KG_MAX = 260;
 export const FACIL = {
   holgadoHasta: 9200, ancho: 2000, anchoTecho: 1150, abreMs: 300, limMin: 330, vueloMm: 40, amagues: 2, perdidaLibre: 80, porMm: 4,
   asist: 250, asistTecho: 30, asistHasta: 9600, solaMax: 300000, plazoMs: 1500, ritmo: 250, maxMs: 6000, cierreMs: 600,
+  // con el dedo (`tactil` en la cabecera del registro): el toque y la pantalla atrasan más y varían más que una tecla. Las
+  // ventanas de PERFECTO, BIEN y límite se estiran `tactil` milésimas, y la de la señal abre `tactilAbre` ms antes y cierra
+  // `tactilLim` ms después (decisión del dueño del 12-nov: «es medio complicada la dinámica de pegarle perfecto al tap»)
+  tactil: 1300, tactilAbre: 80, tactilLim: 110,
 };
 /** Holgura de Fácil a la intensidad I (milésimas): 1000 en los pesos de apertura, 0 desde el 100 % del techo. */
 export const holgura = I => (I <= FACIL.holgadoHasta ? 1000 : I >= 10000 ? 0 : lerpi(I, FACIL.holgadoHasta, 10000, 1000, 0));

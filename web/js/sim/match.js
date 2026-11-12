@@ -18,7 +18,7 @@ export class Partida {
     if (!NIVELES[cfg.nivel]) throw new Error('nivel desconocido');
     if (!Array.isArray(cfg.atletas) || cfg.atletas.length !== 3 || new Set(cfg.atletas.map(x => x.id)).size !== 3) throw new Error('la final es de tres pesistas distintos');
     const ctl = cfg.ctl ?? 'c'; if (!CONTROLES.includes(ctl)) throw new Error('nivel de control desconocido');
-    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl };
+    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl, tactil: ctl === 'f' && !!cfg.tactil };
     const r = new Azar(mezclar(this.cfg.semilla, 7)), N = NIVELES[cfg.nivel];
     this.jueces = [0, 1, 2].map(() => r.entre(900, 1100));
     const tipo = r.ent(3), quien = r.ent(3);
@@ -34,7 +34,7 @@ export class Partida {
     if (this.guion.tipo === 'tocado') this.at[quien].resto = RESTO.tocado;
     if (this.guion.tipo === 'forma') this.at[quien].forma = { s: 2, c: 2 };
     this.fase = 'presentacion'; this.lev = 's'; this.seq = 0; this.barra = 0; this.ultimo = -1; this.llamado = null; this.nLlamado = 0;
-    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl,
+    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}),
       atletas: cfg.atletas.map(x => ({ id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego' })), aperturas: this.at.map(a => ({ s: a.decl.s, c: a.decl.c })), llamados: [] };
   }
 
@@ -124,7 +124,7 @@ export class Partida {
     const L = this.llamado, a = this.at[L.a], f = a.f, I = intensidad(L.kg, techoMomento(this.techoDia(L.a, L.lev), a.resto)), persona = a.ctrl === 'persona';
     if (L.lev === 'c' && !['split', 'power', 'squat'].includes(env)) throw new Error('envión inválido');
     return { lev: L.lev, env: L.lev === 'c' ? env : undefined, I, tec: f.attrs.tec, temple: L.et.length ? f.attrs.tem : 0, garra: f.attrs.gar, anclas: a.modelo, semilla: L.sem,
-      cal: persona ? this.cfg.cal : 0, primera: persona && this.cfg.primera && L.n === 1, domina: L.lev === 's' || f.enviones.includes(env), jueces: this.jueces, reloj: L.reloj, ctl: persona ? this.cfg.ctl : 'c' };
+      cal: persona ? this.cfg.cal : 0, primera: persona && this.cfg.primera && L.n === 1, domina: L.lev === 's' || f.enviones.includes(env), jueces: this.jueces, reloj: L.reloj, ctl: persona ? this.cfg.ctl : 'c', ...(persona && this.cfg.tactil ? { tactil: true } : {}) };
   }
   /** ¿Puede el pesista del llamado pedir `kg` en el instante `ms`? Devuelve el motivo si no. */
   cambioValido(ms, kg) {

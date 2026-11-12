@@ -118,7 +118,10 @@ export function senal(m, now, ctl = 'c') {
   if (!m || m.res) return null;
   const M = m.M, c = m.c, f = ctl === 'f', de = PASOS[c.lev];
   // `bien`: borde de BIEN (± ms); `lim`: hasta cuándo vale el toque; `abre` (Fácil): desde cuándo vale (antes, «todavía no»)
-  const cierre = (clave, verbo, paso, objetivo, desde, w, sub, gesto) => ({ clave, verbo, sub, paso, de, tipo: 'cierre', objetivo, desde, perf: w.p, bien: w.g, lim: w.L ?? w.l, abre: f ? abre(m) : objetivo - (w.A ?? w.l), gesto });
+  // `visto`: donde el círculo se cierra en pantalla. Es el objetivo SIN la corrección de atraso (`c.cal`): el jugador apunta
+  // ahí, su toque llega `cal` ms tarde (pantalla y dedo) y el núcleo lo mide contra `objetivo`. Antes el círculo se cerraba
+  // en `objetivo` y la corrección no corregía nada (el atraso se sumaba igual).
+  const cierre = (clave, verbo, paso, objetivo, desde, w, sub, gesto) => ({ clave, verbo, sub, paso, de, tipo: 'cierre', objetivo, visto: objetivo - c.cal, desde, perf: w.p, bien: w.g, lim: w.L ?? w.l, abre: f ? abre(m) : objetivo - (w.A ?? w.l), gesto });
   switch (m.fase) {
     case 'acomodo': return { clave: 'prep', verbo: t('senal.prep'), tipo: 'espera' };
     case 'tension': case 'hombros': {

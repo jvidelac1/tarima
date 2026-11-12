@@ -25,6 +25,7 @@ const PASO = k => idiv(k * 25, 3);           // ms del paso k de la pelea (120 p
  * @property {number} reloj          ms; 0 = sin reloj (calentamiento)
  * @property {number} [exiFija]      exigencia guionada (calentamiento)
  * @property {'c'|'f'} [ctl]         nivel de control: 'f' (Fácil) ensancha las ventanas, vuelve amague el tirón anticipado y da siempre buena tensión.
+ * @property {boolean} [tactil]      con el dedo (solo en Fácil): ventanas FACIL.tactil más anchas y señal que abre y cierra más tarde.
  *                                   Ausente o 'c': Clásico, las reglas de siempre (docs/CONTROLES.md, sección 4)
  */
 export class Intento {
@@ -68,8 +69,8 @@ export class Intento {
    * no se achican con los kilos, aunque PERFECTO y BIEN sí.
    */
   _w(g) {
-    const c = this.c, f = c.ctl === 'f', w = ventanas(c.I, `${this.M.mov}_${g}`, { tec: c.tec, temple: c.temple, primera: c.primera, ancho: f ? anchoFacil(c.I) : 1000 });
-    w.A = f ? FACIL.abreMs : w.l; w.L = f ? Math.max(w.l, FACIL.limMin) : w.l; return w;
+    const c = this.c, f = c.ctl === 'f', tt = f && c.tactil, w = ventanas(c.I, `${this.M.mov}_${g}`, { tec: c.tec, temple: c.temple, primera: c.primera, ancho: f ? (tt ? idiv(anchoFacil(c.I) * FACIL.tactil, 1000) : anchoFacil(c.I)) : 1000 });
+    w.A = f ? FACIL.abreMs + (tt ? FACIL.tactilAbre : 0) : w.l; w.L = f ? Math.max(w.l, FACIL.limMin + (tt ? FACIL.tactilLim : 0)) : w.l; return w;
   }
 
   _aprieta(t) {

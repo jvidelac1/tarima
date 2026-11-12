@@ -60,14 +60,14 @@ export function jugarSenal(ctx, B, sem, o = {}) {
       // una persona que venía tocando rápido no frena en seco: sigue tocando a su ritmo durante `cola` ms
       if (tipo === 'empuja' && toques && o.cola) cola = { hasta: m.t + r.entre(o.cola[0], o.cola[1]), prox: plan };
       clave = k; toques = 0; tipo = s ? s.tipo : '';
-      plan = !s ? Infinity : s.tipo === 'libre' ? m.t + r.entre(B.reac[0], B.reac[1]) : s.tipo === 'cierre' ? Math.max(m.t + 1, s.objetivo + B.lag + r.campana(B.sd)) : s.tipo === 'empuja' && !o.sinEmpujar ? Math.max(m.t, s.desde) + B.pelea.reac : Infinity;
+      plan = !s ? Infinity : s.tipo === 'libre' ? m.t + r.entre(B.reac[0], B.reac[1]) : s.tipo === 'cierre' ? Math.max(m.t + 1, (B.visto ? s.visto ?? s.objetivo : s.objetivo) + B.lag + r.campana(B.sd)) : s.tipo === 'empuja' && !o.sinEmpujar ? Math.max(m.t, s.desde) + B.pelea.reac : Infinity;
     }
     if (cola && cola.prox > cola.hasta) cola = null;
     if (cola && cola.prox <= m.t + PASO) { S.tecla(Math.max(cola.prox, m.t)); cola.prox = m.t + Math.max(100, B.pelea.per + r.campana(B.pelea.jit)); continue; }
     if (plan <= m.t + PASO) {
       const x = S.tecla(Math.max(plan, m.t)); toques++;
       // «TODAVÍA NO»: la señal sigue ahí, así que vuelve a decidir cuándo tocar (no antes de reaccionar al aviso)
-      if (x && x.motivo === 'temprano' && s && s.tipo === 'cierre') { plan = Math.max(m.t + 150 + r.ent(100), s.objetivo + B.lag + r.campana(B.sd)); continue; }
+      if (x && x.motivo === 'temprano' && s && s.tipo === 'cierre') { plan = Math.max(m.t + 150 + r.ent(100), (B.visto ? s.visto ?? s.objetivo : s.objetivo) + B.lag + r.campana(B.sd)); continue; }
       plan = s && s.tipo === 'empuja' ? m.t + Math.max(100, B.pelea.per + r.campana(B.pelea.jit)) : Infinity;
       continue;
     }
@@ -102,7 +102,7 @@ export function jugarClasico(ctx, B, sem) {
     const s = senal(m, m.t, 'c'), k = s ? s.clave + ':' + (s.tipo === 'cierre' && s.clave.startsWith('aprieta') ? '' : s.desde ?? '') : '';
     if (k !== clave) {
       clave = k; gesto = s?.gesto ?? null;
-      plan = !s ? Infinity : s.tipo === 'cierre' ? Math.max(m.t + 1, s.objetivo + B.lag + r.campana(B.sd)) : s.tipo === 'empuja' ? Math.max(m.t, s.desde) + B.pelea.reac : s.tipo === 'libre' ? (s.objetivo ?? m.t) + 250 + r.ent(250) : Infinity;
+      plan = !s ? Infinity : s.tipo === 'cierre' ? Math.max(m.t + 1, (B.visto ? s.visto ?? s.objetivo : s.objetivo) + B.lag + r.campana(B.sd)) : s.tipo === 'empuja' ? Math.max(m.t, s.desde) + B.pelea.reac : s.tipo === 'libre' ? (s.objetivo ?? m.t) + 250 + r.ent(250) : Infinity;
       if (s && s.clave.startsWith('aprieta') && plan < m.t + 250) plan += m.per;
     }
     if (sube <= m.t + PASO) { S.tecla(Math.max(sube, m.t), 0); abajo = false; sube = Infinity; continue; }
@@ -180,6 +180,16 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const mira = nombre.startsWith('casual (') || nombre.startsWith('flojo'); SUBIDAS.cuenta = mira;
     const xs = medir(jugar, 'f'); SUBIDAS.cuenta = false; fila(nombre, xs, metaTxt(min, max), { subida: true }); cumple(nombre, xs, min, max);
   }
+  // Teléfono (pedido del dueño del 12-nov): el dedo y la pantalla atrasan unos 60 ms y varían más. El bot mira el círculo
+  // (`visto`) y toca a visto + 60 ms + campana de 120 ms. «Antes»: sin las ventanas del dedo, con la corrección de 40 ms que
+  // también corría el círculo (no corregía nada). «Ahora»: ventanas del dedo y corrección de 60 ms (CAL_TACTIL en main.js).
+  console.log('— con el dedo: atraso de 60 ms y desvío de 120 ms —');
+  { const dedo = { ...BOTS.casual, sd: 120, lag: 60, visto: true };
+    fila('dedo, antes (cal 40, sin ventanas del dedo)', medir(senalDe(dedo), 'f', COLS, { cal: 40 }));
+    const xs = medir(senalDe(dedo), 'f', COLS, { cal: 60, tactil: true }); fila('dedo, ahora (cal 60, ventanas del dedo)', xs, metaTxt(90, 100)); cumple('dedo (cal 60, ventanas del dedo)', xs, 90, 100);
+    fila('dedo, ahora, flojo (desvío 180 ms)', medir(senalDe({ ...dedo, sd: 180 }), 'f', COLS, { cal: 60, tactil: true }));
+    fila('dedo, ahora, casual al 97 %', medir(senalDe(dedo), 'f', COLS, { cal: 60, tactil: true }, 9700, 9700));
+    fila('teclado, casual al 97 % (para comparar)', medir(senalDe(BOTS.casual), 'f', COLS, undefined, 9700, 9700)); }
   console.log('— al 100 % del techo —');
   for (const [nombre, jugar, min, max] of [['machacador', ciego(machaca), 0, 25], ['casual', senalDe(BOTS.casual), 35, 70]]) {
     const xs = medir(jugar, 'f', COLS, undefined, 10000, 10000); fila(nombre + ' al 100 %', xs, metaTxt(min, max)); cumple(nombre + ' al 100 %', xs, min, max);

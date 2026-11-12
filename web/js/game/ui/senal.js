@@ -43,16 +43,16 @@ export class Senal {
     let oro = false, cuenta = '', abierta = true;
     if (s && s.tipo === 'cierre') {
       // a ritmo parejo: de 1,6 veces el aro (cuando arranca) a 1 en el objetivo, y sigue achicándose igual de rápido hasta el límite
-      const falta = s.objetivo - now, total = Math.max(1, s.objetivo - s.desde), vel = .6 / total, k = o.parado ? 1 : Math.max(.4, 1 + vel * Math.min(falta, total));
+      const obj = s.visto ?? s.objetivo, falta = obj - now, total = Math.max(1, obj - s.desde), vel = .6 / total, k = o.parado ? 1 : Math.max(.4, 1 + vel * Math.min(falta, total));
       abierta = o.parado || s.abre === undefined || now >= s.abre;
       oro = o.parado || Math.abs(falta) <= s.perf;
       this.cierra.style.transform = `scale(${k.toFixed(3)})`; this.cierra.style.opacity = abierta ? '1' : (.3 + .25 * (1 - Math.min(1, falta / total))).toFixed(2);
       // la franja de BIEN (y la de PERFECTO) en la misma escala que el círculo: el toque sale bien mientras el borde la cruza
-      const fk = `${s.desde}|${s.objetivo}`;
+      const fk = `${s.desde}|${obj}`;
       if (fk !== this.franjaDe) {
         this.franjaDe = fk;
         const banda = (el, w) => {
-          const antes = Math.min(w, Math.max(0, s.objetivo - Math.max(s.abre ?? -Infinity, s.desde))), ko = Math.min(1.6, 1 + vel * antes), ki = Math.max(.4, 1 - vel * w);
+          const antes = Math.min(w, Math.max(0, obj - Math.max((s.abre ?? -Infinity) - (s.objetivo - obj), s.desde))), ko = Math.min(1.6, 1 + vel * antes), ki = Math.max(.4, 1 - vel * w);
           el.hidden = !(w > 0); el.style.setProperty('--ko', ko.toFixed(3)); el.style.setProperty('--kb', ((ko - ki) / 2).toFixed(3));
         };
         banda(this.franja, s.bien ?? 0); banda(this.franjaP, s.perf ?? 0);
