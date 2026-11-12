@@ -539,8 +539,7 @@ async function inicio() {
       ${nombreHTML}
       <h2 id="pesista-t">${esc(t('pesista.titulo', { nombre: mostrado() }))}</h2>
       <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b><small>${t(`pesista.${id}.alto`)} · ${t(`pesista.${id}.txt`)}</small></button>`).join('')}</div>
-      <div class="fila"><button id="btn-opciones" aria-expanded="${S.opciones}">${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button><button id="btn-ayuda">${t('boton.ayuda')}</button><small class="nota legal">${T ? '' : `${t('menus.teclado')} · `}<a href="privacidad.html" target="_blank" rel="noopener">${t('app.privacidad')}</a></small></div>${opciones}
-      <div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button><button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>${facil && falta ? `<small class="nota">${t('opciones.nota_practica')}</small>` : ''}</div>
+      ${opciones}<div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button><button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button><button id="btn-opciones" aria-expanded="${S.opciones}">${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button><button id="btn-ayuda">${t('boton.ayuda')}</button><small class="nota legal">${T ? '' : `${t('menus.teclado')} · `}<a href="privacidad.html" target="_blank" rel="noopener">${t('app.privacidad')}</a></small></div>
       `, 'bienvenida');
     pn.querySelector('.legal a')?.addEventListener('click', () => ev('privacidad_abierta', { pantalla: E.pantalla }));
     const inp = pn.querySelector('#nombre');
@@ -645,7 +644,7 @@ async function elegirApertura(p, lev, sugerida, html) {
     const arriba = html();
     const pn = capa.poner(`${arriba}<h2>${t(lev === 's' ? 'peso.titulo_s' : 'peso.titulo_c')}</h2>
       <div class="fila kgsel"><button id="kg-menos" ${kg <= lo ? 'disabled' : ''} aria-label="−1 kg">−1</button><output id="kg-val">${kg}</output><span>kg</span><button id="kg-mas" ${kg >= hi ? 'disabled' : ''} aria-label="+1 kg">+1</button><button class="ir grande" id="btn-confirmar">${t('peso.boton', { kg })}</button></div>
-      <p>${t('peso.rango', { lo, hi })} ${t('peso.ayuda')}</p>${tactil() ? '' : `<p class="chica">${t('peso.teclas')}</p>`}`, arriba ? 'peso con-tabla' : 'peso');
+      <p>${t('peso.rango', { lo, hi })}${lev === 's' ? ' ' + t('peso.ayuda') : ''}</p>${tactil() ? '' : `<p class="chica">${t('peso.teclas')}</p>`}`, arriba ? 'peso con-tabla' : 'peso');
     if (!abierto) { bloquear(pn); abierto = true; }      // el bloqueo es al abrir, no en cada kilo
     const b = await Promise.race([clic(pn, '#kg-menos,#kg-mas,#btn-confirmar'), new Promise(res => { E.repintar = () => res(null); })]);
     if (!b) continue;

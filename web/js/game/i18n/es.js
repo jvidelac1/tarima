@@ -23,7 +23,7 @@ export default {
   'carga.error': 'Algo falló y el juego se detuvo. Recarga la página.',
   'carga.no_inicia': 'No se pudo iniciar el juego. Recarga la página.',
   'foco.perdido': 'El juego no recibe el teclado · haz clic aquí',
-  'zona.toca': 'Toca aquí',
+  'zona.toca': 'Toca',
   'tecla.toca': 'TOCA',
   'tecla.espacio': 'ESPACIO',
   'tecla.esc': 'ESC',

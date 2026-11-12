@@ -42,8 +42,11 @@ button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px
   .panel.gana{max-width:min(96cqw,760px)}
   .panel.gana .reglas{margin:.2em 0;line-height:1.4}
   .pesistas.rivales .pesista{padding:.35em .5em}
+  .panel.bienvenida{position:relative}
   .panel.bienvenida .cabeza{padding-right:0}
-  .panel.bienvenida .idiomas{position:static;margin-bottom:.3em}
+  .panel.bienvenida .idiomas{top:10px;right:14px}
+  .panel.bienvenida .cabeza{position:static}
+  .panel.bienvenida>#pesista-t{padding-right:6.5em}
   .panel.bienvenida label.nombre{margin-top:.3em}
   .panel.bienvenida .pesista small{font-size:.74em}
   .glosario div{font-size:clamp(11px,3.3cqh,13px)}

@@ -20,7 +20,7 @@ export default {
   'carga.error': 'Something broke and the game stopped. Reload the page.',
   'carga.no_inicia': "The game couldn't start. Reload the page.",
   'foco.perdido': 'The game lost the keyboard · click here',
-  'zona.toca': 'Tap here',
+  'zona.toca': 'Tap',
   'tecla.toca': 'TAP',
   'tecla.espacio': 'SPACE',
   'tecla.esc': 'ESC',
