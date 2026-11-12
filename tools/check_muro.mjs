@@ -208,7 +208,44 @@ async function escenario(L) {
   const db = { partidas: await srv.db.prepare('SELECT COUNT(*) n FROM partidas').first('n'), lista: await srv.db.prepare('SELECT COUNT(*) n FROM lista').first('n'), encuestas: await srv.db.prepare('SELECT COUNT(*) n FROM encuestas').first('n'), fuentes: (await srv.db.prepare('SELECT fuente, COUNT(*) n FROM partidas GROUP BY fuente ORDER BY fuente').all()).results.map(r => `${r.fuente}:${r.n}`).join(' ') };
   if (db.lista !== 1 || db.encuestas !== 1) mal(`en la base: ${JSON.stringify(db)}`);
   console.log(`${tag} idioma ${L} · 4 finales gratis (2 + 2 de la encuesta) · muro en el podio, al recargar y sin encuesta · anotado y libre · base: ${JSON.stringify(db)} · ${nFoto} capturas en ${path.relative(ROOT, dir)}`);
-  await ctx.close(); await srv.cerrar();
+  await ctx.close();
+  await extras(L, base).catch(e => notas.push(`${tag} capturas extra: ${e.message}`));
+  await srv.cerrar();
+}
+
+/**
+ * Capturas extra para la revisión de un jugador nuevo (solo fotos, no fallan la prueba): la página de privacidad, la pausa,
+ * y en el teléfono el iPhone de costado (aviso de instalar), en vertical con la rotación trabada (con y sin el editor del
+ * nombre abierto). Quedan en out/muro/<idioma>/extra_*.png.
+ */
+async function extras(L, base) {
+  const dir = path.join(OUT, L), q = `?dibujo=0&semilla=2026111${L === 'es' ? 5 : 4}&lang=${L}`;
+  const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/131.0.6778.73 Mobile/15E148 Safari/604.1';
+  const casos = L === 'es'
+    ? [['iphone', { viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: IPHONE, locale: 'es-AR' }],
+       ['vertical', { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: IPHONE, locale: 'es-AR' }]]
+    : [['compu', { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, locale: 'en-US' }]];
+  for (const [nombre, opts] of casos) {
+    const ctx = await browser.newContext(opts), page = await ctx.newPage(), J = (fn, a) => page.evaluate(fn, a);
+    const foto = async n => { await J(() => { try { window.JUEGO?.escena?.cuadro?.(0, true); } catch { /* sin escena */ } }).catch(() => null); await page.screenshot({ path: path.join(dir, `extra_${nombre}_${n}.png`) }).catch(() => null); };
+    await page.goto(`${base}/${q}`, { waitUntil: 'load' });
+    await page.waitForFunction(() => window.JUEGO?.listo, null, { timeout: 60000 }).catch(() => null);
+    await page.waitForTimeout(1500); await foto('1_inicio');
+    const priv = await J(() => document.querySelector('a[href*="rivac"]')?.href || '').catch(() => '');
+    const tactil = !!opts.hasTouch;
+    if (tactil) {
+      await page.locator('#nombre').tap().catch(() => null); await page.waitForTimeout(300);
+      await page.keyboard.type('Sofía'); await foto('2_nombre_teclado');
+      await page.locator('#editor-listo').tap().catch(() => null); await page.waitForTimeout(300);
+      await page.locator('#btn-empezar').tap().catch(() => null);
+    } else { await page.locator('#nombre').fill('Sam').catch(() => null); await page.locator('#btn-empezar').click().catch(() => null); }
+    await page.waitForTimeout(2500); await foto('3_tras_jugar');
+    await page.waitForTimeout(4000); await foto('4_mas_tarde');
+    await page.keyboard.press('Escape').catch(() => null); await page.waitForTimeout(800); await foto('5_pausa');
+    if (priv) { await page.goto(priv, { waitUntil: 'load' }); await page.waitForTimeout(500); await page.screenshot({ path: path.join(dir, `extra_${nombre}_6_privacidad.png`), fullPage: true }).catch(() => null); }
+    else notas.push(`[${L}] ${nombre}: no encontré el enlace a la privacidad`);
+    await ctx.close();
+  }
 }
 
 try { for (const L of ['en', 'es'].filter(x => !SOLO || x === SOLO)) await escenario(L); }
