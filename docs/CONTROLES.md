@@ -1,6 +1,6 @@
 # Controles: Fácil y Clásico
 
-Especificación del rediseño de controles de la etapa 1. Reemplaza la sección 3.1 de `docs/JUEGO.md` en teclas y gestos; el resto del diseño sigue igual. Los números de la sección 9 están medidos sobre el núcleo con un prototipo; todo lo que es pantalla está sin probar.
+Especificación del rediseño de controles de la etapa 1. Reemplaza la sección 3.1 de `docs/JUEGO.md` en teclas y gestos; el resto del diseño sigue igual. **Implementado el 11-nov en la rama `demo`**; el estado, lo medido y lo que falta medir están en `HANDOFF.md`, «Controles». Los números de la sección 9 salieron de un prototipo y se volvieron a medir sobre el código real con `tools/play_human.mjs` (dan lo mismo). La pantalla se probó por script y se miró en capturas (`tools/primera.mjs`); ninguna persona lo jugó todavía.
 
 **Qué falló.** Un botón con seis gestos de mantener y soltar, ventanas de ±35 a ±70 ms y ninguna palabra en pantalla durante el intento. Además hay un error de dibujo: **en el calentamiento el pesista no se mueve nunca**. `practica()` confirma en el instante 0 y `poseDe()` (`sequence.js`) pregunta `!m.tConf`, que con 0 da verdadero: la pose queda en `Parado` todo el intento (verificado en node: con `conf = 0`, `tau` vale 0 en tensión y en tirón; con `conf = 1` vale 1,2 y 1,8). Las pruebas no lo ven porque el monitor de la barra usa la misma condición. Se corrige con `m.tConf === undefined` en los dos lugares.
 
@@ -77,7 +77,7 @@ En el envión: apretar y mantener, soltar en el fondo de la flexión, apretar al
 - **Pelea y traba de codos.** El toque sirve si `P < 1 y aguja < exigencia + 50` o si `no trabado y E < exigencia de traba + 150` (la misma regla que usan los rivales). Los que sobran no llegan al núcleo: no hacen temblar ni gastan Resto. Por eso «tocá rápido» es verdad. Sin esta regla el bot casual cae de 99 % a 17 % (temblor).
 - **Fijación automática.** El contacto de la recepción sigue apoyado, así que el núcleo ve apoyo firme a los 300 ms de quedar de pie. `automaticos(m)` corre en cada cuadro y agrega `[tb + 150, 0]` cuando pasó la chicharra: instante fijo, no depende del cuadro. «Suelta antes» y «no fija» no pueden ocurrir.
 - **Amague.** Toque 2 antes de la rodilla o antes del límite, y toque 5 antes del límite: el pesista devuelve la barra y la señal vuelve al paso 1 (o al 4). Sin costo y sin tope; el reloj sigue. Cartel: «AMAGUE · muy temprano».
-- **Toque fuera de turno.** A menos de 60 ms del toque anterior aceptado: se descarta (rebote de tecla). En `acomodo`, en los 450 ms de RESPIRÁ, después de un amague mientras la barra baja, en `post` y en `fijacion`: se descarta sin castigo. En el vuelo antes de tiempo: fallo. Esa es la única regla dura que queda, y es la que deja al bot al azar por debajo del 10 % (si ese toque se descartara, llega a 22 % en arranque y 30 % en dos tiempos).
+- **Toque fuera de turno.** A menos de 60 ms del toque anterior aceptado: se descarta (rebote de tecla). En `acomodo`, en los 450 ms de RESPIRÁ, después de un amague mientras la barra baja, en `post` y en `fijacion`: se descarta sin castigo (en `acomodo` y después de un amague sale «TODAVÍA NO»; en RESPIRÁ no se dice nada, porque suele ser la cola de ¡EMPUJÁ!). En el vuelo antes de tiempo: fallo. Esa es la única regla dura que queda, y es la que deja al bot al azar por debajo del 10 % (si ese toque se descartara, llega a 22 % en arranque y 30 % en dos tiempos).
 - **Soltar la tecla** y la repetición automática no generan nada.
 
 ## 4. Núcleo: qué cambia en Fácil
@@ -122,7 +122,7 @@ En Clásico, los mismos textos con el gesto que corresponde («soltá cuando la 
 
 ## 6. Tutorial
 
-Corre la primera vez (`tarima.tutorial` vacío) en Fácil; después el inicio ofrece «Repetir tutorial». Reemplaza al metrónomo y a las tres prácticas, que quedan solo para Clásico: en Fácil la corrección de atraso es 0 ms en teclado y 40 ms en táctil. Los tres intentos van al 80 %, sin reloj (`reloj: 0`), con `primera: true` y fuera del registro.
+Corre la primera vez (`tarima.tutorial` vacío) en Fácil; después el inicio ofrece «Repetir tutorial». Reemplaza al metrónomo y a las tres prácticas, que quedan solo para Clásico: en Fácil la corrección de atraso es 0 ms en teclado y 40 ms en táctil. Los tres intentos van al 80 %, sin reloj (`reloj: 0`), con `primera: true` y fuera del registro; las dos prácticas llevan exigencia guionada del 90 % para que ¡EMPUJÁ! aparezca.
 
 1. **Panel.** «CÓMO SE JUEGA» · «Un toque de ESPACIO por señal. No hay que mantener ni soltar.» · «Tocá cuando el círculo se cierra sobre el aro.» · «Si dice ¡EMPUJÁ!, tocá rápido hasta quedar de pie.» Botones: «Empezar» y «Saltear tutorial».
 2. **Arranque guiado, en cámara lenta y sin fallo posible.** El reloj del intento lo lleva la presentación: avanza a la mitad de la velocidad y se detiene en cada objetivo hasta que llega el toque, que se registra en el instante exacto del objetivo (sale PERFECTO). Un toque con el reloj andando se descarta con «Todavía no». Exigencia guionada (`exiFija` del 93 %) para que la subida pida toques. Paradas y textos:
@@ -176,7 +176,7 @@ Prototipo de la capa y del bot sobre una copia del núcleo, sin navegador. Apert
 | Al azar en Fácil: instantes de Poisson (mínimo 100 ms entre toques), el peor de cinco ritmos medios entre 250 y 1200 ms | 6 % | 4 % | Menos de 10 % |
 | Los mismos bots en Clásico, casual y flojo | 23 % y 27 % | 14 % y 12 % | — |
 
-Sensibilidad del casual en Fácil (600 intentos): reacción de 1,2 s en la subida, 97 %; un toque cada 350 ms, 90 %; desvío de 120 ms, 93 %; atraso de 120 ms, 89 %; **sin tocar en la subida, 6 %**.
+Sensibilidad del casual en Fácil (600 intentos, con el prototipo; no se repitió sobre el código final): reacción de 1,2 s en la subida, 97 %; un toque cada 350 ms, 90 %; desvío de 120 ms, 93 %; atraso de 120 ms, 89 %. Sobre el código final (2000 intentos, `--info`): **sin tocar en la subida, 6 % y 7 %**; si sigue tocando rápido 0,3 a 0,7 s después de ¡EMPUJÁ!, sin cambios; si sigue 0,5 a 1 s, 82 % en dos tiempos (un toque de más arranca la flexión).
 
 Riesgos:
 
@@ -187,4 +187,4 @@ Riesgos:
 5. **La subida es obligatoria ya en las aperturas** (sin tocar, 6 %). Toda la jugabilidad de Fácil cuelga de que ¡EMPUJÁ! se entienda; por eso tiene parada propia en el tutorial.
 6. **Fácil con pesos altos no está ajustado.** Casual: 90 % al 95 % y 36 a 39 % al 100 %. Un experto (desvío 25 ms): 14 % al 103 %. Casi todos los fallos son en la subida. Queda para el informe de balance.
 7. **Dibujo sin verificar.** Con límites de ±390 a ±470 ms el tirón arrastrado avanza hasta 0,28 s de clip más allá de `Segundo tirón`, y el cambio de ritmo del vuelo puede salir del rango 0,6 a 1,5 de `JUEGO.md` 3.5. Hay que mirarlo en capturas.
-8. **Nada de esto se probó con personas ni en navegador.** Los bots son un modelo; el error humano no es una campana. La prueba real es que el usuario complete el tutorial.
+8. **Nada de esto se probó con personas.** En navegador se probó por script (`tools/check_game.mjs`) y se miraron las capturas de `tools/primera.mjs`; en teléfono, solo emulación. Los bots son un modelo; el error humano no es una campana. La prueba real es que el usuario complete el tutorial.

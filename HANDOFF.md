@@ -179,29 +179,74 @@ Resumen: Ventura 18 ok, 26 ok con reservas, 1 mal. Brenner 22 ok, 23 ok con rese
 
 ## Juego (etapa 1, rama `gameplay`)
 
-Hecho en la sesión cloud, sin GPU: se probó lógica, determinismo y consola con partidas completas jugadas por script. **Nadie lo jugó a mano todavía y no se midió en ningún teléfono**: ritmo, sensación y rendimiento quedan sin validar. El diseño está en [docs/JUEGO.md](docs/JUEGO.md); acá va lo que existe y en qué se aparta.
+Hecho en la sesión cloud, sin GPU: se probó lógica, determinismo y consola con partidas completas jugadas por script. El diseño está en [docs/JUEGO.md](docs/JUEGO.md); acá va lo que existe y en qué se aparta.
+
+**El usuario lo jugó el 11-nov y no pudo hacer un levantamiento** («no entiendo los controles», «prefiero jugarlo con el teclado, reglas claras, fácil de usar, no mouse para los levantamientos»). Los controles se rehicieron ese día en la rama `demo`: ver «Controles» más abajo y [docs/CONTROLES.md](docs/CONTROLES.md). **El rediseño todavía no lo jugó ninguna persona y no se probó en ningún teléfono real**: está medido con bots y mirado en capturas.
 
 ```bash
 cd web && python3 -m http.server 8000      # el juego: http://localhost:8000/juego.html · el visor: /index.html
-node tools/sim_test.mjs                    # núcleo, sin navegador (2 s): pureza, referencias, vivo contra recalculado, 1000 partidas, adulterados
-node tools/balance.mjs --rivales           # informe de balance: válidos por intensidad y perfil, y rivales por nivel
-node tools/check_game.mjs                  # partida completa por teclado y por toques con el reloj inyectado, más un intento en tiempo real
+node tools/sim_test.mjs                    # núcleo, sin navegador (5 s): pureza, referencias (Clásico y Fácil), vivo contra recalculado, 1000 partidas, adulterados
+node tools/play_human.mjs [--info]         # jugabilidad de Fácil con bots de error humano (5 s); sale con error si no cumple el criterio
+node tools/balance.mjs --rivales           # informe de balance (Clásico): válidos por intensidad y perfil, y rivales por nivel
+node tools/check_game.mjs                  # con navegador: partida completa en Fácil por teclado sin mouse y por toques, tutorial, pausa, ayuda y un intento en Clásico
+node tools/primera.mjs                     # con navegador: capturas de lo que ve un jugador nuevo, en out/primera/ (para mirarlas)
 node tools/build_sim_data.mjs [--check]    # reescribe web/data/sim.json desde poses.json (o compara contra el publicado)
 ```
 
-Parámetros de `juego.html`: `?semilla=N` (primera partida reproducible), `?q=movil|baja|media|alta`, `?ritmo=completa`, `?dibujo=0` (no dibuja el 3D; lo usa la prueba).
+Parámetros de `juego.html`: `?semilla=N` (primera partida reproducible), `?q=movil|baja|media|alta`, `?ritmo=completa`, `?ctl=c` (arranca en Clásico), `?dibujo=0` (no dibuja el 3D; lo usa la prueba). Lo que guarda el navegador: `tarima.ctl`, `tarima.tutorial`, `tarima.pesista`, `tarima.nivel`, `tarima.jugadas`, `tarima.env.<ctl>.<pesista>`.
 
 | Pieza | Dónde | Estado |
 |---|---|---|
 | Núcleo (función pura de los eventos, solo enteros) | `web/js/sim/`: `fixed`, `rules`, `data`, `attempt`, `ai`, `match`, `replay` | Completo para la etapa 1. Botón único entero: tensión, tirón, explosión, recepción, pelea, traba, apoyo firme, chicharra y amague; tres enviones; todos los fallos y nulos de la sección 5 |
 | Datos | `web/data/sim.json` (temporada 1) | Anclas en ms leídas de `tt` por segmento y nombre de fase; fichas de los tres. Coinciden con los tiempos de JUEGO.md |
 | Competencia | `match.js`, `ai.js` | Orden por kilos, declaración automática, cambios (dos por intento, llamado desplazado), reloj 0:30 y 0:45, jueces con umbral propio, total, desempate, sin marca, Resto, forma del día, guion, La cuenta, etiquetas, tres niveles |
-| Presentación | `web/juego.html`, `web/css/juego.css`, `web/js/game/` | Inicio, metrónomo de atraso, tres prácticas, presentación, panel único del llamado, ayudas pegadas a la barra, luces de a una, repetición de lo dibujado con traza, tablero, intervalo, podio 2D, revancha. Final exprés y completa |
-| Pruebas | `tools/sim_test.mjs`, `tools/balance.mjs`, `tools/check_game.mjs` | En verde en la sesión cloud (Chromium con SwiftShader) |
+| Controles | `web/js/game/controles.js`, `input.js`, `ui/senal.js`, `ui/mensajes.js` | Niveles Fácil (un toque por señal, por defecto) y Clásico; capa de traducción; señal fija; palabra por toque y línea de fallo; menús por teclado, pausa y ayuda. Ver «Controles» |
+| Presentación | `web/juego.html`, `web/css/juego.css`, `web/js/game/` | Inicio con los tres pasos, tutorial guiado (Fácil) o metrónomo y tres prácticas (Clásico), presentación, panel único del llamado, señal fija, ayudas pegadas a la barra (Clásico y rivales), luces de a una, repetición de lo dibujado con traza, tablero, intervalo, podio 2D, revancha. Final exprés y completa |
+| Pruebas | `tools/sim_test.mjs`, `tools/play_human.mjs`, `tools/balance.mjs`, `tools/check_game.mjs`, `tools/primera.mjs` | En verde el 11-nov en el pod (Chrome con la RTX 4090, por `tools/browser.mjs`); las dos primeras también en la Mac |
 
 **Archivos compartidos con el visor**: cada cambio es una opción que el visor no usa. `cameras.js` (`interactive: false`), `arena.js` (una luz en `null` queda apagada), `athlete.js` (`setClothFlat`: tela de color plano sobre la máscara; cambia la clave de caché del shader de piel) y `trace.js` (`buildPoints` y `setCount`). No se tocaron `blender/`, `web/models/`, `web/data/poses.json`, `web/js/config.js`, `web/js/main.js` ni `tools/check_viewer.mjs`.
 
 **La prueba del visor en la sesión cloud no llega a verde, ni antes ni después de estos cambios**: pide una GPU (ANGLE Metal) y pisos de fps. Con `CHROME_PATH` apuntando al Chromium de la sesión corre por software y se corta igual en la rama base (`pasada-visual`) que en `gameplay`; ver el detalle en el pull request. **Hay que correrla en el Mac** antes de fusionar.
+
+### Controles (11-nov, rama `demo`)
+
+Especificación: [docs/CONTROLES.md](docs/CONTROLES.md). Lo que quedó hecho:
+
+- **Teclado en el levantamiento.** Espacio (Enter hace lo mismo). El clic del mouse no hace gestos en ningún nivel (la prueba verifica que un clic en el escenario no agrega entradas). En teléfono, el dedo sobre la zona táctil.
+- **Fácil, por defecto: una señal, un toque.** Arranque: ¡TIRÁ! (cuando quieras), ¡EXPLOTÁ!, ¡RECIBÍ!; ¡EMPUJÁ! tocando rápido si la subida se traba; fijación y bajada automáticas. Dos tiempos: además ¡FLEXIONÁ!, ¡ARRIBA!, ¡RECIBÍ!. No hay que mantener ni soltar.
+- **Capa de traducción** (`web/js/game/controles.js`, pura): mira la fase del núcleo en el instante del toque y lo convierte en apretar o soltar. El núcleo sigue recibiendo lo mismo de siempre. En Fácil cambia tres cosas, detrás de `ctx.ctl === 'f'`: ventanas por 2 (`FACIL.ancho` en `rules.js`), el tirón anticipado es amague y la tensión es siempre buena. `ctl` va en la cabecera del registro y entra solo en el contexto de la persona: **los rivales juegan con las reglas de Clásico y `tools/sim_ref.json` no cambió**. Las referencias de Fácil están en `tools/sim_ref_facil.json`.
+- **Señal fija** (`#senal`, `ui/senal.js`): verbo en imperativo, aro fijo con un círculo que se cierra, la tecla dibujada (ESPACIO, o TOCÁ en teléfono) y el paso («2 de 3»). A la derecha del pesista en horizontal; al pie del escenario en vertical. Después de cada toque, PERFECTO, BIEN, TEMPRANO o TARDE en el mismo lugar. Clásico usa la misma señal con sus verbos y conserva anillo, línea y medidor.
+- **Línea de fallo** (`ui/mensajes.js`, `explicar()`): debajo de «Intento fallado», qué pasó y qué hacer («No tocaste ¡EXPLOTÁ! Tocá ESPACIO cuando el círculo se cierra.»). También en la repetición y en el panel de reintento del tutorial.
+- **Tutorial guiado** (Fácil, la primera vez; después el inicio ofrece «Repetir tutorial»): panel con tres reglas, un arranque en cámara lenta que se detiene en cada toque y no se puede fallar, y dos prácticas a velocidad real (arranque y dos tiempos) con «Reintentar». En Clásico quedan el metrónomo y las tres prácticas de antes.
+- **Menús sin mouse**: todo panel abre con foco visible (borde dorado) en su botón principal; ↑ ↓ y Tab mueven el foco, ← → cambian los kilos, Enter o Espacio activan. Esc pausa fuera del intento (congela el reloj; hay un botón «II» para el dedo); H o ? abre «Cómo se juega».
+- **Pantalla de inicio**: tres pasos con la tecla dibujada en lugar de la oración, y el selector «Controles: Fácil · Clásico».
+- **Error corregido**: en el calentamiento el pesista no se movía (`poseDe()` tomaba el instante 0 de confirmación como «sin confirmar»). La prueba ahora mide que la barra suba también en el tutorial.
+
+Medido (`node tools/play_human.mjs --info`, 2000 intentos por casilla, aperturas al 88 a 92 %, los tres pesistas, Fácil con tijera). Los bots miran solo la señal y tocan a `objetivo + 40 ms + error` con error de campana:
+
+| Bot | Arranque | Dos tiempos | Meta |
+|---|---|---|---|
+| Casual (desvío 80 ms) | 99,4 % | 99,7 % | 85 % o más |
+| Flojo (desvío 160 ms) | 68,8 % | 73,7 % | 50 % o más |
+| Al azar (instantes de Poisson; el peor de cinco ritmos medios, 250 a 1200 ms) | 5,5 % | 4,5 % | Menos de 10 % |
+| Los mismos bots en Clásico, casual y flojo (informativo) | 22,6 % y 26,4 % | 14,8 % y 11,9 % | — |
+
+- `tools/sim_test.mjs` pasa entero sin tocar `tools/sim_ref.json`: Clásico no cambió.
+- `tools/check_game.mjs` en el pod (RTX 4090): partida completa en Fácil por teclado sin mouse (tutorial incluido, con un fallo a propósito para ver su línea) y otra por toques en 390 × 844; arranque guiado y práctica con el reloj verdadero; pausa y ayuda; metrónomo y una práctica en Clásico. Sin errores de consola.
+- `tools/primera.mjs`: 129 capturas (escritorio, teléfono emulado y Clásico) miradas una por una el 11-nov.
+
+**Lo que no está medido o es estimación:**
+
+- **Ninguna persona jugó el rediseño.** Los bots son un modelo (error de campana, ritmo de toques elegido a mano: uno cada 180 ± 35 ms el casual, 230 ± 60 ms el flojo). La prueba real es que el usuario complete el tutorial.
+- **Teléfono real**: solo emulación táctil en Chrome. En vertical la señal va sobre el pie del escenario y tapa en parte las piernas del pesista en la recepción; no se probó si con el pulgar apoyado se lee.
+- **«Al azar» depende de la definición.** Con instantes de Poisson da menos de 6 %. Un bot que toca a ciegas con ritmo parejo acierta más: 27 % con intervalos uniformes de 150 a 900 ms, y 68 % en arranque con un metrónomo exacto de 750 ms (0 % con 500 y con 1000 ms). Es consecuencia de que el primer toque sea libre y el levantamiento tenga ritmo fijo; no se encontró una regla que lo evite sin bajar al flojo de 50 %.
+- **Fácil con más kilos no está ajustado** (no es parte del criterio): casual 88 % y 91 % al 95 % del techo y 36 % y 39 % al 100 %; flojo 32 % y 36 % al 95 %. Casi todos los fallos son en la subida. Como el segundo y el tercer intento suben 4 y 3 kg, a un jugador flojo la final se le pone difícil después de la apertura.
+- **Sin tocar en ¡EMPUJÁ! casi no se levanta nada** (casual 6 % y 7 %): toda la jugabilidad de Fácil depende de que esa señal se entienda. Tiene parada propia en el tutorial.
+- **El que sigue tocando rápido después de ¡EMPUJÁ!** en la cargada: hasta 0,7 s de más no cambia nada; con 0,5 a 1 s de más el casual baja a 82 % en dos tiempos (el toque de más arranca la flexión). No hay protección para eso.
+- **En Fácil el jugador tiene el doble de ventana que los rivales**: la final es más fácil de ganar. La dificultad se regula con el nivel de rivales; no se midió cuánto.
+- **Dibujo con errores grandes**: con los límites anchos de Fácil el tirón puede seguir hasta 0,28 s de clip más allá de `Segundo tirón` antes del toque. Las capturas tienen toques justos y uno tarde; no se miró un toque en el borde del límite.
+- **El registro guarda la salida de la capa, no las teclas**, y no se subió la versión de reglas (está atada a `sim.json`). Con servidor: subir versión y separar la tabla por `ctl`.
+- No se midieron cuadros por segundo del juego.
 
 ### En qué se aparta de docs/JUEGO.md
 
@@ -214,8 +259,9 @@ Parámetros de `juego.html`: `?semilla=N` (primera partida reproducible), `?q=mo
 - **Nivel Amistoso**: además de errores de 55 ms, los rivales abren y declaran 3,5 % más abajo. Con las aperturas normales quedaban sin marca en más de la mitad de las finales.
 - **Los rivales no usan el squat**: con el balance de hoy no tiene premio (ver abajo).
 - **Cambios de kilos del jugador**: confirmar el panel con otro peso cuenta como cambio. No hay botón aparte para cambiar sin confirmar.
-- **Interrupciones** (pestaña oculta, toque cancelado): los contactos se levantan y nada más. No está la política de repetir el intento ni la pausa del reloj.
-- **Calentamiento**: metrónomo y tres prácticas (dos livianas y una pesada con exigencia de 98 %). La práctica pesada no fuerza la traba de codos. Las prácticas llevan un reloj de 25 s para que nadie quede trabado.
+- **Interrupciones** (pestaña oculta, toque cancelado): los contactos se levantan y nada más. No está la política de repetir el intento. La pausa (Esc o el botón «II») existe solo fuera del intento propio.
+- **Calentamiento**: en Fácil, el tutorial guiado (sin reloj; reemplaza al metrónomo, con corrección de atraso de 0 ms en teclado y 40 ms en táctil). En Clásico, metrónomo y tres prácticas (dos livianas y una pesada con exigencia de 98 %); la práctica pesada no fuerza la traba de codos y las prácticas llevan un reloj de 25 s para que nadie quede trabado.
+- **Envión que viene elegido**: en Fácil, la tijera para los tres (con el squat de Ventura el bot flojo baja de 74 % a 62 %); en Clásico, el primero de la ficha.
 - **Sin retratos en el podio**: el podio 2D usa bandera y nombre para los tres. El primer plano de cara del llamado se usa con Ventura y Brenner, no con Marangi (comparte la cara de Brenner).
 - **Cambio de carga**: corte a la cenital con cartel; los discos no se deslizan.
 - **Tope de 30 cuadros fuera del intento propio e imagen congelada detrás de los paneles**: hechos. El escalón «móvil» existe (`game/perf.js`) y es el que se elige con puntero táctil; **sin medir**.
@@ -240,9 +286,10 @@ Porcentaje de válidos · meta. Jugadores simulados con error típico de 25, 40 
 
 ### Pendientes del juego
 
-- **Jugarlo a mano**, en escritorio y en un teléfono real, antes de tocar más números. Medir una partida entera en el teléfono (`JUEGO.perf.resumen()` da mínimo y mediana de cuadros por tramo).
-- Segunda vuelta de balance: squat, 106 %, casual al 90 y 95 %, Ventura rival y gasto de Resto.
-- Extraer `stage.js` del visor y verificarlo con GPU; política de interrupciones; simular el resto de la final cuando el jugador queda sin marca; botón de pausa (está en la página, oculto).
+- **Que el usuario juegue el tutorial y una final en Fácil con el teclado.** Es la única prueba que falta de verdad. Después, un teléfono real. Medir una partida entera en el teléfono (`JUEGO.perf.resumen()` da mínimo y mediana de cuadros por tramo).
+- Balance de Fácil por encima de la apertura (95 % y 100 %) y contra rivales; decidir si el segundo y el tercer intento tienen que ser tan exigentes en la subida.
+- Segunda vuelta de balance de Clásico: squat, 106 %, casual al 90 y 95 %, Ventura rival y gasto de Resto.
+- Extraer `stage.js` del visor y verificarlo con GPU; política de interrupciones; simular el resto de la final cuando el jugador queda sin marca.
 - Códigos de país: ARX y NVK siguen en la gráfica y en las mallas hasta la etapa 3; Pelagia usa PEL. Búsqueda uno por uno antes de publicar (JUEGO.md, sección 6.1).
 - Marangi es el modelo de Brenner con la tela de color plano (`#7a1626`). **No se revisó en captura si el relieve de «BRENNER» se lee**: mirarlo con GPU; si se lee, limitarlo a planos laterales.
 - Todo lo de la etapa 4 (fallos, festejos, ayudantes y bajadas animados) hoy es corte y texto, como define la sección 11.2.

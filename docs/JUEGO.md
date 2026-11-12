@@ -12,7 +12,7 @@ Es la síntesis de tres propuestas independientes (sensación de juego, competen
 
 1. Es la final de un mundial ficticio de halterofilia, el **Mundial Tarima 2026**, con tres pesistas inventados en una sola categoría. El jugador elige a uno y juega para que gane el oro.
 2. Cada pesista tiene tres intentos de arranque y tres de dos tiempos. Gana el mejor total (mejor arranque más mejor dos tiempos).
-3. Todo el levantamiento se juega con **un solo botón**: la barra espaciadora, el clic o un dedo en la pantalla.
+3. Todo el levantamiento se juega con **una sola tecla**: la barra espaciadora (o un dedo en la pantalla). El mouse no hace gestos del levantamiento. Hay dos niveles de control, **Fácil** (un toque por señal, el que viene elegido) y **Clásico** (mantener y soltar): ver [CONTROLES.md](CONTROLES.md).
 4. La frase que se aprende una vez y sirve para todo: **apretá para despegar, soltá para explotar, apretá para recibir, aguantá apretado y soltá cuando suene la chicharra.**
 5. Si la barra se traba en la subida, **se pelea tocando repetido**. Pelear salva intentos, pero cansa al pesista para los que siguen, y tocar de más lo hace temblar.
 6. Un intento puede salir válido, ser nulo (se completó, pero los jueces lo anulan) o fallar (la barra se cae). Cada error del jugador tiene su causa con nombre. En la etapa 1 esa diferencia se lee en el texto de la causa y en la repetición; cada fallo tiene su animación propia recién desde la etapa 4.
@@ -28,7 +28,7 @@ Es la síntesis de tres propuestas independientes (sensación de juego, competen
 | Tramo | Duración estimada | Qué pasa | Qué decide el jugador |
 |---|---|---|---|
 | Inicio | 0:20 | Pantalla de título y elección de pesista. El menú responde antes de que carguen los modelos | A quién maneja |
-| Calentamiento | 0:40 (se puede saltear desde la segunda partida) | Un metrónomo de 8 toques mide el atraso del dispositivo. Después, dos levantamientos livianos (60 %) enseñan la frase de control y uno **pesado guionado** (exigencia de 98 %, sin costo) enseña la pelea, la traba de codos y el paso a la chicharra. Muestra la forma del día («hoy el arranque sale liviano») | Aceptar o no la corrección de atraso |
+| Calentamiento | 0:40 a 1:00 (se puede saltear) | **Fácil**: tutorial guiado la primera vez (un arranque en cámara lenta que se detiene antes de cada toque y no se puede fallar, y dos prácticas a velocidad real con reintento); ver [CONTROLES.md](CONTROLES.md), sección 6. **Clásico**: un metrónomo de 8 toques mide el atraso del dispositivo; después, dos levantamientos livianos (60 %) enseñan la frase de control y uno **pesado guionado** (exigencia de 98 %, sin costo) enseña la pelea, la traba de codos y el paso a la chicharra | Saltear o repetir; en Clásico, aceptar o no la corrección de atraso |
 | Presentación | 0:20 | Entran los tres en el tablero con país, dorsal y apertura. Se anuncia el guion de la final (sección 7.3) | Apertura de arranque (hay un valor sugerido) |
 | Arranque | 2 a 4 min | Nueve intentos ordenados por kilos. Tres son del jugador | Kilos de cada intento, en el panel de su llamado |
 | Intervalo | 0:25 | Clasificación parcial; los tres recuperan Resto | Apertura de dos tiempos |
@@ -59,22 +59,27 @@ Todo panel que aparece queda bloqueado 400 ms y los kilos se confirman con un bo
 
 ### 3.1 Controles
 
-Hay un solo botón lógico. Se usa con cuatro gestos: apretar, mantener, soltar y tocar repetido.
+**Las teclas, los gestos, la señal en pantalla, el tutorial y los textos están en [CONTROLES.md](CONTROLES.md), que reemplaza a esta sección en todo eso.** Resumen:
+
+- **Fácil** (por defecto): cada gesto es **un toque** de la tecla en el momento de la señal. Arranque: ¡TIRÁ!, ¡EXPLOTÁ!, ¡RECIBÍ!; si la subida se traba, ¡EMPUJÁ! tocando rápido; la fijación y la bajada son automáticas. Dos tiempos: tres toques más, ¡FLEXIONÁ!, ¡ARRIBA!, ¡RECIBÍ!. Una capa de traducción (`web/js/game/controles.js`) convierte cada toque en el apretar o soltar que espera el núcleo; las ventanas son el doble de anchas y el tirón anticipado es un amague.
+- **Clásico**: el esquema de esta sección y de las secciones 3.3 a 4.1, sin cambios: un botón lógico con cuatro gestos (apretar, mantener, soltar y tocar repetido).
 
 | | Botón | Notas |
 |---|---|---|
 | Teclado | Barra espaciadora (también Enter) | Se ignora la repetición automática de la tecla |
-| Mouse | Clic izquierdo sobre el escenario | En el juego la cámara no se orbita con el mouse |
+| Mouse | No hace gestos del levantamiento, en ningún nivel | Solo aprieta botones de paneles. Los paneles también se manejan sin mouse: flechas o Tab, Enter, ← → para los kilos |
 | Táctil, vertical | Cualquier punto del 40 % inferior de la pantalla, sin contar el área segura del sistema | El escenario ocupa el 60 % superior. En el panel táctil no hay información crítica: queda bajo el pulgar |
 | Táctil, horizontal | Cualquier punto fuera de la franja de botones y del área segura | Sin menú contextual, sin zoom y sin desplazamiento de página |
-| Pausa | Esc o un botón chico arriba | Solo fuera del intento. Dentro del intento no hay pausa |
+| Pausa | Esc o un botón chico arriba | Solo fuera del intento. Dentro del intento no hay pausa. H o ? abre «Cómo se juega» |
+
+Lo que sigue en esta sección vale para los dos niveles, salvo donde dice Clásico.
 
 - **Varios dedos o varias teclas.** Fuera de la pelea cuentan como el mismo botón: está apretado mientras haya al menos uno apoyado. En la pelea y en la traba de codos, **cada contacto nuevo es un toque**, aunque haya otro dedo apoyado: así se puede alternar pulgares, o Espacio y Enter, sin perder toques.
 - **El instante de cada gesto** se toma del evento del navegador, en milisegundos, y no del cuadro dibujado. Así la precisión no depende de que el teléfono vaya a 30 cuadros por segundo.
 - **Corrección de atraso.** 0 ms en teclado y 40 ms en táctil por defecto. El metrónomo del calentamiento (8 toques sobre un pulso visual y sonoro, se toma la mediana) propone un valor. El máximo es 100 ms. Queda **fija para toda la partida**; entre partidas, la mediana de los últimos 30 gestos con ventana propone un ajuste. Solo se resta al medir el error de un gesto con ventana; nunca cambia el instante registrado.
 - **Interrupciones.** Si la página pierde visibilidad, entra una llamada o el sistema cancela el toque, no se toma como soltar. Antes de que la barra pase la rodilla es un amague sin costo y el reloj se pausa hasta volver. Después, en solitario el intento se repite desde el llamado (una vez por intento; la segunda es fallo); en el online hay una interrupción perdonada por partida, que queda en el registro, y las demás son fallo.
 - **Sin sonido se juega igual.** Todo aviso sonoro tiene un gemelo visual (sección 8.3).
-- Las ayudas visuales de sincronía van pegadas a la barra y nunca debajo del pulgar.
+- **La señal del jugador** (qué tocar y cuándo: verbo, círculo que se cierra sobre un aro fijo, tecla dibujada y paso) está siempre en el mismo lugar y nunca debajo del pulgar. Las ayudas pegadas a la barra (anillo, línea, medidor) quedan para Clásico y para los intentos de los rivales.
 
 ### 3.2 Cómo se siente el peso
 
@@ -699,14 +704,15 @@ Presentación, en `web/js/game/`:
 |---|---|
 | `main.js` | Entrada de `juego.html`, carga y bucle sin recorte de tiempo |
 | `roster.js` | Plantel del juego: nombre, país, bandera, dorsal y qué modelo usa cada uno. Marangi apunta al modelo de Brenner |
-| `input.js` | Teclado, puntero y táctil convertidos en eventos con su instante; fuente de tiempo inyectable para las pruebas |
+| `input.js` | Teclado y táctil convertidos en eventos con su instante (el mouse se informa aparte y no es gesto); teclado de los paneles; fuente de tiempo inyectable para las pruebas y la pausa |
+| `controles.js` | Capa de traducción del nivel Fácil (un toque por señal → apretar y soltar del núcleo), eventos automáticos y la señal que se muestra. Puro, sin DOM: lo usan el juego, los bots y las pruebas |
 | `director.js` | Cola de tomas: clip, cámara, gráfica y condición de fin; corte de reemplazo cuando falta un segmento |
 | `sequence.js` | Tramos de animación, ritmo variable, cambios de clip y grabación de lo dibujado para la repetición |
 | `cast.js` | Qué personaje está descargado, en memoria o dibujado; precarga del siguiente |
 | `effort.js` | Capas de esfuerzo |
 | `loosebar.js` | Barra suelta una vez que tocó la tarima (rebote y rodadura) y carga animada de discos |
 | `perf.js` | Registrador de cuadros por segundo y escalón de calidad «móvil» |
-| `ui/` | Pantallas: inicio, kilos, medidores, botón táctil, clasificación y resultado |
+| `ui/` | `senal.js` (la señal fija), `mensajes.js` (palabra de cada toque, línea de fallo, pasos de «Cómo se juega»), `ayudas.js` (anillo, línea y medidor de Clásico y de los rivales), `tablero.js` |
 
 Archivos de hoy que cambian. Cada cambio agrega una opción; el comportamiento por defecto, que es el del visor, queda igual.
 
@@ -734,6 +740,7 @@ No se tocan en la etapa 1: `blender/`, `web/models/`, `web/data/poses.json`, `we
   "semilla": 3735928559,   // solo en partidas locales; en el online nunca llega al cliente
   "cal": 40,               // corrección de atraso en ms (0 a 100), fija para toda la partida
   "nivel": "normal",
+  "ctl": "f",              // nivel de control de la persona: "f" Fácil, "c" Clásico; si falta, Clásico (CONTROLES.md, sección 4)
   "atletas": [ { "id": "ventura", "ctrl": "persona", "jugador": "u_123" },
                { "id": "brenner", "ctrl": "juego" },
                { "id": "marangi", "ctrl": "juego" } ],
@@ -753,6 +760,7 @@ No se tocan en la etapa 1: `blender/`, `web/models/`, `web/data/poses.json`, `we
 - Resultado, luces, causa del fallo y tabla **nunca viajan**: se recalculan.
 - Los llamados de los rivales figuran solo con pesista, levantamiento y número. Sus kilos, sus cambios y sus gestos los genera el núcleo, y el recálculo verifica que el orden coincida.
 - La declaración automática no se registra: sale del reglamento.
+- En Fácil, `ent` es la **salida de la capa de traducción** (lo que recibió el núcleo, incluida la bajada automática), no las teclas. `ctl` entra solo en el contexto de la persona: los rivales juegan siempre con las reglas de Clásico. No se subió la versión de reglas; con servidor hay que subirla y separar la tabla por `ctl`.
 
 **Semillas.** De la semilla salen la forma del día, los umbrales de los jueces, el instante de la chicharra y los gestos de los rivales.
 
@@ -815,10 +823,12 @@ El informe incluye además dos jugadores que no deberían ganar:
 | Metrónomo (un ritmo fijo, el mejor que encuentre) | Menos de 50 % de válidos promediando del 85 al 106 % con los errores de un jugador hábil |
 
 - **`tools/check_game.mjs`**, con el mismo patrón que la prueba del visor:
-  - Juega una partida completa por la vía real de entrada, con el reloj inyectado: la prueba adelanta el tiempo y la partida entra en menos de un minuto. Una vez con teclado y otra con toques en tamaño de teléfono.
-  - Juega además un intento corto en tiempo real por cada vía, para probar el reloj verdadero.
-  - Verifica que no haya errores de consola ni pedidos externos, que se visiten todos los estados, que la barra nunca quede bajo la tarima ni separada de las manos, y que el registro exportado dé la misma tabla al recalcularlo.
-  - No mide cuadros por segundo: la sesión cloud dibuja por software. La prueba del visor pide hoy una GPU concreta al lanzar el navegador; la del juego no puede depender de eso.
+  - Juega una partida completa en Fácil por la vía real de entrada, con el reloj inyectado: la prueba adelanta el tiempo y la partida entra en menos de un minuto. Una vez con teclado **sin mouse** (menús con Tab, flechas y Enter; tutorial incluido) y otra con toques en tamaño de teléfono. En Fácil la prueba toca mirando solo la señal que expone `JUEGO.estado()`.
+  - Juega además, con el reloj verdadero, el arranque guiado del tutorial y una práctica por cada vía, y prueba la pausa (Esc) y la ayuda (H). En Clásico juega el metrónomo y un intento de práctica.
+  - Verifica que no haya errores de consola ni pedidos externos, que se visiten todos los estados, que todo panel abra con foco visible en su botón principal, que un clic en el escenario no agregue entradas, que la señal se vea entera y no tape el zócalo, que la barra nunca quede bajo la tarima ni separada de las manos y que suba también en el tutorial, y que el registro exportado dé la misma tabla al recalcularlo.
+  - El navegador sale de `tools/browser.mjs` (`launchOptions()`): placa real si la hay, software si no. No mide cuadros por segundo.
+- **`tools/play_human.mjs`**, sin navegador: el criterio de jugabilidad de [CONTROLES.md](CONTROLES.md), sección 9. Bots con error humano que solo miran la señal (casual 85 % o más, flojo 50 % o más) y un bot que toca al azar (menos de 10 %), en aperturas y en Fácil. Sale con error si no se cumple.
+- **`tools/primera.mjs`**: capturas de lo que ve un jugador nuevo (inicio, cada parada del tutorial, cada señal a velocidad real, una línea de fallo), en escritorio, teléfono y Clásico, en `out/primera/`. Es para mirarlas: la pregunta es si alguien que no conoce el juego entiende qué tocar y cuándo.
 
 ### 9.8 Riesgos
 
@@ -924,8 +934,8 @@ Alineado con [PLAN.md](PLAN.md). La etapa 1 es el juego mínimo jugable **sin ni
 
 | Tema | Entra |
 |---|---|
-| Entrada | `web/juego.html`; teclado, mouse y táctil; calentamiento con metrónomo de atraso y levantamiento pesado guionado |
-| Intento | El botón único completo: tensión, tirón, explosión, recepción, pelea, traba, apoyo firme, chicharra y amague. Los tres enviones |
+| Entrada | `web/juego.html`; teclado y táctil (el mouse solo en paneles); niveles de control Fácil y Clásico ([CONTROLES.md](CONTROLES.md)); tutorial guiado en Fácil; en Clásico, calentamiento con metrónomo de atraso y levantamiento pesado guionado |
+| Intento | El botón único completo (Clásico): tensión, tirón, explosión, recepción, pelea, traba, apoyo firme, chicharra y amague. Los tres enviones. En Fácil, lo mismo traducido a un toque por señal |
 | Resultados | Válido, nulo y todos los fallos de la sección 5, con su causa en texto. **Todos los fallos se ven con el mismo corte**: lo que los distingue en esta etapa es el texto y la repetición |
 | Competencia | Orden por kilos, tres intentos por levantamiento, declaración automática, panel único con cambios, reloj, jueces de a una luz, total, desempate, sin marca, Resto, forma del día, guion, La cuenta, frases del entrenador, etiquetas |
 | Pesistas | Los tres. Marangi usa el modelo de Brenner con tela de color plano y otro nombre en la gráfica |
