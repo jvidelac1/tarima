@@ -371,8 +371,10 @@ export class Athlete {
   }
   /** Mezcla dos muestras cualesquiera del clip (unión cargada → envión durante la pausa del rack). */
   setPair(i, j, u) { const n = this.snap.length - 1, k = x => Math.min(n, Math.max(0, x | 0)); this._blend(this.snap[k(i)], this.snap[k(j)], Math.min(1, Math.max(0, u))); }
-  _blend(A, B, u) {
-    for (let i = 0; i < this.bones.length; i++) { const b = this.bones[i]; b.quaternion.copy(A[i][0]).slerp(B[i][0], u); b.position.copy(A[i][1]).lerp(B[i][1], u); }
+  /** Como setPair, y el resultado se mezcla en `w` con la muestra `k` (el juego: de la pose del fallo a otra fase validada). El visor no lo usa. */
+  setMix(i, j, u, k, w) { const n = this.snap.length - 1, c = x => Math.min(n, Math.max(0, x | 0)); this._blend(this.snap[c(i)], this.snap[c(j)], Math.min(1, Math.max(0, u)), this.snap[c(k)], Math.min(1, Math.max(0, w))); }
+  _blend(A, B, u, C = null, uc = 0) {
+    for (let i = 0; i < this.bones.length; i++) { const b = this.bones[i]; b.quaternion.copy(A[i][0]).slerp(B[i][0], u); b.position.copy(A[i][1]).lerp(B[i][1], u); if (C && uc > 0) { b.quaternion.slerp(C[i][0], uc); b.position.lerp(C[i][1], uc); } }
     this.root.updateMatrixWorld(true);
     const w = this.corr;
     for (const arm of this.arms) {

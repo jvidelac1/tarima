@@ -56,6 +56,15 @@ jobs:
         if: ${{ !cancelled() }}
         run: node tools/play_human.mjs 2>&1 | tee out/logs/play_human.log
 
+      - name: Caída de la barra sin navegador (caida_test)
+        if: ${{ !cancelled() }}
+        run: node tools/caida_test.mjs 2>&1 | tee out/logs/caida_test.log
+
+      - name: Escenas de emoción (check_escenas)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 20
+        run: node tools/check_escenas.mjs 2>&1 | tee out/logs/check_escenas.log
+
       - name: Partida completa por teclado y por toques (check_game)
         if: ${{ !cancelled() }}
         timeout-minutes: 25
@@ -79,9 +88,9 @@ jobs:
         run: |
           {
             echo "### Pruebas del juego (dibujo por software: no mide cuadros por segundo)"
-            for f in sim_test play_human check_game check_fluidez capturas; do
+            for f in sim_test play_human caida_test check_escenas check_game check_fluidez capturas; do
               echo; echo "**$f**"; echo '```'
-              if [ -f "out/logs/$f.log" ]; then tail -n 12 "out/logs/$f.log"; else echo "(no corrió)"; fi
+              if [ -f "out/logs/$f.log" ]; then tail -n 14 "out/logs/$f.log"; else echo "(no corrió)"; fi
               echo '```'
             done
           } >> "$GITHUB_STEP_SUMMARY"
