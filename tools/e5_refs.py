@@ -9,10 +9,13 @@ render crudo de esa vista). Corre los trabajos con tools/comfy_run.mjs contra el
 Uso (en el pod, desde la raíz del repo, con ComfyUI en 127.0.0.1:8188 y sin Blender corriendo):
   .venv/bin/python tools/e5_refs.py frente [--juegos rest_bust,fin_bust,fin_full] [--intentos 3]
   .venv/bin/python tools/e5_refs.py vistas [--juegos ...] [--vistas left,back,right] [--orden plan|inverso] [--intentos 3]
+  .venv/bin/python tools/e5_refs.py vistas --una [...]   una sola imagen de entrada por vista (el render crudo), como el frente
   .venv/bin/python tools/e5_refs.py cerrar          arma out/arte/refs_gen/<nombre>.png (RGBA) y resumen.json; lo que no
                                                     llegó al objetivo queda con el render crudo y así se anota
   .venv/bin/python tools/e5_refs.py medir <repintada.png> <cruda.png>      mide un par suelto
   .venv/bin/python tools/e5_refs.py descartar <nombre> <semilla> <motivo>   marca un intento como descartado a ojo (no se elige más)
+  .venv/bin/python tools/e5_refs.py alternativa <nombre> <semilla> <motivo> deja ese intento en refs_gen/bajo_umbral/<nombre>.png (RGBA) y lo
+                                                    anota en el resumen: una repintada que vale la pena probar aunque no sea la elegida
   .venv/bin/python tools/e5_refs.py hoja [<nombre> ...]                     hoja de control por imagen en refs_gen/hojas: cruda,
                                                     repintada y diferencia de silueta (rojo = sobra, azul = falta) por intento
   .venv/bin/python tools/e5_refs.py objetivo T_A_s1 T_B_s2 T_C_s1          copia las candidatas elegidas a out/arte/target
@@ -33,6 +36,8 @@ y el máximo del canal mayor y la fracción de píxeles por encima de 24; «limp
 El número no alcanza: la indicación v1 del frente (lista de músculos de frente y de espalda juntos) dio IoU 0,918 con la
 espalda pintada sobre el pecho. Por eso la indicación v2 nombra la vista y solo los músculos que se ven desde ahí, pide no
 ensanchar nada, y cada intento se mira en la hoja de control antes de darlo por bueno (`descartar` saca los que no sirven).
+Con dos imágenes de entrada (frente repintado y render crudo de la vista) la silueta se conserva (IoU 0,97 a 0,99) pero Qwen
+casi copia el render crudo: en orden `plan` no se ve cambio de musculatura. `vistas --una` repinta la vista sola, como el frente.
 """
 import argparse, json, os, shutil, subprocess, sys, time
 import numpy as np
@@ -87,6 +92,19 @@ def p_frente(juego):
 NEG = ('text, letters, numbers, logo, brand name, watermark, belt, flag, national emblem, celebrity, famous athlete, '
        'real person likeness, extra fingers, fused fingers, deformed hands, extra limbs, waxy skin, plastic skin, cartoon, anime, '
        'illustration, blurry, low resolution, gray background, gradient background, floor, cast shadow, rim light')
+
+
+MIRA = {'left': 'This is a side view of the figure, seen from his left side: the face points to the left of the image.',
+        'right': 'This is a side view of the figure, seen from his right side: the face points to the right of the image.',
+        'back': 'This is a back view: the figure is seen from behind, the back of the head and the back face the camera.'}
+
+
+def p_una(vista, juego):
+    """Una sola imagen (el render crudo de la vista), como el frente: con dos imágenes Qwen casi copia el render."""
+    return (f'{MIRA[vista]} Keep the exact outline, pose, framing and camera of the figure, and keep the background pure solid black. '
+            f'Repaint only the surface of the body so that it reads as {QUIEN}: {anat(vista, juego)}. {NO_ENSANCHAR} '
+            f'He wears {ROPA[juego.split("_")[1]]}, and no band at the waist. Same head, beard, hair, skin tone, white wrist wraps, and the '
+            'black armband tattoo only where it is now. Realistic skin. Soft even studio lighting, no cast shadows, no rim light.')
 
 
 def p_vista(vista, orden, juego):
@@ -231,15 +249,21 @@ def cmd_frente(a):
 def cmd_vistas(a):
     for juego in a.juegos:
         fr = frente_elegido(juego, a)
-        if not fr: sys.exit(f'Falta el frente repintado de {juego}: correr primero `frente`.')
+        if not fr and not a.una: sys.exit(f'Falta el frente repintado de {juego}: correr primero `frente`.')
         for vista in a.vistas:
             nombre = f'{a.personaje}_{juego}_{vista}'; cr = entrada(nombre)
-            im = {'41': fr, 'ref2': cr} if a.orden == 'plan' else {'41': cr, 'ref2': fr}
-            m = lote(nombre, lambda: {'plantilla': 'image_qwen_image_edit_2511_int8', 'puentes': PUENTES,
-                                      'agregar': {'ref2': {'class_type': 'LoadImage', 'inputs': {'image': ''}},
-                                                  'ref2s': {'class_type': 'FluxKontextImageScale', 'inputs': {'image': ['ref2', 0]}}},
-                                      'fijos': {'TextEncodeQwenImageEditPlus.image2': ['ref2s', 0], **({'VAEEncode.pixels': ['ref2s', 0]} if a.orden == 'plan' else {})},
-                                      'trabajos': [{'indicacion': p_vista(vista, a.orden, juego), 'negativa': NEG, 'imagenes': im}]}, a)
+            if a.una:
+                a.orden = 'una'
+                plan_de = lambda: {'plantilla': 'image_qwen_image_edit_2511_int8', 'puentes': PUENTES,
+                                   'trabajos': [{'indicacion': p_una(vista, juego), 'negativa': NEG, 'imagenes': [cr]}]}
+            else:
+                im = {'41': fr, 'ref2': cr} if a.orden == 'plan' else {'41': cr, 'ref2': fr}
+                plan_de = lambda: {'plantilla': 'image_qwen_image_edit_2511_int8', 'puentes': PUENTES,
+                                   'agregar': {'ref2': {'class_type': 'LoadImage', 'inputs': {'image': ''}},
+                                               'ref2s': {'class_type': 'FluxKontextImageScale', 'inputs': {'image': ['ref2', 0]}}},
+                                   'fijos': {'TextEncodeQwenImageEditPlus.image2': ['ref2s', 0], **({'VAEEncode.pixels': ['ref2s', 0]} if a.orden == 'plan' else {})},
+                                   'trabajos': [{'indicacion': p_vista(vista, a.orden, juego), 'negativa': NEG, 'imagenes': im}]}
+            m = lote(nombre, plan_de, a)
             print(f"VISTA {nombre}: queda s{m['semilla']} con IoU {m['iou']:.4f}" if m else f"VISTA {nombre}: sin intentos válidos", flush=True)
 
 
@@ -255,12 +279,18 @@ def cmd_cerrar(a):
                 e = {'origen': 'qwen', 'semilla': m['semilla'], 'de': m['archivo'], 'iou': d['iou'], 'fondo_p99': d['fondo_p99'], 'fondo_max': d['fondo_max']}
             else:
                 shutil.copyfile(crudo, dst)
-                if m and not fuerza:      # la mejor repintada que no llegó al objetivo queda aparte, por si sirve igual
+                if m and not fuerza and not any(h.get('alternativa') for h in hechos):      # la mejor repintada que no llegó al objetivo queda aparte, por si sirve igual
                     alt = ruta(GEN, 'bajo_umbral', nombre + '.png'); os.makedirs(os.path.dirname(alt), exist_ok=True)
                     d, mk = medir(ruta(m['archivo']), crudo, a.umbral); con_alfa(ruta(m['archivo']), mk, alt)
                 e = {'origen': 'cruda', 'motivo': 'descartada a ojo' if fuerza and m else ('sin intentos' if not hechos else 'todos los intentos descartados a ojo' if not m else f"mejor IoU {m['iou']:.4f}, fondo {'limpio' if m['fondo_limpio'] else 'sucio'}")}
                 if m and not fuerza: e.update(mejor_bajo_umbral=f'{GEN}/bajo_umbral/{nombre}.png', semilla=m['semilla'], de=m['archivo'], iou=m['iou'])
-            e['intentos'] = [{k: h.get(k) for k in ('semilla', 'iou', 'iou_sin_rellenar', 'area_relativa', 'fondo_p99', 'fondo_max', 'fondo_limpio', 'orden', 'indicacion_v', 'denoise', 'segundos', 'descartada')} for h in hechos]
+            alt = next((h for h in hechos if h.get('alternativa')), None)
+            if alt:
+                dalt = ruta(GEN, 'bajo_umbral', nombre + '.png'); os.makedirs(os.path.dirname(dalt), exist_ok=True)
+                d, mk = medir(ruta(alt['archivo']), crudo, a.umbral); con_alfa(ruta(alt['archivo']), mk, dalt)
+                e['alternativa'] = {'archivo': f'{GEN}/bajo_umbral/{nombre}.png', 'semilla': alt['semilla'], 'de': alt['archivo'], 'iou': alt['iou'], 'motivo': alt['alternativa']}
+                e.pop('mejor_bajo_umbral', None)
+            e['intentos'] = [{k: h.get(k) for k in ('semilla', 'iou', 'iou_sin_rellenar', 'area_relativa', 'fondo_p99', 'fondo_max', 'fondo_limpio', 'orden', 'indicacion_v', 'denoise', 'segundos', 'descartada', 'alternativa')} for h in hechos]
             res['imagenes'][nombre] = e
             print(f"{nombre}: {e['origen']}" + (f" s{e['semilla']} IoU {e['iou']:.4f}" if e['origen'] == 'qwen' else f" ({e['motivo']})"))
     json.dump(res, open(ruta(GEN, 'resumen.json'), 'w'), ensure_ascii=False, indent=1)
@@ -274,6 +304,16 @@ def cmd_descartar(a):
     if not n: sys.exit(f'{nombre} no tiene un intento con semilla {semilla}')
     json.dump(hechos, open(ruta(GEN, 'qwen', nombre + '.intentos.json'), 'w'), ensure_ascii=False, indent=1)
     m = mejor(hechos); print(f"{nombre} s{semilla} descartada ({motivo}); queda " + (f"s{m['semilla']} IoU {m['iou']:.4f}" if m else 'sin intentos válidos'))
+
+
+def cmd_alternativa(a):
+    nombre, semilla, motivo = a.resto[0], int(a.resto[1]), ' '.join(a.resto[2:])
+    hechos = intentos_de(nombre); h = next((x for x in hechos if x['semilla'] == semilla), None)
+    if not h: sys.exit(f'{nombre} no tiene un intento con semilla {semilla}')
+    for x in hechos: x.pop('alternativa', None)
+    h['alternativa'] = motivo or 'alternativa'
+    json.dump(hechos, open(ruta(GEN, 'qwen', nombre + '.intentos.json'), 'w'), ensure_ascii=False, indent=1)
+    print(f"{nombre} s{semilla}: alternativa (IoU {h['iou']:.4f}); `cerrar` la deja en {GEN}/bajo_umbral/{nombre}.png")
 
 
 def hoja(nombre, lado=512):
@@ -290,7 +330,7 @@ def hoja(nombre, lado=512):
         fila = Image.new('RGB', (lado * 3, lado + 22), (20, 20, 20))
         for k, im in enumerate([cr, g.resize((lado, lado), Image.LANCZOS), Image.fromarray(dif).resize((lado, lado), Image.LANCZOS)]): fila.paste(im, (k * lado, 22))
         ImageDraw.Draw(fila).text((6, 5), f"{nombre} s{h['semilla']} v{h.get('indicacion_v', 1)} d{h.get('denoise', 1.0)} {h.get('orden') or ''} IoU {h['iou']:.4f} area x{h['area_relativa']:.3f} fondo p99 {h['fondo_p99']:.0f}"
-                                  + (' DESCARTADA: ' + h['descartada'] if h.get('descartada') else ''), fill=(255, 255, 255))
+                                  + (' DESCARTADA: ' + h['descartada'] if h.get('descartada') else '') + (' ALTERNATIVA' if h.get('alternativa') else ''), fill=(255, 255, 255))
         filas.append(fila)
     out = Image.new('RGB', (lado * 3, sum(f.size[1] for f in filas))); y = 0
     for f in filas: out.paste(f, (0, y)); y += f.size[1]
@@ -318,14 +358,15 @@ def cmd_objetivo(a):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
-    ap.add_argument('cmd', choices=['frente', 'vistas', 'cerrar', 'medir', 'objetivo', 'descartar', 'hoja']); ap.add_argument('resto', nargs='*')
+    ap.add_argument('cmd', choices=['frente', 'vistas', 'cerrar', 'medir', 'objetivo', 'descartar', 'alternativa', 'hoja']); ap.add_argument('resto', nargs='*')
     ap.add_argument('--juegos', default='rest_bust,fin_bust,fin_full'); ap.add_argument('--vistas', default='left,back,right')
     ap.add_argument('--orden', default='plan', choices=['plan', 'inverso']); ap.add_argument('--intentos', type=int, default=3)
     ap.add_argument('--umbral', type=int, default=16); ap.add_argument('--iou', type=float, default=0.92)
     ap.add_argument('--crudas', default='', help='nombres que quedan con el render crudo aunque midan bien (descartadas a ojo)')
     ap.add_argument('--personaje', default='ventura')
+    ap.add_argument('--una', action='store_true', help='vistas: una sola imagen de entrada (el render crudo), sin el frente repintado')
     ap.add_argument('--denoise', type=float, default=1.0, help='denoise del muestreador; el lienzo es el render crudo de la vista (en orden plan, se cambia el lienzo a la imagen 2)')
     a = ap.parse_args(); DENOISE = a.denoise; a.juegos = a.juegos.split(','); a.vistas = a.vistas.split(','); a.crudas = [x for x in a.crudas.split(',') if x]
     if a.cmd == 'medir':
         d, _ = medir(a.resto[0], a.resto[1], a.umbral); print(json.dumps(d, indent=1))
-    else: {'frente': cmd_frente, 'vistas': cmd_vistas, 'cerrar': cmd_cerrar, 'objetivo': cmd_objetivo, 'descartar': cmd_descartar, 'hoja': cmd_hoja}[a.cmd](a)
+    else: {'frente': cmd_frente, 'vistas': cmd_vistas, 'cerrar': cmd_cerrar, 'objetivo': cmd_objetivo, 'descartar': cmd_descartar, 'alternativa': cmd_alternativa, 'hoja': cmd_hoja}[a.cmd](a)
