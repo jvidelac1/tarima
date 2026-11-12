@@ -150,7 +150,7 @@ async function abrir(ctx, cpu, guardado, extra = '') {
   page.on('console', m => { if (m.type() === 'error') errs.push('console.error: ' + m.text()); });
   page.on('pageerror', e => errs.push('pageerror: ' + e.message));
   if (guardado) await page.addInitScript(g => { try { if (!sessionStorage.getItem('__flu')) { for (const [k, v] of Object.entries(g)) localStorage.setItem(k, v); sessionStorage.setItem('__flu', '1'); } } catch { /* sin almacenamiento */ } }, guardado);
-  await page.goto(`${base}juego.html?semilla=${SEMILLA}${Q ? '&q=' + Q : ''}${LASTRE ? '&lastre=' + LASTRE : ''}${DEPURA ? '&depura=1' : ''}${LOGICA ? '&dibujo=0' : ''}${extra}`, { waitUntil: 'load' });
+  await page.goto(`${base}juego.html?lang=es&semilla=${SEMILLA}${Q ? '&q=' + Q : ''}${LASTRE ? '&lastre=' + LASTRE : ''}${DEPURA ? '&depura=1' : ''}${LOGICA ? '&dibujo=0' : ''}${extra}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 180000 });
   if (!await page.evaluate(() => window.JUEGO.listo)) throw new Error('el juego no inició');
   const cdp = await ctx.newCDPSession(page);
@@ -267,16 +267,16 @@ async function tutorial() {
   if (levs !== 1) problemas.push(`${tag} antes de jugar hay ${levs} levantamientos; tiene que ser uno solo`);
   if (seg > 60) problemas.push(`${tag} el tutorial tardó ${seg.toFixed(0)} s con un jugador que toca a los 450 ms de cada señal; tiene que durar menos de un minuto`);
   if (a.guardado !== '1') problemas.push(`${tag} al terminar el tutorial no quedó guardado que ya se hizo`);
-  if (!/saltear/i.test(ini)) problemas.push(`${tag} el inicio no ofrece saltear el tutorial`);
+  if (!/saltar la práctica/i.test(ini)) problemas.push(`${tag} el inicio no ofrece saltar la práctica`);
   // recargar: no se repite
   await page.reload({ waitUntil: 'load' }); await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 180000 });
   await poner(page, { seed: SEMILLA, reac: 450, lag: 30, sd: 45, per: 170, jit: 25, fuera: false, doble: false });
   const ini2 = await page.evaluate(() => document.querySelector('#capa .panel').textContent.replace(/\s+/g, ' '));
   await jugar(page, r => r.pantalla === 'presentacion' && r.panel, { minutos: 2 });
   const b = await page.evaluate(() => ({ visitados: JUEGO.E.visitados.slice(), intentos: __flu.intentos.length }));
-  console.log(`${tag} después de recargar: pantallas ${b.visitados.join(' → ')} · levantamientos de tutorial: ${b.intentos} · el inicio ${/repetir tutorial/i.test(ini2) ? 'ofrece «Repetir tutorial»' : 'NO ofrece repetirlo'}`);
+  console.log(`${tag} después de recargar: pantallas ${b.visitados.join(' → ')} · levantamientos de tutorial: ${b.intentos} · el inicio ${/repetir la práctica/i.test(ini2) ? 'ofrece «Repetir la práctica»' : 'NO ofrece repetirla'}`);
   if (b.intentos || b.visitados.includes('tutorial') || b.visitados.includes('guiado')) problemas.push(`${tag} al recargar el tutorial volvió a aparecer`);
-  if (!/repetir tutorial/i.test(ini2)) problemas.push(`${tag} después de hacerlo, el inicio no ofrece «Repetir tutorial»`);
+  if (!/repetir la práctica/i.test(ini2)) problemas.push(`${tag} después de hacerla, el inicio no ofrece «Repetir la práctica»`);
   // «Repetir tutorial» y saltearlo con Esc en medio del levantamiento guiado
   await page.reload({ waitUntil: 'load' }); await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 180000 }); await dormir(600);
   for (let i = 0; i < 40 && !await page.evaluate(() => document.activeElement?.id === 'btn-otro'); i++) await page.keyboard.press('Tab');
@@ -286,7 +286,7 @@ async function tutorial() {
   const salto = await page.waitForFunction(() => JUEGO.estado().pantalla === 'presentacion', null, { timeout: 5000 }).then(() => true, () => false);
   const c = await page.evaluate(() => ({ pantalla: JUEGO.estado().pantalla, sobre: JUEGO.estado().sobre, propios: (JUEGO.E.propios || []).length, saltar: !document.getElementById('saltar').hidden, errores: JUEGO.E.errores }));
   console.log(`${tag} «Repetir tutorial» y Esc en medio del guiado: botón visible ${sv.visible} («${sv.txt}») · ${salto ? `a la presentación en ${Date.now() - tEsc} ms` : 'NO salteó'} · pantalla ${c.pantalla}`);
-  if (!sv.visible || !/saltear/i.test(sv.txt) || !/esc/i.test(sv.txt)) problemas.push(`${tag} durante el tutorial no se ve cómo saltearlo (${JSON.stringify(sv)})`);
+  if (!sv.visible || !/saltar/i.test(sv.txt) || !/esc/i.test(sv.txt)) problemas.push(`${tag} durante el tutorial no se ve cómo saltearlo (${JSON.stringify(sv)})`);
   if (!salto || c.sobre || c.propios || c.saltar) problemas.push(`${tag} Esc no salteó el tutorial limpio: ${JSON.stringify(c)}`);
   for (const e of c.errores.slice(0, 3)) problemas.push(`${tag} ${e}`);
   for (const e of errs.slice(0, 5)) problemas.push(`${tag} ${e}`);

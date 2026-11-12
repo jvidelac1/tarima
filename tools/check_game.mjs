@@ -11,11 +11,13 @@
 //  - lento (Fácil, con Brenner): el arranque guiado tocando ¡EMPUJÁ! cada 600 ms tiene que salir válido a la primera; en la
 //    final, 40 s con el panel del llamado abierto no gastan reloj; y después de confirmar, sin tocar, la señal cuenta los
 //    últimos segundos y el nulo por reloj lleva su línea.
+//  - idioma: con ?lang=en la bienvenida sale en inglés; el selector ES · EN la pasa a español sin recargar, lo recuerda y
+//    actualiza <html lang> y <title>. Las demás corridas fijan ?lang=es y comparan con las claves de web/js/game/i18n/es.js.
 //  - Falla ante errores de consola, excepciones, 404 o pedidos externos; si no se visitan todos los estados; si un panel
 //    abre sin foco en su botón principal; si un clic en el escenario agrega entradas; si la señal no se ve o se sale del
 //    escenario; si la barra queda bajo la tarima, separada de las manos o no sube en el tutorial; o si el registro
 //    exportado no recalcula a la misma tabla.
-// Uso: node tools/check_game.mjs [--headed] [--only=teclado|tactil|clasico|lento] [--semilla=N] [--dibujo]
+// Uso: node tools/check_game.mjs [--headed] [--only=idioma|teclado|tactil|clasico|lento] [--semilla=N] [--dibujo]
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,6 +26,8 @@ import { createRequire } from 'node:module';
 import { launchOptions, isSoftware } from './browser.mjs';
 import { leerDatos } from '../web/js/sim/data.js';
 import { recalcular, resumen } from '../web/js/sim/replay.js';
+import ES from '../web/js/game/i18n/es.js';
+import EN from '../web/js/game/i18n/en.js';
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
@@ -44,9 +48,10 @@ fs.mkdirSync(OUT, { recursive: true });
 const problemas = [], notas = [];
 const browser = await chromium.launch(launchOptions({ headed: HEADED }));
 
-const ESTADOS = ['inicio', 'presentacion', 'llamado', 'intento', 'decision', 'repeticion', 'resumen', 'intervalo', 'clasificacion', 'ceremonia', 'fin'];
+const ESTADOS = ['inicio', 'presentacion', 'apertura', 'llamado', 'intento', 'decision', 'repeticion', 'resumen', 'intervalo', 'clasificacion', 'ceremonia', 'fin'];
 
 async function corrida(via) {
+  if (via === 'idioma') return idiomas();
   const tactil = via === 'tactil', clasico = via === 'clasico', lento = via === 'lento', tag = `[${via}]`;
   const ctx = await browser.newContext(tactil ? { viewport: { width: 844, height: 390 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true } : { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
   const page = await ctx.newPage(), cdp = tactil ? await ctx.newCDPSession(page) : null;
@@ -74,7 +79,7 @@ async function corrida(via) {
     return true;
   };
 
-  await page.goto(`${base}juego.html?semilla=${SEMILLA}&q=${tactil ? 'movil&ritmo=completa' : 'baja'}${clasico ? '&ctl=c' : ''}${DIBUJO ? '' : '&dibujo=0'}`, { waitUntil: 'load' });
+  await page.goto(`${base}juego.html?lang=es&semilla=${SEMILLA}&q=${tactil ? 'movil&ritmo=completa' : 'baja'}${clasico ? '&ctl=c' : ''}${DIBUJO ? '' : '&dibujo=0'}`, { waitUntil: 'load' });
   if (!await J(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
   const gl = await J(() => { const g = JUEGO.escena.renderer.getContext(), e = g.getExtension('WEBGL_debug_renderer_info'); return e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : '?'; });
   console.log(`${tag} ${gl}`);
@@ -96,7 +101,7 @@ async function corrida(via) {
         const g = I.senal;
         if (g) {      // la señal tiene que verse, con la tecla dibujada, y quedar dentro del escenario
           vistas.add(g.verbo); senalN++;
-          if (!g.visible || !(tactil ? /TOCÁ/ : /ESPACIO/).test(g.texto) || !g.texto.includes(g.verbo)) { senalMal++; if (senalMal < 3) mal(`la señal «${g.verbo}» no se ve completa: visible ${g.visible}, texto «${g.texto}»`); }
+          if (!g.visible || !g.texto.includes(ES[tactil ? 'tecla.toca' : 'tecla.espacio']) || !g.texto.includes(g.verbo)) { senalMal++; if (senalMal < 3) mal(`la señal «${g.verbo}» no se ve completa: visible ${g.visible}, texto «${g.texto}»`); }
           if (senalN % 40 === 1) { const r = await J(() => { const a = document.getElementById('senal').getBoundingClientRect(), b = document.getElementById('escena').getBoundingClientRect(), z = document.getElementById('zocalo').getBoundingClientRect(); return { fuera: a.left < b.left - 1 || a.right > b.right + 1 || a.top < b.top - 1 || a.bottom > b.bottom + 1, zocalo: z.width > 0 && a.left < z.right && a.right > z.left && a.top < z.bottom && a.bottom > z.top, ancho: document.documentElement.scrollWidth > innerWidth + 1 }; }); if (r.fuera) mal('la señal se sale del escenario'); if (r.zocalo) mal('la señal tapa el zócalo'); if (r.ancho) mal('la página desborda a lo ancho'); }
         }
         if (I.ctl === 'c') {      // Clásico: apretar, mantener y soltar
@@ -165,9 +170,17 @@ async function corrida(via) {
 
   await J(() => JUEGO.test.manual());
   const s0 = await J(() => JUEGO.estado());
-  if (s0.foco !== '#btn-empezar') mal(`el inicio no abre con el foco en «Empezar» (foco: ${s0.foco})`);
-  const inicioTxt = await page.locator('#capa .panel').textContent();
-  if (!/Cómo se juega/.test(inicioTxt) || !(tactil ? /TOCÁ/ : /ESPACIO/).test(inicioTxt) || /Un solo botón/.test(inicioTxt)) mal('la pantalla de inicio no muestra los tres pasos con la tecla dibujada');
+  // la bienvenida: con teclado el foco arranca en el nombre; con el dedo, en «Jugar» (no abre el teclado de pantalla sin pedirlo)
+  if (s0.foco !== (tactil ? '#btn-empezar' : '#nombre')) mal(`la bienvenida no abre con el foco en ${tactil ? '«Jugar»' : 'el nombre'} (foco: ${s0.foco})`);
+  const ini = await J(() => { const pn = document.querySelector('#capa .panel'); return { jugar: pn.querySelector('#btn-empezar')?.textContent.trim(), nombre: !!pn.querySelector('input#nombre'), idiomas: pn.querySelectorAll('.idi').length, ayuda: !!pn.querySelector('#btn-ayuda'), tarjetas: pn.querySelectorAll('.pesista').length, opciones: !!pn.querySelector('.nivel'), lang: document.documentElement.lang }; });
+  if (ini.jugar !== ES['bienvenida.jugar'] || !ini.nombre || ini.idiomas !== 2 || !ini.ayuda || ini.tarjetas !== 3 || ini.opciones || ini.lang !== 'es') mal(`la bienvenida no tiene nombre, tres tarjetas, «Jugar», ES · EN y ayuda con «Opciones» plegado: ${JSON.stringify(ini)}`);
+  // el nombre se escribe sin que el juego se coma las teclas: la H no abre la ayuda y Espacio no es un toque
+  const NOMBRE = "Hugo O'Neil";
+  if (!tactil) {
+    const k0 = await J(() => JUEGO.toques.total); await page.keyboard.type(NOMBRE);
+    const k1 = await J(() => ({ toques: JUEGO.toques.total, sobre: JUEGO.estado().sobre, valor: document.getElementById('nombre')?.value, titulo: document.getElementById('pesista-t')?.textContent }));
+    if (k1.toques !== k0 || k1.sobre || k1.valor !== NOMBRE || !k1.titulo.includes(NOMBRE)) mal(`escribir el nombre: ${JSON.stringify(k1)} (toques antes ${k0})`);
+  }
 
   if (clasico) {
     // ---- Clásico: metrónomo y un intento de práctica, con el esquema de mantener y soltar
@@ -178,7 +191,7 @@ async function corrida(via) {
     if (r.cal !== 30) mal(`el metrónomo midió ${r.cal} ms y los toques iban con 30 ms de atraso`);
     if (r.propios[0]?.res !== 'valido' || r.propios[0].ctl !== 'c') mal(`la práctica en Clásico no salió válida: ${JSON.stringify(r.propios[0])}`);
     if (!(r.alto.practica > 1.5)) mal(`en el calentamiento la barra no subió (máximo ${r.alto.practica?.toFixed(2)} m)`);
-    for (const v of ['APRETÁ Y MANTENÉ', '¡SOLTÁ!', '¡APRETÁ!', 'DEJÁ APRETADO']) if (!vistas.has(v)) mal(`en Clásico no apareció la señal «${v}»`);
+    for (const v of ['senal.aprieta', 'senal.suelta', 'senal.recibe_pro', 'senal.deja'].map(k => ES[k])) if (!vistas.has(v)) mal(`en Clásico no apareció la señal «${v}»`);
     await foto('practica'); await cerrar(); return;
   }
 
@@ -197,7 +210,7 @@ async function corrida(via) {
     const a2 = await J(() => ({ s: JUEGO.estado(), reloj: document.getElementById('reloj').textContent }));
     console.log(`${tag} panel del llamado: reloj ${a1.reloj}; 40 s después, ${a2.reloj} (pantalla ${a2.s.pantalla})`);
     if (a2.s.pantalla !== 'llamado' || !a2.s.panel || a2.reloj !== a1.reloj || !/^0:(30|45)$/.test(a1.reloj)) mal(`con el panel del llamado abierto el reloj corrió o venció: ${a1.reloj} → ${a2.reloj}, pantalla ${a2.s.pantalla}`);
-    if (!/arranca cuando confirmás/.test(a1.txt) || !/ENTER/.test(a1.txt)) mal(`el panel del llamado no dice cuándo arranca el reloj: «${a1.txt.replace(/\s+/g, ' ').slice(0, 300)}»`);
+    if (!/arranca cuando confirmas/.test(a1.txt) || !/ENTER/.test(a1.txt)) mal(`el panel del llamado no dice cuándo arranca el reloj: «${a1.txt.replace(/\s+/g, ' ').slice(0, 300)}»`);
     // ---- confirmar y no tocar: cuenta regresiva en la señal y nulo por reloj con su línea
     await page.keyboard.press('Enter'); let aviso = '', ultimo = null;
     for (let i = 0; i < 100 && !ultimo; i++) {
@@ -209,13 +222,13 @@ async function corrida(via) {
     }
     console.log(`${tag} sin tocar después de confirmar: aviso «${aviso}» · ${ultimo ? `${ultimo.res}:${ultimo.causa} · «${ultimo.linea}»` : 'no terminó'}`);
     if (!aviso) mal('la señal no avisó que se acababa el reloj');
-    if (!ultimo || ultimo.res !== 'nulo' || ultimo.causa !== 'reloj' || !/desde que confirmás/.test(ultimo.linea)) mal(`el nulo por reloj no salió con su línea: ${JSON.stringify(ultimo)}`);
+    if (!ultimo || ultimo.res !== 'nulo' || ultimo.causa !== 'reloj' || !/desde que confirmas/.test(ultimo.linea)) mal(`el nulo por reloj no salió con su línea: ${JSON.stringify(ultimo)}`);
     await foto('reloj'); await cerrar(); return;
   }
 
   // ---- 1. Fácil: partida completa con el reloj inyectado, sin mouse
   const t0 = Date.now();
-  if (!await pulsa(`.pesista[data-id="${tactil ? 'brenner' : 'ventura'}"]`) || !await pulsa('.nivel[data-n="normal"]')) mal('no se pudo elegir pesista y nivel');
+  if (!await pulsa(`.pesista[data-id="${tactil ? 'brenner' : 'ventura'}"]`) || !await pulsa('#btn-opciones') || !await pulsa('.nivel[data-n="normal"]')) mal('no se pudo elegir pesista y nivel (en «Opciones»)');
   if (tactil) await pulsa('#btn-otro');      // táctil: saltea el tutorial (lo juega después, con el reloj verdadero)
   const envion = tactil ? () => 'split' : clave => (/intento 1/.test(clave) ? 'split' : /intento 2/.test(clave) ? 'squat' : 'power');
   // con teclado, en el tercer arranque no se toca la explosión a propósito: tiene que ser un fallo, con su corte y su línea
@@ -230,7 +243,7 @@ async function corrida(via) {
   if (seg > 90) notas.push(`${tag} la partida tardó ${seg.toFixed(0)} s`);
   if (r.registro.ctl !== 'f') mal(`el registro no quedó en Fácil (ctl ${r.registro.ctl})`);
   if (tactil && !r.visitados.includes('rival')) mal('final completa: no se mostró ningún intento de un rival');
-  for (const e of ESTADOS.concat(tactil ? [] : ['tutorial', 'guiado']).filter(e => !(tactil && e === 'resumen'))) if (!r.visitados.includes(e)) mal(`no se visitó el estado «${e}»`);
+  for (const e of ESTADOS.concat(tactil ? [] : ['tarjeta', 'tutorial', 'guiado']).filter(e => !(tactil && e === 'resumen'))) if (!r.visitados.includes(e)) mal(`no se visitó el estado «${e}»`);
   const rc = recalcular(r.registro, datos);
   if (!rc.ok) mal(`el registro exportado no recalcula: ${rc.error}`); else if (resumen(rc.tabla) !== r.tabla) mal(`recalculado «${resumen(rc.tabla)}», en pantalla «${r.tabla}»`);
   if (r.modelos !== 'brenner,ventura') mal(`modelos en memoria: ${r.modelos}`);
@@ -238,7 +251,7 @@ async function corrida(via) {
   if (r.monitor.barraMin < .2249) mal(`la barra quedó bajo la tarima: centro a ${(r.monitor.barraMin * 1000).toFixed(1)} mm`);
   if (r.monitor.manosMax > .16) mal(`la barra se separó de las manos: ${(r.monitor.manosMax * 1000).toFixed(0)} mm`);
   console.log(`${tag} barra: mínimo ${(r.monitor.barraMin * 1000).toFixed(1)} mm · manos a barra, máximo ${(r.monitor.manosMax * 1000).toFixed(0)} mm · ${r.monitor.cuadros} cuadros medidos · altura máxima por pantalla: ${Object.entries(r.monitor.alto).map(([k, v]) => `${k} ${v.toFixed(2)} m`).join(', ')}`);
-  for (const v of ['¡TIRÁ!', '¡EXPLOTÁ!', '¡RECIBÍ!', '¡EMPUJÁ!', 'AGUANTÁ', '¡ABAJO!', '¡FLEXIONÁ!', '¡ARRIBA!']) if (!vistas.has(v)) mal(`no apareció la señal «${v}»`);
+  for (const v of ['tira', 'explota', 'recibi', 'empuja', 'aguanta', 'abajo', 'flexiona', 'arriba'].map(k => ES['senal.' + k])) if (!vistas.has(v)) mal(`no apareció la señal «${v}»`);
   // el que toca cada señal en su momento tiene que levantar todo (salvo el fallo a propósito)
   const esperado = tactil ? 6 : 5, validos = (r.mios.match(/✓/g) || []).length;
   if (validos < esperado) mal(`tocando cada señal en su momento salieron ${validos} válidos de ${esperado}: ${r.mios}`);
@@ -248,9 +261,16 @@ async function corrida(via) {
     if (tut.length !== 1 || tut[0].pantalla !== 'guiado' || tut[0].res !== 'valido') mal(`tutorial: se esperaba un solo levantamiento (el guiado), válido: ${JSON.stringify(tut)}`);
     if (!(r.monitor.alto.guiado > 1.5)) mal(`en el tutorial la barra no subió: ${JSON.stringify(r.monitor.alto)}`);
     const f = r.propios.find(x => x.res === 'fallo');
-    if (!/✗sin_altura/.test(r.mios) || !f || !/No tocaste ¡EXPLOTÁ!/.test(f.linea)) mal(`el arranque sin explosión no dio «sin altura» con su línea: ${r.mios} · ${JSON.stringify(f)}`); else console.log(`${tag} línea del fallo a propósito: «${f.linea}»`);
+    if (!/✗sin_altura/.test(r.mios) || !f || !/No tocaste ¡EXPLOTA!/.test(f.linea)) mal(`el arranque sin explosión no dio «sin altura» con su línea: ${r.mios} · ${JSON.stringify(f)}`); else console.log(`${tag} línea del fallo a propósito: «${f.linea}»`);
     if (!r.registro.llamados.some(c => c.cambios?.length)) notas.push(`${tag} la partida no tuvo ningún cambio de kilos`);
   }
+  // el nombre del jugador en la tabla y en el podio (con teclado, el que escribió; con el dedo, el de siempre), y los eventos del embudo
+  { const quien = tactil ? ES['bienvenida.nombre_defecto'] : NOMBRE;
+    const x = await J(() => ({ titulo: document.querySelector('#capa .panel h1')?.textContent || '', fila: document.querySelector('#capa .tabla tr.yo td.n')?.textContent || '', botones: [...document.querySelectorAll('#capa .panel button')].map(b => b.id), eventos: (JUEGO.eventos || []).map(e => e.ev) }));
+    if (!x.titulo.includes(quien) || !x.fila.includes(quien)) mal(`el podio o la tabla no llevan el nombre «${quien}»: «${x.titulo}» · «${x.fila}»`);
+    for (const b of ['btn-revancha', 'btn-cambiar', 'btn-compartir']) if (!x.botones.includes(b)) mal(`el podio no tiene #${b}: ${x.botones.join(', ')}`);
+    for (const e of ['juego_abierto', 'nombre_puesto', 'pesista_elegido', 'partida_pedida', 'final_inicio', 'intento_propio', 'final_fin'].concat(tactil ? [] : ['opciones_abiertas', 'tutorial_inicio', 'tutorial_fin'])) if (!x.eventos.includes(e)) mal(`falta el evento «${e}» (hubo: ${[...new Set(x.eventos)].join(', ')})`);
+    console.log(`${tag} podio: «${x.titulo}» · eventos: ${x.eventos.length} (${[...new Set(x.eventos)].join(', ')})`); }
   await foto('fin');
 
   // ---- 2. con el reloj verdadero: pausa, ayuda, tutorial guiado y una práctica a velocidad real
@@ -268,12 +288,14 @@ async function corrida(via) {
   if (p3.sobre || !(p3.t > p2 + 100) || (!tactil && !p3.foco)) mal(`al volver de la pausa: ${JSON.stringify(p3)} (antes ${p2.toFixed(0)})`);
   if (!tactil) {
     await page.keyboard.press('h'); const a1 = await J(() => ({ sobre: JUEGO.estado().sobre, txt: document.getElementById('sobre').textContent })); await foto('ayuda');
+    const glosario = await J(() => document.querySelectorAll('#sobre .glosario dt').length);
+    if (glosario !== 7) mal(`el glosario de «Cómo se juega» tiene ${glosario} palabras (son 7)`);
     if (a1.sobre !== 'ayuda' || !/Cómo se juega/.test(a1.txt) || !/ESPACIO/.test(a1.txt)) mal(`H no abrió «Cómo se juega»: ${JSON.stringify(a1).slice(0, 200)}`);
     await page.keyboard.press('h'); if (await J(() => JUEGO.estado().sobre)) mal('H no cerró la ayuda');
   }
   if (!tactil) {
     const otro = await page.locator('#btn-otro').textContent();
-    if (!/Repetir tutorial/.test(otro)) mal(`después del tutorial el inicio no ofrece repetirlo (dice «${otro}»)`);
+    if (otro.trim() !== ES['opciones.repetir_practica']) mal(`después del tutorial el inicio no ofrece repetirlo (dice «${otro}»)`);
     await pulsa('#btn-otro'); await page.waitForFunction(() => JUEGO.estado().pantalla === 'guiado'); await page.waitForTimeout(300);
     if (!await page.locator('#saltar').isVisible()) mal('durante el tutorial no se ve el botón «Saltear tutorial»');
   }
@@ -292,8 +314,39 @@ async function corrida(via) {
   await cerrar();
 }
 
+/** Idioma: ?lang=en, el selector ES · EN sin recargar, lo que queda guardado y el aviso de girar en los dos idiomas. */
+async function idiomas() {
+  const tag = '[idioma]', ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, locale: 'en-US' }), page = await ctx.newPage();
+  const mal = txt => problemas.push(`${tag} ${txt}`), J = (fn, a) => page.evaluate(fn, a);
+  page.on('console', m => { if (m.type() === 'error') mal(`console.error: ${m.text()}`); });
+  page.on('pageerror', e => mal(`pageerror: ${e.message}`));
+  const leer = () => J(() => ({ lang: document.documentElement.lang, titulo: document.title, jugar: document.getElementById('btn-empezar')?.textContent.trim(), h2: document.getElementById('pesista-t')?.textContent, ev: document.getElementById('ev-titulo')?.textContent, guardado: localStorage.getItem('tarima.idioma'), eventos: (JUEGO.eventos || []).map(e => e.ev) }));
+  // sin ?lang= y con el navegador en inglés: inglés
+  await page.goto(`${base}juego.html?dibujo=0&q=baja`, { waitUntil: 'load' }); if (!await J(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
+  let x = await leer();
+  if (x.lang !== 'en' || x.jugar !== EN['bienvenida.jugar'] || x.titulo !== EN['app.titulo'] || x.ev !== EN['app.evento'] || !x.h2.includes(EN['bienvenida.nombre_defecto'])) mal(`con el navegador en inglés la bienvenida no salió en inglés: ${JSON.stringify(x)}`);
+  await page.screenshot({ path: path.join(OUT, 'idioma_en.png') }).catch(() => null);
+  // el selector la pasa a español sin recargar, y queda guardado
+  await page.locator('#capa .idi[data-lang="es"]').click(); await page.waitForTimeout(150); x = await leer();
+  if (x.lang !== 'es' || x.jugar !== ES['bienvenida.jugar'] || x.titulo !== ES['app.titulo'] || x.ev !== ES['app.evento'] || x.guardado !== 'es' || !x.eventos.includes('idioma_cambiado')) mal(`el selector no pasó a español: ${JSON.stringify(x)}`);
+  await page.screenshot({ path: path.join(OUT, 'idioma_es.png') }).catch(() => null);
+  await page.reload({ waitUntil: 'load' }); await J(() => window.JUEGO.listo); x = await leer();
+  if (x.lang !== 'es') mal(`al recargar no se recordó el español: ${JSON.stringify(x)}`);
+  // ?lang= manda sobre lo guardado
+  await page.goto(`${base}juego.html?dibujo=0&q=baja&lang=en`, { waitUntil: 'load' }); await J(() => window.JUEGO.listo); x = await leer();
+  if (x.lang !== 'en' || x.jugar !== EN['bienvenida.jugar']) mal(`?lang=en no mandó sobre lo guardado: ${JSON.stringify(x)}`);
+  // la ayuda (H) en inglés, con las siete palabras
+  await page.locator('#capa .panel').click({ position: { x: 5, y: 5 } }).catch(() => null);
+  await J(() => document.getElementById('btn-ayuda').click()); await page.waitForTimeout(150);
+  const ay = await J(() => ({ dt: [...document.querySelectorAll('#sobre .glosario dt')].map(d => d.textContent), h2: document.querySelector('#sobre h2')?.textContent }));
+  if (ay.dt.length !== 7 || ay.dt[0] !== EN['glosario.arranque.t']) mal(`la ayuda en inglés: ${JSON.stringify(ay)}`);
+  await page.screenshot({ path: path.join(OUT, 'idioma_ayuda_en.png') }).catch(() => null);
+  console.log(`${tag} navegador en inglés → ${EN['bienvenida.jugar']} · selector → ${ES['bienvenida.jugar']}, guardado y recordado al recargar · ?lang=en manda · ayuda: ${ay.h2} (${ay.dt.length} palabras)`);
+  await ctx.close();
+}
+
 try {
-  for (const via of ['teclado', 'tactil', 'clasico', 'lento'].filter(v => !ONLY || v === ONLY)) await corrida(via);
+  for (const via of ['idioma', 'teclado', 'tactil', 'clasico', 'lento'].filter(v => !ONLY || v === ONLY)) await corrida(via);
 } catch (e) { problemas.push('excepción de la prueba: ' + (e.stack || e.message)); }
 await browser.close(); server.close();
 for (const n of notas) console.log('nota: ' + n);

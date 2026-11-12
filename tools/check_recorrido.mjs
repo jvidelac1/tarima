@@ -10,7 +10,7 @@
 //  - por cada señal con círculo anota cuánto antes del cierre aparece, y cuándo abre la ventana;
 //  - capturas de cada momento en out/recorrido/ (un cuadro del 3D forzado antes de cada una).
 // No mide cuadros por segundo. No falla por la experiencia: falla solo ante errores de consola o si el recorrido no avanza.
-// Uso: node tools/check_recorrido.mjs [--headed] [--semilla=N] [--sin-fotos]
+// Uso: node tools/check_recorrido.mjs [--headed] [--semilla=N] [--sin-fotos] [--lang=en] (en inglés, capturas en out/recorrido_en)
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,9 +20,9 @@ import { launchOptions } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web'), OUT = path.join(ROOT, 'out', 'recorrido');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web'), OUT = path.join(ROOT, 'out', 'recorrido' + (process.argv.includes('--lang=en') ? '_en' : ''));
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
-const HEADED = process.argv.includes('--headed'), FOTOS = !process.argv.includes('--sin-fotos'), SEMILLA = +(arg('semilla') || 20261112);
+const HEADED = process.argv.includes('--headed'), FOTOS = !process.argv.includes('--sin-fotos'), SEMILLA = +(arg('semilla') || 20261112), LANG = arg('lang') === 'en' ? 'en' : 'es';
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
 const server = http.createServer((req, res) => {
   const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname), file = path.join(WEB, rel.endsWith('/') ? rel + 'index.html' : rel);
@@ -38,7 +38,7 @@ const ctx = await browser.newContext({ viewport: { width: 1745, height: 845 }, d
 const page = await ctx.newPage();
 page.on('console', m => { if (m.type() === 'error') problemas.push(`console.error: ${m.text()}`); });
 page.on('pageerror', e => problemas.push(`pageerror: ${e.message}`));
-await page.goto(`${base}juego.html?semilla=${SEMILLA}&q=baja&dibujo=0`, { waitUntil: 'load' });
+await page.goto(`${base}juego.html?lang=${LANG}&semilla=${SEMILLA}&q=baja&dibujo=0`, { waitUntil: 'load' });
 if (!await page.evaluate(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
 const J = (fn, a) => page.evaluate(fn, a);
 await J(() => JUEGO.test.manual());
@@ -63,9 +63,9 @@ const leerUI = () => J(() => {
 //   arranque 2: no toca ¡RECIBÍ! · arranque 3: no toca ¡EXPLOTÁ! y después del final machaca Espacio
 //   dos tiempos 2: no toca el ¡RECIBÍ! del envión (la barra arriba)
 const PLAN = [
-  { re: /Arranque · intento 2/, omite: c => c === 'recibi', nombre: 'arranque 2 sin ¡RECIBÍ!' },
-  { re: /Arranque · intento 3/, omite: c => c === 'explota', machaca: true, nombre: 'arranque 3 sin ¡EXPLOTÁ!, machacando después' },
-  { re: /Dos tiempos · intento 2/, omite: c => c === 'recibi2', nombre: 'dos tiempos 2 sin el ¡RECIBÍ! del envión' },
+  { re: /(Arranque · intento|Snatch · attempt) 2/, omite: c => c === 'recibi', nombre: 'arranque 2 sin ¡RECIBÍ!' },
+  { re: /(Arranque · intento|Snatch · attempt) 3/, omite: c => c === 'explota', machaca: true, nombre: 'arranque 3 sin ¡EXPLOTÁ!, machacando después' },
+  { re: /(Dos tiempos · intento|Clean & jerk · attempt) 2/, omite: c => c === 'recibi2', nombre: 'dos tiempos 2 sin el ¡RECIBÍ! del envión' },
 ];
 
 // ---- capturas por pantalla: segundos (reloj del juego) desde que se entra a cada una

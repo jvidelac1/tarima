@@ -64,7 +64,7 @@ async function correr(C) {
     await page.screenshot({ path: path.join(dir, f) }).catch(() => null); return f;
   };
 
-  await page.goto(`${base}juego.html?semilla=20261112&dibujo=${DIBUJO ? 1 : 0}${C.url || ''}`, { waitUntil: 'load' });
+  await page.goto(`${base}juego.html?lang=es&semilla=20261112&dibujo=${DIBUJO ? 1 : 0}${C.url || ''}`, { waitUntil: 'load' });
   const S0 = await J(() => { const p = document.createElement('div'); p.style.cssText = 'position:fixed;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)'; document.body.append(p); const c = getComputedStyle(p), r = { top: parseFloat(c.paddingTop), right: parseFloat(c.paddingRight), bottom: parseFloat(c.paddingBottom), left: parseFloat(c.paddingLeft) }; p.remove(); return { seguras: r, tactil: matchMedia('(pointer:coarse)').matches }; });
   if (!S0.tactil) mal('la emulación no da puntero grueso: la prueba no sirve');
   if (C.seguras && S0.seguras.left !== C.seguras.left) { notas.push(`${tag} áreas seguras pedidas ${JSON.stringify(C.seguras)}, la página ve ${JSON.stringify(S0.seguras)}`); seguras = S0.seguras; }
@@ -151,7 +151,8 @@ async function correr(C) {
     if (!propio) { await J(() => { const i = document.createElement('input'); i.id = 'prueba-campo'; i.type = 'text'; i.autocomplete = 'off'; document.querySelector('#capa .panel').prepend(i); }); campo = page.locator('#prueba-campo'); }
     await campo.tap(); await page.waitForTimeout(400);
     const esc = await J(() => ({ clase: document.documentElement.classList.contains('escribiendo'), zona: getComputedStyle(document.getElementById('zona')).display, fs: parseFloat(getComputedStyle(document.activeElement).fontSize) }));
-    await campo.fill(''); await page.keyboard.type('Ana María  h'); await page.keyboard.press('ArrowLeft'); await page.keyboard.press('Enter'); await page.waitForTimeout(100);
+    // Enter en el nombre de la bienvenida es «Jugar» (docs/MVP.md, P1): ahí se prueba sin Enter
+    await campo.fill(''); await page.keyboard.type('Ana María  h'); await page.keyboard.press('ArrowLeft'); if (!propio) await page.keyboard.press('Enter'); await page.waitForTimeout(100);
     const desp = await J(() => ({ total: JUEGO.toques.total, valor: document.activeElement?.value, foco: document.activeElement?.tagName, pantalla: JUEGO.estado().pantalla, sobre: JUEGO.estado().sobre, firma: document.querySelector('#capa .panel')?.innerHTML.length }));
     await foto('campo_con_teclado');
     console.log(`${tag} campo de texto${propio ? ' del juego' : ' de prueba'}: «${desp.valor}», toques ${antes.total} → ${desp.total}, escribiendo ${esc.clase}, botón ${esc.zona}, letra ${esc.fs} px`);

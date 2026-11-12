@@ -8,6 +8,8 @@
 //  7. Nivel de control Fácil (docs/CONTROLES.md): la capa de traducción es pura; partidas de referencia jugadas a través
 //     de la capa (tools/sim_ref_facil.json); en vivo, recalculado y avance en pasos irregulares dan lo mismo; un `ctl`
 //     desconocido se rechaza y un registro sin `ctl` es Clásico; toda causa tiene su línea de explicación.
+//  9. Textos (docs/MVP.md, sección 4): los dos idiomas tienen las mismas claves, el español es neutro (sin voseo) y sin jerga,
+//     ninguna clave queda sin resolver, y explicar() y la señal arman frases completas en los dos idiomas.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,7 +21,8 @@ import { recalcular, resumen } from '../web/js/sim/replay.js';
 import { Azar, mezclar } from '../web/js/sim/fixed.js';
 import { RELOJ, CAUSAS, FACIL, exigenciaTabla } from '../web/js/sim/rules.js';
 import { tocar, alDia, senal, GUIADO } from '../web/js/game/controles.js';
-import { explicar } from '../web/js/game/ui/mensajes.js';
+import { explicar, pasos } from '../web/js/game/ui/mensajes.js';
+import { DICCIONARIOS, tr, fijarIdioma, detectarIdioma } from '../web/js/game/i18n/t.js';
 import { jugarSenal, jugarFijo, BOTS } from './play_human.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SIM = path.join(ROOT, 'web/js/sim'), REF = path.join(ROOT, 'tools/sim_ref.json'), REF_F = path.join(ROOT, 'tools/sim_ref_facil.json');
@@ -214,18 +217,21 @@ function jugar(semilla, nivel, persona, estilo = {}) {
     const e1 = []; tocar(ctx, 1000, e1, 2600, 1, 'f'); const antes = JSON.stringify(e1); tocar(ctx, 1000, e1, 2700, 0, 'f'); ok(JSON.stringify(e1) === antes && e1.length === 1, 'Fácil: soltar la tecla agregó una entrada');
     const e0 = []; tocar(ctx, 1000, e0, 1500, 1, 'f'); ok(e0.length === 0, 'Fácil: un toque durante el acomodo llegó al núcleo');
     const c2 = { ...ctx, ctl: 'c' }, e2 = []; tocar(c2, 1000, e2, 2600, 0, 'c'); tocar(c2, 1000, e2, 2600, 1, 'c'); tocar(c2, 1000, e2, 2900, 0, 'c'); ok(JSON.stringify(e2) === '[[2600,1],[2900,0]]', 'Clásico: la capa no es la identidad: ' + JSON.stringify(e2)); }
-  // toda causa tiene su línea, en los dos niveles y con y sin teclado
-  for (const causa of Object.keys(CAUSAS)) for (const ctl of ['f', 'c']) for (const tactil of [false, true]) for (const e of [-500, 500]) {
-    const txt = explicar({ res: 'fallo', causa, toques: e < 0 ? 0 : 9, gestos: [{ g: 'explosion', mov: 's', e, pal: 'tarde', fuera: e > 0 }, { g: 'recepcion', mov: 's', e, pal: 'tarde', fuera: true }] }, ctl, tactil);
-    ok(typeof txt === 'string' && txt.length > 20 && txt.length < 130 && !/undefined|\{/.test(txt) && !(tactil && /ESPACIO/.test(txt)), `explicar(${causa}, ${ctl}${tactil ? ', táctil' : ''}): «${txt}»`);
+  // toda causa tiene su línea, en los dos niveles, con y sin teclado, y en los dos idiomas (entre 20 y 130 caracteres)
+  for (const l of ['es', 'en']) for (const causa of Object.keys(CAUSAS)) for (const ctl of ['f', 'c']) for (const tactil of [false, true]) for (const e of [-500, -100, 30, 500]) {
+    const txt = explicar({ res: 'fallo', causa, toques: e < 0 ? 0 : 9, gestos: [{ g: 'explosion', mov: 's', e, pal: 'tarde', fuera: e > 300 }, { g: 'recepcion', mov: 's', e, pal: 'tarde', fuera: true }] }, ctl, tactil, {}, l);
+    ok(typeof txt === 'string' && txt.length > 20 && txt.length < 130 && !/undefined|\{|\}/.test(txt) && !(tactil && /ESPACIO|SPACE/.test(txt)), `explicar(${l}, ${causa}, ${ctl}${tactil ? ', táctil' : ''}): «${txt}»`);
   }
-  ok(explicar({ res: 'valido', causa: null }, 'f') === '', 'explicar: un válido limpio no lleva línea');
-  // la línea de la subida no contradice a las palabras: con todo en PERFECTO o BIEN no habla de destiempo; con un toque flojo, lo nombra con sus ms
-  { const bien = explicar({ res: 'fallo', causa: 'aplastado', toques: 12, gestos: [{ g: 'explosion', mov: 'c', e: 180, pal: 'bien' }, { g: 'recepcion', mov: 'c', e: -20, pal: 'perfecto' }] }, 'f');
+  ok(explicar({ res: 'valido', causa: null }, 'f', false, {}, 'es') === '', 'explicar: un válido limpio no lleva línea');
+  // la línea de la subida no contradice a las palabras: con todo en PERFECTO o BIEN no habla de destiempo; con un toque flojo,
+  // dice para qué lado y cuánto en palabras («muy tarde»), no en ms (los ms quedan para Pro)
+  { const bien = explicar({ res: 'fallo', causa: 'aplastado', toques: 12, gestos: [{ g: 'explosion', mov: 'c', e: 180, pal: 'bien' }, { g: 'recepcion', mov: 'c', e: -20, pal: 'perfecto' }] }, 'f', false, {}, 'es');
     ok(/más rápido/.test(bien) && !/destiempo|tarde|temprano/.test(bien), `explicar, subida con todo BIEN: «${bien}»`);
-    const tarde = explicar({ res: 'fallo', causa: 'codos', toques: 12, gestos: [{ g: 'explosion', mov: 's', e: 263, pal: 'tarde' }, { g: 'recepcion', mov: 's', e: 10, pal: 'perfecto' }] }, 'f');
-    ok(/¡EXPLOTÁ! 260 ms tarde/.test(tarde), `explicar, subida con un toque tarde: «${tarde}»`);
-    ok(/ENTER/.test(explicar({ res: 'nulo', causa: 'reloj', gestos: [] }, 'c', false, { sinConfirmar: true })) && /desde que confirmás/.test(explicar({ res: 'nulo', causa: 'reloj', gestos: [] }, 'f')), 'explicar: la línea del reloj no dice qué tecla faltó'); }
+    const tarde = explicar({ res: 'fallo', causa: 'codos', toques: 12, gestos: [{ g: 'explosion', mov: 's', e: 263, pal: 'tarde' }, { g: 'recepcion', mov: 's', e: 10, pal: 'perfecto' }] }, 'f', false, {}, 'es');
+    ok(/¡EXPLOTA! muy tarde/.test(tarde) && !/ms/.test(tarde), `explicar, subida con un toque tarde: «${tarde}»`);
+    const late = explicar({ res: 'fallo', causa: 'codos', toques: 12, gestos: [{ g: 'explosion', mov: 's', e: 90, pal: 'tarde' }, { g: 'recepcion', mov: 's', e: 10, pal: 'perfecto' }] }, 'f', false, {}, 'en');
+    ok(/EXPLODE! quite late/.test(late), `explicar en inglés, toque bastante tarde: «${late}»`);
+    ok(/ENTER/.test(explicar({ res: 'nulo', causa: 'reloj', gestos: [] }, 'c', false, { sinConfirmar: true }, 'es')) && /desde que confirmas/.test(explicar({ res: 'nulo', causa: 'reloj', gestos: [] }, 'f', false, {}, 'es')), 'explicar: la línea del reloj no dice qué tecla faltó'); }
   console.log(`7. Fácil: ${casos.length} partidas de referencia · ${n} partidas en vivo contra recalculadas (${Math.round(validos * 100 / intentos)} % de válidos del jugador) · ${k2} intentos por la capa · resultados vistos: ${[...vistos].sort().join(', ')}`);
 }
 
@@ -284,6 +290,29 @@ function jugar(semilla, nivel, persona, estilo = {}) {
     ok(m.res && m.res.res === 'valido', `tutorial guiado, ${id}, un toque cada ${per} ms en ¡EMPUJÁ!: ${m.res ? m.res.res + ':' + m.res.causa : 'no termina'}`);
   }
   console.log(`8. Fácil: toques antes de la ventana sin efecto · ${nSub} subidas: sola en los pesos livianos, cortada a tiempo cerca del techo, ganada tocando cada 250 ms · tutorial guiado sin fallo posible en ${nG} casos (tres pesistas, un toque cada 100 ms a 3 s)`);
+}
+
+// ---------- 9. textos en los dos idiomas ----------
+{
+  const { es, en } = DICCIONARIOS, ke = Object.keys(es), kn = Object.keys(en);
+  ok(ke.length === kn.length && ke.every(k => k in en), `los diccionarios no tienen las mismas claves: solo en es ${ke.filter(k => !(k in en)).join(', ')} · solo en en ${kn.filter(k => !(k in es)).join(', ')}`);
+  // español neutro (decisión del dueño): nada de voseo; y sin jerga de federación en lo que ve el jugador
+  const VOSEO = /\b(tocá|apretá|soltá|mirá|esperá|elegí|podés|tenés|querés|sos|vos|confirmá|pedí|agarrala|empujá|tirá|explotá|flexioná|aguantá|respirá|dejá|mantené|probá|contestá|poné|revisá|marcá|anotate|escribí|recargá|hacé|acá|llamás|empezás|fallás|sentís|marcás|tocás|repetís|subís|ganás|asegurás|pasás|salís|hacés|animás)\b/i;
+  const JERGA = /\b(apertura|nulo|sin marca|resto|tope|dorsal|chicharra)\b/i;
+  for (const [k, v] of Object.entries(es)) { ok(!VOSEO.test(v), `voseo en es.${k}: «${v}»`); ok(!JERGA.test(v), `jerga en es.${k}: «${v}»`); }
+  for (const [k, v] of [...Object.entries(es), ...Object.entries(en)]) ok(!/pagar para levantar|pay to lift/i.test(v), `promesa de monetización en ${k}`);
+  // con las variables comunes resueltas no queda ninguna llave
+  const vars = { nombre: 'Ana', quien: 'Ana', rival: 'Teo', n: 2, de: 3, kg: 150, lo: 140, hi: 155, min: 150, c: 1, s: 5, b: 2, lev: 'x', pos: '2nd', ms: 30, k: 1, controles: 'x', veredicto: 'x', causa: 'x', a: 'x', medalla: 'x', total: 300, marcas_s: '✅', marcas_c: '❌', link: 'x', envion: 'x', verbo: 'x', cuando: 'x', cuanto: 'x', ajuste: 'x', lado: 'x', grado: 'x' };
+  for (const l of ['es', 'en']) for (const tactil of [false, true]) for (const k of ke) { const v = tr(l, k, { ...vars, tactil }); ok(!/[{}]/.test(v) && v.trim().length > 0, `${l}.${k} queda «${v}»`); }
+  // la señal sale en el idioma elegido, y los pasos de «Cómo se juega» también
+  { const ctx = { lev: 's', I: 9000, tec: 7, temple: 0, garra: 6, anclas: datos.modelos.ventura, semilla: 5, cal: 0, primera: false, domina: true, jueces: [1000, 1000, 1000], reloj: 30000, ctl: 'f' };
+    const ent = []; tocar(ctx, 1000, ent, 2600, 1, 'f'); const m = alDia(ctx, 1000, ent, 2650, 'f');
+    fijarIdioma('en'); const sEn = senal(m, 2650, 'f'); fijarIdioma('es'); const sEs = senal(m, 2650, 'f');
+    ok(sEn.verbo === 'EXPLODE!' && sEs.verbo === '¡EXPLOTA!' && sEn.clave === sEs.clave, `la señal no cambia con el idioma: ${sEn.verbo} / ${sEs.verbo}`);
+    ok(pasos('f', true, 'en')[0][1] === 'Tap the screen to start the lift.' && pasos('f', false, 'es')[0][1] === 'Pulsa ESPACIO para empezar el levantamiento.', `pasos: ${JSON.stringify(pasos('f', true, 'en'))}`); }
+  // idioma: ?lang= primero, después lo guardado y por último el navegador; lo que no empieza con «es», inglés
+  ok(detectarIdioma({ lang: 'en', guardado: 'es', navegador: ['es-AR'] }) === 'en' && detectarIdioma({ guardado: 'es', navegador: ['en-US'] }) === 'es' && detectarIdioma({ navegador: ['es-MX', 'en'] }) === 'es' && detectarIdioma({ navegador: ['pt-BR', 'es'] }) === 'en' && detectarIdioma({ lang: 'fr', navegador: ['es'] }) === 'es', 'detectarIdioma no respeta el orden de prioridad');
+  console.log(`9. Textos: ${ke.length} claves en español neutro y en inglés, sin voseo ni jerga, todas resueltas con y sin teclado · señal y pasos según el idioma`);
 }
 
 console.log(fallas.length ? `\nFALLÓ: ${fallas.length} problemas` : `\nOK en ${((Date.now() - t0) / 1000).toFixed(1)} s`);

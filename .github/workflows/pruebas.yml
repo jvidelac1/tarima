@@ -99,12 +99,19 @@ jobs:
         timeout-minutes: 20
         run: node tools/check_recorrido.mjs 2>&1 | tee out/logs/check_recorrido.log
 
+      # El mismo recorrido en inglés (?lang=en), para mirar los textos: capturas en out/recorrido_en. No decide el resultado.
+      - name: Recorrido en inglés (check_recorrido --lang=en, no bloquea)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        timeout-minutes: 20
+        run: node tools/check_recorrido.mjs --lang=en 2>&1 | tee out/logs/check_recorrido_en.log
+
       - name: Resumen
         if: ${{ always() }}
         run: |
           {
             echo "### Pruebas del juego (dibujo por software: no mide cuadros por segundo)"
-            for f in sim_test play_human caida_test check_escenas check_game check_telefono check_fluidez capturas check_recorrido; do
+            for f in sim_test play_human caida_test check_escenas check_game check_telefono check_fluidez capturas check_recorrido check_recorrido_en; do
               echo; echo "**$f**"; echo '```'
               if [ -f "out/logs/$f.log" ]; then tail -n 14 "out/logs/$f.log"; else echo "(no corrió)"; fi
               echo '```'
