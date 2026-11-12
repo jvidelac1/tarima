@@ -62,6 +62,11 @@ export default {
   'opciones.repetir_practica': 'Replay practice',
   'opciones.saltar_practica': 'Skip practice',
   'opciones.sin_calentar': 'Start without warm-up',
+  'opciones.sonido': 'Sound',
+  'opciones.sonido_si': 'On',
+  'opciones.sonido_no': 'Off',
+  'opciones.pantalla': 'Screen',
+  'opciones.como_instalar': 'How to play full screen',
   'opciones.nota_practica': 'First time: a guided practice, under a minute.',
 
   'practica.tarjeta_titulo': 'The snatch',
@@ -429,7 +434,11 @@ export default {
   // ---- phone: rotate and install (full screen on iPhone)
   'girar.titulo': 'Turn your phone sideways',
   'girar.sub': 'Tarima is played in landscape.',
-  'instalar.ios': 'To play full screen: tap Share, then “Add to Home Screen”.',
+  'instalar.safari': 'Full screen: tap Share (or ··· then Share), choose “Add to Home Screen” and open Tarima from the icon.',
+  'instalar.chrome': 'Full screen: tap Share in the address bar, choose “Add to Home Screen” and open Tarima from the icon.',
+  'instalar.otro': 'Full screen: open Share in the browser menu, choose “Add to Home Screen” and open Tarima from the icon.',
+  'sonido.prender': 'Turn sound on',
+  'sonido.apagar': 'Turn sound off',
   'instalar.cerrar': 'Got it',
 
   // ---- a rival's turn and the scoreboard

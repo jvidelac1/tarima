@@ -32,6 +32,12 @@ button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px
 .glosario dd{margin:0;color:var(--mute)}
 /* «?» junto a la pausa: «Cómo se juega» con el dedo */
 #ayudab{position:absolute;z-index:6;top:calc(var(--u)*1.2 + var(--st));left:calc(50% + 30px);font-family:var(--display);min-height:0;min-width:44px;padding:.35em .9em;background:rgba(6,14,48,.88);font-size:calc(var(--u)*1.2)}
+/* parlante a la izquierda de la pausa: prende y apaga el sonido (audio.js); apagado se ve tachado y en rojo */
+#sonidob{position:absolute;z-index:6;top:calc(var(--u)*1.2 + var(--st));right:calc(50% + 30px);font-family:var(--display);min-height:0;min-width:44px;padding:.35em .7em;background:rgba(6,14,48,.88);font-size:calc(var(--u)*1.2);line-height:1;display:flex;align-items:center;justify-content:center}
+#sonidob svg,.panel button svg.parlante{width:1.3em;height:1.3em;flex:none}
+#sonidob.apagado{color:#ff8a7a;border-color:rgba(255,138,122,.6)}
+.panel button[data-sonido]{display:inline-flex;align-items:center;gap:.45em}
+.panel button[data-sonido="no"][aria-pressed="true"]{color:#ffb4a8}
 /* teléfono de costado (o cualquier pantalla baja y ancha): la bienvenida en dos columnas para que entre sin desplazar */
 @media (min-aspect-ratio:3/2) and (max-height:600px){
   .panel.bienvenida{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);column-gap:16px;align-content:start}

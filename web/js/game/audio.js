@@ -1,7 +1,71 @@
 // Sonido mínimo generado por código, sin archivos (docs/JUEGO.md, sección 8.3). Todo aviso sonoro tiene un gemelo visual:
 // si el audio no está disponible o el usuario juega sin sonido, no se pierde nada.
-let ctx = null;
-const listo = () => { try { ctx ||= new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === 'suspended') ctx.resume(); return ctx.state === 'running'; } catch { return false; } };
+//
+// iPhone (Safari y Chrome de iOS: los dos son WebKit). Tres cosas hacían que no sonara nada:
+// - El AudioContext solo arranca dentro del manejador de un gesto (touchend, click, keydown; touchstart y pointerdown no
+//   cuentan, y tampoco lo que corre después de un await). Si queda 'suspended' o 'interrupted' (llamada, pantalla
+//   bloqueada, otra app), hay que reanudarlo dentro de otro gesto. Antes solo se creaba en el clic de un botón de panel y
+//   solo se reanudaba si estaba 'suspended'. Ahora `desbloquear()` corre en la fase de captura de cada gesto, antes que
+//   cualquier otro manejador, y es sincrónico.
+// - Con el interruptor de silencio (o el botón de acción en silencio) WebKit calla Web Audio: lo trata como sonido
+//   «ambiente». Se pide la sesión de reproducción: navigator.audioSession.type = 'playback' (WebKit 16.4 en adelante) y,
+//   además, un <audio> silencioso en bucle (mientras suena un elemento multimedia la sesión es de reproducción y Web Audio
+//   sale aunque el teléfono esté en silencio). Solo en iOS; 4,8 KB de silencio armados acá, sin descargas.
+// - No había forma de prender o apagar el sonido. Ahora hay un botón (#sonidob en la barra y «Sonido» en Opciones) que se
+//   recuerda en este dispositivo (tarima.sonido). Apagado: no se crea ni se reanuda nada de audio.
+import { t, alCambiarIdioma } from './i18n/t.js';
+
+const guardado = {
+  get: k => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* sin almacenamiento */ } },
+};
+const nav = typeof navigator !== 'undefined' ? navigator : {};
+const esIOS = () => /iPhone|iPad|iPod/.test(nav.userAgent || '') || (nav.platform === 'MacIntel' && nav.maxTouchPoints > 1);
+
+let ctx = null, encendido = guardado.get('tarima.sonido') !== '0', silencio = null, silencioSono = false;
+/** Tipo de sesión de audio de WebKit: 'playback' suena con el teléfono en silencio; 'ambient' se mezcla con otra música. */
+function sesion(tipo) { try { if (nav.audioSession && nav.audioSession.type !== tipo) nav.audioSession.type = tipo; } catch { /* sin la API */ } }
+/** WAV mono de 8 bits con 0,1 s de silencio, a la frecuencia del contexto (si no coincide, iOS cambia la del equipo y Web Audio suena mal). */
+function wavSilencio(fm) {
+  const n = Math.round(fm / 10), b = new ArrayBuffer(44 + n), v = new DataView(b), s = (o, x) => { for (let i = 0; i < x.length; i++) v.setUint8(o + i, x.charCodeAt(i)); };
+  s(0, 'RIFF'); v.setUint32(4, 36 + n, true); s(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, fm, true); v.setUint32(28, fm, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); s(36, 'data'); v.setUint32(40, n, true);
+  new Uint8Array(b, 44).fill(128);
+  return URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
+}
+/**
+ * Dentro de un gesto: sesión de reproducción, contexto creado y reanudado, un búfer vacío que lo destraba en los WebKit
+ * viejos y, en iOS, el <audio> silencioso. Sincrónico a propósito: después de un await ya no hay gesto. Con el sonido
+ * apagado no hace nada, salvo que el gesto sea el que lo prende (el botón tachado o «Con sonido» de Opciones): main.js
+ * cambia el estado después de un await, y el desbloqueo tiene que pasar acá, todavía dentro del toque.
+ */
+const PRENDE = '#sonidob.apagado,[data-sonido="si"]';
+function desbloquear(e) {
+  if (!encendido && !(e && e.type === 'click' && e.target?.closest?.(PRENDE))) return;
+  sesion('playback');
+  try {
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      ctx = new AC({ latencyHint: 'interactive' });
+    }
+    if (ctx.state !== 'running') {
+      ctx.resume?.()?.catch?.(() => null);
+      const s = ctx.createBufferSource(); s.buffer = ctx.createBuffer(1, 1, ctx.sampleRate); s.connect(ctx.destination); s.start(0);
+    }
+  } catch { return; }
+  if (esIOS()) {
+    try {
+      if (!silencio) { silencio = document.createElement('audio'); silencio.setAttribute('x-webkit-airplay', 'deny'); silencio.preload = 'auto'; silencio.loop = true; silencio.src = wavSilencio(ctx.sampleRate); }
+      if (silencio.paused) silencio.play()?.then(() => { silencioSono = true; }, () => null);
+    } catch { /* sin <audio> */ }
+  }
+}
+const listo = () => {
+  if (!encendido || !ctx) return false;
+  if (ctx.state !== 'running') { try { ctx.resume?.()?.catch?.(() => null); } catch { /* el próximo gesto */ } }
+  return ctx.state === 'running';
+};
+
 function tono(f0, f1, dur, tipo = 'sine', vol = .2) {
   if (!listo()) return; const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
   o.type = tipo; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
@@ -29,8 +93,47 @@ function masa(dur, vol, f0, f1, ataque = .25) {
 // generador propio para los aplausos (que no cambie el orden de nada del juego)
 let semilla = 7; const azar = () => ((semilla = (semilla * 16807) % 2147483647) / 2147483647);
 const vibra = ms => { try { navigator.vibrate?.(ms); } catch { /* sin vibración */ } };
+
+// ---------- botón de sonido: parlante con ondas (prendido) o tachado (apagado) ----------
+const ICONO = {
+  si: '<svg class="parlante" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  no: '<svg class="parlante" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z" fill="currentColor"/><path d="M16 9l6 6M22 9l-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+};
+/** Pinta el estado en el botón de la barra (#sonidob) y en los de Opciones ([data-sonido="si"|"no"]). */
+function pintar() {
+  if (typeof document === 'undefined') return;
+  const b = document.getElementById('sonidob');
+  if (b) {
+    if (b.dataset.estado !== String(encendido)) { b.innerHTML = ICONO[encendido ? 'si' : 'no']; b.dataset.estado = String(encendido); }
+    b.classList.toggle('apagado', !encendido); b.setAttribute('aria-pressed', String(encendido));
+    const txt = t(encendido ? 'sonido.apagar' : 'sonido.prender'); if (b.title !== txt) { b.setAttribute('aria-label', txt); b.title = txt; }
+  }
+  for (const o of document.querySelectorAll('[data-sonido]')) o.setAttribute('aria-pressed', String((o.dataset.sonido === 'si') === encendido));
+}
+
 export const sonido = {
-  activar() { const ok = listo(); if (ok && !ruidos.size) for (const d of [.03, .05, .08, .1, .12, .18, .3, .6, 1.2, 1.6, 3]) bufer(d); return ok; },
+  /** Prendido o apagado (se recuerda en este dispositivo). */
+  get encendido() { return encendido; },
+  /** Para las pruebas: prendido, estado del contexto, sesión de WebKit y si el <audio> silencioso está sonando. */
+  get estado() { return { encendido, contexto: ctx ? ctx.state : 'sin contexto', sesion: nav.audioSession?.type ?? null, silencio: silencio ? !silencio.paused : null, silencioSono }; },
+  /** Ícono del parlante para un botón (`si`: prendido). */
+  icono: si => ICONO[si ? 'si' : 'no'],
+  /**
+   * Prende o apaga, y lo recuerda. Llamarlo dentro del manejador de un toque: al prender, ahí mismo se desbloquea el audio y
+   * suena un aviso corto (así se oye que quedó prendido).
+   */
+  encender(si) {
+    encendido = !!si; guardado.set('tarima.sonido', encendido ? '1' : '0');
+    if (encendido) {
+      desbloquear(); this.activar();      // (si ya no hay gesto, el desbloqueo lo hizo la captura del mismo clic)
+      if (ctx) { if (ctx.state === 'running') this.aviso(); else ctx.resume?.()?.then?.(() => this.aviso(), () => null); }
+    } else { try { silencio?.pause(); } catch { /* nada */ } sesion('ambient'); try { ctx?.suspend?.()?.catch?.(() => null); } catch { /* nada */ } }
+    pintar(); return encendido;
+  },
+  alternar() { return this.encender(!encendido); },
+  /** Repinta el botón de la barra (al cambiar el idioma lo hace solo). */
+  pintar,
+  activar() { desbloquear(); const ok = listo(); if (ok && !ruidos.size) for (const d of [.03, .05, .08, .1, .12, .18, .3, .6, 1.2, 1.6, 3]) bufer(d); return ok; },
   tic() { tono(1200, 900, .05, 'square', .08); },
   despegue() { ruido(.12, .15, 500); vibra(10); },
   explosion(perfecta) { ruido(.1, .2, 1400); if (perfecta) vibra(20); },
@@ -59,3 +162,18 @@ export const sonido = {
     for (let i = 0; i < n; i++) ruido(.03, .05 + .05 * azar(), 1500 + 2000 * azar(), { tipo: 'bandpass', q: 1.2, en: .1 + 2.6 * Math.pow(azar(), 1.6) });
   },
 };
+
+// Cada gesto (en la fase de captura, antes que el juego) desbloquea o reanuda el audio; el botón de la barra lo alterna.
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  for (const k of ['touchend', 'click', 'keydown', 'pointerup', 'mouseup']) addEventListener(k, desbloquear, { capture: true, passive: true });
+  document.addEventListener('click', e => { if (e.target.closest?.('#sonidob')) sonido.alternar(); });
+  // al volver a la pestaña se intenta reanudar sin gesto (iOS a veces deja); si no, lo hace el próximo toque
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { try { silencio?.pause(); } catch { /* nada */ } return; }
+    if (!encendido) return;
+    try { ctx?.resume?.()?.catch?.(() => null); if (silencio?.paused) silencio.play()?.catch?.(() => null); } catch { /* el próximo toque */ }
+  });
+  if (encendido) sesion('playback');
+  alCambiarIdioma(pintar);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', pintar, { once: true }); else pintar();
+}
