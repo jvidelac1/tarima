@@ -187,7 +187,7 @@ Resumen: (0) preparar el Mac alquilado y la sesión cloud, (1) juego mínimo jug
 
 ## Etapa 2, dirección de arte (11 y 12-nov)
 
-Prueba para que el usuario elija una imagen objetivo y con qué versión del personaje se sigue. Corrió en un pod alquilado con una RTX 4090 (rama `arte`); **nada de esto entró a `web/` ni a `out/<nombre>/`**: cada variante tiene su carpeta (`out_C`, `out_B`, `out_B3`, `webv/<versión>`) y lo demás está en `out/arte`. El paquete con todo (`arte.tgz`, 829 MB: `out/arte`, los `finish.log` de las variantes y los GLB de `webv`) se bajó del pod; `out/` no está en git. Solo se trabajó con Ventura.
+Prueba para que el usuario elija una imagen objetivo y con qué versión del personaje se sigue. Corrió en un pod alquilado con una RTX 4090 (rama `arte`); **nada de esto entró a `web/` ni a `out/<nombre>/`**: cada variante tiene su carpeta (`out_C`, `out_B`, `out_B3`, `webv/<versión>`) y lo demás está en `out/arte`. El paquete con todo (`arte.tgz`, 827 MB: `out/arte`, los `finish.log` de las variantes y los GLB de `webv`; el GLB de A va como `webv/B/models/ventura.glb`, que es el mismo archivo) se bajó del pod; `out/` no está en git. Solo se trabajó con Ventura.
 
 **Falta la decisión del usuario.** Se decide con dos hojas: `out/arte/comparacion_ventura.png` (materiales del juego) y `comparacion_ventura_arcilla.png`, las dos con las tres imágenes objetivo arriba. Para revisores hay una hoja a ciegas en `out/arte/ciega/` (clave aparte, en `out/arte/ciega_clave/`).
 
@@ -233,7 +233,7 @@ Plantillas de ComfyUI usadas: `image_qwen_image_edit_2511_int8` y `3d_pixal3d_mu
 - **E5, imágenes objetivo y referencias repintadas** (Qwen-Image-Edit-2511 sobre `A_P01` y sobre los renders de E3). Tres objetivo en `out/arte/target`: `T_A_s2` (casi fotorreal), `T_B_s1` (realismo estilizado) y `T_C_s1` (más estilizado, brazos y hombros más gruesos). A y B casi no se distinguen (A suma poros, sudor y vello); en las tres el texto chico de la gráfica sale degradado. El revisor recomienda `T_B_s1`: mantiene las proporciones de P01 (no toca siluetas, holguras ni rack) y su lectura depende de volúmenes y sombras; `T_C_s1` obligaría a revalidar `check()` y el rack. Las 12 referencias repintadas (`out/arte/refs_gen`) pasan el IoU de silueta (0,933 a 0,990, objetivo 0,92), pero repintan poco: pectoral, abdomen y deltoides en los frentes, espaldas casi lisas, y tres de las doce son casi el render crudo. Receta que quedó: una sola imagen de entrada (el render crudo de esa vista), denoise 0,8, indicación v5; el método de dos imágenes (frente repintado más render crudo) se descartó. Hicieron falta 29 intentos para 12 imágenes (el tope pactado era 2 reintentos por imagen).
 - **E6, mallas generadas** G0 a G5 en `out/arte/gen` (700.000 triángulos, 42 a 45 MB cada una), con turno en arcilla y `gen_log.csv`. G0 (multivista con los renders crudos, control): no devuelve nuestra forma (3,9 mm de mediana contra un objetivo de 3) y sale facetada. **G1** (multivista con reposo repintado): la única lisa y con anatomía útil en brazos y tronco. G2 y G3 (brazos arriba): brazos aceptables, tronco facetado. G4 (Pixal3D de una vista) y G5 (TRELLIS.2 de una vista): 13 mm de mediana, cambian la pose e inventan la espalda; la multivista aporta. El relieve fino de G1 mide 2,08 mm RMS y el del control G0 1,97: **la ventaja de G1 está probada a ojo (lisa contra facetada), no en milímetros.**
 - **E7 (malla generada estática) y E8 (relieve generado):** en detalle más abajo.
-- **E9, hojas y paquete.** Hojas finales con A, B, B2, B3 y C, sin ningún `AVISO`. C se recapturó en arcilla con las luces nuevas y B3 con materiales en los 12 planos. B solo tiene arcilla en P01, P02, P03, P04 y P07. La hoja a ciegas mezcla las versiones en cada plano (P01 a P04, P08, P10 y P11). `out/arte/pesos.sha256` lista los 11 pesos.
+- **E9, hojas y paquete.** Hojas finales con A, B, B2, B3 y C, sin ningún `AVISO`. C se recapturó en arcilla con las luces nuevas y B3 con materiales en los 12 planos. B solo tiene arcilla en P01, P02, P03, P04 y P07. La hoja a ciegas mezcla las versiones en cada plano (P01 a P04, P08, P10 y P11), con letras en lugar de nombres y el panel de telemetría tapado; B se reconoce igual por la ropa y la cara. `out/arte/pesos.sha256` lista los 11 pesos.
 
 ### E7 y E8 en detalle
 
@@ -261,7 +261,7 @@ Capturas en `out/arte/shots`.
 | `gen_turn.py`, turno de una malla | 51 a 55 s | no medida |
 | `detail.py relief` / `heat` | 1 min / 1 min por malla | no medida |
 
-La VRAM pico es la de toda la placa mientras corría el trabajo: incluye lo que usaban otros procesos (había un Chrome de otro equipo). `out/arte/tiempos.txt` tiene cada corrida con inicio y fin; suma unos 255 minutos anotados, con tramos superpuestos entre agentes. El pod costaba USD 0,92 por hora.
+La VRAM pico es la de toda la placa mientras corría el trabajo: incluye lo que usaban otros procesos (había un Chrome de otro equipo). `out/arte/tiempos.txt` tiene cada corrida con inicio y fin; suma unos 260 minutos anotados, con tramos superpuestos entre agentes. El pod costaba USD 0,92 por hora.
 
 ### Sin probar o sin cerrar
 
