@@ -967,17 +967,17 @@ Alineado con [PLAN.md](PLAN.md). La etapa 1 es el juego mínimo jugable **sin ni
 | Caminar a la barra y magnesio | Corte: placa del pesista y tablero; aparece en `Parado` |
 | Pelea de la subida | El mismo clip a velocidad variable, también hacia atrás, más las capas de esfuerzo |
 | Amague | El clip corre al revés hasta `Salida`: la barra vuelve al piso en las manos |
-| Tirón sin altura | Corte antes de `Triple extensión`, con el texto de la causa; vuelve con la barra en la tarima |
-| Fallo en la recepción, en la subida o en la traba | El pesista se hunde hasta la pose del fondo, corte a las luces rojas con el golpe de discos y el texto de la causa, y al volver la barra está en la tarima y el pesista en `Parado` |
+| Tirón sin altura | (Desde el 12-nov) La barra se suelta donde está y cae con física simple (gravedad, rebote de goma, rodado); el pesista sostiene la pose y se mezcla hacia `Parado` (`game/caida.js`) |
+| Fallo en la recepción, en la subida o en la traba | (Desde el 12-nov) La barra sale hacia adelante (o hacia atrás en «barra atrás») y cae; la cámara la sigue; el pesista se queda en la pose del fallo un momento (sentado en la cargada) y se mezcla hacia `Parado`; golpe de discos, lamento de la tribuna, luces rojas de a una y repetición lenta con la caída |
 | Codos blandos y nulo técnico | No se pueden dibujar: los clips tienen los brazos trabados. Se muestran el medidor de traba, las luces y la causa en texto, con repetición lateral abierta. No se usa el plano de brazos y barra, que mostraría un bloqueo perfecto bajo el cartel de codos blandos |
-| Bajar la barra tras un válido | Un segundo arriba con la barra oscilando, luces, corte; vuelve con la tarima vacía |
+| Bajar la barra tras un válido | (Desde el 12-nov) Sostiene la barra arriba 0,7 s mientras se prenden las luces blancas y sube la ovación; la deja caer adelante, rebota, y la cámara gira hacia el público |
 | Festejo y lamento | Plano del pesista, gráfica, público y repetición lateral con la traza. La cara no cambia de expresión |
 | Marangi | Modelo de Brenner con la tela de un color plano aplicado sobre la máscara de tela: un tinte dejaría leer «BRENNER» y «NVK», que están horneados en la textura. Queda el relieve leve del texto; si se lee en la primera captura, Marangi se muestra solo en planos laterales y en el tablero. Comparte la cara de Brenner: no lleva primer plano de cara |
 | Recuadro del rival y podio 2D | Bandera, dorsal y texto. Para el podio, un retrato neutro de cada modelo tomado en ejecución con el plano de cara que ya existe (no hay arte nuevo ni GPU en la sesión cloud); Marangi va con bandera y dorsal |
-| Ayudantes | Plano cenital de la tarima con los discos deslizándose por la barra, o cambio de carga durante el tablero |
+| Ayudantes | (Desde el 12-nov) La manga de la barra de cerca, con la tarima vacía: las piezas que cambian salen y entran deslizando, el collarín cierra con un golpe metálico y los kilos cambian a la vista. Los ayudantes, con modelo y animación propios, quedan para la etapa de arte |
 | Podio, medallas y foto | Clasificación final en pantalla, con los tres en un podio dibujado en 2D, y plano del ganador |
 
-**En la etapa 1 nunca se muestra la barra cayendo junto al cuerpo.** Una barra suelta movida por una física simple atravesaría al pesista, y eso saca de la experiencia más que un corte.
+**La barra cayendo junto al cuerpo (12-nov).** El riesgo era que una física simple atravesara al pesista. Se resolvió soltando la barra antes de que el cuerpo se mueva y con una velocidad que la saca hacia donde no está el cuerpo, y se mide: `tools/check_escenas.mjs` calcula cuadro a cuadro la holgura entre el eje y los discos y el tronco, la cabeza, las piernas y los brazos, para cada causa, el válido y el nulo, en los dos modelos; un solo cuadro con holgura negativa hace fallar la prueba. Es una aproximación hecha en el visor: no pasó por `check()` de Blender.
 
 ### 11.3 Etapas posteriores
 

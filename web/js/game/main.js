@@ -741,14 +741,15 @@ const MIEMBROS = [['Hips', 'Spine2', .13], ['Spine2', 'Neck', .11], ['Neck', 'He
 function holgura(tb) {
   const a = escena.activo; if (!a || tb < 0) return null;
   const V = escena.barbell.group.position.constructor, b = escena.barbell.group.position, R = escena.pisoBarra;
-  const e0 = new V(-.62, b.y, b.z), e1 = new V(.62, b.y, b.z); let min = { h: 9, que: '' };
+  const e0 = new V(-.62, b.y, b.z), e1 = new V(.62, b.y, b.z), todos = {}; let min = { h: 9, que: '' };
   for (const [x, y, r, brazo] of MIEMBROS) {
     if (brazo && tb < .25) continue;
-    const p = a.boneWorld(x, new V()), q = a.boneWorld(y, new V());
-    const h = distSeg(e0, e1, p, q) - r - .014; if (h < min.h) min = { h, que: x + (x === y ? '' : '-' + y) };
-    for (const P of [p, q]) if (Math.abs(P.x) > .66 && Math.abs(P.x) < 1) { const hd = Math.hypot(P.y - b.y, P.z - b.z) - R - r; if (hd < min.h) min = { h: hd, que: x + ' (disco)' }; }
+    const p = a.boneWorld(x, new V()), q = a.boneWorld(y, new V()), que = x + (x === y ? '' : '-' + y);
+    let h = distSeg(e0, e1, p, q) - r - .014;
+    for (const P of [p, q]) if (Math.abs(P.x) > .66 && Math.abs(P.x) < 1) h = Math.min(h, Math.hypot(P.y - b.y, P.z - b.z) - R - r);      // contra los discos
+    todos[que] = Math.round(h * 1000) / 1000; if (h < min.h) min = { h, que };
   }
-  return { h: Math.round(min.h * 1000) / 1000, que: min.que, y: Math.round(b.y * 1000) / 1000, z: Math.round(b.z * 1000) / 1000 };
+  return { h: Math.round(min.h * 1000) / 1000, que: min.que, y: Math.round(b.y * 1000) / 1000, z: Math.round(b.z * 1000) / 1000, todos };
 }
 
 // ---------- API para la prueba automática y la depuración ----------

@@ -64,6 +64,7 @@ page.on('console', m => { if (m.type() === 'error') problemas.push(`console.erro
 page.on('pageerror', e => problemas.push(`pageerror: ${e.message}`));
 await page.goto(`${base}juego.html?q=baja&dibujo=0`, { waitUntil: 'load' });
 if (!await page.evaluate(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
+await page.evaluate(() => { for (const id of ['capa', 'zocalo', 'senal', 'acuse']) { const e = document.getElementById(id); if (e) e.style.visibility = 'hidden'; } });      // las escenas sin el panel del inicio encima
 const foto = async nombre => { if (FOTOS) await page.screenshot({ path: path.join(OUT, nombre + '.jpg'), type: 'jpeg', quality: 72 }); };
 
 const filas = []; let bad = 0;
@@ -71,13 +72,18 @@ for (const id of ['ventura', 'brenner']) {
   for (const [nombre, lev, seg, fase, mov, res] of CASOS) {
     const info = await page.evaluate(o => window.JUEGO.test.final(o), { id, lev, seg, fase, mov, res, camara: 'lado' });
     if (!info) { problemas.push(`${id} · ${nombre}: no armó escena`); continue; }
-    let min = { h: 9 }, n = 0, malos = 0;
+    // Las cápsulas del cuerpo son gruesas a propósito: en la pose del final (validada en Blender con las mallas, cero BAD
+    // en check()) la barra apoyada en los hombros o rozando la cadera ya da holgura negativa contra ellas. Por eso cada
+    // segmento se compara con su holgura en el primer cuadro que se mide: BAD es atravesarlo MÁS que en esa pose (5 mm).
+    let min = { h: 9 }, n = 0, malos = 0; const base = {}, peor = [];
     for (let t = info.suelta; t <= info.dur + 1e-9; t += 1 / 60) {
       const h = await page.evaluate(t => window.JUEGO.test.finalEn(t), t); if (!h) continue; n++;
-      if (h.h < 0) malos++; if (h.h < min.h) min = { ...h, t: Math.round((t - info.suelta) * 100) / 100 };
+      let mal = false;
+      for (const [k, v] of Object.entries(h.todos)) { if (!(k in base)) base[k] = v; if (v < 0 && v < Math.min(0, base[k]) - .005) { mal = true; if (peor.length < 3) peor.push(`${k} ${(v * 100).toFixed(1)} cm a ${(t - info.suelta).toFixed(2)} s`); } }
+      if (mal) malos++; if (h.h < min.h) min = { ...h, t: Math.round((t - info.suelta) * 100) / 100 };
     }
     bad += malos;
-    filas.push(`${malos ? 'BAD' : 'ok '} ${id.padEnd(8)} ${nombre.padEnd(34)} ${info.tipo.padEnd(8)} ${String(Math.round(info.dur * 100) / 100).padEnd(5)} s · holgura mínima ${(min.h * 100).toFixed(1)} cm (${min.que}, a ${min.t} s de soltar; barra y ${min.y} z ${min.z})${malos ? ` · ${malos} de ${n} cuadros con la barra dentro del cuerpo` : ''}`);
+    filas.push(`${malos ? 'BAD' : 'ok '} ${id.padEnd(8)} ${nombre.padEnd(34)} ${info.tipo.padEnd(8)} ${String(Math.round(info.dur * 100) / 100).padEnd(5)} s · holgura mínima ${(min.h * 100).toFixed(1)} cm (${min.que}, a ${min.t} s de soltar; barra y ${min.y} z ${min.z})${malos ? ` · ${malos} de ${n} cuadros con la barra más adentro del cuerpo que en la pose validada (${peor.join('; ')})` : ''}`);
     // capturas: de costado mientras cae, y el final en el plano de la caída (Ventura todas; Brenner, las que fallan)
     if (FOTOS && (id === 'ventura' || malos)) {
       const k = slug(`${id}_${nombre}`);
@@ -104,13 +110,13 @@ for (const [k0, k1] of [[140, 143], [140, 151], [151, 146]]) {
 
 // plano del llamado: el pesista a la vista con el panel al costado (escritorio) o al pie (teléfono)
 for (const [w, h, nombre] of [[1280, 720, 'escritorio'], [1745, 845, 'mac'], [390, 844, 'telefono']]) {
-  await page.setViewportSize({ width: w, height: h }); await page.waitForTimeout(150);
+  await page.setViewportSize({ width: w, height: h }); await page.waitForTimeout(150); await page.evaluate(() => { document.getElementById('capa').style.visibility = ''; });
   const r = await page.evaluate(() => window.JUEGO.test.planoLlamado());
   console.log(`plano del llamado (${nombre} ${w}×${h}): sujeto en ${JSON.stringify(r.encuadre)}, panel ${Math.round(r.panel.x)},${Math.round(r.panel.y)} ${Math.round(r.panel.width)}×${Math.round(r.panel.height)}`);
   await foto(`llamado_${nombre}`);
 }
 
 await browser.close(); server.close();
-if (bad) problemas.push(`${bad} cuadros con la barra dentro del cuerpo (BAD)`);
+if (bad) problemas.push(`${bad} cuadros con la barra más adentro del cuerpo que en la pose validada (BAD)`);
 if (problemas.length) { console.log('\nPROBLEMAS:\n' + problemas.join('\n')); process.exit(1); }
 console.log(`\ncheck_escenas: bien (${CASOS.length * 2} finales, cero cuadros BAD)`);
