@@ -87,7 +87,9 @@ export const telefono = {
    */
   async pantallaCompleta() {
     if (!this.tactil) return false;
-    if (esIPhone() && !instaladaComoApp()) { this.avisoInstalar(); return false; }      // ni Safari ni Chrome lo dejan en el iPhone
+    // Ni Safari ni Chrome lo dejan en el iPhone. El aviso ya se ofreció al entrar: si sigue abierto al empezar a jugar, se
+    // cierra y queda visto (si no, quedaría encima de la pausa y del parlante toda la partida); vuelve desde Opciones.
+    if (esIPhone() && !instaladaComoApp()) { this.cerrarAviso(); return false; }
     const el = document.documentElement;
     try {
       if (!pantallaActiva()) {
@@ -109,6 +111,11 @@ export const telefono = {
     el.dataset.navegador = navegadorIOS();
     el.querySelector('#instalar-t').textContent = texto('instalar.' + el.dataset.navegador); el.querySelector('#instalar-ok').textContent = texto('ok');
     el.hidden = false; return true;
+  },
+  /** Cierra el aviso de instalar (si estaba abierto) y lo da por visto: no vuelve solo. */
+  cerrarAviso() {
+    const el = document.getElementById('instalar');
+    if (el && !el.hidden) { guardado.set('tarima.instalar', '1'); el.hidden = true; }
   },
   /** Recalcula giro, medidas y clases (lo hace solo con cada cambio de tamaño u orientación). */
   medir() {
