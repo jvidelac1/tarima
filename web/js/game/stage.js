@@ -117,6 +117,62 @@ export function juntarFijos(raiz, fuera) {
   return { antes, despues };
 }
 
+// ---------- escena barata por píxel («Baja» y «Móvil»: Q.barato) ----------
+// El banco del usuario (M1 Pro) decía que a 1 MP lo caro era por píxel: la arena (casi todo el piso con material físico y
+// ocho luces), los haces de luz y los tres contraluces. Q.barato = { piso, haces, bordes } cambia eso solo en el juego:
+// - piso: la tarima y la alfombra del escenario con su luz horneada en una textura (todas las luces, vistas desde arriba,
+//   al construir la escena) y un material sin luces; la sombra del pesista y la barra va en una capa que solo oscurece.
+// - haces: cada cono dibuja una sola cara (con el brillo de las dos), termina donde ya casi no se veía y sale en colores de
+//   pantalla con una curva que imita el tono: sin AgX por fragmento en cada capa que se suma.
+// - bordes: 'material' saca de la escena los tres contraluces y los pone como término del material del pesista y de la barra
+//   (la misma cuenta de un foco, sin sombra); 'luces' es como el visor; 'no' los apaga (variante del banco).
+
+/** Tono de los haces en colores de pantalla: d(x) = A · max(x − X0, 0)^P imita a tonoJS por canal (error menor a 0,03). */
+export const CURVA_HAZ = { A: 1.0467, X0: .0158, P: .36 };
+const HAZ_FS = /* glsl */`uniform vec3 uColor; uniform float uStrength; varying vec3 vN; varying vec3 vV; varying float vT;
+void main(){
+	float edge = pow( abs( dot( normalize( vN ), normalize( vV ) ) ), 2.2 ); float fall = pow( clamp( vT, 0.0, 1.0 ), 1.6 );
+	vec3 c = uColor * uStrength * edge * fall;
+	#if defined( TONE_MAPPING )
+	gl_FragColor = vec4( 2.0 * ${CURVA_HAZ.A.toFixed(4)} * pow( max( c - ${CURVA_HAZ.X0.toFixed(4)}, 0.0 ), vec3( ${CURVA_HAZ.P.toFixed(3)} ) ), 1.0 );
+	#else
+	gl_FragColor = vec4( 2.0 * c, 1.0 );
+	#endif
+}`;
+/**
+ * Cono de haz corto: el mismo cono que el de la arena (vértice en el foco, radio 0,09 → 1 a lo largo de 1), cortado en
+ * `corte` del largo. En `uv.y` va el brillo del cono entero (vT^1,6) por un desvanecido que llega a cero en el corte, ya
+ * pasado por la raíz 1,6 (el sombreador vuelve a elevar). La parte de abajo, la más ancha, era la que menos se veía.
+ */
+export function conoCorto(corte = .72, desde = .45, anillos = 8) {
+  const g = new THREE.CylinderGeometry(.09, .09 + (1 - .09) * corte, corte, 28, anillos, true); g.translate(0, -corte / 2, 0);
+  const uv = g.attributes.uv, s = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  for (let i = 0; i < uv.count; i++) { const t = (1 - uv.getY(i)) * corte, f = Math.pow(1 - t, 1.6) * (1 - s(desde, corte, t)); uv.setY(i, Math.pow(f, 1 / 1.6)); }
+  return g;
+}
+/** Los contraluces como término del material: los materiales con este parche y el estado (prendido o no). */
+const BORDE = { on: false, u: null, mats: new Set() };
+const BORDE_PARS = 'uniform vec3 uBordePos[ 3 ]; uniform vec3 uBordeDir[ 3 ]; uniform vec3 uBordeCol[ 3 ]; uniform vec2 uBordeCono[ 3 ];';
+// la misma cuenta que un SpotLight de three sin sombra (getSpotLightInfo con decaimiento 0), en espacio de vista
+const BORDE_FS = `
+	for ( int i = 0; i < 3; i ++ ) {
+		directLight.direction = normalize( ( viewMatrix * vec4( uBordePos[ i ], 1.0 ) ).xyz - geometryPosition );
+		float bordeAt = smoothstep( uBordeCono[ i ].x, uBordeCono[ i ].y, dot( directLight.direction, normalize( ( viewMatrix * vec4( uBordeDir[ i ], 0.0 ) ).xyz ) ) );
+		directLight.color = uBordeCol[ i ] * bordeAt; directLight.visible = bordeAt > 0.0;
+		if ( bordeAt > 0.0 ) RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );
+	}`;
+/** Pone el parche de bordes en un material con luces (encadenado al onBeforeCompile que ya tenga). Sin efecto mientras BORDE.on sea false. */
+function conBorde(m) {
+  if (!m || !m.isMeshStandardMaterial || BORDE.mats.has(m)) return; BORDE.mats.add(m);
+  const antes = m.onBeforeCompile, propia = m.customProgramCacheKey !== THREE.Material.prototype.customProgramCacheKey, clave = m.customProgramCacheKey;
+  m.onBeforeCompile = function (sh, r) {
+    antes.call(this, sh, r); if (!BORDE.on) return;
+    Object.assign(sh.uniforms, BORDE.u);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <lights_pars_begin>', '#include <lights_pars_begin>\n' + BORDE_PARS).replace('#include <lights_fragment_maps>', BORDE_FS + '\n#include <lights_fragment_maps>');
+  };
+  m.customProgramCacheKey = function () { return (propia ? clave.call(this) : antes.toString()) + (BORDE.on ? '|borde' : ''); };
+}
+
 const v = new THREE.Vector3(), v2 = new THREE.Vector3();
 export const CAM = Object.fromEntries(CAMERAS.map((c, i) => [c.key, i]));
 /**
@@ -159,7 +215,87 @@ export class Escena {
     this.resize(); this.lighting.bake(r, [this.barbell.group, this.trace.group]);
     // después de hornear el entorno (que la ve igual): la arena fija en pocas mallas
     const A = this.arena; this.fijos = juntarFijos(A.group, new Set([A.impostors, A.crowd, A.bokeh, A.flashMesh, ...A.beamMeshes, ...(A.lamps || [])].filter(Boolean)));
+    this.barato = null; this.setBarato(Q.barato);
     new ResizeObserver(() => this.resize()).observe(canvas);
+  }
+  /**
+   * Escena barata por píxel (ver arriba, Q.barato). `B`: {piso, haces, bordes} o null (como el visor). Cambia programas:
+   * solo en la carga (setCalidad) o en el banco, seguido de precalentar o compilar. Lo caro (hornear) se hace una vez.
+   */
+  setBarato(B) {
+    this.barato = B || null; const P = this._barato ||= this._prepararBarato(), A = this.arena, L = this.lighting;
+    const piso = !!(B && B.piso && P.piso), haces = !!(B && B.haces), bordes = (B && B.bordes) || 'luces';
+    if (P.piso) { const p = P.piso; p.tarima.material = piso ? p.matT : p.origT; p.esc.material = piso ? p.matE : p.origE; p.sombra.visible = piso; }
+    A.beamMeshes.forEach((m, i) => { m.material = haces ? P.haces[i] : P.hacesOrig[i]; m.geometry = haces ? P.cono : P.conoOrig; });
+    for (const l of [L.rimA, L.rimB, L.hair]) l.visible = bordes === 'luces';
+    const on = bordes === 'material'; if (on !== BORDE.on) { BORDE.on = on; for (const m of BORDE.mats) m.needsUpdate = true; }
+    this.sombra = 4;
+  }
+  /** Materiales que la escena tiene guardados para otro modo de setBarato (fuera de la escena ahora): para que el banco libere sus programas. */
+  get materialesAparte() {
+    const P = this._barato; if (!P) return []; const o = [...P.haces, ...P.hacesOrig];
+    if (P.piso) o.push(...P.piso.origT, ...P.piso.origE, ...P.piso.matT, ...P.piso.matE, P.piso.sombra.material);
+    return [...new Set(o)];
+  }
+  /** Una sola vez: hornea el piso, arma los haces cortos y los uniforms de los bordes. Con los contraluces prendidos. */
+  _prepararBarato() {
+    const A = this.arena, L = this.lighting, rims = [L.rimA, L.rimB, L.hair], vis = rims.map(l => l.visible);
+    rims.forEach(l => { l.visible = true; });
+    BORDE.u ||= {
+      uBordePos: { value: rims.map(l => l.position.clone()) }, uBordeDir: { value: rims.map(l => l.position.clone().sub(l.target.position).normalize()) },
+      uBordeCol: { value: rims.map(l => new THREE.Vector3(l.color.r, l.color.g, l.color.b).multiplyScalar(l.intensity)) }, uBordeCono: { value: rims.map(l => new THREE.Vector2(Math.cos(l.angle), Math.cos(l.angle * (1 - l.penumbra)))) },
+    };
+    this.barbell.group.traverse(o => { if (o.isMesh) [].concat(o.material).forEach(conBorde); });
+    const hacesOrig = A.beamMeshes.map(m => m.material);
+    const haces = hacesOrig.map(o => new THREE.ShaderMaterial({ name: 'haz barato', vertexShader: o.vertexShader, fragmentShader: HAZ_FS, uniforms: { uColor: o.uniforms.uColor, uStrength: o.uniforms.uStrength }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.FrontSide, fog: false }));
+    let piso = null; try { piso = this._hornearPiso(); } catch (e) { console.warn('piso horneado:', e); }
+    rims.forEach((l, i) => { l.visible = vis[i]; });
+    return { hacesOrig, haces, conoOrig: A.beamMeshes[0]?.geometry, cono: conoCorto(), piso };
+  }
+  /**
+   * Luz horneada de la tarima (4 × 4 m) y de la alfombra del escenario (13 × 11 m): se dibuja cada una sola, desde arriba
+   * con una cámara ortográfica que cubre justo su cara de arriba (las UV de esa cara de la caja van igual que la imagen), a
+   * un destino lineal de media precisión: el color de salida del material físico con todas las luces y el entorno, sin
+   * tono ni sombras. En el juego esa cara usa un material sin luces con esa textura. La sombra del pesista y la barra va en
+   * una lámina con ShadowMaterial apenas arriba de la tarima, con la opacidad que sale de hornear el centro con y sin la
+   * clave. Devuelve null si la placa no puede dibujar en media precisión (queda el piso de siempre).
+   */
+  _hornearPiso() {
+    const r = this.renderer, A = this.arena, ext = r.extensions;
+    if (!A.tarima || !A.escenario || !(ext.has('EXT_color_buffer_float') || ext.has('EXT_color_buffer_half_float'))) return null;
+    const ocultos = []; this.scene.traverse(o => { if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.visible) { o.visible = false; ocultos.push(o); } });
+    const aniso = Math.min(this.Q.aniso || 4, r.capabilities.getMaxAnisotropy()), fondo = this.scene.background;
+    const hornear = (malla, ancho, largo, px, y, tipo = THREE.HalfFloatType, x0 = 0, z0 = 0) => {
+      const media = tipo === THREE.HalfFloatType, h = Math.max(1, Math.round(px * largo / ancho));
+      const rt = new THREE.WebGLRenderTarget(px, h, { type: tipo, generateMipmaps: media, minFilter: media ? THREE.LinearMipmapLinearFilter : THREE.NearestFilter, magFilter: media ? THREE.LinearFilter : THREE.NearestFilter, depthBuffer: true });
+      rt.texture.anisotropy = aniso; rt.texture.name = 'luz horneada';
+      const cam = new THREE.OrthographicCamera(-ancho / 2, ancho / 2, largo / 2, -largo / 2, .05, 2); cam.up.set(0, 0, -1); cam.position.set(x0, y + .5, z0); cam.lookAt(x0, y, z0); cam.updateMatrixWorld();
+      malla.visible = true; r.shadowMap.needsUpdate = true;      // la sombra se rehace sin nadie que la proyecte: sale sin sombras
+      r.setRenderTarget(rt); r.render(this.scene, cam); r.setRenderTarget(null); malla.visible = false;
+      return rt;
+    };
+    let res;
+    try {
+      this.scene.background = null;
+      const tT = hornear(A.tarima, 4, 4, this.Q.tex <= 1024 ? 1024 : 2048, 0), tE = hornear(A.escenario, 13, 11, 512, -.1);
+      // opacidad de la sombra: cuánto baja el color de pantalla en el centro de la tarima sin la luz clave
+      let op = .45;
+      if (ext.has('EXT_color_buffer_float')) {
+        const medio = () => { const rt = hornear(A.tarima, 1.2, 1.2, 8, 0, THREE.FloatType), b = new Float32Array(8 * 8 * 4); r.readRenderTargetPixels(rt, 0, 0, 8, 8, b); rt.dispose(); const c = new THREE.Color(); for (let i = 0; i < 64; i++) { c.r += b[i * 4] / 64; c.g += b[i * 4 + 1] / 64; c.b += b[i * 4 + 2] / 64; } return c; };
+        const k = this.lighting.key, I = k.intensity, con = medio(); k.intensity = 0; const sin = medio(); k.intensity = I;
+        const lum = c => .2126 * c.r + .7152 * c.g + .0722 * c.b, a = lum(tonoJS(con)), b = lum(tonoJS(sin));
+        if (a > 1e-4 && Number.isFinite(b)) op = Math.min(.9, Math.max(.1, 1 - b / a));
+      }
+      const tarima = A.tarima, esc = A.escenario, origT = tarima.material, origE = esc.material;
+      const basico = (rt, nombre) => new THREE.MeshBasicMaterial({ name: nombre, map: rt.texture });
+      const matT = origT.slice(), matE = origE.slice(); matT[2] = basico(tT, 'tarima horneada'); matE[2] = basico(tE, 'alfombra horneada');
+      const sombra = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), new THREE.ShadowMaterial({ name: 'sombra en la tarima', opacity: op, fog: false, depthWrite: false, toneMapped: false }));
+      sombra.rotation.x = -Math.PI / 2; sombra.position.y = .0015; sombra.receiveShadow = true; sombra.renderOrder = -1; sombra.visible = false; sombra.name = 'sombra en la tarima'; this.scene.add(sombra);
+      res = { tarima, esc, origT, origE, matT, matE, sombra, opacidad: +op.toFixed(3), texturas: [tT, tE] };
+    } finally {
+      this.scene.background = fondo; for (const o of ocultos) o.visible = true; r.shadowMap.needsUpdate = true; this.sombra = 4;
+    }
+    return res;
   }
   _post(Q) {
     const p = this.post = new Post(this.renderer, this.scene, this.rig.camera, Q); p.reduceMotion = this.reduceMotion; p.motionObject = this.barbell.group; p.bokehObject = this.arena.bokeh;
@@ -178,6 +314,7 @@ export class Escena {
   /** Copias de sombra de las piezas de la barra que no la tienen (setLoad arma discos nuevos). */
   _sombraBarra() {
     this.barbell.group.traverse(o => {
+      if (o.isMesh) [].concat(o.material).forEach(conBorde);      // discos nuevos: con el parche de bordes antes de compilarse
       if (!o.isMesh || o.userData.sombra || o.layers.mask === 1 << CAPA_SOMBRA || !o.castShadow) return;
       const p = new THREE.Mesh(copiaDeSombra(o.geometry), SOMBRA_MAT); p.name = 'sombra'; p.layers.set(CAPA_SOMBRA); p.castShadow = true; p.receiveShadow = false; p.frustumCulled = o.frustumCulled;
       o.add(p); o.userData.sombra = p;
@@ -212,7 +349,7 @@ export class Escena {
    * Rehace los pases y puede cambiar los programas de todos los materiales: solo durante la carga, seguido de precalentar().
    */
   setCalidad(Q) {
-    if (Q !== this.Q) { this.Q = Q; this.arena.setQuality(Q); this.lighting.setQuality(Q); this.post.dispose(); this._post(Q); this._sombras(); this.directo = !!Q.directo; this._modo(); }
+    if (Q !== this.Q) { this.Q = Q; this.arena.setQuality(Q); this.lighting.setQuality(Q); this.post.dispose(); this._post(Q); this._sombras(); this.directo = !!Q.directo; this._modo(); this.setBarato(Q.barato); }
     this.tope = Q.maxPixels; this.libre = false; this.resize();
   }
   _sombras() { const L = this.lighting, Q = this.Q; L.key.castShadow = this.sombras && Q.shadow > 0; L.key2.castShadow = this.sombras && Q.shadow2 > 0; }
@@ -256,7 +393,7 @@ export class Escena {
   cargar(id) {
     const mod = PLANTEL[id].modelo;
     return this.cargas[mod] ||= Athlete.load(mod, this.poses[mod], { aniso: Math.min(this.Q.aniso || 4, this.renderer.capabilities.getMaxAnisotropy()), maxTex: this.Q.tex })
-      .then(a => { a.root.visible = false; a.root.traverse(o => { if (o.isMesh && o.castShadow) o.layers.enable(CAPA_SOMBRA); }); this.scene.add(a.root); this.atletas[mod] = a; return a; });
+      .then(a => { a.root.visible = false; a.root.traverse(o => { if (o.isMesh && o.castShadow) o.layers.enable(CAPA_SOMBRA); if (o.isMesh) [].concat(o.material).forEach(conBorde); }); this.scene.add(a.root); this.atletas[mod] = a; return a; });
   }
   /** Pone en escena a un pesista (o a nadie, con null). Marangi comparte la instancia de Brenner con la tela de color plano. */
   async mostrar(id) {
