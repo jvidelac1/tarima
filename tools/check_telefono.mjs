@@ -12,6 +12,9 @@
 //  - En vertical (390 × 844, teléfono con la rotación trabada): el contenido se gira 90° (html.rotado) y se juega igual,
 //    con toques sobre el botón; al girar el teléfono de verdad, se usa la orientación real.
 // Sin --dibujo el 3D no se dibuja solo (?dibujo=0, como check_game): antes de cada captura se fuerza un cuadro.
+// Cuánto tapa la interfaz al pesista (tools/tapa.mjs) en el llamado, con la barrita quieta y corriendo, en el levantamiento, en el
+// veredicto y en el turno de un rival, por tamaño de pantalla (tabla al final y out/telefono/tapa.json). TAPA_INFORMA=0: falla
+// si se pasa del umbral (cuerpo ≤ 15 % durante la barrita y el levantamiento, torso ≤ 20 % en el llamado).
 // Uso: node tools/check_telefono.mjs [--headed] [--solo=nombre] [--capturas=out/telefono] [--dibujo]
 import http from 'node:http';
 import fs from 'node:fs';
@@ -20,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { launchOptions } from './browser.mjs';
 import { sinApi } from './sin_api.mjs';
+import { medirEnPagina, fila, revisar as revisarTapa } from './tapa.mjs';
 /** Señales de un toque (la libre de siempre y las de 'u': ¡SALTA!, ¡PÁRATE!, ¡DA TODO!): un toque y la señal se va. */
 const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
@@ -38,7 +42,7 @@ const server = http.createServer((req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/`;
 fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT, { recursive: true });
-const problemas = [], notas = [];
+const problemas = [], notas = [], TAPA = [], INFORMA = process.env.TAPA_INFORMA !== '0';      // por ahora solo informa: el antes
 const browser = await chromium.launch(launchOptions({ headed: HEADED }));
 
 const CASOS = [
@@ -47,6 +51,7 @@ const CASOS = [
   { nombre: 'zurdo_740x360', w: 740, h: 360, dpr: 3, url: '&mano=izq', hastaIntentos: 2 },
   // iPhone en Safari de costado, con la barra de direcciones a la vista: quedan unos 340 px de alto
   { nombre: 'safari_844x340', w: 844, h: 340, dpr: 3, seguras: { top: 0, right: 47, bottom: 21, left: 47 }, hastaIntentos: 2 },
+  { nombre: 'android_932x430', w: 932, h: 430, dpr: 3, hastaIntentos: 2 },
   { nombre: 'vertical_390x844', w: 390, h: 844, dpr: 3, vertical: true, hastaIntentos: 2 },
 ];
 
@@ -179,6 +184,12 @@ async function correr(C) {
   }
 
   // ---------- la partida ----------
+  // cuánto tapa la interfaz al pesista, una vez por momento
+  const medidos = new Set(), tapa = async momento => {
+    if (medidos.has(momento)) return; medidos.add(momento);
+    const x = await J(medirEnPagina).catch(e => ({ error: String(e) })); if (!x) return; if (x.error) { notas.push(`${tag} tapa ${momento}: ${x.error}`); return; }
+    TAPA.push({ p: C.nombre, momento, x }); const r = revisarTapa(momento, x); if (r && !INFORMA) mal(r);
+  };
   const vistas = new Set(), pantallas = new Set(); let firma = '', dedosProbados = false, bordesProbados = false, campoSolo = false, nIntentos = 0, ultToque = 0, hecho = '', revisadas = 0;
   const hasta = s => s.pantalla === 'fin' || (C.hastaIntentos && nIntentos >= C.hastaIntentos);
   for (let n = 0; n < 60000; n++) {
@@ -192,11 +203,15 @@ async function correr(C) {
       firma = clave; pantallas.add(s.pantalla);
       if (s.panel) await av(450);
       const R = await revisar(clave.replace(/\|+/g, ' ').trim()); revisadas++;
+      const sg = I && I.propio ? I.senal : null;
+      if (s.panel && ['inicio', 'presentacion', 'apertura', 'intervalo'].includes(s.pantalla)) await tapa(s.pantalla);
+      if (s.panel && s.pantalla === 'llamado') await tapa('llamado'); else if (sg && sg.tipo === 'barra') { await av(500); await tapa('corre'); } else if (sg && sg.tipo === 'espera' && sg.barra) await tapa('quieta');
+      else if (s.pantalla === 'decision') { await av(1200); await tapa('veredicto'); } else if (s.pantalla === 'rival') { await av(900); await tapa('rival'); }
       if (I && I.propio && !R.zona) mal(`en el intento («${I.senal?.verbo || I.fase}») no se ve el botón táctil`);
       await foto(clave.replace(/\|+/g, '_'));
     }
     if (I && I.propio && s.modo !== 'panel') {
-      const g = I.senal; if (!g) { await av(20); continue; }
+      const g = I.senal; if (!g) { if (['tiron', 'vuelo', 'pelea', 'empuje', 'flexion'].includes(I.fase) && !medidos.has('levanta')) { await tapa('levanta'); await foto('levanta'); } await av(20); continue; }
       vistas.add(g.verbo);
       if (C.dedos && !dedosProbados && (g.tipo === 'luz' || g.tipo === 'barra')) {
         if (g.tipo === 'barra') await ir(g.objetivo);      // 'b': después de la gracia de la barrita      // dos dedos a la vez en ¡SALTA!: dos toques anotados, un solo contacto («doble»)
@@ -259,6 +274,7 @@ async function correr(C) {
 try { for (const C of CASOS.filter(c => !SOLO || c.nombre === SOLO)) await correr(C); }
 catch (e) { problemas.push('excepción de la prueba: ' + (e.stack || e.message)); }
 await browser.close(); server.close();
+if (TAPA.length) { console.log('\nCuánto tapa la interfaz al pesista (caja proyectada desde three; tools/tapa.mjs):'); for (const id of [...new Set(TAPA.map(x => x.p))]) { console.log(`  [${id}]`); for (const x of TAPA.filter(y => y.p === id)) console.log('    ' + fila(x.momento, x.x)); } fs.writeFileSync(path.join(OUT, 'tapa.json'), JSON.stringify(TAPA, null, 1)); }
 for (const n of notas) console.log('nota: ' + n);
 if (problemas.length) { console.log(`\nFALLÓ (${problemas.length}):`); for (const p of problemas.slice(0, 40)) console.log('  ' + p); process.exit(1); }
 console.log('\nOK: teléfono de costado (dos tamaños y mano izquierda) y en vertical con el contenido girado, jugado con toques, campos de texto con el editor de arriba y dos dedos, sin cortes ni superposiciones');

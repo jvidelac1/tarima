@@ -542,6 +542,25 @@ export class Escena {
     return { x: (v.x + 1) / 2 * this.canvas.clientWidth, y: (1 - v.y) / 2 * this.canvas.clientHeight };
   }
   /**
+   * Cajas del pesista y de la barra en la página (px CSS), proyectadas con la cámara de este cuadro. Para las pruebas que
+   * miden cuánto tapa la interfaz (check_barra, check_telefono). Cuerpo: todos los huesos menos `Bar`, con 6 % de la estatura
+   * de más a cada lado (la carne alrededor del hueso); `torso`: de la cabeza a la cadera. Barra: las puntas y los discos.
+   * null sin pesista, o con el contenido girado (las cajas no se pueden comparar con las de la página).
+   */
+  cajas() {
+    const a = this.activo; if (!a || document.documentElement.classList.contains('rotado')) return null;
+    const cam = this.rig.camera, R = this.canvas.getBoundingClientRect(), W = this.canvas.clientWidth, H = this.canvas.clientHeight;
+    const px = p => { p.project(cam); return { x: R.left + (p.x + 1) / 2 * W, y: R.top + (1 - p.y) / 2 * H }; };
+    const caja = ps => ({ l: Math.min(...ps.map(p => p.x)), r: Math.max(...ps.map(p => p.x)), t: Math.min(...ps.map(p => p.y)), b: Math.max(...ps.map(p => p.y)) });
+    a.root.updateMatrixWorld(true); cam.updateMatrixWorld();
+    const nombre = b => b.name.replace(/^mixamorig:?/, ''), huesos = a.bones.filter(b => b !== a.barBone && !/_end$/i.test(nombre(b)) || nombre(b) === 'HeadTop_End');
+    const cuerpo = caja(huesos.map(b => px(b.getWorldPosition(v)))), m = (cuerpo.b - cuerpo.t) * .06;
+    const T = new Set(['Head', 'HeadTop_End', 'Neck', 'Spine', 'Spine1', 'Spine2', 'Hips', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm']);
+    const torso = caja(huesos.filter(b => T.has(nombre(b))).map(b => px(b.getWorldPosition(v))));
+    const y = this.barY ?? 1, z = this.barZ ?? 0, barra = caja([-1.1, 1.1].flatMap(x => [-.225, .225].map(d => px(v.set(x, y + d, z)))));
+    return { cuerpo: { l: cuerpo.l - m, r: cuerpo.r + m, t: cuerpo.t - m, b: cuerpo.b + m * .3 }, torso: { l: torso.l - m, r: torso.r + m, t: torso.t - m, b: torso.b }, barra };
+  }
+  /**
    * Nivel de detalle del pesista según los píxeles por metro con que se lo ve (lo mismo que hace el visor): en plano general
    * los triángulos del cuerpo y del pelo miden menos de un píxel y se dibuja el índice simplificado (30 % y 45 %); en los
    * primeros planos, el completo. También apaga las normales de detalle de piel y tela cuando no se resuelven.
