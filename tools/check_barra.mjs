@@ -56,11 +56,12 @@ for (const P of PANTALLAS) {
   if (!P.primera) await page.addInitScript(() => { try { if (!sessionStorage.getItem('__t')) { localStorage.setItem('tarima.jugadas', '1'); localStorage.setItem('tarima.visto.b_presenta', '1'); localStorage.setItem('tarima.visto.b_fantasma', '1'); sessionStorage.setItem('__t', '1'); } } catch { /* sin almacenamiento */ } });
   // dónde se veía el puntero cuando llegó cada Espacio (antes que el juego: este oyente se registra primero)
   await page.addInitScript(() => { window.__P = []; addEventListener('keydown', e => { if (e.code !== 'Space' || e.repeat) return; const p = document.querySelector('#barrita .b-punt'); window.__P.push({ ts: e.timeStamp, izq: p ? parseFloat(p.style.left) : null, visible: !document.getElementById('barrita')?.hidden }); }, true); });
-  await page.goto(`${base}juego.html?lang=${P.lang}&q=baja&semilla=${SEMILLA}`, { waitUntil: 'load' });
+  // sin dibujo continuo (?dibujo=0, como check_game): por software cada cuadro tarda; antes de cada captura se fuerza uno
+  await page.goto(`${base}juego.html?lang=${P.lang}&q=baja&dibujo=0&semilla=${SEMILLA}`, { waitUntil: 'load' });
   if (!await J(() => window.JUEGO.listo)) { mal('el juego no inició'); await ctx.close(); continue; }
   await J(() => JUEGO.test.manual());
   const av = ms => J(ms => JUEGO.test.avanzar(ms), ms), ir = t => J(t => JUEGO.test.hasta(t, 8), t);
-  const foto = n => page.screenshot({ path: path.join(OUT, `${P.id}_${n}.png`) }).catch(() => null);
+  const foto = async n => { await J(() => { try { window.JUEGO.escena?.cuadro?.(0, true); } catch (e) { console.error('cuadro forzado: ' + (e.stack || e)); } }).catch(() => null); return page.screenshot({ path: path.join(OUT, `${P.id}_${n}.png`) }).catch(() => null); };
   const punto = async () => { const b = await page.locator('#escena').boundingBox(); return { x: Math.round(b.x + b.width * .45), y: Math.round(b.y + b.height * .4) }; };
   const baja = async () => { if (P.tactil) { const p = await punto(); await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.x, y: p.y, id: 1 }] }); } else await page.keyboard.down('Space'); };
   const sube = async () => { if (P.tactil) await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); else await page.keyboard.up('Space'); };
@@ -118,10 +119,10 @@ for (const P of PANTALLAS) {
           }
           if (corte.length) mal(`texto cortado en la barrita: ${corte.join(' · ')}`);
         }
-        await ir(obj - 1); await toque(); hecho = k; pedidas.push(z); await av(60); await foto(`${n + 1}_${z}`); n++;
+        await ir(obj - 1); await toque(); hecho = k; pedidas.push(z); await av(320); await foto(`${n + 1}_${z}`); n++;
         continue;
       }
-      await av(30); continue;
+      await J(() => JUEGO.test.avanzar(60, 30)); continue;
     }
     if (s.panel && !s.sobre) {
       if (s.pantalla === 'llamado') {
@@ -134,7 +135,7 @@ for (const P of PANTALLAS) {
       const v = await J(() => document.getElementById('veredicto').hidden ? '' : document.getElementById('veredicto').textContent);
       if (v && !lineas.includes(v)) { lineas.push(v); if (lineas.length <= 3) await foto(`${lineas.length}_veredicto`); }
     }
-    await av(250);
+    await J(() => JUEGO.test.avanzar(300, 50));
     if (['rival', 'decision', 'carga', 'desplazado'].includes(s.pantalla) && g % 3 === 0) await toque();
   }
   const R = await J(() => (JUEGO.E.propios || []).map(x => ({ res: x.res, linea: x.linea, barras: (x.uno?.barras || []).map(b => b.zona + (b.sola ? '*' : '')) })));
