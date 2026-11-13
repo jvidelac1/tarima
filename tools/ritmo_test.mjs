@@ -18,6 +18,7 @@ import { mezclar } from '../web/js/sim/fixed.js';
 import { RITMO, FASES_RAPIDAS, esDecisivo, modoRival, tramoResumen, veredictoPropio, desdeDecisivo } from '../web/js/game/ritmo.js';
 import { armarCaida } from '../web/js/game/caida.js';
 import { jugarUno, datos, ATL, BOTS_U } from './uno_bots.mjs';
+import { cuerpoDe } from '../web/js/sim/rules.js';
 
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const SEM = +(arg('semillas') || 60), PANEL = +(arg('panel') || 2.5);
@@ -52,7 +53,7 @@ for (const nivel of ['amistoso', 'normal']) for (const id of ATL) for (let k = 0
     const L = { ...p.llamado }, a = p.at[L.a];
     if (a.ctrl === 'persona') {
       cierraEspera(); seguidos = 0; enteros = 0; reloj += PANEL;
-      const env = L.lev === 'c' ? 'split' : undefined, ctx = p.contexto(env), S = jugarUno(ctx, NOVATO, mezclar(semilla, g)), res = S.m.res;
+      const env = L.lev === 'c' ? cuerpoDe(f).casa : undefined, ctx = p.contexto(env), S = jugarUno(ctx, NOVATO, mezclar(semilla, g)), res = S.m.res;
       p.resolver({ conf: S.conf, env, ent: S.ent });
       const dur = (res.t + 80) / 1000; (L.lev === 's' ? intS : intC).push(dur); reloj += dur;
       const v = veredictoPropio(res.res === 'valido', true); (res.res === 'valido' ? verOk : verMal).push(v.total - v.tVer);

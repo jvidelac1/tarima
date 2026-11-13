@@ -1,9 +1,9 @@
 // Metas A a D del nivel 'u' (docs/JUEGO.md, G2.9) sobre los bots de tools/uno_bots.mjs. Lo corre tools/play_human.mjs.
-// A y B ponen la prueba en rojo; C y D se informan (dependen de los factores de cuerpo, que define quien calibra los
-// pesistas con tools/margen_cal.mjs) y dicen PENDIENTE si no se cumplen.
+// A, B, C y D ponen la prueba en rojo. C y D dependen de los factores de cuerpo (sim.json → cuerpoJuego, fijos) y de la base
+// de cada tramo (rules.js → UNO.base), que calibra tools/margen_cal.mjs; acá se confirman con el núcleo de verdad.
 import { jugarUno, ctxUno, BOTS_U, firma, verificar, ATL, datos } from './uno_bots.mjs';
 import { mezclar, Azar } from '../web/js/sim/fixed.js';
-import { gastoTramo, UNO } from '../web/js/sim/rules.js';
+import { gastoTramo, UNO, cuerpoDe } from '../web/js/sim/rules.js';
 
 const CAUSAS_U = new Set(['sin_altura', 'atras', 'fondo', 'aplastado', 'codos']);
 const INTS = [8800, 9000, 9500, 9700, 10000, 10300];
@@ -19,7 +19,7 @@ export function medirUno({ n = 600 } = {}) {
   const curva = {};      // I → lev → id → {v, n, caida: {tramo: n}, mayor: {tramo: n}}
   const aus90 = { v: 0, n: 0 };
   for (const I of INTS) for (const lev of ['s', 'c']) for (const id of ATL) for (const dedo of [false, true]) for (let k = 0; k < n; k++) {
-    const f = datos.atletas[id], env = lev === 'c' ? (k % 2 ? f.enviones[0] : 'split') : undefined;
+    const f = datos.atletas[id], env = lev === 'c' ? (k % 2 ? cuerpoDe(f).casa : 'split') : undefined;
     const sem = mezclar(I, k, ATL.indexOf(id), dedo ? 7 : 3, lev === 's' ? 1 : 2), ctx = ctxUno(id, lev, env, I, sem, dedo ? { tactil: true } : {});
     const out = {};
     for (const [b, B] of Object.entries(BOTS_U)) {
@@ -52,7 +52,7 @@ export function medirUno({ n = 600 } = {}) {
     for (const id of ATL) for (const lev of ['s', 'c']) {
       let v = 0; const N = n;
       for (let k = 0; k < N; k++) {
-        const r = new Azar(mezclar(k, 61)), f = datos.atletas[id], I = 8880 + r.ent(241), env = lev === 'c' ? f.enviones[0] : undefined;
+        const r = new Azar(mezclar(k, 61)), f = datos.atletas[id], I = 8880 + r.ent(241), env = lev === 'c' ? cuerpoDe(f).casa : undefined;
         const ctx = ctxUno(id, lev, env, I, mezclar(k, 62, ATL.indexOf(id), lev === 's' ? 1 : 2), { tactil: true, primera: true });
         const S = jugarUno(ctx, BOTS_U.reactivo, mezclar(k, 63)); if (verificar(ctx, S).res.res === 'valido') v++;
       }
@@ -64,19 +64,30 @@ export function medirUno({ n = 600 } = {}) {
   // ---------- C: curva (informativo) ----------
   { console.log('C. curva del novato (dedo), válidos por intensidad, promedio de los tres pesistas · arranque / dos tiempos (y cada pesista):');
     const meta = I => (I <= 9500 ? [97, 100] : I === 9700 ? [85, 100] : I === 10000 ? [35, 65] : I >= 10300 ? [0, 20] : [0, 100]);
-    let prev = 101, mono = true, cumple = true;
+    let prev = 101, mono = true, cumple = true; const bajo = [];
     for (const I of INTS) {
       const filas = ['s', 'c'].map(lev => { const xs = ATL.map(id => curva[I][lev][id]), prom = xs.reduce((a, x) => a + pc(x.v, x.n), 0) / xs.length; return { lev, prom, xs }; });
       const prom = (filas[0].prom + filas[1].prom) / 2, [lo, hi] = meta(I); if (prom > prev + .5) mono = false; prev = prom; if (prom < lo || prom > hi) cumple = false;
+      // hasta el 97 %, ningún pesista más de 10 puntos debajo del promedio (nadie queda injugable)
+      if (I <= 9700) ATL.forEach((id, j) => { const x = (pc(filas[0].xs[j].v, filas[0].xs[j].n) + pc(filas[1].xs[j].v, filas[1].xs[j].n)) / 2; if (x < prom - 10) bajo.push(`${id} ${x.toFixed(0)} % al ${I / 100} %`); });
       console.log(`   ${(I / 100).toFixed(0)} %: ${filas.map(F => `${f1(F.prom)} % (${F.xs.map(x => pc(x.v, x.n).toFixed(0)).join('/')})`).join(' · ')} · promedio ${f1(prom)} %   meta ${lo === 0 ? `≤ ${hi}` : hi === 100 ? `≥ ${lo}` : `${lo} a ${hi}`} %`);
     }
-    info.push(`C: ${cumple && mono ? 'se cumple' : 'PENDIENTE (calibración con los factores de cuerpo: tools/margen_cal.mjs)'}${mono ? '' : ' · la curva no es monótona'}`); }
+    if (!cumple || !mono) mal.push(`C: la curva sale de sus bandas${mono ? '' : ' o no baja siempre'} (calibrar con tools/margen_cal.mjs)`);
+    if (bajo.length) mal.push(`C: pesistas más de 10 puntos debajo del promedio: ${bajo.join(', ')}`);
+    info.push(`C: ${cumple && mono && !bajo.length ? 'se cumple' : 'NO se cumple'}`); }
 
   // ---------- D: dónde caen (informativo) ----------
   { const tabla = {}; for (const I of [10000, 10300]) for (const lev of ['s', 'c']) for (const id of ATL) { const C = curva[I][lev][id], T = (tabla[id] ||= { n: 0 }); for (const [k, x] of Object.entries(C.mayor)) { T[k] = (T[k] || 0) + x; T.n += x; } }
     console.log('D. tramo que más gastó en las caídas del 100 al 103 %: ' + ATL.map(id => { const T = tabla[id]; return `${id}: ${['tiron', 'arriba', 'pararse'].map(k => `${k} ${pc(T[k] || 0, T.n).toFixed(0)} %`).join(', ')}`; }).join(' · '));
     const al100 = ['s', 'c'].map(lev => { const xs = ATL.map(id => pc(curva[10000][lev][id].v, curva[10000][lev][id].n)); return Math.max(...xs) - Math.min(...xs); });
-    info.push(`D: al 100 %, la mayor diferencia entre pesistas es de ${Math.max(...al100).toFixed(0)} puntos (meta ≥ 15): ${Math.max(...al100) >= 15 ? 'se cumple' : 'PENDIENTE (los pesistas todavía usan CUERPO_NEUTRO si sim.json no trae cuerpoJuego)'}`); }
+    // cada pesista cae donde dice su tarjeta: Largo al pararse, Potente arriba de la cabeza; Compacto, repartido
+    const de = (id, k) => pc(tabla[id][k] || 0, tabla[id].n), dmal = [];
+    if (de('brenner', 'pararse') < 70) dmal.push(`Largo cae por pararse en ${de('brenner', 'pararse').toFixed(0)} % (meta ≥ 70)`);
+    if (de('marangi', 'arriba') < 70) dmal.push(`Potente cae por arriba en ${de('marangi', 'arriba').toFixed(0)} % (meta ≥ 70)`);
+    for (const k of ['tiron', 'arriba', 'pararse']) if (de('ventura', k) > 60) dmal.push(`Compacto cae por ${k} en ${de('ventura', k).toFixed(0)} % (meta ≤ 60)`);
+    if (Math.max(...al100) < 15) dmal.push(`al 100 % los pesistas difieren ${Math.max(...al100).toFixed(0)} puntos (meta ≥ 15)`);
+    if (dmal.length) mal.push(`D: ${dmal.join(' · ')}`);
+    info.push(`D: al 100 %, la mayor diferencia entre pesistas es de ${Math.max(...al100).toFixed(0)} puntos (meta ≥ 15): ${dmal.length ? 'NO se cumple' : 'se cumple'}`); }
 
   // ---------- novato / medio / bueno por tramo (informativo) ----------
   { const NIV = { novato: { ...BOTS_U.reactivo, sd: 120, lag: 60 }, medio: BOTS_U.reactivo, bueno: { reac: 170, sd: 30 } };
@@ -93,6 +104,6 @@ export function medirUno({ n = 600 } = {}) {
       console.log(`   ${I / 100} %: ${fila.join(' · ')}`);
     } }
   for (const x of info) console.log('   ' + x);
-  console.log(mal.length ? `\nFALLÓ (nivel 'u'):\n  ${mal.join('\n  ')}` : `\nOK: metas A y B del nivel 'u' (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
+  console.log(mal.length ? `\nFALLÓ (nivel 'u'):\n  ${mal.join('\n  ')}` : `\nOK: metas A, B, C y D del nivel 'u' (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
   return !mal.length;
 }

@@ -156,7 +156,9 @@ export const CONTROLES = ['c', 'f', 'u'];
  * no lo decide el MARGEN (milésimas de disco: 1 disco = 1000), que se comen los tramos según los kilos y el cuerpo.
  *   margen     margen inicial de todos (3 discos). «El día» (`dia`, triangular de ±dia) se le suma; se revela al agarrar
  *   diaCorte   desde cuánto el día se anuncia «liviana» o «pesada»
- *   base       gasto de cada tramo al 100 % del techo del momento; `r(I)` lo escala (0 hasta `rDesde`, 1 en `rHasta`, y sigue)
+ *   base       gasto de cada tramo al 100 % del techo del momento; `r(I)` lo escala (0 hasta `rDesde`, 1 en `rHasta`, y sigue).
+ *              Calibrada el 13-nov con tools/margen_cal.mjs sobre los factores de cuerpo fijos de sim.json (metas C y D; antes
+ *              900/1500/2000, pensada para un cuerpo promedio): 1000/1700/1800
  *   envion     el tramo «arriba» del dos tiempos: factor `k` (milésimas) y gasto fijo `mas`; el squat suma `squatMovil` si la
  *              movilidad es alta (negativo: devuelve margen) y `squatRigido` si no
  *   sinSalto   gasto de más del tirón sin contacto en ¡SALTA!   · pisoton  lo que devuelve el contacto de ¡PÁRATE!
@@ -174,7 +176,7 @@ export const CONTROLES = ['c', 'f', 'u'];
  */
 export const UNO = {
   margen: 3000, dia: 900, diaCorte: 300,
-  base: { tiron: 900, arriba: 1500, pararse: 2000 }, rDesde: 8500, rHasta: 10000,
+  base: { tiron: 1000, arriba: 1700, pararse: 1800 }, rDesde: 8500, rHasta: 10000,
   envion: { split: { k: 800, mas: 0 }, power: { k: 1000, mas: 500 }, squat: { k: 1000, mas: 0 } }, squatMovil: -250, squatRigido: 500,
   sinSalto: 250, pisoton: 500, garra: 500, frenoMs: 2500, frenoMin: -500, alLimite: 250,
   confMs: 300, dobleTecla: 120, dobleDedo: 80,
@@ -182,11 +184,11 @@ export const UNO = {
   pararseMs: 1500, pararseMin: 700, pisotonCierre: 300, pDuda: 550000, subeMs: { con: 550, sin: 950 }, squatMs: 900,
 };
 /**
- * Cuerpo de juego de un pesista en `'u'` (milésimas por tramo; `movil`: movilidad alta, para el squat). Lo trae sim.json en
- * `atletas.<id>.cuerpoJuego`; mientras no lo traiga, vale el promedio de la tabla de G2.5 (CUERPO_NEUTRO). GANCHO para
- * quien defina los pesistas: match.js lo pasa en `ctx.cuerpo`, y todo lo que muestra el panel sale de `previsto()`.
+ * Cuerpo de juego de un pesista en `'u'` (milésimas por tramo; `movil`: movilidad alta, para el squat; `casa`: el envión que
+ * el panel propone). Lo trae sim.json en `atletas.<id>.cuerpoJuego` (tools/build_sim_data.mjs); sin él vale CUERPO_NEUTRO,
+ * el promedio de los tres. match.js lo pasa en `ctx.cuerpo`, y lo que muestra el panel sale de `previsto()` y `chanceUno()`.
  */
-export const CUERPO_NEUTRO = { tiron: 870, arriba: 980, pararse: 880, movil: false };
+export const CUERPO_NEUTRO = { tiron: 870, arriba: 980, pararse: 880, movil: false, casa: 'split' };
 export const cuerpoDe = f => ({ ...CUERPO_NEUTRO, ...(f && f.cuerpoJuego ? f.cuerpoJuego : {}) });
 /** r(I) en milésimas: 0 hasta UNO.rDesde, 1000 en UNO.rHasta, y sigue en línea recta (1200 al 103 %). */
 export const rUno = I => (I <= UNO.rDesde ? 0 : idiv((I - UNO.rDesde) * 1000, UNO.rHasta - UNO.rDesde));
@@ -215,6 +217,22 @@ export function previsto(I, lev, env, cuerpo, o = { salto: true, pisoton: true }
     if (m < min) { min = m; justo = tr; } if (mayor === null || g > gastos[mayor]) mayor = tr;
   }
   return { fin: m, min, justo, mayor, gastos };
+}
+/**
+ * Chance de que la barra suba (milésimas, 0 a 1000) para quien toca ¡SALTA! y ¡PÁRATE! y usa la garra si se la ofrecen
+ * (`o.garra`: todavía la tiene). Exacta: con esos toques, el resultado depende solo de «el día» (diaDe), así que se suma el
+ * peso de cada día con el que llega, con las mismas reglas que attempt.js (_uCierra y _uGarra). La usan el panel del llamado
+ * («X de 10») y las pruebas (tools/margen_cal.mjs, tools/chance_test.mjs). Enteros: no cambia entre motores.
+ */
+export function chanceUno(I, lev, env, cuerpo, o = {}) {
+  const garra0 = o.garra !== false, G = TRAMOS[lev].map(tr => gastoTramo(tr, I, lev, env, cuerpo, { salto: true, pisoton: true }));
+  const h = idiv(UNO.dia, 2), n = 2 * h + 1; let ok = 0;
+  for (let d = -2 * h; d <= 2 * h; d++) {
+    let m = UNO.margen + d, garra = garra0, cae = false;
+    for (const g of G) { m -= g; if (m >= 0) continue; if (m >= UNO.frenoMin && garra) { garra = false; m += UNO.garra; continue; } cae = true; break; }
+    if (!cae) ok += n - (d < 0 ? -d : d);
+  }
+  return idiv(ok * 1000, n * n);
 }
 /** «El día» de un intento (milésimas de disco): triangular entre −UNO.dia y +UNO.dia, de la semilla del intento. */
 export function diaDe(semilla) { const r = new Azar(mezclar(semilla, 31)), h = idiv(UNO.dia, 2); return r.entre(-h, h) + r.entre(-h, h); }

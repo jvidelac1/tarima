@@ -77,6 +77,18 @@ jobs:
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/ritmo_test.mjs 2>&1 | tee out/logs/ritmo_test.log
 
+      - name: Calibración del margen con los cuerpos de cada pesista (margen_cal, metas C y D)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/margen_cal.mjs 2>&1 | tee out/logs/margen_cal.log
+
+      - name: Chance del panel contra el núcleo (chance_test, meta F)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/chance_test.mjs 2>&1 | tee out/logs/chance_test.log
+
+      - name: Pesistas y decisiones en finales enteras (pesistas_test, metas D y E)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/pesistas_test.mjs 2>&1 | tee out/logs/pesistas_test.log
+
       - name: Fácil de círculos, línea de base para registros viejos (play_human --f, no bloquea)
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         continue-on-error: true
