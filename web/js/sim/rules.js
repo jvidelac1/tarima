@@ -2,7 +2,7 @@
 //   tiempo en ms · intensidad en diezmilésimas (10000 = 100 %) · esfuerzo, exigencia y calidad en milésimas ·
 //   altura y desvío de la barra en mm · Resto en décimas de punto · kilos enteros · techos en gramos.
 // Los valores son los iniciales del documento de diseño; el informe de balance (tools/balance.mjs) es la herramienta para ajustarlos.
-import { idiv, rdiv, lerpi, clampi } from './fixed.js';
+import { idiv, rdiv, lerpi, clampi, mezclar, Azar } from './fixed.js';
 
 export const VERSION = '1.0';
 
@@ -148,7 +148,77 @@ export const segunHolgura = (I, con, sin) => sin + idiv((con - sin) * holgura(I)
 export const asistFacil = I => (I <= FACIL.holgadoHasta ? FACIL.asist : I >= FACIL.asistHasta ? FACIL.asistTecho : lerpi(I, FACIL.holgadoHasta, FACIL.asistHasta, FACIL.asist, FACIL.asistTecho));
 /** Ancho de las ventanas de Fácil a la intensidad I (milésimas). */
 export const anchoFacil = I => segunHolgura(I, FACIL.ancho, FACIL.anchoTecho);
-export const CONTROLES = ['c', 'f'];
+export const CONTROLES = ['c', 'f', 'u'];
+
+/**
+ * Nivel de control «Un toque, un tramo» (`'u'`, docs/JUEGO.md, sección Gameplay 2). Ningún toque tiene un momento justo:
+ * cada contacto cumple un tramo entero y vale en cualquier punto de él; si llega antes, queda guardado. Si la barra sube o
+ * no lo decide el MARGEN (milésimas de disco: 1 disco = 1000), que se comen los tramos según los kilos y el cuerpo.
+ *   margen     margen inicial de todos (3 discos). «El día» (`dia`, triangular de ±dia) se le suma; se revela al agarrar
+ *   diaCorte   desde cuánto el día se anuncia «liviana» o «pesada»
+ *   base       gasto de cada tramo al 100 % del techo del momento; `r(I)` lo escala (0 hasta `rDesde`, 1 en `rHasta`, y sigue)
+ *   envion     el tramo «arriba» del dos tiempos: factor `k` (milésimas) y gasto fijo `mas`; el squat suma `squatMovil` si la
+ *              movilidad es alta (negativo: devuelve margen) y `squatRigido` si no
+ *   sinSalto   gasto de más del tirón sin contacto en ¡SALTA!   · pisoton  lo que devuelve el contacto de ¡PÁRATE!
+ *   garra      lo que suma la garra (una por levantamiento) · frenoMs  lo que dura el FRENO · frenoMin  hasta dónde se ofrece
+ *   alLimite   menos que esto al terminar: «al límite» (vale igual; la presentación pone suspenso)
+ *   confMs     contactos después de confirmar que son parte de la confirmación · dobleTecla, dobleDedo  dos contactos más
+ *              cerca que esto son uno solo
+ *   saltaDesde ms después del contacto de ¡TIRA! en que abre ¡SALTA! (antes, el contacto queda guardado). ¡SALTA! cierra en
+ *              la recepción: así el tramo dura más de un segundo y nadie lo pierde por reaccionar tarde
+ *   tiraSolo   ¡TIRA! sale solo cuando al reloj le quedan estos ms (sin reloj, `relojSin`) · respiraMs  RESPIRA con la barra
+ *              en los hombros · arribaSolo  ¡ARRIBA! sale solo a estos ms de abrir
+ *   pararseMs  el tramo de ¡PÁRATE! cierra a lo sumo a estos ms de empezar la subida (antes, si hubo pisotón, a los
+ *              `pisotonCierre` ms del pisotón y no antes de `pararseMin`). `pDuda`: hasta dónde sube la barra antes del cierre
+ *   subeMs     del cierre a quedar de pie, con pisotón y sin él · squatMs  la subida del squat jerk (automática)
+ */
+export const UNO = {
+  margen: 3000, dia: 900, diaCorte: 300,
+  base: { tiron: 900, arriba: 1500, pararse: 2000 }, rDesde: 8500, rHasta: 10000,
+  envion: { split: { k: 800, mas: 0 }, power: { k: 1000, mas: 500 }, squat: { k: 1000, mas: 0 } }, squatMovil: -250, squatRigido: 500,
+  sinSalto: 250, pisoton: 500, garra: 500, frenoMs: 2500, frenoMin: -500, alLimite: 250,
+  confMs: 300, dobleTecla: 120, dobleDedo: 80,
+  saltaDesde: 250, tiraSolo: 5000, relojSin: 30000, respiraMs: 450, arribaSolo: 6000,
+  pararseMs: 1500, pararseMin: 700, pisotonCierre: 300, pDuda: 550000, subeMs: { con: 550, sin: 950 }, squatMs: 900,
+};
+/**
+ * Cuerpo de juego de un pesista en `'u'` (milésimas por tramo; `movil`: movilidad alta, para el squat). Lo trae sim.json en
+ * `atletas.<id>.cuerpoJuego`; mientras no lo traiga, vale el promedio de la tabla de G2.5 (CUERPO_NEUTRO). GANCHO para
+ * quien defina los pesistas: match.js lo pasa en `ctx.cuerpo`, y todo lo que muestra el panel sale de `previsto()`.
+ */
+export const CUERPO_NEUTRO = { tiron: 870, arriba: 980, pararse: 880, movil: false };
+export const cuerpoDe = f => ({ ...CUERPO_NEUTRO, ...(f && f.cuerpoJuego ? f.cuerpoJuego : {}) });
+/** r(I) en milésimas: 0 hasta UNO.rDesde, 1000 en UNO.rHasta, y sigue en línea recta (1200 al 103 %). */
+export const rUno = I => (I <= UNO.rDesde ? 0 : idiv((I - UNO.rDesde) * 1000, UNO.rHasta - UNO.rDesde));
+/** Tramos de cada levantamiento, en orden. */
+export const TRAMOS = { s: ['tiron', 'arriba', 'pararse'], c: ['tiron', 'pararse', 'arriba'] };
+/**
+ * Gasto de un tramo (milésimas de disco). `o.salto`: hubo contacto en ¡SALTA! (si no, el tirón suma UNO.sinSalto);
+ * `o.pisoton`: hubo contacto en ¡PÁRATE! (el tramo gasta UNO.pisoton menos, sin bajar de 0).
+ */
+export function gastoTramo(tramo, I, lev, env, cuerpo, o = {}) {
+  const r = rUno(I), k = cuerpo[tramo] ?? 1000;
+  let g = idiv(UNO.base[tramo] * r * k, 1000000);
+  if (tramo === 'tiron' && !o.salto) g += UNO.sinSalto;
+  if (tramo === 'arriba' && lev === 'c') { const E = UNO.envion[env] || UNO.envion.split; g = idiv(g * E.k, 1000) + E.mas + (env === 'squat' ? (cuerpo.movil ? UNO.squatMovil : UNO.squatRigido) : 0); }
+  if (tramo === 'pararse' && o.pisoton) g = Math.max(0, g - UNO.pisoton);
+  return g;
+}
+/**
+ * Lo que el panel muestra para un peso («llegas con»): día 0, ¡SALTA! y ¡PÁRATE! tocados y sin garra. `fin`: margen al
+ * terminar (negativo: no llega); `justo`: el tramo donde el margen queda más bajo; `mayor`: el que más gasta; `gastos`.
+ */
+export function previsto(I, lev, env, cuerpo, o = { salto: true, pisoton: true }) {
+  let m = UNO.margen, min = Infinity, justo = null, mayor = null; const gastos = {};
+  for (const tr of TRAMOS[lev]) {
+    const g = gastos[tr] = gastoTramo(tr, I, lev, env, cuerpo, o); m -= g;
+    if (m < min) { min = m; justo = tr; } if (mayor === null || g > gastos[mayor]) mayor = tr;
+  }
+  return { fin: m, min, justo, mayor, gastos };
+}
+/** «El día» de un intento (milésimas de disco): triangular entre −UNO.dia y +UNO.dia, de la semilla del intento. */
+export function diaDe(semilla) { const r = new Azar(mezclar(semilla, 31)), h = idiv(UNO.dia, 2); return r.entre(-h, h) + r.entre(-h, h); }
+export const diaTxt = dia => (dia >= UNO.diaCorte ? 'liviana' : dia <= -UNO.diaCorte ? 'pesada' : 'normal');
 
 /** Causas con su texto. Las de fallo y las de nulo (secciones 5.2 y 5.3). */
 export const CAUSAS = {
