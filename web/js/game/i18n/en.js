@@ -664,4 +664,18 @@ export default {
   'llamado.b_falta': '{discos} short: all green still lifts it',
   'margen.cansancio': 'Fatigue −{d}',
   'glosario.cansancio.t': 'Fatigue', 'glosario.cansancio.d': 'Hitting far off, using your grit or scraping by tires you: the next attempt starts with less energy (half of it carries from the snatch to the clean & jerk).',
+  // ---- final scoreboard, rival-turn «Skip» button and 1RM (13-nov, branch tablero)
+  'tablero.ahora': 'Now', 'tablero.sigue': 'Up next', 'tablero.termino': 'Done', 'tablero.tu': '(you)',
+  'tablero.mejor': 'Best', 'tablero.pide': 'Next', 'tablero.col_s': 'SN', 'tablero.col_c': 'C&J',
+  'tablero.tu_rm': 'your 1RM {kg}', 'tablero.antes': 'was {kg}',
+  'tablero.va_por': '{rival} goes for {kg}', 'tablero.pidio': '{rival} asked for {kg}',
+  'tablero.antes_que_tu': 'goes before you', 'tablero.despues_de_ti': 'goes after you',
+  'tablero.te_pasa': 'if he makes it, he passes you', 'tablero.para_pasarte': 'needs {kg} to pass you',
+  'tablero.aria': 'Final scoreboard',
+  'saltar.boton': 'Skip', 'saltar.aria': 'Skip the rival’s turn (S key)',
+  'rm.linea': '{pct}% of your 1RM ({kg} kg)',
+  'rm.dif.facil': 'Easy', 'rm.dif.medio': 'Medium', 'rm.dif.dificil': 'Hard', 'rm.dif.muy': 'Very hard',
+  'rm.nota': 'Easy: lifts 9 or 10 times out of 10 · Medium: 7 or 8 · Hard: 4 to 6 · Very hard: 3 or fewer.',
+  'rm.tarjeta': '1RM: snatch {s} · C&J {c}',
+  'glosario.rm.t': '1RM', 'glosario.rm.d': 'Your lifter’s best in each lift. When you pick the weight, the panel shows what percentage of your 1RM it is and whether it’s easy, medium, hard or very hard.',
 };

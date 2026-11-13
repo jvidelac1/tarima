@@ -681,4 +681,18 @@ export default {
   'llamado.b_falta': 'Te falta {discos}: con todo en verde sube igual',
   'margen.cansancio': 'Cansancio −{d}',
   'glosario.cansancio.t': 'Cansancio', 'glosario.cansancio.d': 'Pegar lejos, usar la garra o quedar justo te cansa: el próximo intento empieza con menos energía (del arranque al dos tiempos, la mitad).',
+  // ---- tablero de la final, botón «Saltar» del turno de un rival y RM (13-nov, rama tablero)
+  'tablero.ahora': 'Ahora', 'tablero.sigue': 'Sigue', 'tablero.termino': 'Terminó', 'tablero.tu': '(tú)',
+  'tablero.mejor': 'Mejor', 'tablero.pide': 'Pide', 'tablero.col_s': 'Arr.', 'tablero.col_c': 'D. t.',
+  'tablero.tu_rm': 'tu RM {kg}', 'tablero.antes': 'antes {kg}',
+  'tablero.va_por': '{rival} va por {kg}', 'tablero.pidio': '{rival} pidió {kg}',
+  'tablero.antes_que_tu': 'sale antes que tú', 'tablero.despues_de_ti': 'sale después de ti',
+  'tablero.te_pasa': 'si lo levanta, te pasa', 'tablero.para_pasarte': 'para pasarte necesita {kg}',
+  'tablero.aria': 'Tablero de la final',
+  'saltar.boton': 'Saltar', 'saltar.aria': 'Saltar el turno del rival (tecla S)',
+  'rm.linea': '{pct} % de tu RM ({kg} kg)',
+  'rm.dif.facil': 'Fácil', 'rm.dif.medio': 'Medio', 'rm.dif.dificil': 'Difícil', 'rm.dif.muy': 'Muy difícil',
+  'rm.nota': 'Fácil: sube 9 o 10 de cada 10 veces · Medio: 7 u 8 · Difícil: 4 a 6 · Muy difícil: 3 o menos.',
+  'rm.tarjeta': 'RM: arranque {s} · dos tiempos {c}',
+  'glosario.rm.t': 'RM', 'glosario.rm.d': 'El máximo de tu pesista en cada levantamiento. Al elegir los kilos, el panel dice qué porcentaje de tu RM es y si es fácil, medio, difícil o muy difícil.',
 };

@@ -162,3 +162,10 @@ export function fuerteDebil(cuerpo) {
   const T = ['tiron', 'arriba', 'pararse'], f = T.reduce((a, x) => (cuerpo[x] < cuerpo[a] ? x : a)), d = T.reduce((a, x) => (cuerpo[x] > cuerpo[a] ? x : a));
   return { fuerte: nivelTramo(cuerpo[f]) === 'facil' ? f : null, debil: nivelTramo(cuerpo[d]) === 'cuesta' ? d : null };
 }
+/**
+ * Dificultad de un peso en cuatro niveles (pedido del dueño: «si es un tiro fácil, medio, difícil o muy difícil»), por la
+ * chance del panel («X de 10», rules.js → chanceBarra, la misma que dice el entrenador): 9 o 10 Fácil, 7 u 8 Medio, 4 a 6
+ * Difícil, 3 o menos Muy difícil. Sale de la chance y no del porcentaje del RM porque la chance ya cuenta el cansancio, la
+ * energía y el ancho del verde: así la palabra y el «X de 10» nunca se contradicen.
+ */
+export const dificultadDe = n => (n >= 9 ? 'facil' : n >= 7 ? 'medio' : n >= 4 ? 'dificil' : 'muy');

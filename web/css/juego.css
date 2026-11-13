@@ -533,3 +533,71 @@ html.juego-u .seguir{font-size:calc(var(--u)*.95);padding:.3em .65em;background:
   /* el acuse (la tecla que se hunde) sube por encima de la barrita, junto al botón */
   html.juego-u:where(.horiz.bajo) body:has(#barrita:not([hidden])) .acuse{bottom:calc(var(--u)*5.4 + var(--sb))}
 }
+
+/* ---------- tablero de la final, fundidos y botón «Saltar» (13-nov, rama tablero) ----------
+   Pedido del dueño: «hay muchos cortes cuando un pesista termina de tirar» y «un mini tablero que me diga cuánto peso eligen
+   los otros pesistas». El tablero (ui/tablero.js) reemplaza al marcador, al cartel del turno del rival, a los avisos de
+   cambios y al zócalo: una sola cosa dice quién levanta, con cuánto, y qué pidió cada uno. */
+#fundido{position:absolute;inset:0;background:#03050c;opacity:0;pointer-events:none;transition:opacity .14s ease}
+#fundido.on{opacity:1}
+.tablero{position:absolute;left:calc(var(--u)*1.2 + var(--sl));top:calc(var(--u)*1.2 + var(--st));background:rgba(6,14,48,.86);border-left:calc(var(--u)*.28) solid var(--teal);padding:calc(var(--u)*.35) calc(var(--u)*.55) calc(var(--u)*.45) calc(var(--u)*.4);text-transform:none;max-width:min(40cqw,calc(var(--u)*40))}
+body:has(#tablero:not([hidden])) .bug{display:none}
+.tb{border-collapse:collapse;font-variant-numeric:tabular-nums}
+.tb th{font-weight:700;font-size:calc(var(--u)*.78);letter-spacing:.1em;color:var(--mute);text-transform:uppercase;text-align:right;padding:0 calc(var(--u)*.4) calc(var(--u)*.1);white-space:nowrap}
+.tb th:nth-child(2){text-align:left;color:var(--teal)}
+.tb td{padding:calc(var(--u)*.16) calc(var(--u)*.4);font-weight:700;font-size:calc(var(--u)*1.25);line-height:1.12;white-space:nowrap;text-align:right;vertical-align:middle}
+.tb .tb-p{color:var(--mute);font-size:calc(var(--u)*.95);padding-right:0;text-align:center;min-width:1.1em}
+.tb .tb-n{text-align:left}
+.tb .tb-n i{display:inline-block;width:1.15em;height:.78em;margin-right:.4em;vertical-align:middle}
+.tb .tb-n span{display:inline-block;vertical-align:middle;max-width:calc(var(--u)*12);overflow:hidden;text-overflow:ellipsis}
+.tb .tb-n span small{font-weight:500;font-size:calc(var(--u)*.85);color:var(--mute)}
+.tb .tb-n small.tb-rm,.tb .tb-n small.tb-estilo{display:block;font-family:var(--body);font-weight:400;font-size:calc(var(--u)*.78);color:var(--mute);letter-spacing:0;text-transform:none}
+.tb .tb-n small.tb-rm{color:var(--gold)}
+.tb .tb-m{color:var(--ink);font-weight:600;min-width:2.4em}
+.tb .tb-t{color:#fff;font-weight:800}
+.tb .tb-pide{min-width:3.2em}
+.tb .tb-pide b{font-weight:800;font-size:calc(var(--u)*1.4);color:var(--teal)}
+.tb .tb-pide small{display:block;font-family:var(--body);font-weight:400;font-size:calc(var(--u)*.72);letter-spacing:0;color:var(--mute)}
+.tb .tb-pide small.tb-cambio{color:var(--gold);font-weight:600}
+.tb tr.cambio .tb-pide b{color:var(--gold)}
+.tb .tb-e{text-align:left;padding-right:0}
+.tb-int{display:inline-flex;gap:.18em;vertical-align:middle;margin-right:.4em}
+.tb-int i{width:.5em;height:.5em;border:1px solid #4a5480;background:transparent}
+.tb-int i.v{background:#f6f4ea;border-color:#f6f4ea}
+.tb-int i.x{background:var(--red);border-color:var(--red)}
+.tb-int i.ya{border-color:var(--teal);background:rgba(53,230,214,.35)}
+.tb-est{font-style:normal;font-size:calc(var(--u)*.78);letter-spacing:.1em;text-transform:uppercase;color:var(--mute);vertical-align:middle}
+.tb-est.ahora{color:#04121a;background:var(--teal);padding:.05em .45em}
+.tb-est.fin{opacity:.8}
+.tb tr.ahora td{background:rgba(53,230,214,.1)}
+.tb tr.yo td{background:rgba(255,210,63,.13)}
+.tb tr.yo td.tb-n{box-shadow:inset calc(var(--u)*.22) 0 0 var(--gold)}
+.tb tr.yo.ahora td{background:rgba(255,210,63,.22)}
+.tb tr.fin td{opacity:.6}
+.tb-pie{border-top:1px solid var(--line);margin-top:calc(var(--u)*.3);padding-top:calc(var(--u)*.25)}
+.tb-pie p{margin:0;font-family:var(--body);font-size:calc(var(--u)*.92);line-height:1.3;color:var(--ink);white-space:normal}
+.tb-pie p.est{color:var(--gold);font-weight:600}
+@media (prefers-reduced-motion:no-preference){.tb tr.cambio .tb-pide b{animation:tbCambio 1.2s ease-out 2}}
+@keyframes tbCambio{0%{text-shadow:0 0 0 transparent}30%{text-shadow:0 0 12px var(--gold)}100%{text-shadow:0 0 0 transparent}}
+/* lo que el tablero ya dice no se repite: ni marcador, ni cartel del turno, ni avisos sueltos, ni zócalo, ni etiqueta ('b' y 'u') */
+html.juego-u :is(#marcador,#turno,#rival,#zocalo,#etiqueta){display:none!important}
+/* durante el levantamiento propio, en la computadora: chico, atenuado y abajo a la izquierda (arriba va la energía y abajo al
+   centro la barrita); solo nombre, lo que lleva y lo que pide */
+html[data-pantalla=intento] #tablero{top:auto;bottom:calc(var(--u)*1.1 + var(--sb));--u:clamp(7px,1.25cqh,11px);opacity:.62;max-width:18cqw}
+html[data-pantalla=intento] #tablero :is(thead,.tb-pie,.tb-e,.tb-p,.tb-n small,.tb-pide small,.tb-m:not(.tb-t)){display:none}
+/* botón «Saltar» del turno de un rival: abajo a la derecha, encima del acuse; con teclado muestra su tecla (S) */
+.saltar-rival{position:absolute;z-index:6;right:calc(18px + var(--sr));bottom:calc(56px + var(--sb));display:flex;align-items:center;gap:.55em;font-family:var(--display);font-weight:800;font-size:clamp(15px,2.3vh,21px);letter-spacing:.08em;min-height:48px;padding:.35em 1.1em;background:rgba(6,14,48,.9);border:2px solid var(--teal);color:#fff;border-radius:.35em}
+.saltar-rival .tecla{font-size:.8em}
+@media (prefers-reduced-motion:no-preference){.saltar-rival.late{animation:late .5s ease-in-out 2}}
+@media (pointer:coarse){
+  /* teléfono acostado: el tablero compacto arriba a la izquierda (nombre, lo que lleva, lo que pide); en el levantamiento propio
+     no va (la regla de tools/tapa.mjs: nada sobre el pesista). «Saltar» va donde está el botón redondo, que en el turno de un
+     rival no está: grande para el pulgar */
+  :where(html.horiz.bajo) .tablero{--u:clamp(7.5px,2.2cqh,10px);max-width:34cqw;padding:calc(var(--u)*.3) calc(var(--u)*.45)}
+  :where(html.horiz.bajo) .tablero .tb td{font-size:calc(var(--u)*1.2)}
+  :where(html.horiz.bajo) .tablero .tb-n span{max-width:calc(var(--u)*7.5)}
+  :where(html.horiz.bajo) .tablero .tb-pie p{font-size:calc(var(--u)*.95)}
+  html:where(.horiz.bajo)[data-pantalla=intento] #tablero{display:none}
+  :where(html.horiz) .saltar-rival{right:calc(var(--sr) + var(--bm));bottom:calc(var(--sb) + var(--bm));min-height:64px;min-width:120px;justify-content:center;font-size:20px;border-radius:32px}
+  html:where(.horiz).zurdo .saltar-rival{right:auto;left:calc(var(--sl) + var(--bm))}
+}
