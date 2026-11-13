@@ -594,6 +594,8 @@ export default {
   'llamado.u_chance': '{n} de 10',
   'rival.apuesta.comodo': 'cómodo', 'rival.apuesta.justo': 'justo', 'rival.apuesta.limite': 'al límite',
   'turno.apuesta': '{kg} kg, {apuesta}',
+  // personalidad de cada rival (sim/ai.js → PERSONALIDADES) y lo que hace en ese intento, en el cartel de su turno
+  'rival.estilo.seguro': 'va a lo seguro', 'rival.estilo.calcula': 'hace cuentas', 'rival.estilo.arriesga': 'arriesga', 'rival.estilo.todo': 'va por todo', 'rival.estilo.guarda': 'se guarda para el dos tiempos', 'rival.estilo.pasar': 'pide lo justo para pasar',
   'llamado.u_mismo_no': 'La barra no baja: con {kg} kg te falta {discos}.',
   'explica.u.mala': ' Ahí tuvo mala suerte.',
   'explica.u.no_alcanza': ' La garra no alcanzaba: queda para otro intento.',
