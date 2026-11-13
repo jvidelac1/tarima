@@ -54,7 +54,7 @@ export async function probarEntrada({ via = 'teclado', n = 10000, semilla = 1 } 
   const { Azar, mezclar } = await import('../web/js/sim/fixed.js');
   const { ctxUno, ATL } = await import('./uno_bots.mjs');
   const zona = H.el('DIV'), boton = H.el('BUTTON'), cuerpo = H.el('DIV');
-  const b = new Boton([zona]); b.intento = true; b.bordes = dedo;
+  const b = new Boton([zona]); b.intento = true; b.tolerante = true;
   const tomados = []; toques.alCambiar = (T, que) => { if (que === 'baja' && T) tomados.push(T); };
   const MOTIVOS_NO = new Set(['termino', 'pausa', 'mouse', 'sobra', 'espera']);
   const R = { secuencias: 0, pulsaciones: 0, sinResolver: 0, dobles: 0, sinPalabra: 0, bordesQueCuentan: 0, rafagaTira: 0, malFormadas: 0, sinTerminar: 0, casos: {}, ejemplos: [] };
@@ -117,18 +117,40 @@ export async function probarEntrada({ via = 'teclado', n = 10000, semilla = 1 } 
     }
     reloj.manual = t0 + t + 1000; H.hasta(t + 1000); reloj.manual = null;
     // ---- verificaciones
-    R.secuencias++; R.pulsaciones += fisicas.presiones;
+    R.secuencias++; R.pulsaciones += fisicas.presiones + fisicas.bordes;
     const m = simular(ctx, conf, ent);
     if (!m.res) anota('sinTerminar', `secuencia ${k}: el intento no terminó`);
     { let nn = 0, prev = 0; for (const e of ent) { if (e[0] < prev) { anota('malFormadas', `secuencia ${k}: fuera de orden`); break; } prev = e[0]; nn += e[1] ? 1 : -1; if (nn < 0) { anota('malFormadas', `secuencia ${k}: se levanta un contacto que no estaba apoyado`); break; } } }
     const sinRes = tomados.filter(T => T.ok === null); if (sinRes.length) anota('sinResolver', `secuencia ${k}: ${sinRes.length} sin resolver (${sinRes[0].via})`);
     // una pulsación física, un registro y como mucho un contacto para el núcleo
     const bajas = ent.filter(e => e[1]).length, aceptadas = tomados.filter(T => T.ok).length;
-    if (tomados.length > fisicas.presiones || bajas !== aceptadas) anota('dobles', `secuencia ${k}: ${fisicas.presiones} pulsaciones, ${tomados.length} anotadas, ${aceptadas} aceptadas, ${bajas} contactos al núcleo`);
+    if (tomados.length > fisicas.presiones + fisicas.bordes || bajas !== aceptadas) anota('dobles', `secuencia ${k}: ${fisicas.presiones} pulsaciones, ${tomados.length} anotadas, ${aceptadas} aceptadas, ${bajas} contactos al núcleo`);
     for (const T of tomados) if (T.ok !== null && !(T.ok ? QUE_U[T.motivo] : MOTIVOS_NO.has(T.motivo))) anota('sinPalabra', `secuencia ${k}: «${T.motivo}» (${T.ok ? 'aceptado' : 'descartado'}) sin palabra`);
-    if (dedo && tomados.length !== fisicas.presiones) anota('bordesQueCuentan', `secuencia ${k}: ${fisicas.bordes} toques en el borde, ${tomados.length} anotados de ${fisicas.presiones} fuera del borde`);
+    // los toques en el borde también se anotan y se resuelven (Gameplay 2.1): ninguno se pierde sin acuse
+    if (dedo && tomados.length !== fisicas.presiones + fisicas.bordes) anota('bordesQueCuentan', `secuencia ${k}: ${fisicas.bordes} toques en el borde y ${fisicas.presiones} fuera, ${tomados.length} anotados`);
     if (m.U && m.U.contactos.some(c => c.que === 'tira' && c.t < 300)) anota('rafagaTira', `secuencia ${k}: la ráfaga de la confirmación arrancó el tirón`);
   }
   H.restaurar();
   return R;
+}
+
+/**
+ * Clásico no cambia con la gracia del dedo (revisión de Gameplay 2.1): en Clásico soltar es un gesto (¡SUELTA!), así que un
+ * puntero que el sistema cancela se levanta en el acto; la gracia de 400 ms es solo de 'u' (`tolerante`). Devuelve
+ * {clasico, uno}: a cuántos ms del cancel le llegó el «soltar» a quien escucha en cada nivel (null: no llegó).
+ */
+export async function probarCancelClasico() {
+  const H = instalarDOM({}); globalThis.document.documentElement = {}; globalThis.document.title = '';
+  const { Boton, reloj, GRACIA_MS } = await import('../web/js/game/input.js');
+  const out = {};
+  for (const [nivel, tolerante] of [['clasico', false], ['uno', true]]) {
+    const zona = H.el('DIV'), b = new Boton([zona]); b.intento = true; b.tolerante = tolerante; let sube = null;
+    b.oye = (t, v) => { if (!v && sube === null) sube = t; };
+    const t0 = 5000 + (tolerante ? 10000 : 0);
+    reloj.manual = t0; H.hasta(t0); H.despachar({ type: 'pointerdown', timeStamp: t0, pointerId: 9, pointerType: 'touch', clientX: 300, clientY: 200, target: zona, button: 0 }, zona);
+    reloj.manual = t0 + 100; H.hasta(t0 + 100); H.despachar({ type: 'pointercancel', timeStamp: t0 + 100, pointerId: 9, pointerType: 'touch' });
+    reloj.manual = t0 + 100 + GRACIA_MS + 50; H.hasta(t0 + 100 + GRACIA_MS + 50);
+    out[nivel] = sube === null ? null : sube - (t0 + 100); reloj.manual = null;
+  }
+  H.restaurar(); return out;
 }

@@ -22,9 +22,24 @@ export const toques = {
   total: 0, aceptados: 0, descartados: 0, motivos: {}, ultimos: [], abierto: null, alCambiar: null, contexto: null,
   /** Lo que tardó el manejador de cada pulsación del levantamiento (ms, las últimas 64): acuse, núcleo y palabra incluidos. */
   manejo: [],
+  /**
+   * Acuse medido en el aparato de verdad (meta I): ms desde el instante del evento hasta el cuadro siguiente, en que la
+   * tecla hundida (o el anillo del botón) ya se pinta. `esperan`: instantes (performance.now) de pulsaciones que todavía no
+   * tuvieron cuadro; main.js las cierra en cada requestAnimationFrame. `pinta`: las últimas 64; `nPinta`: cuántas hubo.
+   */
+  esperan: [], pinta: [], nPinta: 0,
+  /** En cada cuadro del navegador (main.js, bucle): cierra las pulsaciones que esperaban ese cuadro. */
+  cuadro() {
+    if (!this.esperan.length) return; const a = performance.now();
+    for (const ts of this.esperan) { this.pinta.push(Math.max(0, a - ts)); this.nPinta++; } this.esperan.length = 0;
+    if (this.pinta.length > 64) this.pinta.splice(0, this.pinta.length - 64);
+  },
+  /** p95 del acuse (ms) de las últimas `n` pulsaciones (todas las anotadas, si no se dice). */
+  acuseP95(n = this.pinta.length) { const v = this.pinta.slice(-Math.min(n, this.pinta.length)).sort((a, b) => a - b); return v.length ? v[Math.min(v.length - 1, Math.floor(v.length * .95))] : null; },
   /** Una pulsación nueva (no una repetición del sistema). `t`: instante del evento en el reloj del juego. */
   nuevo(t, via, tecla) {
     const T = this.abierto = { n: ++this.total, t: Math.round(t), via, tecla, ok: null, motivo: '', donde: this.contexto?.() || '', vivo: performance.now() };
+    if (reloj.manual === null) this.esperan.push(t - reloj.desfase);      // el instante del evento en el reloj de performance.now
     this.ultimos.push(T); if (this.ultimos.length > 16) this.ultimos.shift(); this.alCambiar?.(T, 'baja'); return T;
   },
   /**
@@ -38,10 +53,12 @@ export const toques = {
   },
   suelta() { this.alCambiar?.(this.abierto, 'sube'); },
   /** Foto de los contadores, para restar después (cuántos toques y descartes por motivo hubo en un tramo). */
-  foto() { return { total: this.total, aceptados: this.aceptados, descartados: this.descartados, motivos: { ...this.motivos } }; },
+  foto() { return { total: this.total, aceptados: this.aceptados, descartados: this.descartados, motivos: { ...this.motivos }, nPinta: this.nPinta }; },
   /** Lo que pasó desde `f` (foto()): {toques, aceptados, descartados, desc_<motivo>…}, todo números (va a las métricas). */
   desde(f) {
     const o = { toques: this.total - f.total, aceptados: this.aceptados - f.aceptados, descartados: this.descartados - f.descartados };
+    // el acuse medido en este tramo (va a las métricas: es la medida en los aparatos de verdad de la gente)
+    const np = this.nPinta - (f.nPinta || 0); if (np > 0) { o.acuse_n = np; o.acuse_p95_ms = Math.round(this.acuseP95(np)); }
     for (const [k, v] of Object.entries(this.motivos)) { const d = v - (f.motivos[k] || 0); if (d > 0) o['desc_' + k] = d; }
     return o;
   },
@@ -91,9 +108,12 @@ export class Boton {
      * `intento`: hay un levantamiento propio en curso (docs/JUEGO.md G2.2). Espacio y Enter son del levantamiento: se
      * atienden en captura sobre window, con preventDefault, y no activan ningún botón ni el teclado de los paneles; y
      * si el primer evento de una tecla es una repetición (el foco llegó con la tecla ya apretada), cuenta como apretar.
-     * `bordes`: con el dedo, los toques a menos de BORDES px del borde no cuentan (gestos del sistema, barra de inicio, menú).
+     * `tolerante` (nivel 'u'): un puntero que el sistema cancela sigue apoyado GRACIA_MS por si vuelve. En Clásico soltar es un
+     * gesto (¡SUELTA!), así que ahí el puntero cancelado se levanta en el acto, como siempre.
+     * Los toques cerca de los bordes de la pantalla CUENTAN (Gameplay 2.1): ningún toque cambia el resultado en 'u', así que
+     * no hay nada que proteger, y descartarlos en silencio era un toque perdido sin acuse.
      */
-    this.intento = false; this.bordes = false; this.gracia = new Map();
+    this.intento = false; this.tolerante = false; this.gracia = new Map();
     const sube = (id, e) => { const via = this.contactos.get(id); if (via === undefined) return; this.contactos.delete(id); const g = this.gracia.get(id); if (g) { clearTimeout(g); this.gracia.delete(id); } this.oye?.(reloj.deEvento(e), 0, via); };
     const baja = (id, e, via) => {
       if (this.contactos.has(id)) sube(id, e);
@@ -131,7 +151,6 @@ export class Boton {
       // un panel con botones o campos es para tocar esos botones; uno sin nada que tocar («Toca para seguir») cuenta como toque
       if (!this.activo || (e.pointerType === 'mouse' && e.button !== 0) || e.target.closest?.('button,input,select,textarea,label,a,[contenteditable]') || e.target.closest?.('.panel')?.querySelector('button,input,textarea,select,a')) return;
       const via = e.pointerType === 'mouse' ? 'mouse' : 'tactil';
-      if (via === 'tactil' && this.bordes && enBorde(e)) return;      // gesto del sistema o del navegador: no es un contacto
       e.preventDefault(); toques.nuevo(reloj.deEvento(e), via, via === 'mouse' ? 'CLIC' : 'TOQUE');
       if (via === 'tactil' && this.intento) { try { navigator.vibrate?.(12); } catch { /* sin vibración */ } }
       baja('p' + e.pointerId, e, via);
@@ -140,7 +159,8 @@ export class Boton {
     // el sistema canceló el puntero (lupa, desplazamiento, gesto): lo ya contado no se anula, y el dedo sigue apoyado
     // GRACIA_MS por si vuelve; después se levanta
     this._pc = e => {
-      const id = 'p' + e.pointerId; if (!this.contactos.has(id) || this.gracia.has(id)) return;
+      const id = 'p' + e.pointerId; if (!this.tolerante) return this._pu(e);
+      if (!this.contactos.has(id) || this.gracia.has(id)) return;
       this.gracia.set(id, setTimeout(() => { this.gracia.delete(id); if (this.contactos.has(id)) { sube(id, null); toques.suelta(); } }, GRACIA_MS));
     };
     this._todo = e => { for (const id of [...this.contactos.keys()]) sube(id, e); };
@@ -152,7 +172,7 @@ export class Boton {
   /** Hay un contacto que vale como gesto (teclado o dedo). */
   get apretado() { for (const v of this.contactos.values()) if (v !== 'mouse') return true; return false; }
 }
-/** Gracia de un puntero cancelado por el sistema (ms) y bordes de la pantalla que no cuentan (px): arriba, costados, abajo. */
+/** Gracia de un puntero cancelado por el sistema (ms) y bordes de la pantalla (px: arriba, costados, abajo), que en 'u' cuentan igual. */
 export const GRACIA_MS = 400;
 export const BORDES = { arriba: 56, lado: 24, abajo: 20 };
 /** El toque cae en un borde de la pantalla (docs/JUEGO.md G2.3). */

@@ -8,17 +8,23 @@
 // dedos sobre intentos enteros, por la clase Boton de verdad en un DOM de mentira (tools/entrada_sim.mjs): dos dedos a
 // menos de 80 ms, pointercancel con y sin dedo que vuelve (400 ms de gracia), doble toque a 100 ms, mantener 10 s,
 // machacar y toques en los bordes de la pantalla. Criterio: 0 toques sin resolver, 0 contados dos veces, el 100 % con
-// acción o palabra, los bordes nunca cuentan y la ráfaga de la confirmación nunca arranca el tirón.
+// acción o palabra, los toques en los bordes también se anotan y se resuelven (Gameplay 2.1: ninguno se pierde sin acuse) y
+// la ráfaga de la confirmación nunca arranca el tirón.
 // Uso: node tools/dedo_test.mjs [--n=10000]
 if (!process.argv.includes('--f')) {
   const { probarEntrada } = await import('./entrada_sim.mjs');
   const a = k => (process.argv.find(x => x.startsWith(`--${k}=`)) || '').split('=')[1];
   const t0 = Date.now(), R = await probarEntrada({ via: 'dedo', n: +(a('n') || 10000) });
-  console.log(`dedo: ${R.secuencias} secuencias, ${R.pulsaciones} toques fuera del borde · casos: ${JSON.stringify(R.casos)}`);
-  console.log(`sin resolver ${R.sinResolver} · contados dos veces ${R.dobles} · sin acción ni palabra ${R.sinPalabra} · bordes que contaron ${R.bordesQueCuentan} · ráfaga de la confirmación que arrancó el tirón ${R.rafagaTira} · registros mal formados ${R.malFormadas} · intentos sin terminar ${R.sinTerminar}`);
-  const mal = R.sinResolver + R.dobles + R.sinPalabra + R.bordesQueCuentan + R.rafagaTira + R.malFormadas + R.sinTerminar;
+  console.log(`dedo: ${R.secuencias} secuencias, ${R.pulsaciones} toques (con los del borde) · casos: ${JSON.stringify(R.casos)}`);
+  console.log(`sin resolver ${R.sinResolver} · contados dos veces ${R.dobles} · sin acción ni palabra ${R.sinPalabra} · bordes sin anotar ${R.bordesQueCuentan} · ráfaga de la confirmación que arrancó el tirón ${R.rafagaTira} · registros mal formados ${R.malFormadas} · intentos sin terminar ${R.sinTerminar}`);
+  let mal = R.sinResolver + R.dobles + R.sinPalabra + R.bordesQueCuentan + R.rafagaTira + R.malFormadas + R.sinTerminar;
+  // Clásico: un dedo cancelado por el sistema se suelta en el acto (soltar es un gesto); la gracia de 400 ms es solo de 'u'
+  const { probarCancelClasico } = await import('./entrada_sim.mjs'), C = await probarCancelClasico();
+  console.log(`pointercancel: en Clásico el soltar llega a los ${C.clasico} ms · en 'u' a los ${C.uno} ms (gracia)`);
+  if (C.clasico !== 0) { mal++; R.ejemplos.push(`en Clásico un pointercancel tiene que soltar en el acto y soltó a los ${C.clasico} ms`); }
+  if (!(C.uno >= 400)) { mal++; R.ejemplos.push(`en 'u' un pointercancel tiene que esperar la gracia y soltó a los ${C.uno} ms`); }
   if (mal) { console.log('FALLÓ:\n  ' + R.ejemplos.join('\n  ')); process.exit(1); }
-  console.log(`OK: con el dedo ningún toque se pierde ni cuenta dos veces, y los bordes no cuentan (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
+  console.log(`OK: con el dedo ningún toque se pierde ni cuenta dos veces, tampoco en los bordes (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
   process.exit(0);
 }
 const { BOTS, jugarSenal, ctxDe } = await import('./play_human.mjs');

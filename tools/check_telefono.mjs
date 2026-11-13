@@ -205,11 +205,11 @@ async function correr(C) {
         if (t1.total - t0 !== 2 || !t1.motivos.includes('doble')) mal(`dos dedos a la vez: ${t1.total - t0} toques anotados, motivos ${t1.motivos.join(', ')} (se esperaban 2 anotados y uno «doble»)`); else console.log(`${tag} dos dedos a la vez: 2 toques anotados, un solo contacto (${t1.motivos.join(', ')})`);
         ultToque = s.ahora; continue;
       }
-      if (C.partida && !bordesProbados && g.clave === 'tira') {      // un toque en el borde (gesto del sistema) no es un contacto
+      if (C.partida && !bordesProbados && g.clave === 'tira') {      // un toque en el borde cuenta como cualquier otro, con su acuse (Gameplay 2.1)
         bordesProbados = true; const t0 = await J(() => ({ total: JUEGO.toques.total, ent: JUEGO.estado().intento?.entradas })), H = (await page.viewportSize()).height;
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 6, y: Math.round(H / 2), id: 1 }] }); await av(30); await sube(); await av(30);
         const t1 = await J(() => ({ total: JUEGO.toques.total, ent: JUEGO.estado().intento?.entradas, fase: JUEGO.estado().intento?.fase }));
-        if (t1.total !== t0.total || t1.ent !== t0.ent || t1.fase !== 'tension') mal(`un toque en el borde de la pantalla contó: ${JSON.stringify({ antes: t0, despues: t1 })}`); else console.log(`${tag} un toque en el borde no cuenta`);
+        if (t1.total !== t0.total + 1 || t1.ent === t0.ent || t1.fase === 'tension') mal(`un toque en el borde de la pantalla no contó: ${JSON.stringify({ antes: t0, despues: t1 })}`); else console.log(`${tag} un toque en el borde cuenta (tira)`);
         continue;
       }
       if (C.campos && !campoSolo && g.clave === 'tira') {      // un campo sin panel abierto: solo input.js decide (main.js no toca teclas sin panel)

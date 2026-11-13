@@ -112,7 +112,7 @@ for (;;) {
 }
 await dormir(1600);
 const gl = await J(() => { const g = JUEGO.escena?.renderer?.getContext(), x = g?.getExtension('WEBGL_debug_renderer_info'); return x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : ''; }).catch(() => '');
-const fin = await J(() => ({ manejo: JUEGO.toques.manejo.slice(), total: JUEGO.toques.total, T: window.__T, A: window.__A, eventos: JUEGO.eventos.filter(e => e.ev === 'intento_propio').map(e => e.props), propios: (JUEGO.E.propios || []).map(x => `${x.res}${x.causa ? ':' + x.causa : ''}`) }));
+const fin = await J(() => ({ pinta: JUEGO.toques.pinta.slice(), manejo: JUEGO.toques.manejo.slice(), total: JUEGO.toques.total, T: window.__T, A: window.__A, eventos: JUEGO.eventos.filter(e => e.ev === 'intento_propio').map(e => e.props), propios: (JUEGO.E.propios || []).map(x => `${x.res}${x.causa ? ':' + x.causa : ''}`) }));
 await browser.close(); server.close();
 
 // ---------- veredicto ----------
@@ -134,6 +134,10 @@ if (!rivalVisto) mal('no se vio el turno de un rival'); else if (!rivalVisto.ve 
 { const A = fin.A.filter(x => x.intento), p95 = xs => { const v = xs.slice().sort((a, b) => a - b); return v.length ? v[Math.min(v.length - 1, Math.floor(v.length * .95))] : 0; };
   const sinHundir = A.filter(x => !x.on).length, dom = p95(A.map(x => x.dom)), pinta = p95(A.map(x => x.pinta)), man = p95(fin.manejo);
   console.log(`acuse en el intento: ${A.length} pulsaciones · tecla hundida al salir del manejador en ${A.length - sinHundir} · manejador del juego (acuse, núcleo y palabra) p95 ${man.toFixed(1)} ms · del timeStamp: p95 hasta después del evento ${dom.toFixed(1)} ms, hasta el cuadro siguiente ${pinta.toFixed(1)} ms (meta ≤ 17 ms a 60 Hz) · ${gl || 'sin WebGL'}`);
+  // la misma medida que hace el juego en cada aparato (input.js → toques.pinta, que va a intento_propio como acuse_p95_ms y se ve
+  // en ?depura=1): del instante del evento al cuadro siguiente
+  console.log(`acuse medido por el juego (lo que llega a las métricas desde los aparatos de verdad): ${fin.pinta.length} pulsaciones, p95 ${p95(fin.pinta).toFixed(1)} ms`);
+  if (!fin.pinta.length) mal('el juego no midió el acuse (toques.pinta vacío)');
   if (!A.length) mal('no se midió el acuse');
   if (sinHundir) mal(`${sinHundir} pulsaciones sin acuse en el mismo manejador`);
   if (man > 8) mal(`el manejador de la pulsación tarda ${man.toFixed(1)} ms (p95; meta ≤ 8 ms para que el acuse entre en el cuadro)`);
