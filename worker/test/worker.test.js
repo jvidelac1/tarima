@@ -10,7 +10,11 @@ const ORIGEN = 'https://tarima.test';
 let nIp = 0;
 const nuevaIp = () => `198.51.${100 + Math.floor(nIp / 250)}.${(nIp++ % 250) + 1}`;
 const uuid = () => crypto.randomUUID();
-const E = (extra = {}) => Object.assign({}, env, extra);
+// Las pruebas de siempre corren con la regla vieja (2 finales enteras, encuesta +2), que se recupera con estas variables;
+// la de producción (worker/wrangler.jsonc: el arranque gratis) va en «muro en el medio de la final», con P().
+const VIEJA = { GRATIS_ETAPA: 'final', GRATIS: '2', BONO_ENCUESTA: '2' };
+const E = (extra = {}) => Object.assign({}, env, VIEJA, extra);
+const P = (extra = {}) => Object.assign({}, env, extra);
 
 let salidas; // pedidos que el Worker hizo hacia afuera
 let flagsRespuesta; // lo que contesta el /flags falso de PostHog
@@ -46,7 +50,7 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 async function llamar(ruta, cuerpo, o = {}) {
-  const { ip = '192.0.2.10', cookie, origin = ORIGEN, ct = 'application/json', e = env, metodo = 'POST', headers = {} } = o;
+  const { ip = '192.0.2.10', cookie, origin = ORIGEN, ct = 'application/json', e = E(), metodo = 'POST', headers = {} } = o;
   const h = { 'cf-connecting-ip': ip, ...headers };
   if (origin) h.origin = origin;
   if (ct) h['content-type'] = ct;
@@ -248,6 +252,76 @@ describe('encuesta', () => {
     expect(ev.properties.$survey_questions).toHaveLength(5);
     expect(s.cuerpo).not.toContain(ip);
     expect(s.cuerpo).not.toContain(a);
+  });
+});
+
+
+describe('muro en el medio de la final (GRATIS_ETAPA=arranque, la regla de producción)', () => {
+  const ENC = { q1: ['sedes'], q2: ['nada'], q3: 'compu', q4: 'no' };
+  const partidaP = (dispositivo, ip, o = {}) => llamar('/api/partida', { dispositivo, idioma: 'es' }, { ip, e: P(), ...o });
+  const envion = (dispositivo, pase, ip, o = {}) => llamar('/api/envion', { dispositivo, pase, idioma: 'es' }, { ip, e: P(), ...o });
+  const fila = async id => env.DB.prepare('SELECT fuente, etapa, envion_por FROM partidas WHERE id = ?').bind(id).first();
+
+  it('worker/wrangler.jsonc trae la regla del arranque gratis', () => {
+    expect([env.GRATIS_ETAPA, env.GRATIS, env.BONO_ENCUESTA]).toEqual(['arranque', '1', '1']);
+  });
+  it('un arranque gratis; el dos tiempos sin correo es muro; la final siguiente, muro antes de empezar', async () => {
+    const ip = nuevaIp(), a = uuid();
+    const est = await llamar('/api/estado', { dispositivo: a }, { ip, e: P() });
+    expect(est.j).toMatchObject({ puede: true, quedan: 1, etapa: 'arranque', regla: { etapa: 'arranque', gratis: 1, bono: 1 } });
+    const p = await partidaP(a, ip);
+    expect(p.j).toMatchObject({ estado: 'ok', fuente: 'gratis', etapa: 'arranque', quedan: 0, encuesta_disponible: true });
+    const pase = await leerPase(env, p.j.pase, Math.floor(Date.now() / 1000));
+    expect(pase).toMatchObject({ e: 'arranque', n: 1 });
+    expect(await fila(pase.p)).toEqual({ fuente: 'gratis', etapa: 'arranque', envion_por: null });
+    expect((await envion(a, p.j.pase, ip)).j).toMatchObject({ estado: 'muro', motivo: 'envion', encuesta_disponible: true });
+    expect((await partidaP(a, ip)).j).toMatchObject({ estado: 'muro', motivo: 'dispositivo' });
+    // Borrar los datos: otro dispositivo en la misma red tiene su arranque, nunca el dos tiempos del primero.
+    const b = uuid(), pb = await partidaP(b, ip);
+    expect(pb.j.etapa).toBe('arranque');
+    expect((await envion(b, p.j.pase, ip)).j).toEqual({ error: 'pase' });
+    expect((await envion(b, pb.j.pase, ip)).j.estado).toBe('muro');
+  });
+  it('anotarse en el intervalo da el dos tiempos de esa final y juego libre', async () => {
+    const ip = nuevaIp(), a = uuid();
+    const p = await partidaP(a, ip);
+    await llamar('/api/anotar', { dispositivo: a, email: 'intervalo@buendominio.com', aviso: true, consentimiento: '2026-11-c', idioma: 'es' }, { ip, e: P() });
+    const v = await envion(a, p.j.pase, ip);
+    expect(v.j).toMatchObject({ estado: 'ok', via: 'lista', lista: true });
+    expect(await leerPase(env, v.j.pase, Math.floor(Date.now() / 1000))).toMatchObject({ e: 'completa' });
+    expect((await envion(a, p.j.pase, ip)).j.via).toBe('ya');
+    expect((await partidaP(a, ip)).j).toMatchObject({ estado: 'ok', fuente: 'lista', etapa: 'completa', quedan: null });
+  });
+  it('la encuesta en el intervalo termina esa final y suma una completa, una sola vez', async () => {
+    const ip = nuevaIp(), a = uuid();
+    const p = await partidaP(a, ip);
+    expect((await llamar('/api/encuesta', { dispositivo: a, r: ENC }, { ip, e: P() })).j).toEqual({ estado: 'ok', bono: 1 });
+    expect((await envion(a, p.j.pase, ip)).j).toMatchObject({ estado: 'ok', via: 'encuesta', quedan: 1 });
+    expect((await partidaP(a, ip)).j).toMatchObject({ estado: 'ok', fuente: 'encuesta', etapa: 'completa', quedan: 0 });
+    expect((await partidaP(a, ip)).j).toMatchObject({ estado: 'muro', encuesta_disponible: false });
+    const d = await codigoDispositivo(env, a);
+    expect((await env.DB.prepare('SELECT fuente, etapa, envion_por FROM partidas WHERE d = ? ORDER BY id').bind(d).all()).results)
+      .toEqual([{ fuente: 'gratis', etapa: 'completa', envion_por: 'encuesta' }, { fuente: 'encuesta', etapa: 'completa', envion_por: null }]);
+  });
+  it('la API a mano: pase adulterado, vencido o sin pase no dan el dos tiempos', async () => {
+    const ip = nuevaIp(), a = uuid();
+    const p = await partidaP(a, ip);
+    const [v1, cuerpo, firma] = p.j.pase.split('.');
+    const datos = JSON.parse(atob(cuerpo.replace(/-/g, '+').replace(/_/g, '/')));
+    const falso = `${v1}.${btoa(JSON.stringify({ ...datos, e: 'completa' })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}.${firma}`;
+    expect((await envion(a, falso, ip)).j).toEqual({ error: 'pase' });
+    expect((await envion(a, undefined, ip)).status).toBe(400);
+    expect((await envion(a, 'v1.basura.basura', ip)).status).toBe(400);
+  });
+  it('la bandera muro-partidas-gratis no cambia la regla del arranque y queda guardada', async () => {
+    const ip = nuevaIp(), a = uuid();
+    flagsRespuesta = { flags: { 'muro-partidas-gratis': { enabled: true, variant: '2' } } };
+    const r = await llamar('/api/estado', { dispositivo: a }, { ip, e: P({ POSTHOG_KEY: 'phc_prueba' }) });
+    expect([r.j.quedan, r.j.flags['muro-partidas-gratis']]).toEqual([1, '1']);
+    const d = await codigoDispositivo(env, a);
+    expect(JSON.parse((await env.DB.prepare('SELECT flags FROM dispositivos WHERE d = ?').bind(d).first()).flags)['muro-partidas-gratis']).toBe('2');
+    // De vuelta a la regla vieja, la bandera asignada vale.
+    expect((await llamar('/api/estado', { dispositivo: a }, { ip, e: E({ POSTHOG_KEY: 'phc_prueba', GRATIS: '1' }) })).j.quedan).toBe(2);
   });
 });
 
@@ -475,7 +549,7 @@ describe('lista de espera', () => {
   it('exportación: apagada sin clave, 401 con clave mala, CSV sin inyección con la buena', async () => {
     const clave = 'clave-de-exportar-0123456789';
     const pedir = (e, auth) => llamar('/api/exportar', null, { metodo: 'GET', ct: null, origin: null, ip: nuevaIp(), e, headers: auth ? { authorization: auth } : {} });
-    expect((await pedir(env)).status).toBe(404);
+    expect((await pedir(E())).status).toBe(404);
     expect((await pedir(E({ EXPORTAR_CLAVE: clave }), 'Bearer otra')).status).toBe(401);
     await alta('=cmd@buendominio.com');
     const r = await pedir(E({ EXPORTAR_CLAVE: clave }), 'Bearer ' + clave);

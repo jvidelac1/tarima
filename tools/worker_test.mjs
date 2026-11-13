@@ -131,7 +131,87 @@ const T0 = 1_800_000_000, DIA = R.DIA;
   igual(e.jugarHastaMuro('B', 'casa', T0).fuentes.length, 1, 'TOPE_IP=4');
   igual(e.encuesta('B', 'casa', T0), 1, 'BONO_ENCUESTA=1');
   igual(e.encuesta('A', 'casa', T0), 'ya_respondida', 'ENCUESTAS_POR_IP=1');
-  igual(R.config({ GRATIS: 'x', TOPE_IP: '-3' }, { 'muro-partidas-gratis': 'z' }), { gratis: 2, tope_ip: 6, bono: 2, encuestas_por_ip: 3 }, 'valores inválidos: por defecto');
+  igual(R.config({ GRATIS: 'x', TOPE_IP: '-3' }, { 'muro-partidas-gratis': 'z' }), { etapa: 'final', gratis: 2, tope_ip: 6, bono: 2, encuestas_por_ip: 3 }, 'valores inválidos: por defecto (y la regla vieja)');
+  igual(R.config({ GRATIS_ETAPA: 'cualquiera' }).etapa, 'final', 'GRATIS_ETAPA desconocida: la regla vieja');
+}
+
+// ---------- 2b. la regla del arranque gratis (GRATIS_ETAPA='arranque', decisión del dueño del 12 de noviembre) ----------
+{
+  // Igual que index.js: envion() con datos.js: partidaDe() y pasarAlEnvion().
+  class BaseArranque extends Base {
+    partida(d, i, ahora) {
+      const r = this.situacion(d, i, ahora);
+      if (r.puede) { this.partidas.push({ id: this.partidas.length + 1, d, i, en: ahora, fuente: r.fuente, etapa: r.etapa, envion_por: null }); r.id = this.partidas.length; }
+      return r;
+    }
+    envion(d, i, id, ahora) {
+      const p = this.partidas.find(x => x.id === id && x.d === d);
+      if (!p) return 'pase';
+      const dev = this.dev(d, ahora), sit = this.situacion(d, i, ahora);
+      const dec = R.decidirEnvion({ etapa: p.etapa, anotado: !!dev.lista_id, encuesta: !!dev.encuesta_en, encuesta_usada: this.partidas.some(x => x.d === d && x.envion_por === 'encuesta'), encuesta_disponible: sit.encuesta_disponible });
+      if (dec.puede && dec.via !== 'ya') { p.etapa = 'completa'; p.envion_por = dec.via; }
+      return dec;
+    }
+  }
+  const PROD = { GRATIS_ETAPA: 'arranque', GRATIS: '1', BONO_ENCUESTA: '1', TOPE_IP: '6', ENCUESTAS_POR_IP: '3' };
+  igual(R.config(PROD), { etapa: 'arranque', gratis: 1, tope_ip: 6, bono: 1, encuestas_por_ip: 3 }, 'config de producción');
+  igual(R.config(PROD, { 'muro-partidas-gratis': '2' }).gratis, 1, 'con el arranque gratis la bandera muro-partidas-gratis no se usa');
+  igual(R.config({ ...PROD, GRATIS_ETAPA: 'final', GRATIS: '2' }, { 'muro-partidas-gratis': '1' }).gratis, 1, 'con la regla vieja la bandera vuelve a valer');
+  {
+    // Jugador nuevo: una final con permiso solo para el arranque; el dos tiempos, negado; la próxima final, muro.
+    const b = new BaseArranque(PROD);
+    const r = b.partida('A', 'casa', T0);
+    igual([r.puede, r.fuente, r.etapa, r.quedan], [true, 'gratis', 'arranque', 1], 'arranque gratis');
+    const e = b.envion('A', 'casa', r.id, T0);
+    igual([e.puede, e.motivo, e.encuesta_disponible], [false, 'envion', true], 'dos tiempos sin correo ni encuesta: muro con encuesta');
+    igual([b.partida('A', 'casa', T0).puede, b.situacion('A', 'casa', T0).motivo], [false, 'dispositivo'], 'la final siguiente empieza con el muro');
+    igual(b.envion('A', 'casa', 99, T0), 'pase', 'el dos tiempos de otra partida no existe');
+    igual(b.envion('B', 'casa', r.id, T0), 'pase', 'ni el de la partida de otro dispositivo');
+    // Se anota: el dos tiempos de esa final y juego libre, con todas las finales completas.
+    b.anotar('A', T0);
+    igual(b.envion('A', 'casa', r.id, T0), { puede: true, via: 'lista' }, 'anotado: dos tiempos');
+    igual(b.envion('A', 'casa', r.id, T0), { puede: true, via: 'ya' }, 'pedirlo otra vez no cambia nada');
+    const l = b.partida('A', 'casa', T0);
+    igual([l.fuente, l.etapa, l.quedan], ['lista', 'completa', null], 'anotado: finales completas sin límite');
+  }
+  {
+    // Encuesta en el intervalo: termina esa final y suma una completa; una sola vez por dispositivo.
+    const b = new BaseArranque(PROD);
+    const r = b.partida('A', 'casa', T0);
+    igual(b.encuesta('A', 'casa', T0), 1, 'la encuesta suma 1 (BONO_ENCUESTA)');
+    igual(b.envion('A', 'casa', r.id, T0), { puede: true, via: 'encuesta' }, 'encuesta: dos tiempos de esa final');
+    const x = b.partida('A', 'casa', T0);
+    igual([x.puede, x.fuente, x.etapa, x.quedan], [true, 'encuesta', 'completa', 1], 'y una final completa más (quedan, antes de entregarla)');
+    igual([b.partida('A', 'casa', T0).puede, b.situacion('A', 'casa', T0).encuesta_disponible], [false, false], 'después, muro sin encuesta');
+    // Una segunda final en arranque del mismo dispositivo (con GRATIS=2) no recibe otro dos tiempos por la misma encuesta.
+    const c = new BaseArranque({ ...PROD, GRATIS: '2' });
+    const p1 = c.partida('C', 'otra', T0);
+    c.encuesta('C', 'otra', T0);
+    igual(c.envion('C', 'otra', p1.id, T0).via, 'encuesta', 'GRATIS=2: la primera pasa con la encuesta');
+    c.partidas.push({ id: 50, d: 'C', i: 'otra', en: T0, fuente: 'gratis', etapa: 'arranque', envion_por: null });
+    igual(c.envion('C', 'otra', 50, T0).puede, false, 'la encuesta da el dos tiempos una sola vez por dispositivo');
+  }
+  {
+    // Encuesta en el muro del principio (ya gastó el arranque y cerró): una final completa.
+    const b = new BaseArranque(PROD);
+    b.partida('A', 'casa', T0);
+    b.encuesta('A', 'casa', T0);
+    const x = b.partida('A', 'casa', T0);
+    igual([x.fuente, x.etapa, x.quedan, b.partida('A', 'casa', T0).puede], ['encuesta', 'completa', 1, false], 'encuesta en el muro del principio: una final completa (quedan antes de entregarla) y después muro');
+  }
+  {
+    // Borrar los datos (otro dispositivo, misma red): otro arranque gratis, nunca el dos tiempos; la IP frena a las 6.
+    const b = new BaseArranque(PROD);
+    const fuentes = [];
+    for (let k = 0; k < 8; k++) { const r = b.partida('N' + k, 'casa', T0); fuentes.push(r.puede ? r.etapa : r.motivo); if (r.puede) ok(b.envion('N' + k, 'casa', r.id, T0).puede === false, `dispositivo ${k} sin dos tiempos`); }
+    igual(fuentes, ['arranque', 'arranque', 'arranque', 'arranque', 'arranque', 'arranque', 'ip', 'ip'], 'misma IP: 6 arranques y después muro por IP');
+  }
+  {
+    // La regla vieja por variable: finales completas y el dos tiempos sin pedir nada.
+    const b = new BaseArranque({ GRATIS_ETAPA: 'final', GRATIS: '2', BONO_ENCUESTA: '2' });
+    const r = b.partida('A', 'casa', T0);
+    igual([r.etapa, b.envion('A', 'casa', r.id, T0).via, b.partida('A', 'casa', T0).etapa, b.partida('A', 'casa', T0).puede], ['completa', 'ya', 'completa', false], 'GRATIS_ETAPA=final: 2 finales enteras y muro');
+  }
 }
 igual([0, 1, 2, 7, 8, 100].map(d => R.diasDesde(T0, T0 + d * DIA + 5)), ['0', '1', '2-7', '2-7', '8+', '8+'], 'dias');
 
@@ -214,6 +294,8 @@ igual(R.escHtml(`<a href="x">'&`), '&lt;a href=&quot;x&quot;&gt;&#39;&amp;', 'es
   igual(await leerToken({ SECRETO_BAJA: 'otro'.repeat(8) }, tb, 'baja'), null, 'otro secreto');
   const p = await pase(env, { d: 'f'.repeat(64), n: 2, f: 'gratis', ahora: T0 });
   igual(await leerPase(env, p, T0 + 100), { d: 'f'.repeat(12), n: 2, f: 'gratis', exp: T0 + 3 * 3600 }, 'pase válido');
+  const pa = await pase(env, { d: 'f'.repeat(64), n: 1, f: 'gratis', e: 'arranque', p: 7, ahora: T0 });
+  igual(await leerPase(env, pa, T0), { d: 'f'.repeat(12), n: 1, f: 'gratis', e: 'arranque', p: 7, exp: T0 + 3 * 3600 }, 'el pase lleva la etapa y el id de la partida');
   igual(await leerPase(env, p, T0 + 3 * 3600 + 1), null, 'pase vencido');
   igual(await leerPase({ SECRETO_PASE: 'x'.repeat(32) }, p, T0), null, 'pase con otra firma');
 }

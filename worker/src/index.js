@@ -4,7 +4,7 @@
 import * as R from './reglas.js';
 import * as D from './datos.js';
 import { DESCARTABLES } from './descartables.js';
-import { codigoDispositivo, codigoIp, idAzar, igualSeguro, leerToken, pase, token } from './cripto.js';
+import { codigoDispositivo, codigoIp, idAzar, igualSeguro, leerPase, leerToken, pase, token } from './cripto.js';
 import { PREFIJO, capturar, evaluarBanderas, proxy } from './posthog.js';
 import { armarMail, idiomaPagina, pagina, t } from './textos.js';
 
@@ -15,7 +15,7 @@ const SECRETOS = ['SECRETO_IP', 'SECRETO_DISPOSITIVO', 'SECRETO_PASE', 'SECRETO_
 
 // Límites por código de IP: [máximo, período en segundos] (docs/MVP.md 5.5).
 const LIMITES = {
-  estado: [60, 600], partida: [20, 600], anotar: [5, 3600], encuesta: [3, 3600], baja_api: [3, 3600],
+  estado: [60, 600], partida: [20, 600], envion: [20, 600], anotar: [5, 3600], encuesta: [3, 3600], baja_api: [3, 3600],
   baja: [10, 3600], confirmar: [10, 3600], exportar: [10, 3600],
 };
 
@@ -150,7 +150,7 @@ async function banderas(env, ctx, dev, ahora) {
 
 async function api(request, env, ctx, url) {
   const ruta = url.pathname.slice(5);
-  const manejadores = { estado, partida, anotar, encuesta, baja: bajaApi };
+  const manejadores = { estado, partida, envion, anotar, encuesta, baja: bajaApi };
   if (ruta === 'exportar') return exportar(request, env, url);
   const m = manejadores[ruta];
   if (!m) return json({ error: 'no_existe' }, 404);
@@ -167,19 +167,25 @@ async function situacion({ request, env, ctx, b, i, ahora }) {
   const uuid = dispositivoDe(request, b);
   const d = await codigoDispositivo(env, uuid);
   const dev = await D.asegurarDispositivo(env.DB, d, ahora);
-  const { flags, asignadas } = await banderas(env, ctx, dev, ahora);
+  let { flags, asignadas } = await banderas(env, ctx, dev, ahora);
   const cfg = R.config(env, asignadas);
+  // Con la final gratis cortada en el arranque la bandera de cuántas finales no se usa: se reporta lo que vale de verdad
+  // (lo asignado por PostHog sigue guardado para cuando se vuelva a GRATIS_ETAPA='final').
+  if (cfg.etapa === 'arranque') flags = { ...flags, 'muro-partidas-gratis': String(cfg.gratis) };
   const c = await D.contar(env.DB, d, i, ahora);
   const dec = R.decidir({ anotado: !!dev.lista_id, encuesta: !!dev.encuesta_en, usadas_d: c.usadas_d, usadas_i: c.usadas_i, encuestas_i: c.encuestas_i, cfg });
   const contexto = { pais: paisDe(request, env), previas: c.usadas_d, dias: R.diasDesde(dev.creado, ahora) };
   return { uuid, d, dev, flags, cfg, c, dec, contexto };
 }
 
+// La regla vigente, para los textos del juego: hasta dónde llega una final gratis, cuántas y cuánto suma la encuesta.
+const reglaDe = cfg => ({ etapa: cfg.etapa, gratis: cfg.gratis, bono: cfg.bono });
+
 async function estado(a) {
   const s = await situacion(a);
   const r = {
-    dispositivo: s.uuid, puede: s.dec.puede, quedan: s.dec.quedan, lista: !!s.dev.lista_id,
-    encuesta_disponible: s.dec.encuesta_disponible, flags: s.flags, contexto: s.contexto, metricas: metricas(a.env),
+    dispositivo: s.uuid, puede: s.dec.puede, quedan: s.dec.quedan, lista: !!s.dev.lista_id, etapa: s.dec.etapa,
+    encuesta_disponible: s.dec.encuesta_disponible, flags: s.flags, contexto: s.contexto, regla: reglaDe(s.cfg), metricas: metricas(a.env),
   };
   if (s.dev.lista_id) r.lista_id = s.dev.lista_id;
   if (!s.dec.puede) r.motivo = s.dec.motivo;
@@ -191,14 +197,46 @@ async function partida(a) {
   for (let intento = 0; intento < 3; intento++) {
     const s = await situacion(a);
     if (!s.dec.puede) {
-      return json({ estado: 'muro', motivo: s.dec.motivo, encuesta_disponible: s.dec.encuesta_disponible, dispositivo: s.uuid, flags: s.flags, contexto: s.contexto }, 200, setCookie(s.uuid));
+      return json({ estado: 'muro', motivo: s.dec.motivo, encuesta_disponible: s.dec.encuesta_disponible, dispositivo: s.uuid, flags: s.flags, contexto: s.contexto, regla: reglaDe(s.cfg) }, 200, setCookie(s.uuid));
     }
-    const ok = await D.insertarPartida(env.DB, { d: s.d, i, ahora, fuente: s.dec.fuente, usadas_d: s.c.usadas_d, usadas_i: s.c.usadas_i });
-    if (!ok) continue; // otro pedido cambió la cuenta en el medio: se vuelve a decidir
+    const id = await D.insertarPartida(env.DB, { d: s.d, i, ahora, fuente: s.dec.fuente, etapa: s.dec.etapa, usadas_d: s.c.usadas_d, usadas_i: s.c.usadas_i });
+    if (!id) continue; // otro pedido cambió la cuenta en el medio: se vuelve a decidir
     const n = s.c.total_d + 1;
     return json({
-      estado: 'ok', pase: await pase(env, { d: s.d, n, f: s.dec.fuente, ahora }), fuente: s.dec.fuente,
-      quedan: s.dec.quedan == null ? null : s.dec.quedan - 1, n, dispositivo: s.uuid, flags: s.flags, contexto: s.contexto,
+      estado: 'ok', pase: await pase(env, { d: s.d, n, f: s.dec.fuente, e: s.dec.etapa, p: id, ahora }), fuente: s.dec.fuente, etapa: s.dec.etapa,
+      quedan: s.dec.quedan == null ? null : s.dec.quedan - 1, n, encuesta_disponible: s.dec.encuesta_disponible, dispositivo: s.uuid,
+      flags: s.flags, contexto: s.contexto, regla: reglaDe(s.cfg),
+    }, 200, setCookie(s.uuid));
+  }
+  throw new ErrorHttp(503, 'servidor');
+}
+
+// Permiso para el dos tiempos de una final que salió con etapa 'arranque' (docs/MVP.md 5.5): con la lista, o con el bono
+// de la encuesta una vez por dispositivo. Pide el pase de esa final, que tiene que ser de este dispositivo y estar vigente.
+// Responde {estado:'ok', via, pase (nuevo, etapa 'completa'), quedan, lista} o {estado:'muro', motivo:'envion', …};
+// 400 {error:'pase'} si el pase no sirve. Una final 'completa' responde ok sin tocar nada.
+async function envion(a) {
+  const { env, b, ahora } = a;
+  const datos = await leerPase(env, b.pase, ahora);
+  if (!datos || !Number.isSafeInteger(datos.p) || typeof datos.d !== 'string') throw new ErrorHttp(400, 'pase');
+  const s = await situacion(a);
+  if (datos.d !== s.d.slice(0, 12)) throw new ErrorHttp(400, 'pase');
+  for (let intento = 0; intento < 2; intento++) {
+    const fila = await D.partidaDe(env.DB, datos.p, s.d);
+    if (!fila) throw new ErrorHttp(400, 'pase');
+    const dec = R.decidirEnvion({
+      etapa: fila.etapa, anotado: !!s.dev.lista_id, encuesta: !!s.dev.encuesta_en, encuesta_usada: !!fila.encuesta_usada,
+      encuesta_disponible: s.dec.encuesta_disponible,
+    });
+    if (!dec.puede) {
+      log('info', { msg: 'envion', via: 'muro' });
+      return json({ estado: 'muro', motivo: dec.motivo, encuesta_disponible: dec.encuesta_disponible, dispositivo: s.uuid, regla: reglaDe(s.cfg) }, 200, setCookie(s.uuid));
+    }
+    if (dec.via !== 'ya' && !(await D.pasarAlEnvion(env.DB, { id: fila.id, d: s.d, via: dec.via }))) continue; // otro pedido la cambió: se vuelve a leer
+    log('info', { msg: 'envion', via: dec.via });
+    return json({
+      estado: 'ok', via: dec.via, pase: await pase(env, { d: s.d, n: datos.n, f: datos.f, e: 'completa', p: fila.id, ahora }),
+      quedan: s.dec.quedan, lista: !!s.dev.lista_id, dispositivo: s.uuid, regla: reglaDe(s.cfg),
     }, 200, setCookie(s.uuid));
   }
   throw new ErrorHttp(503, 'servidor');

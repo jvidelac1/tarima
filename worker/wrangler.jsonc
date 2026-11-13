@@ -38,9 +38,14 @@
   "vars": {
     "POSTHOG_HOST": "us.i.posthog.com",
     "POSTHOG_ASSETS": "us-assets.i.posthog.com",
-    "GRATIS": "2",
+    // Muro en el medio de la final (decisión del dueño del 12 de noviembre, docs/MVP.md 5.5): la final gratis da solo el
+    // arranque, y el dos tiempos pide el correo o la encuesta (que termina esa final y suma BONO_ENCUESTA completas).
+    // Para volver a la regla vieja (2 finales enteras gratis y la encuesta +2) sin tocar código:
+    //   GRATIS_ETAPA "final", GRATIS "2", BONO_ENCUESTA "2".
+    "GRATIS_ETAPA": "arranque",
+    "GRATIS": "1",
     "TOPE_IP": "6",
-    "BONO_ENCUESTA": "2",
+    "BONO_ENCUESTA": "1",
     "ENCUESTAS_POR_IP": "3",
     "ENCUESTA_ID": "",
     "ENCUESTA_PREGUNTAS": "",

@@ -13,12 +13,23 @@ export const SIN_CONFIRMAR = 30 * DIA; // desde que salió el correo de confirma
 export const PASE_DURA = 3 * 3600;
 export const REFRESCO_FLAGS = DIA;
 
-// Configuración numérica a partir de las variables del Worker y de las banderas del dispositivo.
+/**
+ * Configuración a partir de las variables del Worker y de las banderas del dispositivo.
+ * - GRATIS_ETAPA: hasta dónde llega una final gratis. 'arranque' (decisión del dueño del 12 de noviembre): solo el
+ *   arranque; el dos tiempos necesita la lista o el bono de la encuesta (decidirEnvion). 'final' (la regla vieja, y el
+ *   valor si la variable falta o no se entiende): la final entera.
+ * - GRATIS: cuántas finales gratis. En 'final' la bandera `muro-partidas-gratis` lo pisa; en 'arranque' la bandera no se
+ *   usa (queda guardada para cuando se vuelva a 'final').
+ * - BONO_ENCUESTA: finales que suma la encuesta (en 'arranque', finales completas, además de terminar la que está en
+ *   curso si se contesta en el intervalo).
+ */
 export function config(env = {}, flags = {}) {
   const num = (v, def, min, max) => { const n = Number.parseInt(v, 10); return Number.isFinite(n) && n >= min && n <= max ? n : def; };
+  const etapa = env.GRATIS_ETAPA === 'arranque' ? 'arranque' : 'final';
   const gratisVar = num(env.GRATIS, 2, 0, 50);
-  const gratisFlag = flags['muro-partidas-gratis'] != null ? num(flags['muro-partidas-gratis'], null, 1, 50) : null;
+  const gratisFlag = etapa === 'final' && flags['muro-partidas-gratis'] != null ? num(flags['muro-partidas-gratis'], null, 1, 50) : null;
   return {
+    etapa,
     gratis: gratisFlag ?? gratisVar,
     tope_ip: num(env.TOPE_IP, 6, 0, 500),
     bono: num(env.BONO_ENCUESTA, 2, 0, 50),
@@ -35,18 +46,38 @@ export function config(env = {}, flags = {}) {
  * @param {number}  a.usadas_i    partidas con este código de IP en 30 días, de dispositivos sin lista
  * @param {number}  a.encuestas_i encuestas con premio desde este código de IP en 30 días
  * @param {object}  a.cfg         salida de config()
- * @returns {{puede:boolean, fuente?:string, motivo?:string, quedan:number|null, encuesta_disponible:boolean}}
+ * @returns {{puede:boolean, fuente?:string, etapa?:'arranque'|'completa', motivo?:string, quedan:number|null, encuesta_disponible:boolean}}
+ *   `etapa`: con qué permiso sale la final que se pida ahora. 'arranque' solo para una final gratis con
+ *   GRATIS_ETAPA='arranque' en un dispositivo sin lista ni encuesta.
  */
 export function decidir({ anotado, encuesta, usadas_d, usadas_i, encuestas_i, cfg }) {
-  if (anotado) return { puede: true, fuente: 'lista', quedan: null, encuesta_disponible: !encuesta };
+  if (anotado) return { puede: true, fuente: 'lista', etapa: 'completa', quedan: null, encuesta_disponible: !encuesta };
   const cupo_d = cfg.gratis + (encuesta ? cfg.bono : 0);
   const cupo_i = cfg.tope_ip + cfg.bono * encuestas_i;
   const encuesta_disponible = !encuesta && encuestas_i < cfg.encuestas_por_ip;
   const quedan = Math.max(0, Math.min(cupo_d - usadas_d, cupo_i - usadas_i));
+  const etapa = cfg.etapa === 'arranque' && !encuesta ? 'arranque' : 'completa';
   if (usadas_d < cupo_d && usadas_i < cupo_i) {
-    return { puede: true, fuente: usadas_d < cfg.gratis ? 'gratis' : 'encuesta', quedan, encuesta_disponible };
+    return { puede: true, fuente: usadas_d < cfg.gratis ? 'gratis' : 'encuesta', etapa, quedan, encuesta_disponible };
   }
-  return { puede: false, motivo: usadas_d >= cupo_d ? 'dispositivo' : 'ip', quedan: 0, encuesta_disponible };
+  return { puede: false, motivo: usadas_d >= cupo_d ? 'dispositivo' : 'ip', etapa, quedan: 0, encuesta_disponible };
+}
+
+/**
+ * ¿Se puede jugar el dos tiempos de esta final? (POST /api/envion)
+ * @param {object} a
+ * @param {'arranque'|'completa'} a.etapa  la de la partida en la base
+ * @param {boolean} a.anotado              el dispositivo tiene lista_id
+ * @param {boolean} a.encuesta             el dispositivo ya respondió la encuesta
+ * @param {boolean} a.encuesta_usada       otra final de este dispositivo ya pasó al dos tiempos por la encuesta
+ * @param {boolean} a.encuesta_disponible  la que dice decidir() (para el muro)
+ * @returns {{puede:true, via:'ya'|'lista'|'encuesta'} | {puede:false, motivo:'envion', encuesta_disponible:boolean}}
+ */
+export function decidirEnvion({ etapa, anotado, encuesta, encuesta_usada, encuesta_disponible }) {
+  if (etapa !== 'arranque') return { puede: true, via: 'ya' };
+  if (anotado) return { puede: true, via: 'lista' };
+  if (encuesta && !encuesta_usada) return { puede: true, via: 'encuesta' };
+  return { puede: false, motivo: 'envion', encuesta_disponible: !!encuesta_disponible };
 }
 
 // Antigüedad del dispositivo para la propiedad `dias` de PostHog.
@@ -224,6 +255,7 @@ export function propsEncuesta({ r, ids, encuestaId, envio, idioma: idi, pais }) 
 // ---------- banderas (docs/MVP.md 6.5) ----------
 
 export const BANDERAS = {
+  // Solo vale con GRATIS_ETAPA='final'. Con 'arranque' el Worker no la usa y reporta GRATIS (ver config()).
   'muro-partidas-gratis': { valores: ['1', '2'], defecto: '2', pegajosa: true },
   'muro-texto': { valores: ['a', 'b'], defecto: 'a', pegajosa: true },
   'invitacion-podio1': { valores: ['on', 'off'], defecto: 'on' },

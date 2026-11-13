@@ -23,14 +23,30 @@ export async function contar(db, d, i, ahora) {
 
 /**
  * Inserta la partida solo si las cuentas no cambiaron desde que se leyeron (dos pedidos a la vez no pasan el tope).
- * Devuelve true si se insertó.
+ * Devuelve el id de la partida, o null si no se insertó.
  */
-export async function insertarPartida(db, { d, i, ahora, fuente, usadas_d, usadas_i }) {
+export async function insertarPartida(db, { d, i, ahora, fuente, etapa = 'completa', usadas_d, usadas_i }) {
   const ins = fuente === 'lista'
-    ? db.prepare('INSERT INTO partidas (d, i, en, fuente) VALUES (?1, ?2, ?4, ?5)').bind(d, i, ahora - VENTANA_IP, ahora, fuente)
-    : db.prepare(`INSERT INTO partidas (d, i, en, fuente) SELECT ?1, ?2, ?4, ?5
-        WHERE (${USADAS_D}) = ?6 AND (${USADAS_I}) = ?7`).bind(d, i, ahora - VENTANA_IP, ahora, fuente, usadas_d, usadas_i);
+    ? db.prepare('INSERT INTO partidas (d, i, en, fuente, etapa) VALUES (?1, ?2, ?4, ?5, ?6)').bind(d, i, ahora - VENTANA_IP, ahora, fuente, etapa)
+    : db.prepare(`INSERT INTO partidas (d, i, en, fuente, etapa) SELECT ?1, ?2, ?4, ?5, ?8
+        WHERE (${USADAS_D}) = ?6 AND (${USADAS_I}) = ?7`).bind(d, i, ahora - VENTANA_IP, ahora, fuente, usadas_d, usadas_i, etapa);
   const [r] = await db.batch([ins, db.prepare('UPDATE dispositivos SET ultimo = ?2 WHERE d = ?1').bind(d, ahora)]);
+  return r.meta.changes === 1 ? Number(r.meta.last_row_id) : null;
+}
+
+/** La partida `id` de este dispositivo (null si no es suya), y si otra suya ya pasó al dos tiempos por la encuesta. */
+export const partidaDe = (db, id, d) => db.prepare(`SELECT id, etapa, envion_por,
+    EXISTS (SELECT 1 FROM partidas o WHERE o.d = ?2 AND o.envion_por = 'encuesta') AS encuesta_usada
+    FROM partidas WHERE id = ?1 AND d = ?2`).bind(id, d).first();
+
+/**
+ * Pasa una partida de 'arranque' a 'completa' (permiso para el dos tiempos). Con la encuesta, solo si ninguna otra
+ * partida del dispositivo lo usó (una vez por dispositivo, también con dos pedidos a la vez). true si cambió.
+ */
+export async function pasarAlEnvion(db, { id, d, via }) {
+  const r = await db.prepare(`UPDATE partidas SET etapa = 'completa', envion_por = ?3
+      WHERE id = ?1 AND d = ?2 AND etapa = 'arranque'
+      AND (?3 = 'lista' OR NOT EXISTS (SELECT 1 FROM partidas o WHERE o.d = ?2 AND o.envion_por = 'encuesta'))`).bind(id, d, via).run();
   return r.meta.changes === 1;
 }
 

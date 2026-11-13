@@ -140,7 +140,7 @@ paso "Comprobación en $SITIO"
 sleep 5
 curl -fsS "$SITIO/" | grep -qi '<html' && echo "/ responde con el juego" || echo "AVISO: / no devolvió HTML todavía (Pages puede tardar un minuto)"
 EST="$(curl -sS -X POST "$SITIO/api/estado" -H "origin: $SITIO" -H 'content-type: application/json' --data '{"idioma":"es"}' || true)"
-if printf '%s' "$EST" | node -e 'let t="";process.stdin.on("data",d=>t+=d).on("end",()=>{const j=JSON.parse(t); if(typeof j.puede!=="boolean") process.exit(1); console.log("/api/estado: puede="+j.puede+" quedan="+j.quedan+" métricas="+(j.metricas?"sí":"no"))})' 2>/dev/null; then
+if printf '%s' "$EST" | node -e 'let t="";process.stdin.on("data",d=>t+=d).on("end",()=>{const j=JSON.parse(t); if(typeof j.puede!=="boolean") process.exit(1); console.log("/api/estado: puede="+j.puede+" quedan="+j.quedan+" regla="+(j.regla?j.regla.etapa+"/"+j.regla.gratis+"/+"+j.regla.bono:"vieja")+" métricas="+(j.metricas?"sí":"no"))})' 2>/dev/null; then
   :
 else
   echo "AVISO: /api/estado no respondió como se esperaba: $(printf '%s' "$EST" | head -c 200)"

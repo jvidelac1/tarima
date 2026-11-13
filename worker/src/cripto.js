@@ -54,15 +54,17 @@ export async function leerToken(env, t, tipo) {
   return (await igualSeguro(t, await token(env, m[1], tipo))) ? m[1] : null;
 }
 
-// Pase de una final: v1.<base64url(JSON)>.<HMAC>. En el MVP no es un candado: es el gancho para validar resultados.
-export async function pase(env, { d, n, f, ahora }) {
-  const cuerpo = b64urlTexto(JSON.stringify({ d: d.slice(0, 12), n, f, exp: ahora + 3 * 3600 }));
+// Pase de una final: v1.<base64url(JSON)>.<HMAC>. Lleva el id de la partida (`p`) y su etapa (`e`: 'arranque' o
+// 'completa'); con él se pide el permiso del dos tiempos (/api/envion). También es el gancho para validar resultados.
+export async function pase(env, { d, n, f, e, p, ahora }) {
+  const cuerpo = b64urlTexto(JSON.stringify({ d: d.slice(0, 12), n, f, e, p, exp: ahora + 3 * 3600 }));
   return `v1.${cuerpo}.${await hmacB64(env.SECRETO_PASE, 'v1.' + cuerpo)}`;
 }
 export async function leerPase(env, p, ahora) {
   const m = typeof p === 'string' && p.match(/^v1\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/);
   if (!m) return null;
   if (!(await igualSeguro(m[2], await hmacB64(env.SECRETO_PASE, 'v1.' + m[1])))) return null;
-  const datos = JSON.parse(desdeB64urlTexto(m[1]));
-  return datos.exp >= ahora ? datos : null;
+  let datos;
+  try { datos = JSON.parse(desdeB64urlTexto(m[1])); } catch { return null; }
+  return datos && datos.exp >= ahora ? datos : null;
 }
