@@ -777,9 +777,9 @@ function cuerpoHTML(id, uno = false, barra = false) {
   // 'b': el verde de cada barrita (ancho = fácil), con el mismo dibujo que los tramos
   const cb = barra && cj ? cuerpoBarra(id).barra : null, verdeMed = k => { const x = cb[k], n = x >= 1150 ? 'facil' : x <= 850 ? 'cuesta' : 'normal'; return `<span class="med tramo verde ${n}"><i>${t('cuerpo.barra.' + k)}</i><span class="barra" style="--v:${Math.round(Math.max(.15, Math.min(1, (x - 500) / 900)) * 100)}%"></span><em>${t('barra.verde.' + (n === 'facil' ? 'ancho' : n === 'cuesta' ? 'angosto' : 'medio'))}</em></span>`; };
   // 'b': la tarjeta dice solo lo que cambia el juego (la frase va antes, en su propio bloque): el verde de cada barrita
-  if (cb) return `<span class="cuerpo u b">${['tiron', 'envion'].map(verdeMed).join('')}</span>`;
+  if (cb) return `<span class="cuerpo u vb">${['tiron', 'envion'].map(verdeMed).join('')}</span>`;
   const ficha = uno && cj ? ['tiron', 'arriba', 'pararse'].map(tramoMed).join('') : at ? Object.entries(FICHA).map(([k, c]) => med(k, Math.max(.08, at[c] / 10), t(`ficha.${k}.${nivelFicha(at[c])}`))).join('') : '';
-  return `<span class="cuerpo${uno ? ' u' : ''}${barra ? ' b' : ''}">${['estatura', 'femur', 'brazos', 'movilidad'].map(k => med(k, fr(k, C[k]), largo(k, C[k]))).join('')}${ficha}</span>`;
+  return `<span class="cuerpo${uno ? ' u' : ''}">${['estatura', 'femur', 'brazos', 'movilidad'].map(k => med(k, fr(k, C[k]), largo(k, C[k]))).join('')}${ficha}</span>`;
 }
 
 /** Metrónomo de 8 toques: la mediana del atraso propone la corrección (0 a 100 ms), que queda fija para toda la partida. */

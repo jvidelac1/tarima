@@ -142,11 +142,11 @@ fieldset.pregunta legend{font-family:var(--display);font-weight:700;text-transfo
 .invitacion .cerrar{position:absolute;top:4px;right:4px;min-height:36px;min-width:36px;padding:0;background:none;border:none;font-size:18px}
 /* 'b' (la barrita): la frase en su propio bloque arriba y, debajo, dos filas de texto (el verde de cada barrita), sin barras:
    la tarjeta entra entera en la computadora baja y en el teléfono acostado */
-.pesista small.conviene+.cuerpo.b{margin-top:.45em}
-.pesista .cuerpo.b .med{display:flex;justify-content:space-between;align-items:baseline;gap:.5em;font-size:.8em;margin:0;padding:0;border:0}
-.pesista .cuerpo.b .barra{display:none}
-.pesista .cuerpo.b .med em{white-space:nowrap}
-:where(html.horiz.bajo) .pesista .cuerpo.b .med{font-size:.7em}
+.pesista small.conviene+.cuerpo.vb{margin-top:.45em}
+.pesista .cuerpo.vb .med{display:flex;justify-content:space-between;align-items:baseline;gap:.5em;font-size:.8em;margin:0;padding:0;border:0}
+.pesista .cuerpo.vb .barra{display:none}
+.pesista .cuerpo.vb .med em{white-space:nowrap}
+:where(html.horiz.bajo) .pesista .cuerpo.vb .med{font-size:.7em}
 /* pantallas bajas (la computadora del dueño muestra ~560 px): la bienvenida sin la franja de colores de cada tarjeta ni la
    nota debajo del nombre, para que las tarjetas entren enteras encima de la fila de botones */
 @media (max-height:820px){
