@@ -260,9 +260,12 @@ async function corrida(via) {
   console.log(`${tag} barra: mínimo ${(r.monitor.barraMin * 1000).toFixed(1)} mm · manos a barra, máximo ${(r.monitor.manosMax * 1000).toFixed(0)} mm · ${r.monitor.cuadros} cuadros medidos · altura máxima por pantalla: ${Object.entries(r.monitor.alto).map(([k, v]) => `${k} ${v.toFixed(2)} m`).join(', ')}`);
   for (const v of ['tira', 'salta', 'parate', 'aguanta', 'abajo', 'arriba'].map(k => ES['senal.' + k])) if (!vistas.has(v)) mal(`no apareció la señal «${v}»`);
   for (const v of ['explota', 'recibi', 'empuja', 'flexiona'].map(k => ES['senal.' + k])) if (vistas.has(v)) mal(`en 'u' apareció la señal de círculos «${v}»`);
-  // los que se pidieron con kilos razonables valen todos (también el dos tiempos sin tocar); el de 25 kg de más se cae
-  const validos = (r.mios.match(/✓/g) || []).length, f = r.propios.find(x => x.res === 'fallo'), aus = r.propios.find(x => x.uno && x.uno.tira_sola);
-  if (validos < 5) mal(`con kilos razonables tienen que valer todos: ${validos} válidos de 6 (${r.mios})`);
+  // las aperturas valen siempre (también el dos tiempos sin tocar); el de 25 kg de más se cae. Los otros llevan el peso del
+  // entrenador (G2.1), que en el tercer intento va por más o por el oro con 7½ o 2 de 10: pueden caer, y entonces cada caída
+  // tiene que decir dónde se quedó sin energía (nunca un tiempo)
+  const marcas = r.mios.split(" "), f = r.propios.find(x => x.res === 'fallo'), aus = r.propios.find(x => x.uno && x.uno.tira_sola);
+  if (!/✓/.test(marcas[0] || '') || !/✓/.test(marcas[3] || '')) mal(`las aperturas tienen que valer: ${r.mios}`);
+  for (const x of r.propios.filter(y => y.res === 'fallo')) if (!/^Se quedó sin energía en /.test(x.linea || '')) mal(`una caída sin la línea del tramo: ${JSON.stringify(x)}`);
   if (!f || !/^Se quedó sin energía en /.test(f.linea) || /ms\b|tarde|temprano/i.test(f.linea)) mal(`el arranque con 25 kg de más no cayó con una línea que nombre el tramo: ${r.mios} · ${JSON.stringify(f)}`); else console.log(`${tag} línea del fallo por kilos: «${f.linea}»`);
   if (!aus || aus.res !== 'valido' || !aus.uno.arriba_sola) mal(`el dos tiempos sin tocar no salió solo y válido: ${JSON.stringify(aus)}`); else console.log(`${tag} dos tiempos sin tocar: ${aus.res} · margen ${aus.uno.margen_fin} (salto ${aus.uno.salto}, pisotón ${aus.uno.pisoton})`);
   if (!tactil) {

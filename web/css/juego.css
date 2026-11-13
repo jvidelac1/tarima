@@ -106,6 +106,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 .senal[data-tipo=luz] .s-aro,.senal[data-tipo=uno] .s-aro,.senal.sale .s-aro{height:calc(var(--v)*8.5)}
 .senal[data-tipo=uno] .s-avance,.senal.sale .s-avance{display:block}
 .senal.sale .s-avance b{background:#3a4a7a}
+.senal.sale .s-fijo{display:none!important}      /* con la barra de «sale sola», sin el aro punteado (se cruzaban) */
 .senal[data-tipo=uno] .s-teclas,.senal.sale .s-teclas{margin-bottom:calc(var(--v)*2.6)}
 .senal[data-tipo=luz] .s-verbo,.senal[data-tipo=uno] .s-verbo{color:var(--gold)}
 /* FRENO: la garra se usa sola; la señal es un grito, no una orden */
@@ -297,7 +298,8 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
   /* el podio con sus botones: la tabla completa ya se vio un momento antes (sin botones); acá quedan el podio y los botones */
   :where(html.horiz.bajo) .panel.podio-panel:has(button) .tabla{display:none}
   /* el panel del llamado va al costado: el pesista queda a la vista */
-  :where(html.horiz.bajo) .panel.lado{align-self:center;margin-left:auto;margin-right:0;max-width:min(54cqw,440px)}
+  /* el llamado va abajo y nunca debajo de los botones de sonido, pausa y ayuda (arriba al centro): si no entra, se desplaza */
+  :where(html.horiz.bajo) .panel.lado{align-self:flex-end;margin-left:auto;margin-right:0;max-width:min(54cqw,440px);max-height:calc(100% - 44px)}
 /* teléfono en vertical: «Gira el teléfono» con un dibujo, encima de todo */
 /* (el aviso «Gira el teléfono» ya no existe: en vertical el contenido se gira solo, ver html.rotado) */
 @keyframes girar{0%,22%{transform:rotate(0)}48%,82%{transform:rotate(-90deg)}100%{transform:rotate(0)}}
