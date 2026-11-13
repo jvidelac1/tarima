@@ -961,6 +961,47 @@ no sea Clásico abre en la barrita; `?ctl=u` vuelve a `'u'`). Sin navegador: `no
 - Pendiente: una chance por persona (con su propia puntería), cámara lenta en el toque, vibración distinta por zona en iPhone
   (no tiene vibrate).
 
+### Carga: pantalla de carga y modelos comprimidos (13-nov, rama `carga`)
+
+Pedido del dueño: tarda en cargar (2/3 de los jugadores en el celular, muchos con datos móviles) y mientras carga se ve feo.
+
+- **Modelos** (`tools/comprimir_modelos.sh`, hay que correrlo después de `export_web.py`; `build.sh` lo hace solo). Antes
+  `web/models` pesaba 23,7 MB y el juego bajaba todo. Ahora:
+
+  | archivo | antes | después |
+  |---|---|---|
+  | `ventura.glb` (visor, Alta/Media) | 11,12 MB | 6,19 MB |
+  | `brenner.glb` | 10,02 MB | 5,58 MB |
+  | `ventura_1024.glb` (juego en Baja/Móvil) | — | 3,43 MB |
+  | `brenner_1024.glb` | — | 3,03 MB |
+  | `ventura_mask` PNG → WebP 1024 sin pérdida | 1,31 MB | 0,25 MB |
+  | `brenner_mask` | 1,22 MB | 0,24 MB |
+
+  Qué pesaba: geometría y animación ~6,8 MB por GLB (posición/normal/UV/pesos en float32, morphs correctivos dispersos,
+  1,4 MB de claves) y ~4,3 MB de texturas JPEG (normal y ORM del cuerpo a 2048). Geometría: meshopt con filtro exponencial
+  sobre float32 (posiciones a <0,05 mm, normales a 0,03°, rotaciones a 0,002°), sin cuantizar posiciones (athlete.js usa
+  las matrices de enlace y mide metros por UV), índices/JOINTS/tiempos sin pérdida, pelo y pestañas sin reordenar. Texturas
+  del liviano a 1024: el juego en automático arranca en Baja o Móvil (`tex: 1024`) y ya las achicaba al cargar; color y
+  pelo en WebP, normal y ORM en JPEG 4:4:4. Verificado además con el lector de gltf-transform: mismos 56 nodos, 53
+  articulaciones, morphs `corr_*`, acción `Poses` con 160 canales (diferencia máxima 1,5e-5, tiempos idénticos).
+- **Lo que baja el juego** (`tools/check_carga.mjs`, teléfono 844 × 390, sin caché): 24,63 MB → 7,94 MB. Modelos bajados,
+  antes → después: con 4G (9 Mbps, 85 ms) 33,2 → 21,6 s (run 43455353457) y 39,4 → 27,7 s (run 43459886954); con red
+  lenta (1,6 Mbps, 150 ms) 133,7 → 51,3 s y 138,0 → 55,6 s. La bienvenida sale a los 12–21 s en el runner en los dos
+  casos: ahí manda el dibujo por software, no la red. El primer cuadro salió 0,1–0,4 s más tarde que antes (más CSS y el
+  SVG animado dibujados por software); se sacó el `drop-shadow` del pesista, que es lo más caro de componer.
+- **Pantalla de carga** (`#msg`, `web/js/game/ui/carga.js`, `web/css/carga.css`): un pesista de costado que hace un arranque
+  en bucle (SVG de 1 KB + CSS que genera `tools/carga_svg.py` con cinemática inversa), luz de tarima que respira, barra con
+  los bytes reales de los GLB y máscaras (porcentaje y «0,4 / 7,0 MB»), y una frase cada 4,2 s: cómo se juega y 11 datos de
+  halterofilia (claves `carga.como` y `carga.dato_1..11`). `carga.js` se carga aparte con `async`, antes que three.js; el HTML
+  ya muestra el pesista antes de cualquier JavaScript. La bienvenida ya salía antes de que bajaran los modelos: ahora,
+  detrás de ella, una barrita de 3 px arriba muestra el avance, y si se toca «Jugar» antes de tiempo vuelve la pantalla con
+  la barra y las frases. Movimiento reducido: pesista quieto con la barra arriba, sin fundidos. Capturas en el artefacto
+  `carga-medir` (667 × 375, 844 × 390, escritorio en inglés, movimiento reducido, y el pesista en siete instantes).
+- **Pendiente / sin medir**: Pages manda los GLB y WebP con `max-age=0, must-revalidate` (cada visita revalida; un
+  `_headers` con caché más larga obligaría a cambiar el nombre de los archivos en cada exportación). KTX2 no se probó (pide
+  el transcodificador de Basis, ~0,5 MB, y athlete.js achica y suelta las texturas en un lienzo). Nada de esto se probó en
+  un teléfono real: los tiempos son del runner con la red emulada.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.
