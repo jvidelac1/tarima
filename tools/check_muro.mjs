@@ -138,6 +138,7 @@ async function escenario(L) {
   await pulsa('#btn-revancha');
   s = await jugar(enMuro, 'final 2');
   await av(300); await foto('muro_podio');
+  { const ic = (await eventos()).filter(e => e.ev === 'idioma_cambiado'); if (ic.length) mal(`el idioma cambió solo durante las finales: ${JSON.stringify(ic.map(e => e.props))}`); }
   const muro1 = await J(() => ({ titulo: document.querySelector('#capa .panel h1')?.textContent, correo: !!document.getElementById('correo'), encuesta: !!document.getElementById('btn-encuesta'), zona: getComputedStyle(document.getElementById('zona')).display, idioma: !!document.querySelector('#capa .panel .idi') }));
   if (!muro1.correo || !muro1.encuesta) mal(`el muro de la final 2 no tiene los dos caminos: ${JSON.stringify(muro1)}`);
   if (!muro1.idioma) mal('el muro no tiene el selector ES · EN');

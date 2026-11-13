@@ -160,8 +160,12 @@ export function enBorde(e, w = innerWidth, h = innerHeight) { const x = e.client
 
 // ---------- teclado de los paneles ----------
 const visibles = raiz => [...raiz.querySelectorAll('button:not(:disabled)')].filter(b => b.offsetParent !== null);
-/** Botón principal de un panel: el marcado con .ir, o el primero. */
-export const principal = raiz => { const bs = visibles(raiz); return bs.find(b => b.classList.contains('ir')) || bs[0] || null; };
+/**
+ * Botón principal de un panel: el marcado con .ir, o el primero que no sea del selector ES · EN. Un panel que solo tiene
+ * el selector de idioma (el podio en sus primeros 2,5 s) no enfoca nada: si no, el Espacio que saltea la espera
+ * cambiaba el idioma.
+ */
+export const principal = raiz => { const bs = visibles(raiz); return bs.find(b => b.classList.contains('ir')) || bs.find(b => !b.classList.contains('idi')) || null; };
 /** Clave para reencontrar un botón después de repintar el panel. */
 export function claveDe(b) {
   if (!b || b.tagName !== 'BUTTON') return null; if (b.id) return '#' + b.id;
