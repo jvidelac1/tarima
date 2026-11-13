@@ -414,9 +414,10 @@ body:has(#margen:not([hidden])) .rival{top:calc(var(--u)*10.6 + var(--st))}
 .barrita .b-pal{position:absolute;left:0;right:0;top:0;height:calc(var(--u)*2.6);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:calc(var(--u)*2.5);letter-spacing:.05em;text-shadow:0 2px 8px #000,0 0 2px #000;opacity:0}
 .barrita .b-pal.on{opacity:1}
 .barrita .b-pal.verde{color:#5cf29b}.barrita .b-pal.amarillo{color:#ffd54a}.barrita .b-pal.rojo{color:#ff6a5f}
-.barrita .b-fant{position:absolute;bottom:calc(100% + var(--u)*.3);transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:.2em}
-.barrita .b-fant i{display:block;width:calc(var(--u)*2.6);height:calc(var(--u)*2.6);border-radius:50%;border:3px solid rgba(255,255,255,.85);background:rgba(34,197,107,.15)}
-.barrita .b-fant kbd{font-size:calc(var(--u)*.85)}
+.barrita .b-fant{position:absolute;top:50%;transform:translate(-50%,-50%);pointer-events:none}
+.barrita .b-fant i{display:block;width:calc(var(--u)*4.4);height:calc(var(--u)*4.4);border-radius:50%;border:3px dashed rgba(255,255,255,.95);background:rgba(255,255,255,.08)}
+.barrita .b-fant kbd{display:none}
+.barrita[data-zona=verde] .b-cab,.barrita[data-zona=amarillo] .b-cab,.barrita[data-zona=rojo] .b-cab{visibility:hidden}
 .barrita .b-fant.ya i{background:#3ee68a;border-color:#fff;transform:scale(1.15)}
 .barrita.lento .b-nombre::after{content:' · ' attr(data-lento)}
 .verde-b{display:flex;align-items:center;gap:.4em .9em;flex-wrap:wrap}
@@ -441,10 +442,16 @@ body:has(#margen:not([hidden])) .rival{top:calc(var(--u)*10.6 + var(--st))}
 body:has(#barrita:not([hidden])) .guia{bottom:calc(var(--u)*15.5 + var(--sb))}
 @media (pointer:coarse){
   /* teléfono de costado: entre el zócalo y el botón redondo, sin pasar por debajo del botón */
-  :where(html.horiz) .barrita{left:calc(var(--sl) + var(--u)*1.6);right:calc(var(--boton) + var(--bm)*2 + var(--sr));width:auto;transform:none;bottom:calc(var(--u)*5.4 + var(--sb))}
+  :where(html.horiz) .barrita{left:calc(var(--sl) + var(--u)*1.6);right:calc(var(--boton) + var(--bm)*2 + var(--sr));width:auto;transform:none;bottom:calc(var(--u)*6.2 + var(--sb))}
   html:where(.horiz).zurdo .barrita{left:calc(var(--boton) + var(--bm)*2 + var(--sl));right:calc(var(--sr) + var(--u)*1.6)}
   :where(html.horiz.bajo) .barrita .b-pista{height:calc(var(--u)*3.6)}
   :where(html.horiz.bajo) .barrita .b-verbo{font-size:calc(var(--u)*2)}
   :where(html.horiz.bajo) body:has(#barrita:not([hidden])) .guia{bottom:calc(var(--u)*15 + var(--sb))}
   :where(html:not(.horiz):not(.rotado)) .barrita{width:min(92cqw,calc(var(--u)*56))}
 }
+/* teléfono acostado: el verde del panel en una sola línea (sin palabras) y, en 'b', sin la línea de la garra (se ve en la
+   energía durante el levantamiento): así el panel del llamado entra en 375 px de alto */
+:where(html.horiz.bajo) .verde-b{gap:.2em .6em;margin:.2em 0}
+:where(html.horiz.bajo) .mini-b em,:where(html.horiz.bajo) .mini-b b{display:none}
+:where(html.horiz.bajo) .mb-pista{width:4.6em;height:.8em}
+:where(html.horiz.bajo) .panel:has(.verde-b) p.garra{display:none}

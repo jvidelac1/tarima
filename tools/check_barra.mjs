@@ -42,6 +42,9 @@ const PANTALLAS = [
   { id: 'pc_en', lang: 'en', vp: { width: 1280, height: 720 }, tactil: false },
   { id: 'tel_es', lang: 'es', vp: { width: 667, height: 375 }, tactil: true, primera: true },
   { id: 'tel_en', lang: 'en', vp: { width: 844, height: 390 }, tactil: true },
+  // la computadora baja del dueño (~1800×560 visibles): solo la bienvenida, con las tarjetas de los pesistas
+  { id: 'bajo_es', lang: 'es', vp: { width: 1800, height: 560 }, tactil: false, soloInicio: true },
+  { id: 'bajo_en', lang: 'en', vp: { width: 1800, height: 560 }, tactil: false, soloInicio: true },
 ].filter(x => !SOLO || x.id === SOLO);
 
 for (const P of PANTALLAS) {
@@ -67,6 +70,17 @@ for (const P of PANTALLAS) {
   const cruza = (a, b) => a && b && a.l < b.r - 1 && a.r > b.l + 1 && a.t < b.b - 1 && a.b > b.t + 1;
   const PEDIR = ['verde', 'amarillo', 'rojo'], pedidas = [], vistas = [];
   let n = 0, hecho = '', fotoPanel = 0, lineas = [], revisada = false, medido = null;
+  // la bienvenida: en cada tarjeta nada se pisa (nombre, frase y filas), la tarjeta no se corta y no queda debajo de la fila de
+  // botones (Jugar, Opciones, Cómo se juega)
+  await av(300); await foto('0_inicio');
+  { const T = await J(() => { const pie = document.querySelector('#capa .panel .fila.pie')?.getBoundingClientRect(); return [...document.querySelectorAll('#capa .pesista')].map(p => {
+      const r = p.getBoundingClientRect(), k = [...p.querySelectorAll('b, small, .med')].filter(e => e.offsetParent && getComputedStyle(e).display !== 'none').map(e => e.getBoundingClientRect()); let cruces = 0;
+      for (let i = 0; i < k.length; i++) for (let j = i + 1; j < k.length; j++) { const a = k[i], b = k[j]; if (a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1) cruces++; }
+      const fuera = k.some(x => x.bottom > r.bottom + 1 || x.right > r.right + 1);
+      return { id: p.dataset.id, cruces, fuera, tapa: !!pie && r.bottom > pie.top + 1 && r.top < pie.bottom, alto: Math.round(r.height) }; }); });
+    console.log(`${tag} tarjetas: ${T.map(x => `${x.id} ${x.alto} px${x.cruces ? ` · ${x.cruces} cruces` : ''}${x.fuera ? ' · se corta' : ''}${x.tapa ? ' · bajo los botones' : ''}`).join(' | ')}`);
+    for (const x of T) if (x.cruces || x.fuera || x.tapa) mal(`la tarjeta de ${x.id} no se lee entera: ${JSON.stringify(x)}`); }
+  if (P.soloInicio) { await ctx.close(); continue; }
   await pulsa('#btn-empezar');
   const t0 = Date.now();
   for (let g = 0; g < 20000 && Date.now() - t0 < 6 * 60000; g++) {

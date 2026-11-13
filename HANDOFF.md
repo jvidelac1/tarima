@@ -887,6 +887,80 @@ Lo que cambia entre pesistas son los kilos y el cuerpo, nunca la precisión de l
 - Lo que no se tocó a propósito: los textos `pesista.*.conviene` hablan de precisión, pero solo se ven en Clásico, donde la precisión sí cuenta. Clásico también recibe el ritmo nuevo de los rivales (resumen y fila); en el navegador solo lo cubre la práctica de Clásico de check_game.
 - En check_telefono aparecen notas de descargas de modelos cortadas (`requestfailed … .glb net::ERR_ABORTED`): la prueba recarga la página antes de que terminen de bajar (sin tutorial se llega antes a la recarga). No es un error del juego.
 
+### Barrita (13-nov, noche, rama `gameplay`): el Fácil por defecto es `'b'`
+
+Pedido del dueño: «un puntero que se mueve en la barrita; si tocás muy lejos falla, más o menos cerca regular, en el verde
+perfecto. Al usuario le gusta tirar él». Diseño: `docs/JUEGO.md`, «Gameplay 3». `'u'` sigue en el núcleo (`?ctl=u`, sus
+registros se recalculan igual) y Clásico no cambió. Nada publicado en Cloudflare ni fusionado a mvp.
+
+**Cómo se juega.** El panel trae el peso del entrenador, la chance «X de 10» y el verde que vas a tener con esos kilos (una
+barrita chica por barrita). Al confirmar, el pesista se agacha (PREPÁRATE, la barrita quieta) y arranca el puntero. Tocas
+(Espacio/Enter o el dedo en cualquier parte de la escena) y el pesista tira **en ese instante**. Verde: ¡PERFECTO! (campanazo,
+tribuna, la escena se ilumina de verde); amarillo: REGULAR (−600 de energía, la barrita tiembla); rojo: LEJOS (−1500). Queda la
+marca de dónde pegaste. Arranque: una barrita (tirón). Dos tiempos: la cargada y, con la barra en los hombros (RESPIRA), el
+envión. Pararse, quedar firme y la garra salen solos. Sin tocar, el puntero va más lento desde los 8 s y al minuto el pesista
+tira solo como REGULAR (nunca se cae por no tocar; con mucho peso, el regular puede no alcanzar). Primera final: la
+presentación en una línea y un aro punteado sobre el verde que se llena cuando el puntero pasa (una vez por dispositivo).
+
+**Dónde está.**
+- Núcleo: `rules.js → BARRA` (pasada 1,4 s, lenta 1,7 s desde 8 s, gracia 250 ms, doble 120 ms, zonas por intensidad y
+  pesista, costo de cada zona, gasto ×0,9, persona típica), `posBarra`, `zonasBarra`, `zonaBarra`, `cuerpoBarra`,
+  `repartoBarra` y `chanceBarra` (exacta por programación dinámica, enteros), `HUELLA_B` (registros `ctl: 'b'` con `barra:`;
+  `replay.js` la exige). `attempt.js`: `this.B` y `_bContacto`/`_bPega` sobre la máquina de `'u'`; `res.uno.barras` dice zona,
+  posición y si salió sola. `match.js` y `entrenador.js`: `'b'` usa `cuerpoBarra` y `chanceBarra`.
+- Juego: `ui/barrita.js` (nuevo; `#barrita`, CSS al final de `juego.css`), `controles.js` (`senalB`, `QUE_B`,
+  `proximoCentro`), `main.js` (`esU()` para lo que comparten `'u'` y `'b'`; la barrita en `correrIntento`, el verde del panel,
+  la tarjeta con «Verde tirón / Verde envión»), `input.js` (`sinRepeticion`), `audio.js` (`subida`, `pega`),
+  `stage.js` (`acercar`: la cámara se acerca a 0,93 mientras corre el puntero), textos `barra.*` en `es.js` y `en.js`.
+- Pesistas (ancho del verde, `BARRA.pesistas`): Compacto parejo (1 / 1), Largo 1,3 en el tirón y 0,75 en el envión, Potente al
+  revés. Medio ancho del verde: 170 ms con la apertura, 75 ms al 100 % (por 1,3 o 0,75 según el pesista; 1,4 el primer intento
+  de la primera final).
+
+**Medido** (sin navegador, `node tools/barra_bots.mjs --n=600`; perfiles: novato ±120 ms y 40 ms tarde, 5 % de despistes;
+medio ±70; bueno ±35; típico ±105, el que supone el panel). Válidos % (verde % de los toques):
+
+| perfil · pesista | arr. 90 % | arr. 97 % | arr. 100 % | arr. 103 % | dt 90 % | dt 97 % | dt 100 % | dt 103 % |
+|---|---|---|---|---|---|---|---|---|
+| novato · Compacto | 100 (82) | 92 (56) | 48 (45) | 2 | 100 (81) | 83 (59) | 36 (43) | 4 |
+| novato · Largo | 100 (89) | 96 (72) | 55 (56) | 3 | 100 (77) | 82 (56) | 33 (44) | 5 |
+| novato · Potente | 100 (67) | 78 (45) | 35 (33) | 6 | 99 (77) | 78 (57) | 46 (43) | 16 |
+| medio · Compacto | 100 (97) | 99 (82) | 70 (69) | 3 | 100 (96) | 96 (85) | 67 (69) | 10 |
+| medio · Largo | 100 (99) | 98 (92) | 73 (80) | 4 | 100 (93) | 96 (81) | 59 (66) | 12 |
+| medio · Potente | 100 (90) | 91 (72) | 51 (57) | 10 | 100 (94) | 93 (80) | 68 (67) | 31 |
+| bueno · Compacto | 100 (100) | 100 (99) | 93 (97) | 5 | 100 (100) | 100 (100) | 95 (96) | 23 |
+| bueno · Largo | 100 (100) | 100 (100) | 85 (99) | 6 | 100 (99) | 100 (98) | 90 (94) | 27 |
+| bueno · Potente | 100 (100) | 97 (97) | 66 (89) | 18 | 100 (100) | 99 (98) | 85 (93) | 50 |
+
+- Metas: novato con la apertura (90 %) ≥ 99 % válidos y 65 a 89 % verde; al 100 % el novato entre 33 y 55 % y el bueno
+  siempre más (66 a 95 %). Verde del novato al 97 % por barrita: tirón Largo 72 / Compacto 56 / Potente 45 %; envión Potente 71
+  / Compacto 59 / Largo 42 %. Machacar, mantener, no tocar y el doble toque: 100 % válidos al 90 % en el arranque; el
+  machacador pega en el rojo y en el dos tiempos de Compacto se le cae el 80 % (hay que mirar el puntero).
+- `chance_test`: con la persona típica, error ≤ 2,9 puntos en cada «X de 10» (meta ≤ 5). Con el novato la chance promete
+  hasta 8 puntos de más (en «5 de 10» sube 4,2 de 10) y con el bueno hasta 38 de menos: la chance es la de una persona
+  típica (algo más torpe que el medio, a propósito), no la de quien juega.
+- `ritmo_test` (360 finales): novato, final mediana 130 s (meta ≤ 150), espera máxima 19,0 s (≤ 20), p90 13,4 s, intento
+  propio p90 8,8 s arranque y 13,7 s dos tiempos (metas de `'b'` ≤ 9 y ≤ 15: antes ¡TIRA! salía sola a los 2 s), barras caídas
+  con el panel 14,2 % (≤ 15). Informativo: quien espera siempre al puntero lento hace la final en 201 s y se le cae el 10 %.
+- `teclado_test` y `dedo_test` (10 000 secuencias cada uno, `'b'` y `'u'`): 0 sin resolver, 0 dobles, 0 sin palabra, 0
+  barritas disparadas por más de un contacto. `sim_test`: `sim_ref.json`, `sim_ref_facil.json` y `sim_ref_uno.json` idénticos;
+  `sim_ref_barra.json` nuevo; 600 finales `'b'` recalculadas iguales; toda caída nombra el tramo y la zona.
+
+**Cómo probarlo.** `cd web && python3 -m http.server 8000` → `http://localhost:8000/juego.html` (un `tarima.ctl` guardado que
+no sea Clásico abre en la barrita; `?ctl=u` vuelve a `'u'`). Sin navegador: `node tools/barra_bots.mjs`,
+`node tools/chance_test.mjs`, `node tools/ritmo_test.mjs`. Con navegador (Actions, grupo «toques»): `tools/check_barra.mjs`
+(computadora en español e inglés, teléfono 667×375 y 844×390; capturas en `out/barra/`).
+
+**Apartamientos y pendientes.**
+- «Los kilos que elijas deciden el resto» dice «lo demás»: `sim_test` no deja «resto» (es la palabra vieja del Resto).
+- «Te sobra ¾ de energía» del panel es sin el costo del toque (si pegas en el verde); la chance sí lo cuenta.
+- Esperar al puntero lento es más fácil (más ms de verde): cuesta tiempo de la final, no se castiga.
+- Sin medir con personas ni en un teléfono de verdad: la persona típica (±105 ms) es una estimación; cada `intento_propio`
+  manda `barra_1`, `barra_2`, `barra_pos_1/2` y `barra_sola` para calibrarla con datos.
+- La diferencia entre dónde se ve el puntero y dónde lo juzga el núcleo se mide en `check_barra` con el reloj verdadero; por
+  software (Actions) los cuadros son largos.
+- Pendiente: una chance por persona (con su propia puntería), cámara lenta en el toque, vibración distinta por zona en iPhone
+  (no tiene vibrate).
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.
