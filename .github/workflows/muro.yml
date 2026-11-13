@@ -19,6 +19,7 @@ on:
       - 'web/js/game/main.js'
       - 'web/js/game/ganchos.js'
       - 'web/js/game/i18n/**'
+      - 'web/css/**'
       - 'worker/src/**'
       - 'worker/migraciones/**'
       - 'worker/wrangler.jsonc'

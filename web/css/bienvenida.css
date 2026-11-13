@@ -100,6 +100,11 @@ button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px
 .pesista small.conviene{color:var(--ink);opacity:.85}
 /* muro, lista, encuesta e invitación del podio */
 .panel.muro,.panel.encuesta{max-width:min(94cqw,720px)}
+/* El muro puede salir en el medio de la final (intervalo): el cartel del evento, el reloj, el marcador y el acuse de la
+   tecla quedan debajo del panel y en el teléfono acostado se le montaban encima. */
+body:has(#capa > .panel:is(.muro,.encuesta,.anotado)) :is(.bug,.relojbox,#marcador,#acuse){visibility:hidden}
+/* Con el título en una sola línea (teléfono acostado), la bajada pasaba por debajo del selector ES · EN. */
+.panel.muro:has(>.idiomas.flota)>h1:first-of-type+.bajada{padding-right:112px}
 .panel .muro-cuerpo{display:grid;gap:10px}
 @media (min-width:700px){.panel .muro-cuerpo:has(.camino-encuesta){grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);align-items:start}}
 .formulario label.campo{display:flex;flex-direction:column;gap:.3em;margin:.4em 0}
