@@ -518,12 +518,14 @@ export class Escena {
   alturaMuestra(g) { return this.activo?.barPos[g]?.y ?? 0; }
   /** Acercamiento sutil de la cámara (1 = el plano tal cual; 0,92 = un poco más cerca), amortiguado por el rig. */
   acercar(z = 1) { if (this.rig) this.rig.zoomT = z; }
-  camara(clave) { this.plano = null; this.encuadre = null; this.rig.setShot(null); this.rig.cut(CAM[clave] ?? 0); }
+  /** Cámara fija por clave. `suave` (s): en lugar de cortar, va desde la cámara de ahora (cameras.js, suave). */
+  camara(clave, suave = 0) { if (suave) this.rig.suave(suave); else this.rig.mezcla = null; this.plano = null; this.encuadre = null; this.rig.setShot(null); this.rig.cut(CAM[clave] ?? 0); }
   /**
    * Primer plano por clave (SHOTS del visor o PLANOS del juego). `encuadre`: {x, y} fracción del lienzo (desde arriba a la
    * izquierda) donde tiene que quedar el sujeto, para dejarlo en la parte libre cuando un panel tapa un costado o el pie.
    */
-  primerPlano(clave, encuadre = null) {
+  primerPlano(clave, encuadre = null, suave = 0) {
+    if (suave) this.rig.suave(suave); else this.rig.mezcla = null;
     const base = PLANOS[clave] || SHOTS.find(s => s.key === clave) || null, h = this.P?.h || 1.75;
     const dAbs = encuadre?.dAbs || base?.dAbs, sh = base && dAbs ? { ...base, d: dAbs / h } : base;
     this.plano = sh; this.encuadre = encuadre; this.rig.setShot(sh); if (sh) this._apuntar();      // setShot primero: el corrimiento usa el ángulo del plano

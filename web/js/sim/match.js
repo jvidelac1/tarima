@@ -110,6 +110,18 @@ export class Partida {
     for (let k = min; k <= KG_MAX && (out.oro === null || out.plata === null); k++) { const p = this.puestoSi(i, lev, k); if (p <= 2 && out.plata === null) out.plata = k; if (p === 1 && out.oro === null) out.oro = k; }
     return out;
   }
+  /**
+   * Los kilos que necesita el pesista i para quedar delante de j en lo que se compite ahora (arranque o total): el menor peso
+   * desde su mínimo con el que, válido, lo pasa. null si j todavía no tiene marca, si i ya va delante o si ningún peso alcanza
+   * (por ejemplo, sin arranque válido no hay total). Solo consulta: no cambia nada (tablero de la final, ui/tablero.js).
+   */
+  paraPasar(i, j, lev = this.lev) {
+    const pos = o => [o.findIndex(f => f.a === i), o.findIndex(f => f.a === j)], val = f => (lev === 's' ? f.s : f.total);
+    const o0 = this._orden(this._filas(), lev), [a0, b0] = pos(o0); if (!val(o0[b0]) || a0 < b0) return null;
+    if (this.at[i][lev].length >= 3) return null;
+    for (let k = this.minimo(i, lev); k <= KG_MAX; k++) { const o = this._orden(this._filas(i, lev, k), lev), [a, b] = pos(o); if (a < b && val(o[a])) return k; }
+    return null;
+  }
   /** Etiquetas del intento (sección 6.5). Con alguna etiqueta, el Temple entra en las ventanas. */
   etiquetas(i, lev, n, kg) {
     const a = this.at[i], et = [], R = EVENTO.records;
@@ -182,8 +194,8 @@ export class Partida {
     const a = this.at[L.a]; let env; if (L.lev === 'c') env = elegirEnvion(a.f, this.contexto(a.f.enviones[0]).I);
     const ctx = this.contexto(env), g = gestos(ctx, this.cfg.nivel, L.sem);
     this.reg.llamados.push({ a: L.a, lev: L.lev, n: L.n });
-    const llamado = { ...L }; this._aplicar(ctx, g.res);
-    return { ctx, conf: g.conf, ent: g.ent, res: g.res, llamado, env };
+    const llamado = { ...L }, ap = this._aplicar(ctx, g.res);
+    return { ctx, conf: g.conf, ent: g.ent, res: g.res, llamado, env, avisos: ap.avisos };
   }
   _aplicar(ctx, res) {
     // en 'u' tocar de más no cuesta nada: machacar, mantener o tocar con calma dan lo mismo también en el Resto

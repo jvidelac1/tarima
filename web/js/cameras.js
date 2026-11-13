@@ -60,6 +60,23 @@ export class CameraRig {
     this.index = clamp(i | 0, 0, CAMERAS.length - 1); const c = CAMERAS[this.index]; this.top = 99;
     this.az = this.azT = c.az; this.el = this.elT = c.el; this.zoom = this.zoomT = 1; this.manual = false; this.camera.fov = c.fov; this.time = 0; Object.assign(this._in, this.inset);
   }
+  /**
+   * Transición suave (juego, pedido del dueño: «menos cortes»): el próximo cambio de plano no salta, va desde la cámara de
+   * este cuadro hasta la nueva en `seg` s, con aceleración y frenado (posición, orientación y lente). Se llama justo antes de
+   * `cut` o `setShot`. Con movimiento reducido, corte como siempre.
+   */
+  suave(seg = .7) {
+    if (this.reduceMotion || !(seg > 0)) { this.mezcla = null; return; }
+    const c = this.camera; this.mezcla = { p: c.position.clone(), q: c.quaternion.clone(), fov: c.fov, t: 0, dur: seg };
+  }
+  _mezclar(dt) {
+    const M = this.mezcla; if (!M) return;
+    M.t += dt; const u = Math.min(1, M.t / M.dur), k = u * u * (3 - 2 * u), cam = this.camera;
+    const p = (this._mp ||= new THREE.Vector3()).copy(cam.position), q = (this._mq ||= new THREE.Quaternion()).copy(cam.quaternion);
+    cam.position.copy(M.p).lerp(p, k); cam.quaternion.copy(M.q).slerp(q, k); cam.fov = M.fov + (cam.fov - M.fov) * k;
+    cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+    if (u >= 1) this.mezcla = null;
+  }
   setAthleteHeight(h) { this.height = h; }
   /** Márgenes seguros (fracción del lienzo) ocupados por la gráfica: el encuadre se calcula contra el rectángulo libre. */
   setInsets(i) { Object.assign(this.inset, i); }
@@ -78,7 +95,7 @@ export class CameraRig {
       if (cam.position.y < .08) cam.position.y = .08;
       if (Math.abs(cam.fov - sh.fov) > 1e-4) cam.fov = sh.fov;
       cam.lookAt(this.target); cam.updateProjectionMatrix(); cam.updateMatrixWorld(); this.focusDistance = cam.position.distanceTo(this.target); this.top = 99;
-      return;
+      this._mezclar(dt); return;
     }
     const drift = (this.reduceMotion || this.manual) ? 0 : Math.sin(this.time * .16) * c.drift;
     const az = this.az + drift, el = this.el, I = this._in, snap = this.top > 50;
@@ -111,6 +128,7 @@ export class CameraRig {
     if (cam.position.y < .16) { const dy = .16 - cam.position.y; cam.position.y = .16; this.target.y += dy; }
     cam.lookAt(this.target); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
     this.focusDistance = cam.position.distanceTo(this.subject);
+    this._mezclar(dt);
   }
   dispose() {
     if (!this.interactive) return;
