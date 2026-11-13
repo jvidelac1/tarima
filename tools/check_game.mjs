@@ -223,7 +223,8 @@ async function corrida(via) {
     const a2 = await J(() => ({ s: JUEGO.estado(), reloj: document.getElementById('reloj').textContent }));
     console.log(`${tag} panel del llamado: reloj ${a1.reloj}; 40 s después, ${a2.reloj} (pantalla ${a2.s.pantalla})`);
     if (a2.s.pantalla !== 'llamado' || !a2.s.panel || a2.reloj !== a1.reloj) mal(`con el panel del llamado abierto el reloj corrió o venció: ${a1.reloj} → ${a2.reloj}, pantalla ${a2.s.pantalla}`);
-    if (!/Sin apuro/.test(a1.txt) || !/ESPACIO: levantar \d+ kg/.test(a1.txt) || !/Te sobra|Te falta/.test(a1.txt)) mal(`el panel del llamado no dice «Sin apuro», «ESPACIO: levantar N kg» y «Te sobra / Te falta»: «${a1.txt.replace(/\s+/g, ' ').slice(0, 300)}»`);
+    // desde el 13-nov (menos texto) el panel de 'b' ya no dice «Sin apuro»: los kilos, la chance y la tecla
+    if (!/ESPACIO: levantar \d+ kg/.test(a1.txt) || !/Te sobra|Te falta/.test(a1.txt)) mal(`el panel del llamado no dice «ESPACIO: levantar N kg» y «Te sobra / Te falta»: «${a1.txt.replace(/\s+/g, ' ').slice(0, 300)}»`);
     // ---- confirmar con Espacio (el foco está en «levantar») y no tocar nada más
     await page.keyboard.press('Space'); let quedan = '', ultimo = null, x0 = null;
     let fotoLenta = false;

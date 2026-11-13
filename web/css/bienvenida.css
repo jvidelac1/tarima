@@ -169,3 +169,5 @@ fieldset.pregunta legend{font-family:var(--display);font-weight:700;text-transfo
 .panel .pie .secundarios button.link{color:var(--mute);font-family:var(--body);font-weight:600;font-size:clamp(12px,1.8cqh,14px);min-height:36px;text-decoration-color:rgba(147,160,204,.5)}
 .panel .pie .secundarios button.link[aria-expanded=true]{color:var(--teal)}
 .panel .pie a.legal{margin-left:0;color:var(--mute);font-size:clamp(11px,1.6cqh,13px);text-underline-offset:3px;padding:.4em 0}
+/* en la bienvenida no van el título del evento ni el reloj (el panel lo dice todo) */
+html[data-pantalla=inicio] :is(.bug,.relojbox){display:none}

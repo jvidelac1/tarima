@@ -13,7 +13,7 @@
 //    con toques sobre el botón; al girar el teléfono de verdad, se usa la orientación real.
 // Sin --dibujo el 3D no se dibuja solo (?dibujo=0, como check_game): antes de cada captura se fuerza un cuadro.
 // Cuánto tapa la interfaz al pesista (tools/tapa.mjs) en el llamado, con la barrita quieta y corriendo, en el levantamiento, en el
-// veredicto y en el turno de un rival, por tamaño de pantalla (tabla al final y out/telefono/tapa.json). TAPA_INFORMA=0: falla
+// veredicto y en el turno de un rival, por tamaño de pantalla (tabla al final y out/telefono/tapa.json). Falla
 // si se pasa del umbral (cuerpo ≤ 15 % durante la barrita y el levantamiento, torso ≤ 20 % en el llamado).
 // Uso: node tools/check_telefono.mjs [--headed] [--solo=nombre] [--capturas=out/telefono] [--dibujo]
 import http from 'node:http';
@@ -42,7 +42,7 @@ const server = http.createServer((req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/`;
 fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT, { recursive: true });
-const problemas = [], notas = [], TAPA = [], INFORMA = process.env.TAPA_INFORMA !== '0';      // por ahora solo informa: el antes
+const problemas = [], notas = [], TAPA = [], INFORMA = process.env.TAPA_INFORMA === '1';      // TAPA_INFORMA=1: solo informa (para medir un antes)
 const browser = await chromium.launch(launchOptions({ headed: HEADED }));
 
 const CASOS = [
@@ -116,7 +116,7 @@ async function correr(C) {
       const caja = el => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
       const cruza = (a, b) => a.l < b.r - 1 && a.r > b.l + 1 && a.t < b.b - 1 && a.b > b.t + 1;
       const o = { scroll: se.scrollWidth > W + 1 || se.scrollHeight > H + 1 || scrollX !== 0 || scrollY !== 0, fuera: [], seguras: [], cruces: [], panel: null, zona: ve($('zona')) };
-      const ids = ['zona', 'senal', 'barrita', 'margen', 'zocalo', 'acuse', 'guia', 'veredicto', 'cartel', 'rival', 'etiqueta', 'pausa', 'ayudab', 'sonidob', 'saltar'], B = {};
+      const ids = ['zona', 'senal', 'barrita', 'margen', 'zocalo', 'acuse', 'guia', 'veredicto', 'cartel', 'rival', 'etiqueta', 'pausa', 'ayudab', 'sonidob', 'saltar', 'turno', 'marcador'], B = {};
       for (const id of ids) if (ve($(id))) B[id] = caja($(id));
       for (const k of ['bug', 'relojbox']) { const el = document.querySelector('.' + k); if (ve(el)) B[k] = caja(el); }
       for (const [id, b] of Object.entries(B)) {
@@ -124,7 +124,7 @@ async function correr(C) {
         // lo que se toca o se lee no va debajo de la muesca ni de la barra de inicio (el veredicto y el cartel van centrados)
         if (!['veredicto', 'cartel'].includes(id) && (b.l < seg.left - 1 || b.r > W - seg.right + 1 || b.b > H - seg.bottom + 1)) o.seguras.push(id);
       }
-      for (const [a, b] of [['zona', 'barrita'], ['barrita', 'zocalo'], ['barrita', 'guia'], ['barrita', 'margen'], ['zona', 'senal'], ['zona', 'zocalo'], ['zona', 'acuse'], ['zona', 'guia'], ['zona', 'rival'], ['zona', 'pausa'], ['zona', 'saltar'], ['zona', 'sonidob'], ['sonidob', 'pausa'], ['sonidob', 'bug'], ['sonidob', 'senal'], ['ayudab', 'relojbox'], ['senal', 'zocalo'], ['senal', 'guia'], ['senal', 'etiqueta'], ['senal', 'bug'], ['zocalo', 'acuse'], ['guia', 'zocalo'], ['acuse', 'guia']])
+      for (const [a, b] of [['zona', 'barrita'], ['barrita', 'zocalo'], ['barrita', 'guia'], ['barrita', 'margen'], ['zona', 'senal'], ['zona', 'zocalo'], ['zona', 'acuse'], ['zona', 'guia'], ['zona', 'rival'], ['zona', 'pausa'], ['zona', 'saltar'], ['zona', 'sonidob'], ['sonidob', 'pausa'], ['sonidob', 'bug'], ['sonidob', 'senal'], ['ayudab', 'relojbox'], ['senal', 'zocalo'], ['senal', 'guia'], ['senal', 'etiqueta'], ['senal', 'bug'], ['zocalo', 'acuse'], ['guia', 'zocalo'], ['acuse', 'guia'], ['turno', 'sonidob'], ['turno', 'pausa'], ['turno', 'ayudab'], ['turno', 'marcador'], ['margen', 'guia'], ['margen', 'senal'], ['veredicto', 'margen'], ['veredicto', 'turno']])
         if (B[a] && B[b] && cruza(B[a], B[b])) o.cruces.push(`${a}/${b}`);
       const pn = document.querySelector('#capa .panel') || (ve($('sobre')) ? $('sobre').querySelector('.panel') : null);
       if (pn) {
@@ -186,7 +186,7 @@ async function correr(C) {
   // ---------- la partida ----------
   // cuánto tapa la interfaz al pesista, una vez por momento
   const medidos = new Set(), tapa = async momento => {
-    if (medidos.has(momento)) return; medidos.add(momento);
+    if (medidos.has(momento)) return; medidos.add(momento); await page.waitForTimeout(300);      // las entradas animadas (0,18 s) terminan
     const x = await J(medirEnPagina).catch(e => ({ error: String(e) })); if (!x) return; if (x.error) { notas.push(`${tag} tapa ${momento}: ${x.error}`); return; }
     TAPA.push({ p: C.nombre, momento, x }); const r = revisarTapa(momento, x); if (r && !INFORMA) mal(r);
   };

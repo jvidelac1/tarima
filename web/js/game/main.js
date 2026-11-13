@@ -713,6 +713,8 @@ async function inicio() {
   visita('inicio'); zocalo(null); relojLibre(); const primera = !guardado.get('tarima.jugadas');
   const cfg = { id: guardado.get('tarima.pesista') || 'ventura', nivel: guardado.get('tarima.nivel') || 'amistoso', ritmo: params.get('ritmo') === 'completa' ? 'completa' : 'expres', ctl: ctlInicial(), dif: difInicial() };
   if (!IDS.includes(cfg.id)) cfg.id = 'ventura';
+  // Difícil juega con rivales parejos, salvo que la persona haya elegido los rivales a mano
+  if (cfg.ctl === 'b' && cfg.dif === 'dificil' && cfg.nivel === 'amistoso' && !guardado.get('tarima.nivel_elegido')) cfg.nivel = 'normal';
   fijarDificultad(cfg);
   const guardadoNombre = limpiarNombre(guardado.get('tarima.nombre')), vuelve = !!guardadoNombre;
   const S = { nombre: guardadoNombre, editar: !vuelve, opciones: false, tocoPesista: false, cambio: false, focoNombre: !vuelve };
@@ -755,7 +757,7 @@ async function inicio() {
     if (!b) continue;      // cambió el idioma desde la pausa: se vuelve a pintar
     if (b.dataset.lang) { cambiarIdioma(b.dataset.lang); continue; }
     if (b.dataset.id) { cfg.id = b.dataset.id; S.tocoPesista = true; }
-    else if (b.dataset.n) cfg.nivel = b.dataset.n; else if (b.dataset.r) cfg.ritmo = b.dataset.r; else if (b.dataset.c) cfg.ctl = b.dataset.c;
+    else if (b.dataset.n) { cfg.nivel = b.dataset.n; guardado.set('tarima.nivel_elegido', '1'); } else if (b.dataset.r) cfg.ritmo = b.dataset.r; else if (b.dataset.c) cfg.ctl = b.dataset.c;
     // dificultad: Fácil, Medio y Difícil son la barrita; Difícil trae rivales parejos si estaban los tranquilos
     else if (b.dataset.d) { cfg.dif = b.dataset.d; if (cfg.ctl === 'c') cfg.ctl = 'b'; if (cfg.dif === 'dificil' && cfg.nivel === 'amistoso') cfg.nivel = 'normal'; fijarDificultad(cfg); }
     else if (b.id === 'btn-opciones') { S.opciones = !S.opciones; S.verOpciones = S.opciones; if (S.opciones) ev('opciones_abiertas'); }

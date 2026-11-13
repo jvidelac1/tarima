@@ -40,7 +40,7 @@ const server = http.createServer((req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/`;
 fs.mkdirSync(OUT, { recursive: true });
-const problemas = [], notas = [], TAPA = [], INFORMA = process.env.TAPA_INFORMA !== '0';      // por ahora solo informa: el antes
+const problemas = [], notas = [], TAPA = [], INFORMA = process.env.TAPA_INFORMA === '1';      // TAPA_INFORMA=1: solo informa (para medir un antes)
 const dormir = ms => new Promise(r => setTimeout(r, ms));
 const browser = await chromium.launch(launchOptions({ headed: HEADED }));
 const PANTALLAS = [
@@ -87,7 +87,7 @@ for (const P of PANTALLAS) try {
   const PEDIR = ['verde', 'amarillo', 'rojo'], pedidas = [], vistas = [], medidos = new Set();
   // cuánto tapa la interfaz al pesista en este momento (una vez por momento y pantalla)
   const tapa = async momento => {
-    if (medidos.has(momento)) return; medidos.add(momento);
+    if (medidos.has(momento)) return; medidos.add(momento); await page.waitForTimeout(300);      // las entradas animadas (0,18 s) terminan
     await J(() => { try { window.JUEGO.escena?.cuadro?.(0, false); } catch { /* nada */ } }).catch(() => null);
     const x = await J(medirEnPagina).catch(e => ({ error: String(e) })); if (x && x.error) { notas.push(`${tag} tapa ${momento}: ${x.error}`); return; }
     TAPA.push({ p: P.id, momento, x }); const r = revisar(momento, x); if (r && !INFORMA) mal(r);
@@ -163,7 +163,7 @@ for (const P of PANTALLAS) try {
     }
     if (s.pantalla === 'decision') {
       const v = await J(() => document.getElementById('veredicto').hidden ? '' : document.getElementById('veredicto').textContent);
-      if (v && !lineas.includes(v)) { lineas.push(v); if (lineas.length <= 3) await foto(`${lineas.length}_veredicto`); await tapa('veredicto'); }
+      if (v && !lineas.includes(v)) { lineas.push(v); await tapa('veredicto'); await page.waitForTimeout(250); if (lineas.length <= 3) await foto(`${lineas.length}_veredicto`); }
     }
     if (s.pantalla === 'rival' && !medidos.has('rival')) { await av(900); await tapa('rival'); await foto('rival'); }
     await J(() => JUEGO.test.avanzar(300, 50));

@@ -497,12 +497,15 @@ html.juego-u .veredicto.arriba{top:42%;font-size:calc(var(--u)*1.4)}
 /* con el veredicto a la vista, nada más a la izquierda: ni el marcador, ni los cambios de los rivales, ni la etiqueta */
 html.juego-u body:has(#veredicto:not([hidden])) :is(#marcador,#rival,#etiqueta){display:none!important}
 /* turno de un rival: una línea arriba a la izquierda (en lugar del título), sin la instrucción (la dice «Toca: seguir») */
-html.juego-u .turno{left:calc(var(--u)*1.4 + var(--sl));top:calc(var(--u)*1.4 + var(--st));transform:none;justify-content:flex-start;max-width:min(58cqw,calc(var(--u)*46));padding:calc(var(--u)*.35) calc(var(--u)*.8);background:rgba(6,14,48,.82);white-space:normal}
+/* sin llegar a los botones de sonido, pausa y ayuda (arriba al centro): la apuesta baja a la segunda línea si no entra */
+html.juego-u .turno{left:calc(var(--u)*1.4 + var(--sl));top:calc(var(--u)*1.4 + var(--st));transform:none;justify-content:flex-start;max-width:min(calc(50% - 82px - var(--u)*1.4 - var(--sl)),calc(var(--u)*46));padding:calc(var(--u)*.35) calc(var(--u)*.8);background:rgba(6,14,48,.82);white-space:normal}
 html.juego-u .turno b{font-size:calc(var(--u)*1.15)}
 html.juego-u .turno em{font-size:calc(var(--u)*.95)}
 html.juego-u .turno span{display:none}
 html.juego-u.turno-rival .bug{display:none}
-html.juego-u.turno-rival #marcador{left:calc(var(--u)*1.4 + var(--sl));top:calc(var(--u)*4.6 + var(--st));max-width:min(40cqw,calc(var(--u)*30))}
+html.juego-u.turno-rival #marcador{left:calc(var(--u)*1.4 + var(--sl));top:calc(var(--u)*6.8 + var(--st));max-width:min(calc(50% - 82px - var(--u)*1.4 - var(--sl)),calc(var(--u)*30))}
+/* en el llamado el título del panel ya dice quién, qué intento y cuántos kilos: sin zócalo (tapaba las piernas del pesista) */
+html.juego-u[data-pantalla=llamado] #zocalo{display:none!important}
 html.juego-u .marcador{background:rgba(6,14,48,.78)}
 /* el recuadro «Toca: seguir» más chico */
 html.juego-u .seguir{font-size:calc(var(--u)*.95);padding:.3em .65em;background:rgba(242,244,255,.85)}
