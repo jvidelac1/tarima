@@ -123,7 +123,9 @@ for (let n = 0; n < 60000; n++) {
     }
     if (!g) { await av(20); continue; }
     if (I.parado) { await av(80); await toque(); continue; }
-    if (g.tipo === 'barra') { await av(Math.max(0, g.objetivo - s.ahora)); await toque(); continue; }      // 'b': toca cuando el puntero pasa por el centro del verde
+    // 'b': toca cuando el puntero pasa por el centro del verde; en el intento con 25 kg de más, por el medio del amarillo
+    // (con todo en verde la barra sube siempre, BARRA.verdeSalva: para ver la caída y su línea hay que fallar un toque)
+    if (g.tipo === 'barra') { const obj = g.objetivo + (plan && plan.pesado && g.barra ? Math.round((g.barra.vMs + g.barra.aMs) / 2) : 0); await av(Math.max(0, obj - s.ahora)); await toque(); continue; }
     if (UNTOQUE.has(g.tipo)) { await av(150); await toque(); continue; }
     if (g.tipo === 'cierre') {
       if (I.seDetiene || (plan && plan.omite(g.clave))) { await av(20); continue; }
@@ -194,6 +196,7 @@ for (let n = 0; n < 60000; n++) {
   }
   await av(50);
 }
+const ctlB = await J(() => JUEGO.E?.p?.cfg?.ctl === 'b');
 const fin = await J(() => ({ tabla: JUEGO.E.p ? JUEGO.E.p.tabla().map(f => `${f.id}:${f.s}+${f.c}=${f.total}#${f.puesto ?? '-'}`).join(' ') : '', propios: JUEGO.E.propios || [] }));
 await browser.close(); server.close();
 
@@ -203,7 +206,8 @@ console.log('\nESPERA SIN TOCAR entre el final de cada levantamiento propio y el
 for (const T of tramos) console.log(`  lev ${T.lev} [${T.llamado}] ${T.res} → ${T.espera !== undefined ? (T.espera / 1000).toFixed(1) + ' s hasta ' + T.hasta : 'fin'}\n     ${T.pantallas || ''}${T.linea ? `\n     línea: «${T.linea}»` : ''}${T.machaca ? `\n     machacando Espacio cada 120 ms después del final: ${T.machaca}` : ''}`);
 console.log(`\nDE CONFIRMAR A ¡TIRÁ! (sin tocar): ${preps.join(' · ')}`);
 console.log(`AL LÍMITE: ${medios.join(' · ') || '—'} · FRENOS vistos: ${frenos} · fotos de los discos: ${fotosMargen}`);
-if (medios.some(x => x.includes('FRENO previsto')) && !frenos) problemas.push('se pidió un peso con FRENO previsto y el FRENO no apareció');
+// en 'b' el FRENO solo existe si algún toque salió del verde (BARRA.verdeSalva) y el bot de este recorrido pega en el verde
+if (!ctlB && medios.some(x => x.includes('FRENO previsto')) && !frenos) problemas.push('se pidió un peso con FRENO previsto y el FRENO no apareció');
 console.log('\nSEÑALES CON CÍRCULO: ms desde que aparece hasta el cierre');
 const porClave = {}; for (const x of senales) (porClave[(x.guiado ? 'guiado ' : '') + x.clave] ||= []).push(x.anticipa);
 for (const [k, v] of Object.entries(porClave)) console.log(`  ${k}: ${v.join(', ')}`);
