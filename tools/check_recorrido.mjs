@@ -228,7 +228,7 @@ if (!tramos.some(x => x.machaca)) problemas.push('no se llegó a probar el macha
   console.log(`  ${final !== null && final <= 150000 ? 'cumple' : 'NO    '} final del primer llamado al podio: ${final === null ? '?' : (final / 1000).toFixed(1) + ' s'} · meta ≤ 150 s`);
   if (max > 20000) problemas.push(`una espera sin tocar de ${(max / 1000).toFixed(1)} s (meta ≤ 20 s)`);
   if (final === null || final > 150000) problemas.push(`la final duró ${final === null ? '?' : (final / 1000).toFixed(1) + ' s'} de reloj de juego (meta ≤ 150 s)`);
-  const f = fin.propios.find(x => x.res === 'fallo'); if (!f || !/^(Se cayó en|Dropped in) /.test(f.linea || '')) problemas.push(`el arranque con 25 kg de más no cayó con la línea del tramo: ${JSON.stringify(f)}`); }
+  const f = fin.propios.find(x => x.res === 'fallo'); if (!f || !/^(Se quedó sin energía en|Ran out of energy in) /.test(f.linea || '')) problemas.push(`el arranque con 25 kg de más no cayó con la línea del tramo: ${JSON.stringify(f)}`); }
 console.log('\nPANTALLAS (s): ' + seg.map(x => `${x.p} ${(((x.t1 ?? x.t0) - x.t0) / 1000).toFixed(1)}`).join(' · '));
 if (problemas.length) { console.log('\nPROBLEMAS:\n' + problemas.join('\n')); process.exit(1); }
 console.log(`\ncheck_recorrido: terminó (${nFoto} capturas en out/recorrido)`);

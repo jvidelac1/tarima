@@ -262,7 +262,7 @@ async function corrida(via) {
   // los que se pidieron con kilos razonables valen todos (también el dos tiempos sin tocar); el de 25 kg de más se cae
   const validos = (r.mios.match(/✓/g) || []).length, f = r.propios.find(x => x.res === 'fallo'), aus = r.propios.find(x => x.uno && x.uno.tira_sola);
   if (validos < 5) mal(`con kilos razonables tienen que valer todos: ${validos} válidos de 6 (${r.mios})`);
-  if (!f || !/^Se cayó en /.test(f.linea) || /ms\b|tarde|temprano/i.test(f.linea)) mal(`el arranque con 25 kg de más no cayó con una línea que nombre el tramo: ${r.mios} · ${JSON.stringify(f)}`); else console.log(`${tag} línea del fallo por kilos: «${f.linea}»`);
+  if (!f || !/^Se quedó sin energía en /.test(f.linea) || /ms\b|tarde|temprano/i.test(f.linea)) mal(`el arranque con 25 kg de más no cayó con una línea que nombre el tramo: ${r.mios} · ${JSON.stringify(f)}`); else console.log(`${tag} línea del fallo por kilos: «${f.linea}»`);
   if (!aus || aus.res !== 'valido' || !aus.uno.arriba_sola) mal(`el dos tiempos sin tocar no salió solo y válido: ${JSON.stringify(aus)}`); else console.log(`${tag} dos tiempos sin tocar: ${aus.res} · margen ${aus.uno.margen_fin} (salto ${aus.uno.salto}, pisotón ${aus.uno.pisoton})`);
   if (!tactil) {
     if (!clicProbado) mal('no se llegó a probar el clic en el escenario');

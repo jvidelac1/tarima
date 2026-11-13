@@ -28,7 +28,7 @@ const TIPO = { ventura: 'Compacto', brenner: 'Largo', marangi: 'Potente' };
 
 /** Kilos que pide cada estrategia en el llamado en curso (null: deja lo declarado). */
 const ESTRATEGIAS = {
-  panel: (p, i, lev) => sugerencia(p, i, lev),
+  panel: (p, i, lev) => (p.at[i].cambios === 0 ? sugerencia(p, i, lev) : null),      // como main.js: después de un cambio, se respeta el peso
   plan: () => null,
   prudente: (p, i, lev) => { const a = p.at[i], u = a[lev].at(-1); return u && u.res === 'valido' ? u.kg + 2 : null; },
   codicioso: (p, i, lev) => { const a = p.at[i]; if (!a[lev].length) return null; let k = p.minimo(i); while (k + 1 <= KG_MAX && chanceDe(p, i, lev, k + 1) >= .3) k++; return k; },

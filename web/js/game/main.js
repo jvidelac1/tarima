@@ -876,7 +876,8 @@ function encuadreLibre() {
 function panelLlamado(p, L, t0, alConfirmar, corre = true) {
   const a = p.at[L.a], min = p.minimo(L.a), tv = p.techoVisible(L.a, L.lev, false), facil = p.cfg.ctl !== 'c', uno = p.cfg.ctl === 'u', S = { kg: L.kg, env: guardado.get(`tarima.env.${p.cfg.ctl}.${a.id}`) || (uno ? cuerpoDe(a.id).casa : facil ? 'split' : a.f.enviones[0]), mas: false, dt: p.cfg.ctl === 'f' && L.lev === 'c' && !guardado.get('tarima.dostiempos'), seguro: false };
   // 'u': el panel trae puesto el peso del entrenador (entrenador.js: la chance de cada peso y La cuenta), no el plan fijo
-  const sug = uno && a.cambios < 2 ? sugerencia(p, L.a, L.lev, S.env) : null; if (sug !== null && sug >= min) S.kg = sug;
+  // si ya cambió los kilos en este intento (y quedó desplazado), el panel respeta su peso y no lo pisa el del entrenador
+  const sug = uno && a.cambios === 0 ? sugerencia(p, L.a, L.lev, S.env) : null; if (sug !== null && sug >= min) S.kg = sug;
   // 'u': lo que el pesista llega a guardar con cada peso («llegas con», G2.4): mismo cálculo que el núcleo, día 0 y sin garra
   const llegas = (kg, env) => previsto(p.intensidadDe(L.a, L.lev, kg), L.lev, env, cuerpoDe(a.id));
   const discosHTML = pr => `<span class="pts${pr.fin < 0 ? ' no' : ''}">${puntos(Math.max(0, pr.fin))}</span>`;

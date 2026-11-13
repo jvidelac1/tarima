@@ -58,7 +58,7 @@ for (const nivel of ['amistoso', 'normal']) for (const id of ATL) for (let k = 0
     const L = { ...p.llamado }, a = p.at[L.a];
     if (a.ctrl === 'persona') {
       cierraEspera(); seguidos = 0; enteros = 0; reloj += PANEL;
-      const kg = sugerencia(p, yo, L.lev);
+      const kg = p.at[yo].cambios === 0 ? sugerencia(p, yo, L.lev) : null;
       if (kg !== null && kg !== L.kg && !p.cambioValido(0, kg) && p.cambio(0, kg).desplazado) { reloj += 1.8; continue; }      // desplazado: su cartel y sigue otro
       const env = L.lev === 'c' ? cuerpoDe(id).casa : undefined, ctx = p.contexto(env), S = jugarUno(ctx, NOVATO, mezclar(semilla, g)), res = S.m.res;
       p.resolver({ conf: S.conf, env, ent: S.ent });
