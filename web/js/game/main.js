@@ -1014,7 +1014,8 @@ async function llamadoRival(p, L, cfg) {
   const r = await correrIntento(x.ctx, { a, lev: L.lev, env: x.env, gestos: { conf: x.conf, ent: x.ent }, resumen: modo === 'resumen', decisivo: rapida && modo === 'entero' });
   if (boton.oye === oye) boton.oye = null;
   if (salta) ev('rival_salteado', { modo });
-  await decision(a, L.lev, r.res, L.et, false, { fin: armarFinal(r, L.lev), corto: salta, resumen: modo === 'resumen' && !salta, max: rapida ? RITMO.decisivo.veredicto : 0 });
+  // un toque saltea el turno junto con su veredicto (G2.7): con «Rápida», luces de golpe y la línea, 1 s
+  await decision(a, L.lev, r.res, L.et, false, { fin: armarFinal(r, L.lev), corto: salta && !rapida, resumen: rapida && (modo === 'resumen' || salta), max: rapida ? RITMO.decisivo.veredicto : 0 });
   marcador(p);
   // repetición: con «Rápida», solo del decisivo que cae; con «Completa», como antes (cae o pasa adelante)
   if (!salta && modo === 'entero' && (r.res.res !== 'valido' || (!rapida && pasa))) await repeticion(L.lev, r, pasa ? t('rival.pasa', { rival: quien(a) }) : '', { rival: true, titulo: t('rival.repeticion', { rival: quien(a) }) });
