@@ -525,6 +525,11 @@ html.juego-u .seguir{font-size:calc(var(--u)*.95);padding:.3em .65em;background:
   html.juego-u:where(.horiz.bajo) .veredicto small{font-size:max(12px,calc(var(--u)*1.1))}
   html.juego-u:where(.horiz.bajo) .margen{--u:clamp(7px,2cqh,9.5px)}
   html.juego-u:where(.horiz) .seguir{bottom:calc(var(--sb) + var(--bm) + var(--boton) + var(--u)*.8)}
+  /* turno de un rival en el teléfono acostado: el cartel ocupa dos líneas arriba; el marcador va abajo a la izquierda, donde
+     estaba el zócalo (el cartel ya dice quién y cuántos kilos) */
+  html.juego-u:where(.horiz.bajo).turno-rival #zocalo{display:none!important}
+  html.juego-u:where(.horiz.bajo).turno-rival #marcador{top:auto;bottom:calc(var(--u)*1.2 + var(--sb));left:calc(var(--u)*1.4 + var(--sl))}
+  html:where(.horiz.bajo).juego-u.zurdo.turno-rival #marcador{left:calc(var(--boton) + var(--bm)*2 + var(--sl))}
   /* el acuse (la tecla que se hunde) sube por encima de la barrita, junto al botón */
   html.juego-u:where(.horiz.bajo) body:has(#barrita:not([hidden])) .acuse{bottom:calc(var(--u)*5.4 + var(--sb))}
 }

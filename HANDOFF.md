@@ -1027,6 +1027,92 @@ Pedido del dueño: «que los otros levantadores tengan su propia estrategia de p
 
 **Pendientes.** Las personalidades van atadas al pesista: quien juega con Ventura nunca enfrenta al conservador. Marangi casi nunca queda sin marca en Normal (1 %): «a veces se queda sin marca» se ve en Amistoso. El tercer dos tiempos que reacciona a la tabla todavía cae algunas veces en un kilo más que el jugador (0,1 por final con el plan fijo): es la cuenta del total, no una copia. Jugarlo y mirar si las palabras se leen en el cartel del turno del teléfono.
 
+### Carteles en el teléfono (13-nov, tarde, rama `gameplay`)
+
+Pedido del dueño: «en mobile los carteles me tapan mucho al pesista» y «menos ruido visual: el user entra, juega con el setup
+mínimo y ya». Todo en CSS al final de `web/css/juego.css` (bajo `html.juego-u`, que main.js pone en 'b' y 'u'; Clásico no
+cambia) y `html[data-pantalla]` (lo pone `visita`). Vale para teléfono y computadora.
+- **Durante el intento propio**: sin título del evento, reloj, marcador, cambios de los rivales ni zócalo; la energía, chica
+  arriba a la izquierda; la barrita pegada abajo (en el teléfono, del borde al botón redondo, sin verbo: el botón dice TOCA;
+  el nombre de la barrita y ¡PERFECTO! encima, a la izquierda); la ayuda de primera vez arriba a la derecha; AGUANTA y ¡ABAJO!
+  no se muestran; el esfuerzo de pararse a la izquierda, a media altura.
+- **Veredicto** a la izquierda, a media altura y semitransparente; con él no hay marcador ni cambios de rivales. Un rival en
+  'b' muestra solo la causa si falla (las luces ya están arriba).
+- **Turno del rival** en una línea arriba a la izquierda, sin «mira o toca para saltar» (lo dice «Toca: seguir») y sin
+  llegar a los botones de sonido, pausa y ayuda; el marcador debajo.
+- **Llamado**: sin selector de idioma, sin zócalo, sin la línea de la garra, «sin apuro» ni «lo más duro» en 'b'.
+- **Bienvenida**: Jugar grande; Opciones, Cómo se juega y Privacidad como enlaces chicos; sin título del evento ni reloj;
+  tarjetas solo con una frase corta. Nombre opcional y pesista elegido: un toque y se juega.
+- **Medición** (`tools/tapa.mjs`, nuevo, en `check_barra` y `check_telefono`): caja del pesista proyectada desde three
+  (`stage.js → cajas()`: cuerpo, torso y barra) contra las cajas de la interfaz visible (opacidad > 0,5) y los textos a la
+  vista. Falla si tapa más del 15 % del cuerpo con la barrita (quieta, corriendo, recién tocada) o en el levantamiento, o más
+  del 20 % del torso en el llamado. `TAPA_INFORMA=1`: solo informa.
+
+| Cuerpo tapado (textos a la vista) | antes | después |
+|---|---|---|
+| Teléfono 667×375 · barrita corriendo | 64–77 % (13) | 0 % (5) |
+| Teléfono 844×340 (Safari con barra) · corriendo | 65 % (13) | 15 % (5) |
+| Teléfonos 740×360, 844×390, 932×430 · corriendo | 40–71 % (12–13) | 0–13 % (4–5) |
+| Teléfonos · barrita quieta | 27–50 % (12–13) | 0–8 % (4–5) |
+| Teléfonos · levantamiento | 35–43 % (11–12) | 0–15 % (4–5) |
+| Teléfonos · veredicto propio | 35–37 %, torso 69 % (16) | 3–4 %, torso 0 % (13–15) |
+| Teléfonos · turno del rival | 6–22 %, torso 21–54 % (17) | 0–3 %, torso 0 % (15) |
+| Teléfonos · llamado | 6–13 %, torso 0 % (25) | 0 %, torso 0 % (18) |
+| Computadora · llamado | 1–2 %, torso 0 % (33) | 0 %, torso 0 % (22) |
+| Computadora 1280×720 · corriendo / levantamiento | 27 % / 23 % (14 / 12) | 0 % / 0 % (6 / 4) |
+| Computadora · veredicto propio | 22–24 %, torso 52 % (16) | 1–2 %, torso 0 % (14) |
+| Bienvenida en el teléfono | 18 textos, 3 botones grandes | 16 textos, 1 botón grande (Jugar) |
+
+La barra (con los discos) queda tapada 15–17 % en el teléfono durante la barrita (la pista pasa por debajo de los discos) y
+0–8 % en la computadora. Presentación y apertura (antes de la primera barra) siguen tapando al pesista: son paneles.
+
+### Dificultad (13-nov, tarde, rama `gameplay`)
+
+Pedido del dueño: «si es fácil así está bien; si es un poco más difícil, que requiera un poco más de interacción a nivel tocar
+espacio». Diseño y tabla de parámetros: `docs/JUEGO.md`, G3.D. Se elige solo en Opciones (fila «Dificultad: Fácil · Medio ·
+Difícil · Clásico»; no en la bienvenida, por pedido de menos ruido), queda en `tarima.dificultad` (`?dif=` para pruebas), Fácil
+por defecto. Difícil trae rivales parejos salvo que se hayan elegido a mano. `dificultad` es súper propiedad de la analítica
+(`analitica.propiedades`) y va en `final_inicio` e `intento_propio` (más `barra_3`).
+- **Fácil** = lo de antes, bit a bit (`sim_ref*.json` idénticos, `HUELLA_B` igual).
+- **Medio**: barrita de atrapar arriba en el arranque y de pararse en el dos tiempos, puntero de 1,2 s, verde 80 %, esfuerzo
+  desde el 92 % con 5 toques en 3 s. **Difícil**: barrita en cada fase (tirón, atrapar, pararse; cargada, pararse, envión),
+  puntero de 1,0 s sin ponerse lento, verde 65 %, esfuerzo desde el 88 % con 6 toques en 3 s.
+- Núcleo: `rules.js → NIVELES_B`, `reglasB`, `HUELLAS_B` (registro con `dif` y su huella; `replay.js` rechaza otro nivel o
+  huella), fase `'barra'` en `attempt.js` para atrapar y pararse (el pesista quieto en el fondo; sin tocar, al minuto sale
+  regular). Referencia nueva `tools/sim_ref_dificultad.json` (sim_test 15).
+
+**Medido** (sin navegador; `barra_bots --n=400`, válidos % con la apertura sugerida / al 97 % / al 100 %; arranque · dos tiempos):
+
+| perfil | Fácil (90 %) | Medio (89 %) | Difícil (88 %) |
+|---|---|---|---|
+| novato Compacto | 100/94/61 · 100/85/35 | 100/86/33 · 100/69/11 | 100/61/11 · 100/62/8 |
+| novato Largo | 100/98/65 · 100/85/36 | 100/92/34 · 100/57/11 | 100/59/9 · 100/50/6 |
+| novato Potente | 100/78/36 · 99/80/50 | 100/53/16 · 100/66/30 | 100/45/11 · 100/59/23 |
+| medio Compacto | 100/99/82 · 100/98/67 | 100/98/59 · 100/91/40 | 100/96/40 · 100/90/31 |
+| medio Largo | 100/99/84 · 100/96/62 | 100/99/66 · 100/88/31 | 100/95/38 · 100/86/28 |
+| medio Potente | 100/89/50 · 100/95/72 | 100/77/35 · 100/88/52 | 100/71/26 · 100/85/47 |
+| bueno Compacto | 100/100/97 · 100/100/95 | 100/100/89 · 100/100/79 | 100/100/81 · 100/100/70 |
+| bueno Largo | 100/100/96 · 100/100/93 | 100/100/93 · 100/99/79 | 100/100/78 · 100/99/65 |
+| bueno Potente | 100/96/68 · 100/99/89 | 100/92/54 · 100/99/82 | 100/89/45 · 100/97/76 |
+
+- Metas: con la apertura, Medio novato 100 % (≥ 90) y medio 100 % (≥ 95); Difícil novato 100 % (≥ 75) y bueno 100 % (≥ 95);
+  en los tres el bueno le gana al novato por 15 puntos o más al 100 % (y 25 sumando 97 y 100).
+- Oro en finales enteras (lo que trae el panel; «lee» = el entrenador con la puntería propia, cambiando kilos con ← →):
+  Fácil contra tranquilos novato 87 %, contra parejos bueno 25 % (lee 76 %); Medio contra tranquilos novato 59 %, medio 80 %,
+  bueno 88 %; Difícil (parejos) bueno 4 % con el panel y **44 % si pide lo que su puntería permite**, novato 0 %.
+- Esfuerzo a ritmo cómodo: 2, 2,5 y 3 toques por segundo alcanzan siempre (Fácil, Medio, Difícil).
+- `chance_test` (30 000 intentos por nivel): error máximo por grupo 1,9 / 2,2 / 4,2 puntos (meta ≤ 5). La persona típica del
+  panel: ±105 / ±100 / ±90 ms.
+- `ritmo_test` (novato, 360 finales por nivel): final mediana 131 / 140 / 141 s (metas ≤ 150 / 165 / 180), intento propio p90
+  8,8 · 13,7 / 11,3 · 15,3 / 13,1 · 14,6 s, barras caídas con el panel 14,8 / 16,7 / 23,5 % (metas ≤ 15 / 18 / 25), espera
+  máxima 19,4 / 20,0 / 20,2 s (metas ≤ 20 / 21 / 21: en Medio y Difícil hay más turnos de rivales seguidos).
+- `teclado_test` y `dedo_test` (10 000 secuencias por nivel): 0 sin resolver, 0 dobles, 0 barritas con dos contactos.
+- `sim_test` (15 secciones), `pesistas_test`, `rivales_test`, `play_human`, `servidor_test`: en verde.
+
+**Pendiente.** En Difícil el panel propone kilos para la persona típica y quien apunta bien tiene que subirlos a mano para
+ganar (una chance por persona sigue pendiente). Medio y Difícil se midieron con bots, no con personas. Los metas de ritmo de
+Medio y Difícil (espera ≤ 21 s, caídas ≤ 18 y ≤ 25 %) son nuevas y propias de esos niveles.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.
