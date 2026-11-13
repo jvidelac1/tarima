@@ -11,6 +11,9 @@
 // 13. Nivel 'b' (la barrita, docs/JUEGO.md, Gameplay 3): partidas de referencia jugadas por los bots de
 //     tools/barra_bots.mjs (tools/sim_ref_barra.json); finales en vivo contra recalculadas; toda caída nombra el tramo y
 //     dónde pegó en la barrita; la posición del puntero y la zona son las de rules.js; la señal en los dos idiomas.
+// 14. Rivales con personalidad (web/js/sim/ai.js → PERSONALIDADES, HUELLA_IA): partidas de referencia
+//     (tools/sim_ref_rivales.json); en vivo contra recalculadas; el registro lleva `ia` y otra huella se rechaza; cada turno
+//     de un rival tiene su palabra en los dos idiomas. Las referencias de 2, 7, 12 y 13 (sin `ia`) no cambian.
 // 12. Nivel 'u' (docs/JUEGO.md, Gameplay 2): partidas de referencia jugadas por los bots de tools/uno_bots.mjs
 //     (tools/sim_ref_uno.json); 1000 finales en vivo contra recalculadas (meta L); toda caída tiene su tramo y una línea
 //     sin tiempos (meta G); la garra se gasta una vez por levantamiento; la señal en los dos idiomas.
@@ -22,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { leerDatos } from '../web/js/sim/data.js';
 import { Partida } from '../web/js/sim/match.js';
 import { Intento, simular } from '../web/js/sim/attempt.js';
-import { gestos } from '../web/js/sim/ai.js';
+import { gestos, HUELLA_IA, PERSONALIDADES } from '../web/js/sim/ai.js';
 import { recalcular, resumen } from '../web/js/sim/replay.js';
 import { Azar, mezclar } from '../web/js/sim/fixed.js';
 import { RELOJ, CAUSAS, FACIL, exigenciaTabla } from '../web/js/sim/rules.js';
@@ -38,7 +41,7 @@ import { jugarUno, BOTS_U } from './uno_bots.mjs';
 import { jugarBarra, PERFILES } from './barra_bots.mjs';
 import { posBarra, zonasBarra, zonaBarra, cuerpoBarra, BARRA } from '../web/js/sim/rules.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SIM = path.join(ROOT, 'web/js/sim'), REF = path.join(ROOT, 'tools/sim_ref.json'), REF_F = path.join(ROOT, 'tools/sim_ref_facil.json'), REF_U = path.join(ROOT, 'tools/sim_ref_uno.json'), REF_B = path.join(ROOT, 'tools/sim_ref_barra.json');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SIM = path.join(ROOT, 'web/js/sim'), REF = path.join(ROOT, 'tools/sim_ref.json'), REF_F = path.join(ROOT, 'tools/sim_ref_facil.json'), REF_U = path.join(ROOT, 'tools/sim_ref_uno.json'), REF_B = path.join(ROOT, 'tools/sim_ref_barra.json'), REF_R = path.join(ROOT, 'tools/sim_ref_rivales.json');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const N = +(arg('n') || 1000), UPDATE = process.argv.includes('--update');
 const datos = leerDatos(JSON.parse(fs.readFileSync(path.join(ROOT, 'web/data/sim.json'), 'utf8')));
@@ -61,7 +64,7 @@ const IDS = ['ventura', 'brenner', 'marangi'], NIV = ['amistoso', 'normal', 'dif
 // ---------- jugador simulado ----------
 /** Juega una partida entera. `persona`: índice del pesista manejado por un jugador simulado (o -1: los tres son rivales). Devuelve la partida y su bitácora. */
 function jugar(semilla, nivel, persona, estilo = {}) {
-  const r = new Azar(mezclar(semilla, 9)), cfg = { semilla, nivel, cal: estilo.cal || 0, primera: !!estilo.primera, ...(estilo.ctl ? { ctl: estilo.ctl } : {}), atletas: IDS.map((id, i) => ({ id, ctrl: i === persona ? 'persona' : 'juego' })) };
+  const r = new Azar(mezclar(semilla, 9)), cfg = { semilla, nivel, cal: estilo.cal || 0, primera: !!estilo.primera, ...(estilo.ctl ? { ctl: estilo.ctl } : {}), ...(estilo.ia ? { ia: estilo.ia } : {}), atletas: IDS.map((id, i) => ({ id, ctrl: i === persona ? 'persona' : 'juego' })) };
   const p = new Partida(datos, cfg), bit = [];
   const abrir = lev => { if (persona >= 0) { const [lo, hi] = p.rangoApertura(persona, lev); p.abrir(persona, lev, r.entre(lo, hi)); } p.empezar(); };
   abrir('s');
@@ -506,6 +509,31 @@ function jugar(semilla, nivel, persona, estilo = {}) {
     const m4 = simular(ctx, 0, []); ok(m4.res && m4.res.res === 'valido' && m4.res.uno.barras[0].sola && m4.res.t > BARRA.soloMs, `sin tocar, tira solo al minuto y regular: ${JSON.stringify(m4.res?.uno?.barras)}`);
     ok(pasos('b', true, 'es').length === 3 && /verde/.test(pasos('b', false, 'es')[1][1]), 'pasos de «Cómo se juega» en \'b\''); }
   console.log(`13. 'b': 9 partidas de referencia · ${n} finales en vivo contra recalculadas · ${intentos} intentos propios, ${(validos * 100 / intentos).toFixed(0)} % válidos · zonas ${JSON.stringify(zonas)} · líneas de caída con tramo y zona · puntero y señal en los dos idiomas`);
+}
+
+// ---------- 14. rivales con personalidad ----------
+{
+  const casos = []; for (let k = 0; k < 9; k++) casos.push({ semilla: 7000003 * (k + 1), nivel: NIV[k % 3], persona: k % 3, ctl: ['b', 'c', 'u'][k % 3] });
+  const hoy = casos.map(c => ({ ...c, tabla: resumen(jugar(c.semilla, c.nivel, c.persona, { ctl: c.ctl, ia: HUELLA_IA }).p.tabla()) }));
+  if (UPDATE || !fs.existsSync(REF_R)) { fs.writeFileSync(REF_R, JSON.stringify({ datos: datos.huella, ia: HUELLA_IA, casos: hoy }, null, 1) + '\n'); console.log('14. referencia de los rivales escrita en tools/sim_ref_rivales.json'); }
+  else { const ref = JSON.parse(fs.readFileSync(REF_R, 'utf8')); ok(ref.datos === datos.huella && ref.ia === HUELLA_IA, `la referencia de los rivales es de otra huella (${ref.ia}, hoy ${HUELLA_IA}); si el cambio es intencional: --update`); ref.casos.forEach((c, i) => ok(c.tabla === hoy[i]?.tabla, `referencia de rivales ${i} (semilla ${c.semilla}): guardado «${c.tabla}», hoy «${hoy[i]?.tabla}»`)); }
+  let n = 0, turnos = 0, sinPalabra = 0; const palabras = {};
+  for (let k = 0; k < Math.min(N, 600); k++) {
+    const semilla = mezclar(k, 654), persona = k % 4 - 1, { p } = jugar(semilla, NIV[k % 3], persona, { ctl: ['b', 'c', 'f'][k % 3], ia: HUELLA_IA });
+    const reg = JSON.parse(JSON.stringify(p.reg)), rc = recalcular(reg, datos), t = resumen(p.tabla());
+    ok(reg.ia === HUELLA_IA, `semilla ${semilla}: el registro no guarda la huella de los rivales`);
+    ok(rc.ok && resumen(rc.tabla) === t, `rivales, semilla ${semilla}: recalcular da ${rc.ok ? resumen(rc.tabla) : rc.error} y en vivo ${t}`);
+    if (k < 20) { const g = JSON.parse(JSON.stringify(reg)); g.ia = 'x'; ok(!recalcular(g, datos).ok, 'un registro con otra huella de los rivales se acepta'); }
+    for (const a of p.at) if (a.ctrl === 'juego') for (const lev of ['s', 'c']) for (let m = 1; m <= 3; m++) {
+      turnos++; const w = p.estiloDe(a.i, lev, m); palabras[w] = (palabras[w] || 0) + 1;
+      if (!w || !DICCIONARIOS.es['rival.estilo.' + w] || !DICCIONARIOS.en['rival.estilo.' + w]) sinPalabra++;
+    }
+    n++;
+  }
+  ok(!sinPalabra, `${sinPalabra} turnos de rivales sin su palabra en los dos idiomas`);
+  ok(Object.keys(PERSONALIDADES).every(id => datos.atletas[id]) && new Set(Object.values(PERSONALIDADES).map(x => x.estilo)).size === 3, 'cada pesista tiene una personalidad distinta');
+  try { new Partida(datos, { semilla: 1, nivel: 'normal', cal: 0, primera: false, ia: 'x', atletas: IDS.map(id => ({ id, ctrl: 'juego' })) }); ok(false, 'Partida aceptó otra huella de los rivales'); } catch { /* bien */ }
+  console.log(`14. rivales con personalidad (huella ${HUELLA_IA}): 9 partidas de referencia · ${n} finales en vivo contra recalculadas · palabras ${JSON.stringify(palabras)}`);
 }
 
 console.log(fallas.length ? `\nFALLÓ: ${fallas.length} problemas` : `\nOK en ${((Date.now() - t0) / 1000).toFixed(1)} s`);

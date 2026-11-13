@@ -3,7 +3,7 @@
 // La partida se maneja igual en vivo y al recalcular: abrir() → empezar() → [cambio()] → resolver() o resolverIA() → …
 import { idiv, rdiv, clampi, mezclar, Azar } from './fixed.js';
 import { simular } from './attempt.js';
-import { gestos, decidir, elegirEnvion } from './ai.js';
+import { gestos, decidir, elegirEnvion, planRival, decidirPlan, estiloRival, HUELLA_IA } from './ai.js';
 import { sugerencia } from './entrenador.js';
 import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad, cuerpoDe, cuerpoBarra, HUELLA_U, HUELLA_B } from './rules.js';
 
@@ -15,12 +15,15 @@ export class Partida {
    * @param {{semilla:number, nivel:string, cal:number, primera:boolean, ctl?:'c'|'f'|'u'|'b', atletas:Array<{id:string, ctrl:'persona'|'juego'}>}} cfg
    *   `ctl`: nivel de control de la persona (ausente = 'c', Clásico). Los rivales juegan siempre con las reglas de Clásico.
    *   `tactil`: con el dedo (vale para 'f', 'u' y 'b'; queda en la cabecera del registro).
+   *   `ia`: HUELLA_IA para los rivales con personalidad (ai.js → PERSONALIDADES); ausente, los rivales de siempre (así se
+   *   siguen recalculando los registros viejos, que no la traen). Va en la cabecera del registro.
    */
   constructor(datos, cfg) {
     if (!NIVELES[cfg.nivel]) throw new Error('nivel desconocido');
     if (!Array.isArray(cfg.atletas) || cfg.atletas.length !== 3 || new Set(cfg.atletas.map(x => x.id)).size !== 3) throw new Error('la final es de tres pesistas distintos');
     const ctl = cfg.ctl ?? 'c'; if (!CONTROLES.includes(ctl)) throw new Error('nivel de control desconocido');
-    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl, tactil: (ctl === 'f' || ctl === 'u' || ctl === 'b') && !!cfg.tactil };
+    if (cfg.ia !== undefined && cfg.ia !== HUELLA_IA) throw new Error('reglas de los rivales desconocidas');
+    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl, tactil: (ctl === 'f' || ctl === 'u' || ctl === 'b') && !!cfg.tactil, ia: cfg.ia ?? null };
     const r = new Azar(mezclar(this.cfg.semilla, 7)), N = NIVELES[cfg.nivel];
     this.jueces = [0, 1, 2].map(() => r.entre(900, 1100));
     const tipo = r.ent(3), quien = r.ent(3);
@@ -35,8 +38,14 @@ export class Partida {
     });
     if (this.guion.tipo === 'tocado') this.at[quien].resto = RESTO.tocado;
     if (this.guion.tipo === 'forma') this.at[quien].forma = { s: 2, c: 2 };
+    // rivales con personalidad: el plan sale de su techo visible (con el Resto del guion y el signo de su forma), su nivel y
+    // la semilla; el azar de arriba se consume igual, así forma, jueces y guion son los mismos con una IA o con la otra
+    if (this.cfg.ia) for (const a of this.at) if (a.ctrl === 'juego') {
+      a.plan = planRival(a.id, { s: this.techoVisible(a.i, 's'), c: this.techoVisible(a.i, 'c') }, a.f.techo, cfg.nivel, mezclar(this.cfg.semilla, 31, a.i));
+      a.decl = { ...a.plan.decl };
+    }
     this.fase = 'presentacion'; this.lev = 's'; this.seq = 0; this.barra = 0; this.ultimo = -1; this.llamado = null; this.nLlamado = 0;
-    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : ctl === 'b' ? { barra: HUELLA_B } : {}),
+    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : ctl === 'b' ? { barra: HUELLA_B } : {}), ...(this.cfg.ia ? { ia: this.cfg.ia } : {}),
       atletas: cfg.atletas.map(x => ({ id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego' })), aperturas: this.at.map(a => ({ s: a.decl.s, c: a.decl.c })), llamados: [] };
   }
 
@@ -108,6 +117,9 @@ export class Partida {
     else if (con === 1 && antes !== 1 && this.puestoSi((i + 1) % 3, lev, 0) + this.puestoSi((i + 2) % 3, lev, 0) < 8) et.push('frente');
     return et;
   }
+
+  /** Palabra de la personalidad del rival `i` para su intento `lev`+`n` (clave `rival.estilo.*`), o '' sin personalidad. */
+  estiloDe(i, lev, n) { return estiloRival(this.at[i], lev, n); }
 
   // ---------- orden y llamados ----------
   _siguiente() {
@@ -186,7 +198,8 @@ export class Partida {
     if (n < 3) {
       const salto = a.ctrl === 'persona' ? PLAN[n - 1] : Math.max(1, a.saltos[lev][n - 1]);
       a.decl[lev] = valido ? L.kg + salto : L.kg + (a.f.ia.estilo === 'orgullo' && a.ctrl === 'juego' && a.sube1[(lev === 'c' ? 2 : 0) + n - 1] ? 1 : 0);
-      if (a.ctrl === 'juego') { const k = decidir(this, a.i); if (k !== null) a.decl[lev] = k; }
+      if (a.ctrl === 'juego' && this.cfg.ia) a.decl[lev] = decidirPlan(this, a.i, true);
+      else if (a.ctrl === 'juego') { const k = decidir(this, a.i); if (k !== null) a.decl[lev] = k; }
       // 'u' (Gameplay 2.1): la persona declara lo que propone el entrenador (entrenador.js), no el plan fijo. Así el orden de
       // los llamados ya cuenta con ese peso y el panel no la desplaza al proponerlo
       else if (this.cfg.ctl === 'u' || this.cfg.ctl === 'b') { const k = sugerencia(this, a.i, lev, ctx.env); if (k !== null) a.decl[lev] = k; }
@@ -194,7 +207,7 @@ export class Partida {
     // cambios de los rivales, al cierre de cada intento ajeno
     const avisos = [];
     for (const b of this.at) if (b !== a && b.ctrl === 'juego' && b[lev].length < 3 && b.cambios < 2) {
-      const k = decidir(this, b.i); if (k !== null && k >= this.minimo(b.i)) { avisos.push({ a: b.i, de: b.decl[lev], a_kg: k }); b.decl[lev] = k; b.cambios++; }
+      const k = this.cfg.ia ? decidirPlan(this, b.i, false) : decidir(this, b.i); if (k !== null && k >= this.minimo(b.i)) { avisos.push({ a: b.i, de: b.decl[lev], a_kg: k }); b.decl[lev] = k; b.cambios++; }
     }
     this._siguiente();
     return { res, gasto, avisos, intento: a[lev][n - 1] };
