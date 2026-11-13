@@ -49,7 +49,9 @@ page.on('pageerror', e => mal(`pageerror: ${e.message}`));
 // en el intento, el juego se queda con Espacio en captura (stopImmediatePropagation) y nadie más lo ve
 await page.addInitScript(() => { window.__A = []; addEventListener('keydown', e => { if (e.code !== 'Space' || e.repeat) return; const ts = e.timeStamp, intento = !!window.JUEGO?.E?.intento?.propio; setTimeout(() => { const on = document.getElementById('acuse')?.classList.contains('on'), dom = performance.now() - ts; requestAnimationFrame(t => window.__A.push({ on, dom, pinta: t - ts, intento })); }, 0); }, true); });
 await page.addInitScript(() => { try { if (!sessionStorage.getItem('__t')) { localStorage.setItem('tarima.tutorial', '1'); localStorage.setItem('tarima.jugadas', '1'); localStorage.setItem('tarima.visto.tarjeta', '1'); sessionStorage.setItem('__t', '1'); } } catch { /* nada */ } });
-await page.goto(`${base}juego.html?lang=es&dibujo=0&q=baja&semilla=${SEMILLA}`, { waitUntil: 'load' });
+// prueba los gestos de 'u' (guardado, toque largo, ¡SALTA!, ¡PÁRATE!): desde Gameplay 3 'u' ya no es el de fábrica y se pide con
+// ?ctl=u; la barrita ('b') tiene su prueba en tools/check_barra.mjs
+await page.goto(`${base}juego.html?lang=es&dibujo=0&q=baja&ctl=u&semilla=${SEMILLA}`, { waitUntil: 'load' });
 if (!await page.evaluate(() => window.JUEGO.listo)) throw new Error('el juego no inició');
 // registro de cada pulsación como la ve el juego, con la palabra del acuse en el momento en que se resuelve
 await page.evaluate(() => {

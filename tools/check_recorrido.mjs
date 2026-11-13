@@ -123,6 +123,7 @@ for (let n = 0; n < 60000; n++) {
     }
     if (!g) { await av(20); continue; }
     if (I.parado) { await av(80); await toque(); continue; }
+    if (g.tipo === 'barra') { await av(Math.max(0, g.objetivo - s.ahora)); await toque(); continue; }      // 'b': toca cuando el puntero pasa por el centro del verde
     if (UNTOQUE.has(g.tipo)) { await av(150); await toque(); continue; }
     if (g.tipo === 'cierre') {
       if (I.seDetiene || (plan && plan.omite(g.clave))) { await av(20); continue; }

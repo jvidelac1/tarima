@@ -288,13 +288,13 @@ export function chanceUno(I, lev, env, cuerpo, o = {}) {
  */
 export const BARRA = {
   version: '1.0',
-  pasada: 1400, lentoDesde: 8000, pasadaLenta: 1900, soloMs: 60000, respiraMs: 800, doble: 120, graciaMs: 250,
+  pasada: 1400, lentoDesde: 8000, pasadaLenta: 1700, soloMs: 60000, respiraMs: 800, doble: 120, graciaMs: 250,
   tI: [9000, 9500, 10000, 10300], tVerde: [170, 125, 75, 60], tAmarillo: [220, 180, 140, 130], primera: 1400, topeVerde: 380, topeAmarillo: 470,
   costo: { verde: 0, amarillo: 600, rojo: 1500 },
   escala: { tiron: 900, arriba: 900, pararse: 900 },
   pesistas: { ventura: { tiron: 1000, envion: 1000 }, brenner: { tiron: 1300, envion: 750 }, marangi: { tiron: 750, envion: 1300 } },
   neutro: { tiron: 1000, envion: 1000 },
-  tipico: { sesgo: 20, sd: 90, despiste: 30 },
+  tipico: { sesgo: 30, sd: 105, despiste: 40 },
 };
 /** Huella de las reglas de 'b' (BARRA, UNO y los cuerpos): va en la cabecera de los registros de 'b' y replay.js la exige. */
 export const HUELLA_B = huella(canonico({ BARRA, UNO, CUERPOS_U, CUERPO_NEUTRO }));

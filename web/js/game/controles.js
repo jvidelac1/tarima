@@ -158,6 +158,17 @@ function senalU(m, now) {
 }
 
 /**
+ * Instante (ms del intento) en que el puntero de una barrita que arrancó en `desde` pasa por el centro del verde por
+ * primera vez a partir de `desde_` (más lento desde BARRA.lentoDesde, como posBarra). Lo usan las pruebas y la práctica.
+ */
+export function proximoCentro(desde, desde_) {
+  const P = BARRA.pasada, L = BARRA.lentoDesde, PL = BARRA.pasadaLenta, xL = L * 1000 / P;
+  const e = Math.max(0, desde_ - desde), xe = e <= L ? e * 1000 / P : xL + (e - L) * 1000 / PL;      // en milésimas de pasada
+  const x = Math.ceil((xe - 500) / 1000) * 1000 + 500;
+  return Math.round(desde + (x <= xL ? x * P / 1000 : L + (x - xL) * PL / 1000));
+}
+
+/**
  * La señal de 'b' (la barrita). Tipos: 'barra' (la barrita corre: toca cuando el puntero esté en el verde; `i` 0 tirón o 1
  * envión, `desde` cuándo arrancó el puntero, `z` las zonas, `pos` dónde está el puntero ahora, `lento` si ya va despacio),
  * 'espera' (PREPÁRATE y RESPIRA: la barrita está a la vista, quieta, con `z` e `i`) y 'auto' (AGUANTA, ¡ABAJO!, ¡DA TODO!).

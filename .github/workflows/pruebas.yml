@@ -65,11 +65,15 @@ jobs:
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/play_human.mjs 2>&1 | tee out/logs/play_human.log
 
-      - name: Toques con el dedo, sin navegador (dedo_test, nivel 'u')
+      - name: La barrita sin navegador (barra_bots, Gameplay 3)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/barra_bots.mjs 2>&1 | tee out/logs/barra_bots.log
+
+      - name: Toques con el dedo, sin navegador (dedo_test, niveles 'b' y 'u')
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/dedo_test.mjs 2>&1 | tee out/logs/dedo_test.log
 
-      - name: Espacio en la computadora, sin navegador (teclado_test, nivel 'u')
+      - name: Espacio en la computadora, sin navegador (teclado_test, niveles 'b' y 'u')
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/teclado_test.mjs 2>&1 | tee out/logs/teclado_test.log
 
@@ -116,6 +120,14 @@ jobs:
         if: ${{ !cancelled() && matrix.grupo == 'toques' }}
         timeout-minutes: 20
         run: node tools/check_fluidez.mjs --tutorial --json=out/fluidez/fluidez.json 2>&1 | tee out/logs/check_fluidez.log
+
+      # La barrita ('b') en el navegador: computadora en español e inglés, teléfono acostado 667x375 y 844x390; cada barrita
+      # sale donde se tocó, entra en la pantalla sin tapar nada, y con el reloj verdadero se mide la diferencia entre lo que se
+      # ve y lo que juzga el núcleo. Capturas en out/barra.
+      - name: La barrita en el navegador (check_barra)
+        if: ${{ !cancelled() && matrix.grupo == 'toques' }}
+        timeout-minutes: 15
+        run: node tools/check_barra.mjs 2>&1 | tee out/logs/check_barra.log
 
       # Entrada en tiempo real con teclado real: toque durante PREPÁRATE, al cambiar de señal, doble, largo, ráfagas en
       # ¡EMPUJA!, después de una pausa y en el turno de un rival. Cada pulsación anotada, resuelta, con motivo y acuse.
@@ -169,7 +181,7 @@ jobs:
           {
             echo "### Pruebas del juego (dibujo por software: no mide cuadros por segundo)"
             echo "Grupo: ${{ matrix.titulo }}"
-            for f in sim_test play_human dedo_test perf_test caida_test check_escenas check_game check_toques check_telefono check_iphone check_fluidez capturas check_recorrido check_recorrido_en; do
+            for f in sim_test barra_bots play_human dedo_test perf_test caida_test check_escenas check_game check_barra check_toques check_telefono check_iphone check_fluidez capturas check_recorrido check_recorrido_en; do
               [ -f "out/logs/$f.log" ] || continue
               echo; echo "**$f**"; echo '```'
               tail -n 14 "out/logs/$f.log"

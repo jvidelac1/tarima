@@ -114,6 +114,8 @@ export class Boton {
      * no hay nada que proteger, y descartarlos en silencio era un toque perdido sin acuse.
      */
     this.intento = false; this.tolerante = false; this.gracia = new Map();
+    /** `sinRepeticion` (nivel 'b', la barrita): una tecla que llega ya repitiendo no es un toque; la barrita pide bajar de nuevo. */
+    this.sinRepeticion = false;
     const sube = (id, e) => { const via = this.contactos.get(id); if (via === undefined) return; this.contactos.delete(id); const g = this.gracia.get(id); if (g) { clearTimeout(g); this.gracia.delete(id); } this.oye?.(reloj.deEvento(e), 0, via); };
     const baja = (id, e, via) => {
       if (this.contactos.has(id)) sube(id, e);
@@ -130,7 +132,7 @@ export class Boton {
         // el levantamiento es dueño de la tecla: ni desplaza la página ni activa un botón con foco (preventDefault; el
         // teclado de los paneles y _kd la dejan pasar porque ya viene atendida)
         e.preventDefault();
-        if (e.repeat && this.contactos.has(idTecla(e))) return;      // la repetición del sistema no es un toque nuevo
+        if (e.repeat && (this.sinRepeticion || this.contactos.has(idTecla(e)))) return;      // la repetición del sistema no es un toque nuevo
         const c0 = performance.now(); toques.nuevo(reloj.deEvento(e), 'teclado', esEspacio(e) ? 'ESPACIO' : 'ENTER');
         if (!this.activo) { toques.resolver(false, 'pausa'); return; }
         baja(idTecla(e), e, 'teclado'); toques.manejo.push(performance.now() - c0); if (toques.manejo.length > 64) toques.manejo.shift(); return;

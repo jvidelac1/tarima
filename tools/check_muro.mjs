@@ -94,6 +94,7 @@ async function escenario(L) {
       if (I && I.propio && s.modo !== 'panel') {
         const g = I.senal; if (!g) { await av(20); continue; }
         if (I.parado) { await av(80); await toque(); continue; }
+        if (g.tipo === 'barra') { await ir(g.objetivo); await toque(); continue; }      // 'b': toca cuando el puntero pasa por el centro del verde
         if (UNTOQUE.has(g.tipo)) { await av(150); await toque(); continue; }
         if (g.tipo === 'cierre') { const k = g.clave + g.desde; if (I.seDetiene || hecho === k) { await av(30); continue; } await ir(g.objetivo); await toque(); hecho = k; continue; }
         if (g.tipo === 'empuja') { if (s.ahora - ultToque >= 150) { await toque(); ultToque = s.ahora; } else await av(16); continue; }

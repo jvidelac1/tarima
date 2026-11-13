@@ -45,29 +45,29 @@ export function instalarDOM({ ancho = 844, alto = 390 } = {}) {
  * 80 ms, pointercancel (con y sin dedo que vuelve), doble toque a 100 ms, mantener 10 s, toques en los bordes y la ráfaga
  * de la confirmación. Devuelve los conteos y ejemplos de lo que salió mal.
  */
-export async function probarEntrada({ via = 'teclado', n = 10000, semilla = 1 } = {}) {
+export async function probarEntrada({ via = 'teclado', n = 10000, semilla = 1, ctl = 'u' } = {}) {
   const dedo = via === 'dedo', W = dedo ? 844 : 1280, Hh = dedo ? 390 : 720;
   const H = instalarDOM({ ancho: W, alto: Hh }); globalThis.document.documentElement = {}; globalThis.document.title = '';
   const { Boton, toques, reloj, BORDES, GRACIA_MS } = await import('../web/js/game/input.js');
-  const { tocar, QUE_U } = await import('../web/js/game/controles.js');
+  const { tocar, QUE_U: QU, QUE_B } = await import('../web/js/game/controles.js'), QUE_U = ctl === 'b' ? QUE_B : QU;
   const { simular } = await import('../web/js/sim/attempt.js');
   const { Azar, mezclar } = await import('../web/js/sim/fixed.js');
-  const { ctxUno, ATL } = await import('./uno_bots.mjs');
+  const { ctxUno, ATL } = await import('./uno_bots.mjs'), { ctxBarra } = await import('./barra_bots.mjs');
   const zona = H.el('DIV'), boton = H.el('BUTTON'), cuerpo = H.el('DIV');
-  const b = new Boton([zona]); b.intento = true; b.tolerante = true;
+  const b = new Boton([zona]); b.intento = true; b.tolerante = true; b.sinRepeticion = ctl === 'b';
   const tomados = []; toques.alCambiar = (T, que) => { if (que === 'baja' && T) tomados.push(T); };
   const MOTIVOS_NO = new Set(['termino', 'pausa', 'mouse', 'sobra', 'espera']);
-  const R = { secuencias: 0, pulsaciones: 0, sinResolver: 0, dobles: 0, sinPalabra: 0, bordesQueCuentan: 0, rafagaTira: 0, malFormadas: 0, sinTerminar: 0, casos: {}, ejemplos: [] };
+  const R = { barritas: 0, barritaDoble: 0, secuencias: 0, pulsaciones: 0, sinResolver: 0, dobles: 0, sinPalabra: 0, bordesQueCuentan: 0, rafagaTira: 0, malFormadas: 0, sinTerminar: 0, casos: {}, ejemplos: [] };
   const anota = (k, txt) => { R[k]++; if (R.ejemplos.length < 6) R.ejemplos.push(`${k}: ${txt}`); };
   let base = 1000;
   for (let k = 0; k < n; k++) {
     const r = new Azar(mezclar(semilla, k, dedo ? 2 : 1)), id = ATL[k % 3], lev = k % 2 ? 'c' : 's';
-    const ctx = ctxUno(id, lev, lev === 'c' ? 'split' : undefined, 8800 + r.ent(1500), mezclar(k, 3), dedo ? { tactil: true } : {});
+    const ctx = (ctl === 'b' ? ctxBarra : ctxUno)(id, lev, lev === 'c' ? 'split' : undefined, 8800 + r.ent(1500), mezclar(k, 3), dedo ? { tactil: true } : {});
     const ent = [], conf = 0, t0 = base; base += 200000;
     b.contactos.clear(); for (const g of b.gracia.values()) clearTimeout(g); b.gracia.clear(); b.activo = true; tomados.length = 0;
     b.oye = (t, v, v2) => {
       if (v2 === 'mouse') { if (v) toques.resolver(false, 'mouse'); return; }
-      const x = tocar(ctx, conf, ent, Math.max(0, Math.round(t - t0)), v, 'u'); if (!v) return;
+      const x = tocar(ctx, conf, ent, Math.max(0, Math.round(t - t0)), v, ctl); if (!v) return;
       if (!x.n) toques.resolver(false, x.motivo); else toques.resolver(true, x.que || 'gesto');
     };
     // ---- la secuencia: eventos [t, tipo, datos] en ms desde la confirmación
@@ -128,7 +128,12 @@ export async function probarEntrada({ via = 'teclado', n = 10000, semilla = 1 } 
     for (const T of tomados) if (T.ok !== null && !(T.ok ? QUE_U[T.motivo] : MOTIVOS_NO.has(T.motivo))) anota('sinPalabra', `secuencia ${k}: «${T.motivo}» (${T.ok ? 'aceptado' : 'descartado'}) sin palabra`);
     // los toques en el borde también se anotan y se resuelven (Gameplay 2.1): ninguno se pierde sin acuse
     if (dedo && tomados.length !== fisicas.presiones + fisicas.bordes) anota('bordesQueCuentan', `secuencia ${k}: ${fisicas.bordes} toques en el borde y ${fisicas.presiones} fuera, ${tomados.length} anotados`);
-    if (m.U && m.U.contactos.some(c => c.que === 'tira' && c.t < 300)) anota('rafagaTira', `secuencia ${k}: la ráfaga de la confirmación arrancó el tirón`);
+    if (m.U && m.U.contactos.some(c => (c.que === 'tira' || QUE_B[c.que]?.zona) && c.t < 300)) anota('rafagaTira', `secuencia ${k}: la ráfaga de la confirmación arrancó el tirón`);
+    // 'b': cada barrita la dispara un solo contacto, el primero que llega con ella abierta (pasada la gracia); nunca dos
+    if (ctl === 'b' && m.U) {
+      const dis = m.U.contactos.filter(c => QUE_B[c.que]?.zona); R.barritas += dis.length;
+      if (dis.length > m.U.barras.length || m.U.barras.some(b => b.zona && !b.sola && !dis.some(c => c.t === b.t))) anota('barritaDoble', `secuencia ${k}: ${dis.length} contactos dispararon ${m.U.barras.filter(b => b.zona).length} barritas`);
+    }
   }
   H.restaurar();
   return R;

@@ -512,6 +512,8 @@ export class Escena {
   manosBarra() { const a = this.activo; if (!a) return 0; a.midWorld(['LeftHand', 'RightHand'], v2); const b = this.barbell.group.position; return Math.hypot(v2.y - b.y, v2.z - b.z); }
   /** Altura (m) de la barra en una muestra global del clip (para las líneas de ayuda). */
   alturaMuestra(g) { return this.activo?.barPos[g]?.y ?? 0; }
+  /** Acercamiento sutil de la cámara (1 = el plano tal cual; 0,92 = un poco más cerca), amortiguado por el rig. */
+  acercar(z = 1) { if (this.rig) this.rig.zoomT = z; }
   camara(clave) { this.plano = null; this.encuadre = null; this.rig.setShot(null); this.rig.cut(CAM[clave] ?? 0); }
   /**
    * Primer plano por clave (SHOTS del visor o PLANOS del juego). `encuadre`: {x, y} fracción del lienzo (desde arriba a la

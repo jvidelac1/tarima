@@ -89,7 +89,7 @@ async function corrida(via) {
   if (!await J(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
   const gl = await J(() => { const g = JUEGO.escena.renderer.getContext(), e = g.getExtension('WEBGL_debug_renderer_info'); return e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : '?'; });
   console.log(`${tag} ${gl}`);
-  const vistas = new Set(), paneles = new Set(), fotos = []; let senalMal = 0, senalN = 0, clicProbado = false, escProbado = false;
+  const vistas = new Set(), paneles = new Set(), fotos = [], pedidas = []; let senalMal = 0, senalN = 0, clicProbado = false, escProbado = false, fotosBarra = 0;
 
   /** Juega lo que haya en pantalla hasta que `hasta(estado)` sea cierto. `manual`: la prueba adelanta el reloj. */
   async function jugar(hasta, manual, o = {}) {
@@ -108,7 +108,7 @@ async function corrida(via) {
         if (g) {      // la señal tiene que verse, con la tecla dibujada, y quedar dentro del escenario
           vistas.add(g.verbo); senalN++;
           if (!g.visible || !g.texto.includes(ES[tactil ? 'tecla.toca' : 'tecla.espacio']) || !g.texto.includes(g.verbo)) { senalMal++; if (senalMal < 3) mal(`la señal «${g.verbo}» no se ve completa: visible ${g.visible}, texto «${g.texto}»`); }
-          if (senalN % 40 === 1) { const r = await J(() => { const a = document.getElementById('senal').getBoundingClientRect(), b = document.getElementById('escena').getBoundingClientRect(), z = document.getElementById('zocalo').getBoundingClientRect(); return { fuera: a.left < b.left - 1 || a.right > b.right + 1 || a.top < b.top - 1 || a.bottom > b.bottom + 1, zocalo: z.width > 0 && a.left < z.right && a.right > z.left && a.top < z.bottom && a.bottom > z.top, ancho: document.documentElement.scrollWidth > innerWidth + 1 }; }); if (r.fuera) mal('la señal se sale del escenario'); if (r.zocalo) mal('la señal tapa el zócalo'); if (r.ancho) mal('la página desborda a lo ancho'); }
+          if (senalN % 40 === 1) { const r = await J(id => { const a = document.getElementById(id).getBoundingClientRect(), b = document.getElementById('escena').getBoundingClientRect(), z = document.getElementById('zocalo').getBoundingClientRect(); return { fuera: a.left < b.left - 1 || a.right > b.right + 1 || a.top < b.top - 1 || a.bottom > b.bottom + 1, zocalo: z.width > 0 && a.left < z.right && a.right > z.left && a.top < z.bottom && a.bottom > z.top, ancho: document.documentElement.scrollWidth > innerWidth + 1 }; }, g.barra ? 'barrita' : 'senal'); if (r.fuera) mal('la señal se sale del escenario'); if (r.zocalo) mal('la señal tapa el zócalo'); if (r.ancho) mal('la página desborda a lo ancho'); }
         }
         if (I.ctl === 'c') {      // Clásico: apretar, mantener y soltar
           if (I.fase === 'pelea' || I.fase === 'traba') {
@@ -120,16 +120,26 @@ async function corrida(via) {
           continue;
         }
         // Fácil: un toque por señal. La prueba no mira nada más que la señal.
-        if (!g || o.ausente?.(llamado)) { await av(o.ausente?.(llamado) ? 100 : 20); continue; }
-        if (!tactil && !clicProbado && g.tipo === 'libre' && !I.guiado) {      // un clic en el escenario no es un gesto
+        if (!g || o.ausente?.(llamado)) { await av(o.ausente?.(llamado) ? 500 : 20); continue; }
+        if (!tactil && !clicProbado && (g.tipo === 'libre' || g.tipo === 'barra') && !I.guiado) {      // un clic en el escenario no es un gesto
           clicProbado = true; await page.mouse.click(640, 260); await av(60); const d = (await J(() => JUEGO.estado())).intento;
           if (!d || d.entradas !== I.entradas || d.fase !== I.fase) mal(`un clic en el escenario cambió el intento (entradas ${I.entradas} → ${d?.entradas}, fase ${I.fase} → ${d?.fase})`);
           continue;
         }
-        if (!tactil && !manual && !escProbado && g.tipo === 'libre' && !I.guiado) {      // Esc no pausa dentro del intento (en el tutorial guiado, Esc lo saltea)
+        if (!tactil && !manual && !escProbado && (g.tipo === 'libre' || g.tipo === 'barra') && !I.guiado) {      // Esc no pausa dentro del intento (en el tutorial guiado, Esc lo saltea)
           escProbado = true; await page.keyboard.press('Escape'); await av(60); if ((await J(() => JUEGO.estado())).sobre) mal('Esc abrió la pausa en medio del intento'); continue;
         }
         if (I.parado) { await av(80); await toque(); continue; }      // tutorial: el reloj está detenido esperando el toque
+        // 'b': la barrita. Toca cuando el puntero pasa por la zona pedida (verde: el centro; amarillo: el medio del amarillo;
+        // rojo: la punta), con el reloj inyectado; fotos de la barrita corriendo y del toque marcado
+        if (g.tipo === 'barra') {
+          const k = g.clave + g.desde; if (hecho === k) { await av(manual ? 30 : 15); continue; }
+          const z = o.zona?.(llamado, g.barra.i) || 'verde', obj = g.objetivo + (z === 'amarillo' ? Math.round((g.barra.vMs + g.barra.aMs) / 2) : z === 'rojo' ? 700 : 0);
+          if (fotosBarra < 2) await foto(`barrita_${++fotosBarra}_corre`);
+          await ir(obj - 1); await toque(); hecho = k; pedidas.push({ llamado: llamado.split('|')[0], i: g.barra.i, z });
+          if (pedidas.length <= 3 || z !== 'verde') { await av(60); await foto(`barrita_${pedidas.length}_${z}`); }
+          continue;
+        }
         if (UNTOQUE.has(g.tipo)) { await av(150); await toque(); continue; }
         if (g.tipo === 'cierre') {
           const k = g.clave + g.desde;
@@ -216,18 +226,20 @@ async function corrida(via) {
     if (!/Sin apuro/.test(a1.txt) || !/ESPACIO: levantar \d+ kg/.test(a1.txt) || !/Te sobra|Te falta/.test(a1.txt)) mal(`el panel del llamado no dice «Sin apuro», «ESPACIO: levantar N kg» y «Te sobra / Te falta»: «${a1.txt.replace(/\s+/g, ' ').slice(0, 300)}»`);
     // ---- confirmar con Espacio (el foco está en «levantar») y no tocar nada más
     await page.keyboard.press('Space'); let quedan = '', ultimo = null, x0 = null;
-    for (let i = 0; i < 120 && !ultimo; i++) {
+    let fotoLenta = false;
+    for (let i = 0; i < 200 && !ultimo; i++) {
       await J(() => JUEGO.test.avanzar(500));
+      if (!fotoLenta && i === 20) { fotoLenta = true; await foto('barrita_lenta'); }      // a los 10 s: el puntero ya va más despacio
       const x = await J(() => ({ senal: document.getElementById('senal').hidden ? '' : document.getElementById('senal').textContent.replace(/\s+/g, ' '), propios: JUEGO.E.propios || [], err: JUEGO.estado().errores, I: JUEGO.estado().intento }));
       if (x.err.length) throw new Error('error en el juego: ' + x.err[0]);
       if (!x0 && x.I) x0 = x.I;
       if (!quedan && /Quedan \d+ s/.test(x.senal)) quedan = x.senal;
       if (x.propios.length) ultimo = x.propios[x.propios.length - 1];
     }
-    console.log(`${tag} sin tocar después de confirmar: ${ultimo ? `${ultimo.res}${ultimo.causa ? ':' + ultimo.causa : ''} · ¡TIRA! sola ${ultimo.uno?.tira_sola} · margen ${ultimo.uno?.margen_fin}` : 'no terminó'}`);
+    console.log(`${tag} sin tocar después de confirmar: ${ultimo ? `${ultimo.res}${ultimo.causa ? ':' + ultimo.causa : ''} · barrita ${ultimo.uno?.barras?.[0]?.zona} sola ${ultimo.uno?.barras?.[0]?.sola} · margen ${ultimo.uno?.margen_fin}` : 'no terminó'}`);
     if (!x0) mal('Espacio en el panel no empezó el levantamiento');
-    if (quedan) mal(`en 'u' no hay cuenta regresiva: «${quedan}»`);
-    if (!ultimo || ultimo.res !== 'valido' || !ultimo.uno?.tira_sola) mal(`sin tocar, el levantamiento no salió solo y válido: ${JSON.stringify(ultimo)}`);
+    if (quedan) mal(`en 'b' no hay cuenta regresiva: «${quedan}»`);
+    if (!ultimo || ultimo.res !== 'valido' || !ultimo.uno?.barras?.[0]?.sola) mal(`sin tocar, el levantamiento no salió solo (regular) y válido: ${JSON.stringify(ultimo)}`);
     await foto('solo'); await cerrar(); return;
   }
 
@@ -238,7 +250,10 @@ async function corrida(via) {
   // en 'u' un fallo no sale de tocar mal: sale de pedir mucho. El tercer arranque pide 25 kg de más (se cae, con su línea),
   // y el primer dos tiempos se juega sin tocar nada (sale solo y vale: no tocar nunca tira la barra)
   const pesado = clave => /Arranque · intento 3/.test(clave), ausente = clave => /Dos tiempos · intento 1/.test(clave);
-  const fin = await jugar(s => s.pantalla === 'fin', true, { cambia: true, envion, pesado, ausente });
+  // 'b': dónde pega cada barrita. El segundo arranque en el amarillo; el tercero (25 kg de más) en el verde, y se cae igual
+  // (la línea dice «pegaste en el verde, pero…»); el segundo dos tiempos, la cargada en el rojo (la punta) y el envión en el verde
+  const dondePega = (clave, i) => (/Arranque · intento 2/.test(clave) ? 'amarillo' : /Dos tiempos · intento 2/.test(clave) && i === 0 ? 'rojo' : 'verde');
+  const fin = await jugar(s => s.pantalla === 'fin', true, { cambia: true, envion, pesado, ausente, zona: dondePega });
   const r = await J(() => ({ registro: JUEGO.registro, tabla: JUEGO.E.p.tabla().map(f => `${f.id}:${f.s}+${f.c}=${f.total}#${f.puesto ?? '-'}`).join(' '), monitor: JUEGO.E.monitor, visitados: JUEGO.E.visitados, cal: JUEGO.E.cfg.cal, propios: JUEGO.E.propios || [],
     modelos: Object.keys(JUEGO.escena.atletas).sort().join(','), mios: JUEGO.E.p.at[JUEGO.E.yo].s.concat(JUEGO.E.p.at[JUEGO.E.yo].c).map(x => `${x.kg}${x.res === 'valido' ? '✓' : '✗' + (x.causa || '')}`).join(' ') }));
   const seg = (Date.now() - t0) / 1000;
@@ -246,7 +261,7 @@ async function corrida(via) {
   console.log(`${tag} intentos del jugador: ${r.mios} · controles ${r.registro.ctl} · corrección de atraso ${r.cal} ms · llamados ${r.registro.llamados.length}`);
   console.log(`${tag} señales vistas: ${[...vistas].join(' ')} · paneles con foco verificado: ${[...paneles].join(', ')}`);
   if (seg > 90) notas.push(`${tag} la partida tardó ${seg.toFixed(0)} s`);
-  if (r.registro.ctl !== 'u') mal(`el registro no quedó en Fácil, «un toque, un tramo» (ctl ${r.registro.ctl})`);
+  if (r.registro.ctl !== 'b') mal(`el registro no quedó en Fácil, la barrita (ctl ${r.registro.ctl})`);
   if (tactil && !r.visitados.includes('rival')) mal('final completa: no se mostró ningún intento de un rival');
   // la repetición es solo de los fallos: con el dedo los seis salen válidos y no tiene que haber ninguna
   for (const e of ESTADOS) if (!r.visitados.includes(e)) mal(`no se visitó el estado «${e}»`);
@@ -258,16 +273,21 @@ async function corrida(via) {
   if (r.monitor.barraMin < .2249) mal(`la barra quedó bajo la tarima: centro a ${(r.monitor.barraMin * 1000).toFixed(1)} mm`);
   if (r.monitor.manosMax > .16) mal(`la barra se separó de las manos: ${(r.monitor.manosMax * 1000).toFixed(0)} mm`);
   console.log(`${tag} barra: mínimo ${(r.monitor.barraMin * 1000).toFixed(1)} mm · manos a barra, máximo ${(r.monitor.manosMax * 1000).toFixed(0)} mm · ${r.monitor.cuadros} cuadros medidos · altura máxima por pantalla: ${Object.entries(r.monitor.alto).map(([k, v]) => `${k} ${v.toFixed(2)} m`).join(', ')}`);
-  for (const v of ['tira', 'salta', 'parate', 'aguanta', 'abajo', 'arriba'].map(k => ES['senal.' + k])) if (!vistas.has(v)) mal(`no apareció la señal «${v}»`);
-  for (const v of ['explota', 'recibi', 'empuja', 'flexiona'].map(k => ES['senal.' + k])) if (vistas.has(v)) mal(`en 'u' apareció la señal de círculos «${v}»`);
+  for (const v of [ES['barra.verbo'], ES['senal.aguanta'], ES['senal.abajo']]) if (!vistas.has(v)) mal(`no apareció la señal «${v}»`);
+  for (const v of ['explota', 'recibi', 'empuja', 'flexiona', 'tira', 'salta', 'parate'].map(k => ES['senal.' + k])) if (vistas.has(v)) mal(`en 'b' apareció la señal «${v}» (de círculos o de 'u')`);
   // las aperturas valen siempre (también el dos tiempos sin tocar); el de 25 kg de más se cae. Los otros llevan el peso del
   // entrenador (G2.1), que en el tercer intento va por más o por el oro con 7½ o 2 de 10: pueden caer, y entonces cada caída
   // tiene que decir dónde se quedó sin energía (nunca un tiempo)
-  const marcas = r.mios.split(" "), f = r.propios.find(x => x.res === 'fallo'), aus = r.propios.find(x => x.uno && x.uno.tira_sola);
+  const marcas = r.mios.split(" "), f = r.propios.find(x => x.res === 'fallo'), aus = r.propios.find(x => x.uno && x.uno.barras?.length && x.uno.barras.every(b => b.sola));
   if (!/✓/.test(marcas[0] || '') || !/✓/.test(marcas[3] || '')) mal(`las aperturas tienen que valer: ${r.mios}`);
-  for (const x of r.propios.filter(y => y.res === 'fallo')) if (!/^Se quedó sin energía en /.test(x.linea || '')) mal(`una caída sin la línea del tramo: ${JSON.stringify(x)}`);
-  if (!f || !/^Se quedó sin energía en /.test(f.linea) || /ms\b|tarde|temprano/i.test(f.linea)) mal(`el arranque con 25 kg de más no cayó con una línea que nombre el tramo: ${r.mios} · ${JSON.stringify(f)}`); else console.log(`${tag} línea del fallo por kilos: «${f.linea}»`);
-  if (!aus || aus.res !== 'valido' || !aus.uno.arriba_sola) mal(`el dos tiempos sin tocar no salió solo y válido: ${JSON.stringify(aus)}`); else console.log(`${tag} dos tiempos sin tocar: ${aus.res} · margen ${aus.uno.margen_fin} (salto ${aus.uno.salto}, pisotón ${aus.uno.pisoton})`);
+  // toda caída dice dónde pegó en la barrita y dónde se quedó sin energía (nunca un tiempo)
+  for (const x of r.propios.filter(y => y.res === 'fallo')) if (!/se quedó sin energía en /i.test(x.linea || '') || !/pegaste en el (verde|amarillo|rojo)/i.test(x.linea || '') || /ms\b/.test(x.linea || '')) mal(`una caída sin la línea de la barrita y el tramo: ${JSON.stringify(x)}`);
+  if (!f || !/^Pegaste en el verde, pero /.test(f.linea)) mal(`el arranque con 25 kg de más (pegando en el verde) no cayó con «Pegaste en el verde, pero…»: ${r.mios} · ${JSON.stringify(f)}`); else console.log(`${tag} línea del fallo por kilos: «${f.linea}»`);
+  if (!aus || aus.res !== 'valido') mal(`el dos tiempos sin tocar no salió solo (regular) y válido: ${JSON.stringify(aus)}`); else console.log(`${tag} dos tiempos sin tocar: ${aus.res} · barritas ${aus.uno.barras.map(b => b.zona + (b.sola ? ' sola' : '')).join(', ')} · margen ${aus.uno.margen_fin}`);
+  // cada barrita quedó en la zona donde se tocó (el núcleo juzga el instante del evento con la misma función que dibuja)
+  { const vistas2 = r.propios.flatMap(x => (x.uno?.barras || []).filter(b => !b.sola).map(b => b.zona)), quer = pedidas.map(x => x.z);
+    console.log(`${tag} barritas: pedidas ${quer.join(' ')} · salieron ${vistas2.join(' ')}`);
+    if (vistas2.join() !== quer.join()) mal(`las barritas no salieron donde se tocó: pedidas ${quer.join(' ')}, salieron ${vistas2.join(' ')}`); }
   if (!tactil) {
     if (!clicProbado) mal('no se llegó a probar el clic en el escenario');
     if (!r.registro.llamados.some(c => c.cambios?.length)) notas.push(`${tag} la partida no tuvo ningún cambio de kilos`);
@@ -295,8 +315,8 @@ async function corrida(via) {
     if (p3.sobre || !(p3.t > p2 + 100) || !p3.foco) mal(`al volver de la pausa: ${JSON.stringify(p3)} (antes ${p2.toFixed(0)})`);
     await page.keyboard.press('h'); const a1 = await J(() => ({ sobre: JUEGO.estado().sobre, txt: document.getElementById('sobre').textContent })); await foto('ayuda');
     const glosario = await J(() => document.querySelectorAll('#sobre .glosario dt').length);
-    if (glosario !== 9) mal(`el glosario de «Cómo se juega» tiene ${glosario} palabras (en 'u' son 9: con energía, garra y suerte)`);
-    if (a1.sobre !== 'ayuda' || !/Cómo se juega/.test(a1.txt) || !/ESPACIO/.test(a1.txt) || !/¡SALTA!/.test(a1.txt) || /círculo/.test(a1.txt)) mal(`H no abrió «Cómo se juega» de 'u': ${JSON.stringify(a1).slice(0, 300)}`);
+    if (glosario !== 10) mal(`el glosario de «Cómo se juega» tiene ${glosario} palabras (en 'b' son 10: la barrita, la energía, la garra y la suerte)`);
+    if (a1.sobre !== 'ayuda' || !/Cómo se juega/.test(a1.txt) || !/ESPACIO/.test(a1.txt) || !/verde/.test(a1.txt) || /círculo|¡SALTA!/.test(a1.txt)) mal(`H no abrió «Cómo se juega» de 'b': ${JSON.stringify(a1).slice(0, 300)}`);
     await page.keyboard.press('h'); if (await J(() => JUEGO.estado().sobre)) mal('H no cerró la ayuda');
     if (await page.locator('#btn-otro').count()) mal('en \'u\' el inicio no tiene que ofrecer práctica aparte');
   }
@@ -336,7 +356,7 @@ async function idiomas() {
   await J(() => document.getElementById('btn-ayuda').click()); await page.waitForTimeout(150);
   const ay = await J(() => ({ dt: [...document.querySelectorAll('#sobre .glosario dt')].map(d => d.textContent), h2: document.querySelector('#sobre h2')?.textContent }));
   // en 'u' el glosario suma la energía del levantamiento, la garra y la suerte (9 palabras; Clásico tiene 7)
-  if (ay.dt.length !== 9 || ay.dt[0] !== EN['glosario.arranque.t'] || !ay.dt.includes(EN['glosario.u_energia.t'])) mal(`la ayuda en inglés: ${JSON.stringify(ay)}`);
+  if (ay.dt.length !== 10 || ay.dt[0] !== EN['glosario.barrita.t'] || !ay.dt.includes(EN['glosario.u_energia.t'])) mal(`la ayuda en inglés: ${JSON.stringify(ay)}`);
   await page.screenshot({ path: path.join(OUT, 'idioma_ayuda_en.png') }).catch(() => null);
   await ctx.close();
   // el caso del dueño: el inglés primero en la lista del navegador y el español después → español

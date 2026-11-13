@@ -135,6 +135,22 @@ export const sonido = {
   pintar,
   activar() { desbloquear(); const ok = listo(); if (ok && !ruidos.size) for (const d of [.03, .05, .08, .1, .12, .18, .3, .6, 1.2, 1.6, 3]) bufer(d); return ok; },
   tic() { tono(1200, 900, .05, 'square', .08); },
+  /**
+   * La barrita ('b'): un zumbido grave que sube mientras corre el puntero (devuelve con qué cortarlo) y el golpe del toque
+   * según la zona: verde, campanazo con la tribuna; amarillo, golpe seco; rojo, zumbido bajo.
+   */
+  subida() {
+    if (!listo()) return () => {};
+    const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain(); let fin = false;
+    o.type = 'triangle'; o.frequency.setValueAtTime(150, t); o.frequency.linearRampToValueAtTime(330, t + 6);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.045, t + .5); o.connect(g).connect(ctx.destination); o.start(t);
+    return () => { if (fin) return; fin = true; try { const t2 = ctx.currentTime; g.gain.cancelScheduledValues(t2); g.gain.setValueAtTime(.03, t2); g.gain.exponentialRampToValueAtTime(.0001, t2 + .06); o.stop(t2 + .08); } catch { /* ya cortado */ } };
+  },
+  pega(zona) {
+    if (zona === 'verde') { tono(880, 880, .22, 'triangle', .16); tono(1320, 1320, .3, 'sine', .1); ruido(.6, .07, 2600); vibra(30); }
+    else if (zona === 'amarillo') { tono(300, 240, .14, 'square', .09); ruido(.06, .2, 800); vibra(18); }
+    else { tono(130, 80, .3, 'sawtooth', .12); vibra([20, 40, 20]); }
+  },
   despegue() { ruido(.12, .15, 500); vibra(10); },
   explosion(perfecta) { ruido(.1, .2, 1400); if (perfecta) vibra(20); },
   recepcion() { tono(110, 50, .16, 'sine', .5); ruido(.08, .3, 700); vibra(30); },

@@ -96,6 +96,7 @@ function sonda(cfg) {
       if (s && !(I.guiado && I.seDetiene)) {
         const falta = s.tipo === 'cierre' ? (s.objetivo - I.now) / (I.vel || 1) : 0;      // ms reales hasta el cierre
         if (s.tipo === 'libre' || s.tipo === 'luz' || s.tipo === 'uno' || s.tipo === 'decide') unico = now + cfg.reac;      // 'u': un toque por señal, cuando quieras
+        else if (s.tipo === 'barra') unico = now + Math.max(0, J.proximoCentro(s.desde, I.now + cfg.reac) - I.now) + gauss(cfg.sd);      // 'b': en el verde
         else if (s.tipo === 'cierre') { unico = Math.max(now + 100, now + falta + cfg.lag + gauss(cfg.sd)); M.cierres.push({ clave: s.clave, ms: Math.round(falta) }); }
       }
       if (s && s.tipo === 'empuja') { if (mash === Infinity) mash = now + 250; } else mash = Infinity;
@@ -117,7 +118,7 @@ function sonda(cfg) {
       const I2 = E.intento, T = J.toques ? J.toques.ultimos.find(x => Math.abs(x.t - tJuego) < 2) : null, ac = document.getElementById('acuse');
       k.ent1 = I2 && I2 === I ? I2.ent.length : null; k.reg = T ? { ok: T.ok, motivo: T.motivo, donde: T.donde, nota: T.nota || '' } : null;
       // en 'u' el juego atiende Espacio en captura antes que esta sonda: lo que agregó se busca por el instante de la pulsación
-      if (T && I2 && I2 === I && I2.ctl === 'u') k.agrego = I2.ent.some(e => e[1] === 1 && Math.abs(e[0] - Math.round(T.t - I2.t0)) <= 1);
+      if (T && I2 && I2 === I && (I2.ctl === 'u' || I2.ctl === 'b')) k.agrego = I2.ent.some(e => e[1] === 1 && Math.abs(e[0] - Math.round(T.t - I2.t0)) <= 1);
       k.acuse = ac ? { visible: !ac.hidden && getComputedStyle(ac).display !== 'none', hundida: ac.classList.contains('on'), txt: ac.lastElementChild.textContent } : null;
     }, 0);
   }, true);
@@ -279,8 +280,7 @@ async function tutorial() {
   if (antes) problemas.push(`${tag} en 'u' no hay levantamientos antes de la final: hubo ${antes}`);
   if (/práctica/i.test(ini)) problemas.push(`${tag} el inicio ofrece una práctica aparte: «${ini.slice(0, 200)}»`);
   if (a.propios[0]?.res !== 'valido') problemas.push(`${tag} el primer intento de la final no salió válido: ${JSON.stringify(a.propios[0])}`);
-  if (!a.guias.some(g => /3 veces/.test(g))) problemas.push(`${tag} el primer intento no mostró la presentación en una línea («… 3 veces: tira, salta, párate…»)`);
-  if (!a.guias.some(g => /pisotón/.test(g))) problemas.push(`${tag} no apareció la ayuda de ¡PÁRATE! («toca una vez: pisotón»)`);
+  if (!a.guias.some(g => /en el verde/.test(g))) problemas.push(`${tag} el primer intento no mostró la presentación en una línea («… cuando el puntero esté en el verde…»)`);
   // recargar: las ayudas no vuelven
   await page.reload({ waitUntil: 'load' }); await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 180000 });
   await page.evaluate(() => { window.__guias = new Set(); const f = () => { const g = document.getElementById('guia'); if (JUEGO.E.intento?.propio && !g.hidden) window.__guias.add(g.textContent); requestAnimationFrame(f); }; requestAnimationFrame(f); });

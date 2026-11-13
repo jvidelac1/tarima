@@ -39,8 +39,9 @@ export class Margen {
   /** Un tramo cerró ({tramo, gasto, m} o {tramo, garra, m}, de m.U.log). */
   tramo(x, ahora) {
     if (x.garra) { this.garra = 'usada'; this._garra(); this.el.classList.add('garra-usada'); return this.ir(x.m, ahora, t('margen.garra', { d: cuartos(x.garra) }), 'oro'); }
-    const nombre = t('margen.tramo.' + x.tramo), su = x.suerte || 0, clave = x.gasto <= 0 ? 'margen.gratis' : su >= 150 ? 'margen.mala' : su <= -150 ? 'margen.buena' : 'margen.gasto';
-    this.ir(x.m, ahora, t(clave, { tramo: nombre, d: cuartos(x.gasto) }), x.m < 0 ? 'mal' : su <= -150 ? 'oro' : '');
+    const nombre = t('margen.tramo.' + x.tramo), su = x.suerte || 0, clave = x.zona ? 'margen.b_' + x.zona : x.gasto <= 0 ? 'margen.gratis' : su >= 150 ? 'margen.mala' : su <= -150 ? 'margen.buena' : 'margen.gasto';
+    // 'b': el tramo de una barrita dice dónde pegó («tirón −1¼ · regular»), en el color de la zona
+    this.ir(x.m, ahora, t(clave, { tramo: nombre, d: cuartos(x.gasto) }), x.m < 0 ? 'mal' : x.zona === 'verde' ? 'oro' : x.zona === 'rojo' ? 'mal' : su <= -150 ? 'oro' : '');
   }
   /** FRENO: la garra late; `on` false lo apaga. */
   freno(on) { if (!this.el) return; this.el.classList.toggle('freno', !!on); this._garra(); }
