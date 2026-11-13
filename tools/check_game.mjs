@@ -229,7 +229,8 @@ async function corrida(via) {
     console.log(`${tag} panel del llamado: reloj ${a1.reloj}; 40 s después, ${a2.reloj} (pantalla ${a2.s.pantalla})`);
     if (a2.s.pantalla !== 'llamado' || !a2.s.panel || a2.reloj !== a1.reloj) mal(`con el panel del llamado abierto el reloj corrió o venció: ${a1.reloj} → ${a2.reloj}, pantalla ${a2.s.pantalla}`);
     // desde el 13-nov (menos texto) el panel de 'b' ya no dice «Sin apuro»: los kilos, la chance y la tecla
-    if (!/ESPACIO: levantar \d+ kg/.test(a1.txt) || !/Te sobra|Te falta/.test(a1.txt)) mal(`el panel del llamado no dice «ESPACIO: levantar N kg» y «Te sobra / Te falta»: «${a1.txt.replace(/\s+/g, ' ').slice(0, 300)}»`);
+    // 'b' (13-nov): la línea del RM con la dificultad y la chance reemplaza a «Te sobra / Te falta»
+    if (!/ESPACIO: levantar \d+ kg/.test(a1.txt) || !/\d+ % de tu RM \(\d+ kg\)/.test(a1.txt) || !/(Fácil|Medio|Difícil|Muy difícil)/.test(a1.txt) || !/\d+ de 10/.test(a1.txt)) mal(`el panel del llamado no dice «ESPACIO: levantar N kg» ni la línea del RM («Medio · 92 % de tu RM (163 kg) · 8 de 10»): «${a1.txt.replace(/\s+/g, ' ').slice(0, 300)}»`);
     // ---- confirmar con Espacio (el foco está en «levantar») y no tocar nada más
     await page.keyboard.press('Space'); let quedan = '', ultimo = null, x0 = null;
     let fotoLenta = false;
@@ -326,7 +327,7 @@ async function corrida(via) {
     if (p3.sobre || !(p3.t > p2 + 100) || !p3.foco) mal(`al volver de la pausa: ${JSON.stringify(p3)} (antes ${p2.toFixed(0)})`);
     await page.keyboard.press('h'); const a1 = await J(() => ({ sobre: JUEGO.estado().sobre, txt: document.getElementById('sobre').textContent })); await foto('ayuda');
     const glosario = await J(() => document.querySelectorAll('#sobre .glosario dt').length);
-    if (glosario !== 11) mal(`el glosario de «Cómo se juega» tiene ${glosario} palabras (en 'b' son 11: la barrita, el cansancio, la energía, la garra y la suerte)`);
+    if (glosario !== 12) mal(`el glosario de «Cómo se juega» tiene ${glosario} palabras (en 'b' son 12: la barrita, el cansancio, el RM, la energía, la garra y la suerte)`);
     if (a1.sobre !== 'ayuda' || !/Cómo se juega/.test(a1.txt) || !/ESPACIO/.test(a1.txt) || !/verde/.test(a1.txt) || /círculo|¡SALTA!/.test(a1.txt)) mal(`H no abrió «Cómo se juega» de 'b': ${JSON.stringify(a1).slice(0, 300)}`);
     await page.keyboard.press('h'); if (await J(() => JUEGO.estado().sobre)) mal('H no cerró la ayuda');
     if (await page.locator('#btn-otro').count()) mal('en \'u\' el inicio no tiene que ofrecer práctica aparte');
@@ -367,7 +368,7 @@ async function idiomas() {
   await J(() => document.getElementById('btn-ayuda').click()); await page.waitForTimeout(150);
   const ay = await J(() => ({ dt: [...document.querySelectorAll('#sobre .glosario dt')].map(d => d.textContent), h2: document.querySelector('#sobre h2')?.textContent }));
   // en 'u' el glosario suma la energía del levantamiento, la garra y la suerte (9 palabras; Clásico tiene 7)
-  if (ay.dt.length !== 11 || ay.dt[0] !== EN['glosario.barrita.t'] || !ay.dt.includes(EN['glosario.u_energia.t'])) mal(`la ayuda en inglés: ${JSON.stringify(ay)}`);
+  if (ay.dt.length !== 12 || !ay.dt.includes(EN['glosario.rm.t']) || ay.dt[0] !== EN['glosario.barrita.t'] || !ay.dt.includes(EN['glosario.u_energia.t'])) mal(`la ayuda en inglés: ${JSON.stringify(ay)}`);
   await page.screenshot({ path: path.join(OUT, 'idioma_ayuda_en.png') }).catch(() => null);
   await ctx.close();
   // el caso del dueño: el inglés primero en la lista del navegador y el español después → español

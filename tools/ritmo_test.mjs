@@ -99,7 +99,7 @@ for (const nivel of ['amistoso', 'normal']) for (const id of ATL) for (let k = 0
     // fundido de entrada; el que salta: al segundo, fundido corto al final del intento y el veredicto de 1 s
     let t = FUNDIDO;
     if (esp === 'salta') t += Math.min(vista, REACCION) + (vista > REACCION ? RITMO.fundido.fuera / 1000 : 0) + RITMO.rival.saltado;
-    else t += vista + Math.min(RITMO.rival.veredicto, Math.max(tVer + 1.3, durFinal(x.res, mov))) + (decisivo && !ok ? RITMO.rival.rep + FUNDIDO : 0);
+    else t += vista + Math.min(Math.max(RITMO.rival.veredicto, tVer + 1.2), Math.max(tVer + 1.3, durFinal(x.res, mov))) + (decisivo && !ok ? RITMO.rival.rep + FUNDIDO : 0);
     (decisivo ? decisivos : rivalesNo).push(t); ultimo = L.a;
     reloj += t; traza.push(`${modo} ${t.toFixed(1)}`);
   }

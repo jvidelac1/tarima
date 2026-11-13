@@ -408,7 +408,7 @@ function limpiarVeredicto() { const f = E.limpiar; E.limpiar = null; f?.(); }
  * haga `preparar` (pesista, carga, pose y cámara); si sigue el jugador con su propio pesista, sin fundido.
  */
 async function pasarA(id, preparar, sinFundido = false) {
-  if (sinFundido || !escena.activo) { limpiarVeredicto(); await escena.mostrar(id); await preparar?.(); return; }
+  if ((sinFundido && !E.limpiar) || !escena.activo) { limpiarVeredicto(); await escena.mostrar(id); await preparar?.(); return; }
   await fundido(async () => { limpiarVeredicto(); await escena.mostrar(id); await preparar?.(); });
 }
 
@@ -725,7 +725,8 @@ async function decision(a, lev, res, et, propio, o = {}) {
   // El primer NO VALE suma 1,5 s para leer cuándo vale un levantamiento.
   // 'u' (G2.7): el válido propio no llega a 3 s y el fallo dura tVer + 2,4 s (la barra termina de caer detrás del panel siguiente)
   const total0 = R0 ? R0.total : o.corto ? tVer + .9 : uno ? veredictoPropio(ok, !!fin, limite).total : Math.max(tVer + (propio ? (linea ? (o.rep ? 1.6 : 4.2) : 1.9) + (primerNoVale ? 1.5 : 0) : 1.3), fin && !(propio && ok) ? fin.dur : 0);
-  const total = o.max ? Math.min(total0, Math.max(o.max, tVer + .4)) : total0;      // el decisivo con «Rápida»: la barra que rebota se corta
+  // un rival (sin saltar): el veredicto se lee al menos 1,2 s aunque la barra que rebota se corte (nada aparece y se va en < 1 s)
+  const total = o.max ? Math.min(total0, Math.max(o.max, tVer + (o.rival && !R0 ? 1.2 : .4))) : total0;      // el decisivo con «Rápida»: la barra que rebota se corta
   // sin cortes: la cámara sigue a la barra que cae y gira hacia el público con movimientos suaves; un rival que no decide nada
   // (`o.fija`) queda en la cámara general
   if (fin && !ok && !o.fija) escena.primerPlano('caida', null, .45);
@@ -1188,7 +1189,12 @@ async function llamadoRival(p, L, cfg) {
   tablero(p, L); TB.congelado = true; const yoPrimero = lider(p) === E.yo;
   const x = p.resolverIA();
   visita('rival');
-  await pasarA(a.id, () => { setLuces(null); setReloj(L.reloj); escena.setCarga(L.kg, L.lev); escena.posar(poseParado(escena.P, L.lev), L.lev); escena.camara(camPrincipal()); zocalo(a, L); });
+  // con la imagen tapada, el rival ya queda en la pose con la que empieza a verse (sin salto al arrancar su intento)
+  await pasarA(a.id, () => {
+    setLuces(null); setReloj(L.reloj); escena.setCarga(L.kg, L.lev);
+    const todo = simular(x.ctx, x.conf, x.ent), tv0 = desdeRival(todo, x.conf), m0 = simular(x.ctx, x.conf, x.ent, tv0), pose = m0.res && m0.res.res === 'fallo' ? null : poseDe(m0, tv0, escena.P);
+    escena.posar(pose || poseParado(escena.P, L.lev), L.lev); escena.camara(camPrincipal()); zocalo(a, L);
+  });
   turno(a); etiqueta(etiquetasRival(L.et, yoPrimero)); botonSaltar(true);
   let via = '', momento = ''; const ts = reloj.ahora();
   // saltar en el levantamiento: fundido corto y el intento al final
@@ -1278,7 +1284,7 @@ async function cierre(p) {
   guardado.set('tarima.jugadas', String((+guardado.get('tarima.jugadas') || 0) + 1));
   ev('final_fin', { n: E.finalN, puesto, total: yo.total || 0, duracion_s: Math.round((performance.now() - (E.tFinal0 || performance.now())) / 1000) });
   // plano del ganador detrás del podio 2D
-  const oro = tab[0]?.total ? p.at[tab[0].a] : null; if (oro) { await escena.mostrar(oro.id); escena.posar(poseParado(escena.P, 'c'), 'c'); if (ident(oro).cara) escena.primerPlano('torso'); else escena.camara('3/4'); }
+  const oro = tab[0]?.total ? p.at[tab[0].a] : null; if (oro) await fundido(async () => { await escena.mostrar(oro.id); escena.posar(poseParado(escena.P, 'c'), 'c'); if (ident(oro).cara) escena.primerPlano('torso'); else escena.camara('3/4'); });
   visita('ceremonia');
   const arriba = () => {
     const nombre = esc(nombreJugador());

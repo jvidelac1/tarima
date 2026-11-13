@@ -1251,6 +1251,65 @@ arranque y 5 % del dos tiempos, bueno 44 y 28 %. Ninguna caída con todo verde e
   caída de 'b' nombra zona y barrita de cada toque que falló en los dos idiomas), `check_game` (el tercer arranque, 25 kg de
   más pegando en el amarillo, cae con «pegaste en el amarillo en el tirón»; captura `caida_amarillo`).
 
+### Tablero y menos cortes (13-nov, noche, rama `tablero`)
+
+Pedidos del dueño: «hay muchos cortes cuando un pesista termina de tirar», «un mini tablero que me diga cuánto peso eligen los
+otros pesistas, más enfoque de competencia y estrategia», «quiero ver el levantamiento completo de mi rival, aunque lo pueda
+saltar, con un botón» y «tener el RM del pesista a mano al elegir el peso». Nada fusionado a mvp ni publicado.
+
+- **Medición** (`tools/cortes.mjs`, en `check_recorrido`): el juego anota cada corte a la vista en `JUEGO.E.cortes`
+  (`stage.js → _vigilar`: la cámara salta más de 0,5 m, 10° o 4° de lente entre dos cuadros, cambia el pesista sin fundido, o la
+  barra o la cadera saltan) y cada fundido en `JUEGO.E.fundidos`; un observador en la página anota cada cartel o panel que
+  aparece (visible de verdad) y cuánto dura. Informe por final y en las ventanas entre levantamientos; `out/recorrido/cortes.json`.
+- **Cámara sin cortes**: `CameraRig.suave(seg)` (cameras.js) va de la cámara de este cuadro a la nueva con aceleración y frenado;
+  `escena.camara(clave, suave)` y `primerPlano(clave, encuadre, suave)`. El acomodo del intento, la caída, el giro al público y
+  el plano del llamado son movimientos suaves; un rival que no decide nada se ve entero desde la cámara general, sin moverla.
+  Detrás de un panel se dibuja mientras dura el movimiento. Movimiento reducido: cortes como antes.
+- **Fundidos** (`fundido`, `pasarA` en main.js; `RITMO.fundido` 120 + 200 ms): el cambio de un pesista a otro (y la entrada a la
+  repetición) pasa con la imagen tapada. El veredicto queda a la vista hasta ese fundido (`mantener`, `limpiarVeredicto`): la
+  barra termina de caer y el texto se va con el negro; veredicto y paso al siguiente son un solo momento. Sin «X aprieta los
+  dientes», sin avisos sueltos de cambios, sin cartel «Turno de…», sin zócalo ni etiqueta en 'b'/'u'.
+- **Rival entero y «Saltar»** (`RITMO.rival`): siempre desde poco antes de que agarre la barra, las fases de espera ×4, veredicto
+  ≤ 2,2 s y repetición de 1,8 s solo si cae un decisivo. Botón «Saltar» (abajo a la derecha; en el teléfono acostado donde está
+  el botón redondo, del mismo tamaño) con la tecla **S** (`TECLA_SALTAR`; no choca con Espacio/Enter, Esc = pausa, H = ayuda,
+  flechas = kilos). Saltar: fundido corto al final del intento y veredicto de 0,8 s. Espacio y los toques en la escena ya no
+  saltean nada de un rival (quedan anotados «espera» y el botón late). `rival_salteado` lleva `via` (`boton`/`tecla`), `momento`
+  (`intento`/`veredicto`/`repeticion`), `ms` y `decisivo`.
+- **Tablero** (`ui/tablero.js → datosTablero` puro, `tableroVivoHTML`; `tablero()` en main.js): reemplaza al marcador, al cartel
+  del turno y a los avisos de cambios. Una fila por pesista en el orden en que levantan (`ordenSalida`, la misma regla que
+  `match.js`), con puesto, bandera y nombre (el jugador resaltado en dorado y «(tú)»), su mejor marca (arranque; en el dos
+  tiempos arranque, dos tiempos y total), lo que pidió para su próximo intento («antes 163» en dorado si lo cambió), los
+  intentos hechos (blanco, rojo, el que va) y «Ahora» / «Sigue» / «Terminó». Al pie: quién va ganando (lo de `ui/marcador.js`)
+  y la estrategia del rival que importa: «Brenner pidió 165 · sale después de ti · para pasarte necesita 167» o «Brenner va
+  por 154 · si lo levanta, te pasa» (`Partida.paraPasar`). En la computadora: arriba a la izquierda, con «tu RM» en tu fila y la
+  personalidad de cada rival («hace cuentas») o su apuesta («justo») en la suya; durante el levantamiento propio y con la
+  energía a la vista, chico, atenuado y abajo a la izquierda (nombre, marca, pedido). Teléfono acostado: versión compacta
+  (nombre, marca, pedido, estado y una línea de estrategia); en el levantamiento propio no va. Queda quieto durante un turno
+  (el resultado del rival se calcula antes de mostrarlo) y se pone al día con el veredicto. En el llamado, el plano del pesista
+  se encuadra debajo del tablero (`encuadreLibre`). En el intervalo y el podio no va (la tabla completa está en el panel).
+- **RM** en el panel del llamado ('b'): una línea «Medio · 92 % de tu RM (163 kg) · 8 de 10» en lugar de la energía que sobra
+  (el verde de cada barrita y el cansancio siguen debajo). RM = el techo de la ficha en ese levantamiento (`f.techo`, el que ve
+  la tarjeta); la dificultad sale de la chance del panel (`dificultadDe`, ui/mensajes.js): **9-10 de 10 Fácil, 7-8 Medio, 4-6
+  Difícil, 0-3 Muy difícil**, así nunca contradice al «X de 10» (que ya cuenta cansancio, energía y verde). Con el cuerpo de cada
+  pesista y sin cansancio, el 90 % del RM es Fácil y el 103 % Muy difícil (sim_test 16). En la tarjeta de la bienvenida:
+  «RM: arranque 120 · dos tiempos 150»; en el glosario, «RM».
+
+**Medido** — check_recorrido (Actions, misma semilla, 1745×845, Fácil, sin tocar entre levantamientos):
+
+CORTES_TABLA
+
+`ritmo_test` (360 finales por nivel, novato): **saltando cada rival al segundo**, final mediana 126 / 139 / 138 s y espera
+máxima 17,1 / 18,7 / 17,1 s (Fácil / Medio / Difícil; antes 131 / 140 / 141 s y 19,4 / 20,0 / 20,2 s). **Mirando todo**
+(informativo): final mediana 193 / 203 / 204 s, espera máxima ~60 s; cada turno de rival 8,2 s de mediana y 10,9 s como mucho
+(meta ≤ 12 s). `sim_test` 16 (tablero: la fila «Ahora», «si lo levanta, te pasa» que se cumple, `paraPasar` mínimo, sin llaves en
+los dos idiomas; dificultad monótona con la chance), `rivales_test`, `servidor_test`: en verde.
+
+ACTIONS_LINEA
+
+**Pendiente.** Verlo en un teléfono de verdad (la compacta del tablero en 667×375 y el botón «Saltar» con el pulgar). Mirar con
+datos (`rival_salteado`) cuántos miran a los rivales enteros. El RM es el de la ficha: la «forma del día» y el cansancio no lo
+cambian (sí la chance y la dificultad). Clásico también usa el tablero y el botón (no tiene el «Toca: seguir» de los rivales).
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.

@@ -583,8 +583,8 @@ body:has(#tablero:not([hidden])) .bug{display:none}
 html.juego-u :is(#marcador,#turno,#rival,#zocalo,#etiqueta){display:none!important}
 /* durante el levantamiento propio, en la computadora: chico, atenuado y abajo a la izquierda (arriba va la energía y abajo al
    centro la barrita); solo nombre, lo que lleva y lo que pide */
-html[data-pantalla=intento] #tablero{top:auto;bottom:calc(var(--u)*1.1 + var(--sb));--u:clamp(7px,1.25cqh,11px);opacity:.62;max-width:18cqw}
-html[data-pantalla=intento] #tablero :is(thead,.tb-pie,.tb-e,.tb-p,.tb-n small,.tb-pide small,.tb-m:not(.tb-t)){display:none}
+html[data-pantalla=intento] #tablero,body:has(#margen:not([hidden])) #tablero{top:auto;bottom:calc(var(--u)*1.1 + var(--sb));--u:clamp(7px,1.25cqh,11px);opacity:.62;max-width:18cqw}
+:is(html[data-pantalla=intento],body:has(#margen:not([hidden]))) #tablero :is(thead,.tb-pie,.tb-e,.tb-p,.tb-n small,.tb-pide small,.tb-m:not(.tb-t)){display:none}
 /* botón «Saltar» del turno de un rival: abajo a la derecha, encima del acuse; con teclado muestra su tecla (S) */
 .saltar-rival{position:absolute;z-index:6;right:calc(18px + var(--sr));bottom:calc(56px + var(--sb));display:flex;align-items:center;gap:.55em;font-family:var(--display);font-weight:800;font-size:clamp(15px,2.3vh,21px);letter-spacing:.08em;min-height:48px;padding:.35em 1.1em;background:rgba(6,14,48,.9);border:2px solid var(--teal);color:#fff;border-radius:.35em}
 .saltar-rival .tecla{font-size:.8em}
@@ -597,7 +597,15 @@ html[data-pantalla=intento] #tablero :is(thead,.tb-pie,.tb-e,.tb-p,.tb-n small,.
   :where(html.horiz.bajo) .tablero .tb td{font-size:calc(var(--u)*1.2)}
   :where(html.horiz.bajo) .tablero .tb-n span{max-width:calc(var(--u)*7.5)}
   :where(html.horiz.bajo) .tablero .tb-pie p{font-size:calc(var(--u)*.95)}
-  html:where(.horiz.bajo)[data-pantalla=intento] #tablero{display:none}
-  :where(html.horiz) .saltar-rival{right:calc(var(--sr) + var(--bm));bottom:calc(var(--sb) + var(--bm));min-height:64px;min-width:120px;justify-content:center;font-size:20px;border-radius:32px}
+  html:where(.horiz.bajo)[data-pantalla=intento] #tablero,:where(html.horiz.bajo) body:has(#margen:not([hidden])) #tablero{display:none}
+  :where(html.horiz) .saltar-rival{right:calc(var(--sr) + var(--bm));bottom:calc(var(--sb) + var(--bm));min-height:64px;width:var(--boton);padding:0;justify-content:center;font-size:clamp(16px,calc(var(--boton)*.17),22px);border-radius:32px}
   html:where(.horiz).zurdo .saltar-rival{right:auto;left:calc(var(--sl) + var(--bm))}
 }
+/* panel del llamado: una línea con la dificultad, el porcentaje del RM y la chance («Medio · 92 % de tu RM (163 kg) · 8 de 10») */
+.rm-linea{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25em .6em}
+.rm-linea .dif{font-family:var(--display);font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:.05em .5em;border-radius:.2em;color:#04121a;background:var(--ok)}
+.rm-linea.dif-medio .dif{background:var(--teal)}
+.rm-linea.dif-dificil .dif{background:var(--gold)}
+.rm-linea.dif-muy .dif{background:var(--red);color:#fff}
+.rm-linea .chance{margin-left:auto}
+.pesista small.rm{display:block;margin-top:.25em;font-size:.82em;color:var(--gold);letter-spacing:.02em}

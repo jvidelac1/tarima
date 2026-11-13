@@ -30,6 +30,8 @@ export function instalarEnPagina() {
     }
   };
   new MutationObserver(revisar).observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['hidden', 'class', 'style', 'data-pantalla'], childList: true, characterData: true });
+  // la opacidad de un cartel que entra con una animación cambia sin mutar el DOM: se vuelve a mirar al terminar cada una
+  for (const e of ['animationend', 'transitionend']) document.addEventListener(e, revisar, true);
   V.revisar = revisar; revisar(); return true;
 }
 
