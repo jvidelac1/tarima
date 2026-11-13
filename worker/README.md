@@ -2,7 +2,7 @@
 
 Un Worker de Cloudflare, «tarima», **sin dirección pública** (`workers_dev` y `preview_urls` en false, sin rutas), que:
 
-- lleva la cuenta de las finales gratis en el servidor (`/api/estado`, `/api/partida`), por dispositivo y por IP con HMAC;
+- lleva la cuenta de las finales gratis en el servidor (`/api/estado`, `/api/partida`), por dispositivo y por IP con HMAC, y con la regla del arranque gratis (`GRATIS_ETAPA=arranque`) da el permiso del dos tiempos (`/api/envion`) solo con la lista o la encuesta;
 - guarda la lista de espera (`/api/anotar`) con consentimiento, y tiene la confirmación por correo y la baja de un clic listas para cuando haya envío de correos (`/baja`, `/confirmar`, `/api/baja`);
 - registra el desbloqueo por encuesta (`/api/encuesta`) y manda las respuestas a PostHog;
 - hace de proxy de PostHog en `/qx/*`, para que los bloqueadores no corten las métricas;
@@ -133,6 +133,7 @@ Notas:
   - Sale un mail, como mucho uno por día por dirección: otra vez la confirmación si todavía no se confirmó, o el aviso «Ya estás en la lista» si ya se confirmó.
   - No se toca nada de lo guardado: ni el consentimiento ni `novedades`. En el MVP no se verifica la propiedad del mail, así que un tercero no puede anotar a nadie en las novedades.
 - **Banderas y `GRATIS`.** En D1 solo se guarda lo que PostHog asignó. Mientras la bandera `muro-partidas-gratis` no exista o no responda, manda la variable `GRATIS`, y su valor por defecto nunca queda pegado.
+- **Arranque gratis (`GRATIS_ETAPA=arranque`, la regla de producción desde el 12 de noviembre a la noche).** La final gratis sale con `etapa: 'arranque'` (columna `partidas.etapa`, migración 0003, y `e`/`p` en el pase). `/api/envion {dispositivo, pase}` la pasa a `completa` (con `envion_por`) si el dispositivo está en la lista o respondió la encuesta y ninguna otra partida suya usó la encuesta; si no, `{estado:'muro', motivo:'envion'}`. Un pase que no es de ese dispositivo, adulterado o vencido da 400 `{error:'pase'}`. Con este modo la bandera `muro-partidas-gratis` no se usa y `flags` reporta `GRATIS`. Para la regla vieja: `GRATIS_ETAPA "final"`, `GRATIS "2"`, `BONO_ENCUESTA "2"` (o sin `GRATIS_ETAPA`). Ver `docs/MVP.md`, «Cambio del 12 de noviembre (noche)».
 - **Limpieza.** Los dispositivos se borran a los 180 días sin jugar, estén o no en la lista (lo que promete la página de privacidad). Quien vuelve después pone el mismo mail y recupera el juego libre.
 - **Trampa para bots en `/api/anotar`.** El formulario tiene que llevar un campo escondido `web` (fuera de la vista y con `tabindex=-1` y `autocomplete=off`) que se manda vacío. Si llega con algo, el Worker responde como un alta normal y no guarda nada.
 - **Errores extra.**
@@ -150,7 +151,7 @@ Notas:
 
 Está explicado en `docs/MVP.md` 7:
 
-- **Otra red.** Cambiar de red (VPN, pasar del wifi a los datos) y borrar los datos da 2 finales más por cada red nueva.
+- **Otra red.** Cambiar de red (VPN, pasar del wifi a los datos) y borrar los datos da otro arranque gratis por cada red nueva (2 finales con la regla vieja), nunca el dos tiempos.
 - **Mail ajeno.** Con el mail de otra persona también se desbloquea, porque en el MVP no se verifica la propiedad del mail.
 - **Bloquear `/api/*` y borrar los datos en cada carga.** El cliente (`web/js/game/servidor.js`) aplica el endurecimiento 1 de `docs/MVP.md` 7: «sin servidor» da una final por carga de página **solo** si el navegador no tenía `tarima.dispositivo` al cargar; con historia, un 429, un 503 o la falta de red no regalan nada (sale un error para reintentar), salvo a un anotado. Así lo que queda abierto es bloquear `/api/*` y además borrar los datos del sitio antes de cada final.
 - **Código del juego.** Editar el JavaScript, que es estático, permite jugar sin límite. El pase firmado de `/api/partida` es el gancho para cerrar eso cuando el servidor entregue las semillas de cada final (JUEGO.md 9.6).

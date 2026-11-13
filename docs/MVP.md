@@ -2,16 +2,64 @@
 
 Estado al 12 de noviembre de 2026. Esto es lo que se construye para la primera versión pública. Quien implemente toma de acá las reglas, los textos y el contrato del servidor. Las tres propuestas de partida (conversión, jugador nuevo y producto) quedaron resueltas en este documento. Donde chocaban, la elección está explicada en una línea en la sección 0.
 
+## Cambio del 12 de noviembre (noche): el muro en el medio de la final
+
+**Por qué.** Con las dos primeras horas publicadas (unas 59 personas que jugaron): de cada 3 que empiezan una final, 1 la termina; solo 9 llegaron al muro, que salía después de 2 finales gratis; 1 mail. El dueño decidió: «ponela en el medio de la competencia, apenas terminás el snatch pum mail para seguir jugando gratis indefinido». Esto reemplaza lo que el resto del documento dice sobre «2 finales gratis» y el muro en el podio; donde chocan, manda esta sección. La regla vieja sigue entera en el código y se vuelve a ella con variables (abajo).
+
+**La regla** (variables del Worker en `worker/wrangler.jsonc`: `GRATIS_ETAPA=arranque`, `GRATIS=1`, `BONO_ENCUESTA=1`):
+
+- **Gratis: el arranque de una final por dispositivo**, contado como siempre (dispositivo + HMAC de la IP; `TOPE_IP` sigue limitando por red: 6 finales en 30 días, ahora de solo arranque). El tutorial no cuenta.
+- **El muro sale en el intervalo**, al terminar el último intento del arranque y antes de elegir el primer peso del dos tiempos (momento `tras_arranque`). La tabla del arranque está a la vista detrás. Tiene tres salidas:
+  1. **Correo** → lista de espera y juego libre sin límite, como antes, y **la misma final sigue con el dos tiempos ahí mismo**, sin recargar.
+  2. **Encuesta** (si el servidor la ofrece; una vez por dispositivo) → termina esta final y suma `BONO_ENCUESTA` finales completas (1).
+  3. **«Ahora no (la final termina aquí)»** → se ve la tabla del arranque con «La final termina aquí · Vuelve cuando quieras: el dos tiempos te espera», y «Volver al inicio». Desde ahí se puede volver al muro («Mejor dejo mi correo y sigo»).
+- **Las finales siguientes** de alguien sin correo ni bono de encuesta empiezan con el muro antes del primer intento (momento `inicio`: al cargar la página o al tocar «Jugar»), con el correo y, si queda, la encuesta (que entonces da `BONO_ENCUESTA` finales completas). Ya no hay muro en el podio.
+- **La bienvenida** no promete «te queda 1 final gratis» cuando lo que queda es el arranque gratis.
+
+**Autorizado en el servidor.** Cada partida guarda su `etapa` (`arranque` o `completa`, migración `0003_etapa.sql`) y el pase firmado lleva el id de la partida (`p`) y la etapa (`e`). El dos tiempos de una final `arranque` necesita `POST /api/envion {dispositivo, pase}`, que lo da solo si el dispositivo tiene `lista_id` (`via: 'lista'`) o respondió la encuesta y ninguna otra partida suya pasó por la encuesta (`via: 'encuesta'`, con un `UPDATE` condicional: dos pedidos a la vez no lo duplican). La partida pasa a `completa` con `envion_por` y la respuesta trae un pase nuevo. Sin eso: `{estado:'muro', motivo:'envion', encuesta_disponible}`. Un pase adulterado, vencido o de otro dispositivo: 400 `{error:'pase'}`.
+
+| Qué hace el jugador | Resultado |
+|---|---|
+| Recarga en el intervalo o en medio del arranque | La final del arranque gratis **no se reanuda** (reanudar empieza la final de cero y regalaría otro arranque): el pase se da por gastado y sale el muro al cargar |
+| Otra pestaña en el intervalo | Muro; sin el pase de la otra pestaña no hay dos tiempos |
+| Borra los datos del navegador | Dispositivo nuevo: otro arranque gratis (hasta `TOPE_IP` en la red), nunca el dos tiempos sin correo ni encuesta |
+| Llama a `/api/envion` a mano | Con su pase y sin correo ni encuesta: muro. Con el pase de otro o adulterado: 400 |
+| Edita el JavaScript | Juega sin límite, como antes (sección 7): el servidor no valida el juego, solo lo que entrega |
+| Sin servidor («sin servidor», historia limpia, una vez por carga) | La final entera: sin Worker no hay muro ni permiso que pedir |
+
+**Volver a la regla vieja sin código.** En `worker/wrangler.jsonc`: `GRATIS_ETAPA` `"final"`, `GRATIS` `"2"`, `BONO_ENCUESTA` `"2"`, y publicar el Worker. Si `GRATIS_ETAPA` falta o tiene otro valor, vale la regla vieja. El juego lee la regla de cada respuesta (`regla: {etapa, gratis, bono}` en `/api/estado`, `/api/partida` y `/api/envion`) y cambia solo los textos y el lugar del muro.
+
+**La bandera `muro-partidas-gratis`.** Con `GRATIS_ETAPA=arranque` **no se usa**: cuántas finales gratis lo dice `GRATIS`, y el Worker reporta ese valor en `flags['muro-partidas-gratis']` (así `$feature/muro-partidas-gratis` no miente en PostHog). Lo que PostHog le haya asignado a cada dispositivo queda guardado en D1 y vuelve a valer con la regla vieja.
+
+**Textos** (`i18n/es.js` y `en.js`, claves `muro.arranque.*`, `muro.inicio.*`, `corte.*`, `lista.seguir_envion`, `encuesta.*_envion`, `encuesta.*_completa`). Explican el dos tiempos a quien no conoce el deporte («la barra sube primero a los hombros y después arriba de la cabeza; ahí se decide la medalla»), dicen qué gana con el correo («Termina esta final y juega todas las que quieras, gratis») y, en todos los formularios del correo, «Tu correo nunca va a nuestras métricas: solo lo usamos para avisarte» (`muro.privado`). El consentimiento y la línea legal no cambian, así que la versión sigue en `2026-11-c`.
+
+**Eventos** (nada lleva el correo):
+
+| Evento | Cuándo | Propiedades nuevas |
+|---|---|---|
+| `muro_visto` | Cada vez que se pinta el muro | `momento` (`tras_arranque`, `inicio`, `podio` con la regla vieja), `gratis_etapa`; `motivo` vale `envion` en el intervalo; `origen` vale `intervalo` |
+| `muro_ahora_no` | «Ahora no» | `momento` |
+| `muro_cerrado` | Sale del muro sin desbloquear (vuelve al inicio) | `momento` |
+| `final_cortada` | La final termina en el intervalo | `n`, `momento` |
+| `anotar_ok` | Alta | `momento` |
+| `encuesta_enviada` | Encuesta con 200 | `momento` |
+| `envion_ok` / `envion_negado` | Respuesta de `/api/envion` | `via` (`lista`, `encuesta`) / `motivo` |
+| (súper propiedad) | Todas | `gratis_etapa` (`arranque`, `final`) |
+
+**Embudo nuevo en PostHog.** `muro_visto (momento=tras_arranque)` → `anotar_ok (momento=tras_arranque)` o `encuesta_enviada (momento=tras_arranque)` → `envion_ok` → `final_fin`; y aparte `muro_visto (momento=tras_arranque)` → `muro_cerrado (momento=tras_arranque)`. El de antes del arranque se mira con `final_inicio (n=1)` → `muro_visto (momento=tras_arranque)`.
+
+**Pruebas.** `node tools/servidor_test.mjs` (el Worker de verdad en Node sobre la D1 falsa, con el cliente del juego hablándole: arranque gratis una vez, dos tiempos negado sin correo, permitido tras anotarse y tras la encuesta, recarga en el intervalo, otra pestaña, otro dispositivo en la misma IP, la API a mano, dos pedidos a la vez y la regla vieja por variable), `node tools/worker_test.mjs` (la regla pura), `cd worker && npm test` (en el runtime de Workers) y, con navegador en Actions, `tools/check_muro_medio.mjs` (en inglés con teclado: arranque, muro, correo, dos tiempos en la misma final hasta el podio; en español en el teléfono acostado con toques: arranque, muro, «Ahora no», tabla y fin, muro al empezar, recarga, encuesta, final completa) y `tools/check_muro.mjs` con la regla vieja.
+
 ## 0. Decisiones en una tabla
 
 | Tema | Decisión |
 |---|---|
 | Promesa | «Halterofilia a un botón: ganá la final levantando más kilos que tus rivales.» |
-| Finales gratis | 2 por dispositivo. El tutorial no cuenta. Bandera para probar 1 contra 2 cuando haya 1.000 visitas |
+| Finales gratis | **Desde el 12 de noviembre (noche): el arranque de 1 final por dispositivo** (ver «Cambio del 12 de noviembre»). Antes: 2 por dispositivo, que se recupera con `GRATIS_ETAPA=final`. El tutorial no cuenta |
 | Cuándo se gasta una final | Cuando el servidor entrega el pase, al empezar la final (después del tutorial). Si la página se recarga en medio de la final, el juego reanuda esa misma final una vez con el pase guardado en la pestaña, sin gastar otra (ver «Revisión») |
 | Duración | Final rápida, de 5 a 6 minutos. Del link a la primera final hay menos de 1 minuto |
 | Después de la final 1 | Podio, después «Jugar otra vez» como botón principal y una invitación suave a la lista que se puede cerrar |
-| Después de la final 2 | El muro, con dos caminos: dejar el mail (juego libre hasta la próxima versión) o la encuesta (2 finales más, una sola vez) |
+| Después de la final 2 | Regla vieja: el muro, con dos caminos: dejar el mail (juego libre hasta la próxima versión) o la encuesta (2 finales más, una sola vez). Regla de hoy: el muro sale en el intervalo de la final 1, después del arranque |
 | Cuando se gastan las finales de la encuesta | Vuelve el muro, ahora solo con el mail |
 | Quién lleva la cuenta | El Worker. Cuenta por dispositivo (2) y por IP con HMAC (6 en 30 días). El navegador solo guarda una copia para mostrar el muro al instante |
 | Datos que se piden | Nombre o apodo (opcional, queda en el dispositivo). En el muro: el mail, la casilla de aviso (obligatoria) y la de novedades (opcional). Nada más |
@@ -768,9 +816,10 @@ Es un solo Worker de Cloudflare con assets estáticos, D1 y el límite de pedido
 | `POSTHOG_HOST` | variable | `us.i.posthog.com` |
 | `POSTHOG_ASSETS` | variable | `us-assets.i.posthog.com` |
 | `SECRETO_IP`, `SECRETO_DISPOSITIVO`, `SECRETO_PASE`, `SECRETO_BAJA` | secretos | 32 bytes al azar cada uno |
-| `GRATIS` | variable | `2`. La bandera `muro-partidas-gratis` lo pisa |
+| `GRATIS_ETAPA` | variable | `arranque`: la final gratis da solo el arranque y el dos tiempos pide `/api/envion`. `final` (o sin valor): la final entera, la regla vieja |
+| `GRATIS` | variable | `1` (antes `2`). Con `GRATIS_ETAPA=final` la bandera `muro-partidas-gratis` lo pisa; con `arranque`, no |
 | `TOPE_IP` | variable | `6` |
-| `BONO_ENCUESTA` | variable | `2` |
+| `BONO_ENCUESTA` | variable | `1` (antes `2`). Con el arranque gratis, finales completas además de terminar la que está en curso |
 | `ENCUESTAS_POR_IP` | variable | `3` |
 | `ENCUESTA_ID`, `ENCUESTA_PREGUNTAS` | variables | Id de la encuesta y JSON `{q1:'<id>', …}` con las opciones canónicas |
 | `MAIL_DESDE` | variable | Remitente del dominio, por ejemplo `hola@<dominio>` |
@@ -825,7 +874,8 @@ La cuenta por IP excluye a los dispositivos anotados. Por eso, cuando alguien se
 | Endpoint | Pide | Responde | Límite por `i` |
 |---|---|---|---|
 | `POST /api/estado` | `{dispositivo, idioma}` | `{dispositivo, puede, quedan, lista, lista_id?, motivo?, encuesta_disponible, flags, contexto, metricas}`. No cuenta nada | 60 cada 10 min |
-| `POST /api/partida` | `{dispositivo, idioma}` | `{estado:'ok', pase, fuente, quedan, n, flags, contexto}` o `{estado:'muro', motivo, encuesta_disponible, contexto}` | 20 cada 10 min |
+| `POST /api/partida` | `{dispositivo, idioma}` | `{estado:'ok', pase, fuente, etapa, quedan, n, encuesta_disponible, flags, contexto, regla}` o `{estado:'muro', motivo, encuesta_disponible, contexto, regla}` | 20 cada 10 min |
+| `POST /api/envion` | `{dispositivo, pase, idioma}` | `{estado:'ok', via, pase, quedan, lista, regla}` (`via`: `lista`, `encuesta` o `ya`) o `{estado:'muro', motivo:'envion', encuesta_disponible, regla}`; 400 `{error:'pase'}` | 20 cada 10 min |
 | `POST /api/anotar` | `{dispositivo, sesion, email, nombre?, idioma, aviso:true, novedades:bool, consentimiento:'2026-11-b', turnstile?}` | `{estado:'nuevo' o 'ya_estaba', lista_id, confirmar:bool}`; 400 `{error}` | 5 por hora |
 | `POST /api/encuesta` | `{dispositivo, sesion, idioma, r:{q1:[…], q2:[…], q3:'…', q4:'…', q5?:'…'}, turnstile?}` | `{estado:'ok', bono:2 o 0}`; 409 `{error:'ya_respondida'}`; 400 `{error:'incompleta'}` | 3 por hora |
 | `POST /api/baja` | `{email}` | 202 `{}` siempre | 3 por hora |
@@ -937,7 +987,7 @@ Todos van en minúscula y en español. Ninguno lleva nombre, mail, IP ni disposi
 | `final_fin` | Podio | `n`, `puesto` (1 a 3 o null), `total`, `duracion_s` |
 | `compartir` | Botón compartir | `via` (`nativo`, `copiar`), `medalla`, `pantalla` |
 | `invitacion_vista` / `invitacion_abierta` / `invitacion_cerrada` | Podio 1 | — |
-| `muro_visto` | P9 | `motivo`, `caminos` (`mail+encuesta`, `mail`), `origen` (`podio`, `carga`, `bienvenida`), `variante_texto` |
+| `muro_visto` | P9 | `motivo`, `caminos` (`mail+encuesta`, `mail`), `origen` (`podio`, `carga`, `bienvenida`, `intervalo`), `momento` (`tras_arranque`, `inicio`, `podio`), `variante_texto`, `gratis_etapa`. Los eventos nuevos del muro en el medio están en «Cambio del 12 de noviembre» |
 | `muro_ahora_no` | «Ahora no» | — |
 | `mail_foco` | Primer foco en el campo | `pantalla` (`muro`, `invitacion`) |
 | `anotar_envio` | Envío | `novedades`, `sugerencia_usada`, `pantalla` |
@@ -986,7 +1036,7 @@ El hash de `d` no es dato personal directo, pero es seudónimo. Está cubierto p
 
 | Bandera | Valores | Por defecto | Para qué |
 |---|---|---|---|
-| `muro-partidas-gratis` | `1`, `2` | `2` | Cuántas finales antes del muro. Recién se prueba con 1.000 visitas |
+| `muro-partidas-gratis` | `1`, `2` | `2` | Cuántas finales antes del muro. **Solo con `GRATIS_ETAPA=final`**: con el arranque gratis no se usa y se reporta `GRATIS` |
 | `muro-texto` | `a`, `b` | `a` | El texto del muro (claves `_b`) |
 | `invitacion-podio1` | `on`, `off` | `on` | Si la invitación suave del podio 1 suma o le resta al muro |
 | `grabacion` | `off`, `tercio`, `todas` | `tercio` | Qué parte de las cargas se graba. Ver 6.6 |
@@ -1122,7 +1172,7 @@ Sin huella digital del navegador: es invasiva y en la UE pide consentimiento.
 - **Quien deja el mail juega libre** en ese dispositivo hasta la próxima versión (recomendación aceptada).
 - **Español neutro desde el inicio**, sin voseo: se reescriben las claves en español de la tabla 4.5 con tuteo o sin tratamiento («toca», «gana», «tu pesista»). El inglés no cambia. Esto reemplaza la decisión de voseo de este documento.
 - **Edad mínima para la lista de espera: 16 años**, dicha en la línea legal y en la página de privacidad; el juego no pide edad.
-- Finales gratis antes del muro (1 o 2): pendiente de respuesta del dueño; mientras tanto se implementa con 2, configurable.
+- Finales gratis antes del muro (1 o 2): pendiente de respuesta del dueño; mientras tanto se implementa con 2, configurable. **Resuelto el 12 de noviembre a la noche:** el arranque de una final gratis y el muro en el intervalo (ver «Cambio del 12 de noviembre»).
 - Dominio, mail de contacto y responsable de los datos: pendientes.
 
 ## Revisión (12 de noviembre de 2026)
