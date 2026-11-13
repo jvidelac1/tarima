@@ -3,7 +3,8 @@
 #  - medir: tools/check_carga.mjs con la red de un 4G y de una red lenta: bytes, bienvenida y modelos bajados; capturas de
 #    la pantalla de carga (solo después). Artefacto carga-medir: out/carga/{antes,despues}/.
 #  - visor: tools/check_viewer.mjs (dibujo por software) con los GLB de antes y de después, para comparar personajes, piel,
-#    malla, cara y discos en las capturas. Artefactos visor-antes y visor-despues: out/viewer/.
+#    malla, cara y discos en las capturas. Artefactos visor-antes y visor-despues: out/viewer/. Solo a pedido o con [visor]
+#    en el mensaje del commit (unos 45 minutos).
 # Uso: gh workflow run carga.yml -R jvidelac1/tarima --ref carga
 name: Carga y modelos comprimidos
 
@@ -71,6 +72,8 @@ jobs:
 
   visor:
     name: Visor con los modelos de ${{ matrix.lado }} (dibujo por software)
+    # tarda unos 45 minutos: a pedido, o en un push cuyo mensaje diga [visor]
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[visor]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 75
     strategy:
