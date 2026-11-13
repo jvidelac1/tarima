@@ -1296,15 +1296,33 @@ saltar, con un botón» y «tener el RM del pesista a mano al elegir el peso». 
 
 **Medido** — check_recorrido (Actions, misma semilla, 1745×845, Fácil, sin tocar entre levantamientos):
 
-CORTES_TABLA
+| por final (del primer llamado al podio) | antes (`af1f5e7`) | después, mirando todo | después, saltando cada rival |
+|---|---|---|---|
+| duración de la final | 117 s (rivales resumidos solos) | 172 s | 108 s |
+| cortes bruscos de imagen | 58 (cámara 56, pesista 14, barra 6, pose 5) · 29,7/min | **0** | **0** |
+| fundidos | 0 | 20 | 32 |
+| carteles y paneles que aparecen | 132 · 67,6/min | 68 · 23,8/min | 59 · 32,8/min |
+| entre levantamientos: cortes / carteles por ventana | 2,4 / 5,9 | 0 / 2,4 | 0 / 2,9 |
+| entre levantamientos: carteles de menos de 1 s | 28 | 4 | 25 (el veredicto de 0,8 s del rival saltado) |
 
-`ritmo_test` (360 finales por nivel, novato): **saltando cada rival al segundo**, final mediana 126 / 139 / 138 s y espera
-máxima 17,1 / 18,7 / 17,1 s (Fácil / Medio / Difícil; antes 131 / 140 / 141 s y 19,4 / 20,0 / 20,2 s). **Mirando todo**
-(informativo): final mediana 193 / 203 / 204 s, espera máxima ~60 s; cada turno de rival 8,2 s de mediana y 10,9 s como mucho
-(meta ≤ 12 s). `sim_test` 16 (tablero: la fila «Ahora», «si lo levanta, te pasa» que se cumple, `paraPasar` mínimo, sin llaves en
+Lo que queda de menos de 1 s mirando todo son el panel del llamado cuando el bot confirma en 0,9 s y «Desplazado»; los
+«AGUANTA» / «¡ABAJO!» del levantamiento propio (no son entre levantamientos) siguen apareciendo en el cartel. Antes, por ventana:
+marcador, etiqueta «Para pasar al frente», turno, zócalo, «X aprieta los dientes», veredicto de 0,5 s del resumen y «seguir».
+El antes se midió en una rama temporal (`tablero-antes`, ya borrada) con el juego de `af1f5e7` y el mismo `cortes.mjs`
+(corrida 43526994604).
+
+`ritmo_test` (360 finales por nivel, novato; en Actions): **saltando cada rival al segundo**, final mediana 126 / 136 / 138 s,
+espera p90 12,2 / 12,7 / 14,2 s y máxima 17,1 s en los tres (Fácil / Medio / Difícil; antes 131 / 140 / 141 s y máxima 19,4 /
+20,0 / 20,2 s). **Mirando todo** (informativo): final mediana 195 / 205 / 206 s, espera máxima ~60 s; cada turno de rival, con
+su fundido, 8,2 s de mediana y 11,6 s como mucho (meta ≤ 12 s). `sim_test` 16 (tablero: la fila «Ahora», «si lo levanta, te pasa» que se cumple, `paraPasar` mínimo, sin llaves en
 los dos idiomas; dificultad monótona con la chance), `rivales_test`, `servidor_test`: en verde.
 
-ACTIONS_LINEA
+**Actions** (sobre `721ae7f`, todo en verde): pruebas.yml 43526986388 (núcleo, toques con check_barra y check_toques,
+teléfono, iPhone y recorrido, con `check_recorrido --salta` nuevo), telefono.yml 43526986355, muro.yml 43527022537,
+servidor.yml 43527027056. Capturas miradas: computadora 1280×720 (es/en) y 1745×845, teléfono 667×375 y 844×390: el tablero en
+el llamado, en el turno del rival y en el veredicto, chico durante la barrita, «Saltar» / «Skip S», la línea del RM y las
+tarjetas con el RM. tapa.mjs: turno del rival 0–1,5 % del cuerpo tapado (meta nueva ≤ 15 %), llamado 0 %; los textos a la vista
+suben (llamado 32–39, veredicto 10–30) por el tablero.
 
 **Pendiente.** Verlo en un teléfono de verdad (la compacta del tablero en 667×375 y el botón «Saltar» con el pulgar). Mirar con
 datos (`rival_salteado`) cuántos miran a los rivales enteros. El RM es el de la ficha: la «forma del día» y el cansancio no lo
