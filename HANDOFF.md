@@ -1005,7 +1005,10 @@ Pedido del dueño: tarda en cargar (2/3 de los jugadores en el celular, muchos c
   mediana de una muestra de triángulos y el reordenado cambia cuáles; es un 2 % en un mosaico de 12 mm, invisible.
   (2) `check_viewer` avisaba «el índice 0 del envión no duplica el último de la cargada (huesos 1,0°)»: no era una pose
   distinta sino cuaterniones a 4e-5 de la unidad (`angleTo` de un cuaternión consigo mismo da 1° si no es unitario);
-  athlete.js ahora normaliza al muestrear. Juego (`pruebas.yml`, runs 43456941473 y 43459952561): núcleo, teléfono,
+  athlete.js ahora normaliza al muestrear; en la segunda corrida (run 43464414582) el aviso ya no sale y los avisos son
+  los mismos 5 de antes. Esa corrida quedó en rojo en los DOS lados (también con los modelos viejos) por pedidos de GLB
+  abortados (`requestfailed ... net::ERR_ABORTED`, páginas que se cierran mientras baja un modelo): falla intermitente de
+  `check_viewer` en el runner, no de la compresión. Juego (`pruebas.yml`, runs 43456941473 y 43459952561): núcleo, teléfono,
   iPhone/recorrido, check_fluidez, check_toques y capturas en verde; las capturas con el 3D salen iguales a las de
   `gameplay` (diferencia media 0,15 de 255 en las escenas quietas). `check_barra` falla igual que en `gameplay` 026e385
   (tarjetas y barrita en 1280 × 720: trabajo en curso de la barrita, no de esta rama).
