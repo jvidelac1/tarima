@@ -1,5 +1,57 @@
 # Controles: Fácil y Clásico
 
+## Nivel `'u'` («un toque, un tramo»): el Fácil por defecto desde el 13-nov
+
+**Esto manda sobre el resto del documento.** El diseño está en `docs/JUEGO.md`, sección Gameplay 2. Lo de abajo describe lo implementado en la rama `gameplay` y cómo se mide. El Fácil de círculos (`'f'`) salió de Opciones y queda en el núcleo solo para recalcular registros viejos (`?ctl=f` lo abre para las pruebas). Clásico (`'c'`) no cambió.
+
+### El gesto exacto
+
+Un levantamiento son 3 toques en el arranque y 4 en el dos tiempos. **Ningún toque tiene un momento justo:** cada uno cumple un tramo entero y vale en cualquier punto de él.
+
+| Paso | Señal (tipo) | Cuándo vale el toque | Si no tocas |
+|---|---|---|---|
+| — | PREPÁRATE (`espera`, 1,2 s) | el toque queda **guardado** para ¡TIRA! | sigue |
+| 1 | ¡TIRA! (`libre`) «toca cuando quieras» | cualquier momento | sale sola con 5 s de reloj por delante (a los ~25 s); no hay nulo |
+| 2 | ¡SALTA! (`luz`) «toca otra vez» | desde 250 ms después de ¡TIRA! hasta la **recepción** (un toque antes queda guardado) | salto flojo: ¼ de disco más de gasto |
+| 3 | ¡PÁRATE! (`uno`) «toca una vez» | desde la recepción hasta que el tramo cierra (1,5 s de subida; con el pisotón, antes) | se para más lento y sin la devolución de ½ disco |
+| — | RESPIRA (`espera`, 0,45 s), solo dos tiempos | el toque queda guardado para ¡ARRIBA! | sigue |
+| 4 | ¡ARRIBA! (`libre`) «toca cuando estés listo», solo dos tiempos | cualquier momento | sale solo a los 6 s |
+| — | ¡DA TODO! (`decide`), solo en el FRENO | 2,5 s para usar la garra | la barra cae y la garra queda para otro intento |
+| — | AGUANTA y ¡ABAJO! (`auto`) | — | automáticos |
+
+¡SALTA! cierra en la recepción y no en la explosión (el diseño decía la explosión): con el tirón de 0,73 a 0,85 s, el tramo quedaba en medio segundo y un jugador que reacciona tarde (+600 ms, meta A) perdía el ¼ de disco. Así dura de 1,2 a 1,6 s.
+
+**Regla del contacto** (`attempt.js`, `_uEntrada`): un contacto es un keydown de Espacio o Enter, un pointerdown en la zona, o la tecla o el dedo que ya están apoyados cuando abre un tramo. El primero cumple el tramo; uno de más queda guardado (uno solo) para el tramo siguiente, y si no queda ninguno sale «listo» en gris. Dos contactos a menos de 120 ms (teclado) o de 80 ms (dedo) son uno («doble»), y los de los 300 ms después de confirmar son parte de la confirmación. Mantener cumple cada tramo que abre (también la garra). El núcleo hace todo esto, así que el registro lo recalcula igual en cualquier lado.
+
+**Qué decide.** El margen (`rules.js`, `UNO`): 3 discos más «el día» (±0,9, se revela al agarrar la barra), menos lo que se come cada tramo según la intensidad y el cuerpo del pesista. La capa (`controles.js`) es la identidad en `'u'`; la palabra de cada contacto (`QUE_U`) sale en la placa del pulgar: ¡VAMOS!, ¡BIEN!, ¡PISOTÓN!, ¡ESO!, ¡GARRA! o, en gris, «guardado», «listo», «doble».
+
+### Espacio en la computadora (`input.js`, `Boton`)
+
+- Durante un levantamiento propio (`boton.intento`), Espacio y Enter se atienden en **captura sobre window**, con `preventDefault` y `stopImmediatePropagation`: no desplazan la página ni activan un botón aunque tenga el foco (lo prueba `check_toques`).
+- Si el primer evento de una tecla es una repetición (el foco llegó con la tecla apretada), cuenta como apretar. Las repeticiones de una tecla apoyada no cuentan.
+- Al cerrar el panel del llamado se suelta el foco (`soltarFoco`) y el escenario lo toma (`tabindex=-1`).
+- Acuse en el mismo manejador: la tecla dibujada se hunde y suena el tic; después, la palabra del núcleo.
+
+### El dedo en el celular
+
+- Toda la pantalla cuenta, menos 56 px arriba, 24 px a cada costado y 20 px abajo (`BORDES`, `enBorde`): ahí están los gestos del sistema, y un toque ahí no es un contacto.
+- El contacto cuenta en `pointerdown` (con `preventDefault`); `navigator.vibrate(12)` donde exista.
+- Un `pointercancel` no anula lo contado: el dedo sigue apoyado 400 ms (`GRACIA_MS`) por si vuelve.
+- Sin corrección de atraso: no hay ventanas.
+
+### Cómo se mide (sin navegador, en la Mac o en Actions)
+
+| Prueba | Qué mide |
+|---|---|
+| `node tools/play_human.mjs` | metas A (cinco maneras de tocar dan el mismo resultado; el ausente solo pierde ¼ + ½ disco) y B (primer intento del novato); informa C (curva), D (dónde caen los pesistas) y novato · medio · bueno por tramo |
+| `node tools/teclado_test.mjs`, `node tools/dedo_test.mjs` | meta H: 10 000 secuencias cada una por la clase `Boton` de verdad en un DOM de mentira (`tools/entrada_sim.mjs`) |
+| `node tools/ritmo_test.mjs` | meta J: duración de la final, esperas, turnos de rival, veredicto e intento propio |
+| `node tools/sim_test.mjs` | `'c'` y `'f'` idénticos (`sim_ref.json`, `sim_ref_facil.json`), `sim_ref_uno.json`, 1000 finales `'u'` recalculadas, líneas de caída sin tiempos (meta G) |
+
+`play_human.mjs --f` y `dedo_test.mjs --f` siguen midiendo el Fácil de círculos (línea de base).
+
+---
+
 **12-nov, tarde: entrada tolerante y dificultad que crece con los kilos.** El usuario jugó tres veces y dijo que es «difícil de acertar el momento donde tocar» y que «a veces no agarra bien el space, entonces toco mucho space y no levanta». Cambió Fácil: un toque antes de tiempo ya no gasta la señal ni es amague (la capa responde TODAVÍA NO y vale el primer toque que cae en la ventana); desde la recepción todo toque empuja; en los pesos livianos la barra sube sola; las ventanas de PERFECTO y BIEN se achican recién cerca del techo; y la señal muestra la franja de BIEN y una cuenta 3-2-1. Las secciones 1.1, 2, 3, 4, 5 y 9 ya lo describen. Clásico y los rivales no cambiaron.
 
 Especificación del rediseño de controles de la etapa 1. Reemplaza la sección 3.1 de `docs/JUEGO.md` en teclas y gestos; el resto del diseño sigue igual. **Implementado el 11-nov en la rama `demo`**; el estado, lo medido y lo que falta medir están en `HANDOFF.md`, «Controles». Una verificación independiente encontró tres problemas graves (el reloj corría sobre el panel del llamado, la subida perdida pedía 12 s de toques y el arranque guiado se podía fallar); la corrección cambió las reglas de la subida en Fácil, y este documento ya las describe. Los números de la sección 9 son de `tools/play_human.mjs --info` sobre el código final. La pantalla se probó por script y se miró en capturas (`tools/primera.mjs`); ninguna persona lo jugó todavía.

@@ -313,6 +313,7 @@ function cerrarSobre() {
 /** Teclado de los paneles (se atiende antes que la entrada del levantamiento). */
 function alTeclado(e) {
   if (e.ctrlKey || e.metaKey || e.altKey || !boton || e.target?.closest?.('#editor')) return; const k = e.key;      // el editor de campos del teléfono atiende sus teclas
+  if (boton.intento && (k === ' ' || k === 'Enter') && !enCampo(e)) return;      // durante el levantamiento propio, Espacio y Enter son del levantamiento (input.js)
   // escribiendo en un campo (nombre, correo, encuesta) las letras, Espacio y las flechas ← → son del campo. Enter elige el
   // botón principal de su formulario (o del panel), Esc sale del campo, y ↑ ↓ y Tab mueven el foco como siempre
   if (campo(e.target) || enCampo(e)) {

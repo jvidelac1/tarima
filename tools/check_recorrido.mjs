@@ -89,7 +89,7 @@ let senalPrev = '', senalesFoto = 0, tLlamado0 = null, tPodio = null;
 for (let n = 0; n < 60000; n++) {
   const s = await J(() => JUEGO.estado());
   if (s.errores.length) { problemas.push('error en el juego: ' + s.errores[0]); break; }
-  if (s.pantalla === 'clasificacion' && tPodio === null) tPodio = s.ahora;
+  if (tPodio === null && (s.visitados.includes('clasificacion') || s.pantalla === 'fin')) tPodio = s.ahora;      // el podio (la clasificación pasa enseguida a la ceremonia)
   if (s.pantalla === 'fin' && s.panel) { await foto('fin'); break; }
   // cambio de pantalla
   if (s.pantalla !== actual) {

@@ -1,7 +1,7 @@
 // Prueba de la entrada en tiempo real (pedido del dueño del 12 de noviembre: «a veces estoy tocando Espacio y es como que no
 // se levanta; revisaría bien que me registre todas las acciones», y regla del 13: «el space desde la computadora tiene que
 // estar perfectamente pensado»). Teclado real y reloj real (sin reloj inyectado), con ?dibujo=0. Nivel 'u' (por defecto).
-// En los dos primeros intentos propios de una final:
+// En los tres primeros intentos propios de una final:
 //  1. Un toque durante PREPÁRATE no se pierde: queda «guardado» y el levantamiento arranca solo apenas aparece ¡TIRA!.
 //  2. Un doble toque pegado (el segundo a 40 ms) cuenta como uno: el segundo sale «doble», resuelto y con acuse.
 //  3. Una ráfaga (8 toques cada 60 ms) en ¡SALTA!: todos anotados y resueltos, el resultado no cambia.
@@ -45,14 +45,15 @@ const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, d
 const page = await ctx.newPage();
 page.on('console', m => { if (m.type() === 'error') mal(`console.error: ${m.text()}`); });
 page.on('pageerror', e => mal(`pageerror: ${e.message}`));
+// acuse (meta I): del timeStamp del evento a que la tecla dibujada se hunde y al cuadro siguiente. Va antes que el juego:
+// en el intento, el juego se queda con Espacio en captura (stopImmediatePropagation) y nadie más lo ve
+await page.addInitScript(() => { window.__A = []; addEventListener('keydown', e => { if (e.code !== 'Space' || e.repeat) return; const ts = e.timeStamp, intento = !!window.JUEGO?.E?.intento?.propio; setTimeout(() => { const on = document.getElementById('acuse')?.classList.contains('on'), dom = performance.now() - ts; requestAnimationFrame(t => window.__A.push({ on, dom, pinta: t - ts, intento })); }, 0); }, true); });
 await page.addInitScript(() => { try { if (!sessionStorage.getItem('__t')) { localStorage.setItem('tarima.tutorial', '1'); localStorage.setItem('tarima.jugadas', '1'); localStorage.setItem('tarima.visto.tarjeta', '1'); sessionStorage.setItem('__t', '1'); } } catch { /* nada */ } });
 await page.goto(`${base}juego.html?lang=es&dibujo=0&q=baja&semilla=${SEMILLA}`, { waitUntil: 'load' });
 if (!await page.evaluate(() => window.JUEGO.listo)) throw new Error('el juego no inició');
 // registro de cada pulsación como la ve el juego, con la palabra del acuse en el momento en que se resuelve
 await page.evaluate(() => {
   const T = window.JUEGO.toques, orig = T.alCambiar; window.__T = [];
-  // acuse: del timeStamp del evento a que la tecla dibujada se hunde (mismo manejador) y al cuadro siguiente
-  window.__A = []; addEventListener('keydown', e => { if (e.code !== 'Space') return; const ts = e.timeStamp; queueMicrotask(() => { const on = document.getElementById('acuse').classList.contains('on'), dom = performance.now() - ts; requestAnimationFrame(t => window.__A.push({ on, dom, pinta: t - ts, intento: !!JUEGO.E.intento?.propio })); }); }, true);
   T.alCambiar = (x, que) => { orig?.(x, que); if (que === 'resuelto' && x) { const a = document.querySelector('#acuse b')?.textContent || ''; const r = window.__T.find(y => y.n === x.n); const o = { n: x.n, ok: x.ok, motivo: x.motivo, donde: x.donde, acuse: a }; if (r) Object.assign(r, o); else window.__T.push(o); } else if (que === 'baja' && x) window.__T.push({ n: x.n, ok: null, motivo: '', donde: x.donde, acuse: '' }); };
 });
 const J = (fn, a) => page.evaluate(fn, a);
@@ -68,7 +69,7 @@ for (;;) {
   if (Date.now() - t0 > 6 * 60000) { mal('la prueba no avanza en 6 minutos'); break; }
   const s = await J(() => { const e = JUEGO.estado(); e.propios = (JUEGO.E.propios || []).length; e.turno = { ve: !document.getElementById('turno').hidden, txt: document.getElementById('turno').textContent, senal: !document.getElementById('senal').hidden }; return e; });
   if (s.errores.length) { mal('error en el juego: ' + s.errores[0]); break; }
-  if (s.propios >= 2 && rivalVisto && !(s.intento && s.intento.propio) && s.pantalla !== 'decision') break;      // los dos propios y al menos un turno de un rival
+  if (s.propios >= 3 && rivalVisto && !(s.intento && s.intento.propio) && s.pantalla !== 'decision') break;      // los tres primeros propios y al menos un turno de un rival
   const I = s.intento;
   if (I && I.propio && s.modo !== 'panel') {
     if (!estadoIntento) { k++; estadoIntento = { k, prep: false, tira: null, hecho: '', ultClave: '', ultEmp: 0, cambioHecho: false, dobleHecho: false, largo: false, ent0: I.entradas }; }
@@ -86,11 +87,11 @@ for (;;) {
     if (X.k === 1 && g.clave === 'salta' && !X.dobleHecho) { X.dobleHecho = true; const a = await J(() => JUEGO.toques.total); await espacio(25); await dormir(15); await espacio(25); await dormir(120); R.doble = await J(a => window.__T.filter(x => x.n > a), a); continue; }
     // 3. segundo intento: ráfaga en ¡PÁRATE!
     if (X.k === 2 && g.clave === 'parate' && !X.rafaga) { X.rafaga = true; for (let i = 0; i < 8; i++) { await espacio(25); await dormir(35); } R.rafagas++; continue; }
-    // 5. primer intento: un botón con el foco cuando aparece ¡PÁRATE!; Espacio es del levantamiento
-    if (X.k === 1 && !R.foco && g.clave === 'parate') {
+    // 5. tercer intento: un botón con el foco cuando aparece ¡TIRA!; Espacio es del levantamiento
+    if (X.k === 3 && !R.foco && g.clave === 'tira') {
       await J(() => { const b = document.createElement('button'); b.id = '__b'; b.textContent = 'x'; b.style.cssText = 'position:fixed;left:0;top:0'; window.__clics = 0; b.onclick = () => window.__clics++; document.body.appendChild(b); b.focus(); window.__y0 = scrollY; });
       const a = await J(() => JUEGO.toques.total); await espacio(); await dormir(120);
-      R.foco = await J(a => ({ clics: window.__clics, mueve: scrollY !== window.__y0, anotado: window.__T.filter(x => x.n > a).map(x => x.motivo), pisoton: !!JUEGO.estado().intento?.uno?.pisoton || (JUEGO.E.propios || []).at(-1)?.uno?.pisoton }), a);
+      R.foco = await J(a => ({ clics: window.__clics, mueve: scrollY !== window.__y0, anotado: window.__T.filter(x => x.n > a).map(x => x.motivo), tira: JUEGO.estado().intento?.fase !== 'tension' }), a);
       await J(() => document.getElementById('__b')?.remove()); continue;
     }
     if (UNTOQUE.has(g.tipo)) { await dormir(200); await espacio(); continue; }
@@ -125,7 +126,7 @@ const g = fin.T.find(x => x.motivo === 'guardado'); if (R.guardado && !g) mal('e
 if (!R.largo) mal('no se llegó a probar el toque largo'); else if (R.largo.toques !== 1 || !R.largo.entradas || !R.largo.salto) mal(`el toque largo en ¡TIRA! tiene que contar uno y cumplir ¡SALTA! al seguir apoyado: ${JSON.stringify(R.largo)}`);
 if (!R.doble) mal('no se llegó a probar el doble toque'); else if (R.doble.length !== 2 || R.doble[1].motivo !== 'doble' || R.doble.some(x => x.ok === null)) mal(`el doble toque pegado no salió «doble»: ${JSON.stringify(R.doble)}`);
 if (!R.rafagas) mal('no se llegó a probar la ráfaga en ¡PÁRATE!');
-if (!R.foco) notas.push('no se llegó a probar Espacio con un botón enfocado'); else if (R.foco.clics || R.foco.mueve || !R.foco.anotado.length || !R.foco.pisoton) mal(`con un botón enfocado, Espacio tiene que ser del levantamiento: ${JSON.stringify(R.foco)}`);
+if (!R.foco) mal('no se llegó a probar Espacio con un botón enfocado'); else if (R.foco.clics || R.foco.mueve || !R.foco.anotado.length || !R.foco.tira) mal(`con un botón enfocado, Espacio tiene que ser del levantamiento: ${JSON.stringify(R.foco)}`);
 if (!R.pausa || !R.pausa.abrio || !R.pausa.cerro) mal(`la pausa en el llamado: ${JSON.stringify(R.pausa)}`);
 if (!rivalVisto) mal('no se vio el turno de un rival'); else if (!rivalVisto.ve || rivalVisto.senal || !/rival/i.test(rivalVisto.txt)) mal(`en el turno de un rival: ${JSON.stringify(rivalVisto)}`);
 // acuse (meta I): en el mismo manejador (la tecla ya está hundida al salir del evento) y pintado en el cuadro siguiente

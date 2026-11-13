@@ -309,7 +309,11 @@ export class Intento {
     switch (this.fase) {
       case 'llamado': return 'espera';
       case 'tension': this._uTira(t); return 'tira';
-      case 'tiron': case 'vuelo': if (U.salto === null && t >= M.tp + UNO.saltaDesde) { U.salto = t; return 'salta'; } return this._uGuarda();
+      case 'tiron': case 'vuelo':
+        if (U.salto === null && t >= M.tp + UNO.saltaDesde) { U.salto = t; return 'salta'; }
+        // ¡SALTA! ya está en pantalla: el contacto guardado la va a cumplir apenas abre, así que la palabra es la de saltar
+        if (U.salto === null && !U.guarda) { U.guarda = 1; return 'salta'; }
+        return this._uGuarda();
       case 'pelea': if (M.mov !== 'j' && !M.pelea.cerrado && U.pisoton === null) { this._uPisa(t); return 'pisoton'; } return this._uGuarda();
       case 'freno': this._uGarra(t); return 'garra';
       case 'hombros': if (M.abierto) { this._uArriba(t); return 'arriba'; } return this._uGuarda();

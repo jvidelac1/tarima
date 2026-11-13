@@ -87,7 +87,7 @@ export class Boton {
     this.contactos = new Map(); this.oye = null; this.via = 'teclado'; this.activo = true;
     /**
      * `intento`: hay un levantamiento propio en curso (docs/JUEGO.md G2.2). Espacio y Enter son del levantamiento: se
-     * atienden en captura sobre window, con preventDefault y sin que lleguen a ningún botón ni al teclado de los paneles; y
+     * atienden en captura sobre window, con preventDefault, y no activan ningún botón ni el teclado de los paneles; y
      * si el primer evento de una tecla es una repetición (el foco llegó con la tecla ya apretada), cuenta como apretar.
      * `bordes`: con el dedo, los toques a menos de BORDES px del borde no cuentan (gestos del sistema, barra de inicio, menú).
      */
@@ -105,8 +105,9 @@ export class Boton {
     this._k0 = e => {
       if (!esTecla(e) || enCampo(e) || e.ctrlKey || e.metaKey || e.altKey) return;
       if (this.intento) {
-        // el levantamiento es dueño de la tecla: ni desplaza la página ni activa un botón con foco
-        e.preventDefault(); e.stopImmediatePropagation();
+        // el levantamiento es dueño de la tecla: ni desplaza la página ni activa un botón con foco (preventDefault; el
+        // teclado de los paneles y _kd la dejan pasar porque ya viene atendida)
+        e.preventDefault();
         if (e.repeat && this.contactos.has(idTecla(e))) return;      // la repetición del sistema no es un toque nuevo
         toques.nuevo(reloj.deEvento(e), 'teclado', esEspacio(e) ? 'ESPACIO' : 'ENTER');
         if (!this.activo) { toques.resolver(false, 'pausa'); return; }
