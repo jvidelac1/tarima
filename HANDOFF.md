@@ -818,6 +818,41 @@ Diseño: `docs/JUEGO.md`, sección Gameplay 2. Gesto exacto y pruebas: `docs/CON
 - En el ritmo, «decisivo» es solo oro o medalla (con «pasa adelante» eran el 45 % de los turnos) y se ve entero uno por tramo entre dos levantamientos propios.
 - El tutorial guiado de `'f'` y el metrónomo de Clásico siguen en el código; en `'u'` no se usan.
 
+### Gameplay 2, segunda parte: pesistas y emoción (13-nov, rama `gameplay`)
+
+Lo que cambia entre pesistas son los kilos y el cuerpo, nunca la precisión de los dedos (la meta A sigue en 0 diferencias entre maneras de tocar).
+
+**Pesistas.**
+- `sim.json → atletas.<id>.cuerpoJuego` (lo escribe `tools/build_sim_data.mjs`), con los factores del diseño **fijos**: Compacto 1,1 / 0,7 / 0,85 (tirón / arriba / pararse) y movilidad alta; Largo 0,5 / 0,9 / 1,2; Potente 1,0 / 1,35 / 0,6. El envión de la casa es la tijera para los tres: el squat de Compacto rinde igual hasta el 97 % y peor desde el 100 % (meta D), así que queda como opción en «Más opciones».
+- La base de cada tramo se recalibró con los cuerpos reales: `UNO.base` 1000 / 1700 / 1800 (antes 900 / 1500 / 2000). Herramienta: `tools/margen_cal.mjs` (exacta, sin bots; `--buscar` recorre la grilla).
+- `rules.js → chanceUno()`: chance exacta de que suba un peso (suma los días con los que llega, con la garra si queda). El panel la muestra como «7 de 10» (`deDiez`, en `ui/mensajes.js`: «10 de 10» solo desde 99,5 %).
+- Huella de sim.json nueva (`83f90ed0`): `sim_ref.json` y `sim_ref_facil.json` cambian solo esa línea (las 21 tablas de Clásico y Fácil de círculos son las mismas); `sim_ref_uno.json` regenerada. Ningún servidor recalcula registros (el Worker no importa `web/js/sim`).
+- Tarjeta en `'u'`: una línea por pesista (`pesista.<id>.u`) y tres barras, tirón / arriba / pararse (fácil en dorado, difícil en rojo), en lugar de Energía y Margen. Clásico conserva su tarjeta.
+- En el levantamiento, la primera vez que un pesista pasa por su punto fuerte o débil, se dice debajo de los discos (una vez por pesista y dispositivo: `tarima.visto.u_fuerte_<id>` y `u_debil_<id>`).
+
+**Emoción** (solo presentación; el núcleo y el registro no cambian).
+- `ui/margen.js` (nuevo): los discos de margen arriba al centro. Al agarrar la barra suben o bajan con «el día» y lo dicen. Cada tramo que cierra apaga lo que gastó, con su palabra («tirón −½»). La garra se ve como una ficha. Al caer, el disco que faltó se pone en rojo y dice «Faltó ¾»; si vale, los discos quedan en verde, o en dorado si fue al límite.
+- FRENO: la escena se oscurece por los bordes, la ficha de la garra late, suena un latido cada 0,62 s y no suena nada más. Si la persona toca, se oye un golpe y la tribuna estalla (`sonido.garra`).
+- ¡PÁRATE!: golpe de bajo y un grito corto (`sonido.pisoton`), y la imagen se sacude 4 px durante 120 ms. Sin sacudida si la persona pidió movimiento reducido.
+- Válido al límite: las luces salen más espaciadas (0,45 s), con un latido en cada una, y el veredicto sigue en 2,95 s (`veredictoPropio(ok, fin, limite)`).
+- Panel: «Te falta ½ disco: depende del día · 5 de 10». La Cuenta muestra la chance del peso del oro, de la plata o de pasar al frente. En la primera final, un peso de menos de 5 de 10 pide confirmar dos veces («¿Seguro? 169 kg sube 4 de 10»).
+- Rivales: «191 kg, cómodo / justo / al límite» en el cartel de su turno, según la intensidad (95 % y 99 %).
+
+**Medido** (sin navegador en la Mac, una prueba a la vez; las cuatro corren también en Actions, grupo `nucleo`):
+- **C** (play_human y margen_cal): con el novato del dedo, 100 % hasta el 95 %, 97,6 % al 97 %, 53,7 % al 100 % y 6,1 % al 103 %. Al 100 %, en arranque y en dos tiempos: Compacto 73 y 86, Largo 30 y 59, Potente 17 y 59. Al 97 % ningún pesista queda más de 10 puntos abajo del promedio. Las curvas de margen_cal (exactas) y las de play_human (núcleo y bots) coinciden.
+- **D**: tramo que más gastó en las caídas del 100 al 103 %: Largo, pararse en el 100 %; Potente, arriba en el 100 %; Compacto, repartido (tirón 7, arriba 58 y pararse 36 %). Al 100 %, entre pesistas hay hasta 56 puntos de diferencia.
+- **E** (`tools/pesistas_test.mjs`, nuevo; 200 finales por pesista, estrategia y nivel): con rivales normales, el lector (lee la chance y La Cuenta) gana el oro 55 a 83 puntos más seguido que el prudente (+2 kg) y que el codicioso (+5 kg), que no ganan nunca contra rivales normales; el lector gana el 83 % con Compacto, el 55 % con Largo y el 58 % con Potente. Con rivales amistosos, el lector gana el oro en el 97 al 98 % de las finales con los tres. Con el plan del entrenador (lo que el panel trae puesto: +4 y +3 kg) se caen 0 % de las barras (meta ≤ 12 %), pero gana el oro solo en el 20 al 43 % contra amistosos y nunca contra normales: **para decidir** si el panel debería proponer el peso de La Cuenta cuando la chance es buena.
+- **F** (`tools/chance_test.mjs`, nuevo; 30 000 intentos con el núcleo): en cada «X de 10», el error entre lo medido y lo prometido es de 2,7 puntos como mucho.
+- **J** (ritmo_test): sin cambios. Final mediana de 111 s, espera máxima de 19,3 s, veredicto propio de 2,95 s si vale y de 3,7 s si cae.
+- A, B, G, H, L: siguen en verde (play_human, sim_test, dedo_test, teclado_test, caida_test, perf_test, servidor_test).
+
+**Apartamientos del diseño.**
+- Compacto: la tarjeta dice «Su arranque máximo es el más bajo», no «Levanta menos kilos». Los techos de los tres suman 380 a 382 kg y Compacto tiene el dos tiempos más alto, así que la frase del diseño no era cierta. A igual intensidad, Compacto es el más fácil: es el que viene marcado para quien empieza.
+- Envión de la casa de Compacto: tijera (el diseño ya lo preveía si la meta D no confirmaba el squat).
+- La fase fuerte y la débil se avisan con «Largo: tirón, su punto fuerte» o «Potente: arriba, su punto débil», no con «salto fácil».
+- La apuesta de los rivales sale de la intensidad que pidieron (≤ 95 % cómodo, ≤ 99 % justo, después al límite), no de la tabla de `'u'`: ellos juegan en Clásico.
+- Sin hacer: la cámara lenta (meta K, necesita perf_test con placa), el magnesio del pisotón y Clásico ofrecido después de dos finales ganadas.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.

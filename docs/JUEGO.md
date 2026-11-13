@@ -166,6 +166,7 @@ Cada uno tiene una fase fuerte y una débil, que se ven en los discos del panel,
   - «la barra recorre menos», «rinde con mucho peso» y «se cansa rápido», que hoy no son ciertas o no se sienten.
 - **Lo que no cambia:** `tec`, `tem` y `fon` siguen valiendo en Clásico y para los rivales.
 - **Rivales:** siguen en `'c'`, así que ai.js, balance.mjs, sim_ref.json y sim_ref_facil.json no se tocan. Lo que el resumen de un rival dice de su apuesta («cómodo», «justo», «al límite») sale de esta misma tabla con la intensidad que pidió, no de su simulación.
+- **Hecho (13-nov, segunda parte):** factores tal cual la tabla. La base de cada tramo se recalibró a 1000 / 1700 / 1800 con `tools/margen_cal.mjs`. El envión de la casa de Compacto quedó en tijera, porque el squat rinde menos desde el 100 %. Su tarjeta dice «Su arranque máximo es el más bajo»: los totales máximos de los tres están a 2 kg uno de otro. La apuesta de los rivales sale de la intensidad. Medidas y apartamientos: HANDOFF.md, «Gameplay 2, segunda parte».
 
 ### G2.6 Emoción (sin agregar ningún control)
 

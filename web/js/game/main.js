@@ -511,7 +511,8 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
           if (ahora - visto.latido >= 620) { visto.latido = ahora; sonido.latido(); }
         } else if (visto.freno !== undefined && visto.freno !== null) { visto.freno = null; margenUI.freno(false); $('escena').classList.remove('freno'); }
         // «el día» se revela al agarrar la barra, nunca después de un toque: los discos suben o bajan y lo dicen
-        if (m.fase === 'tension' && diaHasta < 0) { diaHasta = ahora + 2200; margenUI.ir(U.m0, ahora, t('dia.' + diaTxt(U.dia)), U.dia >= 300 ? 'oro' : U.dia <= -300 ? 'mal' : 'gris'); }
+        // (con un toque guardado el tirón sale en el mismo instante en que agarra: se revela igual)
+        if (m.fase !== 'acomodo' && m.fase !== 'llamado' && diaHasta < 0) { diaHasta = ahora + 2200; margenUI.ir(U.m0, ahora, t('dia.' + diaTxt(U.dia)), U.dia >= 300 ? 'oro' : U.dia <= -300 ? 'mal' : 'gris'); }
         margenUI.cuadro(ahora);
       }
       const f = m.fij, abajo = !!f && f.firme && now >= f.tb; if (abajo && !chic) { chic = true; sonido.chicharra(); }
