@@ -174,7 +174,9 @@ async function situacion({ request, env, ctx, b, i, ahora }) {
   if (cfg.etapa === 'arranque') flags = { ...flags, 'muro-partidas-gratis': String(cfg.gratis) };
   const c = await D.contar(env.DB, d, i, ahora);
   const dec = R.decidir({ anotado: !!dev.lista_id, encuesta: !!dev.encuesta_en, usadas_d: c.usadas_d, usadas_i: c.usadas_i, encuestas_i: c.encuestas_i, cfg });
-  const contexto = { pais: paisDe(request, env), previas: c.usadas_d, dias: R.diasDesde(dev.creado, ahora) };
+  // `jugador`: el mismo id seudónimo con el que se evalúan las banderas en PostHog (HMAC del dispositivo, nunca el uuid,
+  // la IP ni el mail). Permite contar personas por día aunque posthog-js, sin cookies, estrene un id en cada carga.
+  const contexto = { pais: paisDe(request, env), previas: c.usadas_d, dias: R.diasDesde(dev.creado, ahora), jugador: 'd_' + dev.d.slice(0, 16) };
   return { uuid, d, dev, flags, cfg, c, dec, contexto };
 }
 

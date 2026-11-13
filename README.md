@@ -82,12 +82,12 @@ gh run list -R jvidelac1/tarima --branch demo --limit 3              # últimas 
 gh run watch <id> -R jvidelac1/tarima --exit-status                  # esperar a que termine (sale con error si falló)
 gh run view <id> -R jvidelac1/tarima                                 # los pasos, y cuál falló
 gh run view <id> -R jvidelac1/tarima --log-failed                    # la salida del paso que falló
-gh run download <id> -R jvidelac1/tarima -n pruebas-out -D out_ci    # capturas, JSON y registros de la corrida
+gh run download <id> -R jvidelac1/tarima -D out_ci    # capturas, JSON y registros: una carpeta por grupo (pruebas-out-nucleo, -toques, -telefono, -recorrido)
 gh workflow run pruebas.yml -R jvidelac1/tarima --ref demo           # a pedido, sobre la punta de demo
 gh run rerun <id> -R jvidelac1/tarima                                # repetir una corrida sobre el mismo commit
 ```
 
-Lo que trae el artefacto `pruebas-out` (14 días):
+Lo que traen los artefactos `pruebas-out-<grupo>` de «Pruebas del juego» (14 días; las pruebas corren en cuatro máquinas en paralelo):
 
 - `logs/*.log`: la salida completa de cada prueba (lo mismo que el log del run). La última línea dice `OK`; si no, hay un bloque `FALLÓ` o `FALLA` con la lista de problemas.
 - `game/*.png`: capturas de `check_game` (fin de la partida, ayuda, presentación, primer intento a velocidad real, Clásico, reloj).

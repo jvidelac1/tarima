@@ -18,9 +18,18 @@ defaults:
 
 jobs:
   pruebas:
-    name: Núcleo, partida completa y toques (dibujo por software)
+    # Cuatro máquinas en paralelo (antes una sola en fila: ~47 min). Cada grupo dura menos de ~15 min.
+    name: ${{ matrix.titulo }} (dibujo por software)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { grupo: nucleo, titulo: 'Núcleo, emoción y partida completa' }
+          - { grupo: toques, titulo: 'Toques, tutorial y capturas' }
+          - { grupo: telefono, titulo: 'Teléfono de costado y en vertical' }
+          - { grupo: recorrido, titulo: 'iPhone y recorrido de un jugador nuevo' }
     env:
       TARIMA_ANGLE: swiftshader      # WebGL por software, pedido de forma explícita (tools/browser.mjs)
     steps:
@@ -49,44 +58,44 @@ jobs:
 
       # Cada prueba corre aunque haya fallado la anterior: un push da el estado de las cuatro.
       - name: Núcleo determinista (sim_test)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/sim_test.mjs 2>&1 | tee out/logs/sim_test.log
 
       - name: Jugador humano simulado (play_human)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/play_human.mjs 2>&1 | tee out/logs/play_human.log
 
       - name: Toques con el dedo, sin navegador (dedo_test)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/dedo_test.mjs 2>&1 | tee out/logs/dedo_test.log
 
       - name: Lógica de fluidez sin navegador (perf_test)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/perf_test.mjs 2>&1 | tee out/logs/perf_test.log
 
       - name: Caída de la barra sin navegador (caida_test)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/caida_test.mjs 2>&1 | tee out/logs/caida_test.log
 
       - name: Escenas de emoción (check_escenas)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         timeout-minutes: 20
         run: node tools/check_escenas.mjs 2>&1 | tee out/logs/check_escenas.log
 
       - name: Partida completa por teclado y por toques (check_game)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         timeout-minutes: 25
         run: node tools/check_game.mjs 2>&1 | tee out/logs/check_game.log
 
       - name: Toques y tutorial en tiempo real (check_fluidez, modo lógica)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.grupo == 'toques' }}
         timeout-minutes: 20
         run: node tools/check_fluidez.mjs --tutorial --json=out/fluidez/fluidez.json 2>&1 | tee out/logs/check_fluidez.log
 
       # Entrada en tiempo real con teclado real: toque durante PREPÁRATE, al cambiar de señal, doble, largo, ráfagas en
       # ¡EMPUJA!, después de una pausa y en el turno de un rival. Cada pulsación anotada, resuelta, con motivo y acuse.
       - name: Toques en tiempo real (check_toques)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.grupo == 'toques' }}
         timeout-minutes: 10
         run: node tools/check_toques.mjs 2>&1 | tee out/logs/check_toques.log
 
@@ -94,7 +103,7 @@ jobs:
       # una revisión de cada pantalla (nada cortado, nada tapado, nada debajo de la muesca), campos de texto, dos dedos a
       # la vez, y el aviso «Gira el teléfono» en vertical. Capturas en out/telefono.
       - name: Teléfono de costado y en vertical (check_telefono)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.grupo == 'telefono' }}
         timeout-minutes: 25
         run: node tools/check_telefono.mjs 2>&1 | tee out/logs/check_telefono.log
 
@@ -102,14 +111,14 @@ jobs:
       # Opciones y «Cómo se juega» desplazados con el dedo sin cortar botones, y el aviso de pantalla completa de cada
       # navegador. Capturas en out/iphone.
       - name: iPhone acostado (check_iphone)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.grupo == 'recorrido' }}
         timeout-minutes: 15
         run: node tools/check_iphone.mjs 2>&1 | tee out/logs/check_iphone.log
 
       # Para mirar el juego sin abrir un navegador: una captura por panel, por señal y por toque, con un cuadro del 3D
       # dibujado por software antes de cada una. Las capturas atrasan los toques, así que este paso no decide el resultado.
       - name: Capturas con el 3D dibujado (no bloquea)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.grupo == 'toques' }}
         continue-on-error: true
         timeout-minutes: 15
         run: node tools/check_fluidez.mjs --tutorial --capturas=out/capturas --json=out/capturas/fluidez.json 2>&1 | tee out/logs/capturas.log
@@ -118,13 +127,13 @@ jobs:
       # Espacio, y capturas a 1745x845 de cada momento en out/recorrido. Falla si la espera sin rivales en el medio llega a
       # 6 s o si machacando no se ve el motivo del fallo al menos 1 s.
       - name: Recorrido de un jugador nuevo (check_recorrido)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.grupo == 'recorrido' }}
         timeout-minutes: 20
         run: node tools/check_recorrido.mjs 2>&1 | tee out/logs/check_recorrido.log
 
       # El mismo recorrido en inglés (?lang=en), para mirar los textos: capturas en out/recorrido_en. No decide el resultado.
       - name: Recorrido en inglés (check_recorrido --lang=en, no bloquea)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.grupo == 'recorrido' }}
         continue-on-error: true
         timeout-minutes: 20
         run: node tools/check_recorrido.mjs --lang=en 2>&1 | tee out/logs/check_recorrido_en.log
@@ -134,9 +143,11 @@ jobs:
         run: |
           {
             echo "### Pruebas del juego (dibujo por software: no mide cuadros por segundo)"
+            echo "Grupo: ${{ matrix.titulo }}"
             for f in sim_test play_human dedo_test perf_test caida_test check_escenas check_game check_toques check_telefono check_iphone check_fluidez capturas check_recorrido check_recorrido_en; do
+              [ -f "out/logs/$f.log" ] || continue
               echo; echo "**$f**"; echo '```'
-              if [ -f "out/logs/$f.log" ]; then tail -n 14 "out/logs/$f.log"; else echo "(no corrió)"; fi
+              tail -n 14 "out/logs/$f.log"
               echo '```'
             done
           } >> "$GITHUB_STEP_SUMMARY"
@@ -145,7 +156,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v6
         with:
-          name: pruebas-out
+          name: pruebas-out-${{ matrix.grupo }}
           path: out/
           if-no-files-found: warn
           retention-days: 14
