@@ -39,6 +39,15 @@ export const ganchos = {
   async muro(info) { void info; return false; },
 
   /**
+   * Intervalo, al terminar el arranque y antes de elegir el primer peso del dos tiempos. Con la regla del arranque gratis
+   * (docs/MVP.md 5.5) quien integre sube ahí el muro: 'sigue' juega el dos tiempos; 'corta' termina la final (main.js
+   * vuelve al inicio). `info.tabla()` es el HTML de la tabla del arranque y `info.visita(n)` marca la pantalla.
+   * @param {{n:number, nombre:string, capa:HTMLElement, t:Function, tabla:()=>string, visita:(n:string)=>void}} info
+   * @returns {Promise<'sigue'|'corta'>}
+   */
+  async intervalo(info) { void info; return 'sigue'; },
+
+  /**
    * P8 · podio, a los 2,5 s, cuando aparecen los botones. `info.lugar` es un <div> vacío debajo de los botones para la
    * invitación suave (podio 1). Devolver 'muro' en el podio 2 hace que main.js llame a muro({origen:'podio'}) en lugar
    * de esperar los botones (P8b); cualquier otra cosa deja el podio como está.

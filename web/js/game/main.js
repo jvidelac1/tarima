@@ -937,6 +937,21 @@ async function carga(kg, lev) {
   await saltable(A.dur * 1000 + 350, 300); enCuadro = null; A.en(99); escena.setCarga(kg, lev); apoya(); veredicto('');
 }
 
+/**
+ * Al terminar el arranque, antes del intervalo: el gancho decide si se juega el dos tiempos (con la regla del arranque
+ * gratis, ahí sube el muro). false: la final termina acá (ya se vio la tabla del arranque).
+ */
+async function trasArranque(p) {
+  E.modo = 'panel'; E.forzar = true; let r = 'sigue';
+  try { r = await ganchos.intervalo?.({ n: E.finalN, nombre: nombreJugador(), capa: $('capa'), t, visita, tabla: () => tableroHTML(p, { yo: E.yo, nombre: nombreJugador() }) }) ?? 'sigue'; } catch (e) { console.warn('ganchos.intervalo:', e); }
+  capa.quitar(); return r !== 'corta';
+}
+/** La final cortada en el intervalo: cuenta como jugada (la próxima no es la primera) y no hay podio. */
+function cortarFinal(p) {
+  void p; marcador(null); zocalo(null); etiqueta(null); turno(null);
+  guardado.set('tarima.jugadas', String((+guardado.get('tarima.jugadas') || 0) + 1));
+}
+
 async function intervalo(p) {
   visita('intervalo'); const f = p.at[E.yo].f, sug = Math.round(f.techo.c * (E.pctApertura || .935));
   const html = () => { const yo = p.tabla().find(x => x.a === E.yo), n = yo && yo.puesto; return `<h1>${t('intervalo.titulo')}</h1>${tableroHTML(p, { yo: E.yo, nombre: nombreJugador() })}<p>${n ? t('intervalo.texto', { n, pos: t('pos.' + n) }) : t('intervalo.sin_puesto')}</p>`; };
@@ -1040,7 +1055,10 @@ async function partida(cfg) {
   const p = E.p = new Partida(datos, { semilla, nivel: cfg.nivel, cal: cfg.cal, primera: cfg.primera, ctl: cfg.ctl, tactil: cfg.ctl === 'f' && tactil(), atletas: IDS.map((id, i) => ({ id, ctrl: i === E.yo ? 'persona' : 'juego' })) });
   await presentacion(p, cfg, errMedio, n === 1); p.empezar();
   while (p.fase !== 'fin') {
-    if (p.fase === 'intervalo') { await intervalo(p); continue; }
+    if (p.fase === 'intervalo') {
+      if (!await trasArranque(p)) { cortarFinal(p); return 'inicio'; }      // sin correo ni encuesta: la final termina con el arranque
+      await intervalo(p); continue;
+    }
     const L = { ...p.llamado }, a = p.at[L.a]; marcador(p, L);
     if (a.ctrl === 'persona') { await carga(L.kg, L.lev); await llamadoPropio(p, L); } else await llamadoRival(p, L, cfg);
   }

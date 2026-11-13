@@ -261,7 +261,7 @@ export function crearAnalitica(o = {}) {
         tactil: !!(ventana.matchMedia && ventana.matchMedia('(pointer: coarse)').matches),
         pais: est?.contexto?.pais ?? null, previas: est?.contexto?.previas ?? null, dias: est?.contexto?.dias ?? null,
         fuente_trafico: fuenteTrafico(buscar, referente, origen), referente: dominioReferente(referente, origen) || null,
-        pantalla, grabada: grabar, ...banderasProps,
+        pantalla, grabada: grabar, gratis_etapa: est?.regla?.etapa ?? null, ...banderasProps,
         // Sin IP del jugador (el proxy no la manda), PostHog ubicaría a todos en el país del servidor de Cloudflare: el país real va en `pais`.
         $geoip_disable: true,
       }));

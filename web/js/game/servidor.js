@@ -6,7 +6,8 @@
 //   const e = await servidor.estado({ idioma });         // P0: nunca tira; si el Worker no contesta en 4 s, vale la copia
 //   const r = await servidor.pedirPase({ idioma });      // P4: ok | muro | sin_servidor | error
 //   servidor.paseParaReanudar()                          // al cargar, antes de mirar el muro: ¿hay una final a medias?
-//   servidor.finalTerminada()                            // en el podio
+//   await servidor.envion({ idioma })                    // permiso del dos tiempos de una final con etapa 'arranque'
+//   servidor.finalTerminada()                            // en el podio (o cuando la final se corta en el intervalo)
 //   await servidor.anotar({ email, nombre, idioma, novedades, sesion })
 //   await servidor.encuesta({ r, idioma, sesion })
 //   await servidor.baja({ email })
@@ -14,8 +15,10 @@
 // Sin servidor de verdad:
 // - En localhost con el servidor estático de Python (POST da 501, 404 o 405 sin JSON) el juego anda sin límite
 //   (modo 'sin_api'): es lo que usan las pruebas del flujo «Pruebas del juego».
-// - `?muro=firme` en localhost simula el Worker en el navegador (2 finales, muro, encuesta +2, anotarse da juego libre),
-//   con la cuenta en localStorage (`tarima.sim`) para que sobreviva a una recarga. `?gratis=1` cambia las 2 por 1.
+// - `?muro=firme` en localhost simula el Worker en el navegador con la regla de producción (GRATIS_ETAPA='arranque': el
+//   arranque de 1 final gratis, muro en el intervalo, la encuesta termina esa final y suma 1, anotarse da juego libre), con
+//   la cuenta en localStorage (`tarima.sim`) para que sobreviva a una recarga. `&etapa=final` simula la regla vieja (2
+//   finales enteras y la encuesta +2); `?gratis=N` cambia cuántas.
 // Fuera de localhost esos dos modos no existen.
 
 export const CONSENTIMIENTO = '2026-11-c';     // versión de web/privacidad.html; el Worker acepta también la «a» y la «b»
@@ -32,7 +35,7 @@ const CLAVES = {
 };
 
 const ESPERA_ESTADO = 4000;          // P0: si no contesta en 4 s, vale la copia local
-const ESPERA_PEDIDO = 3500;          // cada intento de /api/partida
+const ESPERA_PEDIDO = 3500;          // cada intento de /api/partida y de /api/envion
 const REINTENTOS_PASE = [1000, 2000]; // «se reintenta 2 veces en 3 s» (P4)
 const ESPERA_FORM = 10000;           // anotar, encuesta y baja
 // Pase vivo: la pestaña que juega una final lo marca cada LATIDO ms y lo suelta al irse (pagehide). Otra pestaña solo
@@ -228,11 +231,12 @@ export function crearServidor(o = {}) {
         if (j.estado === 'ok') {
           const libre = j.fuente === 'lista';
           guardarCopia({ quedan: libre ? null : j.quedan, lista: libre, muro: !libre && j.quedan === 0, motivo: !libre && j.quedan === 0 ? 'dispositivo' : null });
+          const etapa = j.etapa === 'arranque' ? 'arranque' : 'completa';
           if (j.pase) {
-            sesion.set(CLAVES.pase, JSON.stringify({ pase: j.pase, n: j.n, fuente: j.fuente, exp: expDelPase(j.pase), reanudado: false }));
+            sesion.set(CLAVES.pase, JSON.stringify({ pase: j.pase, n: j.n, fuente: j.fuente, etapa, exp: expDelPase(j.pase), reanudado: false }));
             tomarPase(j.pase);
           }
-          return { ...j, estado: 'ok' };
+          return { ...j, etapa, estado: 'ok' };
         }
         if (j.estado === 'muro') {
           guardarCopia({ muro: true, quedan: 0, lista: false, motivo: j.motivo || 'dispositivo' });
@@ -259,6 +263,48 @@ export function crearServidor(o = {}) {
       sinServidorUsado = true;
       return { estado: 'sin_servidor', fuente: 'sin_servidor', error };
     }
+    return { estado: 'error', error };
+  }
+
+  // ---------- permiso del dos tiempos (POST /api/envion) ----------
+
+  /**
+   * Para una final que salió con etapa 'arranque': pide al Worker el permiso del dos tiempos con el pase de la pestaña.
+   * Lo da con la lista o con el bono de la encuesta (una vez por dispositivo). Devuelve {estado:'ok', via} (y el pase
+   * nuevo queda en la pestaña), {estado:'muro', motivo:'envion', encuesta_disponible} o {estado:'error', error}. Sin
+   * servidor no hay dos tiempos gratis: un error se dice y se reintenta, no se juega igual.
+   */
+  async function envion({ idioma } = {}) {
+    if (modo === 'sin_api') return { estado: 'ok', via: 'sin_api' };
+    const p = leerJson(sesion, CLAVES.pase);
+    if (!p || !p.pase) return { estado: 'error', error: 'pase' };
+    let ultimo = null;
+    for (let k = 0; k <= REINTENTOS_PASE.length; k++) {
+      try {
+        const { j } = await post('/api/envion', { dispositivo: dispositivo(), pase: p.pase, idioma }, ESPERA_PEDIDO);
+        if (UUID4.test(j.dispositivo || '')) local.set(CLAVES.dispositivo, j.dispositivo.toLowerCase());
+        if (j.estado === 'ok') {
+          if (j.pase) {
+            const viejo = firmaDelPase(p.pase);
+            if (viejo) { const v = leerVivos(); delete v[viejo]; guardarVivos(v); }
+            sesion.set(CLAVES.pase, JSON.stringify({ ...p, pase: j.pase, etapa: 'completa', exp: expDelPase(j.pase) }));
+            tomarPase(j.pase);
+          }
+          if (j.lista) guardarCopia({ lista: true, muro: false, quedan: null, motivo: null });
+          else if (Number.isFinite(j.quedan)) guardarCopia({ quedan: j.quedan, muro: j.quedan === 0, motivo: j.quedan === 0 ? 'dispositivo' : null });
+          return { ...j, estado: 'ok' };
+        }
+        if (j.estado === 'muro') return { ...j, estado: 'muro', motivo: j.motivo || 'envion' };
+        ultimo = new ErrorRed('servidor');
+        break;
+      } catch (e) {
+        if (e.tipo === 'sin_api') { modo = 'sin_api'; return { estado: 'ok', via: 'sin_api' }; }
+        ultimo = e;
+        if ((e.tipo === 'red' || e.tipo === 'servidor') && k < REINTENTOS_PASE.length) { await esperar(REINTENTOS_PASE[k]); continue; }
+        break;
+      }
+    }
+    const error = ultimo?.tipo === 'http' && ultimo.cuerpo?.error === 'pase' ? 'pase' : ultimo?.tipo === 'limite' ? 'limite' : ultimo?.tipo === 'red' ? 'red' : 'servidor';
     return { estado: 'error', error };
   }
 
@@ -302,9 +348,17 @@ export function crearServidor(o = {}) {
   // Al cargar: si en esta pestaña quedó una final a medias con su pase vigente, se reanuda UNA vez sin pedir otro.
   // La segunda recarga la da por gastada (devuelve null y la borra). Y solo si ninguna otra pestaña la está jugando: el
   // sessionStorage se copia al duplicar la pestaña, la marca en localStorage la comparten todas.
+  // Una final con etapa 'arranque' (el arranque gratis, sin permiso del dos tiempos) no se reanuda nunca: la final se
+  // reanuda desde el principio, y eso regalaría otro arranque. Se da por gastada y el servidor decide (muro).
   function paseParaReanudar() {
     const p = leerJson(sesion, CLAVES.pase);
     if (!p || !p.pase) return null;
+    if (p.etapa === 'arranque') {
+      sesion.del(CLAVES.pase);
+      const f = firmaDelPase(p.pase), v = leerVivos();
+      if (f && v[f] && (v[f].suelto || ahora() - v[f].t >= VIVO_MS)) { delete v[f]; guardarVivos(v); }
+      return null;
+    }
     const vigente = Number.isFinite(p.exp) && p.exp * 1000 > ahora();
     const m = leerVivos()[firmaDelPase(p.pase)];
     const enJuego = m && !m.suelto && ahora() - m.t < VIVO_MS;
@@ -312,7 +366,7 @@ export function crearServidor(o = {}) {
     p.reanudado = true;
     sesion.set(CLAVES.pase, JSON.stringify(p));
     tomarPase(p.pase);
-    return { pase: p.pase, n: p.n, fuente: p.fuente };
+    return { pase: p.pase, n: p.n, fuente: p.fuente, etapa: p.etapa === 'arranque' ? 'arranque' : 'completa' };
   }
   function finalTerminada() {
     sesion.del(CLAVES.pase);
@@ -376,28 +430,51 @@ export function crearServidor(o = {}) {
   // ---------- Worker simulado (`?muro=firme`, solo localhost) ----------
 
   function simular(ruta, b) {
-    const gratis = Math.max(1, Math.min(9, Number(params.get('gratis')) || 2));
+    const etapaGratis = params.get('etapa') === 'final' ? 'final' : 'arranque';
+    const gratis = Math.max(1, Math.min(9, Number(params.get('gratis')) || (etapaGratis === 'final' ? 2 : 1)));
+    const bono = etapaGratis === 'final' ? 2 : 1;
     const s = leerJson(local, CLAVES.sim) || { usadas: 0, encuesta: false, lista: false };
-    const cupo = gratis + (s.encuesta ? 2 : 0);
+    s.finales = s.finales || {};      // etapa de cada final entregada, por número
+    const cupo = gratis + (s.encuesta ? bono : 0);
     const quedan = s.lista ? null : Math.max(0, cupo - s.usadas);
+    const etapa = etapaGratis === 'arranque' && !s.lista && !s.encuesta ? 'arranque' : 'completa';
     const guardar = () => local.set(CLAVES.sim, JSON.stringify(s));
     const flags = { 'muro-partidas-gratis': String(gratis), 'muro-texto': params.get('texto') === 'b' ? 'b' : 'a', 'invitacion-podio1': 'on', grabacion: 'tercio' };
     const contexto = { pais: null, previas: s.usadas, dias: '0' };
+    const regla = { etapa: etapaGratis, gratis, bono };
     const ok = j => Promise.resolve({ status: 200, j });
+    const armarPase = (n, fuente, e) => {
+      const exp = Math.floor(ahora() / 1000) + 3 * 3600;
+      const cuerpo = btoa(JSON.stringify({ d: 'simulado', n, f: fuente, e, p: n, exp })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      return `v1.${cuerpo}.simulado${n}${e}`;
+    };
     if (ruta === '/api/estado') {
-      const r = { dispositivo: b.dispositivo, puede: s.lista || quedan > 0, quedan, lista: s.lista, encuesta_disponible: !s.encuesta, flags, contexto, metricas: null };
+      const r = { dispositivo: b.dispositivo, puede: s.lista || quedan > 0, quedan, lista: s.lista, etapa, encuesta_disponible: !s.encuesta, flags, contexto, regla, metricas: null };
       if (s.lista) r.lista_id = 'simulado';
       if (!r.puede) r.motivo = 'dispositivo';
       return ok(r);
     }
     if (ruta === '/api/partida') {
-      if (!s.lista && quedan <= 0) return ok({ estado: 'muro', motivo: 'dispositivo', encuesta_disponible: !s.encuesta, dispositivo: b.dispositivo, flags, contexto });
+      if (!s.lista && quedan <= 0) return ok({ estado: 'muro', motivo: 'dispositivo', encuesta_disponible: !s.encuesta, dispositivo: b.dispositivo, flags, contexto, regla });
       const fuente = s.lista ? 'lista' : s.usadas < gratis ? 'gratis' : 'encuesta';
+      s.n = (s.n || 0) + 1;
       if (!s.lista) s.usadas++;
+      s.finales[s.n] = etapa;
       guardar();
-      const exp = Math.floor(ahora() / 1000) + 3 * 3600;
-      const cuerpo = btoa(JSON.stringify({ d: 'simulado', n: s.usadas, f: fuente, exp })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-      return ok({ estado: 'ok', pase: `v1.${cuerpo}.simulado${s.usadas}`, fuente, quedan: s.lista ? null : quedan - 1, n: s.usadas, dispositivo: b.dispositivo, flags, contexto });
+      return ok({ estado: 'ok', pase: armarPase(s.n, fuente, etapa), fuente, etapa, quedan: s.lista ? null : quedan - 1, n: s.n, dispositivo: b.dispositivo, flags, contexto, regla });
+    }
+    if (ruta === '/api/envion') {
+      let n = null;
+      try { n = JSON.parse(atob(String(b.pase).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).p; } catch { n = null; }
+      if (!n || !s.finales[n]) return Promise.reject(new ErrorRed('http', 400, { error: 'pase' }));
+      let via = 'ya';
+      if (s.finales[n] === 'arranque') {
+        if (s.lista) via = 'lista';
+        else if (s.encuesta && !s.envionEncuesta) { via = 'encuesta'; s.envionEncuesta = true; }
+        else return ok({ estado: 'muro', motivo: 'envion', encuesta_disponible: !s.encuesta, dispositivo: b.dispositivo, regla });
+        s.finales[n] = 'completa'; guardar();
+      }
+      return ok({ estado: 'ok', via, pase: armarPase(n, 'gratis', 'completa'), quedan, lista: s.lista, dispositivo: b.dispositivo, regla });
     }
     if (ruta === '/api/anotar') {
       if (/@(noexiste|mailinator)\./.test(b.email)) return Promise.reject(new ErrorRed('http', 400, { error: /noexiste/.test(b.email) ? 'dominio' : 'descartable' }));
@@ -407,7 +484,7 @@ export function crearServidor(o = {}) {
     if (ruta === '/api/encuesta') {
       if (s.encuesta) return Promise.reject(new ErrorRed('http', 409, { error: 'ya_respondida' }));
       s.encuesta = true; guardar();
-      return ok({ estado: 'ok', bono: s.lista ? 0 : 2 });
+      return ok({ estado: 'ok', bono: s.lista ? 0 : bono });
     }
     if (ruta === '/api/baja') return Promise.resolve({ status: 202, j: {} });
     return Promise.reject(new ErrorRed('http', 404, { error: 'no_existe' }));
@@ -415,7 +492,7 @@ export function crearServidor(o = {}) {
 
   return {
     get modo() { return modo; },
-    dispositivo, copia, estado, pedirPase, paseParaReanudar, finalTerminada, soltarPase, anotar, encuesta, baja,
+    dispositivo, copia, estado, pedirPase, envion, paseParaReanudar, finalTerminada, soltarPase, anotar, encuesta, baja,
   };
 }
 
