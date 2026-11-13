@@ -29,6 +29,7 @@ import { t, esc, fijarIdioma, detectarIdioma, idiomaActual, fijarTactil, alCambi
 import { ganchos } from './ganchos.js';
 import { telefono } from './telefono.js';
 import { conexion } from './conexion.js';
+import { cargaUI } from './ui/carga.js';
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -1244,10 +1245,10 @@ async function partida(cfg) {
   // Los dos modelos se terminan de cargar antes de jugar (venían bajando desde el inicio): leer un GLB, compilar sus shaders o
   // subir sus texturas en medio de un levantamiento es un tirón. Todo eso lo hace escena.precalentar() (arrancó en el inicio,
   // detrás del panel) y recién después se calibra la calidad.
-  $('msg').hidden = false; $('msg').textContent = t('carga.modelos'); await Promise.all(IDS.map(id => escena.cargar(id)));
+  cargaUI.mostrar('carga.modelos'); await Promise.all(IDS.map(id => escena.cargar(id)));
   await escena.mostrar(cfg.id); escena.posar(poseParado(escena.P, 's'), 's'); escena.camara(camPrincipal());
   if (DIBUJA) { E.sinDibujo = true; await E.precal; E.sinDibujo = false; await telefono.horizontal(); const c0 = performance.now(), primera = !E.cargaLista; E.cargaLista = true; await calibrar(); if (primera) ev('carga_lista', { ms: Math.round(performance.now()), calibracion_ms: Math.round(performance.now() - c0), calidad: C.nombre }); }
-  $('msg').hidden = true; E.forzar = true;
+  cargaUI.ocultar(); E.forzar = true;
   if (cfg.calentar && !esU(cfg.ctl)) { if (cfg.ctl === 'f') { await tarjeta(); errMedio = await tutorial(cfg); } else { cfg.cal = await metronomo(); errMedio = await practica(cfg); } }
   // P4: el pase se pide después de la práctica, que no gasta nada
   const n = (+guardado.get('tarima.jugadas') || 0) + 1, pase = await pedirPase(cfg, n, 'bienvenida');
@@ -1272,13 +1273,13 @@ async function partida(cfg) {
 /** Un error que detiene el juego: queda en E.errores, sale en pantalla y va a las métricas como clave corta. */
 function fallar(e, tipo = 'excepcion') {
   E.errores.push(String(e?.stack || e)); console.error(e); ev('error_juego', { tipo, pantalla: E.pantalla, ...detalleError(e) });
-  $('msg').hidden = false; $('msg').textContent = t(tipo === 'inicio' ? 'carga.no_inicia' : 'carga.error');
+  cargaUI.error(tipo === 'inicio' ? 'carga.no_inicia' : 'carga.error');
 }
 
 async function iniciar() {
   const refresco = medirRefresco();
   pintarFijos(); telefono.instalar({ t }); telefono.avisoInstalar();      // en el iPhone, una vez: cómo jugar a pantalla completa
-  $('msg').textContent = t('carga.msg');
+  cargaUI.titulo('carga.msg');
   alCambiarIdioma(() => { pintarFijos(); senalUI?.repintar(); barritaUI?.repintar(); if (E.sobre) pintarSobre(E.sobre.tipo); E.repintar?.(); });
   // P0: el estado del servidor (y la medición) en paralelo con los datos; el muro al cargar si corresponde
   const origen = params.get('lang') ? 'url' : guardado.get('tarima.idioma') ? 'guardado' : 'navegador';
@@ -1289,6 +1290,7 @@ async function iniciar() {
   Object.assign(C, calidadInicial(params.get('q'), tactil())); fijarHz(await refresco);
   if (C.auto) C.Q = { ...C.Q, dpr: 2 };      // en automático el tope de píxeles lo pone la calibración, no la densidad de cada calidad
   escena = new Escena($('gl'), C.Q, { reduceMotion }); escena.poses = poses; nombrar();
+  escena.alProgreso = cargaUI.progreso; cargaUI.esperar([...new Set(IDS.map(id => PLANTEL[id].modelo))].flatMap(m => [m + ':glb', ...(poses[m]?.mask ? [m + ':mask'] : [])]));      // bytes de los modelos para la pantalla de carga
   if (C.auto) { gov = new Gobernador(C.hz); gov.calentar(reloj.ahora(), 4000); }
   // los modelos bajan mientras se mira el inicio; apenas están, se compila y se usa una vez todo lo que se va a dibujar
   const cargas = IDS.map(id => escena.cargar(id).catch(() => null));
@@ -1301,7 +1303,7 @@ async function iniciar() {
   $('capa').addEventListener('click', e => { const b = e.target.closest?.('.idi'); if (b && b.dataset.lang) { cambiarIdioma(b.dataset.lang); $('capa').querySelector(`.idi[data-lang="${idiomaActual()}"]`)?.focus({ preventScroll: true }); } });
   addEventListener('keydown', alTeclado, true); $('pausa').onclick = () => abrirSobre('pausa'); $('saltar').onclick = () => E.saltar?.();
   ponerAcuse(); if (params.get('depura') === '1') depura = new Depura($('depura'), () => ({ perf: perf.ult, calidad: window.JUEGO.calidad, toques, pantalla: E.pantalla }));
-  $('msg').hidden = true;
+  cargaUI.ocultar();
   ultimo = reloj.ahora(); requestAnimationFrame(bucle);
   const A = await arranque;
   ev('juego_abierto', { carga_ms: Math.round(performance.now()), pantalla_inicial: A.muro ? 'muro' : 'bienvenida' });

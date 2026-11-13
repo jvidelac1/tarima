@@ -16,6 +16,8 @@
 <meta name="apple-mobile-web-app-title" content="Tarima">
 <link rel="stylesheet" href="css/juego.css">
 <link rel="stylesheet" href="css/bienvenida.css">
+<link rel="stylesheet" href="css/carga.css">
+<link rel="stylesheet" href="css/carga_lev.css">
 <script type="importmap">
 { "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/addons/" } }
 </script>
@@ -54,12 +56,21 @@
   <button id="saltar" hidden tabindex="-1">Saltar práctica <kbd class="tecla ch">ESC</kbd></button>
   <div id="sobre" hidden></div>
   <div id="sinfoco" hidden>El juego no recibe el teclado · haz clic aquí</div>
-  <div id="msg">Tarima</div>
+  <div id="msg" class="carga">
+    <div class="carga-luz" aria-hidden="true"></div>
+    <svg class="lev" viewBox="0 -26 200 210" aria-hidden="true" focusable="false"><defs><radialGradient id="lev-luz" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#35e6d6" stop-opacity=".22"/><stop offset="1" stop-color="#35e6d6" stop-opacity="0"/></radialGradient></defs><ellipse cx="100" cy="178" rx="92" ry="9" fill="url(#lev-luz)"/><path d="M14 177H186" stroke="#1b2548" stroke-width="3"/><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M90 175L96 168L114 175Z" stroke-width="6" fill="currentColor"/><g class="lr"><g class="lm"><path d="M0 0V38" stroke-width="14"/><g transform="translate(0 38)"><g class="lp"><path d="M0 0V36" stroke-width="10"/></g></g></g><g class="lt"><path d="M0 0V-48" stroke-width="17"/><circle cx="7" cy="-62" r="9" fill="currentColor" stroke="none"/><g transform="translate(0 -48)"><g class="lb"><path d="M0 0V31" stroke-width="9"/><g transform="translate(0 31)"><g class="la"><path d="M0 0V29" stroke-width="8"/><g transform="translate(0 29)"><circle r="18" stroke="#ffd23f" stroke-width="6"/><circle r="4" fill="#ffd23f" stroke="none"/></g></g></g></g></g></g></g></g></svg>
+    <div class="carga-marca" aria-hidden="true">Tarima</div>
+    <p class="carga-titulo" id="msg-txt"></p>
+    <div class="carga-prog indet" id="carga-prog" role="progressbar" aria-valuemin="0" aria-valuemax="100"><div class="carga-fila"><div class="carga-barra"><i id="carga-barra-i"></i></div><span class="carga-pct" id="carga-pct"></span></div><div class="carga-det" id="carga-det"></div></div>
+    <p class="carga-dato" id="carga-dato"></p>
+  </div>
 </div>
 <div id="zona" aria-label="Zona de toque del levantamiento"><span id="zona-txt">Toca</span></div>
 <div id="instalar" hidden role="status"><span id="instalar-t"></span><button id="instalar-ok" type="button">OK</button></div>
+<div id="carga-mini" hidden aria-hidden="true"><i></i></div>
 </div>
 <div id="editor" hidden><label for="editor-campo"><span id="editor-t"></span></label><div class="fila"><input id="editor-campo" autocomplete="off"><button class="ir" id="editor-listo" type="button">Listo</button></div></div>
+<script type="module" async src="js/game/ui/carga.js"></script>
 <script type="module" src="js/game/telefono.js"></script>
 <script type="module" src="js/game/main.js"></script>
 </body>
