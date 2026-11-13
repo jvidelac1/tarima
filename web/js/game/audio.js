@@ -153,6 +153,12 @@ export const sonido = {
   metal(fuerte = 1) { tono(2350, 2200, .09, 'triangle', .07 * fuerte); tono(3400, 3300, .06, 'triangle', .04 * fuerte); ruido(.03, .2 * fuerte, 4200, { tipo: 'bandpass', q: 4 }); },
   /** Disco que sale de la manga: roce. */
   roce() { ruido(.18, .07, 1800, { tipo: 'bandpass', q: 1.5 }); },
+  /** FRENO: un latido (dos golpes graves, el segundo más suave). */
+  latido() { if (!listo()) return; const t = ctx.currentTime; for (const [en, v] of [[0, .55], [.17, .35]]) { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(62, t + en); o.frequency.exponentialRampToValueAtTime(40, t + en + .14); g.gain.setValueAtTime(.0001, t + en); g.gain.exponentialRampToValueAtTime(v, t + en + .012); g.gain.exponentialRampToValueAtTime(.001, t + en + .16); o.connect(g).connect(ctx.destination); o.start(t + en); o.stop(t + en + .18); } vibra(15); },
+  /** ¡PÁRATE!: el pisotón contra la tarima (golpe de bajo) y el grito corto del pesista. */
+  pisoton() { tono(58, 34, .26, 'sine', .7); ruido(.08, .4, 320); masa(.3, .07, 760, 520, .03); vibra(25); },
+  /** La garra traba la barra: golpe y la tribuna que estalla. */
+  garra() { tono(90, 45, .2, 'sine', .55); ruido(.06, .3, 900); masa(1.2, .2, 1100, 800, .08); vibra(40); },
   /** «¡Ohhh!» de la tribuna cuando se cae la barra. */
   lamento() { masa(1.6, .16, 520, 260, .18); },
   /** Ovación: la tribuna que sube y aplausos sueltos. `fuerza` 0 a 1 (más en los intentos que deciden medallas). */

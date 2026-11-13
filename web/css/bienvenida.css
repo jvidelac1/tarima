@@ -92,6 +92,12 @@ button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px
 .pesista .med i{font-style:normal;color:var(--mute);text-transform:uppercase;letter-spacing:.04em;font-family:var(--display);font-weight:700}
 .pesista .med em{font-style:normal;color:var(--ink);text-align:right;white-space:nowrap}
 .pesista .barra{display:block;min-width:24px;height:6px;background:linear-gradient(90deg,var(--teal) var(--v,50%),#26305c var(--v,50%))}
+/* 'u': lo que le cuesta cada tramo a ese cuerpo (fácil en dorado, le cuesta en rojo); separado de las medidas por una línea */
+.pesista .med:not(.tramo)+.med.tramo{margin-top:.35em;padding-top:.35em;border-top:1px solid #26305c}
+.pesista .med.tramo.facil .barra{background:linear-gradient(90deg,var(--gold) var(--v,50%),#26305c var(--v,50%))}
+.pesista .med.tramo.facil em{color:var(--gold)}
+.pesista .med.tramo.cuesta .barra{background:linear-gradient(90deg,#ff6a5f var(--v,50%),#26305c var(--v,50%))}
+.pesista .med.tramo.cuesta em{color:#ff8a80}
 /* teléfono de costado: tarjetas bajas (el panel entra en 340 px de alto) */
 :where(html.horiz.bajo) .pesista .cuerpo{gap:0;margin:.15em 0}
 :where(html.horiz.bajo) .pesista .med{font-size:.66em;line-height:1.15;grid-template-columns:5.2em 1fr 3.4em}

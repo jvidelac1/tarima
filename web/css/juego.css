@@ -27,7 +27,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
   :where(html:not(.rotado)) .panel{max-height:100%}
 }
 #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:20px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);pointer-events:none;background:radial-gradient(ellipse at center,#0a1030 0,#03050c 70%)}
-#tv{position:absolute;inset:0;pointer-events:none;font-family:var(--display);text-transform:uppercase}
+#tv{position:absolute;inset:0;z-index:1;pointer-events:none;font-family:var(--display);text-transform:uppercase}
 .bug{position:absolute;top:calc(var(--u)*1.2 + var(--st));left:calc(var(--u)*1.2 + var(--sl));background:rgba(6,14,48,.88);padding:calc(var(--u)*.4) calc(var(--u)*.9);border-left:calc(var(--u)*.28) solid var(--teal)}
 .bug b{display:block;font-weight:800;font-size:calc(var(--u)*1.25);letter-spacing:.04em;line-height:1.1}
 .bug span{display:block;font-weight:500;font-size:calc(var(--u)*.78);letter-spacing:.12em;color:var(--mute)}
@@ -305,6 +305,7 @@ html.rotado #app{position:fixed;left:0;top:0;flex:none;width:var(--app-w,100vh);
 .turno{position:absolute;left:50%;top:calc(var(--u)*5 + var(--st));transform:translateX(-50%);display:flex;align-items:center;gap:.7em;background:rgba(6,14,48,.92);border-bottom:calc(var(--u)*.3) solid var(--c,var(--gold));padding:calc(var(--u)*.45) calc(var(--u)*1.1);max-width:min(92cqw,calc(var(--u)*46));white-space:nowrap}
 .turno i{width:1.8em;height:1.15em;flex:none}
 .turno b{font-weight:800;font-size:calc(var(--u)*1.5);letter-spacing:.05em;color:#fff}
+.turno em{font-style:normal;font-weight:800;font-size:calc(var(--u)*1.15);letter-spacing:.04em;color:var(--gold)}
 .turno span{font-family:var(--body);text-transform:none;font-size:calc(var(--u)*1.05);color:var(--mute);overflow:hidden;text-overflow:ellipsis}
 .marcador{position:absolute;left:calc(var(--u)*1.2 + var(--sl));top:calc(var(--u)*4.4 + var(--st));background:rgba(6,14,48,.88);border-left:calc(var(--u)*.28) solid var(--c,var(--teal));padding:calc(var(--u)*.3) calc(var(--u)*.8);display:flex;flex-direction:column;max-width:46%}
 .marcador b{font-weight:800;font-size:calc(var(--u)*1.05);letter-spacing:.05em;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -340,3 +341,38 @@ html.editando #app{visibility:hidden}
 :where(html.horiz.bajo) body:has(#senal:not([hidden])) #rival{display:none}
 :where(html.horiz.bajo) .panel.lado :is(p.frase,p.reloj){display:none}
 :where(html.horiz.bajo) .veredicto small{font-size:max(13px,calc(var(--u)*1.25))}
+
+/* ---------- 'u': margen a la vista, FRENO y pisotón (ui/margen.js; docs/JUEGO.md, Gameplay 2, «Emoción») ---------- */
+.margen{position:absolute;z-index:3;left:50%;top:calc(var(--u)*4.6 + var(--st));transform:translateX(-50%);display:flex;align-items:center;gap:calc(var(--u)*.6);background:rgba(6,14,48,.86);padding:calc(var(--u)*.35) calc(var(--u)*.9);border-bottom:calc(var(--u)*.25) solid var(--teal);pointer-events:none;white-space:nowrap}
+.margen .m-t{font-weight:800;font-size:calc(var(--u)*.95);letter-spacing:.12em;color:var(--mute)}
+.margen .m-d{display:flex;gap:calc(var(--u)*.35)}
+.margen .m-d i{display:block;width:calc(var(--u)*2.1);height:calc(var(--u)*2.1);border-radius:50%;background:conic-gradient(var(--teal) calc(var(--f,1)*360deg),rgba(255,255,255,.08) 0);box-shadow:inset 0 0 0 calc(var(--u)*.17) rgba(255,255,255,.4)}
+.margen .m-d.bajo i{box-shadow:inset 0 0 0 calc(var(--u)*.17) var(--red)}
+.margen .m-g{font-weight:800;font-size:calc(var(--u)*.9);letter-spacing:.1em;padding:.18em .5em;border:1px solid var(--gold);color:var(--gold);text-transform:uppercase}
+.margen .m-g[data-estado=gastada],.margen .m-g[data-estado=usada]{opacity:.28;border-color:var(--mute);color:var(--mute)}
+.margen .m-p{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:calc(var(--u)*.45);font-weight:800;font-size:calc(var(--u)*1.35);letter-spacing:.04em;color:#fff;text-shadow:0 2px 8px #000,0 0 3px #000;opacity:0;transition:opacity .25s}
+.margen .m-p.on{opacity:1}
+.margen .m-p.oro{color:var(--gold)}
+.margen .m-p.mal{color:#ff6a5f}
+.margen .m-p.gris{color:var(--mute)}
+.margen.freno{border-color:var(--gold)}
+.margen.freno .m-g{background:var(--gold);color:#111;opacity:1}
+.margen.vale{border-color:var(--ok)}
+.margen.vale .m-d i{background:conic-gradient(var(--ok) calc(var(--f,1)*360deg),rgba(255,255,255,.08) 0)}
+.margen.limite{border-color:var(--gold);box-shadow:0 0 calc(var(--u)*1.4) rgba(255,210,63,.5)}
+.margen.limite .m-d i{background:conic-gradient(var(--gold) calc(var(--f,1)*360deg),rgba(255,255,255,.08) 0)}
+.margen.cae{border-color:var(--red)}
+.margen.cae .m-d i:first-child{box-shadow:inset 0 0 0 calc(var(--u)*.17) var(--red);background:rgba(226,35,26,.35)}
+/* el FRENO: la escena se oscurece por los bordes mientras late la garra */
+#escena.freno::after{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 42%,rgba(0,0,0,.62) 100%)}
+@media (prefers-reduced-motion:no-preference){
+  .margen.freno .m-g{animation:latidoG .62s ease-in-out infinite}
+  .margen.cae .m-d i:first-child{animation:parpadea .5s steps(2,jump-none) 6}
+  .margen .m-p.on{animation:pal .2s ease-out}
+  #escena.freno::after{animation:latidoV .62s ease-in-out infinite}
+  #gl.sacude{animation:sacude .12s linear}
+}
+@keyframes latidoG{0%,100%{transform:scale(1)}14%{transform:scale(1.22)}28%{transform:scale(1)}42%{transform:scale(1.12)}}
+@keyframes latidoV{0%,100%{opacity:.85}14%{opacity:1}42%{opacity:.95}}
+@keyframes parpadea{0%{opacity:1}100%{opacity:.15}}
+@keyframes sacude{0%{transform:translate(0,0)}25%{transform:translate(4px,-2px)}50%{transform:translate(-4px,2px)}75%{transform:translate(2px,1px)}100%{transform:translate(0,0)}}

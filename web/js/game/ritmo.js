@@ -40,8 +40,12 @@ export function tramoResumen(m) {
 }
 /** Desde dónde se muestra entero el turno decisivo de un rival (ms de su intento): 1 s antes de su primera explosión. */
 export function desdeDecisivo(m, conf) { const M = m.movs[0]; return Math.max(0, conf, (M && (M.tr || M.tx || M.tp) || 0) - RITMO.decisivo.antes); }
-/** Duración del veredicto propio en 'u' (s), con los mismos momentos que decision() en main.js. */
-export function veredictoPropio(ok, conFinal = true) {
-  const paso = .3, tLuz = conFinal && !ok ? .45 : conFinal ? .2 : .25, tVer = tLuz + 2 * paso + .25;
-  return { tVer, total: tVer + (ok ? RITMO.propioOk : RITMO.propioFallo) };
+/**
+ * Duración del veredicto propio en 'u' (s), con los mismos momentos que decision() en main.js. `limite`: válido al límite,
+ * las luces se prenden con suspenso (`paso` más largo) y el veredicto sigue sin pasar de 3 s en total.
+ */
+export function veredictoPropio(ok, conFinal = true, limite = false) {
+  const paso = ok && limite ? .45 : .3, tLuz = conFinal && !ok ? .45 : conFinal ? .2 : .25, tVer = tLuz + 2 * paso + .25;
+  const tot = tVer + (ok ? RITMO.propioOk : RITMO.propioFallo);
+  return { tVer, paso, total: ok && limite ? Math.min(tot, veredictoPropio(true, conFinal).total) : tot };
 }

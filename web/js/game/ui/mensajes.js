@@ -120,3 +120,19 @@ export function pasos(ctl = 'f', tactil = false, l = idiomaActual()) {
 export const GUIA = { tira: 'guia.tira', explota: 'guia.explota', recibi: 'guia.recibi', empuja: 'guia.empuja', aguanta: 'guia.aguanta', flexiona: 'guia.flexiona' };
 /** Reemplaza {A}, {T} y {t} según haya teclado o no (para textos que ya vienen armados, como el `sub` de la señal). */
 export const conTecla = (txt, tactil, l = idiomaActual()) => { const k = teclasDe(l, tactil); return txt.replace('{A}', k.A).replace('{T}', k.T).replace('{t}', k.t); };
+/** Milésimas de disco en cuartos, cortito y sin la palabra («½», «1¼», «0»): la palabra de cada disco que se apaga. */
+export function cuartos(m) { const a = Math.abs(m); let q = Math.round(a / 250); if (!q && a > 0) q = 1; const n = Math.floor(q / 4), fr = ['', '¼', '½', '¾'][q % 4]; return q ? (n ? String(n) : '') + fr : '0'; }
+/**
+ * La chance del panel en décimos («7 de 10»). `ch` en milésimas (rules.js, chanceUno). «10 de 10» solo si de verdad no falla
+ * (≥ 99,5 %) y «0 de 10» solo si de verdad no llega (< 0,5 %): en las puntas el redondeo no promete de más.
+ */
+export const deDiez = ch => (ch >= 995 ? 10 : ch < 5 ? 0 : Math.max(1, Math.min(9, Math.round(ch / 100))));
+/**
+ * Punto fuerte y débil del cuerpo de un pesista en 'u' (factores de sim.json → cuerpoJuego, milésimas): el tramo que menos
+ * le cuesta y, si alguno le cuesta de verdad (≥ 1150), el que más. Nivel de cada tramo para la tarjeta.
+ */
+export const nivelTramo = k => (k <= 750 ? 'facil' : k >= 1150 ? 'cuesta' : 'normal');
+export function fuerteDebil(cuerpo) {
+  const T = ['tiron', 'arriba', 'pararse'], f = T.reduce((a, x) => (cuerpo[x] < cuerpo[a] ? x : a)), d = T.reduce((a, x) => (cuerpo[x] > cuerpo[a] ? x : a));
+  return { fuerte: nivelTramo(cuerpo[f]) === 'facil' ? f : null, debil: nivelTramo(cuerpo[d]) === 'cuesta' ? d : null };
+}

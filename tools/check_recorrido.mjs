@@ -73,7 +73,11 @@ const leerUI = () => J(() => {
 // ---- qué levantamientos se pierden a propósito (por el título del panel del llamado)
 //   arranque 2: no toca ¡RECIBÍ! · arranque 3: no toca ¡EXPLOTÁ! y después del final machaca Espacio
 //   dos tiempos 2: no toca el ¡RECIBÍ! del envión (la barra arriba)
+//   arranque 2 y dos tiempos 2: sube de a 1 kg hasta que el panel dice «5 de 10» o menos (al límite: ahí aparece el FRENO
+//   si el día no ayuda, y se fotografían los discos y la garra)
 const PLAN = [
+  { re: /(Arranque · intento|Snatch · attempt) 2/, omite: () => false, medio: true, nombre: 'arranque 2 a 5 de 10' },
+  { re: /(Dos tiempos · intento|Clean & jerk · attempt) 2/, omite: () => false, medio: true, nombre: 'dos tiempos 2 a 5 de 10' },
   { re: /(Arranque · intento|Snatch · attempt) 3/, omite: () => false, pesado: true, machaca: true, nombre: 'arranque 3 con 25 kg de más, machacando después' },
 ];
 
@@ -85,6 +89,8 @@ const tramos = [];           // por levantamiento propio: espera hasta el próxi
 const senales = [];          // por señal con círculo: anticipación y apertura
 const machaque = [], preps = [];          // preps: de Confirmar en el llamado a que aparece ¡TIRÁ!
 let senalPrev = '', senalesFoto = 0, tLlamado0 = null, tPodio = null;
+// 'u': fotos de los discos de margen cuando cierra un tramo (el primer levantamiento y los que van al límite) y del FRENO
+let margenPrev = null, fotosMargen = 0, frenos = 0, frenoLev = -1; const medios = [];
 
 for (let n = 0; n < 60000; n++) {
   const s = await J(() => JUEGO.estado());
@@ -101,7 +107,12 @@ for (let n = 0; n < 60000; n++) {
   while (fotosPend.length && s.ahora >= fotosPend[0]) { fotosPend.shift(); const u = await leerUI(); await foto(`${slug(s.pantalla)}_${nLev}_${slug(u.veredicto.slice(0, 40)) || 'sin_texto'}`); }
   const I = s.intento;
   if (I && I.propio && s.modo !== 'panel') {
-    if (!enIntento) { enIntento = true; nLev++; }
+    if (!enIntento) { enIntento = true; nLev++; margenPrev = null; }
+    if (I.uno && I.uno.margen !== margenPrev) {
+      const antes = margenPrev; margenPrev = I.uno.margen;
+      if (antes !== null && fotosMargen < 12 && (nLev === 1 || (plan && (plan.medio || plan.pesado)))) { fotosMargen++; await av(250); await foto(`margen_${nLev}_${I.fase}`); continue; }
+    }
+    if (I.fase === 'freno' && frenoLev !== nLev) { frenoLev = nLev; frenos++; await av(700); await foto(`freno_${nLev}`); continue; }
     const g = I.senal;
     if (g && g.clave + g.desde !== senalPrev) {
       senalPrev = g.clave + g.desde;
@@ -149,6 +160,15 @@ for (let n = 0; n < 60000; n++) {
       if (s.pantalla === 'llamado' && llamadoTxt !== P.titulo) {
         llamadoTxt = P.titulo; plan = PLAN.find(x => x.re.test(P.titulo)) || null; if (tLlamado0 === null) tLlamado0 = s.ahora;
         await av(450); if (plan && plan.pesado) for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowUp');
+        if (plan && plan.medio) {
+          let leido = '';
+          for (let i = 0; i < 30; i++) {
+            const c = await J(() => { const x = document.querySelector('#capa .chance'); return x ? x.textContent : ''; }); leido = c;
+            const n = parseInt(c, 10); if (!c || !(n > 5)) break;
+            await J(() => document.querySelector('#capa #kg-mas')?.click()); await av(60);
+          }
+          medios.push(`${P.titulo}: ${leido}`);
+        }
         await foto(`llamado_${slug(P.titulo)}`);
       }
       await av(300);
@@ -167,6 +187,7 @@ console.log(`levantamientos propios: ${fin.propios.map(x => `${x.pantalla}:${x.r
 console.log('\nESPERA SIN TOCAR entre el final de cada levantamiento propio y el próximo panel que pide algo (reloj del juego):');
 for (const T of tramos) console.log(`  lev ${T.lev} [${T.llamado}] ${T.res} → ${T.espera !== undefined ? (T.espera / 1000).toFixed(1) + ' s hasta ' + T.hasta : 'fin'}\n     ${T.pantallas || ''}${T.linea ? `\n     línea: «${T.linea}»` : ''}${T.machaca ? `\n     machacando Espacio cada 120 ms después del final: ${T.machaca}` : ''}`);
 console.log(`\nDE CONFIRMAR A ¡TIRÁ! (sin tocar): ${preps.join(' · ')}`);
+console.log(`AL LÍMITE (panel «5 de 10»): ${medios.join(' · ') || '—'} · FRENOS vistos: ${frenos} · fotos de los discos: ${fotosMargen}`);
 console.log('\nSEÑALES CON CÍRCULO: ms desde que aparece hasta el cierre');
 const porClave = {}; for (const x of senales) (porClave[(x.guiado ? 'guiado ' : '') + x.clave] ||= []).push(x.anticipa);
 for (const [k, v] of Object.entries(porClave)) console.log(`  ${k}: ${v.join(', ')}`);
