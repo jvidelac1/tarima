@@ -6,9 +6,10 @@
 //  - P8: invitación suave en el podio 1 (bandera invitacion-podio1) y, con la regla vieja (GRATIS_ETAPA='final'), muro en
 //    el podio de la última final gratis.
 //  - Intervalo (regla de producción, GRATIS_ETAPA='arranque'): la final gratis da solo el arranque; al terminarlo sube el
-//    muro (momento 'tras_arranque'). Correo o encuesta → el Worker da permiso para el dos tiempos (servidor.envion) y la
-//    final sigue ahí mismo; «Ahora no» → la tabla del arranque, la final termina ahí y vuelve al inicio.
-//  - P9 a P11: el muro con sus dos caminos (correo o encuesta), la encuesta y el alta en la lista.
+//    muro (momento 'tras_arranque'). Correo → el Worker da permiso para el dos tiempos (servidor.envion) y la final sigue
+//    ahí mismo; «Ahora no» → la tabla del arranque, la final termina ahí y vuelve al inicio.
+//  - P9 a P11: el muro (solo el correo: decisión del dueño del 13 de noviembre, el correo es obligatorio), el alta en la
+//    lista y, en el panel de «anotado», la encuesta opcional de dos preguntas (no da nada; se puede saltear).
 // Todo lo que se ve sale del diccionario (i18n/) y lo escrito por la persona entra escapado. El correo nunca va a las
 // métricas (analitica.js descarta cualquier propiedad con «@»).
 import { ganchos } from './ganchos.js';
@@ -20,11 +21,9 @@ const guardado = { get: k => { try { return localStorage.getItem(k); } catch { r
 // regla: la que manda el Worker (etapa 'arranque' | 'final', gratis, bono). etapa: la de la final en curso. proxima: con qué
 // etapa saldría la próxima final ('arranque' = el arranque gratis: la bienvenida no promete «te queda 1 final»).
 const REGLA_VIEJA = { etapa: 'final', gratis: 2, bono: 2 };
-const S = { estado: null, quedan: null, lista: false, reanudar: null, previas: 0, gratis: 2, encuesta: false, regla: REGLA_VIEJA, etapa: 'completa', proxima: 'completa', pantalla: () => '', cambiarIdioma: null };
+const S = { estado: null, quedan: null, lista: false, reanudar: null, previas: 0, gratis: 2, regla: REGLA_VIEJA, etapa: 'completa', proxima: 'completa', pantalla: () => '', cambiarIdioma: null };
 const leerRegla = r => (r && typeof r === 'object' ? { etapa: r.etapa === 'arranque' ? 'arranque' : 'final', gratis: Number.isFinite(r.gratis) ? r.gratis : 2, bono: Number.isFinite(r.bono) ? r.bono : 2 } : null);
 const conArranque = () => S.regla.etapa === 'arranque';
-/** Texto con {n}: la clave `_1` si n es 1. */
-const tn = (clave, n, datos = {}) => t(n === 1 ? clave + '_1' : clave, { ...datos, n });
 const encuestaHecha = () => guardado.get('tarima.encuesta') === '1';
 
 /** Selector ES · EN dentro de un panel (el clic lo atiende main.js para todas las pantallas). */
@@ -90,72 +89,11 @@ function atarFormulario(raiz, { pantalla, nombre, alAnotar, momento = null, boto
   });
 }
 
-// ---------- encuesta (P10) ----------
-const PREGUNTAS = [
-  { q: 'q1', ops: ['pesista_propio', 'carrera', 'sedes', 'mujeres_categorias', 'amigos_online', 'realismo'], max: 2 },
-  { q: 'q2', ops: ['no_entendi', 'largo', 'dificil', 'facil', 'tecnico', 'nada'], max: 2, sola: 'nada' },
-  { q: 'q3', ops: ['telefono', 'compu', 'tablet', 'consola'], max: 1 },
-  { q: 'q4', ops: ['unico', 'cosmeticos', 'publicidad', 'suscripcion', 'no'], max: 1 },
-];
-/**
- * La encuesta en #capa. Resuelve 'ok' (mandada; `bono` en S), 'ya' (ya se había contestado) o 'volver'. `momento`:
- * 'tras_arranque' (el premio es seguir con el dos tiempos y una final más), 'inicio' o 'podio'.
- */
-function encuesta(capa, { conPremio, momento = null }) {
-  const envion = momento === 'tras_arranque', completas = conArranque() && !envion, bono = S.regla.bono;
-  const premio = () => (envion ? tn('encuesta.premio_envion', bono) : completas ? tn('encuesta.premio_completa', bono) : t('encuesta.premio'));
-  analitica.encuestaVista({ con_premio: conPremio });
-  const R = { q1: [], q2: [], q3: '', q4: '', q5: '' };
-  return new Promise(res => {
-    let fin = false, nota = null;
-    const pinta = () => {
-      const q5 = capa.querySelector('#q5'); if (q5) R.q5 = q5.value;
-      const pn = panel(capa, `${idiomasHTML()}<h2>${t('encuesta.titulo')}</h2>${conPremio ? `<p class="cuenta">${premio()}</p>` : ''}
-        ${PREGUNTAS.map(P => `<fieldset class="pregunta"><legend>${t('encuesta.' + P.q)}</legend><div class="opciones-q">${P.ops.map(o => `<button type="button" class="op" data-q="${P.q}" data-o="${o}" aria-pressed="${P.max === 1 ? R[P.q] === o : R[P.q].includes(o)}">${t(`encuesta.${P.q}.${o}`)}</button>`).join('')}</div></fieldset>`).join('')}
-        <label class="campo" for="q5"><span>${t('encuesta.q5')}</span><textarea id="q5" rows="2" maxlength="280" enterkeyhint="done" placeholder="${esc(t('encuesta.q5_ph'))}">${esc(R.q5)}</textarea></label>
-        <p class="error" id="err" role="alert"${nota ? '' : ' hidden'}>${nota ? t(nota) : ''}</p>
-        <div class="fila"><button class="ir grande" id="btn-enviar">${t(!conPremio ? 'encuesta.enviar_anotado' : envion ? 'encuesta.enviar_envion' : 'encuesta.enviar')}</button><button id="btn-volver">${t('encuesta.volver')}</button></div>`, 'encuesta');
-      pn.querySelectorAll('.op').forEach(b => b.addEventListener('click', () => {
-        const P = PREGUNTAS.find(x => x.q === b.dataset.q), o = b.dataset.o;
-        if (P.max === 1) R[P.q] = o;
-        else {
-          let v = R[P.q].includes(o) ? R[P.q].filter(x => x !== o) : [...R[P.q], o];
-          if (P.sola && o === P.sola && v.includes(o)) v = [o]; else if (P.sola) v = v.filter(x => x !== P.sola);
-          R[P.q] = v.slice(-P.max);
-        }
-        for (const x of pn.querySelectorAll(`.op[data-q="${P.q}"]`)) x.setAttribute('aria-pressed', P.max === 1 ? String(R[P.q] === x.dataset.o) : String(R[P.q].includes(x.dataset.o)));
-      }));
-      pn.querySelector('#btn-volver').addEventListener('click', () => { if (fin) return; fin = true; quitar(); analitica.encuestaCerrada(); res('volver'); });
-      pn.querySelector('#btn-enviar').addEventListener('click', async e => {
-        const btn = e.currentTarget; if (fin || btn.disabled) return;
-        R.q5 = pn.querySelector('#q5').value;
-        const err = pn.querySelector('#err'), decir = k => { nota = k; err.hidden = false; err.textContent = t(k); };
-        if (!R.q1.length || !R.q2.length || !R.q3 || !R.q4) return decir('encuesta.falta');
-        btn.disabled = true;
-        const r = await servidor.encuesta({ r: { q1: R.q1, q2: R.q2, q3: R.q3, q4: R.q4, ...(R.q5.trim() ? { q5: R.q5.trim().slice(0, 280) } : {}) }, idioma: idiomaActual(), sesion: analitica.idSesion() });
-        btn.disabled = false;
-        if (r.ok) {
-          fin = true; quitar(); guardado.set('tarima.encuesta', '1'); S.encuesta = false;
-          analitica.ev('encuesta_enviada', { con_premio: r.bono > 0, momento });
-          if (r.bono > 0) { S.quedan = (S.quedan || 0) + r.bono; S.proxima = 'completa'; }
-          const gracias = r.bono > 0 ? (envion ? t('encuesta.ok_envion') : completas ? tn('encuesta.ok_completa', r.bono) : t('encuesta.ok')) : t('encuesta.ok_anotado');
-          panel(capa, `<h2>${gracias}</h2>`, 'chico');
-          setTimeout(() => res('ok'), 1600); return;
-        }
-        if (r.error === 'ya_respondida') { fin = true; quitar(); guardado.set('tarima.encuesta', '1'); panel(capa, `<h2>${t('encuesta.ya')}</h2>`, 'chico'); setTimeout(() => res('ya'), 1800); return; }
-        decir(r.error === 'limite' ? 'lista.error_limite' : r.error === 'incompleta' ? 'encuesta.falta' : 'lista.error_red');
-      });
-    };
-    const quitar = alIdioma(() => { if (!fin) pinta(); });
-    pinta();
-  });
-}
-
 // ---------- muro (P9) y anotado (P11) ----------
 /**
- * El muro. Resuelve true si la persona puede jugar (se anotó, o contestó la encuesta con premio) y false si vuelve al
- * inicio («Ahora no» y después «Volver al inicio»; en el intervalo, «Ahora no» resuelve false enseguida y quien llama
- * muestra la tabla del arranque).
+ * El muro: solo el correo (decisión del dueño del 13 de noviembre: el correo es obligatorio; la encuesta ya no es un
+ * camino del muro). Resuelve true si la persona se anotó y false si vuelve al inicio («Ahora no» y después «Volver al
+ * inicio»; en el intervalo, «Ahora no» resuelve false enseguida y quien llama muestra la tabla del arranque).
  * `info.momento`: 'tras_arranque' (en el intervalo, con la regla del arranque gratis), 'inicio' (antes del primer intento
  * de una final: al cargar o al pedir el pase) o 'podio' (regla vieja). Si no viene, sale de `info.origen`.
  */
@@ -163,65 +101,91 @@ async function muro(info) {
   const capa = info.capa, motivo = info.motivo || 'dispositivo';
   const momento = info.momento || (info.origen === 'podio' ? 'podio' : 'inicio');
   const envion = momento === 'tras_arranque', nuevo = conArranque() && momento !== 'podio' && motivo !== 'ip';
-  for (;;) {
-    // en el podio no hay respuesta nueva del servidor: vale lo último que dijo (al cargar o en el último pase)
-    const disponible = !!(info.encuesta_disponible ?? S.encuesta) && !encuestaHecha();
-    const soloMail = !disponible && !envion && (encuestaHecha() || S.previas > S.gratis);
-    const variante = analitica.bandera('muro-texto') === 'b' ? 'b' : 'a';
-    analitica.ev('muro_visto', { motivo, momento, caminos: disponible ? 'mail+encuesta' : 'mail', origen: info.origen || 'podio', variante_texto: variante, previas: S.previas, gratis_etapa: S.regla.etapa });
-    const r = await new Promise(res => {
-      let datos = { aviso: false, novedades: false, correo: '' }, despues = false, cerrado = false;
-      const pinta = () => {
-        const prev = capa.querySelector('.formulario'); if (prev) datos = leerFormulario(prev);
-        const n = S.previas || S.gratis, nombre = esc(info.nombre), bono = S.regla.bono;
-        const titulo = motivo === 'ip' ? t('muro.titulo_ip') : envion ? t('muro.arranque.titulo', { nombre }) : nuevo ? t('muro.inicio.titulo', { nombre })
-          : n === 1 ? t('muro.titulo_1', { nombre }) : t('muro.titulo', { nombre, n });
-        const bajada = envion ? t('muro.arranque.bajada') : nuevo ? t('muro.inicio.bajada') : t(variante === 'b' ? 'muro.promesa_b' : 'muro.promesa');
-        const camino = envion ? t('muro.arranque.camino_mail') : nuevo ? t('muro.inicio.camino_mail') : t(variante === 'b' ? 'muro.camino_mail_b' : 'muro.camino_mail');
-        const caminoEncuesta = envion ? tn('muro.arranque.camino_encuesta', bono) : nuevo ? tn('muro.inicio.camino_encuesta', bono) : t('muro.camino_encuesta');
-        const boton = envion ? t('muro.arranque.boton') : null;
-        const pie = envion ? `<button id="btn-ahora-no">${t('muro.arranque.ahora_no')}</button>`
-          : despues ? `<p class="chica">${t('muro.despues')}</p><button id="btn-volver">${t('muro.volver')}</button>` : `<button id="btn-ahora-no">${t('muro.ahora_no')}</button>`;
-        const pn = panel(capa, `${idiomasHTML()}<h1>${titulo}</h1><p class="bajada">${bajada}</p>
-          <div class="muro-cuerpo">${formularioHTML({ ...datos, camino: `<b>${camino}</b>`, otro: true, boton })}
-          ${disponible ? `<div class="camino-encuesta"><p>${caminoEncuesta}</p><button id="btn-encuesta">${t('muro.encuesta_boton')}</button></div>` : soloMail ? `<p class="chica">${t('muro.solo_mail')}</p>` : ''}</div>
-          <div class="fila">${pie}</div>`, envion ? 'muro tras-arranque' : 'muro', null);
-        atarFormulario(pn.querySelector('.formulario'), { pantalla: 'muro', momento, boton, nombre: info.nombre, alAnotar: x => { cerrado = true; quitar(); res({ anotado: x }); } });
-        pn.querySelector('#btn-encuesta')?.addEventListener('click', () => { cerrado = true; quitar(); res({ encuesta: true }); });
-        pn.querySelector('#btn-ahora-no')?.addEventListener('click', () => {
-          analitica.ev('muro_ahora_no', { momento });
-          if (envion) { cerrado = true; quitar(); res({ volver: true }); return; }
-          despues = true; pinta();
-        });
-        pn.querySelector('#btn-volver')?.addEventListener('click', () => { cerrado = true; quitar(); analitica.ev('muro_cerrado', { momento }); res({ volver: true }); });
-      };
-      const quitar = alIdioma(() => { if (!cerrado) pinta(); });
-      pinta();
-    });
-    if (r.volver) return false;
-    if (r.encuesta) {
-      const e = await encuesta(capa, { conPremio: true, momento });
-      if (e === 'ok') return true;
-      if (e === 'ya') info = { ...info, encuesta_disponible: false };
-      continue;
-    }
-    if (r.anotado) { await anotado(capa, r.anotado, info.nombre, momento); return true; }
-  }
+  const variante = analitica.bandera('muro-texto') === 'b' ? 'b' : 'a';
+  analitica.ev('muro_visto', { motivo, momento, caminos: 'mail', origen: info.origen || 'podio', variante_texto: variante, previas: S.previas, gratis_etapa: S.regla.etapa });
+  const r = await new Promise(res => {
+    let datos = { aviso: false, novedades: false, correo: '' }, despues = false, cerrado = false;
+    const pinta = () => {
+      const prev = capa.querySelector('.formulario'); if (prev) datos = leerFormulario(prev);
+      const n = S.previas || S.gratis, nombre = esc(info.nombre);
+      const titulo = motivo === 'ip' ? t('muro.titulo_ip') : envion ? t('muro.arranque.titulo', { nombre }) : nuevo ? t('muro.inicio.titulo', { nombre })
+        : n === 1 ? t('muro.titulo_1', { nombre }) : t('muro.titulo', { nombre, n });
+      const bajada = envion ? t('muro.arranque.bajada') : nuevo ? t('muro.inicio.bajada') : t(variante === 'b' ? 'muro.promesa_b' : 'muro.promesa');
+      const camino = envion ? t('muro.arranque.camino_mail') : nuevo ? t('muro.inicio.camino_mail') : t(variante === 'b' ? 'muro.camino_mail_b' : 'muro.camino_mail');
+      const boton = envion ? t('muro.arranque.boton') : null;
+      const pie = envion ? `<button id="btn-ahora-no">${t('muro.arranque.ahora_no')}</button>`
+        : despues ? `<p class="chica">${t('muro.despues')}</p><button id="btn-volver">${t('muro.volver')}</button>` : `<button id="btn-ahora-no">${t('muro.ahora_no')}</button>`;
+      const pn = panel(capa, `${idiomasHTML()}<h1>${titulo}</h1><p class="bajada">${bajada}</p>
+        <div class="muro-cuerpo">${formularioHTML({ ...datos, camino: `<b>${camino}</b>`, otro: true, boton })}</div>
+        <div class="fila">${pie}</div>`, envion ? 'muro tras-arranque' : 'muro', null);
+      atarFormulario(pn.querySelector('.formulario'), { pantalla: 'muro', momento, boton, nombre: info.nombre, alAnotar: x => { cerrado = true; quitar(); res({ anotado: x }); } });
+      pn.querySelector('#btn-ahora-no')?.addEventListener('click', () => {
+        analitica.ev('muro_ahora_no', { momento });
+        if (envion) { cerrado = true; quitar(); res({ volver: true }); return; }
+        despues = true; pinta();
+      });
+      pn.querySelector('#btn-volver')?.addEventListener('click', () => { cerrado = true; quitar(); analitica.ev('muro_cerrado', { momento }); res({ volver: true }); });
+    };
+    const quitar = alIdioma(() => { if (!cerrado) pinta(); });
+    pinta();
+  });
+  if (r.volver) return false;
+  await anotado(capa, r.anotado, info.nombre, momento);
+  return true;
 }
+
+// ---------- encuesta opcional en el panel de anotado (P11, docs/MVP.md 5.4) ----------
+const PLATAFORMAS = ['app', 'web'];
+const FEATURES = ['pesista_propio', 'mujeres_categorias', 'sedes_campeonatos'];
+/** Texto libre sin direcciones ni «@» (el Worker lo vuelve a limpiar): no viaja nada que parezca un dato de contacto. */
+const limpiarOtra = v => String(v || '').replace(/\S*[@＠]\S*/g, '…').replace(/\b(?:https?:\/\/|www\.)\S*/gi, '…').replace(/\s+/g, ' ').trim().slice(0, 280);
 /**
- * P11: «¡Adentro!», con la encuesta sin premio si todavía no la contestó. En el intervalo no se ofrece la encuesta (la
- * final está en el medio) y el botón dice «Seguir al dos tiempos».
+ * P11: «¡Adentro!» y, si todavía no la contestó en este dispositivo, la encuesta opcional: cómo prefiere jugar (una
+ * opción), qué le gustaría que tenga el juego (varias) y un texto libre opcional. No frena: «Enviar y seguir» manda lo
+ * que haya marcado (si no marcó nada, solo sigue) y «Saltar» sigue sin mandar. En el intervalo el botón sigue al dos
+ * tiempos. Las respuestas van al Worker (/api/encuesta), que las manda a PostHog como `encuesta_respuesta`, sin el correo.
  */
 function anotado(capa, r, nombre, momento = null) {
-  const envion = momento === 'tras_arranque';
+  const envion = momento === 'tras_arranque', ofrecer = !encuestaHecha();
+  if (ofrecer) analitica.encuestaVista({ momento });
+  const R = { plataforma: '', features: [], otra: '' };
   return new Promise(res => {
     let fin = false;
+    const seguir = () => { fin = true; quitar(); res(); };
     const pinta = () => {
-      const ofrecer = !envion && !encuestaHecha();
-      const pn = panel(capa, `${idiomasHTML()}<h2>${t(r.estado === 'ya_estaba' ? 'lista.ok_ya' : 'lista.ok', { nombre: esc(nombre) })}</h2><p>${t('lista.ok_libre')}</p>
-        ${ofrecer ? `<p>${t('lista.ok_encuesta')}</p>` : ''}<div class="fila"><button class="ir grande" id="btn-seguir">${t(envion ? 'lista.seguir_envion' : 'lista.seguir')}</button>${ofrecer ? `<button id="btn-encuesta">${t('muro.encuesta_boton')}</button>` : ''}</div>`, 'chico anotado');
-      pn.querySelector('#btn-seguir').addEventListener('click', () => { fin = true; quitar(); res(); });
-      pn.querySelector('#btn-encuesta')?.addEventListener('click', async () => { fin = true; quitar(); await encuesta(capa, { conPremio: false }); res(); });
+      const q = capa.querySelector('#otra'); if (q) R.otra = q.value;
+      const cab = `${idiomasHTML()}<h2>${t(r.estado === 'ya_estaba' ? 'lista.ok_ya' : 'lista.ok', { nombre: esc(nombre) })}</h2><p>${t('lista.ok_libre')}</p>`;
+      if (!ofrecer) {
+        const pn = panel(capa, `${cab}<div class="fila"><button class="ir grande" id="btn-seguir">${t(envion ? 'lista.seguir_envion' : 'lista.seguir')}</button></div>`, 'chico anotado');
+        pn.querySelector('#btn-seguir').addEventListener('click', seguir);
+        return;
+      }
+      const op = (q, o, on) => `<button type="button" class="op" data-q="${q}" data-o="${o}" aria-pressed="${on}">${t(`encuesta.${q}.${o}`)}</button>`;
+      const pn = panel(capa, `${cab}<div class="encuesta-anotado">
+        <fieldset class="pregunta"><legend>${t('encuesta.plataforma')}</legend><div class="opciones-q">${PLATAFORMAS.map(o => op('plataforma', o, R.plataforma === o)).join('')}</div></fieldset>
+        <fieldset class="pregunta"><legend>${t('encuesta.features')}</legend><div class="opciones-q">${FEATURES.map(o => op('features', o, R.features.includes(o))).join('')}</div></fieldset>
+        <label class="campo" for="otra"><span>${t('encuesta.otra')}</span><textarea id="otra" rows="2" maxlength="280" enterkeyhint="done" placeholder="${esc(t('encuesta.otra_ph'))}">${esc(R.otra)}</textarea></label></div>
+        <div class="fila"><button class="ir grande" id="btn-enviar">${t(envion ? 'encuesta.enviar_envion' : 'encuesta.enviar')}</button><button id="btn-saltar">${t('encuesta.saltar')}</button></div>`, 'anotado encuesta');
+      pn.querySelectorAll('.op').forEach(b => b.addEventListener('click', () => {
+        const o = b.dataset.o;
+        if (b.dataset.q === 'plataforma') R.plataforma = R.plataforma === o ? '' : o;
+        else R.features = R.features.includes(o) ? R.features.filter(x => x !== o) : FEATURES.filter(x => x === o || R.features.includes(x));
+        for (const x of pn.querySelectorAll(`.op[data-q="${b.dataset.q}"]`)) x.setAttribute('aria-pressed', String(b.dataset.q === 'plataforma' ? R.plataforma === x.dataset.o : R.features.includes(x.dataset.o)));
+      }));
+      pn.querySelector('#btn-saltar').addEventListener('click', () => { if (fin) return; analitica.encuestaCerrada({ momento }); seguir(); });
+      pn.querySelector('#btn-enviar').addEventListener('click', () => {
+        if (fin) return;
+        R.otra = pn.querySelector('#otra').value;
+        const otra = limpiarOtra(R.otra);
+        const resp = { ...(R.plataforma ? { plataforma: R.plataforma } : {}), ...(R.features.length ? { features: [...R.features] } : {}), ...(/[\p{L}\p{N}]/u.test(otra.replace(/…/g, '')) ? { otra } : {}) };
+        if (!Object.keys(resp).length) { analitica.encuestaCerrada({ momento }); seguir(); return; }      // nada marcado: solo sigue
+        fin = true; quitar(); guardado.set('tarima.encuesta', '1');
+        // Sin esperar la respuesta: el pedido sigue solo (10 s de espera) y la persona no queda frenada.
+        servidor.encuesta({ r: resp, idioma: idiomaActual(), sesion: analitica.idSesion() }).then(x => { if (!x.ok && x.error !== 'ya_respondida') console.warn('encuesta:', x.error); }).catch(() => null);
+        analitica.ev('encuesta_enviada', { momento, plataforma: resp.plataforma || null, features: resp.features?.length || 0, otra: !!resp.otra });
+        panel(capa, `<h2>${t('encuesta.ok')}</h2>`, 'chico anotado');
+        setTimeout(res, 700);
+      });
     };
     const quitar = alIdioma(() => { if (!fin) pinta(); });
     pinta();
@@ -257,7 +221,7 @@ function corte(info) {
 }
 /**
  * Gancho del intervalo (main.js lo llama al terminar el arranque). Si la final en curso salió con etapa 'arranque', sube
- * el muro; con el correo o la encuesta pide al Worker el permiso del dos tiempos y la final sigue ('sigue'). Si la persona
+ * el muro; con el correo pide al Worker el permiso del dos tiempos y la final sigue ('sigue'). Si la persona
  * no deja nada, se ve la tabla del arranque y la final termina ahí ('corta': main.js vuelve al inicio).
  * @param {{n:number, nombre:string, capa:HTMLElement, tabla:()=>string, visita:(n:string)=>void}} info
  * @returns {Promise<'sigue'|'corta'>}
@@ -265,10 +229,9 @@ function corte(info) {
 async function intervalo(info) {
   if (S.etapa !== 'arranque') return 'sigue';
   const capa = info.capa || document.getElementById('capa');
-  let disponible = S.encuesta;
   for (;;) {
     info.visita?.('muro');
-    if (await muro({ ...info, capa, origen: 'intervalo', momento: 'tras_arranque', motivo: 'envion', encuesta_disponible: disponible })) {
+    if (await muro({ ...info, capa, origen: 'intervalo', momento: 'tras_arranque', motivo: 'envion' })) {
       let r;
       for (;;) {
         r = await servidor.envion({ idioma: idiomaActual() });
@@ -281,7 +244,7 @@ async function intervalo(info) {
         return 'sigue';
       }
       analitica.ev('envion_negado', { motivo: r.estado === 'muro' ? 'muro' : r.error || 'error' });
-      if (r.estado === 'muro') { disponible = !!r.encuesta_disponible; continue; }
+      if (r.estado === 'muro') continue;
     }
     if (await corte(info)) continue;
     analitica.ev('muro_cerrado', { momento: 'tras_arranque' });
@@ -302,12 +265,11 @@ async function pedirPase(info) {
     if (r.estado === 'ok') {
       S.lista = r.fuente === 'lista'; S.quedan = S.lista ? null : r.quedan ?? null; if (Number.isFinite(r.n)) S.previas = r.n;
       S.etapa = r.etapa === 'arranque' ? 'arranque' : 'completa';
-      if (r.encuesta_disponible !== undefined) S.encuesta = !!r.encuesta_disponible;
       return r;
     }
     // sin servidor (historia limpia, una vez por carga): la final entera, como en la regla vieja (sin Worker no hay muro)
     if (r.estado === 'sin_servidor') { S.etapa = 'completa'; return { estado: 'ok', fuente: r.fuente, sinServidor: true }; }
-    if (r.estado === 'muro') { S.quedan = 0; S.encuesta = !!r.encuesta_disponible; return { ...r, momento: 'inicio' }; }
+    if (r.estado === 'muro') { S.quedan = 0; return { ...r, momento: 'inicio' }; }
     // 'error': no se regala ninguna final (endurecimiento 1 de la sección 7): se dice y se ofrece probar de nuevo
     if (!(await errorConexion(capa))) return { estado: 'cancelado', error: r.error };
   }
@@ -317,7 +279,7 @@ async function pedirPase(info) {
 function podio(info) {
   servidor.finalTerminada();
   if (S.lista) return null;
-  // Con el arranque gratis no hay muro en el podio: la próxima final que se pida sin correo ni encuesta empieza con el
+  // Con el arranque gratis no hay muro en el podio: la próxima final que se pida sin correo empieza con el
   // muro antes del primer intento (P4).
   if (S.quedan === 0) return conArranque() ? null : 'muro';
   const lugar = info.lugar;
@@ -339,7 +301,7 @@ function podio(info) {
 
 /**
  * P0: estado del servidor (4 s como mucho; si no, la copia local) y arranque de la medición. Devuelve lo que necesita
- * main.js para decidir la primera pantalla: {muro, motivo, encuesta_disponible}. Nunca tira.
+ * main.js para decidir la primera pantalla: {muro, motivo}. Nunca tira.
  * @param {{idioma:string, idioma_origen:string, version:string, pantalla:()=>string}} o
  */
 async function arranque(o) {
@@ -350,7 +312,7 @@ async function arranque(o) {
   try { e = await servidor.estado({ idioma: o.idioma }); } catch { e = null; }
   S.estado = e;
   if (e) {
-    S.lista = !!e.lista; S.quedan = e.lista ? null : e.quedan ?? null; S.previas = e.contexto?.previas ?? 0; S.encuesta = !!e.encuesta_disponible;
+    S.lista = !!e.lista; S.quedan = e.lista ? null : e.quedan ?? null; S.previas = e.contexto?.previas ?? 0;
     const g = Number(e.flags?.['muro-partidas-gratis']); if (g > 0) S.gratis = g;
     S.regla = leerRegla(e.regla) || S.regla; S.proxima = e.etapa === 'arranque' ? 'arranque' : 'completa';
   }
@@ -358,7 +320,7 @@ async function arranque(o) {
   // muro al cargar: el servidor dice que no puede jugar (recargar, otra pestaña, ventana privada en la misma red…). Si
   // nunca jugó desde este dispositivo (red compartida que gastó su tope), primero la bienvenida y la práctica (P0).
   const muroAhora = !!e && e.puede === false && !S.reanudar && (e.contexto ? e.contexto.previas > 0 : true);
-  return { muro: muroAhora, motivo: e?.motivo || 'dispositivo', encuesta_disponible: !!e?.encuesta_disponible, fuente: e?.fuente || null };
+  return { muro: muroAhora, motivo: e?.motivo || 'dispositivo', fuente: e?.fuente || null };
 }
 
 ganchos.ev = (nombre, props) => analitica.ev(nombre, props);
@@ -373,4 +335,4 @@ ganchos.muro = muro;
 ganchos.intervalo = intervalo;
 ganchos.podio = podio;
 
-export const conexion = { arranque, muro, encuesta, intervalo, get anotado() { return S.lista; }, get quedan() { return S.quedan; }, S };
+export const conexion = { arranque, muro, anotado, intervalo, get anotado() { return S.lista; }, get quedan() { return S.quedan; }, S };

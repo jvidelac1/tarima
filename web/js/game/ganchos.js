@@ -26,14 +26,14 @@ export const ganchos = {
    * P4 · pedido del pase, antes de cada final (después de la práctica). Si devuelve 'muro', main.js llama a muro() y no
    * empieza la final. Si falla la red, quien integre decide (sección 2, P4: dos reintentos y después «sin servidor»).
    * @param {{n:number, pesista:string, ctl:string, nivel:string, ritmo:string}} info  n: número de final en este dispositivo
-   * @returns {Promise<{estado:'ok', fuente?:string, quedan?:number, n?:number} | {estado:'muro', motivo?:string, encuesta_disponible?:boolean}>}
+   * @returns {Promise<{estado:'ok', fuente?:string, quedan?:number, n?:number} | {estado:'muro', motivo?:string}>}
    */
   async pedirPase(info) { void info; return { estado: 'ok', fuente: 'local' }; },
 
   /**
    * P9 · el muro. Lo pinta quien integre (puede usar `info.capa`, el elemento #capa, y `info.t` para los textos) y resuelve
    * cuando la persona puede jugar otra final (true: se pide el pase de nuevo) o cuando vuelve a la bienvenida (false).
-   * @param {{origen:'podio'|'bienvenida'|'carga', motivo?:string, encuesta_disponible?:boolean, nombre:string, capa:HTMLElement, t:Function}} info
+   * @param {{origen:'podio'|'bienvenida'|'carga', motivo?:string, nombre:string, capa:HTMLElement, t:Function}} info
    * @returns {Promise<boolean>}
    */
   async muro(info) { void info; return false; },

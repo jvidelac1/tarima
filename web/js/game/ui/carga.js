@@ -12,7 +12,7 @@ import { t, fijarIdioma, detectarIdioma, fijarTactil, alCambiarIdioma, idiomaAct
 
 const $ = id => document.getElementById(id);
 const reduce = matchMedia('(prefers-reduced-motion:reduce)').matches;
-// el idioma se fija igual que en main.js (que vuelve a hacerlo con el mismo resultado): ?lang=, lo elegido, el navegador
+// el idioma se fija igual que en main.js (que vuelve a hacerlo con el mismo resultado): ?lang=, lo elegido, si no inglés
 try {
   const guardado = (() => { try { return localStorage.getItem('tarima.idioma'); } catch { return null; } })();
   fijarTactil(matchMedia('(pointer:coarse)').matches);

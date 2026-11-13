@@ -1,20 +1,22 @@
 <!doctype html>
 <!--
-  Privacidad de Tarima (docs/MVP.md 5.2), en español neutro y en inglés. Versión 2026-11-c: es la que manda el juego al
+  Privacidad de Tarima (docs/MVP.md 5.2), en inglés (por defecto) y en español neutro. Versión 2026-11-d: es la que manda el juego al
   anotarse (CONSENTIMIENTO en web/js/game/servidor.js). Si cambia lo que dice este texto, subir la versión en los dos
   lugares y agregarla a VERSIONES_CONSENTIMIENTO en worker/src/reglas.js.
   2026-11-c (12-nov-2026): grabación de sesión de la página en una parte de las visitas (docs/MVP.md 6.6).
+  2026-11-d (13-nov-2026): la encuesta opcional después de anotarse (dos preguntas, sin premio) y las novedades sin
+  frecuencia. La página abre en inglés aunque el navegador esté en español (?lang=es o el botón ES para el español).
 
   Datos del responsable completados el 12-nov-2026 (Juan C. Videla, Argentina, contacto por mail).
 -->
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#03050c">
 <meta name="referrer" content="no-referrer">
-<title>Tarima · Privacidad</title>
+<title>Tarima · Privacy</title>
 <link rel="icon" href="data:,">
 <style>
 @font-face{font-family:'Saira Condensed';font-weight:700;font-display:swap;src:url('assets/fonts/saira-condensed-700.woff2') format('woff2')}
@@ -59,17 +61,17 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
 <body>
 <main class="pagina">
   <div class="arriba">
-    <a href="juego.html" data-volver><span lang="es">← Volver al juego</span><span lang="en" hidden>← Back to the game</span></a>
+    <a href="juego.html" data-volver><span lang="es" hidden>← Volver al juego</span><span lang="en">← Back to the game</span></a>
     <div class="idioma" role="group" aria-label="Idioma / Language">
-      <button type="button" data-lang="es" aria-pressed="true">ES</button>
-      <button type="button" data-lang="en" aria-pressed="false">EN</button>
+      <button type="button" data-lang="es" aria-pressed="false">ES</button>
+      <button type="button" data-lang="en" aria-pressed="true">EN</button>
     </div>
   </div>
 
   <!-- ================================ ESPAÑOL ================================ -->
-  <article lang="es" data-idioma="es">
+  <article lang="es" data-idioma="es" hidden>
     <h1>Privacidad de Tarima</h1>
-    <p class="version">Versión 2026-11-c · 12 de noviembre de 2026</p>
+    <p class="version">Versión 2026-11-d · 13 de noviembre de 2026</p>
 
     <p>Responsable: Juan C. Videla,
       Argentina.
@@ -85,7 +87,7 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
 
     <h2>Lista de espera</h2>
     <p>Si te anotas, guardamos tu correo, el nombre que pusiste, el idioma, el país aproximado (según tu conexión), la fecha y la versión de este texto.</p>
-    <p>Los usamos para avisarte cuando abra el acceso anticipado. Si marcaste la otra casilla, también para mandarte novedades, como mucho una por mes. La base es tu consentimiento.</p>
+    <p>Los usamos para avisarte cuando abra el acceso anticipado. Si marcaste la otra casilla, también para mandarte novedades del juego. La base es tu consentimiento.</p>
     <p>Guardamos los datos hasta que te des de baja. Por ahora no mandamos correos de confirmación. Cuando empecemos, te pediremos que confirmes tu correo; si no lo confirmas en 30 días desde ese correo, borraremos tus datos.</p>
     <p>La lista es solo para mayores de 16 años.</p>
 
@@ -101,7 +103,8 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
     </div>
 
     <h2>Encuesta</h2>
-    <p>Las respuestas van a PostHog sin tu nombre ni tu correo. No escribas datos personales en la respuesta libre.</p>
+    <p>Después de anotarte puedes contestar, si quieres, una encuesta de dos preguntas: cómo prefieres jugar Tarima y qué te gustaría que tenga el juego, más un texto libre opcional. Es opcional: puedes saltearla y no da ni quita nada.</p>
+    <p>Las respuestas van a la medición (PostHog) sin tu correo ni tu nombre. Del texto libre sacamos lo que parezca un correo o una dirección web. No escribas datos personales en él.</p>
 
     <h2>Alojamiento</h2>
     <p>El juego y el servidor corren en Cloudflare (encargado), que procesa tu IP para entregar la página y frenar abusos.</p>
@@ -123,9 +126,9 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
   </article>
 
   <!-- ================================ ENGLISH ================================ -->
-  <article lang="en" data-idioma="en" hidden>
+  <article lang="en" data-idioma="en">
     <h1>Tarima privacy</h1>
-    <p class="version">Version 2026-11-c · November 12, 2026</p>
+    <p class="version">Version 2026-11-d · November 13, 2026</p>
 
     <p>Controller: Juan C. Videla,
       Argentina.
@@ -141,7 +144,7 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
 
     <h2>Waitlist</h2>
     <p>If you join, we store your email, the name you entered, language, approximate country (from your connection), the date and the version of this text.</p>
-    <p>We use them to tell you when early access opens. If you ticked the other box, also to send you news, at most once a month. Legal basis: your consent.</p>
+    <p>We use them to tell you when early access opens. If you ticked the other box, also to send you game news. Legal basis: your consent.</p>
     <p>We keep the data until you unsubscribe. We don't send confirmation emails yet. When we start, we'll ask you to confirm your email; if you don't confirm within 30 days of that email, we'll delete your data.</p>
     <p>The list is for people 16 and older.</p>
 
@@ -157,7 +160,8 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
     </div>
 
     <h2>Survey</h2>
-    <p>Answers go to PostHog without your name or email. Please don't write personal details in the free-text answer.</p>
+    <p>After you join you can, if you want, answer a two-question survey: how you'd rather play Tarima and what you'd like the game to have, plus an optional free-text field. It's optional: you can skip it, and it doesn't unlock or change anything.</p>
+    <p>Answers go to our measurement (PostHog) without your email or name. We strip anything that looks like an email or a web address from the free text. Please don't write personal details in it.</p>
 
     <h2>Hosting</h2>
     <p>The game and server run on Cloudflare (processor), which handles your IP to serve the page and stop abuse.</p>
@@ -201,13 +205,14 @@ const T = {
 const guardado = k => { try { return localStorage.getItem(k); } catch { return null; } };
 const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch { /* sin almacenamiento */ } };
 
-// Idioma: ?lang=, después tarima.idioma, después el navegador (docs/MVP.md 4.1).
+// Idioma: ?lang=, después tarima.idioma (lo elegido en el juego o acá); si no, inglés aunque el navegador esté en español
+// (docs/MVP.md 4.1, decisión del dueño del 13 de noviembre).
 function idiomaInicial() {
   const q = new URLSearchParams(location.search).get('lang');
   if (q === 'es' || q === 'en') return q;
   const g = guardado('tarima.idioma');
   if (g === 'es' || g === 'en') return g;
-  return (navigator.languages || [navigator.language || '']).some(l => /^es\b/i.test(l || '')) ? 'es' : 'en';
+  return 'en';
 }
 let idioma = idiomaInicial();
 

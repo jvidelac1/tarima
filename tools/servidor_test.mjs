@@ -20,6 +20,8 @@ import { reenviar } from '../functions/_reenviar.js';
 import { onRequest as raiz } from '../functions/index.js';
 import { VERSIONES_CONSENTIMIENTO } from '../worker/src/reglas.js';
 import worker from '../worker/src/index.js';
+import ES from '../web/js/game/i18n/es.js';
+import EN from '../web/js/game/i18n/en.js';
 import { d1Falsa, varsDelWorker } from './servidor_local.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -63,12 +65,33 @@ const base = o => crearServidor({ host: 'liftinggame.pages.dev', buscar: '', esp
 
 // ---------- 1. servidor.js ----------
 
-igual(CONSENTIMIENTO, '2026-11-c', 'versión del consentimiento');
+igual(CONSENTIMIENTO, '2026-11-d', 'versión del consentimiento');
 ok(VERSIONES_CONSENTIMIENTO.has(CONSENTIMIENTO), 'el Worker acepta la versión que manda el juego');
-ok(['2026-11-a', '2026-11-b'].every(v => VERSIONES_CONSENTIMIENTO.has(v)), 'el Worker sigue aceptando las versiones anteriores');
+ok(['2026-11-a', '2026-11-b', '2026-11-c'].every(v => VERSIONES_CONSENTIMIENTO.has(v)), 'el Worker sigue aceptando las versiones anteriores');
 {
   const priv = fs.readFileSync(path.join(ROOT, 'web/privacidad.html'), 'utf8');
   ok((priv.match(new RegExp(`class="version">(Versión|Version) ${CONSENTIMIENTO} `, 'g')) || []).length === 2, 'la privacidad muestra la misma versión en los dos idiomas');
+  // Decisión del dueño del 13 de noviembre: inglés por defecto (sin mirar el navegador), novedades sin frecuencia, la
+  // encuesta opcional después de anotarse y sin finales de premio.
+  ok(/<html lang="en">/.test(priv) && /<article lang="en" data-idioma="en">/.test(priv) && /<article lang="es" data-idioma="es" hidden>/.test(priv), 'la privacidad abre en inglés');
+  ok(!/navigator\.language/.test(priv), 'la privacidad no elige el idioma por el navegador');
+  ok(!/once a month|a month|monthly|una por mes|al mes|por mes|mensual/i.test(priv), 'la privacidad no dice la frecuencia de las novedades');
+  ok(/dos preguntas/.test(priv) && /two-question survey/.test(priv), 'la privacidad describe la encuesta de dos preguntas');
+}
+{
+  // Textos del muro y de la encuesta (docs/MVP.md 4.5): el muro solo pide el correo; la encuesta nueva, exacta.
+  for (const [L, D] of [['es', ES], ['en', EN]]) {
+    const claves = Object.keys(D);
+    igual(claves.filter(k => /^muro\./.test(k) && /encuesta/.test(k) || /^encuesta\.(q\d|premio|titulo|falta|ya|volver|ok_)/.test(k) || k === 'lista.ok_encuesta'), [], `${L}: sin las claves de la encuesta vieja ni del camino de la encuesta en el muro`);
+    ok(!Object.values(D).some(v => /once a month|monthly|una vez por mes|1 por mes|al mes\b|mensual|suscrip|subscription|\bpay\b|\bpagar\b|pagaría|consola|console/i.test(v)), `${L}: sin frecuencia de novedades, pagos ni consolas`);
+  }
+  igual([EN['lista.novedades'], ES['lista.novedades']], ['Also send me game news.', 'También quiero recibir novedades del juego.'], 'novedades sin frecuencia');
+  igual([EN['encuesta.plataforma'], EN['encuesta.plataforma.app'], EN['encuesta.plataforma.web'], EN['encuesta.features'], EN['encuesta.features.pesista_propio'], EN['encuesta.features.mujeres_categorias'], EN['encuesta.features.sedes_campeonatos'], EN['encuesta.otra']],
+    ['How would you rather play Tarima?', 'Mobile app (App Store / Google Play)', 'In the browser (web game)', 'What would you like the game to have?', 'Create and train your own lifter', 'Women lifters and weight classes', 'New venues and championships', 'Anything else? (optional)'], 'encuesta en inglés');
+  igual([ES['encuesta.plataforma'], ES['encuesta.plataforma.app'], ES['encuesta.plataforma.web'], ES['encuesta.features'], ES['encuesta.features.pesista_propio'], ES['encuesta.features.mujeres_categorias'], ES['encuesta.features.sedes_campeonatos'], ES['encuesta.otra']],
+    ['¿Cómo prefieres jugar Tarima?', 'App para el celular (App Store / Google Play)', 'En el navegador (juego web)', '¿Qué te gustaría que tenga el juego?', 'Crear y entrenar a tu propio pesista', 'Pesistas mujeres y categorías de peso', 'Nuevas sedes y campeonatos', '¿Algo más? (opcional)'], 'encuesta en español');
+  const cx = fs.readFileSync(path.join(ROOT, 'web/js/game/conexion.js'), 'utf8');
+  ok(!/btn-encuesta|camino-encuesta|encuesta_disponible\s*\?\?/.test(cx), 'el muro no tiene el camino de la encuesta');
 }
 ok(pareceCorreo('ana@ejemplo.com') && !pareceCorreo('ana@ejemplo') && !pareceCorreo('ana ejemplo.com') && !pareceCorreo('a@b.c'), 'pareceCorreo');
 igual(sugerirCorreo('ana@gmial.com'), 'ana@gmail.com', 'sugerencia gmial');
@@ -294,10 +317,10 @@ igual(expDelPase('basura'), null, 'pase inválido');
   igual(s.modo, 'simulado', 'modo simulado');
   igual((await s.estado({})).quedan, 2, 'simulado: 2 finales');
   const a = await s.pedirPase({}), b = await s.pedirPase({}), c = await s.pedirPase({});
-  igual([a.estado, a.quedan, b.quedan, c.estado, c.encuesta_disponible], ['ok', 1, 0, 'muro', true], 'simulado: muro a la tercera');
-  igual((await s.encuesta({ r: {} })).bono, 2, 'simulado: encuesta +2');
+  igual([a.estado, a.quedan, b.quedan, c.estado, c.encuesta_disponible], ['ok', 1, 0, 'muro', false], 'simulado: muro a la tercera, sin encuesta');
+  igual((await s.encuesta({ r: {} })).bono, 0, 'simulado: la encuesta no da finales (correo obligatorio)');
   igual((await s.encuesta({ r: {} })).error, 'ya_respondida', 'simulado: encuesta una vez');
-  igual((await s.pedirPase({})).fuente, 'encuesta', 'simulado: final de la encuesta');
+  igual((await s.pedirPase({})).estado, 'muro', 'simulado: después de la encuesta sigue el muro');
   igual((await s.anotar({ email: 'x@noexiste.com' })).error, 'dominio', 'simulado: error de dominio');
   igual((await s.anotar({ email: 'ana@ejemplo.com' })).estado, 'nuevo', 'simulado: anotarse');
   igual((await s.pedirPase({})).fuente, 'lista', 'simulado: juego libre');
@@ -311,15 +334,15 @@ igual(expDelPase('basura'), null, 'pase inválido');
   const local = new Mem(), sesion = new Mem();
   const s = base({ host: 'localhost', buscar: '?muro=firme', local, sesion, fetch: async () => { throw new Error('no debería salir'); } });
   const e = await s.estado({});
-  igual([e.quedan, e.etapa, e.regla], [1, 'arranque', { etapa: 'arranque', gratis: 1, bono: 1 }], 'simulado: un arranque gratis');
+  igual([e.quedan, e.etapa, e.regla], [1, 'arranque', { etapa: 'arranque', gratis: 1, bono: 0 }], 'simulado: un arranque gratis');
   const a = await s.pedirPase({});
   igual([a.estado, a.etapa, a.quedan], ['ok', 'arranque', 0], 'simulado: final con etapa arranque');
   igual((await s.envion({})).estado, 'muro', 'simulado: dos tiempos sin correo, muro');
-  igual((await s.encuesta({ r: {} })).bono, 1, 'simulado: la encuesta suma 1');
-  igual([(await s.envion({})).via, JSON.parse(sesion.getItem('tarima.pase')).etapa], ['encuesta', 'completa'], 'simulado: dos tiempos por la encuesta, y el pase nuevo en la pestaña');
-  const b = await s.pedirPase({});
-  igual([b.estado, b.etapa, b.fuente], ['ok', 'completa', 'encuesta'], 'simulado: una final completa más');
-  igual((await s.pedirPase({})).estado, 'muro', 'simulado: después, muro');
+  igual((await s.encuesta({ r: {} })).bono, 0, 'simulado: la encuesta no suma');
+  igual([(await s.envion({})).estado, JSON.parse(sesion.getItem('tarima.pase')).etapa], ['muro', 'arranque'], 'simulado: la encuesta no da el dos tiempos');
+  igual((await s.pedirPase({})).estado, 'muro', 'simulado: ni otra final');
+  await s.anotar({ email: 'ana@ejemplo.com' });
+  igual([(await s.envion({})).via, JSON.parse(sesion.getItem('tarima.pase')).etapa], ['lista', 'completa'], 'simulado: con el correo, el dos tiempos y el pase nuevo en la pestaña');
 }
 
 // ---------- 1b. la regla del arranque gratis con el Worker de verdad (en Node, D1 falsa) ----------
@@ -329,7 +352,7 @@ igual(expDelPase('basura'), null, 'pase inválido');
   console.log = (...a) => { if (typeof a[0] === 'string' && a[0].startsWith('{"')) return; logReal(...a); };      // registros del Worker
   const SECRETOS = { SECRETO_IP: 'ip'.repeat(16), SECRETO_DISPOSITIVO: 'dv'.repeat(16), SECRETO_PASE: 'pa'.repeat(16), SECRETO_BAJA: 'ba'.repeat(16) };
   const vars = varsDelWorker();
-  igual([vars.GRATIS_ETAPA, vars.GRATIS, vars.BONO_ENCUESTA], ['arranque', '1', '1'], 'worker/wrangler.jsonc: la regla de producción es el arranque gratis');
+  igual([vars.GRATIS_ETAPA, vars.GRATIS, vars.BONO_ENCUESTA], ['arranque', '1', '0'], 'worker/wrangler.jsonc: la regla de producción es el arranque gratis, con el correo obligatorio (la encuesta sin bono)');
   /** Un Worker con su base. `api(ruta, cuerpo, ip)` lo llama como la Function de Pages; `fetchDe(ip)` es el fetch de un navegador. */
   function workerLocal(extra = {}) {
     const db = d1Falsa(), env = { ...vars, ...SECRETOS, ...extra, DB: db };
@@ -348,18 +371,18 @@ igual(expDelPase('basura'), null, 'pase inválido');
     return { db, env, api, fetchDe, filas };
   }
   const cliente = (w, ip, local = new Mem(), sesion = new Mem()) => ({ s: base({ fetch: w.fetchDe(ip), local, sesion }), local, sesion });
-  const ENC = { q1: ['sedes'], q2: ['nada'], q3: 'compu', q4: 'no' };
+  const ENC = { plataforma: 'app', features: ['pesista_propio'], otra: 'Más rivales' };
 
   {
     // Jugador nuevo: el arranque de una final, gratis; el dos tiempos, negado; la próxima final, muro antes de empezar.
     const w = workerLocal(), { s, sesion } = cliente(w, '203.0.113.10');
     const e = await s.estado({ idioma: 'es' });
-    igual([e.puede, e.quedan, e.etapa, e.regla], [true, 1, 'arranque', { etapa: 'arranque', gratis: 1, bono: 1 }], 'Worker: un dispositivo nuevo tiene un arranque gratis');
+    igual([e.puede, e.quedan, e.etapa, e.regla, e.encuesta_disponible], [true, 1, 'arranque', { etapa: 'arranque', gratis: 1, bono: 0 }, false], 'Worker: un dispositivo nuevo tiene un arranque gratis (sin encuesta en el muro)');
     igual(e.flags['muro-partidas-gratis'], '1', 'Worker: la bandera de cuántas finales reporta lo que vale con el arranque gratis');
     const p = await s.pedirPase({ idioma: 'es' });
-    igual([p.estado, p.fuente, p.etapa, p.quedan, p.encuesta_disponible, JSON.parse(sesion.getItem('tarima.pase')).etapa], ['ok', 'gratis', 'arranque', 0, true, 'arranque'], 'Worker: el pase sale con etapa arranque');
+    igual([p.estado, p.fuente, p.etapa, p.quedan, p.encuesta_disponible, JSON.parse(sesion.getItem('tarima.pase')).etapa], ['ok', 'gratis', 'arranque', 0, false, 'arranque'], 'Worker: el pase sale con etapa arranque');
     const v = await s.envion({ idioma: 'es' });
-    igual([v.estado, v.motivo, v.encuesta_disponible], ['muro', 'envion', true], 'Worker: dos tiempos sin correo ni encuesta: muro');
+    igual([v.estado, v.motivo, v.encuesta_disponible], ['muro', 'envion', false], 'Worker: dos tiempos sin correo: muro, sin encuesta');
     igual((await w.filas()).map(f => f.etapa), ['arranque'], 'Worker: la partida queda en arranque');
     igual([(await s.estado({})).puede, (await s.pedirPase({})).estado], [false, 'muro'], 'Worker: la final siguiente empieza con el muro');
     igual((await w.filas()).length, 1, 'Worker: el muro no gasta nada');
@@ -373,17 +396,18 @@ igual(expDelPase('basura'), null, 'pase inválido');
     igual([l.fuente, l.etapa, l.quedan], ['lista', 'completa', null], 'Worker: anotado, finales completas sin límite');
   }
   {
-    // La encuesta en el intervalo: termina esa final y suma una completa; una sola vez.
+    // Correo obligatorio: la encuesta (aunque alguien la mande a mano sin anotarse) no da el dos tiempos ni finales.
     const w = workerLocal(), { s } = cliente(w, '203.0.113.11');
     await s.pedirPase({});
-    igual(await s.encuesta({ r: ENC, idioma: 'es' }), { ok: true, bono: 1 }, 'Worker: la encuesta suma 1');
+    igual(await s.encuesta({ r: ENC, idioma: 'es' }), { ok: true, bono: 0 }, 'Worker: la encuesta no suma');
+    igual((await s.encuesta({ r: ENC })).error, 'ya_respondida', 'Worker: una encuesta por dispositivo');
     const v = await s.envion({});
-    igual([v.estado, v.via, v.quedan], ['ok', 'encuesta', 1], 'Worker: encuesta, permiso del dos tiempos y queda 1');
-    const x = await s.pedirPase({});
-    igual([x.estado, x.fuente, x.etapa], ['ok', 'encuesta', 'completa'], 'Worker: después de la encuesta, una final completa');
-    const y = await s.pedirPase({});
-    igual([y.estado, y.encuesta_disponible], ['muro', false], 'Worker: y después muro sin encuesta');
-    igual((await w.filas()).map(f => [f.fuente, f.etapa, f.envion_por]), [['gratis', 'completa', 'encuesta'], ['encuesta', 'completa', null]], 'Worker: lo que quedó en la base');
+    igual([v.estado, v.motivo, v.encuesta_disponible], ['muro', 'envion', false], 'Worker: la encuesta no da el dos tiempos');
+    igual((await s.pedirPase({})).estado, 'muro', 'Worker: ni otra final');
+    igual((await w.filas()).map(f => [f.fuente, f.etapa, f.envion_por]), [['gratis', 'arranque', null]], 'Worker: lo que quedó en la base');
+    igual((await w.db.prepare('SELECT i FROM encuestas').all()).results, [{ i: null }], 'Worker: la encuesta sin bono no gasta los lugares de la IP');
+    await s.anotar({ email: 'enc@pruebas-tarima.com' });
+    igual((await s.envion({})).via, 'lista', 'Worker: con el correo, el dos tiempos');
   }
   {
     // Recargar en el intervalo (o en medio del arranque): no se reanuda la final (regalaría otro arranque); muro al cargar.
@@ -423,8 +447,8 @@ igual(expDelPase('basura'), null, 'pase inválido');
     // Una partida de la regla vieja (completa) responde ok sin tocar nada; un pase de una partida que no es suya, 400.
     await w.db.prepare("UPDATE partidas SET etapa = 'completa' WHERE id = ?1").bind(datos.p).run();
     igual((await w.api('/api/envion', { dispositivo: dev, pase })).j.via, 'ya', 'una final completa no necesita permiso');
-    // Dos pedidos a la vez con la encuesta: uno solo pasa (la encuesta da el dos tiempos una vez).
-    const w2 = workerLocal({ GRATIS: '2' }), d2 = crypto.randomUUID();
+    // Con bono (no es producción): dos pedidos a la vez con la encuesta, uno solo pasa (la encuesta da el dos tiempos una vez).
+    const w2 = workerLocal({ GRATIS: '2', BONO_ENCUESTA: '1' }), d2 = crypto.randomUUID();
     const p1 = (await w2.api('/api/partida', { dispositivo: d2 })).j.pase, p2 = (await w2.api('/api/partida', { dispositivo: d2 })).j.pase;
     await w2.api('/api/encuesta', { dispositivo: d2, r: ENC });
     const rs = await Promise.all([w2.api('/api/envion', { dispositivo: d2, pase: p1 }), w2.api('/api/envion', { dispositivo: d2, pase: p2 })]);
@@ -442,7 +466,7 @@ igual(expDelPase('basura'), null, 'pase inválido');
     igual(res, ['arranque', 'arranque', 'arranque', 'arranque', 'arranque', 'arranque', 'ip'], 'misma IP: 6 arranques gratis y después muro por IP');
   }
   {
-    // La regla vieja por variable: 2 finales enteras, el dos tiempos sin pedir nada, la encuesta +2.
+    // La regla vieja por variable: 2 finales enteras, el dos tiempos sin pedir nada; con BONO_ENCUESTA 2, la encuesta +2.
     const w = workerLocal({ GRATIS_ETAPA: 'final', GRATIS: '2', BONO_ENCUESTA: '2' }), { s } = cliente(w, '203.0.113.15');
     const e = await s.estado({});
     igual([e.quedan, e.etapa, e.regla.etapa], [2, 'completa', 'final'], 'regla vieja: 2 finales completas');
@@ -487,7 +511,8 @@ igual(expDelPase('basura'), null, 'pase inválido');
   const local = new Mem({ 'tarima.muro': '1', 'tarima.quedan': '0' });
   const w = workerFalso({ '/api/encuesta': [[200, { estado: 'ok', bono: 2 }], [409, { error: 'ya_respondida' }], [400, { error: 'incompleta' }]], '/api/baja': [[202, {}], [429, { error: 'limite' }]] });
   const s = base({ fetch: w.fetch, local });
-  igual(await s.encuesta({ r: { q1: ['sedes'] }, idioma: 'es', sesion: 's' }), { ok: true, bono: 2 }, 'encuesta con premio');
+  igual(await s.encuesta({ r: { plataforma: 'web' }, idioma: 'es', sesion: 's' }), { ok: true, bono: 2 }, 'encuesta con premio (si el Worker lo diera)');
+  igual(w.pedidos.at(-1).cuerpo.r, { plataforma: 'web' }, 'la encuesta manda las respuestas tal cual');
   igual(s.copia(), { muro: false, quedan: 2, lista: false, motivo: null }, 'la encuesta saca el muro y suma 2');
   igual((await s.encuesta({ r: {} })).error, 'ya_respondida', '409');
   igual((await s.encuesta({ r: {} })).error, 'incompleta', '400 incompleta');
@@ -515,7 +540,7 @@ function posthogFalso() {
   return ph;
 }
 const ventanaFalsa = (o = {}) => ({ location: { search: o.search ?? '', origin: 'https://liftinggame.pages.dev' }, matchMedia: () => ({ matches: true }), navigator: o.navigator, addEventListener() {} });
-const ESTADO = { metricas: { clave: 'phc_PRUEBA123', host: '/qx', ui: 'https://us.posthog.com', encuesta: 'enc-1' }, flags: { 'muro-texto': 'b' }, contexto: { pais: 'AR', previas: 1, dias: '0' } };
+const ESTADO = { metricas: { clave: 'phc_PRUEBA123', host: '/qx', ui: 'https://us.posthog.com' }, flags: { 'muro-texto': 'b' }, contexto: { pais: 'AR', previas: 1, dias: '0' } };
 
 igual(limpiarProps({ nombre: 'Ana', email: 'a@b.com', ip: '1.2.3.4', dispositivo: 'x', n: 1, ok: true, txt: 'ana@b.com', obj: {}, pantalla: 'muro' }), { n: 1, ok: true, pantalla: 'muro' }, 'propiedades sin datos personales');
 igual([fuenteTrafico('?utm_source=Amigos'), fuenteTrafico('?c=abc'), fuenteTrafico('')], ['amigos', 'compartido', 'directo'], 'fuente_trafico');
@@ -565,8 +590,10 @@ igual([dominioReferente('https://l.instagram.com/?u=secreto'), dominioReferente(
   a.ev('anotar_ok', { estado: 'nuevo', email: 'no@va.com' });
   igual(ph.llamadas.at(-1), ['capture', 'anotar_ok', { estado: 'nuevo' }, undefined], 'evento directo y sin correo');
   igual(a.idSesion(), 'ph_distinto', 'idSesion es el de PostHog');
-  a.encuestaVista({ con_premio: true });
-  igual(ph.llamadas.at(-1).slice(1, 3), ['survey shown', { $survey_id: 'enc-1', con_premio: true }], 'survey shown con el id de la encuesta');
+  a.encuestaVista({ momento: 'tras_arranque' });
+  igual(ph.llamadas.at(-1).slice(1, 3), ['encuesta_vista', { momento: 'tras_arranque' }], 'encuesta_vista, sin id de encuesta de PostHog');
+  a.encuestaCerrada({ momento: 'inicio' });
+  igual(ph.llamadas.at(-1).slice(1, 3), ['encuesta_salteada', { momento: 'inicio' }], 'encuesta_salteada');
   igual(sesion.getItem('tarima.clave_publica'), 'phc_PRUEBA123', 'la clave pública queda en la pestaña para la privacidad');
   a.consentir();
   igual(ph.llamadas.at(-1), ['set_config', { persistence: 'localStorage+cookie' }], 'consentir cambia la persistencia');

@@ -2,7 +2,7 @@
 // lo usan el juego, los módulos de textos (mensajes, controles, señal) y las pruebas en Node.
 //   t(clave, vars)       texto en el idioma actual, con {variables}. {A}, {T} y {t} salen solas según haya teclado o no.
 //   tr(idioma, clave, vars)  lo mismo en un idioma dado (explicar() y las pruebas).
-//   detectarIdioma({lang, guardado, navegador})  ?lang= primero, después lo guardado y por último el navegador.
+//   detectarIdioma({lang, guardado})  ?lang= primero, después lo guardado; si no, inglés.
 import es from './es.js';
 import en from './en.js';
 
@@ -12,13 +12,13 @@ let idioma = 'es', tactilAhora = false;
 const oyentes = new Set();
 
 /**
- * ?lang= primero, después lo elegido a mano en este dispositivo. Si no hay ninguno, el navegador: español si el español
- * aparece en CUALQUIER lugar de la lista de idiomas (decisión del dueño: su Chrome tiene el inglés primero y el español
- * después, y lo quiere en español); si no, inglés.
+ * ?lang= primero, después lo elegido a mano en este dispositivo (`tarima.idioma`). Si no hay ninguno, inglés, aunque el
+ * navegador esté en español (decisión del dueño del 13 de noviembre: inglés por defecto; el español con ?lang=es o con
+ * el selector ES · EN, que queda guardado). `navegador` se acepta y no se usa.
  */
-export function detectarIdioma({ lang = null, guardado = null, navegador = [] } = {}) {
+export function detectarIdioma({ lang = null, guardado = null } = {}) {
   for (const c of [lang, guardado]) if (c && IDIOMAS.includes(String(c).slice(0, 2).toLowerCase())) return String(c).slice(0, 2).toLowerCase();
-  return (navegador || []).some(l => /^es\b/i.test(String(l || ''))) ? 'es' : 'en';
+  return 'en';
 }
 export const idiomaActual = () => idioma;
 /** Cambia el idioma. Con DOM, actualiza <html lang> y <title>, y avisa a quien escuche (para repintar). */

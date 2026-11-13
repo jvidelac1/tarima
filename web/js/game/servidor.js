@@ -9,19 +9,19 @@
 //   await servidor.envion({ idioma })                    // permiso del dos tiempos de una final con etapa 'arranque'
 //   servidor.finalTerminada()                            // en el podio (o cuando la final se corta en el intervalo)
 //   await servidor.anotar({ email, nombre, idioma, novedades, sesion })
-//   await servidor.encuesta({ r, idioma, sesion })
+//   await servidor.encuesta({ r, idioma, sesion })     // la encuesta opcional después de anotarse: {plataforma, features, otra}
 //   await servidor.baja({ email })
 //
 // Sin servidor de verdad:
 // - En localhost con el servidor estático de Python (POST da 501, 404 o 405 sin JSON) el juego anda sin límite
 //   (modo 'sin_api'): es lo que usan las pruebas del flujo «Pruebas del juego».
 // - `?muro=firme` en localhost simula el Worker en el navegador con la regla de producción (GRATIS_ETAPA='arranque': el
-//   arranque de 1 final gratis, muro en el intervalo, la encuesta termina esa final y suma 1, anotarse da juego libre), con
-//   la cuenta en localStorage (`tarima.sim`) para que sobreviva a una recarga. `&etapa=final` simula la regla vieja (2
-//   finales enteras y la encuesta +2); `?gratis=N` cambia cuántas.
+//   arranque de 1 final gratis, muro en el intervalo, anotarse da juego libre; la encuesta no da nada, BONO_ENCUESTA 0),
+//   con la cuenta en localStorage (`tarima.sim`) para que sobreviva a una recarga. `&etapa=final` simula la regla vieja
+//   (2 finales enteras); `?gratis=N` cambia cuántas.
 // Fuera de localhost esos dos modos no existen.
 
-export const CONSENTIMIENTO = '2026-11-c';     // versión de web/privacidad.html; el Worker acepta también la «a» y la «b»
+export const CONSENTIMIENTO = '2026-11-d';     // versión de web/privacidad.html; el Worker acepta también la «a», la «b» y la «c»
 
 const CLAVES = {
   dispositivo: 'tarima.dispositivo',
@@ -280,7 +280,7 @@ export function crearServidor(o = {}) {
 
   /**
    * Para una final que salió con etapa 'arranque': pide al Worker el permiso del dos tiempos con el pase de la pestaña.
-   * Lo da con la lista o con el bono de la encuesta (una vez por dispositivo). Devuelve {estado:'ok', via} (y el pase
+   * Lo da con la lista (el correo es obligatorio: con BONO_ENCUESTA 0 la encuesta no lo da). Devuelve {estado:'ok', via} (y el pase
    * nuevo queda en la pestaña), {estado:'muro', motivo:'envion', encuesta_disponible} o {estado:'error', error}. Sin
    * servidor no hay dos tiempos gratis: un error se dice y se reintenta, no se juega igual.
    */
@@ -445,12 +445,11 @@ export function crearServidor(o = {}) {
   function simular(ruta, b) {
     const etapaGratis = params.get('etapa') === 'final' ? 'final' : 'arranque';
     const gratis = Math.max(1, Math.min(9, Number(params.get('gratis')) || (etapaGratis === 'final' ? 2 : 1)));
-    const bono = etapaGratis === 'final' ? 2 : 1;
+    const bono = 0;      // correo obligatorio (worker/wrangler.jsonc, BONO_ENCUESTA 0): la encuesta no da nada
     const s = leerJson(local, CLAVES.sim) || { usadas: 0, encuesta: false, lista: false };
     s.finales = s.finales || {};      // etapa de cada final entregada, por número
-    const cupo = gratis + (s.encuesta ? bono : 0);
-    const quedan = s.lista ? null : Math.max(0, cupo - s.usadas);
-    const etapa = etapaGratis === 'arranque' && !s.lista && !s.encuesta ? 'arranque' : 'completa';
+    const quedan = s.lista ? null : Math.max(0, gratis - s.usadas);
+    const etapa = etapaGratis === 'arranque' && !s.lista ? 'arranque' : 'completa';
     const guardar = () => local.set(CLAVES.sim, JSON.stringify(s));
     const flags = { 'muro-partidas-gratis': String(gratis), 'muro-texto': params.get('texto') === 'b' ? 'b' : 'a', 'invitacion-podio1': 'on', grabacion: 'tercio' };
     const contexto = { pais: null, previas: s.usadas, dias: '0' };
@@ -462,14 +461,14 @@ export function crearServidor(o = {}) {
       return `v1.${cuerpo}.simulado${n}${e}`;
     };
     if (ruta === '/api/estado') {
-      const r = { dispositivo: b.dispositivo, puede: s.lista || quedan > 0, quedan, lista: s.lista, etapa, encuesta_disponible: !s.encuesta, flags, contexto, regla, metricas: null };
+      const r = { dispositivo: b.dispositivo, puede: s.lista || quedan > 0, quedan, lista: s.lista, etapa, encuesta_disponible: false, flags, contexto, regla, metricas: null };
       if (s.lista) r.lista_id = 'simulado';
       if (!r.puede) r.motivo = 'dispositivo';
       return ok(r);
     }
     if (ruta === '/api/partida') {
-      if (!s.lista && quedan <= 0) return ok({ estado: 'muro', motivo: 'dispositivo', encuesta_disponible: !s.encuesta, dispositivo: b.dispositivo, flags, contexto, regla });
-      const fuente = s.lista ? 'lista' : s.usadas < gratis ? 'gratis' : 'encuesta';
+      if (!s.lista && quedan <= 0) return ok({ estado: 'muro', motivo: 'dispositivo', encuesta_disponible: false, dispositivo: b.dispositivo, flags, contexto, regla });
+      const fuente = s.lista ? 'lista' : 'gratis';
       s.n = (s.n || 0) + 1;
       if (!s.lista) s.usadas++;
       s.finales[s.n] = etapa;
@@ -483,8 +482,7 @@ export function crearServidor(o = {}) {
       let via = 'ya';
       if (s.finales[n] === 'arranque') {
         if (s.lista) via = 'lista';
-        else if (s.encuesta && !s.envionEncuesta) { via = 'encuesta'; s.envionEncuesta = true; }
-        else return ok({ estado: 'muro', motivo: 'envion', encuesta_disponible: !s.encuesta, dispositivo: b.dispositivo, regla });
+        else return ok({ estado: 'muro', motivo: 'envion', encuesta_disponible: false, dispositivo: b.dispositivo, regla });
         s.finales[n] = 'completa'; guardar();
       }
       return ok({ estado: 'ok', via, pase: armarPase(n, 'gratis', 'completa'), quedan, lista: s.lista, dispositivo: b.dispositivo, regla });
@@ -497,7 +495,7 @@ export function crearServidor(o = {}) {
     if (ruta === '/api/encuesta') {
       if (s.encuesta) return Promise.reject(new ErrorRed('http', 409, { error: 'ya_respondida' }));
       s.encuesta = true; guardar();
-      return ok({ estado: 'ok', bono: s.lista ? 0 : bono });
+      return ok({ estado: 'ok', bono });
     }
     if (ruta === '/api/baja') return Promise.resolve({ status: 202, j: {} });
     return Promise.reject(new ErrorRed('http', 404, { error: 'no_existe' }));

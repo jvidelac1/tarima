@@ -112,7 +112,7 @@ button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px
 :where(html.horiz.bajo) .pesista b{overflow-wrap:anywhere;font-size:1em}
 :where(html.horiz.bajo) .panel.bienvenida .pesista .b{display:none}
 .pesista small.conviene{color:var(--ink);opacity:.85}
-/* muro, lista, encuesta e invitación del podio */
+/* muro (solo el correo), lista, encuesta opcional del panel de anotado e invitación del podio */
 .panel.muro,.panel.encuesta{max-width:min(94cqw,720px)}
 /* El muro puede salir en el medio de la final (intervalo): el cartel del evento, el reloj, el marcador y el acuse de la
    tecla quedan debajo del panel y en el teléfono acostado se le montaban encima. */
@@ -120,7 +120,6 @@ body:has(#capa > .panel:is(.muro,.encuesta,.anotado)) :is(.bug,.relojbox,#marcad
 /* Con el título en una sola línea (teléfono acostado), la bajada pasaba por debajo del selector ES · EN. */
 .panel.muro:has(>.idiomas.flota)>h1:first-of-type+.bajada{padding-right:112px}
 .panel .muro-cuerpo{display:grid;gap:10px}
-@media (min-width:700px){.panel .muro-cuerpo:has(.camino-encuesta){grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);align-items:start}}
 .formulario label.campo{display:flex;flex-direction:column;gap:.3em;margin:.4em 0}
 .formulario label.campo span,.panel label.campo span{font-family:var(--display);font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--teal);font-size:clamp(14px,2.2cqh,18px)}
 .panel label.campo input,.panel label.campo textarea{font:inherit;font-family:var(--body);font-size:max(16px,clamp(15px,2.3cqh,18px));color:var(--ink);background:#0d1533;border:1px solid var(--line);border-bottom:2px solid var(--teal);border-radius:0;padding:.45em .7em;width:100%;-webkit-appearance:none;appearance:none}
@@ -130,8 +129,6 @@ body:has(#capa > .panel:is(.muro,.encuesta,.anotado)) :is(.bug,.relojbox,#marcad
 .panel p.error{color:#ff8a7a;font-weight:600}
 .panel p.camino{color:var(--ink)}
 .panel .legal a,.panel a.privacidad{color:var(--teal)}
-.camino-encuesta{background:#0d1533;border:1px solid var(--line);border-left:3px solid var(--gold);padding:.6em .8em}
-.camino-encuesta p{color:var(--ink)!important}
 fieldset.pregunta{border:none;margin:.5em 0;padding:0}
 fieldset.pregunta legend{font-family:var(--display);font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--teal);font-size:clamp(14px,2.2cqh,17px);margin-bottom:.3em;padding:0}
 .opciones-q{display:flex;flex-wrap:wrap;gap:6px}
