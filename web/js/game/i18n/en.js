@@ -638,5 +638,6 @@ export default {
   'pesista.ventura.b': 'Even: the same green on both bars. Reliable, lifts less.',
   'pesista.brenner.b': 'Wide green on the pull, narrow on the jerk. Standing up with a heavy bar is hard for him.',
   'pesista.marangi.b': 'Narrow green on the pull, wide on the jerk. Streaky: full of surprises.',
-  'cuerpo.barra.tiron': 'Green pull', 'cuerpo.barra.envion': 'Green jerk',
+  'cuerpo.barra.tiron': 'Pull', 'cuerpo.barra.envion': 'Jerk',
+  'barra.verde.ancho': 'wide green', 'barra.verde.medio': 'medium green', 'barra.verde.angosto': 'narrow green',
 };

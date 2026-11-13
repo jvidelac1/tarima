@@ -126,7 +126,7 @@ jobs:
       # ve y lo que juzga el núcleo. Capturas en out/barra.
       - name: La barrita en el navegador (check_barra)
         if: ${{ !cancelled() && matrix.grupo == 'toques' }}
-        timeout-minutes: 15
+        timeout-minutes: 20
         run: node tools/check_barra.mjs 2>&1 | tee out/logs/check_barra.log
 
       # Entrada en tiempo real con teclado real: toque durante PREPÁRATE, al cambiar de señal, doble, largo, ráfagas en

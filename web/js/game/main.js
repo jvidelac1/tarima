@@ -727,7 +727,7 @@ async function inicio() {
       ${params.has('c') ? `<p class="desafio">${t('bienvenida.desafio')}</p>` : ''}${q ? `<p class="quedan">${q}</p>` : ''}
       ${nombreHTML}
       <h2 id="pesista-t">${esc(t('pesista.titulo', { nombre: mostrado() }))}</h2>
-      <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b>${cuerpoHTML(id, uno, cfg.ctl === 'b')}<small class="conviene">${t(cfg.ctl === 'b' ? `pesista.${id}.b` : uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small></button>`).join('')}</div>
+      <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b>${cfg.ctl === 'b' ? `<small class="conviene">${t(`pesista.${id}.b`)}</small>${cuerpoHTML(id, uno, true)}` : `${cuerpoHTML(id, uno)}<small class="conviene">${t(uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small>`}</button>`).join('')}</div>
       ${opciones}<div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<button id="btn-opciones" aria-expanded="${S.opciones}">${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button><button id="btn-ayuda">${t('boton.ayuda')}</button><small class="nota legal">${T ? '' : `${t('menus.teclado')} · `}<a href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></small></div>
       `, 'bienvenida');
     pn.querySelector('.legal a')?.addEventListener('click', () => ev('privacidad_abierta', { pantalla: E.pantalla }));
@@ -775,9 +775,11 @@ function cuerpoHTML(id, uno = false, barra = false) {
   const at = datos?.atletas?.[id]?.attrs, cj = datos?.atletas?.[id] ? cuerpoDe(id) : null;
   const tramoMed = k => `<span class="med tramo ${nivelTramo(cj[k])}"><i>${t('cuerpo.tramo.' + k)}</i><span class="barra" style="--v:${Math.round(Math.max(.1, Math.min(1, (1600 - cj[k]) / 1200)) * 100)}%"></span><em>${t('cuerpo.' + nivelTramo(cj[k]))}</em></span>`;
   // 'b': el verde de cada barrita (ancho = fácil), con el mismo dibujo que los tramos
-  const cb = barra && cj ? cuerpoBarra(id).barra : null, verdeMed = k => { const x = cb[k], n = x >= 1150 ? 'facil' : x <= 850 ? 'cuesta' : 'normal'; return `<span class="med tramo ${n}"><i>${t('cuerpo.barra.' + k)}</i><span class="barra" style="--v:${Math.round(Math.max(.15, Math.min(1, (x - 500) / 900)) * 100)}%"></span><em>${t('barra.ancho.' + (n === 'facil' ? 'ancho' : n === 'cuesta' ? 'angosto' : 'medio'))}</em></span>`; };
-  const ficha = uno && cj ? (cb ? ['tiron', 'envion'].map(verdeMed).join('') : '') + ['tiron', 'arriba', 'pararse'].map(tramoMed).join('') : at ? Object.entries(FICHA).map(([k, c]) => med(k, Math.max(.08, at[c] / 10), t(`ficha.${k}.${nivelFicha(at[c])}`))).join('') : '';
-  return `<span class="cuerpo${uno ? ' u' : ''}">${['estatura', 'femur', 'brazos', 'movilidad'].map(k => med(k, fr(k, C[k]), largo(k, C[k]))).join('')}${ficha}</span>`;
+  const cb = barra && cj ? cuerpoBarra(id).barra : null, verdeMed = k => { const x = cb[k], n = x >= 1150 ? 'facil' : x <= 850 ? 'cuesta' : 'normal'; return `<span class="med tramo verde ${n}"><i>${t('cuerpo.barra.' + k)}</i><span class="barra" style="--v:${Math.round(Math.max(.15, Math.min(1, (x - 500) / 900)) * 100)}%"></span><em>${t('barra.verde.' + (n === 'facil' ? 'ancho' : n === 'cuesta' ? 'angosto' : 'medio'))}</em></span>`; };
+  // 'b': la tarjeta dice solo lo que cambia el juego (la frase va antes, en su propio bloque): el verde de cada barrita
+  if (cb) return `<span class="cuerpo u b">${['tiron', 'envion'].map(verdeMed).join('')}</span>`;
+  const ficha = uno && cj ? ['tiron', 'arriba', 'pararse'].map(tramoMed).join('') : at ? Object.entries(FICHA).map(([k, c]) => med(k, Math.max(.08, at[c] / 10), t(`ficha.${k}.${nivelFicha(at[c])}`))).join('') : '';
+  return `<span class="cuerpo${uno ? ' u' : ''}${barra ? ' b' : ''}">${['estatura', 'femur', 'brazos', 'movilidad'].map(k => med(k, fr(k, C[k]), largo(k, C[k]))).join('')}${ficha}</span>`;
 }
 
 /** Metrónomo de 8 toques: la mediana del atraso propone la corrección (0 a 100 ms), que queda fija para toda la partida. */
@@ -921,7 +923,7 @@ function panelLlamado(p, L, t0, alConfirmar, corre = true) {
   // 'b': el verde que vas a tener con esos kilos, dibujado como la barrita (una por barrita) antes de confirmar
   const verdeHTML = kg => {
     if (!barra) return ''; const I = p.intensidadDe(L.a, L.lev, kg);
-    const una = i => { const z = zonasBarra(I, cuerpoP, i, primeraB), n = z.vMs >= 150 ? 'ancho' : z.vMs >= 95 ? 'medio' : 'angosto'; return `<span class="mini-b" title="${esc(t('barra.nombre.' + L.lev + i))}"><em>${esc(t('barra.nombre.' + L.lev + i))}</em><span class="mb-pista"><i class="mb-am" style="left:${(500 - z.a) / 10}%;width:${z.a / 5}%"></i><i class="mb-ve" style="left:${(500 - z.v) / 10}%;width:${z.v / 5}%"></i></span><b>${esc(t('barra.ancho.' + n))}</b></span>`; };
+    const una = i => { const z = zonasBarra(I, cuerpoP, i, primeraB), n = z.vMs >= 150 ? 'ancho' : z.vMs >= 95 ? 'medio' : 'angosto'; return `<span class="mini-b" title="${esc(t('barra.nombre.' + L.lev + i) + ': ' + t('barra.ancho.' + n))}"><em>${esc(t('barra.nombre.' + L.lev + i))}</em><span class="mb-pista"><i class="mb-am" style="left:${(500 - z.a) / 10}%;width:${z.a / 5}%"></i><i class="mb-ve" style="left:${(500 - z.v) / 10}%;width:${z.v / 5}%"></i></span><b>${esc(t('barra.ancho.' + n))}</b></span>`; };
     return `<p class="verde-b"><span>${esc(t('llamado.b_verde'))}</span>${(L.lev === 'c' ? [0, 1] : [0]).map(una).join('')}</p>`;
   };
   const conChance = (txt, kg) => `${txt.replace(/\.$/, '')} (${t('llamado.u_chance', { n: chance(kg) })}).`;
@@ -936,7 +938,7 @@ function panelLlamado(p, L, t0, alConfirmar, corre = true) {
     // sin llegar con el día normal, todavía puede subir (el día o la garra): lo dice la chance, sin contradecirla
     // sin llegar sin suerte: la garra (si la tiene y alcanza), la suerte o nada; lo dice sin contradecir la chance
     const n10 = chance(S.kg), falta = llega ? t('llamado.u_llegas', { discos: discos(pr.fin) }) : t(pr.conGarra && a.garraUno[L.lev] ? 'llamado.u_con_garra' : n10 > 0 ? 'llamado.u_falta' : 'llamado.u_no_llegas', { discos: discos(-pr.fin) });
-    const linea = `<p class="discos${llega ? '' : ' no'}">${discosHTML(pr)} ${esc(falta)} · <b class="chance">${esc(t('llamado.u_chance', { n: n10 }))}</b> · ${esc(t('llamado.u_justo', { tramo: tramoTxt(pr.mayor, L.lev) }))}</p>`;
+    const linea = `<p class="discos${llega ? '' : ' no'}">${discosHTML(pr)} ${esc(falta)} · <b class="chance">${esc(t('llamado.u_chance', { n: n10 }))}</b><span class="justo"> · ${esc(t('llamado.u_justo', { tramo: tramoTxt(pr.mayor, L.lev) }))}</span></p>`;
     // La cuenta con su apuesta: lo que hace falta para el oro (o la plata, o pasar al frente) y la chance de ese peso
     const cuentaU = L.lev === 'c' ? [C.oro ? conChance(t('cuenta.oro', { kg: C.oro }), C.oro) : t(sinArranque ? 'cuenta.sin_arranque' : 'cuenta.oro_no'), C.plata && C.plata !== C.oro ? conChance(t('cuenta.plata', { kg: C.plata }), C.plata) : ''].filter(Boolean).join(' ') : C.oro ? conChance(t('cuenta.liderar', { kg: C.oro }), C.oro) : '';
     const garra = `<p class="chica garra">${t(a.garraUno[L.lev] ? 'llamado.u_garra_si' : 'llamado.u_garra_no')}</p>`;

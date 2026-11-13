@@ -42,9 +42,12 @@ const PANTALLAS = [
   { id: 'pc_en', lang: 'en', vp: { width: 1280, height: 720 }, tactil: false },
   { id: 'tel_es', lang: 'es', vp: { width: 667, height: 375 }, tactil: true, primera: true },
   { id: 'tel_en', lang: 'en', vp: { width: 844, height: 390 }, tactil: true },
+  // la computadora baja del dueño (~1800×560 visibles): solo la bienvenida, con las tarjetas de los pesistas
+  { id: 'bajo_es', lang: 'es', vp: { width: 1800, height: 560 }, tactil: false, soloInicio: true },
+  { id: 'bajo_en', lang: 'en', vp: { width: 1800, height: 560 }, tactil: false, soloInicio: true },
 ].filter(x => !SOLO || x.id === SOLO);
 
-for (const P of PANTALLAS) {
+for (const P of PANTALLAS) try {
   const tag = `[${P.id}]`, mal = t => problemas.push(`${tag} ${t}`);
   const ctx = await browser.newContext({ viewport: P.vp, deviceScaleFactor: P.tactil ? 2 : 1, ...(P.tactil ? { hasTouch: true, isMobile: true } : {}), locale: P.lang === 'es' ? 'es-AR' : 'en-US' });
   const page = await ctx.newPage(), cdp = P.tactil ? await ctx.newCDPSession(page) : null, J = (fn, a) => page.evaluate(fn, a);
@@ -53,20 +56,34 @@ for (const P of PANTALLAS) {
   if (!P.primera) await page.addInitScript(() => { try { if (!sessionStorage.getItem('__t')) { localStorage.setItem('tarima.jugadas', '1'); localStorage.setItem('tarima.visto.b_presenta', '1'); localStorage.setItem('tarima.visto.b_fantasma', '1'); sessionStorage.setItem('__t', '1'); } } catch { /* sin almacenamiento */ } });
   // dónde se veía el puntero cuando llegó cada Espacio (antes que el juego: este oyente se registra primero)
   await page.addInitScript(() => { window.__P = []; addEventListener('keydown', e => { if (e.code !== 'Space' || e.repeat) return; const p = document.querySelector('#barrita .b-punt'); window.__P.push({ ts: e.timeStamp, izq: p ? parseFloat(p.style.left) : null, visible: !document.getElementById('barrita')?.hidden }); }, true); });
-  await page.goto(`${base}juego.html?lang=${P.lang}&q=baja&semilla=${SEMILLA}`, { waitUntil: 'load' });
+  // sin dibujo continuo (?dibujo=0, como check_game): por software cada cuadro tarda; antes de cada captura se fuerza uno
+  await page.goto(`${base}juego.html?lang=${P.lang}&q=baja&dibujo=0&semilla=${SEMILLA}`, { waitUntil: 'load' });
   if (!await J(() => window.JUEGO.listo)) { mal('el juego no inició'); await ctx.close(); continue; }
   await J(() => JUEGO.test.manual());
   const av = ms => J(ms => JUEGO.test.avanzar(ms), ms), ir = t => J(t => JUEGO.test.hasta(t, 8), t);
-  const foto = n => page.screenshot({ path: path.join(OUT, `${P.id}_${n}.png`) }).catch(() => null);
+  const foto = async n => { await J(() => { try { window.JUEGO.escena?.cuadro?.(0, true); } catch (e) { console.error('cuadro forzado: ' + (e.stack || e)); } }).catch(() => null); return page.screenshot({ path: path.join(OUT, `${P.id}_${n}.png`) }).catch(() => null); };
   const punto = async () => { const b = await page.locator('#escena').boundingBox(); return { x: Math.round(b.x + b.width * .45), y: Math.round(b.y + b.height * .4) }; };
   const baja = async () => { if (P.tactil) { const p = await punto(); await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.x, y: p.y, id: 1 }] }); } else await page.keyboard.down('Space'); };
   const sube = async () => { if (P.tactil) await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); else await page.keyboard.up('Space'); };
   const toque = async () => { await baja(); await av(30); await sube(); };
-  const pulsa = async sel => { const l = page.locator(sel).first(); if (!(await l.count()) || !(await l.isVisible())) return false; if (P.tactil) await l.tap(); else { await l.focus(); await page.keyboard.press('Enter'); } return true; };
+  const pulsa = async sel => { const l = page.locator(sel).first(); if (!(await l.count()) || !(await l.isVisible()) || !(await l.isEnabled())) return false; if (P.tactil) await l.tap(); else { await l.focus(); await page.keyboard.press('Enter'); } return true; };
   const caja = id => J(id => { const e = document.getElementById(id); if (!e || e.hidden) return null; const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; }, id);
   const cruza = (a, b) => a && b && a.l < b.r - 1 && a.r > b.l + 1 && a.t < b.b - 1 && a.b > b.t + 1;
   const PEDIR = ['verde', 'amarillo', 'rojo'], pedidas = [], vistas = [];
   let n = 0, hecho = '', fotoPanel = 0, lineas = [], revisada = false, medido = null;
+  // la bienvenida: en cada tarjeta nada se pisa (nombre, frase y filas), la tarjeta no se corta y no queda debajo de la fila de
+  // botones (Jugar, Opciones, Cómo se juega)
+  await av(300); await foto('0_inicio');
+  { const T = await J(() => { const pie = document.querySelector('#capa .panel .fila.pie')?.getBoundingClientRect(); return [...document.querySelectorAll('#capa .pesista')].map(p => {
+      const r = p.getBoundingClientRect(), k = [...p.querySelectorAll('b, small, .med')].filter(e => e.offsetParent && getComputedStyle(e).display !== 'none').map(e => e.getBoundingClientRect()); let cruces = 0;
+      for (let i = 0; i < k.length; i++) for (let j = i + 1; j < k.length; j++) { const a = k[i], b = k[j]; if (a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1) cruces++; }
+      const fuera = k.some(x => x.bottom > r.bottom + 1 || x.right > r.right + 1);
+      return { id: p.dataset.id, cruces, fuera, tapa: !!pie && r.bottom > pie.top + 1 && r.top < pie.bottom, alto: Math.round(r.height) }; }); });
+    const PN = await J(() => { const pn = document.querySelector('#capa .panel'); return pn ? { cliente: pn.clientHeight, contenido: pn.scrollHeight } : null; });
+    console.log(`${tag} panel de bienvenida: ${PN?.cliente} px a la vista de ${PN?.contenido} px`);
+    console.log(`${tag} tarjetas: ${T.map(x => `${x.id} ${x.alto} px${x.cruces ? ` · ${x.cruces} cruces` : ''}${x.fuera ? ' · se corta' : ''}${x.tapa ? ' · bajo los botones' : ''}`).join(' | ')}`);
+    for (const x of T) if (x.cruces || x.fuera || x.tapa) mal(`la tarjeta de ${x.id} no se lee entera: ${JSON.stringify(x)}`); }
+  if (P.soloInicio) { await ctx.close(); continue; }
   await pulsa('#btn-empezar');
   const t0 = Date.now();
   for (let g = 0; g < 20000 && Date.now() - t0 < 6 * 60000; g++) {
@@ -104,10 +121,10 @@ for (const P of PANTALLAS) {
           }
           if (corte.length) mal(`texto cortado en la barrita: ${corte.join(' · ')}`);
         }
-        await ir(obj - 1); await toque(); hecho = k; pedidas.push(z); await av(60); await foto(`${n + 1}_${z}`); n++;
+        await ir(obj - 1); await toque(); hecho = k; pedidas.push(z); await av(320); await foto(`${n + 1}_${z}`); n++;
         continue;
       }
-      await av(30); continue;
+      await J(() => JUEGO.test.avanzar(60, 30)); continue;
     }
     if (s.panel && !s.sobre) {
       if (s.pantalla === 'llamado') {
@@ -120,7 +137,7 @@ for (const P of PANTALLAS) {
       const v = await J(() => document.getElementById('veredicto').hidden ? '' : document.getElementById('veredicto').textContent);
       if (v && !lineas.includes(v)) { lineas.push(v); if (lineas.length <= 3) await foto(`${lineas.length}_veredicto`); }
     }
-    await av(250);
+    await J(() => JUEGO.test.avanzar(300, 50));
     if (['rival', 'decision', 'carga', 'desplazado'].includes(s.pantalla) && g % 3 === 0) await toque();
   }
   const R = await J(() => (JUEGO.E.propios || []).map(x => ({ res: x.res, linea: x.linea, barras: (x.uno?.barras || []).map(b => b.zona + (b.sola ? '*' : '')) })));
@@ -141,7 +158,7 @@ for (const P of PANTALLAS) {
     }
   }
   await ctx.close();
-}
+} catch (e) { problemas.push(`[${P.id}] excepción: ${(e.message || e).split('\n')[0]}`); }
 await browser.close(); server.close();
 for (const x of notas) console.log('nota: ' + x);
 if (problemas.length) { console.log(`\nFALLÓ (${problemas.length}):`); for (const p of problemas.slice(0, 30)) console.log('  ' + p); process.exit(1); }

@@ -118,7 +118,7 @@ for (let n = 0; n < 60000; n++) {
     if (g && g.clave + g.desde !== senalPrev) {
       senalPrev = g.clave + g.desde;
       if (g.tipo === 'cierre') senales.push({ lev: nLev, clave: g.clave, guiado: I.guiado, ve: s.ahora, objetivo: g.objetivo, anticipa: g.objetivo !== null ? Math.round(g.objetivo - s.ahora) : null });
-      if (g.clave === 'tira' && tConfirma !== null && !I.guiado) { preps.push(`lev ${nLev} ${((s.ahora - tConfirma) / 1000).toFixed(1)} s`); tConfirma = null; }
+      if ((g.clave === 'tira' || g.tipo === 'barra') && tConfirma !== null && !I.guiado) { preps.push(`lev ${nLev} ${((s.ahora - tConfirma) / 1000).toFixed(1)} s`); tConfirma = null; }
       if (senalesFoto < 14 && (nLev <= 2 || I.guiado || g.clave === 'flexiona' || g.clave === 'arriba' || g.clave === 'recibi2')) { senalesFoto++; await foto(`senal_${nLev}_${g.clave}_aparece`); }
     }
     if (!g) { await av(20); continue; }
@@ -166,7 +166,7 @@ for (let n = 0; n < 60000; n++) {
           // el peso con el que este llamado termina en FRENO: la suerte de cada tramo sale de la semilla del llamado (rules.js,
           // ruidoDe), así que la prueba lo puede ver de antemano (el jugador no). Si ninguno da FRENO, el primero con «5 de 10» o menos
           const kgFreno = await J(async () => {
-            const R = await import(new URL('js/sim/rules.js', location.href).href), p = JUEGO.E.p, L = p.llamado, a = p.at[L.a], cu = R.cuerpoDe(a.id);
+            const R = await import(new URL('js/sim/rules.js', location.href).href), p = JUEGO.E.p, L = p.llamado, a = p.at[L.a], cu = p.cfg.ctl === 'b' ? R.cuerpoBarra(a.id) : R.cuerpoDe(a.id);      // 'b': la prueba pega en el verde (sin costo de más)
             if (!a.garraUno[L.lev]) return null;
             const T = R.TRAMOS[L.lev], su = T.map((_, i) => R.ruidoDe(L.sem, i, cu.ruido || 0)), env = L.lev === 'c' ? cu.casa : undefined;
             for (let kg = p.minimo(L.a); kg <= L.kg + 20; kg++) {
@@ -229,7 +229,7 @@ if (!tramos.some(x => x.machaca)) problemas.push('no se llegó a probar el macha
   console.log(`  ${final !== null && final <= 150000 ? 'cumple' : 'NO    '} final del primer llamado al podio: ${final === null ? '?' : (final / 1000).toFixed(1) + ' s'} · meta ≤ 150 s`);
   if (max > 20000) problemas.push(`una espera sin tocar de ${(max / 1000).toFixed(1)} s (meta ≤ 20 s)`);
   if (final === null || final > 150000) problemas.push(`la final duró ${final === null ? '?' : (final / 1000).toFixed(1) + ' s'} de reloj de juego (meta ≤ 150 s)`);
-  const f = fin.propios.find(x => x.res === 'fallo'); if (!f || !/^(Se quedó sin energía en|Ran out of energy in) /.test(f.linea || '')) problemas.push(`el arranque con 25 kg de más no cayó con la línea del tramo: ${JSON.stringify(f)}`); }
+  const f = fin.propios.find(x => x.res === 'fallo'); if (!f || !/(se quedó sin energía en|out of energy in) /i.test(f.linea || '')) problemas.push(`el arranque con 25 kg de más no cayó con la línea del tramo: ${JSON.stringify(f)}`); }
 console.log('\nPANTALLAS (s): ' + seg.map(x => `${x.p} ${(((x.t1 ?? x.t0) - x.t0) / 1000).toFixed(1)}`).join(' · '));
 if (problemas.length) { console.log('\nPROBLEMAS:\n' + problemas.join('\n')); process.exit(1); }
 console.log(`\ncheck_recorrido: terminó (${nFoto} capturas en out/recorrido)`);

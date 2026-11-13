@@ -1,5 +1,11 @@
 # Controles: Fácil y Clásico
 
+**Desde el 13-nov (noche) el Fácil por defecto es la barrita (`'b'`)**: ver `docs/JUEGO.md`, «Gameplay 3», y HANDOFF.md,
+«Barrita». Lo que sigue sobre `'u'` vale para `?ctl=u` y para recalcular sus registros. La entrada de `'b'` usa la misma clase
+`Boton` (`input.js`) con `sinRepeticion` (una repetición del teclado nunca es un toque) y la gracia del dedo cancelado de `'u'`;
+el acuse de cada contacto es la zona (`QUE_B` en `controles.js`). Se prueba con `teclado_test` y `dedo_test` (las dos corren
+`'b'` y `'u'`), `tools/barra_bots.mjs` y, con navegador, `tools/check_barra.mjs`.
+
 ## Nivel `'u'` («un toque, un tramo»): el Fácil por defecto desde el 13-nov
 
 **Esto manda sobre el resto del documento.** El diseño está en `docs/JUEGO.md`, sección Gameplay 2. Lo de abajo describe lo implementado en la rama `gameplay` y cómo se mide. El Fácil de círculos (`'f'`) salió de Opciones y queda en el núcleo solo para recalcular registros viejos (`?ctl=f` lo abre para las pruebas). Clásico (`'c'`) no cambió.

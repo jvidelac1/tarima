@@ -1,5 +1,27 @@
 # Diseño del juego — Tarima
 
+## Gameplay 3: la barrita (13 de noviembre, noche)
+
+**Manda sobre Gameplay 2 para el Fácil por defecto**, que pasa a ser el nivel **`'b'` (la barrita)**. `'u'` queda en el núcleo
+para recalcular sus registros (`?ctl=u`) y Clásico (`'c'`) no cambia. Pedido del dueño: «tenés un puntero que se mueve en la
+barrita y si tocás muy lejos, falla; más o menos cerca, regular; en el verde, perfecto. Al usuario le gusta tirar él».
+
+- **Una barrita en el arranque (el tirón) y dos en el dos tiempos (la cargada y el envión).** Pararse, quedar firme y la garra
+  salen solos según la energía. Ni ¡SALTA! ni ¡PÁRATE! ni ¡ARRIBA! como toques.
+- **El puntero va y vuelve sin reloj** (`rules.js → posBarra`: 1,4 s de punta a punta, 1,7 s desde los 8 s sin tocar). El toque
+  dispara el tramo en ese instante. Sin ningún toque, al minuto (el reloj de la competencia) tira solo, como REGULAR.
+- **Zonas** (`zonasBarra`): verde = perfecto (nada de más), amarillo = regular (+600 de energía en ese tramo), rojo = lejos
+  (+1500). El ancho depende de los kilos (verde de ±170 ms con la apertura a ±75 ms al 100 %) y del pesista: Largo verde ancho en
+  el tirón y angosto en el envión, Potente al revés, Compacto parejo (`BARRA.pesistas`). El primer intento de la primera final,
+  1,4 veces más ancho. Si la barra sube lo sigue decidiendo la energía de `'u'` (kilos × cuerpo × suerte + el costo del toque),
+  con el gasto escalado a 0,9 (`BARRA.escala`).
+- **Panel**: el verde que va a tener con esos kilos (una barrita chica por barrita) y la chance «X de 10» con `chanceBarra`, que
+  integra dónde pega una persona típica (`BARRA.tipico`: ±105 ms, 30 ms tarde, 4 % de despistes). El entrenador usa la misma.
+- **Entrada**: el toque se juzga con el instante del evento, en el mismo reloj con el que se dibuja el puntero (que se dibuja un
+  cuadro y medio adelantado); dos contactos a menos de 120 ms son uno; los primeros 250 ms de una barrita no la disparan; una
+  tecla que ya venía repitiendo no cuenta. Después del toque queda la marca y ¡PERFECTO! / REGULAR / LEJOS.
+- Medidas, ajustes y lo que falta: HANDOFF.md, «Barrita».
+
 ## Gameplay 2 (13 de noviembre)
 
 **Esta sección manda** sobre el resto del documento y sobre la parte de Fácil de [CONTROLES.md](CONTROLES.md) para el nivel de control nuevo **`'u'` («un toque, un tramo»)**, que pasa a ser el modo por defecto. Clásico (`'c'`) no cambia. El Fácil de círculos (`'f'`) sale de Opciones y queda en el núcleo solo para recalcular registros viejos.

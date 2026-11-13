@@ -655,5 +655,6 @@ export default {
   'pesista.ventura.b': 'Parejo: el mismo verde en las dos barritas. Fiable, levanta menos kilos.',
   'pesista.brenner.b': 'Verde ancho en el tirón y angosto en el envión. Pararse con mucho peso le cuesta.',
   'pesista.marangi.b': 'Verde angosto en el tirón y ancho en el envión. Irregular: sorprende.',
-  'cuerpo.barra.tiron': 'Verde tirón', 'cuerpo.barra.envion': 'Verde envión',
+  'cuerpo.barra.tiron': 'Tirón', 'cuerpo.barra.envion': 'Envión',
+  'barra.verde.ancho': 'verde ancho', 'barra.verde.medio': 'verde medio', 'barra.verde.angosto': 'verde angosto',
 };
