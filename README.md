@@ -135,7 +135,6 @@ tools/
   export_web.py     GLB reempaquetado, máscaras y web/data/poses.json (sin comprimir)
   comprimir_modelos.sh  comprime web/models: hay que correrlo después de cada export_web.py (build.sh lo hace solo)
   check_carga.mjs   carga del juego con la red limitada: bytes, tiempos y capturas de la pantalla de carga
-  carga_svg.py      genera el pesista animado de la pantalla de carga (web/css/carga_lev.css)
   verify_build.py   verifica que web/ corresponde al último build
   check_viewer.mjs  prueba automática del visor (npm install; usa el Chrome del sistema)
   check_game.mjs, check_fluidez.mjs   pruebas del juego con navegador (corren también en GitHub Actions)

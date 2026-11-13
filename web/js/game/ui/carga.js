@@ -1,6 +1,5 @@
-// Pantalla de carga (#msg en juego.html): un pesista que hace un arranque en bucle (SVG en el HTML, animación en
-// css/carga_lev.css, sin JavaScript), la barra con los bytes reales de los modelos, y frases cortas que rotan cada 4 s
-// (cómo se juega y datos de halterofilia). juego.html carga este módulo aparte y con async: corre apenas bajan los textos,
+// Pantalla de carga (#msg en juego.html): fondo con una luz de tarima que respira (css/carga.css), la barra con los bytes
+// reales de los modelos, y frases cortas que rotan cada 4 s (cómo se juega y datos de halterofilia). juego.html carga este módulo aparte y con async: corre apenas bajan los textos,
 // antes de three.js y del resto del juego. main.js lo importa (es el mismo módulo) y lo maneja:
 //   cargaUI.titulo(clave)         la línea de arriba de la barra, por clave de texto (null la saca)
 //   cargaUI.esperar(claves)       qué archivos se esperan ('ventura:glb', 'ventura:mask'...), para el porcentaje

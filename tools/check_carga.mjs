@@ -101,7 +101,7 @@ for (const perfil of USAR) {
 async function revisar(page, donde) {
   const r = await page.evaluate(() => {
     const W = innerWidth, H = innerHeight, m = document.getElementById('msg'); if (!m || m.hidden) return { oculto: true };
-    const sel = ['.lev', '.carga-marca', '#msg-txt', '.carga-fila', '#carga-det', '#carga-dato'], cajas = [];
+    const sel = ['.carga-marca', '#msg-txt', '.carga-fila', '#carga-det', '#carga-dato'], cajas = [];
     for (const s of sel) { const e = m.querySelector(s); if (!e) continue; const c = getComputedStyle(e); if (c.display === 'none' || (s === '#msg-txt' && !e.textContent)) continue; const b = e.getBoundingClientRect(); cajas.push({ s, x: b.x, y: b.y, w: b.width, h: b.height, txt: e.textContent.trim().slice(0, 80) }); }
     return { W, H, cajas, scroll: document.scrollingElement.scrollHeight > H + 1 };
   });
@@ -122,7 +122,7 @@ if (nueva && CAPTURAS) {
   const CASOS = [{ nombre: '667x375', w: 667, h: 375, dpr: 2 }, { nombre: '844x390', w: 844, h: 390, dpr: 3 }, { nombre: 'escritorio_en', w: 1280, h: 720, dpr: 1, touch: false, url: URL0.replace('lang=es', 'lang=en') }, { nombre: '844x390_reducido', w: 844, h: 390, dpr: 3, reduced: true }];
   for (const C of CASOS) {
     const { ctx, page, tag } = await abrir({ ...C, perfil: 'lenta' });
-    // al abrir: el HTML y su CSS ya muestran el pesista, antes de que baje el juego
+    // al abrir: el HTML y su CSS ya muestran la pantalla (marca, luz y barra), antes de que baje el juego
     await espera(page, () => document.getElementById('msg') && document.fonts.status === 'loaded', 30000); await page.waitForTimeout(700);
     await foto(page, `${C.nombre}_abriendo`); await revisar(page, `${tag} al abrir`);
     if (!await espera(page, () => window.__carga.panel !== null, 120000)) { problemas.push(`${tag} no llegó a la bienvenida`); await ctx.close(); continue; }
@@ -151,18 +151,12 @@ if (nueva && CAPTURAS) {
     if (await page.evaluate(() => !document.getElementById('carga-mini').hidden)) problemas.push(`${tag} la barrita de arriba sigue a la vista después de la carga`);
     await ctx.close();
   }
-  // el pesista: siete instantes del arranque, con la animación detenida (main.js vacío: la bienvenida no lo tapa)
+  // la pantalla de carga no lleva dibujo animado (el dueño sacó el pesista): que no vuelva
   {
-    const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true }), page = await ctx.newPage();
-    page.on('pageerror', e => problemas.push(`[pesista] pageerror: ${e.message}`));
-    await page.route('**/js/game/main.js', r => r.fulfill({ contentType: 'text/javascript', body: '' }));
-    await page.goto(base + URL0, { waitUntil: 'load' });
-    await espera(page, () => document.querySelector('#msg .lev'), 20000);
-    const caja = await page.evaluate(() => { const b = document.querySelector('#msg .lev').getBoundingClientRect(); return { x: b.x - 10, y: b.y - 6, width: b.width + 20, height: b.height + 12 }; });
-    for (const f of [0, .3, .4, .46, .56, .82, .95]) {
-      await page.evaluate(f => { for (const a of document.getAnimations()) if (/^lev-/.test(a.animationName || '')) { a.pause(); a.currentTime = f * 3600; } }, f);
-      await page.waitForTimeout(80); await foto(page, `pesista_${String(Math.round(f * 100)).padStart(2, '0')}`, caja);
-    }
+    const { ctx, page, tag } = await abrir({ w: 844, h: 390, dpr: 1 });
+    await espera(page, () => !!document.getElementById('msg'), 20000);
+    const n = await page.evaluate(() => document.querySelectorAll('#msg svg, #msg img, #msg canvas').length);
+    if (n) problemas.push(`${tag} la pantalla de carga tiene ${n} dibujos (se pidió sin pesista)`);
     await ctx.close();
   }
 }
