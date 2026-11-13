@@ -296,6 +296,7 @@ html.rotado #app{position:fixed;left:0;top:0;flex:none;width:var(--app-w,100vh);
 .marcador b{font-weight:800;font-size:calc(var(--u)*1.05);letter-spacing:.05em;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .marcador span{font-weight:700;font-size:calc(var(--u)*.95);letter-spacing:.05em;color:var(--gold)}
 body:has(.etiqueta:not([hidden])) .marcador{top:calc(var(--u)*7 + var(--st))}
+html.turno-rival #marcador{top:calc(var(--u)*9.2 + var(--st))}      /* debajo del cartel del turno del rival: con «Si Brenner levanta…» lo pisaba */
 /* durante el turno de un rival no hay botón de levantar ni señal: tocar solo saltea (y lo dice el cartel) */
 html.turno-rival #zona,html.turno-rival #senal{display:none!important}      /* el acuse queda: dice que el toque llegó (y que saltea) */
 
