@@ -146,7 +146,7 @@ fieldset.pregunta legend{font-family:var(--display);font-weight:700;text-transfo
 .pesista .cuerpo.vb .med{display:flex;justify-content:space-between;align-items:baseline;gap:.5em;font-size:.8em;margin:0;padding:0;border:0}
 .pesista .cuerpo.vb .barra{display:none}
 .pesista .cuerpo.vb .med em{white-space:nowrap}
-:where(html.horiz.bajo) .pesista .cuerpo.vb .med{font-size:.7em}
+:where(html.horiz.bajo) .pesista .cuerpo.vb{display:none}      /* en el teléfono acostado la frase ya dice el verde de cada barrita */
 /* pantallas bajas (la computadora del dueño muestra ~560 px): la bienvenida sin la franja de colores de cada tarjeta ni la
    nota debajo del nombre, para que las tarjetas entren enteras encima de la fila de botones */
 @media (max-height:820px){
