@@ -23,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { launchOptions } from './browser.mjs';
 import { sinApi } from './sin_api.mjs';
+import { saltarRival } from './saltar_rival.mjs';
 import { medirEnPagina, fila, revisar as revisarTapa } from './tapa.mjs';
 /** Señales de un toque (la libre de siempre y las de 'u': ¡SALTA!, ¡PÁRATE!, ¡DA TODO!): un toque y la señal se va. */
 const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
@@ -116,7 +117,7 @@ async function correr(C) {
       const caja = el => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
       const cruza = (a, b) => a.l < b.r - 1 && a.r > b.l + 1 && a.t < b.b - 1 && a.b > b.t + 1;
       const o = { scroll: se.scrollWidth > W + 1 || se.scrollHeight > H + 1 || scrollX !== 0 || scrollY !== 0, fuera: [], seguras: [], cruces: [], panel: null, zona: ve($('zona')) };
-      const ids = ['zona', 'senal', 'barrita', 'margen', 'zocalo', 'acuse', 'guia', 'veredicto', 'cartel', 'rival', 'etiqueta', 'pausa', 'ayudab', 'sonidob', 'saltar', 'turno', 'marcador'], B = {};
+      const ids = ['zona', 'senal', 'barrita', 'margen', 'zocalo', 'acuse', 'guia', 'veredicto', 'cartel', 'rival', 'etiqueta', 'pausa', 'ayudab', 'sonidob', 'saltar', 'turno', 'marcador', 'tablero', 'saltar-rival'], B = {};
       for (const id of ids) if (ve($(id))) B[id] = caja($(id));
       for (const k of ['bug', 'relojbox']) { const el = document.querySelector('.' + k); if (ve(el)) B[k] = caja(el); }
       for (const [id, b] of Object.entries(B)) {
@@ -124,7 +125,7 @@ async function correr(C) {
         // lo que se toca o se lee no va debajo de la muesca ni de la barra de inicio (el veredicto y el cartel van centrados)
         if (!['veredicto', 'cartel'].includes(id) && (b.l < seg.left - 1 || b.r > W - seg.right + 1 || b.b > H - seg.bottom + 1)) o.seguras.push(id);
       }
-      for (const [a, b] of [['zona', 'barrita'], ['barrita', 'zocalo'], ['barrita', 'guia'], ['barrita', 'margen'], ['zona', 'senal'], ['zona', 'zocalo'], ['zona', 'acuse'], ['zona', 'guia'], ['zona', 'rival'], ['zona', 'pausa'], ['zona', 'saltar'], ['zona', 'sonidob'], ['sonidob', 'pausa'], ['sonidob', 'bug'], ['sonidob', 'senal'], ['ayudab', 'relojbox'], ['senal', 'zocalo'], ['senal', 'guia'], ['senal', 'etiqueta'], ['senal', 'bug'], ['zocalo', 'acuse'], ['guia', 'zocalo'], ['acuse', 'guia'], ['turno', 'sonidob'], ['turno', 'pausa'], ['turno', 'ayudab'], ['turno', 'marcador'], ['margen', 'guia'], ['margen', 'senal'], ['veredicto', 'margen'], ['veredicto', 'turno']])
+      for (const [a, b] of [['zona', 'barrita'], ['barrita', 'zocalo'], ['barrita', 'guia'], ['barrita', 'margen'], ['zona', 'senal'], ['zona', 'zocalo'], ['zona', 'acuse'], ['zona', 'guia'], ['zona', 'rival'], ['zona', 'pausa'], ['zona', 'saltar'], ['zona', 'sonidob'], ['sonidob', 'pausa'], ['sonidob', 'bug'], ['sonidob', 'senal'], ['ayudab', 'relojbox'], ['senal', 'zocalo'], ['senal', 'guia'], ['senal', 'etiqueta'], ['senal', 'bug'], ['zocalo', 'acuse'], ['guia', 'zocalo'], ['acuse', 'guia'], ['turno', 'sonidob'], ['turno', 'pausa'], ['turno', 'ayudab'], ['turno', 'marcador'], ['margen', 'guia'], ['margen', 'senal'], ['veredicto', 'margen'], ['veredicto', 'turno'], ['tablero', 'veredicto'], ['tablero', 'sonidob'], ['tablero', 'pausa'], ['tablero', 'ayudab'], ['tablero', 'relojbox'], ['tablero', 'senal'], ['tablero', 'margen'], ['tablero', 'acuse'], ['saltar-rival', 'acuse'], ['saltar-rival', 'veredicto'], ['saltar-rival', 'zona']])
         if (B[a] && B[b] && cruza(B[a], B[b])) o.cruces.push(`${a}/${b}`);
       const pn = document.querySelector('#capa .panel') || (ve($('sobre')) ? $('sobre').querySelector('.panel') : null);
       if (pn) {
@@ -250,6 +251,7 @@ async function correr(C) {
       if (hay) { const ok = await pulsa('#capa .panel button.ir'); if (s.pantalla === 'llamado' && ok) nIntentos++; await av(ok ? 50 : 200); continue; }
     }
     await av(['rival', 'decision', 'repeticion', 'repeticion_rival'].includes(s.pantalla) ? 450 : 200);
+    if (!(I && I.propio) && n % 3 === 0 && await saltarRival(page, true)) continue;      // un rival: solo con el botón «Saltar»
     if (['decision', 'repeticion', 'repeticion_rival', 'carga', 'desplazado', 'rival'].includes(s.pantalla) && n % 3 === 0 && !(I && I.propio)) await toque();      // el toque de saltear
   }
   const fin = await J(() => ({ s: JUEGO.estado(), propios: (JUEGO.E.propios || []).map(x => `${x.pantalla} ${x.res}${x.causa ? ':' + x.causa : ''}`), toques: { total: JUEGO.toques.total, aceptados: JUEGO.toques.aceptados } }));

@@ -25,6 +25,7 @@ import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { launchOptions } from './browser.mjs';
+import { saltarRival } from './saltar_rival.mjs';
 /** Señales de un toque (la libre de siempre y las de 'u': ¡SALTA!, ¡PÁRATE!, ¡DA TODO!): un toque y la señal se va. */
 const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
@@ -432,7 +433,7 @@ async function interactuarJuego(page) {
       const P = await J(() => { const ir = document.querySelector('#capa .panel button.ir:not(:disabled)'); return { ir: !!ir, foco: document.activeElement === ir }; });
       if (P.ir) { await dormir(400); if (!P.foco) await J(() => document.querySelector('#capa .panel button.ir:not(:disabled)')?.focus()); await page.keyboard.press('Enter'); await dormir(300); continue; }
     }
-    if (['rival', 'decision', 'repeticion', 'repeticion_rival', 'carga', 'desplazado'].includes(s.pantalla) && Date.now() - ultSalto > 1500) { await espacio(); ultSalto = Date.now(); continue; }
+    if (['rival', 'decision', 'repeticion', 'repeticion_rival', 'carga', 'desplazado'].includes(s.pantalla) && Date.now() - ultSalto > 1500) { if (!await saltarRival(page)) await espacio(); ultSalto = Date.now(); continue; }
     await dormir(30);
   }
   return { tA, tB };

@@ -172,6 +172,13 @@ jobs:
         timeout-minutes: 20
         run: node tools/check_recorrido.mjs 2>&1 | tee out/logs/check_recorrido.log
 
+      # El mismo recorrido saltando cada rival con el botón «Saltar» (tecla S) al segundo: con eso la final tiene que seguir
+      # cumpliendo el ritmo (espera ≤ 20 s, final ≤ 150 s). Capturas en out/recorrido_salta.
+      - name: Recorrido saltando los rivales (check_recorrido --salta)
+        if: ${{ !cancelled() && matrix.grupo == 'recorrido' }}
+        timeout-minutes: 20
+        run: node tools/check_recorrido.mjs --salta 2>&1 | tee out/logs/check_recorrido_salta.log
+
       # El mismo recorrido en inglés (?lang=en), para mirar los textos: capturas en out/recorrido_en. No decide el resultado.
       - name: Recorrido en inglés (check_recorrido --lang=en, no bloquea)
         if: ${{ !cancelled() && matrix.grupo == 'recorrido' }}
@@ -185,7 +192,7 @@ jobs:
           {
             echo "### Pruebas del juego (dibujo por software: no mide cuadros por segundo)"
             echo "Grupo: ${{ matrix.titulo }}"
-            for f in sim_test barra_bots play_human dedo_test perf_test caida_test check_escenas check_game check_barra check_toques check_telefono check_iphone check_fluidez capturas check_recorrido check_recorrido_en; do
+            for f in sim_test barra_bots play_human dedo_test perf_test caida_test check_escenas check_game check_barra check_toques check_telefono check_iphone check_fluidez capturas check_recorrido check_recorrido_salta check_recorrido_en; do
               [ -f "out/logs/$f.log" ] || continue
               echo; echo "**$f**"; echo '```'
               tail -n 14 "out/logs/$f.log"

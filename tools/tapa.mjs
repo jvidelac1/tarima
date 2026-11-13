@@ -11,7 +11,7 @@ export function medirEnPagina() {
   const vw = innerWidth, vh = innerHeight;
   const opacidad = e => { let o = 1; for (let x = e; x && x.nodeType === 1; x = x.parentElement) { const c = getComputedStyle(x); if (c.display === 'none' || c.visibility === 'hidden') return 0; o *= +c.opacity; } return o; };
   const visible = e => e && !e.hidden && opacidad(e) > .5;
-  const SEL = ['#tv > *', '#capa > .panel', '#zona', '#pausa', '#sonidob', '#saltar', '#sobre', '#instalar', '#sinfoco'];
+  const SEL = ['#tv > *', '#capa > .panel', '#zona', '#pausa', '#sonidob', '#saltar', '#saltar-rival', '#sobre', '#instalar', '#sinfoco'];
   const ui = [];
   for (const e of document.querySelectorAll(SEL.join(','))) {
     if (!visible(e)) continue; const r = e.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue;
@@ -45,12 +45,14 @@ export function medirEnPagina() {
 export const fila = (m, x) => (x && x.sinPesista ? `${m.padEnd(10)} sin pesista · ${x.textos} textos` : x ? `${m.padEnd(10)} cuerpo ${String(x.cuerpo.pct).padStart(5)} %${x.cuerpo.quien.length ? ` (${x.cuerpo.quien.join(', ')})` : ''} · torso ${x.torso.pct} % · barra ${x.barra.pct} % · ${x.textos} textos` : `${m.padEnd(10)} sin pesista`);
 
 /**
- * Umbrales (porcentaje del cuerpo tapado): durante la barrita y el levantamiento ≤ 15 %; en el llamado, el torso ≤ 20 %
+ * Umbrales (porcentaje del cuerpo tapado): durante la barrita, el levantamiento y el turno de un rival ≤ 15 %; en el llamado, el torso ≤ 20 %
  * (el panel puede ocupar más, pero del lado opuesto a la cara y el torso). Devuelve el problema o null.
  */
 export function revisar(momento, x) {
   if (!x || x.sinPesista) return null;
   if (['quieta', 'corre', 'pega', 'levanta'].includes(momento) && x.cuerpo.pct > 15) return `${momento}: la interfaz tapa el ${x.cuerpo.pct} % del pesista (meta ≤ 15 %): ${x.cuerpo.quien.join(', ')}`;
+  // turno de un rival (13-nov): el tablero y el botón «Saltar» no tapan al rival que levanta
+  if (momento === 'rival' && x.cuerpo.pct > 15) return `rival: la interfaz tapa el ${x.cuerpo.pct} % del rival (meta ≤ 15 %): ${x.cuerpo.quien.join(', ')}`;
   if (momento === 'llamado' && x.torso.pct > 20) return `llamado: el panel tapa el ${x.torso.pct} % del torso y la cara del pesista (meta ≤ 20 %): ${x.torso.quien.join(', ')}`;
   return null;
 }

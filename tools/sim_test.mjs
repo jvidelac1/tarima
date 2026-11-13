@@ -36,7 +36,8 @@ import { tocar, alDia, senal, GUIADO } from '../web/js/game/controles.js';
 import { explicar, pasos } from '../web/js/game/ui/mensajes.js';
 import { marcadorDe, amenaza, etiquetasRival } from '../web/js/game/ui/marcador.js';
 import { PLANTEL, JUGADOR, FICHA, nivelFicha, CUERPO } from '../web/js/game/roster.js';
-import { tableroHTML } from '../web/js/game/ui/tablero.js';
+import { tableroHTML, datosTablero, tableroVivoHTML, ordenSalida } from '../web/js/game/ui/tablero.js';
+import { dificultadDe, deDiez } from '../web/js/game/ui/mensajes.js';
 import { DICCIONARIOS, tr, fijarIdioma, detectarIdioma } from '../web/js/game/i18n/t.js';
 import { toques } from '../web/js/game/input.js';
 import { jugarSenal, jugarFijo, BOTS } from './play_human.mjs';
@@ -607,6 +608,54 @@ function lineaNombraToques(res, lev, I) {
   }
   ok(tipos[2] && tipos[3] && tipos[0] && tipos[1], `atrapar y pararse tienen que aparecer: ${JSON.stringify(tipos)}`);
   console.log(`15. dificultad (huellas ${HUELLAS_B.medio} y ${HUELLAS_B.dificil}): 12 partidas de referencia · ${n} finales en vivo contra recalculadas · válidos del jugador Medio ${Math.round(porNivel.medio.v * 100 / porNivel.medio.i)} % y Difícil ${Math.round(porNivel.dificil.v * 100 / porNivel.dificil.i)} % · barritas ${JSON.stringify(tipos)}`);
+}
+
+// ---------- 16. tablero de la final y dificultad del peso (13-nov, rama tablero) ----------
+{
+  // En partidas al azar, con el jugador en cada pesista, antes de cada intento:
+  // - la primera fila es quien levanta («Ahora», con los kilos del llamado) y el orden es el que la partida va a seguir;
+  // - «si lo levanta, te pasa» solo si con esos kilos el rival queda delante, y cuando los levanta, queda delante;
+  // - «para pasarte necesita N»: con N queda delante y con N − 1 no;
+  // - el tablero se arma en los dos idiomas sin llaves sin resolver.
+  const vistos = { ahora: 0, te_pasa: 0, paso: 0, para: 0, cambio: 0, sigue: 0 }; let n = 0;
+  const delante = (p, i, j, lev) => { const o = p.tabla(); return o.findIndex(f => f.a === i) < o.findIndex(f => f.a === j); };
+  const nombres = { nombre: i => IDS[i], corto: i => IDS[i], ident: () => ({ color: '#fff', bandera: '#000' }), rm: 150 };
+  for (let k = 0; k < 90; k++) for (let yo = 0; yo < 3; yo++) {
+    const p = new Partida(datos, { semilla: 16000 + k, nivel: NIV[k % 3], cal: 0, primera: false, ia: HUELLA_IA, atletas: IDS.map(id => ({ id, ctrl: 'juego' })) });
+    p.empezar(); const cambios = {};
+    for (let g = 0; p.fase !== 'fin' && g < 80; g++) {
+      if (p.fase === 'intervalo') { ok(datosTablero(p, yo) === null, 'en el intervalo el tablero no se muestra'); p.empezar(); continue; }
+      const L = { ...p.llamado }, d = datosTablero(p, yo, L, cambios), lev = p.lev; n++;
+      ok(d.filas[0].a === L.a && d.filas[0].estado === 'ahora' && d.filas[0].pide === L.kg, `semilla ${16000 + k}: la primera fila no es quien levanta`); vistos.ahora++;
+      ok(d.filas.length === 3 && new Set(d.filas.map(f => f.a)).size === 3, 'el tablero no tiene a los tres');
+      const sig = d.filas.find(f => f.estado === 'sigue'); if (sig) vistos.sigue++;
+      for (const l of ['es', 'en']) { fijarIdioma(l); const h = tableroVivoHTML(d, nombres), hc = tableroVivoHTML(d, { ...nombres, compacto: true }); ok(!/[{}]/.test(h.replace(/style="[^"]*"/g, '')) && !/[{}]/.test(hc.replace(/style="[^"]*"/g, '')), `tablero con llaves sin resolver (${l})`); }
+      fijarIdioma('es');
+      const est = d.pie.find(x => x.clave === 'tablero.rival'), pasa = est?.partes.find(x => x.clave === 'tablero.te_pasa'), para = est?.partes.find(x => x.clave === 'tablero.para_pasarte');
+      const r = est ? est.partes[0].rival : null;
+      if (para) { vistos.para++; const need = p.paraPasar(r, yo, lev); ok(need === para.kg, `para pasarte: ${para.kg} y paraPasar ${need}`); }
+      const antes = p.at.map(a => a.decl[lev]), x = p.resolverIA(); void x;
+      if (pasa && r === L.a) { vistos.te_pasa++; if (p.at[r][lev].at(-1).res === 'valido' && p.tabla().find(f => f.a === yo)) { vistos.paso++; ok(delante(p, r, yo, lev), `semilla ${16000 + k}: dijo «si lo levanta, te pasa», lo levantó y no pasó`); } }
+      delete cambios[L.a]; for (const c of x.avisos || []) { cambios[c.a] ??= c.de; vistos.cambio++; ok(antes[c.a] === c.de, 'el aviso de cambio no dice los kilos de antes'); }
+    }
+  }
+  // paraPasar en un caso armado: con N pasa y con N − 1 no
+  { const p = new Partida(datos, { semilla: 3, nivel: 'normal', cal: 0, primera: false, ia: HUELLA_IA, atletas: IDS.map(id => ({ id, ctrl: 'juego' })) }); p.empezar();
+    for (let g = 0; g < 4; g++) p.resolverIA();
+    for (const i of [0, 1, 2]) for (const j of [0, 1, 2]) { if (i === j) continue; const need = p.paraPasar(i, j); if (need === null) continue;
+      const pr = kg => { const o = p._orden(p._filas(i, p.lev, kg), p.lev); return o.findIndex(f => f.a === i) < o.findIndex(f => f.a === j); };
+      ok(pr(need) && (need === p.minimo(i) || !pr(need - 1)), `paraPasar(${i}, ${j}) = ${need} no es el mínimo que pasa`); } }
+  ok(Object.values(vistos).every(v => v > 0), `el tablero no pasó por todos los estados: ${JSON.stringify(vistos)}`);
+  // dificultad del peso: sale de la chance («X de 10») y nunca baja cuando sube la chance
+  const ORD = ['muy', 'dificil', 'medio', 'facil']; let prev = -1;
+  for (let c = 0; c <= 1000; c += 5) { const dd = ORD.indexOf(dificultadDe(deDiez(c))); ok(dd >= prev, `la dificultad baja con la chance ${c}`); prev = dd; }
+  ok(dificultadDe(10) === 'facil' && dificultadDe(9) === 'facil' && dificultadDe(8) === 'medio' && dificultadDe(7) === 'medio' && dificultadDe(6) === 'dificil' && dificultadDe(4) === 'dificil' && dificultadDe(3) === 'muy' && dificultadDe(0) === 'muy', 'cortes de la dificultad');
+  // el porcentaje del RM y la dificultad: con el cuerpo de cada pesista, al 90 % del RM (fresco) es fácil y al 103 % muy difícil
+  for (const id of IDS) for (const lev of ['s', 'c']) {
+    const cu = cuerpoBarra(id), ch = I => deDiez(chanceBarra(I, lev, lev === 'c' ? 'split' : undefined, cu, { garra: true, primera: false, fatiga: 0 }));
+    ok(dificultadDe(ch(9000)) === 'facil' && dificultadDe(ch(10300)) === 'muy', `${id} ${lev}: al 90 % ${dificultadDe(ch(9000))} y al 103 % ${dificultadDe(ch(10300))}`);
+  }
+  console.log(`16. tablero: ${n} llamados en ${90 * 3} finales · ${JSON.stringify(vistos)} · dificultad del peso por la chance (Fácil 9-10, Medio 7-8, Difícil 4-6, Muy difícil 0-3)`);
 }
 
 console.log(fallas.length ? `\nFALLÓ: ${fallas.length} problemas` : `\nOK en ${((Date.now() - t0) / 1000).toFixed(1)} s`);

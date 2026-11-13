@@ -32,6 +32,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { launchOptions, isSoftware, rendererWebGL } from './browser.mjs';
 import { sinApi } from './sin_api.mjs';
+import { saltarRival } from './saltar_rival.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
@@ -187,7 +188,7 @@ async function jugar(page, hasta, { minutos = 8, eti = '' } = {}) {
     const f = `${r.pantalla}|${r.titulo}|${r.botones}`;
     if (f !== firma) { firma = f; tFirma = Date.now(); bit.push(`${((Date.now() - t0) / 1000).toFixed(1)} ${r.pantalla}${r.titulo ? ' «' + r.titulo + '»' : ''}`); if (CAPT) { await dormir(500); await foto(`${r.pantalla}_${r.titulo}`); tFirma = Date.now(); } }
     if (r.panel && r.botones > 0 && !r.sobre) { if (Date.now() - tFirma > 700 && r.foco) { await page.keyboard.press('Enter'); tFirma = Date.now() + 400; } continue; }
-    if (['rival', 'decision', 'repeticion', 'repeticion_rival', 'carga', 'desplazado'].includes(r.pantalla) && Date.now() - ultSalto > 700 && Date.now() - tFirma > 1500) { await toque(page); enviados++; ultSalto = Date.now(); }
+    if (['rival', 'decision', 'repeticion', 'repeticion_rival', 'carga', 'desplazado'].includes(r.pantalla) && Date.now() - ultSalto > 700 && Date.now() - tFirma > 1500) { if (!await saltarRival(page)) { await toque(page); enviados++; } ultSalto = Date.now(); }
   }
 }
 

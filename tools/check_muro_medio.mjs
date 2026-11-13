@@ -15,6 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { launchOptions } from './browser.mjs';
+import { saltarRival } from './saltar_rival.mjs';
 import { iniciarServidorLocal } from './servidor_local.mjs';
 import ES from '../web/js/game/i18n/es.js';
 import EN from '../web/js/game/i18n/en.js';
@@ -102,6 +103,7 @@ async function escenario(L) {
         if (Date.now() - tFirma > 20000) throw new Error(`${que}: panel sin salida en «${s.pantalla}»`);
       }
       await av(['rival', 'decision', 'repeticion', 'repeticion_rival'].includes(s.pantalla) ? 450 : 200);
+      if (!(I && I.propio) && n % 3 === 0 && await saltarRival(page, tactil)) continue;      // un rival: solo con «Saltar»
       if (['decision', 'repeticion', 'repeticion_rival', 'carga', 'desplazado', 'rival'].includes(s.pantalla) && n % 3 === 0 && !(I && I.propio)) await toque();
     }
   }

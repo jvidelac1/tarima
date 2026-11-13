@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { launchOptions, isSoftware } from './browser.mjs';
 import { sinApi } from './sin_api.mjs';
+import { saltarRival } from './saltar_rival.mjs';
 import { leerDatos } from '../web/js/sim/data.js';
 import { recalcular, resumen } from '../web/js/sim/replay.js';
 import ES from '../web/js/game/i18n/es.js';
@@ -175,6 +176,8 @@ async function corrida(via) {
       // una captura de la caída con el amarillo (la línea que nombra el toque)
       if (!fotoCaida) { const v = await J(() => { const e = document.getElementById('veredicto'); return e && !e.hidden ? e.textContent : ''; }); if (/pegaste en el amarillo en|hit the yellow on/i.test(v)) { fotoCaida = true; await foto('caida_amarillo'); console.log(`${tag} caída con el amarillo: «${v}»`); } }
       await av(['rival', 'decision', 'repeticion', 'repeticion_rival'].includes(s.pantalla) ? 450 : 200);
+      // un rival se saltea solo con «Saltar» (la tecla S o el botón); lo propio, con Espacio o un toque
+      if (!(I && I.propio) && n % 3 === 0 && await saltarRival(page, tactil)) { await av(200); continue; }
       if (['rival', 'decision', 'repeticion', 'repeticion_rival', 'carga', 'desplazado'].includes(s.pantalla) && n % 3 === 0 && !(I && I.propio)) { await baja(); await av(20); await sube(); }      // el toque de saltear
     }
     throw new Error('la prueba no avanza (pantalla ' + (await J(() => JUEGO.estado().pantalla)) + ')');

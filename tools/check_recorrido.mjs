@@ -16,8 +16,13 @@
 //  - machacando Espacio después del fallo, el veredicto con el motivo se ve, y al menos 1 s;
 //  - ritmo (G2.7 y meta J de docs/JUEGO.md): ninguna espera sin tocar pasa de 20 s (con rivales en el medio), y la final,
 //    desde el primer panel del llamado hasta el podio, dura 150 s o menos de reloj de juego. Capturas de la pantalla 'rival'.
+// Rivales (13-nov, pedido del dueño): cada turno de rival se ve entero y se saltea solo con el botón «Saltar» (tecla S). Por
+// defecto la prueba MIRA todo (no salta): cada turno de rival tiene que durar 12 s o menos (con su fundido), y la final y la
+// espera máxima se informan. Con --salta pulsa S al segundo de cada turno de rival: ahí valen las metas de ritmo de siempre
+// (espera ≤ 20 s, final ≤ 150 s).
+// Cortes (tools/cortes.mjs): cortes bruscos de imagen, fundidos y carteles que aparecen, por final y entre levantamientos.
 // No mide cuadros por segundo.
-// Uso: node tools/check_recorrido.mjs [--headed] [--semilla=N] [--sin-fotos] [--lang=en] (en inglés, capturas en out/recorrido_en)
+// Uso: node tools/check_recorrido.mjs [--headed] [--semilla=N] [--sin-fotos] [--lang=en] [--salta] (capturas en out/recorrido[_en][_salta])
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -31,7 +36,8 @@ const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web'), OUT = path.join(ROOT, 'out', 'recorrido' + (process.argv.includes('--lang=en') ? '_en' : ''));
+const SALTA = process.argv.includes('--salta');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web'), OUT = path.join(ROOT, 'out', 'recorrido' + (process.argv.includes('--lang=en') ? '_en' : '') + (SALTA ? '_salta' : ''));
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const HEADED = process.argv.includes('--headed'), FOTOS = !process.argv.includes('--sin-fotos'), SEMILLA = +(arg('semilla') || 20261112), LANG = arg('lang') === 'en' ? 'en' : 'es';
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
@@ -84,7 +90,7 @@ const PLAN = [
 ];
 
 // ---- capturas por pantalla: segundos (reloj del juego) desde que se entra a cada una
-const FOTOS_EN = { decision: [.5, 1.25, 2, 3.5], repeticion: [.6, 3], carga: [.25, .7, 1.4], resumen: [.3, 1.6], desplazado: [.3], rival: [.4, 1.5] };
+const FOTOS_EN = { decision: [.5, 1.25, 2, 3.5], repeticion: [.6, 3], carga: [.25, .7, 1.4], resumen: [.3, 1.6], desplazado: [.3], rival: [.8, 3, 6] };
 const seg = [];              // pantallas en orden: {p, t0, t1}
 let actual = null, plan = null, llamadoTxt = '', nLev = 0, enIntento = false, tFin = null, tConfirma = null, fotosPend = [];
 const tramos = [];           // por levantamiento propio: espera hasta el próximo panel, y en qué
@@ -94,7 +100,7 @@ let senalPrev = '', senalesFoto = 0, tLlamado0 = null, tPodio = null;
 // 'u': fotos de los discos de margen cuando cierra un tramo (el primer levantamiento y los que van al límite) y del FRENO
 let margenPrev = null, fotosMargen = 0, frenos = 0, frenoLev = -1; const medios = [];
 
-const entre = []; let tSinIntento = null;      // ventanas entre levantamientos (sin intento en curso), para tools/cortes.mjs
+const entre = [], saltados = new Set(); let tSinIntento = null;      // ventanas entre levantamientos (sin intento en curso), para tools/cortes.mjs
 for (let n = 0; n < 60000; n++) {
   const s = await J(() => JUEGO.estado());
   if (s.intento && tSinIntento !== null) { entre.push([tSinIntento, s.ahora + 1000]); tSinIntento = null; } else if (!s.intento && tSinIntento === null && tLlamado0 !== null) tSinIntento = s.ahora;
@@ -138,6 +144,12 @@ for (let n = 0; n < 60000; n++) {
     }
     if (g.tipo === 'empuja') { await toque(); await av(120); continue; }
     await av(30); continue;
+  }
+  // --salta: «Saltar» (la tecla S) al segundo de cada turno de rival
+  if (SALTA && !(I && I.propio) && ['rival', 'decision', 'repeticion_rival'].includes(s.pantalla)) {
+    const ve = await J(() => { const b = document.getElementById('saltar-rival'); return !!b && !b.hidden; });
+    const desde = seg.findLast(x => x.p === 'rival')?.t0 ?? s.ahora;
+    if (ve && s.ahora - desde >= 1000 && !saltados.has(desde)) { saltados.add(desde); await page.keyboard.press('KeyS'); await av(50); continue; }
   }
   // terminó un levantamiento propio: desde acá no se toca nada hasta el próximo panel que pida algo
   if (enIntento && !(I && I.propio)) {
@@ -201,7 +213,7 @@ for (let n = 0; n < 60000; n++) {
   await av(50);
 }
 const ctlB = await J(() => JUEGO.E?.p?.cfg?.ctl === 'b');
-const vista = await page.evaluate(leerEnPagina);
+const vista = await page.evaluate(leerEnPagina), eventosSalto = await J(() => JUEGO.eventos.filter(e => e.ev === 'rival_salteado').map(e => e.props));
 if (tSinIntento !== null && tPodio !== null) entre.push([tSinIntento, tPodio]);
 const fin = await J(() => ({ tabla: JUEGO.E.p ? JUEGO.E.p.tabla().map(f => `${f.id}:${f.s}+${f.c}=${f.total}#${f.puesto ?? '-'}`).join(' ') : '', propios: JUEGO.E.propios || [] }));
 await browser.close(); server.close();
@@ -235,11 +247,19 @@ for (const T of tramos.filter(x => x.machaca)) {
 if (!tramos.some(x => x.machaca)) problemas.push('no se llegó a probar el machaque después del fallo');
 // ritmo de la final (meta J): espera máxima 20 s, y la final entera 150 s o menos (reloj de juego)
 { const esperas = tramos.filter(T => T.espera !== undefined && T.lista && !T.lista.includes('intervalo')).map(T => T.espera), max = Math.max(0, ...esperas);
-  const final = tLlamado0 !== null && tPodio !== null ? tPodio - tLlamado0 : null;
-  console.log(`  ${max <= 20000 ? 'cumple' : 'NO    '} espera máxima sin tocar: ${(max / 1000).toFixed(1)} s (esperas: ${esperas.map(x => (x / 1000).toFixed(1)).join(', ')}) · meta ≤ 20 s`);
-  console.log(`  ${final !== null && final <= 150000 ? 'cumple' : 'NO    '} final del primer llamado al podio: ${final === null ? '?' : (final / 1000).toFixed(1) + ' s'} · meta ≤ 150 s`);
-  if (max > 20000) problemas.push(`una espera sin tocar de ${(max / 1000).toFixed(1)} s (meta ≤ 20 s)`);
-  if (final === null || final > 150000) problemas.push(`la final duró ${final === null ? '?' : (final / 1000).toFixed(1) + ' s'} de reloj de juego (meta ≤ 150 s)`);
+  const final = tLlamado0 !== null && tPodio !== null ? tPodio - tLlamado0 : null, cumple = ok => (ok ? 'cumple' : SALTA ? 'NO    ' : 'info  ');
+  // sin --salta (mira cada rival entero) la espera y la final se informan; con --salta son metas
+  console.log(`  ${cumple(max <= 20000)} espera máxima sin tocar: ${(max / 1000).toFixed(1)} s (esperas: ${esperas.map(x => (x / 1000).toFixed(1)).join(', ')}) · meta ≤ 20 s${SALTA ? '' : ' (solo saltando los rivales)'}`);
+  console.log(`  ${cumple(final !== null && final <= 150000)} final del primer llamado al podio: ${final === null ? '?' : (final / 1000).toFixed(1) + ' s'} · meta ≤ 150 s${SALTA ? '' : ' (solo saltando los rivales)'}`);
+  if (SALTA && max > 20000) problemas.push(`una espera sin tocar de ${(max / 1000).toFixed(1)} s (meta ≤ 20 s)`);
+  if (final === null || (SALTA && final > 150000)) problemas.push(`la final duró ${final === null ? '?' : (final / 1000).toFixed(1) + ' s'} de reloj de juego (meta ≤ 150 s)`);
+  // cada turno de rival, de que empieza (pantalla «rival») a que empieza lo siguiente: ≤ 12 s mirándolo entero
+  const turnos = []; seg.forEach((x, i) => { if (x.p !== 'rival') return; const sig = seg.slice(i + 1).find(y => !['rival', 'decision', 'repeticion_rival'].includes(y.p) || y.p === 'rival'); if (sig) turnos.push(sig.t0 - x.t0); });
+  const tMax = Math.max(0, ...turnos);
+  console.log(`  ${tMax <= 12000 ? 'cumple' : 'NO    '} turnos de rival (${turnos.length}${SALTA ? ', saltados al segundo' : ', enteros'}): ${turnos.map(x => (x / 1000).toFixed(1)).join(', ')} s · máximo ${(tMax / 1000).toFixed(1)} s · meta ≤ 12 s`);
+  if (!turnos.length) problemas.push('no se vio ningún turno de rival'); else if (tMax > 12000) problemas.push(`un turno de rival duró ${(tMax / 1000).toFixed(1)} s (meta ≤ 12 s)`);
+  if (SALTA && saltados.size === 0) problemas.push('--salta: no se saltó ningún rival');
+  if (SALTA) { const ev = await Promise.resolve(eventosSalto); console.log(`  rival_salteado: ${ev.length} eventos (${[...new Set(ev.map(e => e.via + '/' + e.momento))].join(', ')})`); if (ev.length < saltados.size || ev.some(e => e.via !== 'tecla')) problemas.push(`rival_salteado: ${JSON.stringify(ev.slice(0, 3))}`); }
   const f = fin.propios.find(x => x.res === 'fallo'); if (!f || !/(se quedó sin energía en|out of energy in) /i.test(f.linea || '')) problemas.push(`el arranque con 25 kg de más no cayó con la línea del tramo: ${JSON.stringify(f)}`); }
 if (vista && tLlamado0 !== null && tPodio !== null) {
   const R = resumir(vista, tLlamado0, tPodio, entre.filter(([a]) => a < tPodio));

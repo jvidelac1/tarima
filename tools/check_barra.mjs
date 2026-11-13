@@ -23,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { launchOptions } from './browser.mjs';
 import { sinApi } from './sin_api.mjs';
+import { saltarRival } from './saltar_rival.mjs';
 import { medirEnPagina, fila, revisar } from './tapa.mjs';
 
 const require = createRequire(import.meta.url);
@@ -167,7 +168,7 @@ for (const P of PANTALLAS) try {
     }
     if (s.pantalla === 'rival' && !medidos.has('rival')) { await av(900); await tapa('rival'); await foto('rival'); }
     await J(() => JUEGO.test.avanzar(300, 50));
-    if (['rival', 'decision', 'carga', 'desplazado'].includes(s.pantalla) && g % 3 === 0) await toque();
+    if (['rival', 'decision', 'carga', 'desplazado'].includes(s.pantalla) && g % 3 === 0 && !await saltarRival(page, P.tactil)) await toque();
   }
   const R = await J(() => (JUEGO.E.propios || []).map(x => ({ res: x.res, linea: x.linea, barras: (x.uno?.barras || []).map(b => b.zona + (b.sola ? '*' : '')) })));
   for (const x of R) vistas.push(...x.barras);
