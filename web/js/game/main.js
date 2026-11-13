@@ -880,7 +880,9 @@ function panelLlamado(p, L, t0, alConfirmar, corre = true) {
   const explica = S.dt ? t('llamado.dt_primera') : facil && primeraVez('barra_no_baja') ? t('llamado.barra_no_baja') : '';
   const uPintar = (kilos, antes, fijo, T) => {
     const pr = llegas(S.kg, S.env), llega = pr.fin >= 0;
-    const linea = `<p class="discos${llega ? '' : ' no'}">${discosHTML(pr)} ${esc(llega ? t('llamado.u_llegas', { discos: discos(pr.fin) }) : t('llamado.u_no_llegas', { discos: discos(-pr.fin) }))} · <b class="chance">${esc(t('llamado.u_chance', { n: chance(S.kg) }))}</b> · ${esc(t('llamado.u_justo', { tramo: tramoTxt(pr.mayor, L.lev) }))}</p>`;
+    // sin llegar con el día normal, todavía puede subir (el día o la garra): lo dice la chance, sin contradecirla
+    const n10 = chance(S.kg), falta = llega ? t('llamado.u_llegas', { discos: discos(pr.fin) }) : t(n10 > 0 ? 'llamado.u_falta' : 'llamado.u_no_llegas', { discos: discos(-pr.fin) });
+    const linea = `<p class="discos${llega ? '' : ' no'}">${discosHTML(pr)} ${esc(falta)} · <b class="chance">${esc(t('llamado.u_chance', { n: n10 }))}</b> · ${esc(t('llamado.u_justo', { tramo: tramoTxt(pr.mayor, L.lev) }))}</p>`;
     // La cuenta con su apuesta: lo que hace falta para el oro (o la plata, o pasar al frente) y la chance de ese peso
     const cuentaU = L.lev === 'c' ? [C.oro ? conChance(t('cuenta.oro', { kg: C.oro }), C.oro) : t(sinArranque ? 'cuenta.sin_arranque' : 'cuenta.oro_no'), C.plata && C.plata !== C.oro ? conChance(t('cuenta.plata', { kg: C.plata }), C.plata) : ''].filter(Boolean).join(' ') : C.oro ? conChance(t('cuenta.liderar', { kg: C.oro }), C.oro) : '';
     const garra = `<p class="chica">${t(a.garraUno[L.lev] ? 'llamado.u_garra_si' : 'llamado.u_garra_no')}</p>`;
@@ -896,7 +898,8 @@ function panelLlamado(p, L, t0, alConfirmar, corre = true) {
     const ms = corre ? reloj.ahora() - t0 : 0, fijo = a.cambios >= 2 || ms > L.reloj - RELOJ.cambiosHasta, T = tactil();
     const bajo = S.kg <= min, menosTit = bajo && !fijo ? ` title="${esc(t('llamado.no_baja', { kg: min }))}"` : '';
     // 'u': «ESPACIO: levantar 92 kg» con el foco ya ahí; en la primera final, un peso con el que no llega pide confirmar dos veces
-    const noLlega = uno && llegas(S.kg, S.env).fin < 0, txtConf = !uno ? t('llamado.confirmar') : S.seguro && noLlega ? t('llamado.u_seguro', { kg: S.kg }) : t(T ? 'llamado.u_confirmar' : 'llamado.u_confirmar_tecla', { kg: S.kg });
+    // en la primera final, un peso que sube menos de 5 de cada 10 veces pide confirmar dos veces
+    const noLlega = uno && chance(S.kg) < 5, txtConf = !uno ? t('llamado.confirmar') : S.seguro && noLlega ? t('llamado.u_seguro', { kg: S.kg, n: chance(S.kg) }) : t(T ? 'llamado.u_confirmar' : 'llamado.u_confirmar_tecla', { kg: S.kg });
     const kilos = kilosHTML(S.kg, min, KG_MAX, fijo, `<button class="ir" id="btn-confirmar">${esc(txtConf)}</button>`).replace('id="kg-menos"', `id="kg-menos"${menosTit}`);
     const atajos = `<div class="fila">${facil ? `<span>${t('ficha.titulo')}</span>` : ''}${Object.entries(fichas).map(([k, v]) => `<button class="ficha" data-kg="${v}" ${fijo ? 'disabled' : ''} aria-pressed="${v === S.kg}">${t('ficha.' + k)} ${v}</button>`).join('')}</div>`;
     const envion = L.lev === 'c' ? `<div class="fila"><span>${t('envion.titulo')}</span>${Object.keys(ENVIONES).map(e => `<button class="envion" data-env="${e}" aria-pressed="${e === S.env}">${ENVIONES[e]}${a.f.enviones.includes(e) ? '' : ' *'}</button>`).join('')}</div>` : '';
@@ -921,7 +924,7 @@ function panelLlamado(p, L, t0, alConfirmar, corre = true) {
     const mas = pn.querySelector('#btn-mas'); if (mas) al(mas, () => { S.mas = !S.mas; pinta(); });
     al(pn.querySelector('#btn-confirmar'), () => {
       sonido.activar();
-      if (uno && E.primeraFinal && !S.seguro && llegas(S.kg, S.env).fin < 0) { S.seguro = true; pinta(); return; }
+      if (uno && E.primeraFinal && !S.seguro && chance(S.kg) < 5) { S.seguro = true; pinta(); return; }
       guardado.set(`tarima.env.${p.cfg.ctl}.${a.id}`, S.env); E.repintar = null; alConfirmar(S);
     });
     E.repintar = () => pinta();

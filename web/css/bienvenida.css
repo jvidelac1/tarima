@@ -100,7 +100,8 @@ button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px
 .pesista .med.tramo.cuesta em{color:#ff8a80}
 /* teléfono de costado: tarjetas bajas (el panel entra en 340 px de alto) */
 :where(html.horiz.bajo) .pesista .cuerpo{gap:0;margin:.15em 0}
-:where(html.horiz.bajo) .pesista .med{font-size:.66em;line-height:1.15;grid-template-columns:5.2em 1fr 3.4em}
+:where(html.horiz.bajo) .pesista .med{font-size:.66em;line-height:1.15;grid-template-columns:5.2em minmax(8px,1fr) auto;gap:.3em}
+:where(html.horiz.bajo) .pesista .barra{min-width:8px}
 :where(html.horiz.bajo) .pesista small.conviene{font-size:.68em;line-height:1.2}
 :where(html.horiz.bajo) .panel.bienvenida .pesista .b{display:none}
 .pesista small.conviene{color:var(--ink);opacity:.85}

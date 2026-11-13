@@ -350,8 +350,8 @@ html.editando #app{visibility:hidden}
 .margen .m-d.bajo i{box-shadow:inset 0 0 0 calc(var(--u)*.17) var(--red)}
 .margen .m-g{font-weight:800;font-size:calc(var(--u)*.9);letter-spacing:.1em;padding:.18em .5em;border:1px solid var(--gold);color:var(--gold);text-transform:uppercase}
 .margen .m-g[data-estado=gastada],.margen .m-g[data-estado=usada]{opacity:.28;border-color:var(--mute);color:var(--mute)}
-.margen .m-p{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:calc(var(--u)*.45);font-weight:800;font-size:calc(var(--u)*1.35);letter-spacing:.04em;color:#fff;text-shadow:0 2px 8px #000,0 0 3px #000;opacity:0;transition:opacity .25s}
-.margen .m-p.on{opacity:1}
+.margen .m-p{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:calc(var(--u)*.35);font-weight:800;font-size:calc(var(--u)*1.35);letter-spacing:.04em;color:#fff;background:rgba(6,14,48,.9);padding:.12em .55em;text-shadow:0 1px 4px #000;display:none}
+.margen .m-p.on{display:block}
 .margen .m-p.oro{color:var(--gold)}
 .margen .m-p.mal{color:#ff6a5f}
 .margen .m-p.gris{color:var(--mute)}
@@ -368,10 +368,11 @@ html.editando #app{visibility:hidden}
 @media (prefers-reduced-motion:no-preference){
   .margen.freno .m-g{animation:latidoG .62s ease-in-out infinite}
   .margen.cae .m-d i:first-child{animation:parpadea .5s steps(2,jump-none) 6}
-  .margen .m-p.on{animation:pal .2s ease-out}
+  .margen .m-p.on{animation:palM .2s ease-out}
   #escena.freno::after{animation:latidoV .62s ease-in-out infinite}
   #gl.sacude{animation:sacude .12s linear}
 }
+@keyframes palM{from{transform:translateX(-50%) scale(1.25)}to{transform:translateX(-50%)}}
 @keyframes latidoG{0%,100%{transform:scale(1)}14%{transform:scale(1.22)}28%{transform:scale(1)}42%{transform:scale(1.12)}}
 @keyframes latidoV{0%,100%{opacity:.85}14%{opacity:1}42%{opacity:.95}}
 @keyframes parpadea{0%{opacity:1}100%{opacity:.15}}

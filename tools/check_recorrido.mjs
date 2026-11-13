@@ -73,8 +73,8 @@ const leerUI = () => J(() => {
 // ---- qué levantamientos se pierden a propósito (por el título del panel del llamado)
 //   arranque 2: no toca ¡RECIBÍ! · arranque 3: no toca ¡EXPLOTÁ! y después del final machaca Espacio
 //   dos tiempos 2: no toca el ¡RECIBÍ! del envión (la barra arriba)
-//   arranque 2 y dos tiempos 2: sube de a 1 kg hasta que el panel dice «5 de 10» o menos (al límite: ahí aparece el FRENO
-//   si el día no ayuda, y se fotografían los discos y la garra)
+//   arranque 2 y dos tiempos 2: sube de a 1 kg hasta el peso que termina en FRENO (lo calcula la prueba con «el día» del
+//   llamado, que el jugador no ve) o, si no hay, hasta «5 de 10»; se fotografían los discos, el FRENO y la garra
 const PLAN = [
   { re: /(Arranque · intento|Snatch · attempt) 2/, omite: () => false, medio: true, nombre: 'arranque 2 a 5 de 10' },
   { re: /(Dos tiempos · intento|Clean & jerk · attempt) 2/, omite: () => false, medio: true, nombre: 'dos tiempos 2 a 5 de 10' },
@@ -101,6 +101,7 @@ for (let n = 0; n < 60000; n++) {
   if (s.pantalla !== actual) {
     if (seg.length) seg[seg.length - 1].t1 = s.ahora;
     seg.push({ p: s.pantalla, t0: s.ahora, t1: null }); actual = s.pantalla;
+    if (s.pantalla === 'desplazado') llamadoTxt = '';      // el llamado que sigue tiene otra semilla: el plan se vuelve a calcular
     fotosPend = (FOTOS_EN[s.pantalla] || []).map(x => s.ahora + x * 1000);
     if (['inicio', 'presentacion', 'intervalo', 'ceremonia'].includes(s.pantalla)) await foto(s.pantalla);
   }
@@ -161,13 +162,24 @@ for (let n = 0; n < 60000; n++) {
         llamadoTxt = P.titulo; plan = PLAN.find(x => x.re.test(P.titulo)) || null; if (tLlamado0 === null) tLlamado0 = s.ahora;
         await av(450); if (plan && plan.pesado) for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowUp');
         if (plan && plan.medio) {
+          // el peso con el que este llamado termina en FRENO: «el día» sale de la semilla del llamado (rules.js, diaDe), así que
+          // la prueba lo puede ver de antemano (el jugador no). Si ninguno da FRENO, el primero con «5 de 10» o menos
+          const kgFreno = await J(async () => {
+            const R = await import(new URL('js/sim/rules.js', location.href).href), p = JUEGO.E.p, L = p.llamado, a = p.at[L.a], cu = R.cuerpoDe(a.f), d = R.diaDe(L.sem);
+            if (!a.garraUno[L.lev]) return null;
+            for (let kg = L.kg; kg <= L.kg + 20; kg++) {
+              const I = p.intensidadDe(L.a, L.lev, kg); let m = R.UNO.margen + d;
+              for (const tr of R.TRAMOS[L.lev]) { m -= R.gastoTramo(tr, I, L.lev, L.lev === 'c' ? cu.casa : undefined, cu, { salto: true, pisoton: true }); if (m < 0) { if (m >= R.UNO.frenoMin) return kg; break; } }
+            }
+            return null;
+          });
           let leido = '';
           for (let i = 0; i < 30; i++) {
-            const c = await J(() => { const x = document.querySelector('#capa .chance'); return x ? x.textContent : ''; }); leido = c;
-            const n = parseInt(c, 10); if (!c || !(n > 5)) break;
+            const c = await J(() => ({ txt: document.querySelector('#capa .chance')?.textContent || '', kg: +(document.querySelector('#capa #kg-val')?.textContent || 0) })); leido = `${c.kg} kg ${c.txt}`;
+            const n = parseInt(c.txt, 10); if (!c.txt || (kgFreno !== null ? c.kg >= kgFreno : !(n > 5))) break;
             await J(() => document.querySelector('#capa #kg-mas')?.click()); await av(60);
           }
-          medios.push(`${P.titulo}: ${leido}`);
+          medios.push(`${P.titulo}: ${leido}${kgFreno !== null ? ' (FRENO previsto)' : ''}`);
         }
         await foto(`llamado_${slug(P.titulo)}`);
       }
@@ -187,7 +199,8 @@ console.log(`levantamientos propios: ${fin.propios.map(x => `${x.pantalla}:${x.r
 console.log('\nESPERA SIN TOCAR entre el final de cada levantamiento propio y el próximo panel que pide algo (reloj del juego):');
 for (const T of tramos) console.log(`  lev ${T.lev} [${T.llamado}] ${T.res} → ${T.espera !== undefined ? (T.espera / 1000).toFixed(1) + ' s hasta ' + T.hasta : 'fin'}\n     ${T.pantallas || ''}${T.linea ? `\n     línea: «${T.linea}»` : ''}${T.machaca ? `\n     machacando Espacio cada 120 ms después del final: ${T.machaca}` : ''}`);
 console.log(`\nDE CONFIRMAR A ¡TIRÁ! (sin tocar): ${preps.join(' · ')}`);
-console.log(`AL LÍMITE (panel «5 de 10»): ${medios.join(' · ') || '—'} · FRENOS vistos: ${frenos} · fotos de los discos: ${fotosMargen}`);
+console.log(`AL LÍMITE: ${medios.join(' · ') || '—'} · FRENOS vistos: ${frenos} · fotos de los discos: ${fotosMargen}`);
+if (medios.some(x => x.includes('FRENO previsto')) && !frenos) problemas.push('se pidió un peso con FRENO previsto y el FRENO no apareció');
 console.log('\nSEÑALES CON CÍRCULO: ms desde que aparece hasta el cierre');
 const porClave = {}; for (const x of senales) (porClave[(x.guiado ? 'guiado ' : '') + x.clave] ||= []).push(x.anticipa);
 for (const [k, v] of Object.entries(porClave)) console.log(`  ${k}: ${v.join(', ')}`);
