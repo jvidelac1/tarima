@@ -161,8 +161,8 @@ async function escenario(L) {
   // El dos tiempos sin correo, por la API a mano con el pase de la pestaña: muro.
   { const r = await J(async () => { const p = JSON.parse(sessionStorage.getItem('tarima.pase') || '{}'); const x = await fetch('/api/envion', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dispositivo: localStorage.getItem('tarima.dispositivo'), pase: p.pase }) }); return { etapa: p.etapa, j: await x.json() }; });
     if (r.etapa !== 'arranque' || r.j.estado !== 'muro') mal(`la API a mano dio el dos tiempos sin correo: ${JSON.stringify(r)}`); }
-  // La encuesta mandada a mano (otro dispositivo, sin anotarse) no da nada.
-  { const r = await J(async () => { const x = await fetch('/api/encuesta', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dispositivo: crypto.randomUUID(), r: { plataforma: 'web' } }) }); return x.json(); });
+  // La encuesta mandada a mano (otro dispositivo, sin anotarse: sin la cookie tdv, que si no gana) no da nada.
+  { const r = await J(async () => { const x = await fetch('/api/encuesta', { method: 'POST', credentials: 'omit', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dispositivo: crypto.randomUUID(), r: { plataforma: 'web' } }) }); return x.json(); });
     if (r.estado !== 'ok' || r.bono !== 0) mal(`la encuesta a mano: ${JSON.stringify(r)} (se esperaba ok y bono 0)`); aEncuesta.length = 0; }
 
   if (!tactil) {

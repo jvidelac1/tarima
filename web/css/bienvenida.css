@@ -133,6 +133,12 @@ fieldset.pregunta{border:none;margin:.5em 0;padding:0}
 fieldset.pregunta legend{font-family:var(--display);font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--teal);font-size:clamp(14px,2.2cqh,17px);margin-bottom:.3em;padding:0}
 .opciones-q{display:flex;flex-wrap:wrap;gap:6px}
 .opciones-q button.op{text-transform:none;letter-spacing:0;font-family:var(--body);font-weight:600;font-size:clamp(13px,2cqh,15px);text-align:left}
+/* encuesta opcional del panel de anotado: en el teléfono acostado, preguntas más juntas y el texto libre más bajo, para
+   que los botones de enviar y saltar entren sin desplazar el panel */
+.encuesta-anotado fieldset.pregunta{margin:.35em 0}
+:where(html.horiz.bajo) .encuesta-anotado label.campo{margin:.2em 0}
+:where(html.horiz.bajo) .encuesta-anotado textarea{height:2.5em;min-height:0;resize:none}
+:where(html.horiz.bajo) .encuesta-anotado .opciones-q button.op{min-height:34px;padding-top:.25em;padding-bottom:.25em}
 .invitacion{position:relative;margin-top:.6em;background:#0d1533;border:1px solid var(--line);border-left:3px solid var(--gold);padding:.6em 2.6em .6em .8em}
 .invitacion.abierta{padding-right:.8em}
 .invitacion b{display:block;color:var(--ink);font-family:var(--display);text-transform:uppercase;letter-spacing:.04em}

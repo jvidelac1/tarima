@@ -183,6 +183,8 @@ async function escenario(L) {
     await escribir('#otra', 'Online duels');
     await foto('encuesta_contestada');
     await pulsa('#btn-enviar');
+    // «¡Gracias!» un momento (todavía en la pantalla del muro) y sigue solo
+    await esperar(() => !document.querySelector('#capa .panel.anotado'), 'el fin del panel de anotado');
   }
   s = await jugar(x => ['presentacion', 'apertura'].includes(x.pantalla), 'la final después de anotarse', 4);
   { const p = await ultimo('partida_pedida'); if (p?.fuente !== 'lista') mal(`la final después de anotarse no salió con fuente «lista»: ${JSON.stringify(p)}`); }
