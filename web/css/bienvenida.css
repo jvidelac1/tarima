@@ -160,3 +160,6 @@ fieldset.pregunta legend{font-family:var(--display);font-weight:700;text-transfo
 .panel.bienvenida{display:flex;flex-direction:column;overflow:hidden}
 .panel.bienvenida>.bv-cuerpo{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;padding-bottom:6px}
 .panel.bienvenida>.pie{position:static;flex:none}
+/* ES · EN se desplaza con lo de arriba (si no, las tarjetas pasaban por debajo de los botones de idioma) */
+.panel.bienvenida>.bv-cuerpo{position:relative}
+.panel.bienvenida>.bv-cuerpo .idiomas{top:0;right:0}
