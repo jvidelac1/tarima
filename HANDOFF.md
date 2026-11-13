@@ -995,6 +995,38 @@ no sea Clásico abre en la barrita; `?ctl=u` vuelve a `'u'`). Sin navegador: `no
 - Pendiente: una chance por persona (con su propia puntería), cámara lenta en el toque, vibración distinta por zona en iPhone
   (no tiene vibrate).
 
+### Rivales con su propia estrategia de kilos (13-nov, rama `rivales`)
+
+Pedido del dueño: «que los otros levantadores tengan su propia estrategia de pesos, no que siempre usen lo mismo que yo».
+
+**Diagnóstico** (`tools/rivales_test.mjs`, 500 finales por estrategia y nivel en `'b'`, el novato de `barra_bots.mjs`; y una contrafáctica: antes de cada llamado, qué pediría cada rival si el jugador hubiera declarado ±3 kg).
+- No copiaban el NIVEL de kilos: la correlación entre los kilos del jugador y los de cada rival en el mismo intento es −0,19 a 0,14 con todas las estrategias (con la que pide kilos al azar, −0,15 a 0,07), y los intentos a ±1 kg del jugador (6 a 21 %; codicioso 1 a 3 %) son los mismos que con el rival de otra final. Se parecen porque los tres pesistas tienen techos a 2 kg y abren entre el 91 y el 96 %.
+- Lo que se ve como espejo son los **cambios**: `decidir` con estilo «pasa» (Brenner) y «orgullo» (Marangi) declaraba un kilo más que lo que tuviera declarado otro pesista a 2 kg o menos. El 21 % de las decisiones de los rivales cambiaba si el jugador declaraba otra cosa (35 % las de Brenner, 31 % las de Marangi, 0 % Ventura), 41 a 54 % de los cambios caían justo en lo declarado por el jugador o un kilo más, y eso son 0,8 a 1,4 avisos «X pide N kg» por final. El tercer dos tiempos salía de los kilos del puntero (33 % depende de la marca del jugador). La apertura no salía de la del jugador ni el entrenador compartía plan: el amistoso solo baja 3,5 %.
+
+**Qué cambió** (`web/js/sim/ai.js` → `PERSONALIDADES`, `planRival`, `decidirPlan`; tabla en docs/JUEGO.md 7.3). Cada rival tiene la personalidad de su ficha y un plan sembrado por final (apertura, adónde quiere llegar en el segundo y el tercero, si se guarda, si sube tras un nulo) que sale de su techo visible, su forma y su Resto. Ventura «va a lo seguro», Brenner «hace cuentas» (se guarda en el tercer arranque cuatro finales de cada diez; en el dos tiempos asegura si va primero y pide lo justo para pasar en el último si va atrás), Marangi «arriesga» (abre alto, el tercero por encima del 100 %, «va por todo»). La tabla solo cuenta en el dos tiempos y en totales; nunca miran lo declarado por otro. La palabra sale en el cartel del turno del rival («191 kg, justo · va a lo seguro») y en «Tus rivales hoy» de la presentación (claves `rival.estilo.*` en `es.js` y `en.js`).
+- **Compatibilidad.** `new Partida(..., { ia: HUELLA_IA })` usa los rivales nuevos y el registro lleva `ia`; sin `ia`, los de siempre. `replay.js` rechaza otra huella (`'huella de las reglas de los rivales'`). `tools/sim_ref*.json` no cambiaron y siguen pasando; `tools/sim_ref_rivales.json` es la referencia nueva (`sim_test` 14). La lógica de `planRival`/`decidirPlan` no entra en la huella: si cambia, subir `IA.version` y borrar `sim_ref_rivales.json` para regenerarlo. `main.js` solo cambió en tres líneas (la huella al crear la Partida, el cartel del turno y la presentación). El muro no se tocó.
+- `pesistas_test` y `ritmo_test` ahora juegan contra los rivales nuevos; `balance.mjs --rivales` sigue con los viejos.
+
+**Mediciones antes → después** (novato, 500 finales por estrategia y nivel; oro del jugador):
+
+| | Amistoso | Normal |
+|---|---|---|
+| Panel (entrenador) | 92 → 93 % | 24 → 29 % |
+| Prudente (+2) | 90 → 91 % | 8 → 13 % |
+| Fijo (93 %, +4 +3) | 94 → 92 % | 10 → 12 % |
+| Codicioso | 81 → 84 % | 28 → 27 % |
+| Azar | 91 → 91 % | 9 → 13 % |
+
+- Jugador «medio» (300 finales): panel 99 → 97 % y 36 → 37 %; prudente 96 → 96 % y 10 → 17 %.
+- Decisiones de rivales que cambian si el jugador declara ±3 kg: **21 % → 0 %**; con 3 kg más de marca: 5 → 4 % (la tabla del último dos tiempos). Cambios espejo por final: 0,8–1,4 → 0,02–0,12. Correlación de kilos: −0,06 a 0,17 (antes −0,19 a 0,14): baja antes y después, no era ahí el espejo. Distancia media al jugador en el mismo intento: 4 a 7 kg (codicioso 9 a 13).
+- Rivales en Normal (total medio ± desvío · válidos): Ventura 372 ±3,8 · 88 %, Brenner 371 ±4,2 · 81 %, Marangi 376 ±7,1 · 77 % (antes 371 · 86 %, 372 · 66 %, 374 · 76 %). En Amistoso, sin marca: Ventura 3 %, Brenner 5 %, Marangi 12 % (antes 4, 20 y 6 %).
+- Variedad: 8 a 11 aperturas de arranque distintas por rival y 305 a 322 planes distintos cada 333 finales.
+- `pesistas_test` ('u', rivales normales, panel): Compacto 46 %, Largo 50 %, Potente 67 % (antes 55 / 58 / 64); parejos 22 puntos (meta ≤ 25), E en verde. Quien elige Potente enfrenta a Ventura y Brenner, los dos más previsibles: es el par más fácil.
+
+**Pruebas.** Sin navegador, de a una en la Mac: `sim_test` (14 secciones; las referencias viejas sin cambios), `rivales_test`, `pesistas_test`, `ritmo_test`, `chance_test`, `play_human`, en verde. Actions, pruebas.yml sobre `rivales` (run 43462071474): núcleo (con `rivales_test`, nuevo paso), teléfono, iPhone y recorrido en verde; falla `check_barra` (tarjetas que «tapan» y barrita angosta en 1280×720), igual que en `gameplay` en 026e385 (run 43452015428), sin relación con los rivales. La primera corrida (43459362229) encontró que la línea nueva de la presentación no entraba en Safari 844×340: la palabra va en la misma línea que la apertura y en el teléfono acostado se oculta. Capturas miradas: «Tus rivales hoy» con «hace cuentas» y «arriesga», y el cartel «Turno de Ilya Brenner (rival) · 154 kg, cómodo · hace cuentas».
+
+**Pendientes.** Las personalidades van atadas al pesista: quien juega con Ventura nunca enfrenta al conservador. Marangi casi nunca queda sin marca en Normal (1 %): «a veces se queda sin marca» se ve en Amistoso. El tercer dos tiempos que reacciona a la tabla todavía cae algunas veces en un kilo más que el jugador (0,1 por final con el plan fijo): es la cuenta del total, no una copia. Jugarlo y mirar si las palabras se leen en el cartel del turno del teléfono.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.

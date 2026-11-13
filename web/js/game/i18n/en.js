@@ -577,6 +577,8 @@ export default {
   'llamado.u_chance': '{n} in 10',
   'rival.apuesta.comodo': 'comfortable', 'rival.apuesta.justo': 'tight', 'rival.apuesta.limite': 'on the limit',
   'turno.apuesta': '{kg} kg, {apuesta}',
+  // each rival's personality (sim/ai.js → PERSONALIDADES) and what they do on that attempt, on their turn card
+  'rival.estilo.seguro': 'plays it safe', 'rival.estilo.calcula': 'does the math', 'rival.estilo.arriesga': 'takes risks', 'rival.estilo.todo': 'goes all in', 'rival.estilo.guarda': 'saving it for the clean & jerk', 'rival.estilo.pasar': 'asks just enough to pass',
   'llamado.u_mismo_no': 'The bar never goes down: with {kg} kg you are {discos} short.',
   'explica.u.mala': ' Bad luck there.',
   'explica.u.no_alcanza': ' Grit wouldn’t be enough: it’s saved for another attempt.',

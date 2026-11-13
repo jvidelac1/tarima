@@ -17,6 +17,7 @@
 //   parejos: con rivales normales, ningún pesista gana con el panel más de 25 puntos que otro.
 // Uso: node tools/pesistas_test.mjs [--n=200]
 import { Partida } from '../web/js/sim/match.js';
+import { HUELLA_IA } from '../web/js/sim/ai.js';      // los rivales del juego (con personalidad)
 import { mezclar } from '../web/js/sim/fixed.js';
 import { cuerpoDe, KG_MAX } from '../web/js/sim/rules.js';
 import { sugerencia, chanceDe } from '../web/js/sim/entrenador.js';
@@ -37,7 +38,7 @@ const ESTRATEGIAS = {
 
 function final(id, nivel, estrategia, k) {
   const yo = ATL.indexOf(id), semilla = mezclar(k, 5150, yo, nivel === 'normal' ? 1 : 0);
-  const p = new Partida(datos, { semilla, nivel, cal: 0, primera: false, ctl: 'u', tactil: true, atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
+  const p = new Partida(datos, { semilla, nivel, cal: 0, primera: false, ctl: 'u', tactil: true, ia: HUELLA_IA, atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
   const f = datos.atletas[id], elegir = ESTRATEGIAS[estrategia], cuerpo = cuerpoDe(id), out = { barras: 0, caidas: 0, tramo: {} };
   for (const lev of ['s', 'c']) { const [lo, hi] = p.rangoApertura(yo, lev); p.abrir(yo, lev, Math.max(lo, Math.min(hi, Math.round(f.techo[lev] * .9)))); }
   p.empezar();

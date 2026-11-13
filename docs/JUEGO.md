@@ -906,6 +906,18 @@ Por eso los rivales fallan con las mismas causas visibles que el jugador, y un s
 | Tras un nulo | Repite | Repite | Repite o sube 1 |
 | Cambios | Casi nunca | Pasa al rival por un kilo para salir después; declara alto y baja | Sube por orgullo si lo pasan; nunca asegura |
 
+**Rivales con personalidad (13-nov, registros con `ia`; `web/js/sim/ai.js` → `PERSONALIDADES`).** La tabla de arriba y el «Tercer intento» de abajo quedan para los registros viejos. Antes Brenner y Marangi declaraban un kilo más que lo que tuviera declarado otro pesista a 2 kg o menos, y el jugador lo veía como «me copian los kilos». Ahora cada uno juega su plan, sembrado por final, desde su techo visible (permilajes antes del −3,5 % de Amistoso):
+
+| | Ventura · «va a lo seguro» | Brenner · «hace cuentas» | Marangi · «arriesga» |
+|---|---|---|---|
+| Apertura | 91,5 a 95 % | 91 a 95 % | 93 a 97 % |
+| Segundo / tercero (adónde quiere llegar; de ahí salen sus saltos) | 96,5–98 % / 98,5–100 % | 96,5–98,5 % / 99–101 % | 96–98 % / 100,5–103,5 % («va por todo») |
+| Tras un nulo | Repite; si no tiene marca en ese levantamiento, el tercero también repite | Repite | Repite o sube 1 (una final de cada dos) |
+| La tabla (solo en el dos tiempos, con un total en la mano) | Último intento: sube un puesto si cuesta ≤ 101 % | Si va primero, segundo cómodo (≤ 97,5 %) y en el último obliga al perseguidor a pasar del 100 %; si va atrás, en el último pide lo justo para subir un puesto (≤ 101–103 %) | Último intento: va por el oro si cuesta ≤ 107 % |
+| Arranque | — | Cuatro finales de cada diez «se guarda» en el tercero (≤ 96,5 %) | — |
+
+Nunca miran lo que declaró otro: la tabla se lee en totales. Su palabra sale en el cartel de su turno y en la presentación; en un intento puntual cambia por «va por todo», «se guarda para el dos tiempos» o «pide lo justo para pasar». Medidas: `node tools/rivales_test.mjs` y HANDOFF.md, «Rivales con su propia estrategia de kilos».
+
 **Cada final es distinta.** La semilla mueve la apertura de cada rival entre el 91 % y el 96 %, y cada salto en ±1 kg. Además elige un **guion**, que se anuncia en la presentación:
 
 | Guion | Efecto, a la vista de todos |

@@ -93,6 +93,10 @@ jobs:
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/pesistas_test.mjs 2>&1 | tee out/logs/pesistas_test.log
 
+      - name: Rivales con su propia estrategia de kilos (rivales_test)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/rivales_test.mjs 2>&1 | tee out/logs/rivales_test.log
+
       - name: Fácil de círculos, línea de base para registros viejos (play_human --f, no bloquea)
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         continue-on-error: true

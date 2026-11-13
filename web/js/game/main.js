@@ -21,6 +21,7 @@ import { tableroHTML } from './ui/tablero.js';
 import { marcadorDe, etiquetasRival } from './ui/marcador.js';
 import { leerDatos } from '../sim/data.js';
 import { Partida } from '../sim/match.js';
+import { HUELLA_IA } from '../sim/ai.js';
 import { simular } from '../sim/attempt.js';
 import { recalcular, resumen } from '../sim/replay.js';
 import { EVENTO, KG_MAX, RELOJ, PLAN, exigenciaTabla, previsto, cuerpoDe, chanceUno, chanceBarra, cuerpoBarra, zonasBarra } from '../sim/rules.js';
@@ -879,7 +880,7 @@ async function presentacion(p, cfg, errMedio, primera) {
   const forma = s => t(s > 0 ? 'forma.liviano' : s < 0 ? 'forma.pesado' : 'forma.normal');
   const rivales = p.at.filter(a => a.i !== E.yo);
   const html = () => `${idiomasHTML(true)}${primera ? `<h2>${t('gana.titulo')}</h2><ol class="reglas"><li>${t('gana.l1')}</li><li>${t('gana.l2')}</li><li>${t('gana.l3')}</li></ol>` : ''}
-    <h2>${t('gana.rivales')}</h2><div class="pesistas rivales">${rivales.map(a => `<div class="pesista"><div class="b" style="background:${PLANTEL[a.id].bandera}"></div><b>${esc(a.f.nombre)}</b><small>${t('gana.abre', { s: a.decl.s, c: a.decl.c })}</small></div>`).join('')}</div>
+    <h2>${t('gana.rivales')}</h2><div class="pesistas rivales">${rivales.map(a => `<div class="pesista"><div class="b" style="background:${PLANTEL[a.id].bandera}"></div><b>${esc(a.f.nombre)}</b><small>${t('gana.abre', { s: a.decl.s, c: a.decl.c })}${a.plan ? `<span class="estilo"> · ${t('rival.estilo.' + a.plan.estilo)}</span>` : ''}</small></div>`).join('')}</div>
     ${G.tipo !== 'nada' ? `<p>${esc(G.tipo === 'tocado' && esU(cfg.ctl) ? t('guion.tocado_u', { rival: quien(p.at[G.a]) }) : GUIONES[G.tipo](G.a >= 0 ? quien(p.at[G.a]) : ''))}</p>` : ''}<p>${t('gana.forma', { s: forma(yo.forma.s), c: forma(yo.forma.c) })}</p>`;
   let pn = capa.poner(`${html()}<div class="fila"><button class="ir grande" id="btn-gana">${t('gana.seguir')}</button></div>`, 'gana');
   bloquear(pn);
@@ -1092,7 +1093,8 @@ function turno(a, apuesta = '') {
 /** Cómo se la juega un rival con `kg` (intensidad del momento): cómodo hasta el 95 %, justo hasta el 99 %, al límite después. */
 const apuestaRival = (p, L) => { const I = p.intensidadDe(L.a, L.lev, L.kg); return t('turno.apuesta', { kg: L.kg, apuesta: t('rival.apuesta.' + (I <= 9500 ? 'comodo' : I <= 9900 ? 'justo' : 'limite')) }); };
 async function llamadoRival(p, L, cfg) {
-  const apuesta = esU(cfg.ctl) ? apuestaRival(p, L) : '';
+  // y su personalidad en una palabra (ai.js → PERSONALIDADES): «va a lo seguro», «arriesga», «va por todo»…
+  const estilo = p.estiloDe(L.a, L.lev, L.n), apuesta = [esU(cfg.ctl) ? apuestaRival(p, L) : '', estilo ? t('rival.estilo.' + estilo) : ''].filter(Boolean).join(' · ');
   const a = p.at[L.a], antes = lider(p), x = p.resolverIA(), pasa = x.res.res === 'valido' && antes !== L.a && lider(p) === L.a;
   const rapida = cfg.ritmo !== 'completa', decisivo = esDecisivo(L.et), seguidos = E.rivalesSeguidos = (E.rivalesSeguidos || 0) + 1;
   const modo = modoRival({ et: L.et, seguidos, enteros: E.rivalesEnteros || 0, rapida }); if (modo === 'entero') E.rivalesEnteros = (E.rivalesEnteros || 0) + 1;
@@ -1258,7 +1260,7 @@ async function partida(cfg) {
   const n = (+guardado.get('tarima.jugadas') || 0) + 1, pase = await pedirPase(cfg, n, 'bienvenida');
   if (!pase) return 'inicio';
   E.pase = pase; E.finalN = pase.n ?? n; E.finalIniciada = false; E.tFinal0 = performance.now(); E.antes = null; E.primeraFinal = n === 1; E.rivalesSeguidos = 0; E.casi = null;
-  const p = E.p = new Partida(datos, { semilla, nivel: cfg.nivel, cal: cfg.cal, primera: cfg.primera, ctl: cfg.ctl, tactil: (cfg.ctl === 'f' || esU(cfg.ctl)) && tactil(), atletas: IDS.map((id, i) => ({ id, ctrl: i === E.yo ? 'persona' : 'juego' })) });
+  const p = E.p = new Partida(datos, { semilla, ia: HUELLA_IA, nivel: cfg.nivel, cal: cfg.cal, primera: cfg.primera, ctl: cfg.ctl, tactil: (cfg.ctl === 'f' || esU(cfg.ctl)) && tactil(), atletas: IDS.map((id, i) => ({ id, ctrl: i === E.yo ? 'persona' : 'juego' })) });
   await presentacion(p, cfg, errMedio, n === 1); p.empezar();
   while (p.fase !== 'fin') {
     if (p.fase === 'intervalo') {

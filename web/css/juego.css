@@ -290,6 +290,7 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
   :where(html.horiz.bajo) .panel p{line-height:1.32}
   :where(html.horiz.bajo) .pesista{padding:.4em .55em}
   :where(html.horiz.bajo) .pesista .b{height:.75em;margin-bottom:.3em}
+  :where(html.horiz.bajo) .pesista .estilo{display:none}      /* la personalidad del rival queda para el cartel de su turno */
   :where(html.horiz.bajo) .kgsel output{font-size:clamp(26px,9cqh,38px)}
   :where(html.horiz.bajo) .podio{margin:.4em 0}:where(html.horiz.bajo) .podio .p1{padding-bottom:2.2em}:where(html.horiz.bajo) .podio .p2{padding-bottom:1.3em}:where(html.horiz.bajo) .podio .p3{padding-bottom:.6em}
   :where(html.horiz.bajo) .pulso{width:clamp(56px,19cqh,88px);margin:.3em auto}
