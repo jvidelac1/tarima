@@ -61,7 +61,7 @@ jobs:
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/sim_test.mjs 2>&1 | tee out/logs/sim_test.log
 
-      - name: Jugador humano simulado (play_human, nivel 'u': metas A y B)
+      - name: Jugador humano simulado (play_human, nivel 'u', metas A y B)
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/play_human.mjs 2>&1 | tee out/logs/play_human.log
 
