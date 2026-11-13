@@ -162,22 +162,23 @@ for (let n = 0; n < 60000; n++) {
         llamadoTxt = P.titulo; plan = PLAN.find(x => x.re.test(P.titulo)) || null; if (tLlamado0 === null) tLlamado0 = s.ahora;
         await av(450); if (plan && plan.pesado) for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowUp');
         if (plan && plan.medio) {
-          // el peso con el que este llamado termina en FRENO: «el día» sale de la semilla del llamado (rules.js, diaDe), así que
-          // la prueba lo puede ver de antemano (el jugador no). Si ninguno da FRENO, el primero con «5 de 10» o menos
+          // el peso con el que este llamado termina en FRENO: la suerte de cada tramo sale de la semilla del llamado (rules.js,
+          // ruidoDe), así que la prueba lo puede ver de antemano (el jugador no). Si ninguno da FRENO, el primero con «5 de 10» o menos
           const kgFreno = await J(async () => {
-            const R = await import(new URL('js/sim/rules.js', location.href).href), p = JUEGO.E.p, L = p.llamado, a = p.at[L.a], cu = R.cuerpoDe(a.f), d = R.diaDe(L.sem);
+            const R = await import(new URL('js/sim/rules.js', location.href).href), p = JUEGO.E.p, L = p.llamado, a = p.at[L.a], cu = R.cuerpoDe(a.id);
             if (!a.garraUno[L.lev]) return null;
-            for (let kg = L.kg; kg <= L.kg + 20; kg++) {
-              const I = p.intensidadDe(L.a, L.lev, kg); let m = R.UNO.margen + d;
-              for (const tr of R.TRAMOS[L.lev]) { m -= R.gastoTramo(tr, I, L.lev, L.lev === 'c' ? cu.casa : undefined, cu, { salto: true, pisoton: true }); if (m < 0) { if (m >= R.UNO.frenoMin) return kg; break; } }
+            const T = R.TRAMOS[L.lev], su = T.map((_, i) => R.ruidoDe(L.sem, i, cu.ruido || 0)), env = L.lev === 'c' ? cu.casa : undefined;
+            for (let kg = p.minimo(L.a); kg <= L.kg + 20; kg++) {
+              const I = p.intensidadDe(L.a, L.lev, kg), G = T.map(tr => R.gastoTramo(tr, I, L.lev, env, cu)); let m = R.UNO.margen;
+              for (let i = 0; i < T.length; i++) { m -= R.conSuerte(G[i], su[i]); if (m < 0) { if (m >= R.UNO.frenoMin && R.garraAlcanza(m, G.slice(i + 1))) return kg; break; } }
             }
             return null;
           });
           let leido = '';
           for (let i = 0; i < 30; i++) {
             const c = await J(() => ({ txt: document.querySelector('#capa .chance')?.textContent || '', kg: +(document.querySelector('#capa #kg-val')?.textContent || 0) })); leido = `${c.kg} kg ${c.txt}`;
-            const n = parseInt(c.txt, 10); if (!c.txt || (kgFreno !== null ? c.kg >= kgFreno : !(n > 5))) break;
-            await J(() => document.querySelector('#capa #kg-mas')?.click()); await av(60);
+            const n = parseInt(c.txt, 10); if (!c.txt || (kgFreno !== null ? c.kg === kgFreno : !(n > 5))) break;
+            await J(sube => document.querySelector(sube ? '#capa #kg-mas' : '#capa #kg-menos')?.click(), kgFreno === null || c.kg < kgFreno); await av(60);
           }
           medios.push(`${P.titulo}: ${leido}${kgFreno !== null ? ' (FRENO previsto)' : ''}`);
         }

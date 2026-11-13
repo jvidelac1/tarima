@@ -99,15 +99,18 @@ export function puntos(m, de = 3) { const x = Math.max(0, Math.min(de, m / 1000)
 /** Nombre del tramo en una frase («la subida de la cargada») y como sujeto («Pararse con la cargada»). */
 export const tramoTxt = (tramo, lev, l = idiomaActual(), mayor = false) => tr(l, `tramo.${mayor ? 'mayor.' : ''}${tramo === 'tiron' ? 'tiron' : `${tramo}_${lev}`}`);
 /**
- * Línea de 'u' (docs/JUEGO.md G2.4, «Línea de caída»): dónde cayó y qué tramo gastó más, nunca un tiempo. `o.quien`,
- * `o.kg`, `o.pct` (intensidad en %) completan la frase; sin ellos, la versión corta. Válido: solo si quedó al límite.
+ * Línea de 'u' (docs/JUEGO.md G2.4 y 2.1, «Línea de caída»): dónde se quedó sin energía y cuánto gastó ese tramo (un solo
+ * tramo, el de la caída), nunca un tiempo ni un toque, porque ningún toque cambia el resultado. Si ese tramo tuvo mala
+ * suerte (gastó ≥ 150 de más) lo dice; si la garra no alcanzaba y quedó guardada, también (una sola de las dos).
+ * `o.quien`, `o.kg`, `o.pct` (intensidad en %) completan la frase; sin ellos, la versión corta. Válido: solo si quedó al límite.
  */
 function lineaU(res, o, l) {
   const u = res && res.uno; if (!u) return '';
   const lev = o.lev || (u.gastos.arriba !== undefined && Object.keys(u.gastos)[1] === 'pararse' ? 'c' : 's');
   if (res.res === 'valido') return u.al_limite ? tr(l, 'explica.u.limite', { discos: discos(u.margen_fin, l) }) : '';
-  const mayor = u.tramo_mayor || u.tramo_caida, v = { donde: tramoTxt(u.tramo_caida, lev, l), mayor: tramoTxt(mayor, lev, l, true), discos: discos(u.gastos[mayor] || 0, l) };
-  return o.quien && o.kg && o.pct ? tr(l, 'explica.u.cae', { ...v, quien: o.quien, kg: o.kg, pct: o.pct }) : tr(l, 'explica.u.cae_corta', v);
+  const tramo = u.tramo_caida, v = { donde: tramoTxt(tramo, lev, l), d: cuartos(u.gastos[tramo] || 0) };
+  const extra = u.garra_no_alcanza ? tr(l, 'explica.u.no_alcanza') : (u.suertes?.[tramo] || 0) >= 150 ? tr(l, 'explica.u.mala') : '';
+  return (o.quien && o.kg && o.pct ? tr(l, 'explica.u.cae', { ...v, quien: o.quien, kg: o.kg, pct: o.pct }) : tr(l, 'explica.u.cae_corta', v)) + extra;
 }
 
 /** Los tres pasos de «Cómo se juega»: [cantidad de teclas dibujadas, texto]. */

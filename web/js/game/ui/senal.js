@@ -32,7 +32,7 @@ export class Senal {
     const el = this.el; el.hidden = false;
     const clave = s ? s.clave + '|' + s.tipo : '';
     if (clave !== this.clave) {
-      this.clave = clave; el.dataset.tipo = s ? s.tipo : 'nada'; el.dataset.gesto = s?.gesto || ''; el.dataset.largo = s && s.verbo.length > 12 ? '1' : '';      // «APRETÁ Y MANTENÉ» no entra a tamaño completo
+      this.clave = clave; el.dataset.tipo = s ? s.tipo : 'nada'; el.dataset.clave = s ? s.clave : ''; el.classList.toggle('sale', !!(s && s.tipo === 'libre' && s.sale && s.desde !== undefined)); el.dataset.gesto = s?.gesto || ''; el.dataset.largo = s && s.verbo.length > 12 ? '1' : '';      // «APRETÁ Y MANTENÉ» no entra a tamaño completo
       this.paso.textContent = s && s.paso ? t('practica.paso', { n: s.paso, de: s.de }) : ''; this.verbo.textContent = s ? s.verbo : '';
       this.subBase = s && s.sub ? conTecla(s.sub, this.tactil) : ''; this.subTxt = null;
     }
@@ -63,9 +63,10 @@ export class Senal {
     if (cuenta !== this.cuentaTxt) { this.cuentaTxt = cuenta; this.cuenta.textContent = cuenta; if (cuenta) { this.cuenta.classList.remove('late'); void this.cuenta.offsetWidth; this.cuenta.classList.add('late'); } }
     el.classList.toggle('cerrada', !abierta);
     if (s && s.tipo === 'empuja') { this.avance.style.width = `${Math.round(Math.max(0, Math.min(1, s.avance)) * 100)}%`; this.piso.style.width = `${Math.round((s.piso || 0) * 100)}%`; }
-    // 'u': la luz de ¡SALTA! sube hasta donde salta el pesista; ¡PÁRATE! muestra la barra subiendo; ¡DA TODO!, el tiempo que queda
-    else if (s && (s.tipo === 'luz' || s.tipo === 'uno' || s.tipo === 'decide')) {
-      const k = s.tipo === 'luz' ? (now - s.desde) / Math.max(1, s.luz - s.desde) : s.tipo === 'uno' ? s.avance : 1 - (now - s.desde) / Math.max(1, s.hasta - s.desde);
+    // 'u': ¡PÁRATE! muestra la barra subiendo; ¡TIRA! y ¡ARRIBA!, lo que falta para que salgan solas (sin apuro: si se llena,
+    // el pesista lo hace solo y no pasa nada malo). ¡SALTA! no tiene barra: no hay un momento justo que marcar
+    else if (s && (s.tipo === 'uno' || (s.tipo === 'libre' && s.sale && s.desde !== undefined))) {
+      const k = s.tipo === 'uno' ? s.avance : (now - s.desde) / Math.max(1, s.vence - s.desde);
       this.avance.style.width = `${Math.round(Math.max(0, Math.min(1, k)) * 100)}%`; this.piso.style.width = '0%';
     }
     el.classList.toggle('guardado', !!(s && s.guardado));

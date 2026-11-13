@@ -122,31 +122,30 @@ export const PASOS = { s: 3, c: 6 };
 export const PASOS_U = { s: 3, c: 4 };
 
 /**
- * La señal de 'u'. Tipos: 'espera' (PREPÁRATE, RESPIRA), 'libre' (¡TIRA!, ¡ARRIBA!: cuando quieras; `vence`: cuándo sale
- * solo), 'luz' (¡SALTA!: el tramo va de `abre` a `hasta`; `luz` es donde salta el pesista, solo presentación), 'uno'
- * (¡PÁRATE!: un toque, de `desde` a `hasta`; `avance` 0..1), 'decide' (¡DA TODO!: usar la garra, de `desde` a `hasta`) y
- * 'auto' (AGUANTA, ¡ABAJO!). `sale` (en las libres): al llegar a `vence` el juego lo hace solo, sin cuenta regresiva
- * ni castigo. null entre tramos: la palabra del toque anterior queda sola, sin una orden al lado.
- * `guardado`: hay un contacto guardado que va a cumplir el tramo que viene.
+ * La señal de 'u'. Ningún toque cambia el resultado (Gameplay 2.1): las señales con toque son para acompañar y todas salen
+ * solas si no se toca. Tipos: 'espera' (PREPÁRATE, RESPIRA), 'libre' (¡TIRA!, ¡ARRIBA!: cuando quieras; `desde` y `vence`:
+ * cuándo apareció y cuándo sale sola; `sale`: sale sola, sin castigo), 'luz' (¡SALTA!: vale de `abre` a `hasta`; sin
+ * barra que se llene, porque no hay un momento justo), 'uno' (¡PÁRATE!: un toque, de `desde` a `hasta`; `avance` 0..1, la
+ * barra que sube) y 'auto' (AGUANTA, ¡ABAJO!, y ¡DA TODO! del FRENO, donde la garra se usa sola). null entre tramos: la
+ * palabra del toque anterior queda sola, sin una orden al lado. `guardado`: hay un contacto guardado para el tramo que viene.
  */
 function senalU(m, now) {
   const M = m.M, U = m.U, c = m.c, de = PASOS_U[c.lev], g = U.guarda > 0;
-  const tira = () => Math.max(m.tSet, m.tConf + (c.reloj || UNO.relojSin) - UNO.tiraSolo);
   switch (m.fase) {
     case 'acomodo': return { clave: 'prep', verbo: t('senal.prep'), tipo: 'espera', guardado: g };
-    case 'tension': return { clave: 'tira', verbo: t('senal.tira'), sub: t('senal.tira_u'), paso: 1, de, tipo: 'libre', vence: tira(), sale: true, guardado: g };
+    case 'tension': return { clave: 'tira', verbo: t('senal.tira'), sub: t('senal.tira_u'), paso: 1, de, tipo: 'libre', desde: m.tSet, vence: m.tSet + UNO.tiraSolo, sale: true, guardado: g };
     case 'tiron': case 'vuelo':
       if (U.salto !== null) return null;
-      return { clave: 'salta', verbo: t('senal.salta'), sub: t('senal.salta_sub'), paso: 2, de, tipo: 'luz', desde: M.tp, abre: M.tSalta, luz: M.tx, hasta: M.tx + M.an.rec, guardado: g };
+      return { clave: 'salta', verbo: t('senal.salta'), sub: t('senal.salta_sub'), paso: 2, de, tipo: 'luz', desde: M.tp, abre: M.tSalta, hasta: M.tx + M.an.rec, guardado: g };
     case 'pelea': {
       const p = M.pelea;
       if (M.mov === 'j' || p.cerrado || U.pisoton !== null) return null;
       return { clave: 'parate', verbo: t('senal.parate'), sub: t('senal.parate_sub'), paso: 3, de, tipo: 'uno', desde: p.t0, hasta: p.tCierre, avance: p.P / 1000000, guardado: g };
     }
-    case 'freno': return { clave: 'datodo', verbo: t('senal.datodo'), sub: t('senal.datodo_sub'), tipo: 'decide', desde: U.freno.t0, hasta: U.freno.hasta, tramo: U.freno.tramo };
+    case 'freno': return { clave: 'datodo', verbo: t('senal.datodo'), sub: t('senal.datodo_sub'), tipo: 'auto', desde: U.freno.t0, hasta: U.freno.hasta, tramo: U.freno.tramo };
     case 'hombros':
       if (!M.abierto) return { clave: 'respira', verbo: t('senal.respira'), tipo: 'espera', guardado: g };
-      return { clave: 'arriba', verbo: t('senal.arriba'), sub: t('senal.arriba_u'), paso: 4, de, tipo: 'libre', vence: M.tDev, sale: true, guardado: g };
+      return { clave: 'arriba', verbo: t('senal.arriba'), sub: t('senal.arriba_u'), paso: 4, de, tipo: 'libre', desde: M.ign, vence: M.tDev, sale: true, guardado: g };
     case 'post': return { clave: 'aguanta', verbo: t('senal.aguanta'), sub: t('senal.aguanta_sub'), tipo: 'auto' };
     case 'fijacion': return now >= m.fij.tb ? { clave: 'abajo', verbo: t('senal.abajo'), sub: t('senal.abajo_sub'), tipo: 'auto' } : { clave: 'aguanta', verbo: t('senal.aguanta'), sub: t('senal.aguanta_sub'), tipo: 'auto' };
     default: return null;

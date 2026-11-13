@@ -1,7 +1,7 @@
 // Margen a la vista en el levantamiento propio del nivel 'u' (docs/JUEGO.md, Gameplay 2, «Emoción»). Solo presentación: lo
 // que dibuja sale del núcleo (m.U y su bitácora `log`), nunca lo decide.
-//   - Arriba al centro (fuera del pulgar), los discos de margen: tres al empezar, y al agarrar la barra suben o bajan con
-//     «el día». Cada tramo que cierra apaga lo que gastó, con su palabra («tirón −½», «pararse −1½»).
+//   - Arriba al centro (fuera del pulgar), la energía en tres puntos. Cada tramo que cierra apaga lo que gastó, con su palabra
+//     («tirón −½», «pararse −1½ · pesó más» si tuvo mala suerte): el resultado se va viendo tramo a tramo, nunca antes.
 //   - La ficha de la garra: apagada si ya se usó; en el FRENO late en dorado (y la escena se oscurece por los bordes).
 //   - Al terminar: si cae, parpadea en rojo lo que faltó («Faltó ¼»); si vale, los discos que quedan brillan (en dorado si
 //     fue al límite).
@@ -39,8 +39,8 @@ export class Margen {
   /** Un tramo cerró ({tramo, gasto, m} o {tramo, garra, m}, de m.U.log). */
   tramo(x, ahora) {
     if (x.garra) { this.garra = 'usada'; this._garra(); this.el.classList.add('garra-usada'); return this.ir(x.m, ahora, t('margen.garra', { d: cuartos(x.garra) }), 'oro'); }
-    const nombre = t('margen.tramo.' + x.tramo);
-    this.ir(x.m, ahora, x.gasto > 0 ? t('margen.gasto', { tramo: nombre, d: cuartos(x.gasto) }) : t('margen.gratis', { tramo: nombre }), x.m < 0 ? 'mal' : '');
+    const nombre = t('margen.tramo.' + x.tramo), su = x.suerte || 0, clave = x.gasto <= 0 ? 'margen.gratis' : su >= 150 ? 'margen.mala' : su <= -150 ? 'margen.buena' : 'margen.gasto';
+    this.ir(x.m, ahora, t(clave, { tramo: nombre, d: cuartos(x.gasto) }), x.m < 0 ? 'mal' : su <= -150 ? 'oro' : '');
   }
   /** FRENO: la garra late; `on` false lo apaga. */
   freno(on) { if (!this.el) return; this.el.classList.toggle('freno', !!on); this._garra(); }
@@ -61,10 +61,10 @@ export class Margen {
   }
   _valor(ahora) { const A = this.anim; return A ? lerp(A.de, A.a, suave((ahora - A.t0) / MS)) : this.m; }
   _garra() { const g = this.el?.querySelector('.m-g'); if (g) g.dataset.estado = this.garra; }
-  /** Discos: tres siempre, el cuarto solo si el día dio más de tres; cada uno lleno según lo que queda (`m` en milésimas). */
+  /** Tres puntos de energía, cada uno lleno según lo que queda (`m` en milésimas). */
   _pintar(m) {
     const d = this.el?.querySelector('.m-d'); if (!d) return;
-    const n = this.m > 3000 || m > 3000 ? 4 : 3;
+    const n = 3;
     while (d.children.length < n) d.appendChild(document.createElement('i'));
     while (d.children.length > n) d.lastChild.remove();
     for (let k = 0; k < n; k++) { const f = Math.max(0, Math.min(1, m / 1000 - k)), i = d.children[k]; i.style.setProperty('--f', f.toFixed(3)); i.classList.toggle('vacio', f <= 0); }
