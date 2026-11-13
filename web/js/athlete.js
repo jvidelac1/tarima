@@ -318,7 +318,8 @@ export class Athlete {
     this.snap = []; this.barPos = [];
     for (let i = 0; i < n; i++) {
       mixer.setTime(Math.min(t0 + i / sub, clip.duration - 1e-4));
-      this.snap.push(this.bones.map(b => [b.quaternion.clone(), b.position.clone()]));
+      // normalizado: las claves de rotación del GLB comprimido salen a 1e-5 de la unidad (filtro exponencial de meshopt)
+      this.snap.push(this.bones.map(b => [b.quaternion.clone().normalize(), b.position.clone()]));
       this.root.updateMatrixWorld(true);
       this.barPos.push(this.barBone.getWorldPosition(new THREE.Vector3()));
     }

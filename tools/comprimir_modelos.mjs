@@ -18,7 +18,8 @@
 //    float32 al decodificar, con una grilla fija por componente (ver BITS: error de micrones en posiciones, de millonésimas
 //    en rotaciones). No se usa KHR_mesh_quantization: cuantizar posiciones obliga a meter una escala en las matrices inversas
 //    de enlace y athlete.js las usa (correctivos de brazos) y mide metros por unidad de UV sobre la malla.
-//    Con BITS de abajo: posiciones a menos de 0,05 mm, normales a 0,03°, UV a 0,06 texel de 2048, rotaciones a 0,002°.
+//    Con BITS de abajo: posiciones a menos de 0,05 mm, normales a 0,03°, UV a 0,06 texel de 2048, rotaciones a 0,002°
+//    (los cuaterniones quedan a ~1e-5 de la unidad: athlete.js los normaliza al muestrear).
 //  - Sin pérdida: índices, JOINTS, tiempos de las claves y matrices inversas de enlace.
 //  - Las primitivas opacas se reordenan para la caché de vértices (mismos triángulos, otro orden: comprime mucho mejor). Las
 //    de mezcla alfa (pelo y pestañas) no: el pelo es una primitiva en capas y el orden de sus triángulos es el de dibujo.

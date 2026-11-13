@@ -986,7 +986,8 @@ Pedido del dueño: tarda en cargar (2/3 de los jugadores en el celular, muchos c
   articulaciones, morphs `corr_*`, acción `Poses` con 160 canales (diferencia máxima 1,5e-5, tiempos idénticos).
 - **Lo que baja el juego** (`tools/check_carga.mjs`, teléfono 844 × 390, sin caché): 24,63 MB → 7,94 MB. Modelos bajados,
   antes → después: con 4G (9 Mbps, 85 ms) 33,2 → 21,6 s (run 43455353457) y 39,4 → 27,7 s (run 43459886954); con red
-  lenta (1,6 Mbps, 150 ms) 133,7 → 51,3 s y 138,0 → 55,6 s. La bienvenida sale a los 12–21 s en el runner en los dos
+  lenta (1,6 Mbps, 150 ms) 133,7 → 51,3 s y 138,0 → 55,6 s; última corrida (run 43461772198): 34,5 → 21,0 s y
+  135,0 → 52,1 s. La bienvenida sale a los 12–21 s en el runner en los dos
   casos: ahí manda el dibujo por software, no la red. El primer cuadro salió 0,1–0,4 s más tarde que antes (más CSS y el
   SVG animado dibujados por software); se sacó el `drop-shadow` del pesista, que es lo más caro de componer.
 - **Pantalla de carga** (`#msg`, `web/js/game/ui/carga.js`, `web/css/carga.css`): un pesista de costado que hace un arranque
@@ -997,6 +998,17 @@ Pedido del dueño: tarda en cargar (2/3 de los jugadores en el celular, muchos c
   detrás de ella, una barrita de 3 px arriba muestra el avance, y si se toca «Jugar» antes de tiempo vuelve la pantalla con
   la barra y las frases. Movimiento reducido: pesista quieto con la barra arriba, sin fundidos. Capturas en el artefacto
   `carga-medir` (667 × 375, 844 × 390, escritorio en inglés, movimiento reducido, y el pesista en siete instantes).
+- **Visor antes y después** (`carga.yml`, run 43455353457, `check_viewer` en los dos lados, 141 capturas cada uno): verdes;
+  caras, pelo, barba, piel, manos, zapatillas y discos iguales a la vista (diferencia media por píxel 1,2 de 255; lo más
+  distinto son cuadros tomados en plena reproducción). Dos diferencias medidas: (1) los metros por unidad de UV del cuerpo
+  (escala del mosaico de poros y trama) pasan de 1,81 a 1,78 en Ventura y de 1,88 a 1,84 en Brenner: `metersPerUv` toma la
+  mediana de una muestra de triángulos y el reordenado cambia cuáles; es un 2 % en un mosaico de 12 mm, invisible.
+  (2) `check_viewer` avisaba «el índice 0 del envión no duplica el último de la cargada (huesos 1,0°)»: no era una pose
+  distinta sino cuaterniones a 4e-5 de la unidad (`angleTo` de un cuaternión consigo mismo da 1° si no es unitario);
+  athlete.js ahora normaliza al muestrear. Juego (`pruebas.yml`, runs 43456941473 y 43459952561): núcleo, teléfono,
+  iPhone/recorrido, check_fluidez, check_toques y capturas en verde; las capturas con el 3D salen iguales a las de
+  `gameplay` (diferencia media 0,15 de 255 en las escenas quietas). `check_barra` falla igual que en `gameplay` 026e385
+  (tarjetas y barrita en 1280 × 720: trabajo en curso de la barrita, no de esta rama).
 - **Pendiente / sin medir**: Pages manda los GLB y WebP con `max-age=0, must-revalidate` (cada visita revalida; un
   `_headers` con caché más larga obligaría a cambiar el nombre de los archivos en cada exportación). KTX2 no se probó (pide
   el transcodificador de Basis, ~0,5 MB, y athlete.js achica y suelta las texturas en un lienzo). Nada de esto se probó en
