@@ -47,7 +47,7 @@ const PANTALLAS = [
   { id: 'bajo_en', lang: 'en', vp: { width: 1800, height: 560 }, tactil: false, soloInicio: true },
 ].filter(x => !SOLO || x.id === SOLO);
 
-for (const P of PANTALLAS) {
+for (const P of PANTALLAS) try {
   const tag = `[${P.id}]`, mal = t => problemas.push(`${tag} ${t}`);
   const ctx = await browser.newContext({ viewport: P.vp, deviceScaleFactor: P.tactil ? 2 : 1, ...(P.tactil ? { hasTouch: true, isMobile: true } : {}), locale: P.lang === 'es' ? 'es-AR' : 'en-US' });
   const page = await ctx.newPage(), cdp = P.tactil ? await ctx.newCDPSession(page) : null, J = (fn, a) => page.evaluate(fn, a);
@@ -66,7 +66,7 @@ for (const P of PANTALLAS) {
   const baja = async () => { if (P.tactil) { const p = await punto(); await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.x, y: p.y, id: 1 }] }); } else await page.keyboard.down('Space'); };
   const sube = async () => { if (P.tactil) await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); else await page.keyboard.up('Space'); };
   const toque = async () => { await baja(); await av(30); await sube(); };
-  const pulsa = async sel => { const l = page.locator(sel).first(); if (!(await l.count()) || !(await l.isVisible())) return false; if (P.tactil) await l.tap(); else { await l.focus(); await page.keyboard.press('Enter'); } return true; };
+  const pulsa = async sel => { const l = page.locator(sel).first(); if (!(await l.count()) || !(await l.isVisible()) || !(await l.isEnabled())) return false; if (P.tactil) await l.tap(); else { await l.focus(); await page.keyboard.press('Enter'); } return true; };
   const caja = id => J(id => { const e = document.getElementById(id); if (!e || e.hidden) return null; const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; }, id);
   const cruza = (a, b) => a && b && a.l < b.r - 1 && a.r > b.l + 1 && a.t < b.b - 1 && a.b > b.t + 1;
   const PEDIR = ['verde', 'amarillo', 'rojo'], pedidas = [], vistas = [];
@@ -79,6 +79,8 @@ for (const P of PANTALLAS) {
       for (let i = 0; i < k.length; i++) for (let j = i + 1; j < k.length; j++) { const a = k[i], b = k[j]; if (a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1) cruces++; }
       const fuera = k.some(x => x.bottom > r.bottom + 1 || x.right > r.right + 1);
       return { id: p.dataset.id, cruces, fuera, tapa: !!pie && r.bottom > pie.top + 1 && r.top < pie.bottom, alto: Math.round(r.height) }; }); });
+    const PN = await J(() => { const pn = document.querySelector('#capa .panel'); return pn ? { cliente: pn.clientHeight, contenido: pn.scrollHeight } : null; });
+    console.log(`${tag} panel de bienvenida: ${PN?.cliente} px a la vista de ${PN?.contenido} px`);
     console.log(`${tag} tarjetas: ${T.map(x => `${x.id} ${x.alto} px${x.cruces ? ` · ${x.cruces} cruces` : ''}${x.fuera ? ' · se corta' : ''}${x.tapa ? ' · bajo los botones' : ''}`).join(' | ')}`);
     for (const x of T) if (x.cruces || x.fuera || x.tapa) mal(`la tarjeta de ${x.id} no se lee entera: ${JSON.stringify(x)}`); }
   if (P.soloInicio) { await ctx.close(); continue; }
@@ -156,7 +158,7 @@ for (const P of PANTALLAS) {
     }
   }
   await ctx.close();
-}
+} catch (e) { problemas.push(`[${P.id}] excepción: ${(e.message || e).split('\n')[0]}`); }
 await browser.close(); server.close();
 for (const x of notas) console.log('nota: ' + x);
 if (problemas.length) { console.log(`\nFALLÓ (${problemas.length}):`); for (const p of problemas.slice(0, 30)) console.log('  ' + p); process.exit(1); }

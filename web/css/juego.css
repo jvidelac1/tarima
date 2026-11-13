@@ -455,3 +455,4 @@ body:has(#barrita:not([hidden])) .guia{bottom:calc(var(--u)*15.5 + var(--sb))}
 :where(html.horiz.bajo) .mini-b em,:where(html.horiz.bajo) .mini-b b{display:none}
 :where(html.horiz.bajo) .mb-pista{width:4.6em;height:.8em}
 :where(html.horiz.bajo) .panel:has(.verde-b) p.garra{display:none}
+:where(html.horiz.bajo) .panel:has(.verde-b) .discos .justo{display:none}      /* en 'b' el verde dice más que «lo más duro» */

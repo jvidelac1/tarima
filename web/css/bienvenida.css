@@ -147,3 +147,11 @@ fieldset.pregunta legend{font-family:var(--display);font-weight:700;text-transfo
 .pesista .cuerpo.b .barra{display:none}
 .pesista .cuerpo.b .med em{white-space:nowrap}
 :where(html.horiz.bajo) .pesista .cuerpo.b .med{font-size:.7em}
+/* pantallas bajas (la computadora del dueño muestra ~560 px): la bienvenida sin la franja de colores de cada tarjeta ni la
+   nota debajo del nombre, para que las tarjetas entren enteras encima de la fila de botones */
+@media (max-height:820px){
+  .panel.bienvenida .pesista .b{display:none}
+  .panel.bienvenida label.nombre+.nota{display:none}
+  .panel.bienvenida .pesistas{margin:.4em 0}
+  .panel.bienvenida .pesista small.conviene{font-size:.74em;line-height:1.25}
+}
