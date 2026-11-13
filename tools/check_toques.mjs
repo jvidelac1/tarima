@@ -101,7 +101,7 @@ for (;;) {
     await dormir(10); continue;
   }
   if (estadoIntento && !(I && I.propio)) estadoIntento = null;
-  if (s.turno.ve && !rivalVisto) rivalVisto = { ...s.turno, pantalla: s.pantalla };
+  if (s.turno.ve && s.turno.saltar && !rivalVisto) rivalVisto = { ...s.turno, pantalla: s.pantalla };      // el botón sale cuando termina el fundido
   // 7. el primer turno de un rival: Espacio no lo saltea; la tecla S sí
   if (s.pantalla === 'rival' && s.turno.saltar && !rivalSalto) {
     await dormir(700); const cuenta = () => J(() => ({ p: JUEGO.estado().pantalla, now: JUEGO.estado().intento?.now ?? null, ev: JUEGO.eventos.filter(e => e.ev === 'rival_salteado').map(e => e.props) }));
