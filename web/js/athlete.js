@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptSimplifier } from 'three/addons/libs/meshopt_simplifier.module.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { smoothstep, disposeObject } from './util.js';
 import { CORR } from './config.js';
 
@@ -12,7 +13,8 @@ const SOLE = .016;   // la suela baja 16 mm del origen del rig
 const DETAIL_MIN_PX = 210;
 /** Lado máximo de la máscara de piel/tela/pelo (px). */
 const MASK_MAX = 1024;
-const loader = new GLTFLoader();
+// los GLB vienen con la geometría y la animación comprimidas (EXT_meshopt_compression, tools/comprimir_modelos.sh)
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const _v = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
 
 const SKIN_PARS = /* glsl */`
@@ -131,6 +133,17 @@ function keepSource(tex, blob, max) {
   tex.onUpdate = () => { const im = tex.image; if (!im?.close) return; tex.userData.w = im.width; tex.userData.h = im.height; im.close(); tex.userData.closed = true; };
 }
 
+/** Baja un archivo como Blob avisando los bytes que van llegando (fetch no da progreso por sí solo). */
+async function bajar(url, avisa) {
+  const res = await fetch(url); if (!res.ok) throw new Error(url + ': ' + res.status);
+  const total = +res.headers.get('content-length') || 0, tipo = res.headers.get('content-type') || '';
+  if (!avisa || !res.body?.getReader) { const b = await res.blob(); avisa?.({ loaded: b.size, total: b.size, lengthComputable: true }); return b; }
+  const rd = res.body.getReader(), partes = []; let n = 0;
+  for (;;) { const { done, value } = await rd.read(); if (done) break; partes.push(value); n += value.length; avisa({ loaded: n, total, lengthComputable: total > 0 }); }
+  avisa({ loaded: n, total: n, lengthComputable: true });
+  return new Blob(partes, { type: tipo });
+}
+
 /** Normales de detalle compartidas por todos los personajes (las escribe tools/export_web.py). */
 let detailPromise = null;
 function loadDetail(aniso) {
@@ -217,17 +230,22 @@ function eyeMaterial(src) {
 export class Athlete {
   /**
    * @param {string} name      ventura | brenner
-   * @param {object} data      entrada de poses.json (usa sub y, si viene, mask)
-   * @param {{aniso:number}} opt
+   * @param {object} data      entrada de poses.json (usa sub y, si vienen, mask y glb1024)
+   * @param {{aniso:number, maxTex:number, progreso:(clave:string, bajado:number, total:number)=>void}} opt
+   *   progreso: bytes bajados del GLB y de la máscara, a medida que llegan (total 0 si el servidor no lo dice)
    */
-  static async load(name, data, { aniso = 8, maxTex = 4096 } = {}) {
-    const [gltf, detail] = await Promise.all([loader.loadAsync(`models/${name}.glb`), loadDetail(aniso), MeshoptSimplifier.ready.catch(() => null)]);
-    // la máscara es opcional; solo se pide si el build avisa que existe (evita un 404 en consola)
+  static async load(name, data, { aniso = 8, maxTex = 4096, progreso = null } = {}) {
+    // con texturas de 1024 como tope se baja el GLB que ya las trae a 1024 (el mismo modelo, un tercio del peso)
+    const url = maxTex <= 1024 && data.glb1024 ? data.glb1024 : `models/${name}.glb`;
+    const avisa = clave => progreso ? e => { try { progreso(clave, e.loaded, e.lengthComputable ? e.total : 0); } catch { /* el aviso no frena la carga */ } } : undefined;
+    // la máscara es opcional; solo se pide si el build avisa que existe (evita un 404 en consola). Baja a la par del GLB.
+    const maskBlob = data.mask ? bajar(typeof data.mask === 'string' ? data.mask : `models/${name}_mask.png`, avisa(name + ':mask')).catch(() => null) : null;
+    const [gltf, detail] = await Promise.all([loader.loadAsync(url, avisa(name + ':glb')), loadDetail(aniso), MeshoptSimplifier.ready.catch(() => null)]);
     let mask = null;
-    if (data.mask) {
+    if (maskBlob) {
       try {
-        const res = await fetch(typeof data.mask === 'string' ? data.mask : `models/${name}_mask.png`); if (!res.ok) throw new Error(String(res.status));
-        const blob = await res.blob(); mask = new THREE.Texture(await createImageBitmap(blob, BITMAP)); mask.flipY = false; mask.colorSpace = THREE.NoColorSpace; mask.anisotropy = aniso;
+        const blob = await maskBlob; if (!blob) throw new Error('sin máscara');
+        mask = new THREE.Texture(await createImageBitmap(blob, BITMAP)); mask.flipY = false; mask.colorSpace = THREE.NoColorSpace; mask.anisotropy = aniso;
         mask.generateMipmaps = true; mask.minFilter = THREE.LinearMipmapLinearFilter; mask.needsUpdate = true;
         const max = Math.min(MASK_MAX, maxTex); fitTexture(mask, max); keepSource(mask, blob, max);
       } catch { mask = null; }
@@ -236,7 +254,7 @@ export class Athlete {
     const seen = new Set(), uses = new Map(), json = gltf.parser.json, jobs = [];
     gltf.scene.traverse(o => { for (const m of [].concat(o.material || [])) for (const k of TEX_KEYS) { const t = m[k]; if (t && !seen.has(t)) { seen.add(t); uses.set(t.source, (uses.get(t.source) || 0) + 1); } } });
     for (const t of seen) {
-      const im = json.images?.[json.textures?.[gltf.parser.associations.get(t)?.textures]?.source];
+      const tx = json.textures?.[gltf.parser.associations.get(t)?.textures], im = json.images?.[tx?.source ?? tx?.extensions?.EXT_texture_webp?.source];
       // (si dos texturas comparten imagen no se suelta: la segunda todavía puede necesitarla para subir)
       if (im?.bufferView !== undefined && uses.get(t.source) === 1) jobs.push(gltf.parser.getDependency('bufferView', im.bufferView).then(ab => keepSource(t, new Blob([ab], { type: im.mimeType || 'image/png' }), maxTex)).catch(() => null));
       fitTexture(t, maxTex);

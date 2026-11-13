@@ -734,7 +734,8 @@
     140
    ]
   },
-  "mask": "models/ventura_mask.png"
+  "mask": "models/ventura_mask.webp",
+  "glb1024": "models/ventura_1024.glb"
  },
  "brenner": {
   "h": 1.83,
@@ -1471,6 +1472,7 @@
     140
    ]
   },
-  "mask": "models/brenner_mask.png"
+  "mask": "models/brenner_mask.webp",
+  "glb1024": "models/brenner_1024.glb"
  }
 }

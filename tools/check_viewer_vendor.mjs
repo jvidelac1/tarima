@@ -14,6 +14,7 @@ const ADDONS = [
   'postprocessing/UnrealBloomPass.js',
   'postprocessing/SMAAPass.js',
   'libs/meshopt_simplifier.module.js',      // nivel de detalle del atleta al cargar (athlete.js)
+  'libs/meshopt_decoder.module.js',         // GLB con EXT_meshopt_compression (tools/comprimir_modelos.sh)
 ];
 
 fs.rmSync(DST, { recursive: true, force: true });
