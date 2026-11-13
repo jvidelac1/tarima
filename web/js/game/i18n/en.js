@@ -588,4 +588,5 @@ export default {
   'glosario.garra.t': 'Grit', 'glosario.garra.d': 'One per lift: if energy runs out by a little, it saves you on its own.',
   'glosario.suerte.t': 'Luck', 'glosario.suerte.d': 'Each part can cost a bit more or less than expected. “X in 10” already counts it.',
   'llamado.u_sugiere': 'Your coach suggests this weight (you asked for {kg}).',
+  'llamado.u_con_garra': '{discos} short: your grit gets you there',
 };

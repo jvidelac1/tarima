@@ -605,4 +605,5 @@ export default {
   'glosario.garra.t': 'Garra', 'glosario.garra.d': 'Una por levantamiento: si la energía se acaba por poco, te salva sola.',
   'glosario.suerte.t': 'Suerte', 'glosario.suerte.d': 'Cada parte puede costar un poco más o menos que lo previsto. «X de 10» ya la cuenta.',
   'llamado.u_sugiere': 'Tu entrenador sugiere este peso (pediste {kg}).',
+  'llamado.u_con_garra': 'Te falta {discos}: llegas con la garra',
 };

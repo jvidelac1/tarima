@@ -229,7 +229,8 @@ export function ruidoDe(semilla, i, pasos) { if (!pasos) return 0; const r = new
 export function garraAlcanza(m, restantes) { let x = m + UNO.garra; if (x < 0) return false; for (const g of restantes) { x -= g; if (x < 0) return false; } return true; }
 /**
  * Lo que el panel muestra para un peso («llegas con»): sin suerte y sin garra. `fin`: energía al terminar (negativo: no
- * llega); `justo`: el tramo donde queda más baja; `mayor`: el que más gasta; `gastos`.
+ * llega); `justo`: el tramo donde queda más baja; `mayor`: el que más gasta; `gastos`; `conGarra`: no llega, pero con la
+ * garra (si la tiene) sí.
  */
 export function previsto(I, lev, env, cuerpo) {
   let m = UNO.margen, min = Infinity, justo = null, mayor = null; const gastos = {};
@@ -237,7 +238,10 @@ export function previsto(I, lev, env, cuerpo) {
     const g = gastos[tr] = gastoTramo(tr, I, lev, env, cuerpo); m -= g;
     if (m < min) { min = m; justo = tr; } if (mayor === null || g > gastos[mayor]) mayor = tr;
   }
-  return { fin: m, min, justo, mayor, gastos };
+  // sin suerte y con la garra: ¿la salva? (mismas reglas que _uCierra)
+  let x = UNO.margen, conGarra = false; const G = TRAMOS[lev].map(tr => gastos[tr]);
+  for (let i = 0; i < G.length; i++) { x -= G[i]; if (x >= 0) continue; if (!conGarra && x >= UNO.frenoMin && garraAlcanza(x, G.slice(i + 1))) { x += UNO.garra; conGarra = true; continue; } conGarra = false; break; }
+  return { fin: m, min, justo, mayor, gastos, conGarra: conGarra && m < 0 };
 }
 /**
  * Chance de que la barra suba (milésimas, 0 a 1000), para cualquiera: como ningún toque cambia el resultado, depende solo de
