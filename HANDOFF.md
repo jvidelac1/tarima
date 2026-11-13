@@ -874,7 +874,8 @@ Lo que cambia entre pesistas son los kilos y el cuerpo, nunca la precisión de l
 - **J** (ritmo_test, 360 finales por jugador): el novato que a veces no toca, final mediana 113 s, espera mediana 5,8 s, p90 13,3 s y máxima 19,9 s, intento propio p90 6,8 s (arranque) y 10,3 s (dos tiempos); el ausente, que no toca nunca, final mediana 130 s e intento p90 8,9 y 13,8 s (antes: 309 s y 45,8 s). Barras caídas con el panel: 8,9 %. Veredicto de una caída propia: tVer + 2,4 s, ahora medido.
 - **H** (teclado_test y dedo_test, 10 000 secuencias): 0 sin resolver, 0 dobles, 0 sin palabra, los toques del borde anotados; Clásico suelta en el acto un dedo cancelado y `'u'` espera la gracia.
 - **L** (sim_test): `sim_ref.json` y `sim_ref_facil.json` **idénticos a mvp, huella incluida**; `sim_ref_uno.json` regenerada; 1000 finales `'u'` recalculadas iguales. servidor_test: 244 controles bien.
-- Actions sobre el push `6e8397d`: ACTIONS_PENDIENTE
+- **Actions** (sin cambios de juego después de estos commits): pruebas.yml 43394719554 sobre `f113362`, los cuatro grupos en verde; telefono.yml 43393312835, muro.yml 43393281641 y servidor.yml 43393281668 sobre `c4fa8f8`, en verde. Capturas miradas: llamado y ¡TIRA! en Android 667×375 (el panel ya no queda debajo de los botones de arriba), «TOCA: SEGUIR» encima del botón y el cartel de los rivales debajo de la energía (Android 667×375 y Safari 844×340), tarjetas de inicio en el iPhone 667×375 en inglés (sin cortes), glosario de `'u'` en inglés, FRENO («pararse −1¼ · pesó más», «¡DA TODO! la garra te salva»), panel en inglés y línea de caída («Ran out of energy in the pull (used 3½)…»).
+- check_toques (Actions, por software): 34 pulsaciones anotadas y resueltas, manejador p95 2,7 ms, acuse medido por el juego p95 77 ms (SwiftShader: nota, como antes).
 
 **Cómo probarlo.** `cd web && python3 -m http.server 8000` y abrir `http://localhost:8000/juego.html` (con `?depura=1` se ve el acuse medido de cada toque). Elegir un pesista, confirmar con Espacio lo que trae el panel y no tocar nada: el levantamiento sale solo. Después probar machacar, mantener o tocar con calma: el resultado es el mismo. En el celular, lo mismo con el pulgar en cualquier parte de la pantalla. Lo que cambia la final es el peso que se pide y el pesista.
 
@@ -883,7 +884,8 @@ Lo que cambia entre pesistas son los kilos y el cuerpo, nunca la precisión de l
 - Las amplitudes de suerte y los cuerpos son de diseño, calibrados con bots; el tiempo real de una persona en el panel sigue estimado (2,5 s en ritmo_test).
 - Sigue sin hacer: cámara lenta (meta K), magnesio del pisotón, Clásico ofrecido después de dos victorias.
 - La segunda parte decía que el squat de Compacto «rinde peor desde el 100 %»: no era así (margen_cal daba +1 al 100 %). Hoy da 0 a +6 puntos y la casa sigue en tijera.
-- Lo que no se tocó a propósito: los textos `pesista.*.conviene` hablan de precisión, pero solo se ven en Clásico, donde la precisión sí cuenta.
+- Lo que no se tocó a propósito: los textos `pesista.*.conviene` hablan de precisión, pero solo se ven en Clásico, donde la precisión sí cuenta. Clásico también recibe el ritmo nuevo de los rivales (resumen y fila); en el navegador solo lo cubre la práctica de Clásico de check_game.
+- En check_telefono aparecen notas de descargas de modelos cortadas (`requestfailed … .glb net::ERR_ABORTED`): la prueba recarga la página antes de que terminen de bajar (sin tutorial se llega antes a la recarga). No es un error del juego.
 
 ## Contratos entre Blender y el visor
 
