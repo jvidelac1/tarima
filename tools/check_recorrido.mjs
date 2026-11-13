@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { launchOptions } from './browser.mjs';
 import { sinApi } from './sin_api.mjs';
+import { instalarEnPagina, leerEnPagina, resumir, informe } from './cortes.mjs';
 /** Señales de un toque (la libre de siempre y las de 'u': ¡SALTA!, ¡PÁRATE!, ¡DA TODO!): un toque y la señal se va. */
 const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
@@ -53,6 +54,7 @@ await page.goto(`${base}juego.html?lang=${LANG}&semilla=${SEMILLA}&q=baja&dibujo
 if (!await page.evaluate(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
 const J = (fn, a) => page.evaluate(fn, a);
 await J(() => JUEGO.test.manual());
+await page.evaluate(instalarEnPagina);      // carteles que aparecen y desaparecen (tools/cortes.mjs)
 
 // ---- entrada y reloj
 const av = ms => J(ms => JUEGO.test.avanzar(ms), ms);
@@ -92,8 +94,10 @@ let senalPrev = '', senalesFoto = 0, tLlamado0 = null, tPodio = null;
 // 'u': fotos de los discos de margen cuando cierra un tramo (el primer levantamiento y los que van al límite) y del FRENO
 let margenPrev = null, fotosMargen = 0, frenos = 0, frenoLev = -1; const medios = [];
 
+const entre = []; let tSinIntento = null;      // ventanas entre levantamientos (sin intento en curso), para tools/cortes.mjs
 for (let n = 0; n < 60000; n++) {
   const s = await J(() => JUEGO.estado());
+  if (s.intento && tSinIntento !== null) { entre.push([tSinIntento, s.ahora + 1000]); tSinIntento = null; } else if (!s.intento && tSinIntento === null && tLlamado0 !== null) tSinIntento = s.ahora;
   if (s.errores.length) { problemas.push('error en el juego: ' + s.errores[0]); break; }
   if (tPodio === null && (s.visitados.includes('clasificacion') || s.pantalla === 'fin')) tPodio = s.ahora;      // el podio (la clasificación pasa enseguida a la ceremonia)
   if (s.pantalla === 'fin' && s.panel) { await foto('fin'); break; }
@@ -197,6 +201,8 @@ for (let n = 0; n < 60000; n++) {
   await av(50);
 }
 const ctlB = await J(() => JUEGO.E?.p?.cfg?.ctl === 'b');
+const vista = await page.evaluate(leerEnPagina);
+if (tSinIntento !== null && tPodio !== null) entre.push([tSinIntento, tPodio]);
 const fin = await J(() => ({ tabla: JUEGO.E.p ? JUEGO.E.p.tabla().map(f => `${f.id}:${f.s}+${f.c}=${f.total}#${f.puesto ?? '-'}`).join(' ') : '', propios: JUEGO.E.propios || [] }));
 await browser.close(); server.close();
 
@@ -235,6 +241,11 @@ if (!tramos.some(x => x.machaca)) problemas.push('no se llegó a probar el macha
   if (max > 20000) problemas.push(`una espera sin tocar de ${(max / 1000).toFixed(1)} s (meta ≤ 20 s)`);
   if (final === null || final > 150000) problemas.push(`la final duró ${final === null ? '?' : (final / 1000).toFixed(1) + ' s'} de reloj de juego (meta ≤ 150 s)`);
   const f = fin.propios.find(x => x.res === 'fallo'); if (!f || !/(se quedó sin energía en|out of energy in) /i.test(f.linea || '')) problemas.push(`el arranque con 25 kg de más no cayó con la línea del tramo: ${JSON.stringify(f)}`); }
+if (vista && tLlamado0 !== null && tPodio !== null) {
+  const R = resumir(vista, tLlamado0, tPodio, entre.filter(([a]) => a < tPodio));
+  console.log('\nCORTES Y CARTELES (tools/cortes.mjs):\n  ' + informe(R).join('\n  '));
+  fs.writeFileSync(path.join(OUT, 'cortes.json'), JSON.stringify({ resumen: R, ...vista, entre, desde: tLlamado0, hasta: tPodio }, null, 1));
+}
 console.log('\nPANTALLAS (s): ' + seg.map(x => `${x.p} ${(((x.t1 ?? x.t0) - x.t0) / 1000).toFixed(1)}`).join(' · '));
 if (problemas.length) { console.log('\nPROBLEMAS:\n' + problemas.join('\n')); process.exit(1); }
 console.log(`\ncheck_recorrido: terminó (${nFoto} capturas en out/recorrido)`);

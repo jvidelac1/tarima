@@ -5,7 +5,7 @@ name: Teléfono (táctil, de costado)
 
 on:
   push:
-    branches: [mvp, telefono-pulido, gameplay]
+    branches: [mvp, telefono-pulido, gameplay, tablero]
     paths:
       - 'web/js/game/telefono.js'
       - 'web/js/game/audio.js'

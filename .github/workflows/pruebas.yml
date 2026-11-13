@@ -6,7 +6,7 @@ name: Pruebas del juego
 
 on:
   push:
-    branches: [demo, gameplay]
+    branches: [demo, gameplay, tablero]
   workflow_dispatch:
 
 permissions:

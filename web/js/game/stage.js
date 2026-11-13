@@ -216,6 +216,10 @@ export class Escena {
     this._post(Q); this._modo();
     this.atletas = {}; this.cargas = {}; this.tls = {}; this.activo = null; this.id = null; this.yo = null; this.poses = null; this.plano = null; this.sombra = 4;
     this.barY = PLATE_R; this._py = [PLATE_R, PLATE_R]; this.kg = 0;
+    // vigía de cortes (tools/cortes.mjs): un salto de la imagen de un cuadro al siguiente. `alCorte(razones)` lo recibe main.js;
+    // `velado`: la imagen está tapada por un fundido (lo que cambia detrás no es un corte a la vista)
+    this.vigia = { p: new THREE.Vector3(), d: new THREE.Vector3(), q: new THREE.Vector3(), cad: new THREE.Vector3(), fov: 0, bar: [0, 0], listo: false, id: null };
+    this.alCorte = null; this.velado = false;
     this.barbell.setLoad(100); this._sombraBarra(); this.barbell.setPosition(v.set(0, PLATE_R, 0)); this.barbell.settle(PLATE_R);
     this.resize(); this.lighting.bake(r, [this.barbell.group, this.trace.group]);
     // después de hornear el entorno (que la ve igual): la arena fija en pocas mallas
@@ -572,10 +576,27 @@ export class Escena {
   }
   /** Avanza cámara y entorno; dibuja si `pintar`. */
   cuadro(dt, pintar = true) {
-    this._apuntar(); this.rig.update(dt); this.trace.face(this.rig.camera); this.post.focus = this.rig.focusDistance; this.arena.update(dt, this.rig.camera); this._detalle();
+    this._apuntar(); this.rig.update(dt); this._vigilar(dt); this.trace.face(this.rig.camera); this.post.focus = this.rig.focusDistance; this.arena.update(dt, this.rig.camera); this._detalle();
     if (!pintar) return;
     const r = this.renderer; r.shadowMap.needsUpdate = this.sombra > 0; if (this.sombra > 0) this.sombra--;
     this._dibujar(dt);
+  }
+  /**
+   * Cortes a la vista: entre este cuadro y el anterior la cámara saltó (más de 0,5 m, 10° o 4° de lente), cambió el pesista,
+   * o la barra o la cadera del pesista saltaron (más de 0,35 m y 0,25 m: nada se mueve tan rápido en 50 ms). Con la imagen
+   * tapada por un fundido no cuenta. Un cuadro es un corte aunque tenga varias razones.
+   */
+  _vigilar(dt) {
+    const W = this.vigia, cam = this.rig.camera, a = this.activo, d = cam.getWorldDirection(W.q), r = [];
+    const cad = a ? a.boneWorld('Hips', v2) : null;
+    if (W.listo && dt > 0 && dt <= .05 && !this.velado) {
+      if (cam.position.distanceTo(W.p) > .5 || d.angleTo(W.d) > .17 || Math.abs(cam.fov - W.fov) > 4) r.push('camara');
+      if ((this.id ?? null) !== W.id) r.push('pesista');
+      else if (cad && cad.distanceTo(W.cad) > .25) r.push('pose');
+      if (Math.hypot(this.barY - W.bar[0], (this.barZ ?? 0) - W.bar[1]) > .35 && !r.includes('pesista')) r.push('barra');
+      if (r.length) try { this.alCorte?.(r); } catch { /* solo medición */ }
+    }
+    W.p.copy(cam.position); W.d.copy(d); W.fov = cam.fov; W.bar[0] = this.barY; W.bar[1] = this.barZ ?? 0; W.id = this.id ?? null; if (cad) W.cad.copy(cad); W.listo = true;
   }
   _dibujar(dt) {
     if (this.directo) { const r = this.renderer; r.setRenderTarget(null); r.render(this.scene, this.rig.camera); return; }
