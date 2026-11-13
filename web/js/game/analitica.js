@@ -260,6 +260,7 @@ export function crearAnalitica(o = {}) {
         idioma, idioma_origen, version,
         tactil: !!(ventana.matchMedia && ventana.matchMedia('(pointer: coarse)').matches),
         pais: est?.contexto?.pais ?? null, previas: est?.contexto?.previas ?? null, dias: est?.contexto?.dias ?? null,
+        jugador: /^d_[0-9a-f]{16}$/.test(est?.contexto?.jugador ?? '') ? est.contexto.jugador : null,
         fuente_trafico: fuenteTrafico(buscar, referente, origen), referente: dominioReferente(referente, origen) || null,
         pantalla, grabada: grabar, ...banderasProps,
         // Sin IP del jugador (el proxy no la manda), PostHog ubicaría a todos en el país del servidor de Cloudflare: el país real va en `pais`.
