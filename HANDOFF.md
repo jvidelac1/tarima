@@ -913,7 +913,7 @@ presentación en una línea y un aro punteado sobre el verde que se llena cuando
   la tarjeta con «Verde tirón / Verde envión»), `input.js` (`sinRepeticion`), `audio.js` (`subida`, `pega`),
   `stage.js` (`acercar`: la cámara se acerca a 0,93 mientras corre el puntero), textos `barra.*` en `es.js` y `en.js`.
 - Pesistas (ancho del verde, `BARRA.pesistas`): Compacto parejo (1 / 1), Largo 1,25 en el tirón y 0,8 en el envión, Potente
-  revés. Medio ancho del verde: 170 ms con la apertura, 75 ms al 100 % (por 1,3 o 0,75 según el pesista; 1,4 el primer intento
+  al revés (0,75 / 1,3). Medio ancho del verde: 170 ms con la apertura, 75 ms al 100 % (por el factor del pesista; 1,4 el primer intento
   de la primera final).
 
 **Segunda vuelta (pedidos del dueño del mediodía).**

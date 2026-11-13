@@ -274,7 +274,9 @@ async function corrida(via) {
   if (r.monitor.manosMax > .16) mal(`la barra se separó de las manos: ${(r.monitor.manosMax * 1000).toFixed(0)} mm`);
   console.log(`${tag} barra: mínimo ${(r.monitor.barraMin * 1000).toFixed(1)} mm · manos a barra, máximo ${(r.monitor.manosMax * 1000).toFixed(0)} mm · ${r.monitor.cuadros} cuadros medidos · altura máxima por pantalla: ${Object.entries(r.monitor.alto).map(([k, v]) => `${k} ${v.toFixed(2)} m`).join(', ')}`);
   for (const v of [ES['barra.verbo'], ES['senal.aguanta'], ES['senal.abajo']]) if (!vistas.has(v)) mal(`no apareció la señal «${v}»`);
-  for (const v of ['explota', 'recibi', 'empuja', 'flexiona', 'tira', 'salta', 'parate'].map(k => ES['senal.' + k])) if (vistas.has(v)) mal(`en 'b' apareció la señal «${v}» (de círculos o de 'u')`);
+  // ¡PÁRATE! sí puede aparecer: es el esfuerzo corto de pararse en los intentos exigentes (Gameplay 3)
+  for (const v of ['explota', 'recibi', 'empuja', 'flexiona', 'tira', 'salta'].map(k => ES['senal.' + k])) if (vistas.has(v)) mal(`en 'b' apareció la señal «${v}» (de círculos o de 'u')`);
+  if (vistas.has(ES['senal.parate'])) console.log(`${tag} apareció el esfuerzo de pararse (¡PÁRATE!)`);
   // las aperturas valen siempre (también el dos tiempos sin tocar); el de 25 kg de más se cae. Los otros llevan el peso del
   // entrenador (G2.1), que en el tercer intento va por más o por el oro con 7½ o 2 de 10: pueden caer, y entonces cada caída
   // tiene que decir dónde se quedó sin energía (nunca un tiempo)
