@@ -213,7 +213,7 @@ async function corrida(via) {
     const a2 = await J(() => ({ s: JUEGO.estado(), reloj: document.getElementById('reloj').textContent }));
     console.log(`${tag} panel del llamado: reloj ${a1.reloj}; 40 s después, ${a2.reloj} (pantalla ${a2.s.pantalla})`);
     if (a2.s.pantalla !== 'llamado' || !a2.s.panel || a2.reloj !== a1.reloj) mal(`con el panel del llamado abierto el reloj corrió o venció: ${a1.reloj} → ${a2.reloj}, pantalla ${a2.s.pantalla}`);
-    if (!/Sin reloj/.test(a1.txt) || !/ESPACIO: levantar \d+ kg/.test(a1.txt) || !/Llegas con/.test(a1.txt)) mal(`el panel del llamado no dice «Sin reloj», «ESPACIO: levantar N kg» y «Llegas con»: «${a1.txt.replace(/\s+/g, ' ').slice(0, 300)}»`);
+    if (!/Sin apuro/.test(a1.txt) || !/ESPACIO: levantar \d+ kg/.test(a1.txt) || !/Te sobra|Te falta/.test(a1.txt)) mal(`el panel del llamado no dice «Sin apuro», «ESPACIO: levantar N kg» y «Te sobra / Te falta»: «${a1.txt.replace(/\s+/g, ' ').slice(0, 300)}»`);
     // ---- confirmar con Espacio (el foco está en «levantar») y no tocar nada más
     await page.keyboard.press('Space'); let quedan = '', ultimo = null, x0 = null;
     for (let i = 0; i < 120 && !ultimo; i++) {
@@ -295,7 +295,7 @@ async function corrida(via) {
     if (p3.sobre || !(p3.t > p2 + 100) || !p3.foco) mal(`al volver de la pausa: ${JSON.stringify(p3)} (antes ${p2.toFixed(0)})`);
     await page.keyboard.press('h'); const a1 = await J(() => ({ sobre: JUEGO.estado().sobre, txt: document.getElementById('sobre').textContent })); await foto('ayuda');
     const glosario = await J(() => document.querySelectorAll('#sobre .glosario dt').length);
-    if (glosario !== 7) mal(`el glosario de «Cómo se juega» tiene ${glosario} palabras (son 7)`);
+    if (glosario !== 9) mal(`el glosario de «Cómo se juega» tiene ${glosario} palabras (en 'u' son 9: con energía, garra y suerte)`);
     if (a1.sobre !== 'ayuda' || !/Cómo se juega/.test(a1.txt) || !/ESPACIO/.test(a1.txt) || !/¡SALTA!/.test(a1.txt) || /círculo/.test(a1.txt)) mal(`H no abrió «Cómo se juega» de 'u': ${JSON.stringify(a1).slice(0, 300)}`);
     await page.keyboard.press('h'); if (await J(() => JUEGO.estado().sobre)) mal('H no cerró la ayuda');
     if (await page.locator('#btn-otro').count()) mal('en \'u\' el inicio no tiene que ofrecer práctica aparte');

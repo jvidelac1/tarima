@@ -73,8 +73,8 @@ const leerUI = () => J(() => {
 // ---- qué levantamientos se pierden a propósito (por el título del panel del llamado)
 //   arranque 2: no toca ¡RECIBÍ! · arranque 3: no toca ¡EXPLOTÁ! y después del final machaca Espacio
 //   dos tiempos 2: no toca el ¡RECIBÍ! del envión (la barra arriba)
-//   arranque 2 y dos tiempos 2: sube de a 1 kg hasta el peso que termina en FRENO (lo calcula la prueba con «el día» del
-//   llamado, que el jugador no ve) o, si no hay, hasta «5 de 10»; se fotografían los discos, el FRENO y la garra
+//   arranque 2 y dos tiempos 2: va de a 1 kg hasta el peso que termina en FRENO (lo calcula la prueba con la suerte de cada
+//   tramo del llamado, que el jugador no ve) o, si no hay, hasta «5 de 10»; se fotografían la energía, el FRENO y la garra
 const PLAN = [
   { re: /(Arranque · intento|Snatch · attempt) 2/, omite: () => false, medio: true, nombre: 'arranque 2 a 5 de 10' },
   { re: /(Dos tiempos · intento|Clean & jerk · attempt) 2/, omite: () => false, medio: true, nombre: 'dos tiempos 2 a 5 de 10' },
