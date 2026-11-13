@@ -71,10 +71,12 @@ export function decidir({ anotado, encuesta, usadas_d, usadas_i, encuestas_i, cf
  * @param {boolean} a.encuesta             el dispositivo ya respondió la encuesta
  * @param {boolean} a.encuesta_usada       otra final de este dispositivo ya pasó al dos tiempos por la encuesta
  * @param {boolean} a.encuesta_disponible  la que dice decidir() (para el muro)
+ * @param {'arranque'|'final'} [a.regla]   GRATIS_ETAPA vigente (config().etapa). Con 'final' (se volvió a la regla
+ *                                         vieja) las finales que salieron como 'arranque' y siguen en juego terminan gratis.
  * @returns {{puede:true, via:'ya'|'lista'|'encuesta'} | {puede:false, motivo:'envion', encuesta_disponible:boolean}}
  */
-export function decidirEnvion({ etapa, anotado, encuesta, encuesta_usada, encuesta_disponible }) {
-  if (etapa !== 'arranque') return { puede: true, via: 'ya' };
+export function decidirEnvion({ etapa, anotado, encuesta, encuesta_usada, encuesta_disponible, regla = 'arranque' }) {
+  if (etapa !== 'arranque' || regla === 'final') return { puede: true, via: 'ya' };
   if (anotado) return { puede: true, via: 'lista' };
   if (encuesta && !encuesta_usada) return { puede: true, via: 'encuesta' };
   return { puede: false, motivo: 'envion', encuesta_disponible: !!encuesta_disponible };

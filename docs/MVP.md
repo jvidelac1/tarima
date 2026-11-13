@@ -27,7 +27,7 @@ Estado al 12 de noviembre de 2026. Esto es lo que se construye para la primera v
 | Edita el JavaScript | Juega sin límite, como antes (sección 7): el servidor no valida el juego, solo lo que entrega |
 | Sin servidor («sin servidor», historia limpia, una vez por carga) | La final entera: sin Worker no hay muro ni permiso que pedir |
 
-**Volver a la regla vieja sin código.** En `worker/wrangler.jsonc`: `GRATIS_ETAPA` `"final"`, `GRATIS` `"2"`, `BONO_ENCUESTA` `"2"`, y publicar el Worker. Si `GRATIS_ETAPA` falta o tiene otro valor, vale la regla vieja. El juego lee la regla de cada respuesta (`regla: {etapa, gratis, bono}` en `/api/estado`, `/api/partida` y `/api/envion`) y cambia solo los textos y el lugar del muro.
+**Volver a la regla vieja sin código.** En `worker/wrangler.jsonc`: `GRATIS_ETAPA` `"final"`, `GRATIS` `"2"`, `BONO_ENCUESTA` `"2"`, y publicar el Worker. Si `GRATIS_ETAPA` falta o tiene otro valor, vale la regla vieja. Las finales que salieron con el arranque gratis y siguen en juego cuando se vuelve a la regla vieja terminan gratis: con `GRATIS_ETAPA=final`, `/api/envion` responde `via:'ya'` sin pedir nada. El juego lee la regla de cada respuesta (`regla: {etapa, gratis, bono}` en `/api/estado`, `/api/partida` y `/api/envion`) y cambia solo los textos y el lugar del muro.
 
 **La bandera `muro-partidas-gratis`.** Con `GRATIS_ETAPA=arranque` **no se usa**: cuántas finales gratis lo dice `GRATIS`, y el Worker reporta ese valor en `flags['muro-partidas-gratis']` (así `$feature/muro-partidas-gratis` no miente en PostHog). Lo que PostHog le haya asignado a cada dispositivo queda guardado en D1 y vuelve a valer con la regla vieja.
 

@@ -452,6 +452,15 @@ igual(expDelPase('basura'), null, 'pase inválido');
     igual((await s.pedirPase({})).estado, 'muro', 'regla vieja: muro a la tercera');
     igual((await s.encuesta({ r: ENC })).bono, 2, 'regla vieja: la encuesta suma 2');
   }
+  {
+    // Volver a la regla vieja con una final del arranque gratis en juego: esa final termina gratis, sin muro.
+    const w = workerLocal(), { s } = cliente(w, '203.0.113.16');
+    igual((await s.pedirPase({})).etapa, 'arranque', 'cambio de regla: la final salió con el arranque gratis');
+    igual((await s.envion({})).estado, 'muro', 'cambio de regla: con la regla nueva el dos tiempos pide el correo');
+    w.env.GRATIS_ETAPA = 'final'; w.env.GRATIS = '2'; w.env.BONO_ENCUESTA = '2';
+    igual((await s.envion({})).via, 'ya', 'cambio de regla: con GRATIS_ETAPA=final la final en juego termina gratis');
+    igual((await s.pedirPase({})).etapa, 'completa', 'cambio de regla: y la siguiente sale completa');
+  }
   console.log = logReal;
 }
 

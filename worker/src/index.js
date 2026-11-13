@@ -228,7 +228,7 @@ async function envion(a) {
     if (!fila) throw new ErrorHttp(400, 'pase');
     const dec = R.decidirEnvion({
       etapa: fila.etapa, anotado: !!s.dev.lista_id, encuesta: !!s.dev.encuesta_en, encuesta_usada: !!fila.encuesta_usada,
-      encuesta_disponible: s.dec.encuesta_disponible,
+      encuesta_disponible: s.dec.encuesta_disponible, regla: s.cfg.etapa,
     });
     if (!dec.puede) {
       log('info', { msg: 'envion', via: 'muro' });

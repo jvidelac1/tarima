@@ -313,6 +313,12 @@ describe('muro en el medio de la final (GRATIS_ETAPA=arranque, la regla de produ
     expect((await envion(a, undefined, ip)).status).toBe(400);
     expect((await envion(a, 'v1.basura.basura', ip)).status).toBe(400);
   });
+  it('volver a la regla vieja con una final del arranque en juego: su dos tiempos no pide nada', async () => {
+    const ip = nuevaIp(), a = uuid();
+    const p = await partidaP(a, ip);
+    expect((await envion(a, p.j.pase, ip)).j.estado).toBe('muro');
+    expect((await envion(a, p.j.pase, ip, { e: E() })).j).toMatchObject({ estado: 'ok', via: 'ya' });
+  });
   it('la bandera muro-partidas-gratis no cambia la regla del arranque y queda guardada', async () => {
     const ip = nuevaIp(), a = uuid();
     flagsRespuesta = { flags: { 'muro-partidas-gratis': { enabled: true, variant: '2' } } };

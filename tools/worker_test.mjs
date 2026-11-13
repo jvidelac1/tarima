@@ -148,7 +148,7 @@ const T0 = 1_800_000_000, DIA = R.DIA;
       const p = this.partidas.find(x => x.id === id && x.d === d);
       if (!p) return 'pase';
       const dev = this.dev(d, ahora), sit = this.situacion(d, i, ahora);
-      const dec = R.decidirEnvion({ etapa: p.etapa, anotado: !!dev.lista_id, encuesta: !!dev.encuesta_en, encuesta_usada: this.partidas.some(x => x.d === d && x.envion_por === 'encuesta'), encuesta_disponible: sit.encuesta_disponible });
+      const dec = R.decidirEnvion({ etapa: p.etapa, anotado: !!dev.lista_id, encuesta: !!dev.encuesta_en, encuesta_usada: this.partidas.some(x => x.d === d && x.envion_por === 'encuesta'), encuesta_disponible: sit.encuesta_disponible, regla: R.config(this.env).etapa });
       if (dec.puede && dec.via !== 'ya') { p.etapa = 'completa'; p.envion_por = dec.via; }
       return dec;
     }
@@ -211,6 +211,14 @@ const T0 = 1_800_000_000, DIA = R.DIA;
     const b = new BaseArranque({ GRATIS_ETAPA: 'final', GRATIS: '2', BONO_ENCUESTA: '2' });
     const r = b.partida('A', 'casa', T0);
     igual([r.etapa, b.envion('A', 'casa', r.id, T0).via, b.partida('A', 'casa', T0).etapa, b.partida('A', 'casa', T0).puede], ['completa', 'ya', 'completa', false], 'GRATIS_ETAPA=final: 2 finales enteras y muro');
+  }
+  {
+    // Se vuelve a la regla vieja con una final del arranque gratis en juego: su dos tiempos no pide nada.
+    const b = new BaseArranque({ GRATIS_ETAPA: 'arranque', GRATIS: '1', BONO_ENCUESTA: '1' });
+    const r = b.partida('A', 'casa', T0);
+    igual(b.envion('A', 'casa', r.id, T0).puede, false, 'regla nueva: dos tiempos negado');
+    b.env = { GRATIS_ETAPA: 'final', GRATIS: '2', BONO_ENCUESTA: '2' };
+    igual(b.envion('A', 'casa', r.id, T0), { puede: true, via: 'ya' }, 'de vuelta a la regla vieja: la final en juego termina gratis');
   }
 }
 igual([0, 1, 2, 7, 8, 100].map(d => R.diasDesde(T0, T0 + d * DIA + 5)), ['0', '1', '2-7', '2-7', '8+', '8+'], 'dias');
