@@ -1,8 +1,40 @@
 # MVP de Tarima
 
-Estado al 12 de noviembre de 2026. Esto es lo que se construye para la primera versión pública. Quien implemente toma de acá las reglas, los textos y el contrato del servidor. Las tres propuestas de partida (conversión, jugador nuevo y producto) quedaron resueltas en este documento. Donde chocaban, la elección está explicada en una línea en la sección 0.
+Estado al 13 de noviembre de 2026. Esto es lo que se construye para la primera versión pública. Quien implemente toma de acá las reglas, los textos y el contrato del servidor. Las tres propuestas de partida (conversión, jugador nuevo y producto) quedaron resueltas en este documento. Donde chocaban, la elección está explicada en una línea en la sección 0.
+
+## Cambio del 13 de noviembre: correo obligatorio, encuesta opcional después de anotarse e inglés por defecto
+
+**Decisión del dueño** (textual): «Mail sí o sí. […] las preguntas serían tipo feature request, qué quisiera que tenga el juego con 3 propuestas y un opcional que puede sumar el user, no especifiques cantidad de novedades». Esto pisa todo lo que el resto del documento dice de la encuesta como camino del muro, de sus premios (finales de más, el dos tiempos) y de sus preguntas viejas; donde chocan, manda esta sección.
+
+- **El correo es obligatorio.** El muro (tras el arranque, al inicio de una final y, con la regla vieja, en el podio) pide solo el correo: no hay «¿Sin correo? Contesta 4 preguntas…» ni premio de finales por encuesta. «Ahora no» sigue igual: en el intervalo termina la final con la tabla del arranque. La regla del arranque gratis y la cuenta no cambian.
+- **En el servidor la encuesta no desbloquea nada.** `BONO_ENCUESTA` es `"0"` en `worker/wrangler.jsonc` (y 0 si la variable falta). Con 0: `encuesta_disponible` es siempre `false`, contestar no suma finales, no cambia la etapa de las finales, `/api/envion` no acepta la vía de la encuesta y la fila de `encuestas` queda con `i = NULL` (no gasta los lugares de la red). La maquinaria del bono sigue en el código y en las pruebas por si algún día se vuelve a usar con un valor mayor.
+- **La encuesta nueva, opcional, en el panel de «anotado».** Después de anotarse (en el muro o en la invitación no: en el panel «¡Adentro, {nombre}!» que sigue al muro), sin frenar: «Enviar y seguir al dos tiempos» / «Enviar y seguir jugando» manda lo marcado (si no marcó nada, solo sigue) y «Saltar» sigue sin mandar. Una vez por dispositivo (`tarima.encuesta` en el navegador y la tabla `encuestas` en el Worker). Dos preguntas:
+
+| Clave | Inglés (por defecto) | Español |
+|---|---|---|
+| `encuesta.plataforma` (una opción) | How would you rather play Tarima? | ¿Cómo prefieres jugar Tarima? |
+| `encuesta.plataforma.app` | Mobile app (App Store / Google Play) | App para el celular (App Store / Google Play) |
+| `encuesta.plataforma.web` | In the browser (web game) | En el navegador (juego web) |
+| `encuesta.features` (varias) | What would you like the game to have? | ¿Qué te gustaría que tenga el juego? |
+| `encuesta.features.pesista_propio` | Create and train your own lifter | Crear y entrenar a tu propio pesista |
+| `encuesta.features.mujeres_categorias` | Women lifters and weight classes | Pesistas mujeres y categorías de peso |
+| `encuesta.features.sedes_campeonatos` | New venues and championships | Nuevas sedes y campeonatos |
+| `encuesta.otra` (texto libre) | Anything else? (optional) | ¿Algo más? (opcional) |
+| `encuesta.otra_ph` | Please don’t include personal details. | No pongas datos personales. |
+| `encuesta.enviar_envion` / `encuesta.enviar` | Send and go to the clean & jerk / Send and keep playing | Enviar y seguir al dos tiempos / Enviar y seguir jugando |
+| `encuesta.saltar` · `encuesta.ok` | Skip · Thanks! | Saltar · ¡Gracias! |
+
+  Nada de precios, pagos, suscripciones, consolas ni tablets.
+- **Dónde quedan las respuestas.** El juego las manda a `POST /api/encuesta` (`r: {plataforma?, features?, otra?}`) sin esperar la respuesta. El Worker las valida, registra el dispositivo en `encuestas` (una por dispositivo) y manda a PostHog el evento propio **`encuesta_respuesta`** con `plataforma` (`app` | `web` | null), `features` (lista de `pesista_propio`, `mujeres_categorias`, `sedes_campeonatos`), `otra` (texto libre limpio: sin controles ni HTML, sin palabras con «@» ni direcciones web, que pasan a «…», recortado a 280), `idioma`, `pais` y `$process_person_profile: false`, con el `distinct_id` de la sesión de PostHog (el mismo del embudo; nunca el correo). No depende de `ENCUESTA_ID` (la variable y `ENCUESTA_PREGUNTAS` se borraron) ni de crear una encuesta en PostHog: alcanza con `POSTHOG_KEY`. Las preguntas viejas (`q1`–`q5`: qué agregar primero, qué gustó menos, dónde jugaría con consola y tablet, el costo, qué lo haría volver) se borraron del juego y del Worker.
+- **Eventos del juego.** `encuesta_vista` y `encuesta_salteada` (con `momento`) reemplazan a `survey shown` y `survey dismissed`; `encuesta_enviada` lleva `momento`, `plataforma`, `features` (cuántas) y `otra` (sí o no). `muro_visto` lleva siempre `caminos: 'mail'`.
+- **Inglés por defecto.** `detectarIdioma` (`web/js/game/i18n/t.js`): `?lang=` primero, después lo elegido y guardado (`tarima.idioma`); si no hay ninguno, inglés, aunque el navegador esté en español. `idioma_origen` vale `url`, `guardado` o `defecto`. `web/privacidad.html` abre en inglés (con el botón ES) y las páginas del Worker (`/confirmar`, `/baja`) también, salvo `?lang=es` o que la persona se haya anotado en español; llevan un enlace a la misma página en el otro idioma («Ver en español» / «View in English»).
+- **Novedades sin frecuencia.** «Also send me game news.» / «También quiero recibir novedades del juego.»; la privacidad tampoco dice frecuencia.
+- **Privacidad 2026-11-d.** Describe la encuesta opcional (después de anotarse, dos preguntas, texto libre sin datos personales, a la medición sin el correo) y saca la frecuencia de las novedades. El juego manda `2026-11-d`; el Worker acepta a, b, c y d. **Publicar primero el Worker.**
+- **Pruebas.** `worker_test` y `npm test` del Worker (bono 0, validación y `encuesta_respuesta`, páginas en inglés), `servidor_test` (el Worker de verdad: la encuesta no da el dos tiempos ni finales; textos exactos; privacidad), `sim_test` (inglés por defecto) y, con navegador, `check_muro_medio` (navegador en español y juego en inglés; muro solo con el correo; encuesta salteada con teclado en la computadora y contestada con toques en el teléfono, en inglés y después en español), `check_muro` (regla vieja, encuesta contestada y salteada), `check_analitica` (privacidad en inglés por defecto y eventos nuevos) y `check_game` (navegador en español → inglés; `?lang=es` → español).
 
 ## Cambio del 12 de noviembre (noche): el muro en el medio de la final
+
+> Desde el 13 de noviembre la encuesta ya no es una salida del muro ni da finales (ver la sección de arriba): lo que sigue sobre la encuesta como camino es historia.
 
 **Por qué.** Con las dos primeras horas publicadas (unas 59 personas que jugaron): de cada 3 que empiezan una final, 1 la termina; solo 9 llegaron al muro, que salía después de 2 finales gratis; 1 mail. El dueño decidió: «ponela en el medio de la competencia, apenas terminás el snatch pum mail para seguir jugando gratis indefinido». Esto reemplaza lo que el resto del documento dice sobre «2 finales gratis» y el muro en el podio; donde chocan, manda esta sección. La regla vieja sigue entera en el código y se vuelve a ella con variables (abajo).
 
@@ -212,7 +244,7 @@ Si todavía no contestó la encuesta, se le ofrece sin premio («¿Nos ayudás a
 
 ### 4.1 Idioma
 
-- **Orden de prioridad.** Primero `?lang=es|en`, después `tarima.idioma` y por último `navigator.languages`. El primero que empieza con `es` da español; cualquier otro caso, inglés.
+- **Orden de prioridad.** Primero `?lang=es|en`, después `tarima.idioma` (lo elegido con el selector). Si no hay ninguno, inglés, aunque el navegador esté en español (decisión del dueño del 13 de noviembre; antes miraba `navigator.languages`).
 - **Cambio manual.** El selector ES · EN está en la bienvenida, la pausa, el muro y la encuesta. El cambio se aplica sin recargar: la pantalla actual se vuelve a pintar, y se actualizan `<html lang>` y `<title>`.
 - **Dónde viven los textos.** En `web/js/game/i18n/es.js` y `en.js` (`export default { clave: 'texto' }`), con `t(clave, vars)` en `web/js/game/i18n/t.js`. Las variables van entre llaves.
 - **mensajes.js.** `explicar()` y `pasos()` reciben el idioma como parámetro y arman la frase con plantillas por idioma: no alcanza con concatenar trozos traducidos, porque el orden cambia. El archivo sigue siendo puro.
@@ -602,9 +634,6 @@ En inglés, la primera letra de `{T}` y de `{A}` va en mayúscula al empezar una
 | `muro.titulo_ip` | Desde esta conexión ya se jugaron las finales gratis. | The free finals on this connection are used up. |
 | `muro.promesa` | Estamos armando el juego completo: tu propio pesista, pesistas mujeres, categorías de peso y sedes nuevas. Vos nos ayudás a elegir qué llega primero. | We're building the full game: your own lifter, women lifters, weight classes and new venues. You help us pick what comes first. |
 | `muro.camino_mail` | Dejá tu mail y seguí jugando sin límite. | Leave your email and keep playing, no limit. |
-| `muro.camino_encuesta` | ¿Sin mail? Contestá 4 preguntas y jugá 2 finales más. | No email? Answer 4 questions and play 2 more finals. |
-| `muro.encuesta_boton` | Contestar (1 minuto) | Answer (1 minute) |
-| `muro.solo_mail` | Ya usaste las finales de la encuesta. Para seguir, dejá tu mail. | You've used your survey finals. To keep playing, leave your email. |
 | `muro.otro_dispositivo` | ¿Ya te anotaste en otro dispositivo? Poné el mismo mail. | Already joined on another device? Use the same email. |
 | `muro.ahora_no` | Ahora no | Not now |
 | `muro.despues` | Cuando quieras, acá está. Mientras, podés compartir tu resultado. | Whenever you're ready, it's here. Meanwhile, share your result. |
@@ -623,7 +652,7 @@ Variantes de la bandera `muro-texto`: la `a` usa `muro.promesa` y `muro.camino_m
 | `lista.mail` | Tu mail | Your email |
 | `lista.mail_ph` | nombre@ejemplo.com | name@example.com |
 | `lista.aviso` | Quiero que Tarima me avise por mail cuando abra el acceso anticipado. | Email me when Tarima's early access opens. |
-| `lista.novedades` | También quiero novedades del juego (como mucho 1 por mes). | Also send me game news (at most once a month). |
+| `lista.novedades` | También quiero recibir novedades del juego. | Also send me game news. |
 | `lista.legal` | Usamos tu mail solo para esto; no lo vendemos ni lo compartimos. Te das de baja con un clic desde cualquier mail. Tus partidas quedan ligadas a un número interno de la lista, nunca a tu mail. Solo mayores de 16. Privacidad | We use your email only for this; we never sell or share it. Unsubscribe in one click from any email. Your games are linked to an internal list number, never to your email. 16+ only. Privacy |
 | `lista.boton` | Anotarme y seguir jugando | Join and keep playing |
 | `lista.enviando` | Anotando… | Joining… |
@@ -637,48 +666,12 @@ Variantes de la bandera `muro-texto`: la `a` usa `muro.promesa` y `muro.camino_m
 | `lista.ok` | ¡Adentro, {nombre}! Estás en la lista de acceso anticipado. | You're in, {nombre}! You're on the early access list. |
 | `lista.ok_ya` | Ya estabas en la lista. ¡A jugar! | You were already on the list. Let's play! |
 | `lista.ok_confirmar` | Revisá tu mail. Mientras, jugá todo lo que quieras. | Check your inbox. Meanwhile, play as much as you like. |
-| `lista.ok_encuesta` | ¿Nos ayudás a decidir qué hacer primero? 4 preguntas, 1 minuto. | Help us decide what to build first? 4 questions, 1 minute. |
 | `lista.seguir` | Seguir jugando | Keep playing |
 
 **Encuesta**
 
 | Clave | Español | Inglés |
 |---|---|---|
-| `encuesta.titulo` | 4 preguntas rápidas | 4 quick questions |
-| `encuesta.premio` | Al terminar, sumás 2 finales. | Finish and get 2 more finals. |
-| `encuesta.q1` | ¿Qué te gustaría que agreguemos primero? Elegí hasta 2. | What should we add first? Pick up to 2. |
-| `encuesta.q1.pesista_propio` | Crear mi propio pesista | Create my own lifter |
-| `encuesta.q1.carrera` | Carrera y entrenamiento para mejorar a mi pesista | Career and training to improve my lifter |
-| `encuesta.q1.sedes` | Finales en sedes distintas | Finals at different venues |
-| `encuesta.q1.mujeres_categorias` | Pesistas mujeres y categorías de peso | Women lifters and weight classes |
-| `encuesta.q1.amigos_online` | Jugar contra amigos u online | Play against friends or online |
-| `encuesta.q1.realismo` | Más realismo (técnica, jueces, control antidoping) | More realism (technique, judges, doping control) |
-| `encuesta.q2` | ¿Qué fue lo que menos te gustó? Elegí hasta 2. | What did you like least? Pick up to 2. |
-| `encuesta.q2.no_entendi` | No entendí qué tenía que hacer | I didn't get what to do |
-| `encuesta.q2.largo` | Las finales son largas | Finals take too long |
-| `encuesta.q2.dificil` | Es difícil | It's too hard |
-| `encuesta.q2.facil` | Es fácil o repetitivo | It's too easy or repetitive |
-| `encuesta.q2.tecnico` | Se veía o andaba mal | It looked or ran badly |
-| `encuesta.q2.nada` | Nada, me gustó | Nothing, I liked it |
-| `encuesta.q3` | ¿Dónde jugarías más a Tarima? | Where would you play Tarima most? |
-| `encuesta.q3.telefono` | En el teléfono | On my phone |
-| `encuesta.q3.compu` | En la computadora | On a computer |
-| `encuesta.q3.tablet` | En una tablet | On a tablet |
-| `encuesta.q3.consola` | En una consola o la tele | On a console or TV |
-| `encuesta.q4` | Si el juego completo tuviera un costo, ¿qué preferirías? | If the full game cost something, what would you prefer? |
-| `encuesta.q4.unico` | Pagar una vez y tenerlo entero | Pay once and own it all |
-| `encuesta.q4.cosmeticos` | Gratis, con cosas opcionales para tu pesista (ropa, cinturones) | Free, with optional gear for your lifter (outfits, belts) |
-| `encuesta.q4.publicidad` | Gratis con publicidad | Free with ads |
-| `encuesta.q4.suscripcion` | Una suscripción mensual | A monthly subscription |
-| `encuesta.q4.no` | No pagaría | I wouldn't pay |
-| `encuesta.q5` | ¿Qué te haría volver mañana? (opcional) | What would bring you back tomorrow? (optional) |
-| `encuesta.q5_ph` | No pongas datos personales. | Please don't include personal details. |
-| `encuesta.enviar` | Enviar y jugar | Send and play |
-| `encuesta.enviar_anotado` | Enviar | Send |
-| `encuesta.falta` | Contestá las 4 primeras para seguir. | Answer the first 4 to continue. |
-| `encuesta.ok` | ¡Gracias! Sumaste 2 finales. | Thanks! You've got 2 more finals. |
-| `encuesta.ok_anotado` | ¡Gracias! Esto nos ayuda a decidir qué hacer primero. | Thanks! This helps us decide what to build first. |
-| `encuesta.ya` | Ya se contestó la encuesta desde este dispositivo o esta conexión. | The survey was already answered from this device or connection. |
 
 **Pausa, ayuda y privacidad dentro del juego**
 
@@ -753,7 +746,7 @@ Los campos `{responsable}`, `{país}` y `{contacto}` los completa el dueño (dec
 >
 > **Finales gratis.** Para contarlas guardamos un identificador al azar de tu navegador (en el almacenamiento del sitio y en una cookie técnica) y un código que sale de tu dirección IP pasada por una clave secreta. Nunca guardamos la IP. El código de la IP se borra a los 30 días y el del dispositivo, a los 180 días sin jugar. Lo hacemos por interés legítimo: que las finales gratis sean de verdad limitadas.
 >
-> **Lista de espera.** Si te anotás, guardamos tu mail, el nombre que pusiste, el idioma, el país aproximado (según tu conexión), la fecha y la versión de este texto. Los usamos para avisarte cuando abra el acceso anticipado y, si marcaste la otra casilla, para mandarte novedades, como mucho una por mes. La base es tu consentimiento. Guardamos los datos hasta que te des de baja; si no confirmás el mail, los borramos a los 30 días. La lista es solo para mayores de 16.
+> **Lista de espera.** Si te anotás, guardamos tu mail, el nombre que pusiste, el idioma, el país aproximado (según tu conexión), la fecha y la versión de este texto. Los usamos para avisarte cuando abra el acceso anticipado y, si marcaste la otra casilla, para mandarte novedades del juego. La base es tu consentimiento. Guardamos los datos hasta que te des de baja; si no confirmás el mail, los borramos a los 30 días. La lista es solo para mayores de 16.
 >
 > **Medición.** Usamos PostHog (PostHog Inc., Estados Unidos) como encargado para medir cómo se juega: qué pantallas se ven, cuántas finales se terminan y dónde se abandona. No usamos cookies de medición ni guardamos nada en tu navegador para esto, y no le mandamos a PostHog tu nombre, tu mail ni tu IP. Si te anotás, tus partidas quedan ligadas a un número interno de la lista, nunca a tu mail. Los datos se alojan en la nube de PostHog en Estados Unidos. La transferencia desde Europa está cubierta por el acuerdo de tratamiento de datos de PostHog, con las cláusulas contractuales tipo de la Comisión Europea. Podés desactivar la medición acá: {interruptor}.
 >
@@ -775,7 +768,7 @@ Los campos `{responsable}`, `{país}` y `{contacto}` los completa el dueño (dec
 >
 > **Free finals.** To count them we store a random ID for your browser (in site storage and a technical cookie) and a code derived from your IP address with a secret key. We never store the IP itself. The IP code is deleted after 30 days, the device code after 180 days without play. Legal basis: our legitimate interest in keeping free finals actually limited.
 >
-> **Waitlist.** If you join, we store your email, the name you entered, language, approximate country (from your connection), the date and the version of this text. We use them to tell you when early access opens and, if you ticked the other box, to send you news, at most once a month. Legal basis: your consent. We keep it until you unsubscribe; if you don't confirm your email, we delete it after 30 days. The list is for people 16 and older.
+> **Waitlist.** If you join, we store your email, the name you entered, language, approximate country (from your connection), the date and the version of this text. We use them to tell you when early access opens and, if you ticked the other box, to send you game news. Legal basis: your consent. We keep it until you unsubscribe; if you don't confirm your email, we delete it after 30 days. The list is for people 16 and older.
 >
 > **Measurement.** We use PostHog (PostHog Inc., United States) as a processor to measure how the game is played: which screens are seen, how many finals are finished and where people drop off. We use no measurement cookies and store nothing in your browser for this, and we never send PostHog your name, email or IP. If you join the list, your games are linked to an internal list number, never to your email. Data is hosted in PostHog's US cloud. Transfers from Europe are covered by PostHog's data processing agreement, which includes the European Commission's standard contractual clauses. You can turn measurement off here: {interruptor}.
 >
@@ -795,12 +788,12 @@ Los campos `{responsable}`, `{país}` y `{contacto}` los completa el dueño (dec
 
 ### 5.4 La encuesta
 
-- **Preguntas.** Son 5: las 4 primeras se tocan y son obligatorias para el premio, y la 5.ª es abierta y opcional (sección 4.5, `encuesta.*`). En la 1 y la 2 se eligen hasta 2 opciones; «Nada, me gustó» es exclusiva. En la 3 y la 4, una sola.
-- **En PostHog.** Se crea una encuesta de tipo API con las mismas 5 preguntas. Las opciones se cargan con el texto en español, que es la etiqueta canónica. El Worker traduce los códigos del juego a esas etiquetas y agrega `idioma` como propiedad. El id de la encuesta y los ids de las preguntas viven en la configuración del Worker.
-- **Quién la manda a PostHog.** El Worker, no el navegador. Así cada respuesta queda atada a un desbloqueo, no se duplica y llega aunque haya un bloqueador.
-- **Cuántas veces.** Una por dispositivo y hasta 3 por IP en 30 días. El orquestador había pedido una por IP; la cambio porque una casa con dos jugadores dejaría a uno sin encuesta.
-- **Si ya está anotado.** Se ofrece sin premio, también una sola vez.
-- **Sin servidor.** Si el Worker no responde, la encuesta no se puede mandar: no hay premio sin registro.
+Desde el 13 de noviembre (sección «Cambio del 13 de noviembre» arriba):
+
+- **Dónde y cuándo.** Opcional, en el panel de «anotado», después de dejar el correo. No da nada y no frena: se puede saltear y seguir al dos tiempos o a jugar. Una vez por dispositivo.
+- **Preguntas.** Dos: cómo prefiere jugar (app para el celular o en el navegador, una opción) y qué le gustaría que tenga el juego (tres propuestas, se pueden marcar varias), más un texto libre opcional. Textos en `encuesta.*` de `i18n/es.js` y `en.js`.
+- **Quién la manda a PostHog.** El Worker, como el evento `encuesta_respuesta` (`plataforma`, `features`, `otra`, `idioma`, `pais`), sin el correo. No hace falta una encuesta de PostHog ni `ENCUESTA_ID`.
+- **Sin servidor.** Si el Worker no responde, la respuesta se pierde (el juego no espera ni reintenta: la encuesta nunca frena el juego).
 
 ### 5.5 Contrato del servidor
 
@@ -819,9 +812,8 @@ Es un solo Worker de Cloudflare con assets estáticos, D1 y el límite de pedido
 | `GRATIS_ETAPA` | variable | `arranque`: la final gratis da solo el arranque y el dos tiempos pide `/api/envion`. `final` (o sin valor): la final entera, la regla vieja |
 | `GRATIS` | variable | `1` (antes `2`). Con `GRATIS_ETAPA=final` la bandera `muro-partidas-gratis` lo pisa; con `arranque`, no |
 | `TOPE_IP` | variable | `6` |
-| `BONO_ENCUESTA` | variable | `1` (antes `2`). Con el arranque gratis, finales completas además de terminar la que está en curso |
+| `BONO_ENCUESTA` | variable | `0` desde el 13 de noviembre (correo obligatorio: la encuesta no da nada; 0 también si falta). Con un valor mayor vuelve la maquinaria del bono (antes `1` y `2`) |
 | `ENCUESTAS_POR_IP` | variable | `3` |
-| `ENCUESTA_ID`, `ENCUESTA_PREGUNTAS` | variables | Id de la encuesta y JSON `{q1:'<id>', …}` con las opciones canónicas |
 | `MAIL_DESDE` | variable | Remitente del dominio, por ejemplo `hola@<dominio>` |
 | `TURNSTILE` | variable | `0`. En `1`, exige el token en `/api/anotar` y `/api/encuesta` |
 | `DB` | D1 | `tarima` |
@@ -888,7 +880,7 @@ Los límites devuelven 429 `{error:'limite'}`.
 **Campos de las respuestas**
 
 - **`contexto`.** `{pais: cf.country, previas: usadas_d, dias: '0' | '1' | '2-7' | '8+'}`. `dias` cuenta desde `dispositivos.creado`.
-- **`metricas`.** `{clave: POSTHOG_KEY, host: '/qx', ui: 'https://us.posthog.com', encuesta: ENCUESTA_ID}`, o `null` si no hay clave.
+- **`metricas`.** `{clave: POSTHOG_KEY, host: '/qx', ui: 'https://us.posthog.com'}`, o `null` si no hay clave.
 - **`flags`.** El valor de cada bandera para este dispositivo (sección 6.5).
 - **`pase`.** `v1.<base64url(JSON{d: d[0..12], n, f: fuente, exp: ahora + 3 h})>.<HMAC(SECRETO_PASE)>`. En el MVP el juego solo lo guarda en memoria. Es el gancho para validar resultados más adelante (JUEGO.md 9.6), no un candado.
 
@@ -905,15 +897,13 @@ Los límites devuelven 429 `{error:'limite'}`.
 - **Alta nueva.** `id` son 16 bytes al azar en hex, sin relación con el mail. Se manda el mail de confirmación con `/confirmar?t=HMAC(SECRETO_BAJA, id + 'c')`, y el token de baja es `HMAC(SECRETO_BAJA, id)`.
 - **En PostHog.** No se manda nada desde el Worker: el juego hace `identify(lista_id)` y captura `anotar_ok`.
 
-**Validaciones de `/api/encuesta`**
+**Validaciones de `/api/encuesta`** (desde el 13 de noviembre)
 
-- **Respuestas.** `q1` y `q2` son arreglos de 1 o 2 códigos válidos («nada» va sola). `q3` y `q4` son un código válido cada una. `q5` es opcional, hasta 280 caracteres, sin controles ni HTML.
+- **Respuestas.** `r: {plataforma?, features?, otra?}`: `plataforma` es `app` o `web`; `features`, una lista sin repetidos de `pesista_propio`, `mujeres_categorias` y `sedes_campeonatos`; `otra`, texto que se limpia (sin controles ni HTML, sin palabras con «@» ni direcciones web) y se recorta a 280. Todo es opcional pero tiene que quedar algo (si no, 400 `incompleta`); un código o una clave de más, 400 `formato`.
 - **Si ya tiene `encuesta_en`.** Responde 409.
-- **Si la IP llegó a `ENCUESTAS_POR_IP`.** Responde 409 `{error:'ya_respondida'}`.
 - **Si todo está bien.**
-  - Se inserta la fila en `encuestas` y se marca `dispositivos.encuesta_en`. El `bono` es 2 si no estaba anotado y 0 si lo estaba.
-  - Se manda a PostHog, con `ctx.waitUntil`, un `POST https://us.i.posthog.com/i/v0/e/` con `{api_key, event:'survey sent', distinct_id: sesion, properties:{$survey_id, $survey_completed:true, $survey_submission_id: uuid, $survey_questions:[{id, question}], $survey_response_<id>: …, idioma, pais, $process_person_profile:false}}`.
-  - En las preguntas de opción múltiple la respuesta va como arreglo de etiquetas, y en las de una sola opción, como texto.
+  - Se inserta la fila en `encuestas` y se marca `dispositivos.encuesta_en`. Con `BONO_ENCUESTA` 0 (producción) el `bono` es 0 y `i` queda NULL; solo con un bono mayor y sin lista se mira el tope de `ENCUESTAS_POR_IP` y se guarda `i`.
+  - Se manda a PostHog, con `ctx.waitUntil`, el evento `encuesta_respuesta` (`distinct_id: sesion`, propiedades `plataforma`, `features`, `otra`, `idioma`, `pais`, `$process_person_profile:false`).
   - Si el envío a PostHog falla, se reintenta una vez; el desbloqueo no depende del envío.
 
 **Seguridad**
@@ -996,10 +986,10 @@ Todos van en minúscula y en español. Ninguno lleva nombre, mail, IP ni disposi
 | `anotar_envio` | Envío | `novedades`, `sugerencia_usada`, `pantalla` |
 | `anotar_ok` | 200 de `/api/anotar`, después de `identify(lista_id)` | `estado` (`nuevo`, `ya_estaba`), `pantalla`, `finales_previas` |
 | `anotar_error` | Error | `motivo` (`formato`, `dominio`, `descartable`, `aviso`, `red`, `limite`) |
-| `survey shown` | Abre la encuesta | `$survey_id`, `con_premio` |
-| `encuesta_enviada` | 200 de `/api/encuesta` | `con_premio` |
-| `survey dismissed` | Sale sin mandar | `$survey_id` |
-| `survey sent` | Lo manda el Worker (5.5) | Respuestas de la encuesta |
+| `encuesta_vista` | Sale la encuesta en el panel de anotado | `momento` |
+| `encuesta_enviada` | Manda la encuesta (sin esperar la respuesta) | `momento`, `plataforma`, `features` (cuántas), `otra` (sí o no) |
+| `encuesta_salteada` | «Saltar», o seguir sin marcar nada | `momento` |
+| `encuesta_respuesta` | Lo manda el Worker (5.5) | `plataforma`, `features`, `otra`, `idioma`, `pais` |
 | `privacidad_abierta` | Link del pie | `pantalla` |
 | `medicion_desactivada` | Interruptor, antes de apagar. No se llama a `opt_out_capturing()`, que guarda su propia marca en el navegador: con `tarima.medicion = 0` posthog-js no se inicia y la página se recarga | — |
 | `error_juego` | `E.errores` o `window.onerror` | `tipo` (clave corta, sin texto libre), `pantalla` |
@@ -1015,7 +1005,7 @@ Todos van en minúscula y en español. Ninguno lleva nombre, mail, IP ni disposi
 1. **Activación:** `juego_abierto` → `nombre_puesto` → `tutorial_fin` o `tutorial_salteado` → `final_inicio (n=1)` → `intento_propio (intento=1)` → `final_fin (n=1)`.
 2. **Hasta el muro:** `final_fin (n=1)` → `final_inicio (n=2)` → `final_fin (n=2)` → `muro_visto`.
 3. **Muro:** `muro_visto` → `mail_foco` → `anotar_envio` → `anotar_ok`, separado por `variante_texto`, `idioma` y `tactil`.
-4. **Encuesta y después mail:** `encuesta_enviada (con_premio)` → `final_inicio (fuente=encuesta)` → `muro_visto (caminos=mail)` → `anotar_ok`.
+4. **Encuesta tras anotarse:** `anotar_ok` → `encuesta_vista` → `encuesta_enviada` (y aparte `encuesta_salteada`).
 5. **Compartir:** `final_fin` → `compartir`, y aparte `juego_abierto (fuente_trafico=compartido)` → `final_fin`.
 
 **Cohortes:** anotados (personas identificadas), anotados confirmados, respondieron la encuesta, llegaron por un link compartido, tráfico de amigos (para excluirlo), y por `idioma`, `pais` y `tactil`.
@@ -1024,7 +1014,7 @@ Todos van en minúscula y en español. Ninguno lleva nombre, mail, IP ni disposi
 - **«MVP · embudo».** Los embudos 1 a 3, `anotar_ok` por día, mails por visitante y la tabla de tracción de la sección 1 como números grandes.
 - **«MVP · abandono».** `$pageleave` por `pantalla`, `intento_propio` por `causa` en la final 1, y TODAVÍA NO por intento en la final 1 contra la 2.
 - **«MVP · salud».** `error_juego` por tipo, `carga_ms` y `ms` (mediana y p90) por `tactil`, y `calidad`.
-- **«MVP · encuesta».** La vista nativa de resultados de la encuesta, más la pregunta 1 cruzada por `idioma` y `pais`.
+- **«MVP · encuesta».** `encuesta_respuesta` por `plataforma` y por cada valor de `features`, cruzado por `idioma` y `pais`, y la lista de `otra`.
 - **«MVP · experimentos».** El embudo 3 por `$feature/…`. Se usan gráficos con separación por propiedad y no el producto Experiments, porque sin un id persistente sus estadísticas por persona no valen.
 
 ### 6.5 Banderas
@@ -1134,7 +1124,7 @@ Sin huella digital del navegador: es invasiva y en la UE pide consentimiento.
 1. **PostHog** (proyecto 606461, US Cloud):
    - Activar «Discard client IP data».
    - Aceptar el DPA.
-   - Crear la encuesta de tipo API con las 5 preguntas de 4.5 y pasar su id y los ids de las preguntas.
+   - (Ya no hace falta crear una encuesta de tipo API: las respuestas llegan como el evento `encuesta_respuesta`.)
    - Crear las banderas `muro-partidas-gratis` (`2` al 100 %), `muro-texto` (`a` al 100 %), `invitacion-podio1` (`on`) y `grabacion` (multivariante `off`, `tercio`, `todas`; sin crearla vale `tercio`).
    - Prender «Session replay» en el proyecto (6.6).
    - Fijar la retención de eventos en 12 meses.
