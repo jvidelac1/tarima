@@ -23,9 +23,10 @@ dominaba. Cambios, todos en el nivel `'u'` (Clásico y los rivales no cambian):
    Compacto: fiable (±200 de suerte por tramo), techo bajo. Largo: suerte normal (±250), le cuesta pararse. Potente: irregular
    (±600), le cuesta arriba de la cabeza; el que puede dar la sorpresa. Kilos que suben 9 de 10 veces: 376 / 377 / 371; 5 de
    10: 380 / 382 / 383; 2 de 10: 383 / 385 / 391.
-5. **El panel trae puesto el peso del entrenador** (`web/js/game/entrenador.js`): el más alto que sube 9 de 10 en el segundo
-   intento (dejando lugar al tercero), 7½ de 10 en el tercero, y el del oro cuando la chance lo justifica. Quien confirma con
-   Espacio gana con rivales normales (48 a 58 % de las finales) y se le caen 5 a 10 % de las barras.
+5. **El entrenador declara el peso** (`web/js/sim/entrenador.js`, lo usa `match.js` en `'u'` y el panel): el más alto que sube
+   9 de 10 en el segundo intento (dejando lugar al tercero), 7½ de 10 en el tercero, y el del oro cuando la chance lo
+   justifica. Quien confirma con Espacio gana con rivales normales (55 a 64 % de las finales) y se le caen 6 a 13 % de las
+   barras.
 6. La unidad se llama **energía** («Te sobra 1½ de energía»), no «discos» (que eran también los de la barra).
 
 Medidas y apartamientos: HANDOFF.md, «Gameplay 2.1».

@@ -4,6 +4,7 @@
 import { idiv, rdiv, clampi, mezclar, Azar } from './fixed.js';
 import { simular } from './attempt.js';
 import { gestos, decidir, elegirEnvion } from './ai.js';
+import { sugerencia } from './entrenador.js';
 import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad, cuerpoDe, HUELLA_U } from './rules.js';
 
 const LEVS = ['s', 'c'];
@@ -185,6 +186,9 @@ export class Partida {
       const salto = a.ctrl === 'persona' ? PLAN[n - 1] : Math.max(1, a.saltos[lev][n - 1]);
       a.decl[lev] = valido ? L.kg + salto : L.kg + (a.f.ia.estilo === 'orgullo' && a.ctrl === 'juego' && a.sube1[(lev === 'c' ? 2 : 0) + n - 1] ? 1 : 0);
       if (a.ctrl === 'juego') { const k = decidir(this, a.i); if (k !== null) a.decl[lev] = k; }
+      // 'u' (Gameplay 2.1): la persona declara lo que propone el entrenador (entrenador.js), no el plan fijo. Así el orden de
+      // los llamados ya cuenta con ese peso y el panel no la desplaza al proponerlo
+      else if (this.cfg.ctl === 'u') { const k = sugerencia(this, a.i, lev, ctx.env); if (k !== null) a.decl[lev] = k; }
     }
     // cambios de los rivales, al cierre de cada intento ajeno
     const avisos = [];

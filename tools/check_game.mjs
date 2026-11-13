@@ -158,7 +158,8 @@ async function corrida(via) {
             }
           }
           let hizo = false; for (const sel of o.botones || ['#capa .panel button.ir']) if (await pulsa(sel)) { hizo = true; break; }
-          await av(hizo ? 50 : 200); continue;
+          // 350 ms entre dos pulsaciones del mismo panel: el segundo «¿Seguro?» no acepta una ráfaga que empezó antes (G2.1)
+          await av(hizo ? 350 : 200); continue;
         }
       }
       await av(['rival', 'decision', 'repeticion', 'repeticion_rival'].includes(s.pantalla) ? 450 : 200);
@@ -331,7 +332,8 @@ async function idiomas() {
   await page.locator('#capa .panel').click({ position: { x: 5, y: 5 } }).catch(() => null);
   await J(() => document.getElementById('btn-ayuda').click()); await page.waitForTimeout(150);
   const ay = await J(() => ({ dt: [...document.querySelectorAll('#sobre .glosario dt')].map(d => d.textContent), h2: document.querySelector('#sobre h2')?.textContent }));
-  if (ay.dt.length !== 7 || ay.dt[0] !== EN['glosario.arranque.t']) mal(`la ayuda en inglés: ${JSON.stringify(ay)}`);
+  // en 'u' el glosario suma la energía del levantamiento, la garra y la suerte (9 palabras; Clásico tiene 7)
+  if (ay.dt.length !== 9 || ay.dt[0] !== EN['glosario.arranque.t'] || !ay.dt.includes(EN['glosario.u_energia.t'])) mal(`la ayuda en inglés: ${JSON.stringify(ay)}`);
   await page.screenshot({ path: path.join(OUT, 'idioma_ayuda_en.png') }).catch(() => null);
   await ctx.close();
   // el caso del dueño: el inglés primero en la lista del navegador y el español después → español

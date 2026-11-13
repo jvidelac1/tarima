@@ -21,7 +21,7 @@ import { RITMO, FASES_RAPIDAS, esDecisivo, modoRival, tramoResumen, veredictoPro
 import { armarCaida } from '../web/js/game/caida.js';
 import { jugarUno, datos, ATL, BOTS_U } from './uno_bots.mjs';
 import { cuerpoDe } from '../web/js/sim/rules.js';
-import { sugerencia } from '../web/js/game/entrenador.js';
+import { sugerencia } from '../web/js/sim/entrenador.js';
 
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const SEM = +(arg('semillas') || 60), PANEL = +(arg('panel') || 2.5);

@@ -177,6 +177,8 @@ export const CONTROLES = ['c', 'f', 'u'];
  *   chicharraMax  AGUANTA dura a lo sumo esto antes de ¡ABAJO! (la chicharra de los jueces; en Clásico, hasta FIJA.chMax)
  */
 export const UNO = {
+  // versión de las reglas de 'u' y del entrenador (sim/entrenador.js), que declara el peso de la persona: entra en HUELLA_U
+  version: '2.1',
   margen: 3000,
   base: { tiron: 940, arriba: 1600, pararse: 1700 }, rDesde: 8500, rHasta: 10000,
   envion: { split: { k: 800, mas: 0 }, power: { k: 1000, mas: 500 }, squat: { k: 1000, mas: 0 } }, squatMovil: -250, squatRigido: 500,

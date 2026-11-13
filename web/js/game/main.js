@@ -5,7 +5,7 @@ import { reloj, Boton, toques, principal, claveDe, enfocar, navegar, enCampo } f
 import { Escena } from './stage.js';
 import { poseDe, poseParado, marcas, tramo } from './sequence.js';
 import { armarCaida, poseCaida } from './caida.js';
-import { sugerencia } from './entrenador.js';
+import { sugerencia } from '../sim/entrenador.js';
 import { PLANTEL, JUGADOR, FICHA, nivelFicha, ENVIONES, LEV, ETIQUETAS, GUIONES, CUERPO, BARRA } from './roster.js';
 import { Registrador, Gobernador, calidadInicial, medirRefresco, decidirCalidad, pasoDe, metaDe, nombreDe, escalones, pisoDe, PRESET, PISO_MP, MARGEN, TECHO_MP } from './perf.js';
 import { sonido } from './audio.js';

@@ -3,7 +3,8 @@
 // tocar, da lo mismo): lo único que cambia entre estrategias es qué kilos pide.
 //   panel      confirma siempre lo que el panel trae puesto: el peso del entrenador (web/js/game/entrenador.js), que lee la
 //              chance de cada peso y La cuenta. Es lo que hace quien aprieta Espacio sin pensar
-//   plan       abre al 90 % y sigue el plan fijo de antes (+4 y +3 kg, repite si cae): la referencia vieja
+//   plan       abre al 90 % y confirma lo declarado, que en 'u' ya es el peso del entrenador al cerrar el intento anterior
+//              (match.js); el panel lo vuelve a mirar al abrir el llamado, con lo que hicieron los rivales en el medio
 //   prudente   abre al 90 % y sube siempre 2 kg (repite si cae)
 //   codicioso  pide siempre el peso más alto que sube 3 de cada 10 veces (lo que el panel muestra como «3 de 10»)
 // Criterios (rivales normales y amistosos, N finales por pesista y estrategia):
@@ -18,7 +19,7 @@
 import { Partida } from '../web/js/sim/match.js';
 import { mezclar } from '../web/js/sim/fixed.js';
 import { cuerpoDe, KG_MAX } from '../web/js/sim/rules.js';
-import { sugerencia, chanceDe } from '../web/js/game/entrenador.js';
+import { sugerencia, chanceDe } from '../web/js/sim/entrenador.js';
 import { jugarUno, datos, ATL, BOTS_U } from './uno_bots.mjs';
 
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
@@ -31,7 +32,7 @@ const ESTRATEGIAS = {
   panel: (p, i, lev) => (p.at[i].cambios === 0 ? sugerencia(p, i, lev) : null),      // como main.js: después de un cambio, se respeta el peso
   plan: () => null,
   prudente: (p, i, lev) => { const a = p.at[i], u = a[lev].at(-1); return u && u.res === 'valido' ? u.kg + 2 : null; },
-  codicioso: (p, i, lev) => { const a = p.at[i]; if (!a[lev].length) return null; let k = p.minimo(i); while (k + 1 <= KG_MAX && chanceDe(p, i, lev, k + 1) >= .3) k++; return k; },
+  codicioso: (p, i, lev) => { const a = p.at[i]; if (!a[lev].length) return null; let k = p.minimo(i); while (k + 1 <= KG_MAX && chanceDe(p, i, lev, k + 1) >= 300) k++; return k; },
 };
 
 function final(id, nivel, estrategia, k) {
