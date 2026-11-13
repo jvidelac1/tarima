@@ -787,6 +787,36 @@ Decisión del dueño: grabar solo la página, en una parte de las sesiones, sin 
 - **Estimación, sin datos todavía:** que el muro en el intervalo convierta más que el del podio. Se mira con el embudo `muro_visto (momento=tras_arranque)` → `anotar_ok`/`encuesta_enviada` → `envion_ok` → `final_fin`, contra `muro_cerrado`.
 - **Pendiente.** Publicar (lo corre el orquestador con `tools/desplegar.sh`: migración remota 0003 y Worker antes que Pages). Las páginas viejas en caché del navegador no saben pedir `/api/envion`: con la regla nueva, juegan la final gratis entera una vez (la partida queda `arranque` en la base) hasta que recarguen.
 
+### Gameplay 2: control «un toque, un tramo», aprendizaje y ritmo (13-nov, rama `gameplay`)
+
+Diseño: `docs/JUEGO.md`, sección Gameplay 2. Gesto exacto y pruebas: `docs/CONTROLES.md`, sección `'u'`. El nivel `'u'` es el Fácil por defecto; `'c'` (Clásico) no cambió y `'f'` (círculos) quedó solo para recalcular registros viejos (`?ctl=f`). Nada publicado en Cloudflare.
+
+**Qué se hizo.**
+- **Núcleo** (`attempt.js`, métodos `_u…`; `rules.js`, `UNO`): margen en milésimas de disco (3 discos + «el día» ±0,9), gasto por tramo `base × r(I) × cuerpo`, contactos guardados y apoyados, doble de 120/80 ms, confirmación de 300 ms, ¡TIRA! sola a los ~25 s, ¡ARRIBA! sola a los 6 s, FRENO de 2,5 s con la garra (una por levantamiento, `match.js` la apaga), sin nulos. `res.uno` lleva margen, día, gastos, garra, `tramo_caida` y `tramo_mayor`. En `'u'` tocar no gasta Resto.
+- **Capa y señal** (`controles.js`): identidad para el núcleo; `senal(m, t, 'u')` con tipos `libre`, `luz`, `uno`, `decide`, `espera` y `auto`; `QUE_U` da la palabra de cada contacto.
+- **Entrada** (`input.js`): Espacio y Enter del levantamiento en captura con `preventDefault`, primer evento repetido cuenta como apretar, gracia de 400 ms del dedo cancelado, bordes que no cuentan (`BORDES`), `vibrate(12)`, foco al escenario al cerrar el llamado, tic de audio en el mismo manejador.
+- **Juego** (`main.js`): `'u'` por defecto (un `'f'` guardado se lee como `'u'`); Opciones «Fácil» y «Clásico (exigente)»; sin tarjeta ni tutorial aparte; panel del llamado con «Llegas con ●●○», lo más duro, la garra, «ESPACIO: levantar N kg» y, en la primera final, confirmar dos veces un peso con el que no llega; el envión en «Más opciones» con sus discos; presentación en una línea y ayudas de primera vez dentro del primer intento; «el día» al agarrar la barra; línea de caída con tramo y gasto (`mensajes.js`, `explicar(res, 'u', …)`); sin repetición propia; analítica nueva (MVP.md, 6.3).
+- **Ritmo** (`ritmo.js`, compartido con la prueba): rival resumido (1 s antes de su última explosión hasta la recepción, veredicto de 1 s), en fila de 1,2 s desde el tercero seguido, entero solo el que se juega el oro o una medalla (uno por tramo, desde 1 s antes de la explosión, fases lentas ×5, veredicto cortado a 2,6 s, repetición solo si cae); veredicto propio de 2,95 s si vale y tVer + 2,4 s si cae; carga de la barra sin espera; recuadro «ESPACIO: seguir» / «Toca: seguir»; eventos `rival_salteado` y `veredicto_salteado`.
+
+**Medido** (sin navegador en la Mac, y en Actions; números del 13-nov):
+- **A** (play_human, 600 por casilla, 3 pesistas × teclado y dedo × 88 a 103 %, 21 600 casos × 6 bots): 0 resultados distintos entre reactivo, tardío, fantasma, mantiene y machacador; 0 caídas por entrada; el ausente solo pierde ¼ + ½ disco y saca 100 % al 90 %.
+- **B**: el novato con el dedo y la apertura sugerida, 100 % en arranque y dos tiempos con los tres.
+- **C** (con `CUERPO_NEUTRO`): 100 % hasta el 95 %, ~95 % al 97 %, ~50 % al 100 %, ~5 % al 103 %. Se cumple, pero lo recalibra quien defina los pesistas.
+- **H** (teclado_test y dedo_test, 10 000 secuencias cada una): 0 sin resolver, 0 contados dos veces, 0 sin palabra, bordes que no cuentan, ráfaga de confirmación que nunca arranca el tirón.
+- **J** (ritmo_test, 360 finales): final mediana ~111 s (meta ≤ 150), espera mediana 5,8 s, p90 13,5 s, máxima 19,3 s (meta ≤ 10 · 15 · 20), rival no decisivo ≤ 2,9 s, decisivo ≤ 7,5 s, intento propio p90 6,4 s (arranque) y 9,6 s (dos tiempos). Con paneles de 2,5 s por decisión: el tiempo real de una persona en el panel no está medido.
+- **G y L** (sim_test): 1000 finales `'u'` recalculadas iguales, `sim_ref.json` y `sim_ref_facil.json` idénticos, `sim_ref_uno.json` nuevo, toda caída con tramo y sin tiempos.
+- Con navegador (Actions): check_game (teclado, dedo, lento), check_recorrido (espera máxima 12,7 s), check_telefono y check_iphone en verde; capturas del llamado, ¡TIRA!, ¡SALTA!, ¡PÁRATE! y el turno del rival miradas.
+
+**Ganchos para quien sigue (pesistas y emoción).**
+- **Pesistas:** `rules.js` → `cuerpoDe(f)` lee `sim.json → atletas.<id>.cuerpoJuego` `{tiron, arriba, pararse, movil}` (milésimas) y, sin él, `CUERPO_NEUTRO` (el promedio de la tabla de G2.5). `match.js` lo pasa en `ctx.cuerpo` y el panel usa el mismo `previsto()`. Agregar `cuerpoJuego` cambia la huella de sim.json (`tools/build_sim_data.mjs`) y hay que regenerar `sim_ref_uno.json` (`node tools/sim_test.mjs --update` reescribe las tres referencias: revisar que `sim_ref.json` y `sim_ref_facil.json` no cambien). Faltan `tools/margen_cal.mjs` y `tools/chance_test.mjs` (metas C, D y F), las tarjetas de roster.js sin Energía y los textos `pesista.*.conviene`, que todavía hablan de «toques a destiempo» y «tocas preciso» (contradicen `'u'`).
+- **Emoción:** `E.alTramo(entrada, m)` en `main.js` se llama cada vez que cierra un tramo (`{t, tramo, gasto, m}` o `{t, tramo, garra, m}`; está en `m.U.log`) para los discos que se apagan; el FRENO es la fase `'freno'` (la barra tiembla con 0,55 y suena `aviso`); el pisotón suena `recepcion`; «al límite» está en `res.uno.al_limite`. Cámara lenta, luces de a una con suspenso, apuesta de los rivales en el resumen y Clásico ofrecido tras dos victorias: sin hacer.
+
+**Apartamientos del diseño.**
+- ¡SALTA! cierra en la recepción y no en la explosión (con medio segundo, el que reacciona tarde perdía el ¼; meta A).
+- «Bajar a X kg» después de una caída no existe: la barra nunca baja (`p.minimo`). El panel dice lo que da el mismo peso.
+- En el ritmo, «decisivo» es solo oro o medalla (con «pasa adelante» eran el 45 % de los turnos) y se ve entero uno por tramo entre dos levantamientos propios.
+- El tutorial guiado de `'f'` y el metrónomo de Clásico siguen en el código; en `'u'` no se usan.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.

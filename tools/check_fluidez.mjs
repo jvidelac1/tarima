@@ -116,6 +116,8 @@ function sonda(cfg) {
     setTimeout(() => {
       const I2 = E.intento, T = J.toques ? J.toques.ultimos.find(x => Math.abs(x.t - tJuego) < 2) : null, ac = document.getElementById('acuse');
       k.ent1 = I2 && I2 === I ? I2.ent.length : null; k.reg = T ? { ok: T.ok, motivo: T.motivo, donde: T.donde, nota: T.nota || '' } : null;
+      // en 'u' el juego atiende Espacio en captura antes que esta sonda: lo que agregó se busca por el instante de la pulsación
+      if (T && I2 && I2 === I && I2.ctl === 'u') k.agrego = I2.ent.some(e => e[1] === 1 && Math.abs(e[0] - Math.round(T.t - I2.t0)) <= 1);
       k.acuse = ac ? { visible: !ac.hidden && getComputedStyle(ac).display !== 'none', hundida: ac.classList.contains('on'), txt: ac.lastElementChild.textContent } : null;
     }, 0);
   }, true);
@@ -222,7 +224,7 @@ async function medir(cpu, gob = false) {
   const acept = enInt.filter(k => (k.reg ? k.reg.ok : k.ent1 !== null && k.ent1 > k.ent0)), desc = enInt.filter(k => !acept.includes(k));
   // el registro del juego contra lo que de verdad pasó: un toque «aceptado» en el intento tiene que haber agregado entradas, y uno «descartado» no
   // un toque «guardado» (llegó con PREPÁRATE en pantalla) se acepta y su entrada entra recién al aparecer ¡TIRA!
-  const cruzados = enInt.filter(k => k.reg && k.ent1 !== null && k.reg.motivo !== 'guardado' && k.reg.ok !== (k.ent1 > k.ent0));
+  const cruzados = enInt.filter(k => k.reg && k.ent1 !== null && k.reg.motivo !== 'guardado' && k.reg.ok !== (k.agrego ?? (k.ent1 > k.ent0)));
   if (cruzados.length) problemas.push(`${tag} ${cruzados.length} toques del intento con registro que no coincide con las entradas (${cruzados.slice(0, 3).map(k => `${k.fase}: ${k.reg.ok ? 'aceptado' : k.reg.motivo}, entradas ${k.ent0}→${k.ent1}`).join('; ')})`);
   const motivos = {}; for (const k of desc) { const m = k.reg ? (k.reg.motivo || 'SIN MOTIVO') : 'sin registro'; motivos[m] = (motivos[m] || 0) + 1; }
   const sinReg = T.filter(k => info.toques && !k.reg), sinMotivo = T.filter(k => k.reg && !k.reg.ok && !k.reg.motivo), sinAcuse = T.filter(k => info.toques && (!k.acuse || !k.acuse.visible || !k.acuse.hundida || (k.reg && k.reg.ok === false && !k.acuse.txt)));

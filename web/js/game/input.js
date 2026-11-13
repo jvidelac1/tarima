@@ -20,6 +20,8 @@ export const reloj = {
  */
 export const toques = {
   total: 0, aceptados: 0, descartados: 0, motivos: {}, ultimos: [], abierto: null, alCambiar: null, contexto: null,
+  /** Lo que tardó el manejador de cada pulsación del levantamiento (ms, las últimas 64): acuse, núcleo y palabra incluidos. */
+  manejo: [],
   /** Una pulsación nueva (no una repetición del sistema). `t`: instante del evento en el reloj del juego. */
   nuevo(t, via, tecla) {
     const T = this.abierto = { n: ++this.total, t: Math.round(t), via, tecla, ok: null, motivo: '', donde: this.contexto?.() || '', vivo: performance.now() };
@@ -109,9 +111,9 @@ export class Boton {
         // teclado de los paneles y _kd la dejan pasar porque ya viene atendida)
         e.preventDefault();
         if (e.repeat && this.contactos.has(idTecla(e))) return;      // la repetición del sistema no es un toque nuevo
-        toques.nuevo(reloj.deEvento(e), 'teclado', esEspacio(e) ? 'ESPACIO' : 'ENTER');
+        const c0 = performance.now(); toques.nuevo(reloj.deEvento(e), 'teclado', esEspacio(e) ? 'ESPACIO' : 'ENTER');
         if (!this.activo) { toques.resolver(false, 'pausa'); return; }
-        baja(idTecla(e), e, 'teclado'); return;
+        baja(idTecla(e), e, 'teclado'); toques.manejo.push(performance.now() - c0); if (toques.manejo.length > 64) toques.manejo.shift(); return;
       }
       if (!e.repeat) toques.nuevo(reloj.deEvento(e), 'teclado', esEspacio(e) ? 'ESPACIO' : 'ENTER');
     };
