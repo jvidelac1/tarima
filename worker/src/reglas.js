@@ -3,9 +3,10 @@
 
 // Versión del texto de privacidad que acepta quien se anota. 2026-11-b: sin borrado por no confirmar mientras no haya
 // correos, contacto pendiente y el HMAC de la IP explicado (web/privacidad.html). 2026-11-c: grabación de sesión de la
-// página en una parte de las visitas. La «a» y la «b» se siguen aceptando (páginas del juego viejas en caché).
-export const CONSENTIMIENTO = '2026-11-c';
-export const VERSIONES_CONSENTIMIENTO = new Set(['2026-11-a', '2026-11-b', CONSENTIMIENTO]);
+// página en una parte de las visitas. 2026-11-d: la encuesta opcional después de anotarse (dos preguntas, sin premio) y
+// las novedades sin frecuencia. Las anteriores se siguen aceptando (páginas del juego viejas en caché).
+export const CONSENTIMIENTO = '2026-11-d';
+export const VERSIONES_CONSENTIMIENTO = new Set(['2026-11-a', '2026-11-b', '2026-11-c', CONSENTIMIENTO]);
 export const DIA = 86400;            // segundos
 export const VENTANA_IP = 30 * DIA;  // cuenta por IP y retención del código de IP
 export const RETENCION = 180 * DIA;  // partidas y dispositivos sin lista
@@ -21,7 +22,8 @@ export const REFRESCO_FLAGS = DIA;
  * - GRATIS: cuántas finales gratis. En 'final' la bandera `muro-partidas-gratis` lo pisa; en 'arranque' la bandera no se
  *   usa (queda guardada para cuando se vuelva a 'final').
  * - BONO_ENCUESTA: finales que suma la encuesta (en 'arranque', finales completas, además de terminar la que está en
- *   curso si se contesta en el intervalo).
+ *   curso si se contesta en el intervalo). Desde el 13 de noviembre es 0 (decisión del dueño: el correo es obligatorio
+ *   y la encuesta no desbloquea nada); también si la variable falta. Con 0 la encuesta no cuenta para nada de la regla.
  */
 export function config(env = {}, flags = {}) {
   const num = (v, def, min, max) => { const n = Number.parseInt(v, 10); return Number.isFinite(n) && n >= min && n <= max ? n : def; };
@@ -32,7 +34,7 @@ export function config(env = {}, flags = {}) {
     etapa,
     gratis: gratisFlag ?? gratisVar,
     tope_ip: num(env.TOPE_IP, 6, 0, 500),
-    bono: num(env.BONO_ENCUESTA, 2, 0, 50),
+    bono: num(env.BONO_ENCUESTA, 0, 0, 50),
     encuestas_por_ip: num(env.ENCUESTAS_POR_IP, 3, 0, 100),
   };
 }
@@ -41,20 +43,23 @@ export function config(env = {}, flags = {}) {
  * La regla de la cuenta.
  * @param {object} a
  * @param {boolean} a.anotado     el dispositivo tiene lista_id
- * @param {boolean} a.encuesta    el dispositivo ya respondió la encuesta (encuesta_en)
+ * @param {boolean} a.encuesta    el dispositivo ya respondió la encuesta (encuesta_en); con cfg.bono 0 no cuenta
  * @param {number}  a.usadas_d    partidas del dispositivo con fuente distinta de 'lista'
  * @param {number}  a.usadas_i    partidas con este código de IP en 30 días, de dispositivos sin lista
  * @param {number}  a.encuestas_i encuestas con premio desde este código de IP en 30 días
  * @param {object}  a.cfg         salida de config()
  * @returns {{puede:boolean, fuente?:string, etapa?:'arranque'|'completa', motivo?:string, quedan:number|null, encuesta_disponible:boolean}}
+ *   `encuesta_disponible`: la encuesta como camino del muro (da finales). Siempre false con cfg.bono 0 y para los anotados.
  *   `etapa`: con qué permiso sale la final que se pida ahora. 'arranque' solo para una final gratis con
  *   GRATIS_ETAPA='arranque' en un dispositivo sin lista ni encuesta.
  */
 export function decidir({ anotado, encuesta, usadas_d, usadas_i, encuestas_i, cfg }) {
-  if (anotado) return { puede: true, fuente: 'lista', etapa: 'completa', quedan: null, encuesta_disponible: !encuesta };
+  if (anotado) return { puede: true, fuente: 'lista', etapa: 'completa', quedan: null, encuesta_disponible: false };
+  const premio = cfg.bono > 0;
+  encuesta = !!encuesta && premio;      // sin bono, haber contestado no cambia nada
   const cupo_d = cfg.gratis + (encuesta ? cfg.bono : 0);
   const cupo_i = cfg.tope_ip + cfg.bono * encuestas_i;
-  const encuesta_disponible = !encuesta && encuestas_i < cfg.encuestas_por_ip;
+  const encuesta_disponible = premio && !encuesta && encuestas_i < cfg.encuestas_por_ip;
   const quedan = Math.max(0, Math.min(cupo_d - usadas_d, cupo_i - usadas_i));
   const etapa = cfg.etapa === 'arranque' && !encuesta ? 'arranque' : 'completa';
   if (usadas_d < cupo_d && usadas_i < cupo_i) {
@@ -73,13 +78,14 @@ export function decidir({ anotado, encuesta, usadas_d, usadas_i, encuestas_i, cf
  * @param {boolean} a.encuesta_disponible  la que dice decidir() (para el muro)
  * @param {'arranque'|'final'} [a.regla]   GRATIS_ETAPA vigente (config().etapa). Con 'final' (se volvió a la regla
  *                                         vieja) las finales que salieron como 'arranque' y siguen en juego terminan gratis.
+ * @param {number} [a.bono]                BONO_ENCUESTA vigente (config().bono). Con 0 la encuesta no da el dos tiempos.
  * @returns {{puede:true, via:'ya'|'lista'|'encuesta'} | {puede:false, motivo:'envion', encuesta_disponible:boolean}}
  */
-export function decidirEnvion({ etapa, anotado, encuesta, encuesta_usada, encuesta_disponible, regla = 'arranque' }) {
+export function decidirEnvion({ etapa, anotado, encuesta, encuesta_usada, encuesta_disponible, regla = 'arranque', bono = 0 }) {
   if (etapa !== 'arranque' || regla === 'final') return { puede: true, via: 'ya' };
   if (anotado) return { puede: true, via: 'lista' };
-  if (encuesta && !encuesta_usada) return { puede: true, via: 'encuesta' };
-  return { puede: false, motivo: 'envion', encuesta_disponible: !!encuesta_disponible };
+  if (bono > 0 && encuesta && !encuesta_usada) return { puede: true, via: 'encuesta' };
+  return { puede: false, motivo: 'envion', encuesta_disponible: bono > 0 && !!encuesta_disponible };
 }
 
 // Antigüedad del dispositivo para la propiedad `dias` de PostHog.
@@ -164,94 +170,76 @@ export function normalizarNombre(v) {
 
 export const idioma = v => (v === 'es' || v === 'en' ? v : 'en');
 
-// ---------- encuesta (docs/MVP.md 4.5 y 5.4) ----------
-// Etiquetas canónicas en español: son las opciones que se cargan en la encuesta de PostHog.
+// ---------- encuesta (docs/MVP.md 5.4) ----------
+// Opcional, en el panel de «anotado» (decisión del dueño del 13 de noviembre): no da finales ni desbloquea nada.
+// Dos preguntas: cómo prefiere jugar (una opción) y qué le gustaría que tenga el juego (varias), más un texto libre
+// opcional. Las respuestas van a PostHog como el evento `encuesta_respuesta` (propsRespuesta), sin el correo.
 
 export const ENCUESTA = {
-  q1: { pregunta: '¿Qué te gustaría que agreguemos primero?', multiple: true, opciones: {
-    pesista_propio: 'Crear mi propio pesista',
-    carrera: 'Carrera y entrenamiento para mejorar a mi pesista',
-    sedes: 'Finales en sedes distintas',
-    mujeres_categorias: 'Pesistas mujeres y categorías de peso',
-    amigos_online: 'Jugar contra amigos u online',
-    realismo: 'Más realismo (técnica, jueces, control antidoping)',
+  plataforma: { pregunta: 'How would you rather play Tarima?', opciones: {
+    app: 'Mobile app (App Store / Google Play)',
+    web: 'In the browser (web game)',
   } },
-  q2: { pregunta: '¿Qué fue lo que menos te gustó?', multiple: true, exclusiva: 'nada', opciones: {
-    no_entendi: 'No entendí qué tenía que hacer',
-    largo: 'Las finales son largas',
-    dificil: 'Es difícil',
-    facil: 'Es fácil o repetitivo',
-    tecnico: 'Se veía o andaba mal',
-    nada: 'Nada, me gustó',
+  features: { pregunta: 'What would you like the game to have?', multiple: true, opciones: {
+    pesista_propio: 'Create and train your own lifter',
+    mujeres_categorias: 'Women lifters and weight classes',
+    sedes_campeonatos: 'New venues and championships',
   } },
-  q3: { pregunta: '¿Dónde jugarías más a Tarima?', opciones: {
-    telefono: 'En el teléfono',
-    compu: 'En la computadora',
-    tablet: 'En una tablet',
-    consola: 'En una consola o la tele',
-  } },
-  q4: { pregunta: 'Si el juego completo tuviera un costo, ¿qué preferirías?', opciones: {
-    unico: 'Pagar una vez y tenerlo entero',
-    cosmeticos: 'Gratis, con cosas opcionales para tu pesista (ropa, cinturones)',
-    publicidad: 'Gratis con publicidad',
-    suscripcion: 'Una suscripción mensual',
-    no: 'No pagaría',
-  } },
-  q5: { pregunta: '¿Qué te haría volver mañana?', abierta: true, max: 280 },
+  otra: { pregunta: 'Anything else? (optional)', abierta: true, max: 280 },
 };
 
-/** Valida las respuestas. Devuelve {ok:true, r} con la forma limpia, o {ok:false, error:'incompleta'|'formato'}. */
+/**
+ * Texto libre sin datos de contacto: sin caracteres de control ni HTML, y sin palabras con «@» ni direcciones web (se
+ * cambian por «…»). Espacios juntados y recortado a `max` caracteres; '' si no queda ninguna letra ni número.
+ */
+export function limpiarTextoLibre(v, max = ENCUESTA.otra.max) {
+  if (typeof v !== 'string') return '';
+  let t = v.normalize('NFC').replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ').replace(/<[^>]*>?/g, '').replace(/[<>]/g, '');
+  t = t.replace(/\S*[@＠]\S*/g, '…')
+    .replace(/\b(?:https?:\/\/|www\.)\S*/gi, '…')
+    .replace(/\b[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)*\.[a-z]{2,}\b(?:\/\S*)?/giu, '…');
+  t = t.replace(/\s+/g, ' ').trim();
+  if (!/[\p{L}\p{N}]/u.test(t.replace(/…/g, ''))) return '';      // no quedó nada para leer
+  return [...t].slice(0, max).join('').trim();
+}
+
+/**
+ * Valida las respuestas {plataforma?, features?, otra?}. Todo es opcional, pero tiene que venir algo. Devuelve
+ * {ok:true, r} con la forma limpia, o {ok:false, error:'incompleta'|'formato'}.
+ */
 export function validarEncuesta(r) {
   if (!r || typeof r !== 'object' || Array.isArray(r)) return { ok: false, error: 'incompleta' };
   for (const k of Object.keys(r)) if (!(k in ENCUESTA)) return { ok: false, error: 'formato' };
   const limpio = {};
-  for (const k of ['q1', 'q2']) {
-    const q = ENCUESTA[k], v = r[k];
-    if (v == null || (Array.isArray(v) && v.length === 0)) return { ok: false, error: 'incompleta' };
-    if (!Array.isArray(v) || v.length > 2 || new Set(v).size !== v.length) return { ok: false, error: 'formato' };
-    if (!v.every(c => typeof c === 'string' && Object.hasOwn(q.opciones, c))) return { ok: false, error: 'formato' };
-    if (q.exclusiva && v.includes(q.exclusiva) && v.length > 1) return { ok: false, error: 'formato' };
-    limpio[k] = v;
+  if (r.plataforma != null && r.plataforma !== '') {
+    if (typeof r.plataforma !== 'string' || !Object.hasOwn(ENCUESTA.plataforma.opciones, r.plataforma)) return { ok: false, error: 'formato' };
+    limpio.plataforma = r.plataforma;
   }
-  for (const k of ['q3', 'q4']) {
-    const v = r[k];
-    if (v == null || v === '') return { ok: false, error: 'incompleta' };
-    if (typeof v !== 'string' || !Object.hasOwn(ENCUESTA[k].opciones, v)) return { ok: false, error: 'formato' };
-    limpio[k] = v;
+  if (r.features != null) {
+    const v = r.features, ops = ENCUESTA.features.opciones;
+    if (!Array.isArray(v) || v.length > Object.keys(ops).length || new Set(v).size !== v.length) return { ok: false, error: 'formato' };
+    if (!v.every(c => typeof c === 'string' && Object.hasOwn(ops, c))) return { ok: false, error: 'formato' };
+    if (v.length) limpio.features = Object.keys(ops).filter(c => v.includes(c));      // orden fijo
   }
-  if (r.q5 != null) {
-    if (typeof r.q5 !== 'string') return { ok: false, error: 'formato' };
-    // Sin caracteres de control ni HTML: se sacan; lo que queda tiene que entrar en 280.
-    const t = r.q5.normalize('NFC').replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ').replace(/<[^>]*>?/g, '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim();
-    if ([...t].length > ENCUESTA.q5.max) return { ok: false, error: 'formato' };
-    if (t) limpio.q5 = t;
+  if (r.otra != null) {
+    if (typeof r.otra !== 'string' || [...r.otra].length > 2000) return { ok: false, error: 'formato' };
+    const t = limpiarTextoLibre(r.otra);
+    if (t) limpio.otra = t;
   }
+  if (!Object.keys(limpio).length) return { ok: false, error: 'incompleta' };
   return { ok: true, r: limpio };
 }
 
-/**
- * Propiedades del evento 'survey sent' de PostHog (encuesta de tipo API).
- * @param ids  {q1:'<uuid de la pregunta>', ...} desde ENCUESTA_PREGUNTAS
- */
-export function propsEncuesta({ r, ids, encuestaId, envio, idioma: idi, pais }) {
-  const props = {
-    $survey_id: encuestaId,
-    $survey_completed: true,
-    $survey_submission_id: envio,
-    $survey_questions: [],
+/** Propiedades del evento `encuesta_respuesta` de PostHog (sin el correo, el nombre ni el dispositivo). */
+export function propsRespuesta({ r, idioma: idi, pais }) {
+  return {
+    plataforma: r.plataforma ?? null,
+    features: r.features ?? [],
+    otra: r.otra ?? null,
     idioma: idi,
     pais: pais ?? null,
     $process_person_profile: false,
   };
-  for (const k of Object.keys(ENCUESTA)) {
-    const id = ids?.[k];
-    if (!id) continue;
-    const q = ENCUESTA[k];
-    props.$survey_questions.push({ id, question: q.pregunta });
-    if (r[k] == null) continue;
-    props[`$survey_response_${id}`] = q.abierta ? r[k] : q.multiple ? r[k].map(c => q.opciones[c]) : q.opciones[r[k]];
-  }
-  return props;
 }
 
 // ---------- banderas (docs/MVP.md 6.5) ----------

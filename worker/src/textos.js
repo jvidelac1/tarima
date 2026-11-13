@@ -26,6 +26,7 @@ export const TEXTOS = {
     'baja.token_invalido': 'Ese enlace ya no sirve. Pide uno nuevo desde la página de privacidad.',
     'pagina.limite': 'Demasiados intentos. Prueba de nuevo en un rato.',
     'pagina.error': 'Algo falló. Prueba de nuevo en un rato.',
+    'pagina.ver_en': 'Ver en español',
   },
   en: {
     'mail.confirmar.asunto': 'Confirm your spot in Tarima',
@@ -49,16 +50,21 @@ export const TEXTOS = {
     'baja.token_invalido': 'That link no longer works. Request a new one from the privacy page.',
     'pagina.limite': 'Too many tries. Try again in a bit.',
     'pagina.error': 'Something broke. Try again in a bit.',
+    'pagina.ver_en': 'View in English',
   },
 };
 
 export const t = (idi, clave, vars = {}) => (TEXTOS[idi]?.[clave] ?? TEXTOS.en[clave]).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
 
-// Idioma preferido de una página: el de la fila de la lista si se conoce, si no Accept-Language.
+// Idioma de una página: ?lang= si viene; si no, el que la persona usaba en el juego cuando se anotó (fila de la lista), y
+// si no se sabe, inglés (decisión del dueño del 13 de noviembre: inglés por defecto aunque el navegador esté en español;
+// el español con ?lang=es o con el enlace de la página).
 export function idiomaPagina(request, preferido) {
+  let q = null;
+  try { q = new URL(request.url).searchParams.get('lang'); } catch { q = null; }
+  if (q === 'es' || q === 'en') return q;
   if (preferido === 'es' || preferido === 'en') return preferido;
-  const al = (request.headers.get('accept-language') || '').toLowerCase();
-  return /^\s*es\b/.test(al) ? 'es' : 'en';
+  return 'en';
 }
 
 const CSS = `:root{color-scheme:light dark;--bg:#f6f4ef;--fg:#1b1b1b;--sub:#5d5a54;--ac:#c8102e;--card:#fff}
@@ -70,15 +76,20 @@ button,a.b{display:inline-block;background:var(--ac);color:#fff;border:0;border-
 .marca{color:var(--sub);font-size:.85rem;margin-top:24px}`;
 
 /**
- * Página bilingüe mínima: el idioma principal arriba y el otro, más chico, debajo.
+ * Página bilingüe mínima: el idioma principal arriba y el otro, más chico, debajo. Con `request` de un GET, además un
+ * enlace a la misma página en el otro idioma (?lang=).
  * `cuerpo(idi)` devuelve {titulo, html} ya escapado.
  */
-export function pagina(idi, cuerpo, { status = 200 } = {}) {
+export function pagina(idi, cuerpo, { status = 200, request = null } = {}) {
   const otro = idi === 'es' ? 'en' : 'es';
   const a = cuerpo(idi), b = cuerpo(otro);
+  let enlace = '';
+  if (request && request.method === 'GET') {
+    try { const u = new URL(request.url); u.searchParams.set('lang', otro); enlace = `<p class="otro"><a href="${escHtml(u.pathname + u.search)}" lang="${otro}" hreflang="${otro}">${escHtml(t(otro, 'pagina.ver_en'))}</a></p>`; } catch { enlace = ''; }
+  }
   const html = `<!doctype html><html lang="${idi}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex"><title>Tarima · ${escHtml(a.titulo)}</title><style>${CSS}</style></head>
-<body><main><div class="c"><h1>${escHtml(a.titulo)}</h1>${a.html}<div class="otro" lang="${otro}"><strong>${escHtml(b.titulo)}</strong>${b.extra ? ' ' + b.extra : ''}</div></div>
+<body><main><div class="c"><h1>${escHtml(a.titulo)}</h1>${a.html}<div class="otro" lang="${otro}"><strong>${escHtml(b.titulo)}</strong>${b.extra ? ' ' + b.extra : ''}</div>${enlace}</div>
 <p class="marca">Tarima</p></main></body></html>`;
   return new Response(html, {
     status,
