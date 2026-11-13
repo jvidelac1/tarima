@@ -1147,15 +1147,16 @@ Pedido del dueño: tarda en cargar (2/3 de los jugadores en el celular, muchos c
   lenta (1,6 Mbps, 150 ms) 133,7 → 51,3 s y 138,0 → 55,6 s; última corrida (run 43461772198): 34,5 → 21,0 s y
   135,0 → 52,1 s. La bienvenida sale a los 12–21 s en el runner en los dos
   casos: ahí manda el dibujo por software, no la red. El primer cuadro salió 0,1–0,4 s más tarde que antes (más CSS y el
-  SVG animado dibujados por software); se sacó el `drop-shadow` del pesista, que es lo más caro de componer.
-- **Pantalla de carga** (`#msg`, `web/js/game/ui/carga.js`, `web/css/carga.css`): un pesista de costado que hace un arranque
-  en bucle (SVG de 1 KB + CSS que genera `tools/carga_svg.py` con cinemática inversa), luz de tarima que respira, barra con
+  SVG animado dibujados por software; el SVG ya no está).
+- **Pantalla de carga** (`#msg`, `web/js/game/ui/carga.js`, `web/css/carga.css`): ~~un pesista de costado que hace un arranque
+  en bucle~~ (sacado el 13-nov a la noche a pedido del dueño: «le sacaría el pesista ese que hiciste que no me gustó»; se
+  borró `tools/carga_svg.py` y la marca TARIMA quedó más grande en su lugar), luz de tarima que respira, barra con
   los bytes reales de los GLB y máscaras (porcentaje y «0,4 / 7,0 MB»), y una frase cada 4,2 s: cómo se juega y 11 datos de
   halterofilia (claves `carga.como` y `carga.dato_1..11`). `carga.js` se carga aparte con `async`, antes que three.js; el HTML
-  ya muestra el pesista antes de cualquier JavaScript. La bienvenida ya salía antes de que bajaran los modelos: ahora,
+  ya muestra la pantalla antes de cualquier JavaScript. La bienvenida ya salía antes de que bajaran los modelos: ahora,
   detrás de ella, una barrita de 3 px arriba muestra el avance, y si se toca «Jugar» antes de tiempo vuelve la pantalla con
-  la barra y las frases. Movimiento reducido: pesista quieto con la barra arriba, sin fundidos. Capturas en el artefacto
-  `carga-medir` (667 × 375, 844 × 390, escritorio en inglés, movimiento reducido, y el pesista en siete instantes).
+  la barra y las frases. Movimiento reducido: sin fundidos. Capturas en el artefacto
+  `carga-medir` (667 × 375, 844 × 390, escritorio en inglés, movimiento reducido).
 - **Visor antes y después** (`carga.yml`, run 43455353457, `check_viewer` en los dos lados, 141 capturas cada uno): verdes;
   caras, pelo, barba, piel, manos, zapatillas y discos iguales a la vista (diferencia media por píxel 1,2 de 255; lo más
   distinto son cuadros tomados en plena reproducción). Dos diferencias medidas: (1) los metros por unidad de UV del cuerpo
@@ -1174,6 +1175,81 @@ Pedido del dueño: tarda en cargar (2/3 de los jugadores en el celular, muchos c
   `_headers` con caché más larga obligaría a cambiar el nombre de los archivos en cada exportación). KTX2 no se probó (pide
   el transcodificador de Basis, ~0,5 MB, y athlete.js achica y suelta las texturas en un lienzo). Nada de esto se probó en
   un teléfono real: los tiempos son del runner con la red emulada.
+
+### Todo verde, la barra sube; carga sin pesista (13-nov, noche, rama `gameplay`)
+
+Dos pedidos del dueño después de probar todo («está todo perfecto» salvo esto), antes de publicar:
+
+1. **Pantalla de carga sin el pesista**: «le dejaría la pantalla de carga, le sacaría el pesista ese que hiciste que no me
+   gustó». Fuera el SVG de `juego.html`, sus animaciones de `carga.css` y `tools/carga_svg.py`. Quedan el fondo, la luz que
+   respira, la marca TARIMA (más grande: es lo único arriba), la barra con los bytes y las frases. `check_carga` revisa que
+   la pantalla no tenga ningún dibujo (`svg`, `img`, `canvas`) y que nada se pise ni se salga en 667×375, 844×390 y 1280×720.
+2. **La incongruencia**: «tocás espacio, llega perfecto y capaz se le cae la barra». Regla nueva (`rules.js → BARRA.verdeSalva`,
+   `BARRA.version` 1.1; en los tres niveles):
+   - **Si todas las barritas de un levantamiento salen en verde, la barra sube siempre.** Ni la energía, ni la suerte del tramo,
+     ni el cansancio la tiran.
+   - Mientras todo lo jugado va en verde, un tramo que se queda sin energía se completa igual: la energía queda en 0, la garra
+     no se gasta y la energía dice «tirón −1 · ¡lo salva el verde!». Lo que faltó cansa igual (`res.uno.protegido`; `fatigaDe`
+     lo cuenta como si hubiera faltado).
+   - El esfuerzo de pararse **no aparece** mientras todo va en verde (no podría hacerla caer): el pesista se para solo y ese
+     tramo cuesta lo mismo que con el esfuerzo hecho (`res.uno.esfuerzo_solo`; la energía dice «pararse −½ · ¡de pie!»). Se eligió
+     esto y no el «¡DE PIE!» automático porque no toca la interfaz del esfuerzo y deja la energía igual de justa que si se
+     hubiera hecho.
+   - Con una barrita amarilla o roja (o una que salió sola, que es regular) vuelven las reglas de siempre desde ese tramo
+     (garra incluida). Las caídas siempre tienen un toque que falló y la línea lo nombra con su barrita: «173 kg es el 99 % y
+     pegaste en el amarillo en el envión (−½): se quedó sin energía en el envión» (con dos: «el amarillo en la cargada y en el
+     rojo en el envión»). Claves `explica.b.toque`, `explica.b.y`, `barra.en.*`; se borraron `explica.b.verde*` (ya no puede pasar).
+   - Por encima del techo el verde se cierra (antes se quedaba en ±60 ms al 103 % y seguía así; con la regla, cualquiera que
+     pegue bien levantaría cualquier peso): `BARRA.tI/tVerde` = ±75 ms al 100 %, ±30 al 103 %, nada al 106 %. Hasta el 100 % no
+     cambió nada.
+   - `chanceBarra` lleva en la programación dinámica «todo verde hasta acá» (incluye la probabilidad de todo verde); el panel
+     «X de 10» y el entrenador la usan. Panel sin llegar en 'b': «Te falta ½: con todo en verde sube igual». Ayuda y «Cómo se
+     juega» lo dicen («Todo en verde: la barra sube siempre»).
+   - Huellas nuevas: `HUELLA_B` (Fácil) y las de Medio y Difícil (`HUELLAS_B`) cambian con la versión. `sim_ref_barra.json` y
+     `sim_ref_dificultad.json` regeneradas; `sim_ref_rivales.json` regenerada porque 3 de sus 9 partidas son de 'b' (cambió una, la
+     semilla 28000012; las de 'c' y 'u' iguales). `sim_ref.json`, `sim_ref_facil.json` y `sim_ref_uno.json` idénticas.
+
+**Medido** (`barra_bots --n=400`; válidos % con la apertura sugerida / al 97 % / al 100 %; arranque · dos tiempos). Hasta el
+100 % casi igual que antes (la regla solo salva intentos todo verde que se quedaban sin energía, y muchos de esos ya los salvaba
+la garra):
+
+| perfil | Fácil (90 %) | Medio (89 %) | Difícil (88 %) |
+|---|---|---|---|
+| novato Compacto | 100/94/62 · 100/85/35 | 100/86/33 · 100/69/11 | 100/61/11 · 100/62/8 |
+| novato Largo | 100/98/67 · 100/85/36 | 100/92/34 · 100/57/11 | 100/59/9 · 100/50/6 |
+| novato Potente | 100/79/46 · 99/80/52 | 100/54/18 · 100/66/30 | 100/45/11 · 100/59/23 |
+| medio Compacto | 100/99/82 · 100/98/67 | 100/98/59 · 100/91/40 | 100/96/40 · 100/90/31 |
+| medio Largo | 100/99/86 · 100/96/63 | 100/99/66 · 100/88/31 | 100/95/39 · 100/86/28 |
+| medio Potente | 100/92/65 · 100/95/74 | 100/77/40 · 100/88/52 | 100/72/28 · 100/85/48 |
+| bueno Compacto | 100/100/97 · 100/100/95 | 100/100/89 · 100/100/79 | 100/100/81 · 100/100/70 |
+| bueno Largo | 100/100/99 · 100/100/94 | 100/100/94 · 100/99/80 | 100/100/78 · 100/99/65 |
+| bueno Potente | 100/99/93 · 100/100/96 | 100/94/69 · 100/99/87 | 100/89/53 · 100/97/77 |
+
+Al 103 %: Fácil bueno 44–67 % arranque y 35–48 % dos tiempos (antes 18–21 y 31–58), novato 15–22 y 4–12; Medio y Difícil, el
+bueno 2–24 %, el novato 0–4 %.
+
+**Todo verde** (% de los intentos con todas sus barritas en verde, los tres pesistas juntos; apertura / 97 / 100 / 103 %):
+
+| perfil | Fácil arr. · dt | Medio arr. · dt | Difícil arr. · dt |
+|---|---|---|---|
+| novato | 77/57/42/19 · 62/32/16/4 | 39/18/9/1 · 23/7/2/0 | 9/3/1/0 · 9/2/1/0 |
+| típico (panel) | 84/64/49/22 · 70/40/22/6 | 51/25/13/2 · 36/12/4/0 | 19/6/2/0 · 19/6/1/0 |
+| medio | 95/82/68/31 · 90/67/42/11 | 74/43/28/4 · 68/29/11/2 | 36/12/4/0 · 34/12/4/0 |
+| bueno | 100/99/95/57 · 99/98/89/35 | 99/89/71/18 · 98/84/57/8 | 88/55/30/2 · 88/52/27/3 |
+
+Intentos todo verde que se quedaban sin energía (los salva el verde): 0–6 % hasta el 97 %; al 100 %, Fácil novato 20 % del
+arranque y 5 % del dos tiempos, bueno 44 y 28 %. Ninguna caída con todo verde en ninguna casilla (`barra_bots` lo exige).
+
+- Metas: la de Fácil «novato al 100 % entre 30 y 65 %» pasa a **30 a 70** (Largo en el arranque da 67 %). Las demás, iguales y
+  en verde. Oro en finales: Fácil amistoso novato con el panel 89 % (antes 87), normales bueno que lee su puntería 87 % (76);
+  Medio amistoso novato 60 % (59); Difícil bueno que lee 48 % (44), novato 0 %.
+- `chance_test` (30 000 intentos por nivel): error máximo por grupo 2,0 / 2,9 / 3,7 puntos (meta ≤ 5). `ritmo_test` (novato):
+  final mediana 131 / 140 / 141 s, barras caídas con el panel 14,1 / 16,4 / 23,7 % (metas ≤ 15 / 18 / 25). `pesistas_test`,
+  `rivales_test`, `dedo_test`, `teclado_test`, `play_human`, `servidor_test`: en verde, de a una en la Mac.
+- `sim_test` (nuevo: 270 intentos al 99–103 % con el puntero en el centro, cansancio de 0 a ¾ y
+  los tres niveles: todos válidos, 242 salvados por el verde; la chance de quien siempre pega en el verde es 10 de 10; toda
+  caída de 'b' nombra zona y barrita de cada toque que falló en los dos idiomas), `check_game` (el tercer arranque, 25 kg de
+  más pegando en el amarillo, cae con «pegaste en el amarillo en el tirón»; captura `caida_amarillo`).
 
 ## Contratos entre Blender y el visor
 

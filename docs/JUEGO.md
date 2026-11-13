@@ -24,6 +24,15 @@ barrita y si tocás muy lejos, falla; más o menos cerca, regular; en el verde, 
   siguientes del mismo levantamiento (la mitad pasa del arranque al dos tiempos). **Esfuerzo**: en los intentos exigentes
   (desde el 95 % y con la energía justa al pararse) ¡PÁRATE! pide 3 toques sin apuro; hechos, pararse cuesta menos.
   **Enviones**: split el más fácil, power intermedio, squat el más difícil.
+- **Todo verde, la barra sube** (`BARRA.verdeSalva`, versión 1.1 de las reglas, 13-nov, noche; pedido del dueño: «tocás
+  espacio, llega perfecto y capaz se le cae la barra. Esa es la única incongruencia»). En los tres niveles: si todas las
+  barritas de un levantamiento salen en verde, la barra sube siempre; ni la energía, ni la suerte del tramo, ni el cansancio la
+  pueden tirar. Mientras todo va en verde, un tramo que se queda sin energía se completa igual (la energía queda en 0, la
+  garra no se gasta, «tirón −1 · ¡lo salva el verde!») y lo que faltó cansa igual para los intentos siguientes; el esfuerzo de
+  pararse no aparece y el pesista se para solo con el mismo premio. Con una barrita amarilla o roja (o una que salió sola, que
+  es regular) vuelven las reglas de siempre desde ese tramo, y la línea de caída nombra cada toque que falló: «173 kg es el
+  99 % y pegaste en el amarillo en el envión (−½): se quedó sin energía en el envión». `chanceBarra` y el entrenador cuentan la
+  probabilidad de todo verde.
 - Medidas, ajustes y lo que falta: HANDOFF.md, «Barrita».
 
 ### G3.D Dificultad: Fácil · Medio · Difícil (13-nov, tarde)
@@ -51,7 +60,7 @@ de coordinar con el movimiento del pesista ni carreras de toques; lo de más son
   regular. Con barrita de pararse, el esfuerzo (si toca) viene después y cuenta lo que costó esa barrita.
 - **Ancho por pesista** de las barritas nuevas (`rules.js → PESISTAS_B2`): Compacto atrapa con verde ancho, Largo se para con
   verde angosto, Potente al revés (atrapa angosto, se para ancho): los mismos puntos fuertes y débiles de la energía.
-- **Núcleo**: `rules.js → NIVELES_B`, `reglasB(dif)`; cada nivel tiene su huella (`HUELLAS_B`; Fácil, la de siempre) y el
+- **Núcleo**: `rules.js → NIVELES_B`, `reglasB(dif)`; cada nivel tiene su huella (`HUELLAS_B`; Fácil, `HUELLA_B`) y el
   registro lleva `dif` solo si no es Fácil. `chanceBarra(…, { dif })` y el entrenador usan las reglas y la persona típica del
   nivel. Referencia: `tools/sim_ref_dificultad.json` (sim_test 15).
 
