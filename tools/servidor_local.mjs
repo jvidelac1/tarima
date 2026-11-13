@@ -45,7 +45,7 @@ export function d1Falsa(archivo = ':memory:') {
 }
 
 /** Variables de worker/wrangler.jsonc (sin comentarios). */
-function varsDelWorker() {
+export function varsDelWorker() {
   const txt = fs.readFileSync(path.join(ROOT, 'worker/wrangler.jsonc'), 'utf8').replace(/("(?:[^"\\]|\\.)*")|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, s) => s || '').replace(/,(\s*[}\]])/g, '$1');
   return JSON.parse(txt).vars || {};
 }

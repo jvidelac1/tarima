@@ -7,6 +7,10 @@
 //     sesión (6.6): sorteo por la bandera `grabacion`, sin lienzo, campos y nombre tapados, nada sin medición.
 //  3. Las Functions de Pages (functions/): pasan /api/* al Worker con la IP y el país en cabeceras propias, y «/» muestra
 //     el juego.
+//  1b. La regla del arranque gratis (GRATIS_ETAPA='arranque', docs/MVP.md 5.5) con el Worker de verdad (worker/src/index.js)
+//     en Node sobre la D1 falsa de tools/servidor_local.mjs, y con este cliente hablándole: arranque gratis una vez, dos
+//     tiempos negado sin correo, permitido tras anotarse y tras la encuesta, recarga en el intervalo, otra pestaña, otro
+//     dispositivo en la misma IP, la API a mano y la regla vieja por variable.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +19,8 @@ import { crearAnalitica, nombreVisible, limpiarProps, fuenteTrafico, dominioRefe
 import { reenviar } from '../functions/_reenviar.js';
 import { onRequest as raiz } from '../functions/index.js';
 import { VERSIONES_CONSENTIMIENTO } from '../worker/src/reglas.js';
+import worker from '../worker/src/index.js';
+import { d1Falsa, varsDelWorker } from './servidor_local.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fallas = []; let n = 0;
@@ -163,6 +169,44 @@ igual(expDelPase('basura'), null, 'pase inválido');
   igual(base({ fetch: w2.fetch, local, sesion: sesB, ahora: () => t }).paseParaReanudar()?.n, 2, 'la segunda pestaña reanuda la suya');
 }
 
+
+// envion: permiso del dos tiempos, con reintentos; el pase nuevo queda en la pestaña
+{
+  const local = new Mem(), sesion = new Mem();
+  const exp = Math.floor(Date.now() / 1000) + 3600;
+  const paseA = `v1.${b64url(JSON.stringify({ d: 'abc', n: 1, f: 'gratis', e: 'arranque', p: 1, exp }))}.firmaA`;
+  const paseC = `v1.${b64url(JSON.stringify({ d: 'abc', n: 1, f: 'gratis', e: 'completa', p: 1, exp }))}.firmaC`;
+  const w = workerFalso({
+    '/api/partida': [[200, { estado: 'ok', pase: paseA, fuente: 'gratis', etapa: 'arranque', quedan: 0, n: 1, dispositivo: UUID }]],
+    '/api/envion': [[200, { estado: 'muro', motivo: 'envion', encuesta_disponible: true }], 'red', [503, { error: 'servidor' }], [200, { estado: 'ok', via: 'lista', pase: paseC, lista: true, quedan: null }], [400, { error: 'pase' }]],
+  });
+  const esperas = [];
+  const s = base({ fetch: w.fetch, local, sesion, esperar: async ms => { esperas.push(ms); } });
+  igual((await s.envion({})).error, 'pase', 'envion sin pase en la pestaña: error sin pedir nada');
+  const p = await s.pedirPase({});
+  igual([p.etapa, JSON.parse(sesion.getItem('tarima.pase')).etapa], ['arranque', 'arranque'], 'el pase guarda la etapa');
+  const m = await s.envion({ idioma: 'es' });
+  igual([m.estado, m.motivo, m.encuesta_disponible, w.pedidos.at(-1).cuerpo.pase], ['muro', 'envion', true, paseA], 'envion: muro, mandando el pase de la pestaña');
+  const o = await s.envion({});
+  igual([o.estado, o.via, esperas], ['ok', 'lista', [1000, 2000]], 'envion: reintenta la red y los 5xx');
+  igual([JSON.parse(sesion.getItem('tarima.pase')).pase, JSON.parse(sesion.getItem('tarima.pase')).etapa, s.copia().lista], [paseC, 'completa', true], 'envion: el pase nuevo queda en la pestaña');
+  igual(Object.keys(JSON.parse(local.getItem('tarima.pase_vivo'))), ['firmaC'], 'envion: el pase vivo pasa al nuevo');
+  igual((await s.envion({})).error, 'pase', 'envion: 400 pase');
+  // Sin API en localhost no hay muro ni permiso que pedir.
+  const sa = base({ fetch: workerFalso({ '/api/estado': [[501, null]] }).fetch, host: 'localhost' });
+  await sa.estado({});
+  igual((await sa.envion({})).estado, 'ok', 'sin API: el dos tiempos se juega');
+}
+{
+  // Recargar con el pase del arranque gratis: no se reanuda (reanudar empieza la final de cero y regalaría otro arranque).
+  const local = new Mem(), sesion = new Mem();
+  const exp = Math.floor(Date.now() / 1000) + 3600;
+  sesion.setItem('tarima.pase', JSON.stringify({ pase: 'v1.x.f1', n: 1, fuente: 'gratis', etapa: 'arranque', exp, reanudado: false }));
+  local.setItem('tarima.pase_vivo', JSON.stringify({ f1: { c: 'otra', t: Date.now() - 1000, suelto: true, exp } }));
+  igual(base({ local, sesion }).paseParaReanudar(), null, 'el arranque gratis no se reanuda');
+  igual([sesion.getItem('tarima.pase'), local.getItem('tarima.pase_vivo')], [null, null], 'y su pase se borra');
+}
+
 // pase: muro
 {
   const local = new Mem();
@@ -232,7 +276,7 @@ igual(expDelPase('basura'), null, 'pase inválido');
 // ?muro=firme en localhost: Worker simulado
 {
   const local = new Mem();
-  const s = base({ host: 'localhost', buscar: '?muro=firme', local, fetch: async () => { throw new Error('no debería salir'); } });
+  const s = base({ host: 'localhost', buscar: '?muro=firme&etapa=final', local, fetch: async () => { throw new Error('no debería salir'); } });
   igual(s.modo, 'simulado', 'modo simulado');
   igual((await s.estado({})).quedan, 2, 'simulado: 2 finales');
   const a = await s.pedirPase({}), b = await s.pedirPase({}), c = await s.pedirPase({});
@@ -245,6 +289,156 @@ igual(expDelPase('basura'), null, 'pase inválido');
   igual((await s.pedirPase({})).fuente, 'lista', 'simulado: juego libre');
   const fuera = base({ host: 'liftinggame.pages.dev', buscar: '?muro=firme', fetch: workerFalso({}).fetch });
   igual(fuera.modo, 'servidor', '?muro=firme no vale fuera de localhost');
+}
+
+
+// ?muro=firme en localhost, con la regla de producción (el arranque gratis)
+{
+  const local = new Mem(), sesion = new Mem();
+  const s = base({ host: 'localhost', buscar: '?muro=firme', local, sesion, fetch: async () => { throw new Error('no debería salir'); } });
+  const e = await s.estado({});
+  igual([e.quedan, e.etapa, e.regla], [1, 'arranque', { etapa: 'arranque', gratis: 1, bono: 1 }], 'simulado: un arranque gratis');
+  const a = await s.pedirPase({});
+  igual([a.estado, a.etapa, a.quedan], ['ok', 'arranque', 0], 'simulado: final con etapa arranque');
+  igual((await s.envion({})).estado, 'muro', 'simulado: dos tiempos sin correo, muro');
+  igual((await s.encuesta({ r: {} })).bono, 1, 'simulado: la encuesta suma 1');
+  igual([(await s.envion({})).via, JSON.parse(sesion.getItem('tarima.pase')).etapa], ['encuesta', 'completa'], 'simulado: dos tiempos por la encuesta, y el pase nuevo en la pestaña');
+  const b = await s.pedirPase({});
+  igual([b.estado, b.etapa, b.fuente], ['ok', 'completa', 'encuesta'], 'simulado: una final completa más');
+  igual((await s.pedirPase({})).estado, 'muro', 'simulado: después, muro');
+}
+
+// ---------- 1b. la regla del arranque gratis con el Worker de verdad (en Node, D1 falsa) ----------
+{
+  const ORIGEN = 'https://liftinggame.pages.dev';
+  const logReal = console.log;
+  console.log = (...a) => { if (typeof a[0] === 'string' && a[0].startsWith('{"')) return; logReal(...a); };      // registros del Worker
+  const SECRETOS = { SECRETO_IP: 'ip'.repeat(16), SECRETO_DISPOSITIVO: 'dv'.repeat(16), SECRETO_PASE: 'pa'.repeat(16), SECRETO_BAJA: 'ba'.repeat(16) };
+  const vars = varsDelWorker();
+  igual([vars.GRATIS_ETAPA, vars.GRATIS, vars.BONO_ENCUESTA], ['arranque', '1', '1'], 'worker/wrangler.jsonc: la regla de producción es el arranque gratis');
+  /** Un Worker con su base. `api(ruta, cuerpo, ip)` lo llama como la Function de Pages; `fetchDe(ip)` es el fetch de un navegador. */
+  function workerLocal(extra = {}) {
+    const db = d1Falsa(), env = { ...vars, ...SECRETOS, ...extra, DB: db };
+    const llamar = async (ruta, init, ip) => {
+      const pend = [], ctx = { waitUntil: p => pend.push(Promise.resolve(p).catch(() => null)), passThroughOnException() {} };
+      const r = await worker.fetch(new Request(ORIGEN + ruta, { ...init, headers: { ...(init.headers || {}), origin: ORIGEN, 'cf-connecting-ip': ip } }), env, ctx);
+      await Promise.all(pend);
+      return r;
+    };
+    const api = async (ruta, cuerpo, ip = '203.0.113.7') => {
+      const r = await llamar(ruta, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(cuerpo) }, ip);
+      return { status: r.status, j: await r.json() };
+    };
+    const fetchDe = ip => (url, init) => llamar(url, init, ip);
+    const filas = async () => (await db.prepare('SELECT id, fuente, etapa, envion_por FROM partidas ORDER BY id').all()).results;
+    return { db, env, api, fetchDe, filas };
+  }
+  const cliente = (w, ip, local = new Mem(), sesion = new Mem()) => ({ s: base({ fetch: w.fetchDe(ip), local, sesion }), local, sesion });
+  const ENC = { q1: ['sedes'], q2: ['nada'], q3: 'compu', q4: 'no' };
+
+  {
+    // Jugador nuevo: el arranque de una final, gratis; el dos tiempos, negado; la próxima final, muro antes de empezar.
+    const w = workerLocal(), { s, sesion } = cliente(w, '203.0.113.10');
+    const e = await s.estado({ idioma: 'es' });
+    igual([e.puede, e.quedan, e.etapa, e.regla], [true, 1, 'arranque', { etapa: 'arranque', gratis: 1, bono: 1 }], 'Worker: un dispositivo nuevo tiene un arranque gratis');
+    igual(e.flags['muro-partidas-gratis'], '1', 'Worker: la bandera de cuántas finales reporta lo que vale con el arranque gratis');
+    const p = await s.pedirPase({ idioma: 'es' });
+    igual([p.estado, p.fuente, p.etapa, p.quedan, p.encuesta_disponible, JSON.parse(sesion.getItem('tarima.pase')).etapa], ['ok', 'gratis', 'arranque', 0, true, 'arranque'], 'Worker: el pase sale con etapa arranque');
+    const v = await s.envion({ idioma: 'es' });
+    igual([v.estado, v.motivo, v.encuesta_disponible], ['muro', 'envion', true], 'Worker: dos tiempos sin correo ni encuesta: muro');
+    igual((await w.filas()).map(f => f.etapa), ['arranque'], 'Worker: la partida queda en arranque');
+    igual([(await s.estado({})).puede, (await s.pedirPase({})).estado], [false, 'muro'], 'Worker: la final siguiente empieza con el muro');
+    igual((await w.filas()).length, 1, 'Worker: el muro no gasta nada');
+    // Se anota en el intervalo: la misma final sigue con el dos tiempos, sin recargar.
+    igual((await s.anotar({ email: 'ana@pruebas-tarima.com', idioma: 'es' })).ok, true, 'Worker: se anota');
+    const v2 = await s.envion({ idioma: 'es' });
+    igual([v2.estado, v2.via, v2.lista, JSON.parse(sesion.getItem('tarima.pase')).etapa], ['ok', 'lista', true, 'completa'], 'Worker: anotado, permiso del dos tiempos de esa final');
+    igual((await w.filas()).map(f => [f.etapa, f.envion_por]), [['completa', 'lista']], 'Worker: la partida pasa a completa por la lista');
+    igual((await s.envion({})).via, 'ya', 'Worker: pedir el permiso otra vez no cambia nada');
+    const l = await s.pedirPase({});
+    igual([l.fuente, l.etapa, l.quedan], ['lista', 'completa', null], 'Worker: anotado, finales completas sin límite');
+  }
+  {
+    // La encuesta en el intervalo: termina esa final y suma una completa; una sola vez.
+    const w = workerLocal(), { s } = cliente(w, '203.0.113.11');
+    await s.pedirPase({});
+    igual(await s.encuesta({ r: ENC, idioma: 'es' }), { ok: true, bono: 1 }, 'Worker: la encuesta suma 1');
+    const v = await s.envion({});
+    igual([v.estado, v.via, v.quedan], ['ok', 'encuesta', 1], 'Worker: encuesta, permiso del dos tiempos y queda 1');
+    const x = await s.pedirPase({});
+    igual([x.estado, x.fuente, x.etapa], ['ok', 'encuesta', 'completa'], 'Worker: después de la encuesta, una final completa');
+    const y = await s.pedirPase({});
+    igual([y.estado, y.encuesta_disponible], ['muro', false], 'Worker: y después muro sin encuesta');
+    igual((await w.filas()).map(f => [f.fuente, f.etapa, f.envion_por]), [['gratis', 'completa', 'encuesta'], ['encuesta', 'completa', null]], 'Worker: lo que quedó en la base');
+  }
+  {
+    // Recargar en el intervalo (o en medio del arranque): no se reanuda la final (regalaría otro arranque); muro al cargar.
+    const w = workerLocal(), local = new Mem(), sesion = new Mem();
+    const a = base({ fetch: w.fetchDe('203.0.113.12'), local, sesion });
+    await a.estado({}); await a.pedirPase({});
+    a.soltarPase();      // pagehide
+    const b = base({ fetch: w.fetchDe('203.0.113.12'), local, sesion });
+    igual(b.paseParaReanudar(), null, 'recarga en el intervalo: la final del arranque gratis no se reanuda');
+    igual(sesion.getItem('tarima.pase'), null, 'y el pase se borra de la pestaña');
+    const e = await b.estado({});
+    igual([e.puede, e.motivo, e.contexto.previas], [false, 'dispositivo', 1], 'Worker: al recargar, muro (el que ya jugó lo ve al cargar)');
+    igual([(await b.pedirPase({})).estado, (await b.envion({})).estado], ['muro', 'error'], 'recargada, sin pase en la pestaña no hay dos tiempos');
+    // Una final completa (anotado) sí se reanuda una vez, como siempre.
+    await b.anotar({ email: 'beto@pruebas-tarima.com' });
+    await b.pedirPase({}); b.soltarPase();
+    const c = base({ fetch: w.fetchDe('203.0.113.12'), local, sesion });
+    igual(c.paseParaReanudar()?.etapa, 'completa', 'una final completa se reanuda una vez');
+  }
+  {
+    // Otra pestaña (mismo dispositivo, sin el pase): muro, y sin pase no hay dos tiempos. La API a mano: pase de otro
+    // dispositivo, pase adulterado o vencido, todo 400.
+    const w = workerLocal(), local = new Mem();
+    const a = base({ fetch: w.fetchDe('203.0.113.13'), local, sesion: new Mem() });
+    const pa = await a.pedirPase({});
+    const pase = pa.pase;
+    const otra = base({ fetch: w.fetchDe('203.0.113.13'), local, sesion: new Mem() });
+    igual([(await otra.estado({})).puede, (await otra.pedirPase({})).estado, (await otra.envion({})).error], [false, 'muro', 'pase'], 'otra pestaña: muro y sin dos tiempos');
+    const dev = local.getItem('tarima.dispositivo');
+    igual((await w.api('/api/envion', { dispositivo: dev, pase })).j.estado, 'muro', 'API a mano con el pase bueno: muro');
+    igual((await w.api('/api/envion', { dispositivo: crypto.randomUUID(), pase })).j, { error: 'pase' }, 'API a mano: el pase de otro dispositivo no sirve');
+    const [v1, cuerpo, firma] = pase.split('.');
+    const datos = JSON.parse(Buffer.from(cuerpo, 'base64url').toString());
+    const falso = `${v1}.${Buffer.from(JSON.stringify({ ...datos, e: 'completa' })).toString('base64url')}.${firma}`;
+    igual((await w.api('/api/envion', { dispositivo: dev, pase: falso })).j, { error: 'pase' }, 'API a mano: el pase adulterado no sirve');
+    igual((await w.api('/api/envion', { dispositivo: dev })).status, 400, 'API a mano: sin pase, 400');
+    // Una partida de la regla vieja (completa) responde ok sin tocar nada; un pase de una partida que no es suya, 400.
+    await w.db.prepare("UPDATE partidas SET etapa = 'completa' WHERE id = ?1").bind(datos.p).run();
+    igual((await w.api('/api/envion', { dispositivo: dev, pase })).j.via, 'ya', 'una final completa no necesita permiso');
+    // Dos pedidos a la vez con la encuesta: uno solo pasa (la encuesta da el dos tiempos una vez).
+    const w2 = workerLocal({ GRATIS: '2' }), d2 = crypto.randomUUID();
+    const p1 = (await w2.api('/api/partida', { dispositivo: d2 })).j.pase, p2 = (await w2.api('/api/partida', { dispositivo: d2 })).j.pase;
+    await w2.api('/api/encuesta', { dispositivo: d2, r: ENC });
+    const rs = await Promise.all([w2.api('/api/envion', { dispositivo: d2, pase: p1 }), w2.api('/api/envion', { dispositivo: d2, pase: p2 })]);
+    igual(rs.map(r => r.j.estado).sort(), ['muro', 'ok'], 'GRATIS=2: la encuesta da el dos tiempos a una sola de las dos finales');
+  }
+  {
+    // Otro dispositivo en la misma IP (borrar los datos): otro arranque gratis, nunca el dos tiempos; la IP frena a los 6.
+    const w = workerLocal(), ip = '203.0.113.14', res = [];
+    for (let k = 0; k < 7; k++) {
+      const { s } = cliente(w, ip);
+      const p = await s.pedirPase({});
+      res.push(p.estado === 'ok' ? p.etapa : p.motivo);
+      if (p.estado === 'ok') ok((await s.envion({})).estado === 'muro', `misma IP, dispositivo ${k + 1}: sin dos tiempos`);
+    }
+    igual(res, ['arranque', 'arranque', 'arranque', 'arranque', 'arranque', 'arranque', 'ip'], 'misma IP: 6 arranques gratis y después muro por IP');
+  }
+  {
+    // La regla vieja por variable: 2 finales enteras, el dos tiempos sin pedir nada, la encuesta +2.
+    const w = workerLocal({ GRATIS_ETAPA: 'final', GRATIS: '2', BONO_ENCUESTA: '2' }), { s } = cliente(w, '203.0.113.15');
+    const e = await s.estado({});
+    igual([e.quedan, e.etapa, e.regla.etapa], [2, 'completa', 'final'], 'regla vieja: 2 finales completas');
+    const a = await s.pedirPase({});
+    igual([a.etapa, (await s.envion({})).via], ['completa', 'ya'], 'regla vieja: el dos tiempos no pide nada');
+    await s.pedirPase({});
+    igual((await s.pedirPase({})).estado, 'muro', 'regla vieja: muro a la tercera');
+    igual((await s.encuesta({ r: ENC })).bono, 2, 'regla vieja: la encuesta suma 2');
+  }
+  console.log = logReal;
 }
 
 // anotar

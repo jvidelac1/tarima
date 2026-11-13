@@ -1,20 +1,31 @@
 # Muro de punta a punta (docs/MVP.md 2, 5 y 7) sin cuenta de Cloudflare: el Worker de verdad (worker/src/index.js) corre en
 # Node sobre una D1 falsa (node:sqlite) detrás de las Functions de Pages (functions/_reenviar.js), con tools/servidor_local.mjs.
-# Dos jugadores nuevos: en inglés con teclado en una computadora, y en español con toques en un teléfono de costado.
+# Dos trabajos en paralelo, cada uno con dos jugadores nuevos (en inglés con teclado en una computadora, y en español con
+# toques en un teléfono de costado):
+#  - medio: la regla de producción (worker/wrangler.jsonc, GRATIS_ETAPA='arranque'): el arranque gratis, el muro en el
+#    intervalo, el correo sigue al dos tiempos en la misma final, «Ahora no» corta la final (tools/check_muro_medio.mjs).
+#  - vieja: la regla de antes por variables (GRATIS_ETAPA='final', 2 finales, encuesta +2), para poder volver a ella
+#    (tools/check_muro.mjs).
 # Por software (SwiftShader): verifica el flujo, no mide cuadros por segundo.
 name: Muro y lista (punta a punta)
 
 on:
   push:
-    branches: [mvp]
+    branches: [mvp, muro-medio]
     paths:
       - 'web/js/game/conexion.js'
       - 'web/js/game/servidor.js'
       - 'web/js/game/analitica.js'
+      - 'web/js/game/main.js'
+      - 'web/js/game/ganchos.js'
+      - 'web/js/game/i18n/**'
       - 'worker/src/**'
+      - 'worker/migraciones/**'
+      - 'worker/wrangler.jsonc'
       - 'functions/**'
       - 'tools/servidor_local.mjs'
       - 'tools/check_muro.mjs'
+      - 'tools/check_muro_medio.mjs'
       - '.github/workflows/muro.yml'
   workflow_dispatch:
 
@@ -26,8 +37,61 @@ defaults:
     shell: bash
 
 jobs:
-  muro:
-    name: Dos finales, muro, recarga, encuesta, dos más, muro y correo
+  medio:
+    name: Arranque gratis, muro en el intervalo, correo y dos tiempos; Ahora no y fin
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TARIMA_ANGLE: swiftshader
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24      # node:sqlite para la D1 falsa
+          cache: npm
+      - name: Dependencias
+        run: npm ci
+      - name: Chrome
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || true)"
+          if [ -z "$CHROME" ]; then
+            wget -q -O "$RUNNER_TEMP/chrome.deb" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+            sudo apt-get update -q && sudo apt-get install -y -q "$RUNNER_TEMP/chrome.deb"
+            CHROME="$(command -v google-chrome)"
+          fi
+          "$CHROME" --version
+          echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
+          mkdir -p out/logs
+      - name: Jugador nuevo en inglés, con teclado (check_muro_medio --solo=en)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 28
+        run: node tools/check_muro_medio.mjs --solo=en 2>&1 | tee out/logs/check_muro_medio_en.log
+      - name: Jugador nuevo en español, teléfono de costado con toques (check_muro_medio --solo=es)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 28
+        run: node tools/check_muro_medio.mjs --solo=es 2>&1 | tee out/logs/check_muro_medio_es.log
+      - name: Resumen
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Muro en el medio de la final (Worker local con la regla de producción, dibujo por software)"
+            for f in check_muro_medio_en check_muro_medio_es; do
+              echo; echo "**$f**"; echo '```'
+              if [ -f "out/logs/$f.log" ]; then tail -n 30 "out/logs/$f.log"; else echo "(no corrió)"; fi
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Capturas y registros como artefacto
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: muro-medio-out
+          path: out/
+          if-no-files-found: warn
+          retention-days: 14
+
+  vieja:
+    name: Regla vieja por variables (2 finales, muro en el podio, encuesta, correo)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -63,7 +127,7 @@ jobs:
         if: ${{ always() }}
         run: |
           {
-            echo "### Muro de punta a punta (Worker local, dibujo por software)"
+            echo "### Muro con la regla vieja (GRATIS_ETAPA=final; Worker local, dibujo por software)"
             for f in check_muro_en check_muro_es; do
               echo; echo "**$f**"; echo '```'
               if [ -f "out/logs/$f.log" ]; then tail -n 30 "out/logs/$f.log"; else echo "(no corrió)"; fi
@@ -74,7 +138,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v6
         with:
-          name: pruebas-out
+          name: muro-vieja-out
           path: out/
           if-no-files-found: warn
           retention-days: 14

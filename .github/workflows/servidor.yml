@@ -5,7 +5,7 @@ name: Servidor y publicación
 
 on:
   push:
-    branches: [mvp, demo]
+    branches: [mvp, demo, muro-medio]
     paths:
       - 'worker/**'
       - 'functions/**'

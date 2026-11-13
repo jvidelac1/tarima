@@ -1,4 +1,6 @@
-// Prueba de punta a punta del muro (docs/MVP.md, secciones 2, 5 y 7), con el Worker de verdad sobre una D1 falsa
+// Prueba de punta a punta del muro con la REGLA VIEJA (GRATIS_ETAPA='final', GRATIS=2, BONO_ENCUESTA=2: la que se
+// recupera cambiando esas variables del Worker; la de producción, el arranque gratis, la prueba tools/check_muro_medio.mjs)
+// (docs/MVP.md, secciones 2, 5 y 7), con el Worker de verdad sobre una D1 falsa
 // (tools/servidor_local.mjs: sin cuenta de Cloudflare, sin red y sin PostHog). Dos jugadores nuevos, cada uno con su
 // propio servidor (base vacía):
 //  - en: computadora (1280 × 720), navegador en inglés, todo con teclado. Juega 2 finales (después de la primera, la
@@ -31,7 +33,7 @@ const CORREO = { en: 'player.one@pruebas-tarima.com', es: 'ana.prueba@pruebas-ta
 
 async function escenario(L) {
   const tactil = L === 'es', D = L === 'es' ? ES : EN, tag = `[${L}]`, dir = path.join(OUT, L); fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
-  const srv = await iniciarServidorLocal({ silencio: true });
+  const srv = await iniciarServidorLocal({ silencio: true, vars: { GRATIS_ETAPA: 'final', GRATIS: '2', BONO_ENCUESTA: '2' } });
   const base = srv.url.replace(/\/$/, '');
   const ctx = await browser.newContext(tactil
     ? { viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, locale: 'en-US' }
