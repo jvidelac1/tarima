@@ -876,13 +876,13 @@ function lider(p) { const f = p.tabla()[0]; return f && f.puesto === 1 ? f.a : n
 /**
  * Marcador siempre a la vista durante la final (pedido del dueño: «ver que estoy compitiendo contra alguien»): un solo
  * mensaje según el estado (ui/marcador.js). `L`: el intento que está por empezar (para avisar si el rival te pasa). null lo
- * esconde.
+ * esconde. En el turno de un rival baja debajo del cartel «Turno de…» (juego.css) para no pisarlo.
  */
 function marcador(p, L = null) {
   const el = $('marcador'); if (!el) return;
   const m = marcadorDe(p, E.yo, L);
   if (!m) { el.hidden = true; return; }
-  const txt = t(m.clave, { kg: m.kg, rival: quien(p.at[m.lider]) }), sub = m.sub ? t(m.sub.clave, { kg: m.sub.kg, rival: m.sub.rival != null ? quien(p.at[m.sub.rival]) : '' }) : '';
+  const txt = t(m.clave, { kg: m.kg, rival: quien(p.at[m.lider]) }), sub = m.sub ? t(m.sub.clave, { kg: m.sub.kg, rival: m.sub.rival != null ? corto(p.at[m.sub.rival]) : '' }) : '';
   el.hidden = false; el.style.setProperty('--c', ident(p.at[m.lider]).color);
   el.innerHTML = `<b>${esc(txt)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}`;
 }

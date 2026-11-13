@@ -492,7 +492,7 @@ export default {
   'marcador.gana': 'Va ganando {rival}',
   'marcador.falta': 'Para pasarlo: {kg} kg',
   'marcador.ganas_solo': 'Vas ganando',
-  'marcador.te_pasa': '{rival} intenta {kg} kg: si lo levanta, te pasa',
+  'marcador.te_pasa': 'Si {rival} levanta {kg} kg, te pasa',
   'marcador.empate': 'Empatados en {kg} kg',
   'marcador.sin_total': 'Sin arranque válido no hay total',
   'rival.repeticion': 'Repetición · {rival}',
