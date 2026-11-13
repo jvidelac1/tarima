@@ -931,8 +931,10 @@ presentación en una línea y un aro punteado sobre el verde que se llena cuando
   `verdeEnvion`: gasto 0,7 / 0,85 + ¼ / 0,95 + ½, verde ×1 / ×0,9 / ×0,8; la movilidad alta solo achica la diferencia del
   squat). En «Más opciones» dice «más fácil / intermedio / más difícil»; el panel propone split.
 - **Bienvenida**: la parte de arriba (`.bv-cuerpo`) se desplaza y la fila Jugar / Opciones / Cómo se juega queda fuera de ella:
-  ya no tapa las tarjetas. Las tarjetas en `'b'` llevan la frase en su propio bloque y solo el verde de cada barrita; en
-  pantallas de menos de 820 px de alto, sin la franja de colores ni la nota del nombre.
+  ya no tapa las tarjetas (al repintar se conserva su desplazamiento). Las tarjetas en `'b'` llevan la frase en su propio
+  bloque y debajo el verde de cada barrita (en el teléfono acostado, solo la frase); en pantallas de menos de 820 px de alto,
+  sin la franja de colores ni la nota del nombre. Medido en `check_barra` a 1280×720, 1280×600, 1440×700, 1800×560, 667×375 y
+  844×390: las tarjetas se ven enteras sin desplazar y nada se pisa.
 - El entrenador es un poco más prudente en `'b'` (9,3 de 10 en el segundo intento, 8 de 10 en el tercero). Gasto ×0,925.
 
 **Medido** (sin navegador, `node tools/barra_bots.mjs --n=600`; perfiles: novato ±120 ms y 40 ms tarde, 5 % de despistes,
@@ -971,6 +973,11 @@ dos tiempos con split:
 - Navegador (`check_barra`, Actions): con el reloj verdadero, entre dónde se veía el puntero al apretar y dónde lo juzgó el
   núcleo hubo 21 y 25 ms (por software); dos Espacios a 60 ms cuentan uno; cada barrita sale donde se tocó en computadora y
   teléfono, en español y en inglés.
+
+**Actions** (13-nov, sobre `c987907` de la rama `gameplay`): pruebas.yml 43463056525 (núcleo con check_game,
+teléfono, iPhone y recorrido, toques con check_fluidez, check_barra y check_toques), muro.yml 43463057206, telefono.yml
+43463056930; servidor.yml 43457300744. Capturas de la barrita en el artefacto `pruebas-out-toques` (`out/barra/`): miradas en
+computadora y teléfono acostado, español e inglés.
 
 **Cómo probarlo.** `cd web && python3 -m http.server 8000` → `http://localhost:8000/juego.html` (un `tarima.ctl` guardado que
 no sea Clásico abre en la barrita; `?ctl=u` vuelve a `'u'`). Sin navegador: `node tools/barra_bots.mjs`,
