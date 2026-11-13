@@ -1,4 +1,4 @@
-# Pruebas del juego en cada push a `demo` (y a pedido). El runner no tiene placa: Chrome dibuja con SwiftShader (por
+# Pruebas del juego en cada push a `demo` y a `gameplay` (y a pedido). El runner no tiene placa: Chrome dibuja con SwiftShader (por
 # software), así que acá se verifica lógica, toques, paneles y tutorial. Los cuadros por segundo NO se miden en este flujo:
 # eso se mide en una máquina con placa (`juego.html?banco=1`, o `node tools/check_fluidez.mjs` con GPU).
 # Cómo se dispara y cómo se leen los resultados: README, sección «Pruebas en GitHub Actions».
@@ -6,7 +6,7 @@ name: Pruebas del juego
 
 on:
   push:
-    branches: [demo]
+    branches: [demo, gameplay]
   workflow_dispatch:
 
 permissions:
@@ -61,13 +61,46 @@ jobs:
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/sim_test.mjs 2>&1 | tee out/logs/sim_test.log
 
-      - name: Jugador humano simulado (play_human)
+      - name: Jugador humano simulado (play_human, nivel 'u', metas A y B)
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/play_human.mjs 2>&1 | tee out/logs/play_human.log
 
-      - name: Toques con el dedo, sin navegador (dedo_test)
+      - name: La barrita sin navegador (barra_bots, Gameplay 3)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/barra_bots.mjs 2>&1 | tee out/logs/barra_bots.log
+
+      - name: Toques con el dedo, sin navegador (dedo_test, niveles 'b' y 'u')
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/dedo_test.mjs 2>&1 | tee out/logs/dedo_test.log
+
+      - name: Espacio en la computadora, sin navegador (teclado_test, niveles 'b' y 'u')
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/teclado_test.mjs 2>&1 | tee out/logs/teclado_test.log
+
+      - name: Ritmo de la final, sin navegador (ritmo_test)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/ritmo_test.mjs 2>&1 | tee out/logs/ritmo_test.log
+
+      - name: Calibración del margen con los cuerpos de cada pesista (margen_cal, metas C y D)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/margen_cal.mjs 2>&1 | tee out/logs/margen_cal.log
+
+      - name: Chance del panel contra el núcleo (chance_test, meta F)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/chance_test.mjs 2>&1 | tee out/logs/chance_test.log
+
+      - name: Pesistas y decisiones en finales enteras (pesistas_test, metas D y E)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/pesistas_test.mjs 2>&1 | tee out/logs/pesistas_test.log
+
+      - name: Rivales con su propia estrategia de kilos (rivales_test)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/rivales_test.mjs 2>&1 | tee out/logs/rivales_test.log
+
+      - name: Fácil de círculos, línea de base para registros viejos (play_human --f, no bloquea)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        continue-on-error: true
+        run: node tools/play_human.mjs --f --n=600 2>&1 | tee out/logs/play_human_f.log
 
       - name: Lógica de fluidez sin navegador (perf_test)
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
@@ -91,6 +124,14 @@ jobs:
         if: ${{ !cancelled() && matrix.grupo == 'toques' }}
         timeout-minutes: 20
         run: node tools/check_fluidez.mjs --tutorial --json=out/fluidez/fluidez.json 2>&1 | tee out/logs/check_fluidez.log
+
+      # La barrita ('b') en el navegador: computadora en español e inglés, teléfono acostado 667x375 y 844x390; cada barrita
+      # sale donde se tocó, entra en la pantalla sin tapar nada, y con el reloj verdadero se mide la diferencia entre lo que se
+      # ve y lo que juzga el núcleo. Capturas en out/barra.
+      - name: La barrita en el navegador (check_barra)
+        if: ${{ !cancelled() && matrix.grupo == 'toques' }}
+        timeout-minutes: 20
+        run: node tools/check_barra.mjs 2>&1 | tee out/logs/check_barra.log
 
       # Entrada en tiempo real con teclado real: toque durante PREPÁRATE, al cambiar de señal, doble, largo, ráfagas en
       # ¡EMPUJA!, después de una pausa y en el turno de un rival. Cada pulsación anotada, resuelta, con motivo y acuse.
@@ -144,7 +185,7 @@ jobs:
           {
             echo "### Pruebas del juego (dibujo por software: no mide cuadros por segundo)"
             echo "Grupo: ${{ matrix.titulo }}"
-            for f in sim_test play_human dedo_test perf_test caida_test check_escenas check_game check_toques check_telefono check_iphone check_fluidez capturas check_recorrido check_recorrido_en; do
+            for f in sim_test barra_bots play_human dedo_test perf_test caida_test check_escenas check_game check_barra check_toques check_telefono check_iphone check_fluidez capturas check_recorrido check_recorrido_en; do
               [ -f "out/logs/$f.log" ] || continue
               echo; echo "**$f**"; echo '```'
               tail -n 14 "out/logs/$f.log"

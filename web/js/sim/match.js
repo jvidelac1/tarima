@@ -3,22 +3,30 @@
 // La partida se maneja igual en vivo y al recalcular: abrir() → empezar() → [cambio()] → resolver() o resolverIA() → …
 import { idiv, rdiv, clampi, mezclar, Azar } from './fixed.js';
 import { simular } from './attempt.js';
-import { gestos, decidir, elegirEnvion } from './ai.js';
-import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad } from './rules.js';
+import { gestos, decidir, elegirEnvion, planRival, decidirPlan, estiloRival, HUELLA_IA } from './ai.js';
+import { sugerencia } from './entrenador.js';
+import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad, cuerpoDe, cuerpoBarra, HUELLA_U, HUELLAS_B, NIVELES_B, fatigaDe, sumarFatiga } from './rules.js';
 
 const LEVS = ['s', 'c'];
 
 export class Partida {
   /**
    * @param {object} datos  sim.json ya verificado (data.js)
-   * @param {{semilla:number, nivel:string, cal:number, primera:boolean, ctl?:'c'|'f', atletas:Array<{id:string, ctrl:'persona'|'juego'}>}} cfg
+   * @param {{semilla:number, nivel:string, cal:number, primera:boolean, ctl?:'c'|'f'|'u'|'b', atletas:Array<{id:string, ctrl:'persona'|'juego'}>}} cfg
    *   `ctl`: nivel de control de la persona (ausente = 'c', Clásico). Los rivales juegan siempre con las reglas de Clásico.
+   *   `tactil`: con el dedo (vale para 'f', 'u' y 'b'; queda en la cabecera del registro).
+   *   `ia`: HUELLA_IA para los rivales con personalidad (ai.js → PERSONALIDADES); ausente, los rivales de siempre (así se
+   *   siguen recalculando los registros viejos, que no la traen). Va en la cabecera del registro.
+   *   `dif`: en 'b', el nivel de dificultad ('facil' si falta; 'medio' o 'dificil', rules.js → NIVELES_B). Va en la cabecera
+   *   (solo si no es Fácil, así los registros de Fácil no cambian) con la huella de las reglas de ese nivel.
    */
   constructor(datos, cfg) {
     if (!NIVELES[cfg.nivel]) throw new Error('nivel desconocido');
     if (!Array.isArray(cfg.atletas) || cfg.atletas.length !== 3 || new Set(cfg.atletas.map(x => x.id)).size !== 3) throw new Error('la final es de tres pesistas distintos');
     const ctl = cfg.ctl ?? 'c'; if (!CONTROLES.includes(ctl)) throw new Error('nivel de control desconocido');
-    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl, tactil: ctl === 'f' && !!cfg.tactil };
+    if (cfg.ia !== undefined && cfg.ia !== HUELLA_IA) throw new Error('reglas de los rivales desconocidas');
+    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl, tactil: (ctl === 'f' || ctl === 'u' || ctl === 'b') && !!cfg.tactil, ia: cfg.ia ?? null, dif: ctl === 'b' && NIVELES_B[cfg.dif] ? cfg.dif : 'facil' };
+    if (cfg.dif !== undefined && cfg.dif !== 'facil' && this.cfg.dif !== cfg.dif) throw new Error('nivel de dificultad desconocido');
     const r = new Azar(mezclar(this.cfg.semilla, 7)), N = NIVELES[cfg.nivel];
     this.jueces = [0, 1, 2].map(() => r.entre(900, 1100));
     const tipo = r.ent(3), quien = r.ent(3);
@@ -27,14 +35,20 @@ export class Partida {
       const f = datos.atletas[x.id]; if (!f) throw new Error('pesista desconocido: ' + x.id);
       const forma = { s: r.entre(-2, 2), c: r.entre(-2, 2) }, pct = clampi(f.ia.apertura + r.entre(-25, 25), 910, 960) + N.abre;
       const saltos = { s: f.ia.saltos.s.map(k => k + r.entre(-1, 1)), c: f.ia.saltos.c.map(k => k + r.entre(-1, 1)) }, sube1 = [r.ent(3) === 0, r.ent(3) === 0, r.ent(3) === 0, r.ent(3) === 0];
-      const a = { i, id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego', f, modelo: datos.modelos[f.modelo], resto: RESTO.ini, forma, saltos, sube1, s: [], c: [], decl: { s: 0, c: 0 }, mejor: { s: 0, c: 0 }, seqMejor: { s: -1, c: -1 }, ult: { s: -1, c: -1 }, cambios: 0, bono: '' };
+      const a = { i, id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego', f, modelo: datos.modelos[f.modelo], resto: RESTO.ini, forma, saltos, sube1, s: [], c: [], decl: { s: 0, c: 0 }, mejor: { s: 0, c: 0 }, seqMejor: { s: -1, c: -1 }, ult: { s: -1, c: -1 }, cambios: 0, bono: '', garraUno: { s: true, c: true }, fatiga: { s: 0, c: 0 } };
       if (a.ctrl === 'juego') { if (N.forma) { forma.s += N.forma; forma.c += N.forma; } a.decl.s = rdiv(f.techo.s * pct, 1000); a.decl.c = rdiv(f.techo.c * pct, 1000); }
       return a;
     });
     if (this.guion.tipo === 'tocado') this.at[quien].resto = RESTO.tocado;
     if (this.guion.tipo === 'forma') this.at[quien].forma = { s: 2, c: 2 };
+    // rivales con personalidad: el plan sale de su techo visible (con el Resto del guion y el signo de su forma), su nivel y
+    // la semilla; el azar de arriba se consume igual, así forma, jueces y guion son los mismos con una IA o con la otra
+    if (this.cfg.ia) for (const a of this.at) if (a.ctrl === 'juego') {
+      a.plan = planRival(a.id, { s: this.techoVisible(a.i, 's'), c: this.techoVisible(a.i, 'c') }, a.f.techo, cfg.nivel, mezclar(this.cfg.semilla, 31, a.i));
+      a.decl = { ...a.plan.decl };
+    }
     this.fase = 'presentacion'; this.lev = 's'; this.seq = 0; this.barra = 0; this.ultimo = -1; this.llamado = null; this.nLlamado = 0;
-    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}),
+    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : ctl === 'b' ? { barra: HUELLAS_B[this.cfg.dif], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}) } : {}), ...(this.cfg.ia ? { ia: this.cfg.ia } : {}),
       atletas: cfg.atletas.map(x => ({ id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego' })), aperturas: this.at.map(a => ({ s: a.decl.s, c: a.decl.c })), llamados: [] };
   }
 
@@ -57,6 +71,8 @@ export class Partida {
 
   // ---------- consultas ----------
   techoDia(i, lev) { const a = this.at[i]; return (a.f.techo[lev] + a.forma[lev]) * 1000; }
+  /** Intensidad (diezmilésimas) que tendría ahora `kg` para el pesista i: la misma que usa el intento (panel de 'u'). */
+  intensidadDe(i, lev, kg) { return intensidad(kg, techoMomento(this.techoDia(i, lev), this.at[i].resto)); }
   /** Techo visible (g): el de ficha corregido por el Resto. Con `signo`, suma 1 kg por el signo de la forma del día (lo que usan los rivales). */
   techoVisible(i, lev, signo = true) { const a = this.at[i], s = a.forma[lev]; return techoMomento(a.f.techo[lev] * 1000, a.resto) + (signo ? (s > 0 ? 1000 : s < 0 ? -1000 : 0) : 0); }
   /** Mínimo que puede pedir: 1 kg más tras un válido, lo mismo tras un nulo, y nunca menos de lo que ya está en la barra. */
@@ -105,6 +121,9 @@ export class Partida {
     return et;
   }
 
+  /** Palabra de la personalidad del rival `i` para su intento `lev`+`n` (clave `rival.estilo.*`), o '' sin personalidad. */
+  estiloDe(i, lev, n) { return estiloRival(this.at[i], lev, n); }
+
   // ---------- orden y llamados ----------
   _siguiente() {
     const lev = this.lev, cand = this.at.filter(a => a[lev].length < 3);
@@ -124,7 +143,10 @@ export class Partida {
     const L = this.llamado, a = this.at[L.a], f = a.f, I = intensidad(L.kg, techoMomento(this.techoDia(L.a, L.lev), a.resto)), persona = a.ctrl === 'persona';
     if (L.lev === 'c' && !['split', 'power', 'squat'].includes(env)) throw new Error('envión inválido');
     return { lev: L.lev, env: L.lev === 'c' ? env : undefined, I, tec: f.attrs.tec, temple: L.et.length ? f.attrs.tem : 0, garra: f.attrs.gar, anclas: a.modelo, semilla: L.sem,
-      cal: persona ? this.cfg.cal : 0, primera: persona && this.cfg.primera && L.n === 1, domina: L.lev === 's' || f.enviones.includes(env), jueces: this.jueces, reloj: L.reloj, ctl: persona ? this.cfg.ctl : 'c', ...(persona && this.cfg.tactil ? { tactil: true } : {}) };
+      cal: persona ? this.cfg.cal : 0, primera: persona && this.cfg.primera && L.n === 1, domina: L.lev === 's' || f.enviones.includes(env), jueces: this.jueces, reloj: L.reloj, ctl: persona ? this.cfg.ctl : 'c', ...(persona && this.cfg.tactil ? { tactil: true } : {}),
+      // 'u' y 'b': el cuerpo de juego del pesista (rules.js → CUERPOS_U; en 'b', con el ancho de cada barrita) y si todavía
+      // tiene la garra de este levantamiento
+      ...(persona && this.cfg.ctl === 'u' ? { cuerpo: cuerpoDe(a.id), garraUno: a.garraUno[L.lev] } : persona && this.cfg.ctl === 'b' ? { cuerpo: cuerpoBarra(a.id), garraUno: a.garraUno[L.lev], fatiga: a.fatiga[L.lev], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}) } : {}) };
   }
   /** ¿Puede el pesista del llamado pedir `kg` en el instante `ms`? Devuelve el motivo si no. */
   cambioValido(ms, kg) {
@@ -164,12 +186,15 @@ export class Partida {
     return { ctx, conf: g.conf, ent: g.ent, res: g.res, llamado, env };
   }
   _aplicar(ctx, res) {
+    // en 'u' tocar de más no cuesta nada: machacar, mantener o tocar con calma dan lo mismo también en el Resto
     const L = this.llamado, a = this.at[L.a], lev = L.lev, valido = res.res === 'valido';
-    const costo = RESTO.base[lev] + Math.max(0, idiv(ctx.I - 9500, 100)) * RESTO.sobre95 + Math.min(RESTO.topePelea, res.toques * RESTO.toque + idiv(res.fuera * RESTO.fueraSeg, 120)) + (valido ? 0 : RESTO.nulo) + (lev === 'c' ? RESTO.envion[ctx.env] : 0);
+    const costo = RESTO.base[lev] + Math.max(0, idiv(ctx.I - 9500, 100)) * RESTO.sobre95 + (ctx.ctl === 'u' || ctx.ctl === 'b' ? 0 : Math.min(RESTO.topePelea, res.toques * RESTO.toque + idiv(res.fuera * RESTO.fueraSeg, 120))) + (valido ? 0 : RESTO.nulo) + (lev === 'c' ? RESTO.envion[ctx.env] : 0);
     const gasto = Math.max(0, idiv(costo * multFondo(a.f.attrs.fon), 1000)), seq = this.seq++;
     a.resto = Math.max(0, a.resto - gasto);
     a[lev].push({ kg: L.kg, res: res.res, causa: res.causa, luces: res.luces, seq, env: ctx.env, et: L.et, I: ctx.I, gasto });
     if (valido && L.kg > a.mejor[lev]) { a.mejor[lev] = L.kg; a.seqMejor[lev] = seq; }
+    if (res.uno && res.uno.garra === 'usada') a.garraUno[lev] = false;      // 'u': una garra por levantamiento
+    if (ctx.ctl === 'b' && res.uno) sumarFatiga(a.fatiga, lev, fatigaDe(res.uno));      // 'b': lo que exigió este intento cansa a los siguientes
     for (const b of this.at) if (b !== a) b.resto = Math.min(RESTO.ini, b.resto + RESTO.ajeno);
     a.ult[lev] = seq; a.cambios = 0; this.ultimo = a.i; this.barra = L.kg;
     // declaración automática: el plan del entrenador
@@ -177,12 +202,16 @@ export class Partida {
     if (n < 3) {
       const salto = a.ctrl === 'persona' ? PLAN[n - 1] : Math.max(1, a.saltos[lev][n - 1]);
       a.decl[lev] = valido ? L.kg + salto : L.kg + (a.f.ia.estilo === 'orgullo' && a.ctrl === 'juego' && a.sube1[(lev === 'c' ? 2 : 0) + n - 1] ? 1 : 0);
-      if (a.ctrl === 'juego') { const k = decidir(this, a.i); if (k !== null) a.decl[lev] = k; }
+      if (a.ctrl === 'juego' && this.cfg.ia) a.decl[lev] = decidirPlan(this, a.i, true);
+      else if (a.ctrl === 'juego') { const k = decidir(this, a.i); if (k !== null) a.decl[lev] = k; }
+      // 'u' (Gameplay 2.1): la persona declara lo que propone el entrenador (entrenador.js), no el plan fijo. Así el orden de
+      // los llamados ya cuenta con ese peso y el panel no la desplaza al proponerlo
+      else if (this.cfg.ctl === 'u' || this.cfg.ctl === 'b') { const k = sugerencia(this, a.i, lev, ctx.env); if (k !== null) a.decl[lev] = k; }
     }
     // cambios de los rivales, al cierre de cada intento ajeno
     const avisos = [];
     for (const b of this.at) if (b !== a && b.ctrl === 'juego' && b[lev].length < 3 && b.cambios < 2) {
-      const k = decidir(this, b.i); if (k !== null && k >= this.minimo(b.i)) { avisos.push({ a: b.i, de: b.decl[lev], a_kg: k }); b.decl[lev] = k; b.cambios++; }
+      const k = this.cfg.ia ? decidirPlan(this, b.i, false) : decidir(this, b.i); if (k !== null && k >= this.minimo(b.i)) { avisos.push({ a: b.i, de: b.decl[lev], a_kg: k }); b.decl[lev] = k; b.cambios++; }
     }
     this._siguiente();
     return { res, gasto, avisos, intento: a[lev][n - 1] };

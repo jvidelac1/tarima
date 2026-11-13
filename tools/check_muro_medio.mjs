@@ -18,6 +18,8 @@ import { launchOptions } from './browser.mjs';
 import { iniciarServidorLocal } from './servidor_local.mjs';
 import ES from '../web/js/game/i18n/es.js';
 import EN from '../web/js/game/i18n/en.js';
+/** Señales de un toque (la libre de siempre y las de 'u': ¡SALTA!, ¡PÁRATE!, ¡DA TODO!): un toque y la señal se va. */
+const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
@@ -88,7 +90,8 @@ async function escenario(L) {
       if (I && I.propio && s.modo !== 'panel') {
         const g = I.senal; if (!g) { await av(20); continue; }
         if (I.parado) { await av(80); await toque(); continue; }
-        if (g.tipo === 'libre') { await av(150); await toque(); continue; }
+        if (g.tipo === 'barra') { await ir(g.objetivo); await toque(); continue; }      // 'b': toca cuando el puntero pasa por el centro del verde
+        if (UNTOQUE.has(g.tipo)) { await av(150); await toque(); continue; }
         if (g.tipo === 'cierre') { const k = g.clave + g.desde; if (I.seDetiene || hecho === k) { await av(30); continue; } await ir(g.objetivo); await toque(); hecho = k; continue; }
         if (g.tipo === 'empuja') { if (s.ahora - ultToque >= 150) { await toque(); ultToque = s.ahora; } else await av(16); continue; }
         await av(30); continue;

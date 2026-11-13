@@ -1,0 +1,45 @@
+/* Pantalla de carga (#msg) y barrita de descarga (#carga-mini). La maneja js/game/ui/carga.js. Va aparte de juego.css: pisa
+   la regla #msg de allá. */
+#msg.carga{flex-direction:column;gap:clamp(6px,2.2vh,18px);padding:calc(10px + var(--st)) calc(16px + var(--sr)) calc(10px + var(--sb)) calc(16px + var(--sl));
+  font-size:16px;letter-spacing:0;text-transform:none;color:var(--ink);overflow:hidden;
+  background:radial-gradient(ellipse 55% 45% at 50% 50%,rgba(53,230,214,.07),transparent 72%),radial-gradient(ellipse at center,#0a1030 0,#03050c 70%);
+  transition:opacity .4s ease}
+#msg.carga.saliendo{opacity:0}
+#msg.carga>*{position:relative}
+/* luz de tarima: un cono cálido desde arriba que respira muy despacio */
+#msg .carga-luz{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(255,236,190,.07),rgba(255,236,190,0) 78%);
+  clip-path:polygon(43% 0,57% 0,74% 100%,26% 100%);animation:carga-luz 7s ease-in-out infinite alternate}
+@keyframes carga-luz{from{opacity:.55}to{opacity:1}}
+#msg .carga-marca{margin-bottom:clamp(4px,2vh,16px);font-family:var(--display);font-weight:800;font-size:clamp(26px,8vh,56px);letter-spacing:.34em;margin-right:-.34em;text-transform:uppercase;line-height:1}
+#msg .carga-titulo{margin:0;max-width:min(30em,92%);text-align:center;font-family:var(--display);font-weight:700;font-size:clamp(14px,2.6vh,20px);letter-spacing:.05em;text-transform:uppercase;color:var(--teal);line-height:1.2}
+#msg .carga-titulo:empty{display:none}
+#msg .carga-prog{width:min(340px,82%);display:flex;flex-direction:column;gap:4px}
+#msg .carga-fila{display:flex;align-items:center;gap:10px}
+#msg .carga-barra{flex:1;height:6px;border-radius:3px;background:#141c3a;overflow:hidden;position:relative}
+#msg .carga-barra i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:3px;background:linear-gradient(90deg,var(--teal),#a8f7ef);transition:width .3s ease}
+#msg .carga-prog.indet .carga-barra i{width:34%!important;animation:carga-indet 1.5s ease-in-out infinite}
+@keyframes carga-indet{from{transform:translateX(-105%)}to{transform:translateX(300%)}}
+#msg .carga-pct{min-width:3em;text-align:left;font-family:var(--display);font-weight:700;font-size:15px;font-variant-numeric:tabular-nums;color:var(--ink)}
+#msg .carga-pct:empty{display:none}
+#msg .carga-det{min-height:1.3em;font-size:clamp(11px,1.9vh,13px);color:var(--mute);text-align:center;font-variant-numeric:tabular-nums}
+#msg .carga-dato{margin:0;max-width:min(34em,92%);min-height:2.7em;text-align:center;font-size:clamp(13px,2.3vh,16px);line-height:1.35;color:#c9d0f0;transition:opacity .35s ease}
+#msg .carga-dato:empty{visibility:hidden}
+#msg .carga-dato.cambia{opacity:0}
+/* el juego se detuvo: solo el texto */
+#msg.carga.error .carga-prog,#msg.carga.error .carga-dato,#msg.carga.error .carga-luz{display:none}
+#msg.carga.error .carga-titulo{color:var(--ink)}
+/* teléfono acostado (poco alto): todo más junto */
+@media (max-height:430px){
+  #msg.carga{gap:6px}
+  #msg .carga-marca{font-size:clamp(24px,9vh,34px);margin-bottom:6px}
+  #msg .carga-dato{min-height:2.6em;font-size:13px}
+}
+/* barrita fina arriba de todo mientras los modelos bajan detrás de la bienvenida */
+#carga-mini{position:fixed;left:0;right:0;top:0;height:3px;z-index:56;pointer-events:none;background:rgba(20,28,58,.6);transition:opacity .6s ease .2s}
+#carga-mini i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--teal),#a8f7ef);box-shadow:0 0 8px rgba(53,230,214,.6);transition:width .3s ease}
+#carga-mini.fuera{opacity:0}
+@media (prefers-reduced-motion:reduce){
+  #msg.carga,#msg .carga-dato,#msg .carga-barra i,#carga-mini,#carga-mini i{transition:none}
+  #msg .carga-luz{animation:none;opacity:.8}
+  #msg .carga-prog.indet .carga-barra i{animation:none;width:100%!important;opacity:.35}
+}

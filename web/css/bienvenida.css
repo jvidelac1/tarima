@@ -40,11 +40,11 @@ button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px
 .panel button[data-sonido="no"][aria-pressed="true"]{color:#ffb4a8}
 /* teléfono de costado (o cualquier pantalla baja y ancha): la bienvenida en dos columnas para que entre sin desplazar */
 @media (min-aspect-ratio:3/2) and (max-height:600px){
-  .panel.bienvenida{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);column-gap:16px;align-content:start}
-  .panel.bienvenida>*{grid-column:1}
-  .panel.bienvenida>#pesista-t{grid-column:2;grid-row:1}
-  .panel.bienvenida>.pesistas{grid-column:2;grid-row:2/span 4;align-self:start;margin-top:0}
-  .panel.bienvenida>.fila,.panel.bienvenida>.opciones{grid-column:1/-1}
+  .panel.bienvenida>.bv-cuerpo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);column-gap:16px;align-content:start}
+  .panel.bienvenida>.bv-cuerpo>*{grid-column:1}
+  .panel.bienvenida>.bv-cuerpo>#pesista-t{grid-column:2;grid-row:1}
+  .panel.bienvenida>.bv-cuerpo>.pesistas{grid-column:2;grid-row:2/span 4;align-self:start;margin-top:0}
+  .panel.bienvenida>.bv-cuerpo>.fila,.panel.bienvenida>.bv-cuerpo>.opciones{grid-column:1/-1}
   .panel.gana{max-width:min(96cqw,760px)}
   .panel.gana .reglas{margin:.2em 0;line-height:1.4}
   .pesistas.rivales .pesista{padding:.35em .5em}
@@ -52,18 +52,18 @@ button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px
   .panel.bienvenida .cabeza{padding-right:0}
   .panel.bienvenida .idiomas{top:10px;right:14px}
   .panel.bienvenida .cabeza{position:static}
-  .panel.bienvenida>#pesista-t{padding-right:6.5em}
+  .panel.bienvenida>.bv-cuerpo>#pesista-t{padding-right:6.5em}
   .panel.bienvenida label.nombre{margin-top:.3em}
   .panel.bienvenida .pesista small{font-size:.74em}
   .glosario div{font-size:clamp(11px,3.3cqh,13px)}
   button.grande{min-height:46px}
 }
 /* lo mismo en el teléfono de costado, también con el contenido girado (html.horiz.bajo lo pone telefono.js) */
-  :where(html.horiz.bajo) .panel.bienvenida{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);column-gap:16px;align-content:start}
-  :where(html.horiz.bajo) .panel.bienvenida>*{grid-column:1}
-  :where(html.horiz.bajo) .panel.bienvenida>#pesista-t{grid-column:2;grid-row:1}
-  :where(html.horiz.bajo) .panel.bienvenida>.pesistas{grid-column:2;grid-row:2/span 4;align-self:start;margin-top:0}
-  :where(html.horiz.bajo) .panel.bienvenida>.fila,:where(html.horiz.bajo) .panel.bienvenida>.opciones{grid-column:1/-1}
+  :where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);column-gap:16px;align-content:start}
+  :where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo>*{grid-column:1}
+  :where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo>#pesista-t{grid-column:2;grid-row:1}
+  :where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo>.pesistas{grid-column:2;grid-row:2/span 4;align-self:start;margin-top:0}
+  :where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo>.fila,:where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo>.opciones{grid-column:1/-1}
   :where(html.horiz.bajo) .panel.gana{max-width:min(96cqw,760px)}
   :where(html.horiz.bajo) .panel.gana .reglas{margin:.2em 0;line-height:1.4}
   :where(html.horiz.bajo) .pesistas.rivales .pesista{padding:.35em .5em}
@@ -71,7 +71,7 @@ button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px
   :where(html.horiz.bajo) .panel.bienvenida .cabeza{padding-right:0}
   :where(html.horiz.bajo) .panel.bienvenida .idiomas{top:10px;right:14px}
   :where(html.horiz.bajo) .panel.bienvenida .cabeza{position:static}
-  :where(html.horiz.bajo) .panel.bienvenida>#pesista-t{padding-right:6.5em}
+  :where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo>#pesista-t{padding-right:6.5em}
   :where(html.horiz.bajo) .panel.bienvenida label.nombre{margin-top:.3em}
   :where(html.horiz.bajo) .panel.bienvenida .pesista small{font-size:.74em}
   :where(html.horiz.bajo) .glosario div{font-size:clamp(11px,3.3cqh,13px)}
@@ -92,10 +92,24 @@ button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px
 .pesista .med i{font-style:normal;color:var(--mute);text-transform:uppercase;letter-spacing:.04em;font-family:var(--display);font-weight:700}
 .pesista .med em{font-style:normal;color:var(--ink);text-align:right;white-space:nowrap}
 .pesista .barra{display:block;min-width:24px;height:6px;background:linear-gradient(90deg,var(--teal) var(--v,50%),#26305c var(--v,50%))}
+/* 'u': lo que le cuesta cada tramo a ese cuerpo (fácil en dorado, le cuesta en rojo); separado de las medidas por una línea */
+.pesista .med:not(.tramo)+.med.tramo{margin-top:.35em;padding-top:.35em;border-top:1px solid #26305c}
+.pesista .med.tramo.facil .barra{background:linear-gradient(90deg,var(--gold) var(--v,50%),#26305c var(--v,50%))}
+.pesista .med.tramo.facil em{color:var(--gold)}
+.pesista .med.tramo.cuesta .barra{background:linear-gradient(90deg,#ff6a5f var(--v,50%),#26305c var(--v,50%))}
+.pesista .med.tramo.cuesta em{color:#ff8a80}
 /* teléfono de costado: tarjetas bajas (el panel entra en 340 px de alto) */
 :where(html.horiz.bajo) .pesista .cuerpo{gap:0;margin:.15em 0}
-:where(html.horiz.bajo) .pesista .med{font-size:.66em;line-height:1.15;grid-template-columns:5.2em 1fr 3.4em}
+:where(html.horiz.bajo) .pesista .med{font-size:.66em;line-height:1.15;grid-template-columns:5.2em minmax(8px,1fr) auto;gap:.3em}
+:where(html.horiz.bajo) .pesista .barra{min-width:8px}
 :where(html.horiz.bajo) .pesista small.conviene{font-size:.68em;line-height:1.2}
+/* teléfono bajo en 'u': solo lo que cambia el juego de cada pesista (lo que le cuesta cada tramo y su frase). Las medidas del
+   cuerpo no entraban en 667×375 y en inglés se cortaban justo los valores («sho», «ea»). Los títulos parten si no entran */
+:where(html.horiz.bajo) .pesista .cuerpo.u .med:not(.tramo){display:none}
+:where(html.horiz.bajo) .pesista .cuerpo.u .med{display:flex;justify-content:space-between;gap:.5em}
+:where(html.horiz.bajo) .pesista .cuerpo.u .barra{display:none}
+:where(html.horiz.bajo) .pesista .cuerpo.u .med.tramo{margin-top:0;padding-top:0;border-top:0}
+:where(html.horiz.bajo) .pesista b{overflow-wrap:anywhere;font-size:1em}
 :where(html.horiz.bajo) .panel.bienvenida .pesista .b{display:none}
 .pesista small.conviene{color:var(--ink);opacity:.85}
 /* muro, lista, encuesta e invitación del podio */
@@ -126,3 +140,34 @@ fieldset.pregunta legend{font-family:var(--display);font-weight:700;text-transfo
 .invitacion.abierta{padding-right:.8em}
 .invitacion b{display:block;color:var(--ink);font-family:var(--display);text-transform:uppercase;letter-spacing:.04em}
 .invitacion .cerrar{position:absolute;top:4px;right:4px;min-height:36px;min-width:36px;padding:0;background:none;border:none;font-size:18px}
+/* 'b' (la barrita): la frase en su propio bloque arriba y, debajo, dos filas de texto (el verde de cada barrita), sin barras:
+   la tarjeta entra entera en la computadora baja y en el teléfono acostado */
+.pesista small.conviene+.cuerpo.vb{margin-top:.45em}
+.pesista .cuerpo.vb .med{display:flex;justify-content:space-between;align-items:baseline;gap:.5em;font-size:.8em;margin:0;padding:0;border:0}
+.pesista .cuerpo.vb .barra{display:none}
+.pesista .cuerpo.vb .med em{white-space:nowrap}
+:where(html.horiz.bajo) .pesista .cuerpo.vb{display:none}      /* en el teléfono acostado la frase ya dice el verde de cada barrita */
+/* pantallas bajas (la computadora del dueño muestra ~560 px): la bienvenida sin la franja de colores de cada tarjeta ni la
+   nota debajo del nombre, para que las tarjetas entren enteras encima de la fila de botones */
+@media (max-height:820px){
+  .panel.bienvenida .pesista .b{display:none}
+  .panel.bienvenida label.nombre+.nota{display:none}
+  .panel.bienvenida .pesistas{margin:.4em 0}
+  .panel.bienvenida .pesista small.conviene{font-size:.74em;line-height:1.25}
+}
+/* bienvenida: la parte de arriba se desplaza y la fila de botones queda abajo, fuera de ella (antes era pegajosa y tapaba
+   el final de las tarjetas en pantallas bajas) */
+.panel.bienvenida{display:flex;flex-direction:column;overflow:hidden}
+.panel.bienvenida>.bv-cuerpo{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;padding-bottom:6px}
+.panel.bienvenida>.pie{position:static;flex:none}
+/* ES · EN se desplaza con lo de arriba (si no, las tarjetas pasaban por debajo de los botones de idioma) */
+.panel.bienvenida>.bv-cuerpo{position:relative}
+.panel.bienvenida>.bv-cuerpo .idiomas{top:0;right:0}
+/* bienvenida con lo mínimo (13-nov, «el user entra, juega con el setup mínimo y ya»): Jugar grande; Opciones, Cómo se juega y
+   Privacidad chicos y a un costado */
+.panel .pie .secundarios{display:flex;align-items:center;flex-wrap:wrap;gap:0 .9em;margin-left:auto}
+.panel .pie .secundarios button.link{color:var(--mute);font-family:var(--body);font-weight:600;font-size:clamp(12px,1.8cqh,14px);min-height:36px;text-decoration-color:rgba(147,160,204,.5)}
+.panel .pie .secundarios button.link[aria-expanded=true]{color:var(--teal)}
+.panel .pie a.legal{margin-left:0;color:var(--mute);font-size:clamp(11px,1.6cqh,13px);text-underline-offset:3px;padding:.4em 0}
+/* en la bienvenida no van el título del evento ni el reloj (el panel lo dice todo) */
+html[data-pantalla=inicio] :is(.bug,.relojbox){display:none}

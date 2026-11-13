@@ -1,0 +1,69 @@
+{
+ "datos": "09c9b907",
+ "ia": "d280707a",
+ "casos": [
+  {
+   "semilla": 7000003,
+   "nivel": "amistoso",
+   "persona": 0,
+   "ctl": "b",
+   "tabla": "marangi:168+196=364#1 ventura:163+196=359#2 brenner:165+187=352#3"
+  },
+  {
+   "semilla": 14000006,
+   "nivel": "normal",
+   "persona": 1,
+   "ctl": "c",
+   "tabla": "marangi:171+210=381#1 ventura:166+208=374#2 brenner:168+205=373#3"
+  },
+  {
+   "semilla": 21000009,
+   "nivel": "dificil",
+   "persona": 2,
+   "ctl": "u",
+   "tabla": "ventura:168+210=378#1 brenner:172+205=377#2 marangi:164+200=364#3"
+  },
+  {
+   "semilla": 28000012,
+   "nivel": "amistoso",
+   "persona": 0,
+   "ctl": "b",
+   "tabla": "marangi:169+195=364#1 ventura:162+199=361#2 brenner:163+190=353#3"
+  },
+  {
+   "semilla": 35000015,
+   "nivel": "normal",
+   "persona": 1,
+   "ctl": "c",
+   "tabla": "ventura:168+209=377#1 marangi:170+206=376#2 brenner:165+205=370#3"
+  },
+  {
+   "semilla": 42000018,
+   "nivel": "dificil",
+   "persona": 2,
+   "ctl": "u",
+   "tabla": "brenner:177+202=379#1 ventura:168+208=376#2 marangi:169+202=371#3"
+  },
+  {
+   "semilla": 49000021,
+   "nivel": "amistoso",
+   "persona": 0,
+   "ctl": "b",
+   "tabla": "marangi:168+206=374#1 ventura:162+204=366#2 brenner:159+193=352#3"
+  },
+  {
+   "semilla": 56000024,
+   "nivel": "normal",
+   "persona": 1,
+   "ctl": "c",
+   "tabla": "marangi:173+211=384#1 ventura:169+210=379#2 brenner:167+191=358#3"
+  },
+  {
+   "semilla": 63000027,
+   "nivel": "dificil",
+   "persona": 2,
+   "ctl": "u",
+   "tabla": "ventura:169+208=377#1 brenner:174+202=376#2 marangi:164+206=370#3"
+  }
+ ]
+}

@@ -27,6 +27,8 @@ export function cuanto(e, l = idiomaActual(), pro = false) {
  * @returns {string} '' si no hay nada que explicar (válido con tres blancas)
  */
 export function explicar(res, ctl = 'c', tactil = false, o = {}, l = idiomaActual()) {
+  if (ctl === 'u') return lineaU(res, o || {}, l);
+  if (ctl === 'b') return lineaB(res, o || {}, l);
   const r = linea(res, ctl, tactil, o || {}, l); if (!r) return '';
   return tr(l, r[0], { tactil, ...r[1] }).replace(/!\./g, '!');
 }
@@ -81,12 +83,82 @@ function linea(res, ctl, tactil, o, l) {
   }
 }
 
+/**
+ * Margen en discos, con cuartos («1½ discos», «¾ de disco»). `m` en milésimas de disco; se redondea al cuarto más cercano
+ * (nunca a «nada» si queda algo).
+ */
+export function discos(m, l = idiomaActual()) {
+  const a = Math.abs(m); let q = Math.round(a / 250); if (!q && a > 0) q = 1;
+  const n = Math.floor(q / 4), r = q % 4, fr = ['', '¼', '½', '¾'][r];
+  if (!q) return tr(l, 'discos.nada');
+  if (!n) return tr(l, r === 1 ? 'discos.cuarto' : r === 2 ? 'discos.medio' : 'discos.tres_cuartos');
+  if (n === 1 && !r) return tr(l, 'discos.uno');
+  return tr(l, 'discos.n', { n: n + fr });
+}
+/** Discos dibujados (●●○, ◑ para medio, en rojo cuando no alcanza: lo pinta quien llama) para el margen `m` sobre 3. */
+export function puntos(m, de = 3) { const x = Math.max(0, Math.min(de, m / 1000)); let s = ''; for (let i = 0; i < de; i++) { const f = x - i; s += f >= .75 ? '●' : f >= .25 ? '◑' : '○'; } return s; }
+/** Nombre del tramo en una frase («la subida de la cargada») y como sujeto («Pararse con la cargada»). */
+export const tramoTxt = (tramo, lev, l = idiomaActual(), mayor = false) => tr(l, `tramo.${mayor ? 'mayor.' : ''}${tramo === 'tiron' ? 'tiron' : `${tramo}_${lev}`}`);
+/**
+ * Línea de 'u' (docs/JUEGO.md G2.4 y 2.1, «Línea de caída»): dónde se quedó sin energía y cuánto gastó ese tramo (un solo
+ * tramo, el de la caída), nunca un tiempo ni un toque, porque ningún toque cambia el resultado. Si ese tramo tuvo mala
+ * suerte (gastó ≥ 150 de más) lo dice; si la garra no alcanzaba y quedó guardada, también (una sola de las dos).
+ * `o.quien`, `o.kg`, `o.pct` (intensidad en %) completan la frase; sin ellos, la versión corta. Válido: solo si quedó al límite.
+ */
+function lineaU(res, o, l) {
+  const u = res && res.uno; if (!u) return '';
+  const lev = o.lev || (u.gastos.arriba !== undefined && Object.keys(u.gastos)[1] === 'pararse' ? 'c' : 's');
+  if (res.res === 'valido') return u.al_limite ? tr(l, 'explica.u.limite', { discos: discos(u.margen_fin, l) }) : '';
+  const tramo = u.tramo_caida, v = { donde: tramoTxt(tramo, lev, l), d: cuartos(u.gastos[tramo] || 0) };
+  const extra = u.garra_no_alcanza ? tr(l, 'explica.u.no_alcanza') : (u.suertes?.[tramo] || 0) >= 150 ? tr(l, 'explica.u.mala') : '';
+  return (o.quien && o.kg && o.pct ? tr(l, 'explica.u.cae', { ...v, quien: o.quien, kg: o.kg, pct: o.pct }) : tr(l, 'explica.u.cae_corta', v)) + extra;
+}
+
+/**
+ * Línea de 'b' (docs/JUEGO.md, Gameplay 3): dónde se quedó sin energía y, siempre, cada barrita que no salió verde y en qué
+ * barrita fue: «173 kg es el 99 % y pegaste en el amarillo en el envión (−½): se quedó sin energía en el envión». Con todas
+ * las barritas en verde la barra no se cae (rules.js, BARRA.verdeSalva), así que una caída siempre tiene un toque que nombrar.
+ * Válido: solo si quedó al límite.
+ */
+function lineaB(res, o, l) {
+  const u = res && res.uno; if (!u) return '';
+  const lev = o.lev || (Object.keys(u.gastos)[1] === 'pararse' ? 'c' : 's');
+  if (res.res === 'valido') return u.al_limite ? tr(l, 'explica.u.limite', { discos: discos(u.margen_fin, l) }) : '';
+  const B = (u.barras || []).filter(b => b.zona !== 'verde'), extra = B.reduce((a, b) => a + b.extra, 0);
+  const v = { donde: tramoTxt(u.tramo_caida, lev, l), quien: o.quien, kg: o.kg, pct: o.pct, d: cuartos(u.gastos[u.tramo_caida] || 0) };
+  const larga = o.kg && o.pct;
+  // el cansancio se nombra si sin él se paraba
+  const cansado = u.fatiga && u.margen_fin + u.fatiga >= 0 ? tr(l, 'explica.b.cansado', { d: cuartos(u.fatiga) }) : '';
+  // no debería pasar (todo verde sube): la línea de 'u', sin toques
+  if (!B.length) return (larga ? tr(l, 'explica.u.cae', v) : tr(l, 'explica.u.cae_corta', v)) + cansado;
+  // «el amarillo en el envión», «el amarillo en la cargada y en el rojo en el envión»: cada toque que falló, en orden
+  const toques = B.map(b => tr(l, 'explica.b.toque', { zona: tr(l, 'barra.z.' + b.zona), en: tr(l, `barra.en.${lev}${b.i}`) })).join(tr(l, 'explica.b.y'));
+  return tr(l, larga ? 'explica.b.zona' : 'explica.b.zona_corta', { ...v, toques, d: cuartos(extra) }) + cansado;
+}
+
 /** Los tres pasos de «Cómo se juega»: [cantidad de teclas dibujadas, texto]. */
 export function pasos(ctl = 'f', tactil = false, l = idiomaActual()) {
-  const k = ctl === 'f' ? ['f1', 'f2', 'f3'] : ['c1', 'c2', 'c3'];
+  const k = ctl === 'b' ? ['b1', 'b2', 'b3'] : ctl === 'u' ? ['u1', 'u2', 'u3'] : ctl === 'f' ? ['f1', 'f2', 'f3'] : ['c1', 'c2', 'c3'];
+  if (ctl === 'u' || ctl === 'b') return k.map(x => [1, tr(l, 'pasos.' + x, { tactil })]);
   return k.map((x, i) => [i === 2 ? 3 : 1, tr(l, 'pasos.' + x, { tactil })]);
 }
 /** Clave del texto del tutorial guiado en cada parada (Un toque). */
 export const GUIA = { tira: 'guia.tira', explota: 'guia.explota', recibi: 'guia.recibi', empuja: 'guia.empuja', aguanta: 'guia.aguanta', flexiona: 'guia.flexiona' };
 /** Reemplaza {A}, {T} y {t} según haya teclado o no (para textos que ya vienen armados, como el `sub` de la señal). */
 export const conTecla = (txt, tactil, l = idiomaActual()) => { const k = teclasDe(l, tactil); return txt.replace('{A}', k.A).replace('{T}', k.T).replace('{t}', k.t); };
+/** Milésimas de disco en cuartos, cortito y sin la palabra («½», «1¼», «0»): la palabra de cada disco que se apaga. */
+export function cuartos(m) { const a = Math.abs(m); let q = Math.round(a / 250); if (!q && a > 0) q = 1; const n = Math.floor(q / 4), fr = ['', '¼', '½', '¾'][q % 4]; return q ? (n ? String(n) : '') + fr : '0'; }
+/**
+ * La chance del panel en décimos («7 de 10»). `ch` en milésimas (rules.js, chanceUno). «10 de 10» solo si de verdad no falla
+ * (≥ 99,5 %) y «0 de 10» solo si de verdad no llega (< 0,5 %): en las puntas el redondeo no promete de más.
+ */
+export const deDiez = ch => (ch >= 995 ? 10 : ch < 5 ? 0 : Math.max(1, Math.min(9, Math.round(ch / 100))));
+/**
+ * Punto fuerte y débil del cuerpo de un pesista en 'u' (factores de sim.json → cuerpoJuego, milésimas): el tramo que menos
+ * le cuesta y, si alguno le cuesta de verdad (≥ 1150), el que más. Nivel de cada tramo para la tarjeta.
+ */
+export const nivelTramo = k => (k <= 750 ? 'facil' : k >= 1150 ? 'cuesta' : 'normal');
+export function fuerteDebil(cuerpo) {
+  const T = ['tiron', 'arriba', 'pararse'], f = T.reduce((a, x) => (cuerpo[x] < cuerpo[a] ? x : a)), d = T.reduce((a, x) => (cuerpo[x] > cuerpo[a] ? x : a));
+  return { fuerte: nivelTramo(cuerpo[f]) === 'facil' ? f : null, debil: nivelTramo(cuerpo[d]) === 'cuesta' ? d : null };
+}

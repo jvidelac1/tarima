@@ -12,7 +12,8 @@ export class Depura {
       `cuadros/s  ofrece ${p.ofrecidos} · dibuja ${p.dibujados}`,
       `ms/cuadro  ${p.ms.toFixed(1)} · peor ${p.max.toFixed(0)}`,
       `calidad    ${c.nombre}${c.auto ? ' (auto)' : ' (fija)'} · ${c.megapixeles} MP · bajó ${c.cambios.length}`,
-      `toques ${k.total} · ok ${k.aceptados} · descartados ${k.descartados}`];
+      `toques ${k.total} · ok ${k.aceptados} · descartados ${k.descartados}`,
+      `acuse      p95 ${k.acuseP95?.() == null ? '—' : k.acuseP95().toFixed(1) + ' ms'} (${k.pinta?.length || 0}; meta ≤ 17 a 60 Hz)`];
     for (const T of k.ultimos.slice(-7).reverse()) l.push(`${String(T.n).padStart(3)} ${T.ok === null ? '…' : T.ok ? '✓' : '✗'} ${T.tecla.padEnd(7)} ${T.ok === false ? MOTIVO[T.motivo] || T.motivo : T.nota || MOTIVO[T.motivo] || ''} · ${T.donde}`);
     const txt = l.join('\n'); if (txt !== this.txt) { this.txt = txt; this.el.textContent = txt; }
   }

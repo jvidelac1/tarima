@@ -70,7 +70,8 @@ def main():
     for n in names:
         print(f'== {n} ==')
         o = os.path.join(OUTR, n); files = {k: os.path.join(o, k) for k in ('s3.blend', 'maps.npz', 's3b.blend', 's4.blend', n + '.glb', 'poses.json', 'body_color.png', 'body_mask.png')}
-        files.update({'web glb': os.path.join(WEB, 'models', n + '.glb'), 'web mask': os.path.join(WEB, 'models', n + '_mask.png'), 'web poses.json': wp})
+        wm = os.path.join(WEB, 'models', n + '_mask.webp')      # tools/comprimir_modelos.sh la pasa a WebP
+        files.update({'web glb': os.path.join(WEB, 'models', n + '.glb'), 'web mask': wm if os.path.exists(wm) else os.path.join(WEB, 'models', n + '_mask.png'), 'web poses.json': wp})
         for k, p in files.items():
             if not os.path.exists(p): err(n, f'falta {p}'); continue
             m = os.path.getmtime(p)
@@ -92,12 +93,18 @@ def main():
         print(f'  sub {sub} · h {pj["h"]} · agarre {pj["grip"]}')
         # GLB
         J0, B0 = glb(files[n + '.glb']); J, B = glb(files['web glb'])
-        h0, h1 = anim_hash(J0, B0), anim_hash(J, B)
-        if h0 != h1: err(n, f'la animación del GLB de web/ ({h1}) no es la del build ({h0})')
-        with tempfile.TemporaryDirectory() as td:
-            export_web.repack(files[n + '.glb'], os.path.join(td, 'x.glb'), o)
-            same = open(os.path.join(td, 'x.glb'), 'rb').read() == open(files['web glb'], 'rb').read()
-        if not same: err(n, 'el GLB de web/ no es el reempaquetado del GLB del build')
+        if 'EXT_meshopt_compression' in J.get('extensionsUsed', []):
+            # comprimido por tools/comprimir_modelos.sh: los búferes no se leen desde Python (la compresión ya verificó al
+            # decodificar que el error queda en su tope); la estructura se mira en el de web/ y los datos en el del build
+            h0 = h1 = anim_hash(J0, B0); same = 'comprimido (no se compara byte a byte)'
+            B = B0; Jd = J; J = dict(J0, nodes=Jd['nodes'], meshes=Jd['meshes'], materials=Jd['materials'], animations=J0['animations'])
+        else:
+            h0, h1 = anim_hash(J0, B0), anim_hash(J, B)
+            if h0 != h1: err(n, f'la animación del GLB de web/ ({h1}) no es la del build ({h0})')
+            with tempfile.TemporaryDirectory() as td:
+                export_web.repack(files[n + '.glb'], os.path.join(td, 'x.glb'), o)
+                same = open(os.path.join(td, 'x.glb'), 'rb').read() == open(files['web glb'], 'rb').read()
+            if not same: err(n, 'el GLB de web/ no es el reempaquetado del GLB del build')
         bones = [x['name'] for x in J['nodes'] if x['name'].startswith('mixamorig')]; names_ = [x['name'] for x in J['nodes']]
         meshes = [x['name'] for x in J['nodes'] if 'mesh' in x]; mats = [m['name'] for m in J['materials']]
         morphs = sorted({t for me in J['meshes'] for t in me.get('extras', {}).get('targetNames', [])})

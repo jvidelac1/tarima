@@ -1,5 +1,461 @@
 # Diseño del juego — Tarima
 
+## Gameplay 3: la barrita (13 de noviembre, noche)
+
+**Manda sobre Gameplay 2 para el Fácil por defecto**, que pasa a ser el nivel **`'b'` (la barrita)**. `'u'` queda en el núcleo
+para recalcular sus registros (`?ctl=u`) y Clásico (`'c'`) no cambia. Pedido del dueño: «tenés un puntero que se mueve en la
+barrita y si tocás muy lejos, falla; más o menos cerca, regular; en el verde, perfecto. Al usuario le gusta tirar él».
+
+- **Una barrita en el arranque (el tirón) y dos en el dos tiempos (la cargada y el envión).** Pararse, quedar firme y la garra
+  salen solos según la energía. Ni ¡SALTA! ni ¡PÁRATE! ni ¡ARRIBA! como toques.
+- **El puntero va y vuelve sin reloj** (`rules.js → posBarra`: 1,4 s de punta a punta, 1,7 s desde los 8 s sin tocar). El toque
+  dispara el tramo en ese instante. Sin ningún toque, al minuto (el reloj de la competencia) tira solo, como REGULAR.
+- **Zonas** (`zonasBarra`): verde = perfecto (nada de más), amarillo = regular (+600 de energía en ese tramo), rojo = lejos
+  (+1500). El ancho depende de los kilos (verde de ±170 ms con la apertura a ±75 ms al 100 %) y del pesista: Largo verde ancho en
+  el tirón y angosto en el envión, Potente al revés, Compacto parejo (`BARRA.pesistas`). El primer intento de la primera final,
+  1,4 veces más ancho. Si la barra sube lo sigue decidiendo la energía de `'u'` (kilos × cuerpo × suerte + el costo del toque),
+  con el gasto escalado a 0,925 (`BARRA.escala`).
+- **Panel**: el verde que va a tener con esos kilos (una barrita chica por barrita) y la chance «X de 10» con `chanceBarra`, que
+  integra dónde pega una persona típica (`BARRA.tipico`: ±105 ms, 30 ms tarde, 4 % de despistes). El entrenador usa la misma.
+- **Entrada**: el toque se juzga con el instante del evento, en el mismo reloj con el que se dibuja el puntero (que se dibuja un
+  cuadro y medio adelantado); dos contactos a menos de 120 ms son uno; los primeros 250 ms de una barrita no la disparan; una
+  tecla que ya venía repitiendo no cuenta. Después del toque queda la marca y ¡PERFECTO! / REGULAR / LEJOS.
+- **Cansancio**: lo que un intento exige (toques lejos, la garra, quedar justo) se resta a la energía inicial de los
+  siguientes del mismo levantamiento (la mitad pasa del arranque al dos tiempos). **Esfuerzo**: en los intentos exigentes
+  (desde el 95 % y con la energía justa al pararse) ¡PÁRATE! pide 3 toques sin apuro; hechos, pararse cuesta menos.
+  **Enviones**: split el más fácil, power intermedio, squat el más difícil.
+- **Todo verde, la barra sube** (`BARRA.verdeSalva`, versión 1.1 de las reglas, 13-nov, noche; pedido del dueño: «tocás
+  espacio, llega perfecto y capaz se le cae la barra. Esa es la única incongruencia»). En los tres niveles: si todas las
+  barritas de un levantamiento salen en verde, la barra sube siempre; ni la energía, ni la suerte del tramo, ni el cansancio la
+  pueden tirar. Mientras todo va en verde, un tramo que se queda sin energía se completa igual (la energía queda en 0, la
+  garra no se gasta, «tirón −1 · ¡lo salva el verde!») y lo que faltó cansa igual para los intentos siguientes; el esfuerzo de
+  pararse no aparece y el pesista se para solo con el mismo premio. Con una barrita amarilla o roja (o una que salió sola, que
+  es regular) vuelven las reglas de siempre desde ese tramo, y la línea de caída nombra cada toque que falló: «173 kg es el
+  99 % y pegaste en el amarillo en el envión (−½): se quedó sin energía en el envión». `chanceBarra` y el entrenador cuentan la
+  probabilidad de todo verde.
+- Medidas, ajustes y lo que falta: HANDOFF.md, «Barrita».
+
+### G3.D Dificultad: Fácil · Medio · Difícil (13-nov, tarde)
+
+Pedido del dueño: «si es fácil así está bien; si es un poco más difícil, que requiera un poco más de interacción a nivel tocar
+espacio». Se elige en Opciones (fila «Dificultad»: Fácil · Medio · Difícil · Clásico), queda en el dispositivo
+(`tarima.dificultad`) y va como súper propiedad `dificultad` en la analítica. Fácil por defecto. La regla del dueño sigue: nada
+de coordinar con el movimiento del pesista ni carreras de toques; lo de más son barritas legibles y toques cómodos.
+
+| | Fácil (`BARRA`) | Medio | Difícil |
+|---|---|---|---|
+| Barritas del arranque | tirón | tirón, atrapar arriba | tirón, atrapar arriba, pararse |
+| Barritas del dos tiempos | cargada, envión | cargada, pararse, envión | cargada, pararse, envión |
+| Puntero de punta a punta | 1,4 s (1,7 desde los 8 s) | 1,2 s (1,5 desde los 8 s) | 1,0 s, nunca lento |
+| Verde (ancho en la barrita) | el de siempre | 80 % | 65 % (amarillo 90 %) |
+| Costo amarillo / rojo (tirón y envión) | 600 / 1500 | 600 / 1500 | 450 / 1200 |
+| Costo amarillo / rojo (atrapar y pararse) | — | 350 / 900 | 300 / 800 |
+| Esfuerzo al pararse | desde 95 %, 3 toques en 3 s | desde 92 %, 5 en 3 s | desde 88 %, 6 en 3 s |
+| Persona típica del panel | ±105 ms | ±100 ms | ±90 ms |
+| Apertura sugerida | 90 % | 89 % | 88 % |
+| Rivales al elegirla | los que estaban | los que estaban | parejos si estaban los tranquilos |
+
+- **Atrapar** y **pararse** corren con el pesista quieto en el fondo (la barra arriba en el arranque, en los hombros en la
+  cargada): el toque cierra el tramo «arriba» (atrapar) o arranca la subida (pararse); sin tocar, al minuto salen solos como
+  regular. Con barrita de pararse, el esfuerzo (si toca) viene después y cuenta lo que costó esa barrita.
+- **Ancho por pesista** de las barritas nuevas (`rules.js → PESISTAS_B2`): Compacto atrapa con verde ancho, Largo se para con
+  verde angosto, Potente al revés (atrapa angosto, se para ancho): los mismos puntos fuertes y débiles de la energía.
+- **Núcleo**: `rules.js → NIVELES_B`, `reglasB(dif)`; cada nivel tiene su huella (`HUELLAS_B`; Fácil, `HUELLA_B`) y el
+  registro lleva `dif` solo si no es Fácil. `chanceBarra(…, { dif })` y el entrenador usan las reglas y la persona típica del
+  nivel. Referencia: `tools/sim_ref_dificultad.json` (sim_test 15).
+
+## Gameplay 2 (13 de noviembre)
+
+**Esta sección manda** sobre el resto del documento y sobre la parte de Fácil de [CONTROLES.md](CONTROLES.md) para el nivel de control nuevo **`'u'` («un toque, un tramo»)**, que pasa a ser el modo por defecto. Clásico (`'c'`) no cambia. El Fácil de círculos (`'f'`) sale de Opciones y queda en el núcleo solo para recalcular registros viejos.
+
+Se sintetizó a partir de tres propuestas (accesible, emoción y profundidad), tres juicios y cuatro diagnósticos (otros juegos, control actual, ritmo de la final y pesistas), todos del 13 de noviembre. Ganó por puntaje agregado **«Un toque, un tramo»** (la propuesta accesible), con injertos de las otras dos. Cómo se resolvieron las contradicciones está en G2.12. Todo número es un valor inicial. Los del margen salen de un modelo chico sin el núcleo (G2.4) y se recalibran con los bots.
+
+### G2.R Revisión 2.1 (13-nov, después de los verificadores): manda sobre G2.1 a G2.6
+
+Tres verificadores encontraron que quedaban toques con plazo que cambiaban el resultado (el FRENO de 2,5 s con la garra, ¡SALTA!
+y ¡PÁRATE! con su ¼ y ½ disco), que «el día» revelado al agarrar decidía la barra antes del primer toque, y que un pesista
+dominaba. Cambios, todos en el nivel `'u'` (Clásico y los rivales no cambian):
+
+1. **Ningún toque cambia el resultado.** Los toques acompañan (arrancan antes, aceleran la subida). ¡TIRA! y ¡ARRIBA! salen solas
+   a los 2 s; ¡SALTA! y ¡PÁRATE! no tienen premio ni castigo. Meta A: seis maneras de tocar, la de no tocar incluida, dan lo mismo.
+2. **La garra se usa sola**, y solo si con ella el resto del levantamiento llega (sin suerte); si no alcanzaría, queda para otro
+   intento. El FRENO es una pausa de 1 s sin nada que tocar.
+3. **Suerte por tramo en lugar de «el día».** Cada tramo gasta lo suyo más o menos una suerte uniforme que se ve recién al cerrar
+   ese tramo («pararse −1½ · pesó más»). El resultado se va viendo de a un tramo. La chance del panel («X de 10») es exacta
+   para cualquiera, porque no depende de cómo se toque.
+4. **Pesistas parejos y distintos.** Los cuerpos viven en `rules.js → CUERPOS_U` (no en sim.json, que vuelve a la huella de mvp).
+   Compacto: fiable (±200 de suerte por tramo), techo bajo. Largo: suerte normal (±250), le cuesta pararse. Potente: irregular
+   (±600), le cuesta arriba de la cabeza; el que puede dar la sorpresa. Kilos que suben 9 de 10 veces: 376 / 377 / 371; 5 de
+   10: 380 / 382 / 383; 2 de 10: 383 / 385 / 391.
+5. **El entrenador declara el peso** (`web/js/sim/entrenador.js`, lo usa `match.js` en `'u'` y el panel): el más alto que sube
+   9 de 10 en el segundo intento (dejando lugar al tercero), 7½ de 10 en el tercero, y el del oro cuando la chance lo
+   justifica. Quien confirma con Espacio gana con rivales normales (55 a 64 % de las finales) y se le caen 6 a 13 % de las
+   barras.
+6. La unidad se llama **energía** («Te sobra 1½ de energía»), no «discos» (que eran también los de la barra).
+
+Medidas y apartamientos: HANDOFF.md, «Gameplay 2.1».
+
+### G2.0 La regla del dueño
+
+> «Lo peor de todo es coordinar el movimiento con los círculos, a mí me costó bastante, empujar al final también, debe ser sencillo sin tanta coordinación, que la complejidad venga por el tipo de pesista, los pesos utilizados, y el push desde el celular debe estar perfectamente pensado, lo mismo para el space desde la computadora, si es difícil es algo negativo.»
+
+Lo que implica:
+
+- **No hay círculos que se cierran, ni momento justo, ni toques rápidos.** Ningún resultado depende de *cuándo* cae un toque.
+- **El riesgo viene de las decisiones y del cuerpo:** qué pesista, cuántos kilos, qué envión y cuándo gastar la garra. Una caída se explica con «pediste mucho para ese pesista», nunca con «tocaste tarde».
+- **El toque y el Espacio están diseñados y medidos:** cada contacto válido se reconoce y se ve, y ninguno se pierde ni se cuenta dos veces.
+- **Que sea difícil es un defecto.** Clásico queda para quien quiera precisión y es opcional.
+
+Por qué hace falta (diagnóstico del 13 de noviembre sobre origin/mvp 3058c25):
+
+- **Datos reales:** se cae el 36 % de las barras, 1 de cada 3 termina la final y 12 personas se fueron a los 30 s del primer levantamiento.
+- **Un bot que reacciona como una persona nueva** (toca 250 ± 80 ms después de ver la señal) hace en Fácil con teclado 61 / 44 % de válidos al 90 % (arranque / dos tiempos) sin el bono del primer intento, y 17 / 9 % al 95 %.
+- **La subida (¡EMPUJA!) queda perdida antes de empezar** desde el 93 % si hubo un TARDE antes. Esa es la queja «no se puede parar».
+- **Clásico da 0 a 20 % de válidos** con humanos simulados.
+- **El pesista por defecto espera 80,7 s** (mediana) sin tocar nada antes del dos tiempos, porque `cfg.ritmo` no hace nada desde 714effe.
+- **Fémur, brazos y movilidad no entran en ninguna regla.**
+
+### G2.1 El intento en `'u'`
+
+**Principio.** Cada toque cumple un tramo entero del levantamiento y vale en cualquier momento de ese tramo. Un toque que llega antes queda guardado. No tocar nunca tira la barra por sí solo: o cuesta un poco de margen, o el juego espera y después sigue solo. Si la barra sube o no lo decide el **margen** (G2.4), y el margen lo fijan los kilos y el cuerpo.
+
+**Arranque** (pasos «1 de 3» a «3 de 3»):
+
+| Paso | Señal (es / en) | Línea de regla (es / en) | Qué hace el contacto | Sin contacto |
+|---|---|---|---|---|
+| — | PREPÁRATE / GET READY (1,2 s, automático) | — | queda guardado para ¡TIRA! | sigue a ¡TIRA! |
+| 1 de 3 | ¡TIRA! / PULL! | toca cuando quieras / tap when ready | arranca el tirón | espera. Cuando quedan 5 s de reloj, arranca solo («¡Vamos!»). **No hay nulo por reloj** |
+| 2 de 3 | ¡SALTA! / JUMP! | toca otra vez / tap again | salto con empuje: gasto 0 y la palabra «¡BIEN!» | al terminar la luz salta solo: «salto flojo», −¼ de disco |
+| — | recepción (automática, 0,55 a 0,75 s) | — | queda guardado para ¡PÁRATE! | — |
+| 3 de 3 | ¡PÁRATE! / STAND UP! | toca una vez / tap once | pisotón: devuelve ½ disco y la subida se acelera | se para más lento y sin devolución |
+| — | AGUANTA / HOLD y ¡ABAJO! / DOWN | automáticos, como hoy | — | — |
+
+- El tramo de ¡SALTA! va desde 250 ms después del contacto de ¡TIRA! hasta el ancla de la explosión (la barra en la cadera).
+- La explosión ocurre siempre en el ancla. El contacto solo dice si fue «con empuje».
+- La luz sobre el muslo y junto a la barra es presentación: muestra dónde salta el pesista. Tocar en cualquier punto del tramo rinde lo mismo.
+- En `'u'` no hay PERFECTO, TEMPRANO ni TARDE.
+
+**Dos tiempos** (pasos «1 de 4» a «4 de 4»):
+
+- **Cargada:** igual que el arranque (¡TIRA!, ¡SALTA!, recepción automática y ¡PÁRATE!).
+- **RESPIRA:** 0,45 s, automática.
+- **4 de 4, ¡ARRIBA! / UP!:** «toca cuando estés listo» / «tap when ready».
+  - Con un contacto, la flexión, el empuje y la recepción del envión salen solos con las anclas del modelo (`an.dip`, `an.rec`, `an.post`). Así sequence.js y las poses se reutilizan sin cambios.
+  - Sin contacto, el envión sale solo a los 6 s con «¡Ahora!». En `'u'` no existe «La devolvió al piso».
+
+**Regla del contacto** (la misma para todos los tramos y las dos plataformas):
+
+1. Un **contacto** puede ser:
+   - un toque nuevo: un keydown de Espacio o Enter sin `e.repeat`, o un pointerdown en la zona;
+   - la tecla o el dedo que ya está apoyado cuando el tramo abre.
+2. Cada tramo con toque se cumple con **su primer contacto**. Si llega otro contacto en ese tramo, queda guardado (uno solo) para el siguiente tramo con toque del mismo levantamiento. Si no quedan tramos, se ve un acuse gris «listo» y no tiene efecto.
+3. **Contactos que cuentan como uno:**
+   - dos contactos a menos de 120 ms con teclado, o a menos de 80 ms con dos dedos, son uno solo (acuse gris «doble»);
+   - los contactos en los 300 ms siguientes a confirmar el llamado son parte de la confirmación.
+4. **Mantener es un solo contacto**, y además cumple cada tramo que abre mientras sigue apoyado. Mantener de punta a punta juega el intento entero sin perder nada.
+
+Consecuencia: machacar, mantener, tocar con calma o tocar de más dan **exactamente el mismo resultado**. Solo el que no toca nunca ¡SALTA! ni ¡PÁRATE! pierde margen: ¼ + ½ disco.
+
+### G2.2 El Espacio en la computadora
+
+- **Escucha.** Durante el intento (desde que se confirma hasta las luces), Espacio y Enter pertenecen al levantamiento: se escuchan en `window`, en fase de captura y con `preventDefault`. Nunca desplazan la página ni activan un botón. La excepción son los campos de texto.
+- **Qué cuenta como apretar.**
+  - Un keydown sin `e.repeat` y sin Ctrl, Meta ni Alt.
+  - Si el primer evento de una tecla es un `repeat` (el foco llegó con la tecla ya apretada), cuenta como apretar.
+- **Tecla apoyada.** El estado sale de keydown y keyup con un contador de teclas, así que dos teclas a la vez valen como una. Si se pierde un keyup, la tecla queda como apoyada, y eso solo puede cumplir tramos: nunca castiga. El blur y el cambio de visibilidad siguen poniendo pausa, como hoy en input.js.
+- **Foco.** Al confirmar el llamado se hace `blur()` del botón y el escenario toma el foco (`tabindex=-1`). Lo mismo al cerrar cada panel. Durante el intento no hay nada enfocable. Es la causa probable de «no me detecta bien la barra espaciadora».
+- **Acuse en el mismo manejador**, sin esperar al cuadro:
+  - la tecla dibujada se hunde (con una clase CSS), aparece un anillo y suena un tic, con el AudioContext ya activado en el primer gesto;
+  - enseguida el núcleo pone la palabra: «¡BIEN!», «GUARDADO», «listo» o «doble».
+- **Se mide** con `tools/teclado_test.mjs` (nuevo, sin navegador) y con check_toques en Actions.
+
+### G2.3 El dedo en el celular (acostado)
+
+- **Zona.** Todo el escenario menos 56 px arriba (pausa y menú), 24 px a cada costado (gestos del sistema) y 20 px abajo (barra de inicio).
+  - Abajo va una placa translúcida con el verbo y la mano, pero no hace falta apuntarle.
+  - El texto de la señal va arriba al centro, nunca bajo el pulgar.
+- **Eventos.**
+  - Solo Pointer Events. El contacto cuenta en pointerdown, nunca en pointerup ni en click.
+  - `preventDefault` en pointerdown y el menú contextual anulado.
+  - CSS de la zona: `touch-action:none`, `user-select:none`, `-webkit-touch-callout:none` y `overscroll-behavior:none`.
+- **Dedo apoyado.** Hay un dedo apoyado mientras el Set de `pointerId` no está vacío.
+  - Un segundo dedo a menos de 80 ms es el mismo contacto.
+  - Un pointercancel no anula un contacto ya contado. Para seguir tomándolo como apoyado hay 400 ms de gracia.
+- **Acuse:** un anillo donde está el dedo, la placa que se hunde, `navigator.vibrate(12)` donde exista (Android) y el tic de audio (en iOS no hay vibración).
+- **Latencia.** No importa, porque no hay ventanas. En `'u'` no se usan la corrección de 60 ms ni las ventanas táctiles (`tactil` en match.js ya vale solo para `'f'`).
+- **Toques fantasma.** Como mucho adelantan ¡TIRA! o usan la garra. Ninguno puede provocar una caída.
+
+### G2.4 El margen (discos)
+
+**Unidades.** El núcleo cuenta el margen en milésimas de disco, con enteros como el resto: 1 disco = 1000 = 4 cuartos. La pantalla lo muestra en discos con cuartos.
+
+**Reglas** (constantes `UNO` en rules.js):
+
+- **Margen inicial:** todos empiezan con **3 discos (3000)**. Los kilos no cambian el margen inicial. Lo que cambian es cuánto se come cada tramo: un solo concepto.
+- **«El día»:** un valor triangular entre −900 y +900 (la suma de dos uniformes de `Azar(semilla del intento)`).
+  - Se revela al agarrar la barra: «hoy se siente liviana», «normal» o «pesada» (los cortes están en ±300).
+  - Nunca aparece después de un toque.
+- **Gasto de cada tramo:** `base × r(I) × factor del cuerpo`.
+  - `r(I)` vale 0 hasta el 85 % del techo del momento y 1 al 100 %. Sube en línea recta y sigue igual por encima (al 103 % vale 1,2).
+  - Valores de `base`: **tirón 900, arriba 1500, pararse 2000**.
+  - «Arriba» es la recepción del arranque y, en el dos tiempos, el envión.
+- **Envión:**
+  - tijera, «arriba» ×0,8;
+  - power, ×1,0 y +500;
+  - squat, ×1,0, con +250 de margen si la movilidad es alta y −500 si no.
+- **Contactos:**
+  - sin contacto en ¡SALTA!, +250 de gasto en el tirón;
+  - con contacto en ¡PÁRATE!, −500 de gasto en el tramo de pararse (es la devolución del pisotón).
+- **Orden de los tramos:**
+  - arranque: tirón → arriba → pararse;
+  - dos tiempos: tirón → pararse (de la cargada) → arriba (el envión).
+- **Al cerrar cada tramo:**
+  - si `m ≥ 0`, sigue;
+  - si `−500 ≤ m < 0` y queda garra, viene el **FRENO**;
+  - si no, la barra cae **en ese tramo**.
+- **«Al límite».** Si termina con menos de ¼ de disco, la barra tiembla y las luces se encienden de a una con suspenso, pero el intento es **válido**. En `'u'` no hay nulos: válido o fallo, siempre explicable.
+- **Garra y FRENO.** Hay una garra por levantamiento (una en el arranque y otra en el dos tiempos) y vale +500. Solo se ofrece si alcanza para salvar el tramo.
+  - El FRENO es un estado del núcleo de 2500 ms: la barra queda frenada y tiembla.
+  - Señal: «¡DA TODO!» / «GIVE IT ALL!», con la línea «toca para usar tu garra · si no tocas, la sueltas» / «tap to use your grit · no tap lets it go».
+  - Con un contacto (incluida la tecla o el dedo apoyado), la garra se usa, `m += 500` y el levantamiento sigue.
+  - Sin contacto, la barra cae y la garra queda para otro intento. Esa es la decisión táctica: guardarla para el tercero.
+- **Línea de caída.** Nombra el tramo donde cayó y el que más gastó, nunca un tiempo. Ejemplo: «Se cayó en el envión. Pararse con la cargada se llevó 1½ discos: para Largo, 172 kg es el 99 %.»
+- **Panel del llamado.** Para cada peso muestra «**llegas con**»: el margen previsto en el tramo más justo, con día 0, ¡SALTA! y ¡PÁRATE! tocados y sin garra. Se ve en discos (●●○, ●◑○, y en rojo cuando no alcanza) junto al nombre del tramo más justo. ← y → cambian los kilos y los discos se actualizan al momento.
+
+**Modelo inicial** (script del scratchpad: margen determinista + «el día» + garra usada si se ofrece, con los factores de G2.5). Son los válidos con ¡SALTA! y ¡PÁRATE! tocados:
+
+| Intensidad | Arranque (Compacto / Largo / Potente) | Dos tiempos en tijera (C / L / P) |
+|---|---|---|
+| 90 a 95 % | 100 / 100 / 100 | 100 / 100 / 100 |
+| 97 % | 100 / 96 / 98 | 100 / 100 / 100 |
+| 100 % | 75 / 30 / 37 | 89 / 57 / 76 |
+| 103 % | 11 / 0 / 0 | 27 / 2 / 12 |
+
+Sin tocar nunca ¡SALTA! ni ¡PÁRATE! (el bot «ausente»), el arranque da 100 % al 90 %, 99 / 88 / 90 % al 95 % y 51 / 16 / 20 % al 98 %.
+
+La curva es empinada entre el 97 y el 103 %, que es justo donde se decide la final. El paso 2 del plan crea `tools/margen_cal.mjs` sobre el núcleo real y ajusta solo las tres `base`, `r(I)` y el rango del día hasta cumplir las metas C y D. Los factores de cuerpo no se tocan, porque son la personalidad de cada pesista.
+
+### G2.5 Pesistas
+
+Cada uno tiene una fase fuerte y una débil, que se ven en los discos del panel, en dónde se apagan durante el intento y en la línea de caída. Van en `web/data/sim.json` → `atletas.<id>.cuerpoJuego` = `{tiron, arriba, pararse, casa}` (en milésimas). Solo los lee `'u'`.
+
+| | Tirón | Arriba | Pararse | Envión de la casa | Tarjeta (es / en) |
+|---|---|---|---|---|---|
+| **Compacto** (fémur y brazos cortos, movilidad alta; viene marcado) | 1,1 | **0,7** | 0,85 | squat si la meta D lo confirma; si no, tijera | «Recibe abajo y aguanta arriba. Levanta menos kilos.» / «Catches low and holds it overhead. Lifts less weight.» |
+| **Largo** (fémur y brazos largos) | **0,5** | 0,9 | **1,2** | tijera | «Tira la barra alto, pero pararse con mucho peso le cuesta.» / «Pulls the bar high, but standing up under heavy weight is hard.» |
+| **Potente** (torso largo, piernas cortas y fuertes, hombros rígidos; solo en reglas, sin Blender) | 1,0 | **1,35** | **0,6** | tijera | «Se para con cualquier peso; arriba de la cabeza va justo.» / «Stands up with anything; overhead is shaky.» |
+
+- **Debilidades.** Compacto tiene como débil los kilos: su techo es el más bajo, y para pelear el oro tiene que pedir cerca de su 100 %. Largo pierde al pararse. Potente pierde arriba de la cabeza, en la recepción del arranque y en el envión.
+- **Cómo se nota en la final:**
+  - en el primer intento aparece una sola vez el acuse de la fase fuerte («Largo: salto fácil»);
+  - la primera vez que gasta la fase débil aparece un aviso corto («a Largo le cuesta pararse»);
+  - en el panel, el mismo peso da discos distintos según el pesista.
+- **Se saca de la tarjeta:**
+  - la barra de Energía (equivale a 1 kg en toda la final);
+  - «la barra recorre menos», «rinde con mucho peso» y «se cansa rápido», que hoy no son ciertas o no se sienten.
+- **Lo que no cambia:** `tec`, `tem` y `fon` siguen valiendo en Clásico y para los rivales.
+- **Rivales:** siguen en `'c'`, así que ai.js, balance.mjs, sim_ref.json y sim_ref_facil.json no se tocan. Lo que el resumen de un rival dice de su apuesta («cómodo», «justo», «al límite») sale de esta misma tabla con la intensidad que pidió, no de su simulación.
+- **Hecho (13-nov, segunda parte):** factores tal cual la tabla. La base de cada tramo se recalibró a 1000 / 1700 / 1800 con `tools/margen_cal.mjs`. El envión de la casa de Compacto quedó en tijera, porque el squat rinde menos desde el 100 %. Su tarjeta dice «Su arranque máximo es el más bajo»: los totales máximos de los tres están a 2 kg uno de otro. La apuesta de los rivales sale de la intensidad. Medidas y apartamientos: HANDOFF.md, «Gameplay 2, segunda parte».
+
+### G2.6 Emoción (sin agregar ningún control)
+
+1. **Los discos se apagan** de a uno, con una palabra corta: «tirón −½», «pararse −1½». Con el último disco todos saben que el próximo tramo decide.
+2. **FRENO:** es una pausa dramática de 2,5 s. La barra tiembla, el público se calla, se oye un latido y late la ficha de garra.
+   - Si traba: golpe de sonido, la barra vibra y el público estalla.
+   - Si cae: un lamento corto y parpadea el disco que faltó.
+3. **Cámara lenta, solo de presentación.** El reloj del núcleo no se estira, y ni el registro ni el servidor la conocen.
+   - **Cuándo:** como mucho una vez por intento, y en 1 de cada 3 intentos propios o menos. Al empezar el tramo que deja ¼ de disco previsto o menos, o en un intento por oro o por récord.
+   - **Cómo:** 0,7 s a media velocidad con acercamiento. La presentación se atrasa como mucho 350 ms y se pone al día en el segundo siguiente.
+   - **Durante la cámara lenta** los contactos valen igual.
+   - **Rendimiento:** perf.js baja la calidad antes, para que no haya tirones en el celular.
+4. **Pisotón de ¡PÁRATE!:** golpe de bajo, sacudón de cámara de 4 px durante 120 ms, magnesio y grito del pesista.
+5. **«El día»** se revela al agarrar la barra: una sorpresa chica y justa.
+6. **Luces de a una** en el veredicto propio, con suspenso cuando es «al límite».
+7. **Marcador** con la apuesta legible: «Para pasar a Brenner: 174 → llegas con ●○○».
+8. **Cierre del primer intento:** «Eso es todo. Lo difícil es elegir los kilos.» / «That's it. The hard part is picking the weight.» Después de una caída cercana: «¡Casi!» y, en el llamado siguiente, el botón «Bajar a X kg» preseleccionado.
+
+### G2.7 Ritmo de la final
+
+**Presupuesto** con las opciones por defecto (Fácil, rivales amistosos, ritmo «Rápida»):
+
+| Qué | Meta | Hoy |
+|---|---|---|
+| Final completa, desde el primer peso hasta el podio (reloj de juego, mediana) | 150 s o menos | 215 a 219 s |
+| Espera sin tocar entre un levantamiento propio y el siguiente panel propio | 20 s como máximo, p90 de 15 s o menos y mediana de 10 s o menos | 80,7 s de mediana antes del dos tiempos 1 (Ventura) |
+| Turno de rival no decisivo | 3 s o menos | unos 11,4 s |
+| Turno de rival, del tercero seguido en adelante | fila de 1,2 s en el marcador | — |
+| Turno de rival decisivo (oro o medalla) | entero, 9 s o menos | — |
+| Veredicto propio | 3 s o menos si vale, tVer + 2,4 s si falla | tVer + 4,2 s si falla |
+| Carga de la barra | 0 s aparte | unos 12 s por final |
+
+**Cómo** (en main.js):
+
+1. **«Rápida» vuelve a existir en `llamadoRival`.** Un rival no decisivo se muestra con un corte a 1 s antes de su explosión, las luces de golpe y una línea con su apuesta y el resultado, sin repetición. «Completa» queda como hoy.
+2. **Repetición de un rival solo si es decisivo.** Hoy sale en el 85 % de los turnos.
+3. **`carga()` sin await**, debajo del panel del llamado. El cartel muestra solo el peso final, sin los intermedios que bajan a 120.
+4. **El panel del llamado de Fácil** viene con los kilos sugeridos preseleccionados.
+   - Espacio confirma: «ESPACIO: levantar 92 kg».
+   - ← y → cambian los kilos, y los discos se ven al lado.
+   - El envión queda en «Más opciones», con sus discos.
+5. **Saltear con un toque.** Toda pantalla pasiva lleva el recuadro fijo «ESPACIO / toca: seguir», y un toque saltea el turno del rival junto con su veredicto. Eventos `rival_salteado`, `veredicto_salteado` y `carga_salteada`.
+6. **El muro no se toca:** arranque gratis, muro en el intervalo antes del dos tiempos, y con el mail se juega libre. Solo llega antes porque se resumen los rivales.
+
+### G2.8 Aprendizaje y textos
+
+- **Sin tutorial aparte en `'u'`.** Se saltean `tarjeta()` y `tutorial()`, y el primer arranque de la primera final hace de práctica. Las ayudas de primera vez se muestran una sola vez cada una, con `primeraVez()`:
+  - una mano o la tecla ESPACIO fantasma «toca» la placa en ¡TIRA!;
+  - una flecha a la luz de ¡SALTA!;
+  - en ¡PÁRATE!, «toca una vez: pisotón».
+- **Presentación en una línea**, que se cierra sola a los 4 s o con un toque: «Toca 3 veces: tira, salta, párate. Los kilos que elijas deciden el resto.» / «Tap 3 times: pull, jump, stand. The weight you pick decides the rest.»
+- **Señales planas** en es.js y en.js, con las mismas claves y en español neutro con tuteo (sim_test lo exige): ¡TIRA! / PULL!, ¡SALTA! / JUMP!, ¡PÁRATE! / STAND UP!, ¡ARRIBA! / UP!, AGUANTA / HOLD, ¡ABAJO! / DOWN, ¡DA TODO! / GIVE IT ALL!.
+  - Se sacan en `'u'` EXPLODE!, DIP!, «stay ahead of the red» y PERFECTO.
+  - La palabra del toque anterior pasa a la placa del pulgar, así nunca hay dos imperativos a la vez en pantalla.
+  - Los descartes se reducen a «doble», «listo» y «guardado».
+- **Después de una caída,** el llamado siguiente trae una línea («Con 2 kg menos llegas con ●●○») y el botón «Bajar a X kg» preseleccionado.
+- **En la primera final,** pedir un peso con el que «no llegas» pide confirmación.
+- **Opciones:** «Fácil» o «Clásico (exigente)».
+  - Si el guardado dice `'f'`, se lee como `'u'`.
+  - Clásico se ofrece una sola vez, después de dos finales ganadas, con su tutorial actual.
+
+### G2.9 Metas medibles
+
+Cada meta es un criterio que pone la prueba en rojo, salvo la M.
+
+- **A. Sin coordinación** (play_human, `'u'`, 600 intentos por casilla: 3 pesistas × teclado y dedo × 88 a 103 %).
+  - Con la misma semilla dan **resultados idénticos** en el 100 % de los casos los bots: reactivo (250 ± 80 ms más el atraso del aparato, a veces mira tarde, toques de más y de menos), mantiene, machacador (8 por s), fantasma (contactos de 30 a 300 ms al azar) y tardío (+600 ms).
+  - El bot ausente difiere solo en ¼ + ½ disco y hace 95 % o más de válidos al 90 %.
+  - **Cero** fallos con causa de entrada: anticipado, devuelve, reloj, sin_apoyo, ni ninguna causa por tarde.
+- **B. Primer intento:** el novato reactivo, con la apertura sugerida, hace 97 % o más de válidos en arranque y en dos tiempos con los tres pesistas, sin ningún bono escondido.
+- **C. Curva de riesgo** (novato, promedio de los pesistas, garra usada si se ofrece).
+  - Hasta 95 %: 97 % o más. Al 97 %: 85 % o más. Al 100 %: 35 a 65 %. Al 103 %: 20 % o menos.
+  - Monótona.
+  - Hasta el 97 %, ningún pesista queda más de 10 puntos abajo del promedio.
+  - Con el plan sugerido completo, 12 % o menos de barras caídas.
+- **D. Pesistas.**
+  - Entre el 98 y el 103 %, en el 70 % o más de las caídas de Largo el tramo que más gastó es pararse, y en las de Potente es arriba.
+  - En Compacto, ningún tramo pasa del 60 % de las caídas.
+  - Al 100 %, en algún levantamiento dos pesistas difieren en 15 puntos o más.
+  - El squat de la casa de Compacto queda solo si da tanto o más que la tijera.
+- **E. Las decisiones importan.** Con rivales normales, el bot lector (elige kilos mirando los discos y el marcador) gana el oro por lo menos 15 puntos más seguido que el codicioso (+5 kg fijos) y que el prudente (+2 kg fijos), con cada pesista.
+- **F. Discos honestos** (tools/chance_test.mjs). En cada banda de «llegas con» (2 o más, 1 a 2, ½ a 1, 0 a ½ y no llega), lo que mide el novato coincide con lo que usa el panel, con un error de 5 puntos o menos. «X de 10» se muestra junto a los discos solo si esta meta pasa.
+- **G. Toda caída se explica:** el 100 % de las caídas nombra el tramo y lo que gastó. Ninguna línea menciona tiempos.
+- **H. Toques** (teclado_test y dedo_test, sin navegador). En 10 000 secuencias:
+  - casos: repetición del teclado, keyup perdido, foco en un botón, blur, dos dedos a menos de 80 ms, pointercancel, doble toque a 100 ms, mantener 10 s y toques en los bordes;
+  - resultado: 0 contactos sin resolver, 0 contados dos veces y el 100 % con acción o palabra;
+  - los bordes nunca cuentan, y la ráfaga de la confirmación nunca arranca el tirón.
+- **I. Acuse** (check_toques en Actions y telefono.yml):
+  - p95 de 1 cuadro o menos (17 ms o menos a 60 Hz) entre el timeStamp del evento y la pintura, con teclado y con táctil;
+  - durante el intento, Espacio nunca desplaza la página ni activa un botón;
+  - las capturas del teléfono acostado muestran la zona y el texto fuera del pulgar.
+- **J. Ritmo** (tools/ritmo_test.mjs: 60 semillas × 3 pesistas × 2 niveles de rivales).
+  - Cumple el presupuesto de G2.7.
+  - Intento propio (p90 del novato): 7 s o menos en el arranque y 12 s o menos en el dos tiempos.
+  - check_recorrido se pone en rojo si una espera con rivales pasa de 20 s o la final pasa de 150 s, y suma capturas de la pantalla 'rival'.
+- **K. Cámara lenta** en 1 de cada 3 intentos propios o menos y como mucho una vez por intento. perf_test agrega el caso.
+- **L. Compatibilidad.**
+  - sim_ref.json y sim_ref_facil.json quedan idénticos, y se agrega sim_ref_uno.json.
+  - replay.js recalcula idénticas 1000 finales `'u'`, y los registros `'f'` y `'c'` siguen dando lo mismo.
+  - check_muro, check_muro_medio, worker_test y servidor_test en verde sin tocar conexion.js, servidor.js ni worker/.
+- **M. Datos reales** (después de que el dueño publique; no es criterio de bots):
+  - barras caídas: 15 % o menos (hoy 36 %);
+  - finales terminadas: 55 % o más de las empezadas (hoy un 33 %);
+  - salidas a los 30 s del primer levantamiento: la mitad o menos;
+  - primer arranque válido: 90 % o más;
+  - duración de la final (`final_fin.duracion_s`): mediana de 3,5 min o menos.
+
+### G2.10 Riesgos
+
+- **Que se sienta resuelto de antemano** («el juego se juega solo»).
+  - Mitigación: los discos y el día a la vista, el FRENO con la garra, los rivales que obligan a pedir kilos y la meta E.
+  - Medición: el abandono después del primer levantamiento.
+- **Sensación de tragamonedas con el día** («llegaba con ●○○ y cayó»).
+  - El día se anuncia antes de tirar y el panel es honesto (meta F).
+  - Si duele, se achica el rango y se recalibra la curva.
+- **Los que les gustaba el ritmo pierden gestos.** Mitigación: Clásico intacto y ofrecido después de dos finales ganadas.
+- **Mantener en iOS** (lupa, selección, barras de Safari). Mitigación:
+  - el gesto que se enseña es tocar, y mantener solo suma;
+  - el CSS de la zona, los bordes excluidos y las capturas de telefono.yml.
+- **Foco del teclado:** un panel que deje el foco en un botón. Mitigación: `blur()` al cerrar cada panel, la escucha en captura y un caso en teclado_test.
+- **Animación con tiempos automáticos.**
+  - La recepción y el envión automáticos caen en las anclas que ya existen.
+  - Si algo se ve raro, se corrige el tiempo en la capa de juego, nunca las poses de blender/.
+- **main.js tiene unas 12 comparaciones `ctl === 'f'`** (líneas 294, 373, 602, 610, 718, 726, 758, 792, 840, 854, 1050 y 1055).
+  - Hay que revisarlas una por una con un ayudante `facil = ctl !== 'c'`, y no reemplazarlas a ciegas.
+  - Dos de ellas son la práctica y el tutorial, que en `'u'` se saltean.
+- **Analítica.** `intento_propio` agrega `margen_ini`, `dia`, `gastos`, `margen_fin`, `garra`, `tramo_caida`, `tramo_mayor` y `patron_entrada`. Los campos viejos quedan con `null` para no romper los paneles de PostHog.
+- **El diagnóstico no está confirmado con datos:** que las caídas reales se juntan en la subida es una predicción de los bots. Antes de dar el problema por cerrado hay que cruzar `intento_propio.causa` con el número de intento y la intensidad.
+- **Alcance.** Para saber qué movió los datos, va en commits chicos, con una prueba en cada paso y sin publicar.
+
+### G2.11 Plan
+
+**0. Rama.** Hecho el 13 de noviembre: `gameplay` avanzó por fast-forward a origin/mvp (3058c25) en el worktree `/Users/juancavidela/tarima-trabajo/gameplay`. En la Mac se corren solo `node --check` y las pruebas sin navegador, de a una. Lo que usa navegador va a Actions. No se publica en Cloudflare.
+
+**Entrega 1 (esta noche).**
+
+1. **Bots primero.** Sumar a tools/play_human.mjs los bots reactivo, mantiene, machacador, fantasma, tardío, ausente, lector, codicioso y prudente, y guardar la línea de base de `'f'`.
+2. **Reglas** (web/js/sim/rules.js):
+   - `CONTROLES = ['c','f','u']` y la tabla `UNO` (margen 3000, base, `r(I)`, día, contactos, garra, FRENO de 2500 ms, ¡ARRIBA! solo a los 6 s, arranque solo con 5 s de reloj, memoria de 250 ms, doble de 120 / 80 ms).
+   - `VERSION` sigue en 1.0, porque `'c'` y `'f'` no cambian.
+   - En web/data/sim.json, `cuerpoJuego` por pesista, y la huella se regenera con tools/build_sim_data.mjs.
+   - tools/margen_cal.mjs calibra contra las metas C y D.
+3. **Núcleo** (web/js/sim/attempt.js, ramas `c.ctl === 'u'`):
+   - ¡TIRA! con un contacto o automático, sin nulo por reloj;
+   - `_explota(ancla, 0)` siempre, con la palabra «bien» o «flojo»;
+   - `_recibe` automático;
+   - pelea determinista: la velocidad sale del margen, el contacto de ¡PÁRATE! la acelera, y no hay piso rojo, tope de 6 s ni toque rápido;
+   - gastos al cerrar cada tramo, estado `freno` y caída con `tramo_caida` y `tramo_mayor`;
+   - hombros: un contacto o automático a los 6 s, y el envión agendado en las anclas;
+   - `res` con `margen_ini`, `dia`, `gastos`, `margen_fin` y `garra`.
+   - Pruebas: sim_test (con `'c'` y `'f'` idénticos) y el nuevo sim_ref_uno.json.
+4. **Capa** (web/js/game/controles.js): `traducir`, `automaticos` y `senal` para `'u'`, con los tipos `libre`, `luz` (¡SALTA!), `uno` (¡PÁRATE!) y `decide` (FRENO), más `PASOS` `{s: 3, c: 4}`. Pruebas: play_human con las metas A a D, y caida_test.
+5. **Entrada** (web/js/game/input.js y telefono.js, más el CSS de la zona): la regla del contacto de G2.1, G2.2 y G2.3. Se crea tools/teclado_test.mjs y se amplía dedo_test (meta H).
+6. **Presentación:**
+   - ui/senal.js: la luz de ¡SALTA! y la placa del pulgar;
+   - ui/margen.js (nuevo): los discos con la palabra de cada gasto;
+   - ui/ayudas.js: las ayudas de primera vez;
+   - ui/mensajes.js: las líneas de caída con el tramo y el gasto.
+7. **Final** (web/js/game/main.js):
+   - `ctl` por defecto `'u'` y Opciones;
+   - panel con «llegas con», garra, «Bajar a X kg» y Espacio para confirmar;
+   - saltear `tarjeta()` y `tutorial()`;
+   - el ritmo de G2.7 completo y los eventos de salteo.
+8. **Textos:** roster.js (tarjetas y sin Energía), es.js y en.js con las mismas claves.
+9. **Ritmo:** tools/ritmo_test.mjs (a partir del modelo `ritmo.mjs` del scratchpad) y metas en rojo en check_recorrido.
+10. **Actions:**
+    - `gh workflow run pruebas.yml -R jvidelac1/tarima --ref gameplay` y telefono.yml;
+    - `gh run watch <id> -R jvidelac1/tarima --exit-status` en tramos de menos de 9 min;
+    - bajar las capturas con `gh run download` a una carpeta nueva del scratchpad y **mirarlas**: la luz, los discos, el FRENO, el teléfono acostado y el acuse.
+11. **Documentación:** docs/CONTROLES.md (sección de `'u'` con el gesto exacto), HANDOFF.md (lo medido y lo que queda como estimación: los factores de cuerpo y el día) y la analítica nueva.
+
+**Entrega 2 (después de que el dueño lo juegue con el teclado y en el celular):**
+
+- cámara lenta y perf_test;
+- «X de 10» si la meta F pasa;
+- la línea de apuesta de los rivales;
+- la oferta de Clásico después de dos victorias;
+- ajustar el día y los valores `base` con los datos reales.
+
+**Servidor.** El Worker (worker/src) no importa web/js/sim ni recalcula intentos. El recálculo es replay.js, que ya valida `ctl` contra `CONTROLES`. Agregar `'u'` en rules.js alcanza: no hace falta desplegar el Worker, y servidor_test cubre el recálculo local.
+
+### G2.12 Contradicciones resueltas y descartes
+
+- **¡SALTA! con momento justo** (la propuesta accesible, con una franja de 500 a 750 ms) frente a **sin tiempo** (los injertos de los tres juicios). Se eligió sin tiempo: la luz es solo presentación y en `'u'` no hay PERFECTO. Así lo pide la regla del dueño.
+- **Margen inicial según los kilos** (accesible) frente a **margen fijo con gastos según los kilos.** Se eligió el fijo: es un solo concepto, «los kilos se comen los discos», y el intento siempre empieza lleno.
+- **«El día» de ±¼ de disco** frente a **±0,9.** Con ±¼, el modelo pasa del 100 al 0 % en 2 puntos de intensidad y la decisión de kilos se vuelve trivial. Con ±0,9 hay curva. Si se siente injusto, se achica (riesgos).
+- **La meta «la habilidad importa solo arriba» (bueno − novato ≥ 25)** se descarta porque contradice la regla del dueño. La reemplaza la meta E: importan las decisiones.
+- **Mantener como gesto principal** (emoción) se descarta, porque mantener es frágil en iOS. Mantener vale igual que tocar (regla 4), pero el gesto que se enseña es tocar.
+- **El aro de concentración de 1 s** se descarta: un toque fantasma ya no puede dañar.
+- **Garra o palmas:** se eligió la garra, que suma una decisión de guardarla y un momento dentro del intento. Las palmas quedan fuera, para no sumar otra ficha.
+- **Cómo se calcula el riesgo.** Se descartan el σ del atleta con PRNG en la capa (emoción) y `cuerpo.js` con `plan()` (profundidad). El margen vive en attempt.js con `Azar(semilla)`, como hoy, y replay.js lo recalcula sin capa extra ni `VERSION` nueva.
+- **Rivales en el modelo nuevo** (profundidad) se descarta: siguen en `'c'`. Su balance y quién gana no se mueven esta noche.
+- **Nulos en `'u'`:** no hay. «Al límite» da suspenso, pero el intento es válido.
+- **Cámara lenta acoplada al núcleo** (emoción) se descarta: es solo presentación.
+- **El riesgo de servidor** que anunciaban las propuestas estaba sobreestimado: el Worker no recalcula (ver G2.11).
+
+---
+
+Lo que sigue es el documento del 11 de noviembre. Donde contradiga a Gameplay 2, manda Gameplay 2 para el nivel `'u'`.
+
 Redactado el 11 de noviembre de 2026. Este documento dice cómo se juega; [PLAN.md](PLAN.md) dice en qué etapa se hace cada cosa y [HANDOFF.md](../HANDOFF.md) dice qué existe hoy.
 
 Es la síntesis de tres propuestas independientes (sensación de juego, competencia y producción), corregida después de dos críticas (una de diseño y una técnica). Donde las propuestas no coincidían se eligió una y el motivo está en el anexo A. Lo que cambió por las críticas, y lo que se descartó de ellas, está en el anexo B.
@@ -487,6 +943,18 @@ Por eso los rivales fallan con las mismas causas visibles que el jugador, y un s
 | Hasta cuánto pide por necesidad | 101 % del techo visible | 100,5 % | 103 % |
 | Tras un nulo | Repite | Repite | Repite o sube 1 |
 | Cambios | Casi nunca | Pasa al rival por un kilo para salir después; declara alto y baja | Sube por orgullo si lo pasan; nunca asegura |
+
+**Rivales con personalidad (13-nov, registros con `ia`; `web/js/sim/ai.js` → `PERSONALIDADES`).** La tabla de arriba y el «Tercer intento» de abajo quedan para los registros viejos. Antes Brenner y Marangi declaraban un kilo más que lo que tuviera declarado otro pesista a 2 kg o menos, y el jugador lo veía como «me copian los kilos». Ahora cada uno juega su plan, sembrado por final, desde su techo visible (permilajes antes del −3,5 % de Amistoso):
+
+| | Ventura · «va a lo seguro» | Brenner · «hace cuentas» | Marangi · «arriesga» |
+|---|---|---|---|
+| Apertura | 91,5 a 95 % | 91 a 95 % | 93 a 97 % |
+| Segundo / tercero (adónde quiere llegar; de ahí salen sus saltos) | 96,5–98 % / 98,5–100 % | 96,5–98,5 % / 99–101 % | 96–98 % / 100,5–103,5 % («va por todo») |
+| Tras un nulo | Repite; si no tiene marca en ese levantamiento, el tercero también repite | Repite | Repite o sube 1 (una final de cada dos) |
+| La tabla (solo en el dos tiempos, con un total en la mano) | Último intento: sube un puesto si cuesta ≤ 101 % | Si va primero, segundo cómodo (≤ 97,5 %) y en el último obliga al perseguidor a pasar del 100 %; si va atrás, en el último pide lo justo para subir un puesto (≤ 101–103 %) | Último intento: va por el oro si cuesta ≤ 107 % |
+| Arranque | — | Cuatro finales de cada diez «se guarda» en el tercero (≤ 96,5 %) | — |
+
+Nunca miran lo que declaró otro: la tabla se lee en totales. Su palabra sale en el cartel de su turno y en la presentación; en un intento puntual cambia por «va por todo», «se guarda para el dos tiempos» o «pide lo justo para pasar». Medidas: `node tools/rivales_test.mjs` y HANDOFF.md, «Rivales con su propia estrategia de kilos».
 
 **Cada final es distinta.** La semilla mueve la apertura de cada rival entre el 91 % y el 96 %, y cada salto en ±1 kg. Además elige un **guion**, que se anuncia en la presentación:
 

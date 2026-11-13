@@ -1,0 +1,93 @@
+{
+ "datos": "09c9b907",
+ "huellas": {
+  "medio": "be6d074f",
+  "dificil": "892f7335"
+ },
+ "casos": [
+  {
+   "semilla": 9000017,
+   "nivel": "amistoso",
+   "persona": 0,
+   "dif": "medio",
+   "tabla": "marangi:169+192=361#1 ventura:163+198=361#2 brenner:169+187=356#3"
+  },
+  {
+   "semilla": 18000034,
+   "nivel": "normal",
+   "persona": 1,
+   "dif": "dificil",
+   "tabla": "ventura:168+210=378#1 marangi:166+196=362#2 brenner:166+196=362#3"
+  },
+  {
+   "semilla": 27000051,
+   "nivel": "dificil",
+   "persona": 2,
+   "dif": "medio",
+   "tabla": "ventura:169+209=378#1 brenner:172+205=377#2 marangi:0+192=0#-"
+  },
+  {
+   "semilla": 36000068,
+   "nivel": "amistoso",
+   "persona": 0,
+   "dif": "dificil",
+   "tabla": "brenner:165+200=365#1 marangi:161+203=364#2 ventura:164+187=351#3"
+  },
+  {
+   "semilla": 45000085,
+   "nivel": "normal",
+   "persona": 1,
+   "dif": "medio",
+   "tabla": "marangi:168+207=375#1 ventura:157+207=364#2 brenner:166+187=353#3"
+  },
+  {
+   "semilla": 54000102,
+   "nivel": "dificil",
+   "persona": 2,
+   "dif": "dificil",
+   "tabla": "ventura:167+211=378#1 brenner:173+204=377#2 marangi:164+183=347#3"
+  },
+  {
+   "semilla": 63000119,
+   "nivel": "amistoso",
+   "persona": 0,
+   "dif": "medio",
+   "tabla": "marangi:168+195=363#1 ventura:164+197=361#2 brenner:158+186=344#3"
+  },
+  {
+   "semilla": 72000136,
+   "nivel": "normal",
+   "persona": 1,
+   "dif": "dificil",
+   "tabla": "ventura:167+209=376#1 marangi:165+198=363#2 brenner:169+0=0#-"
+  },
+  {
+   "semilla": 81000153,
+   "nivel": "dificil",
+   "persona": 2,
+   "dif": "medio",
+   "tabla": "ventura:168+210=378#1 brenner:174+203=377#2 marangi:160+187=347#3"
+  },
+  {
+   "semilla": 90000170,
+   "nivel": "amistoso",
+   "persona": 0,
+   "dif": "dificil",
+   "tabla": "marangi:168+198=366#1 ventura:166+197=363#2 brenner:165+193=358#3"
+  },
+  {
+   "semilla": 99000187,
+   "nivel": "normal",
+   "persona": 1,
+   "dif": "medio",
+   "tabla": "ventura:165+208=373#1 marangi:169+203=372#2 brenner:166+192=358#3"
+  },
+  {
+   "semilla": 108000204,
+   "nivel": "dificil",
+   "persona": 2,
+   "dif": "dificil",
+   "tabla": "ventura:170+211=381#1 brenner:173+203=376#2 marangi:164+200=364#3"
+  }
+ ]
+}

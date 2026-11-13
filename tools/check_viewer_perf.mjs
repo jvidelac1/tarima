@@ -9,7 +9,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const arg = (k, d) => { const a = process.argv.find(a => a.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3) : d; };
 const WEBS = [path.resolve(arg('web', path.join(ROOT, 'web'))), ...(arg('web2') ? [path.resolve(arg('web2'))] : [])], QS = arg('q', 'alta,media,baja').split(','), ROUNDS = +arg('rounds', 3), MAXR = +arg('max-rounds', 10), REPS = +arg('reps', 30), WHO = arg('who', 'ventura');
 const [VW, VH] = arg('size', '1600x900').split('x').map(Number), DPR = +arg('dpr', 1), SHOT = arg('shot', '');
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.woff2': 'font/woff2' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2' };
 const serve = WEB => new Promise(done => { const server = http.createServer((req, res) => { const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname), f = path.join(WEB, rel.endsWith('/') ? rel + 'index.html' : rel);
   if (!fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); res.end(); return; } res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'Cache-Control': 'no-store' }); fs.createReadStream(f).pipe(res); }); server.listen(0, '127.0.0.1', () => done(server)); });
 const servers = await Promise.all(WEBS.map(serve));

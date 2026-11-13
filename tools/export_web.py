@@ -5,6 +5,8 @@
 - Saca los morph targets de las primitivas que no los usan (zapatillas, ojos, cinturón, pelo, pestañas): pasan a una malla y un nodo
   aparte ('<nodo>_parts') con el mismo skin, y se descartan sus accesores en cero.
 - Escribe web/models/detail_cloth.png y detail_skin.png: normales de detalle en mosaico (opcionales para el visor, con la máscara G y R).
+Después hay que correr tools/comprimir_modelos.sh (build.sh lo hace solo): comprime la geometría con meshopt, arma el GLB
+liviano con texturas a 1024 (<nombre>_1024.glb, el que baja el juego) y pasa la máscara a WebP; acá todo sale sin comprimir.
 Variables: TARIMA_OUT (carpeta de salida del build), TARIMA_WEB (destino, por defecto web/),
 TARIMA_WEBTEX (tope de resolución de color y normal del cuerpo: 2048 por defecto para la web; 4096 para primeros planos, ~4x memoria de GPU)."""
 import io, json, os, shutil, struct, sys
@@ -141,3 +143,4 @@ if __name__=='__main__':
     detail_tiles(os.path.join(WEB,'models'))
     json.dump(data,open(dst,'w',encoding='utf-8'),ensure_ascii=False,indent=1)
     print('ok',list(data))
+    print('AVISO web/models quedó sin comprimir: correr tools/comprimir_modelos.sh '+' '.join(names))

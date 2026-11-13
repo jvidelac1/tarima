@@ -26,8 +26,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
   :where(html:not(.rotado)) #capa{position:fixed;inset:0;padding-bottom:calc(8px + var(--sb));z-index:5}
   :where(html:not(.rotado)) .panel{max-height:100%}
 }
-#msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:20px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);pointer-events:none;background:radial-gradient(ellipse at center,#0a1030 0,#03050c 70%)}
-#tv{position:absolute;inset:0;pointer-events:none;font-family:var(--display);text-transform:uppercase}
+#msg{position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:20px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);pointer-events:none;background:radial-gradient(ellipse at center,#0a1030 0,#03050c 70%)}
+#tv{position:absolute;inset:0;z-index:1;pointer-events:none;font-family:var(--display);text-transform:uppercase}
 .bug{position:absolute;top:calc(var(--u)*1.2 + var(--st));left:calc(var(--u)*1.2 + var(--sl));background:rgba(6,14,48,.88);padding:calc(var(--u)*.4) calc(var(--u)*.9);border-left:calc(var(--u)*.28) solid var(--teal)}
 .bug b{display:block;font-weight:800;font-size:calc(var(--u)*1.25);letter-spacing:.04em;line-height:1.1}
 .bug span{display:block;font-weight:500;font-size:calc(var(--u)*.78);letter-spacing:.12em;color:var(--mute)}
@@ -93,14 +93,32 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 .senal.oro .s-verbo,.senal[data-tipo=libre] .s-verbo,.senal[data-tipo=empuja] .s-verbo{color:var(--gold)}
 .senal[data-tipo=espera] .s-verbo,.senal[data-tipo=auto] .s-verbo{color:var(--mute);font-size:calc(var(--v)*2.6)}
 .senal[data-largo="1"] .s-verbo{font-size:calc(var(--v)*2.3)}
-.senal[data-tipo=espera] .s-teclas,.senal[data-tipo=auto] .s-teclas,.senal[data-tipo=nada] .s-teclas{opacity:.22}
+.senal[data-tipo=espera] .s-teclas,.senal[data-tipo=nada] .s-teclas{opacity:.22}
+/* AGUANTA, ¡ABAJO! y ¡DA TODO! (la garra sola) no piden nada: sin tecla dibujada, que invitaría a tocar */
+.senal[data-tipo=auto] .s-teclas{visibility:hidden}
 .senal[data-tipo=espera],.senal[data-tipo=auto]{border-top-color:var(--line)}
 .senal[data-tipo=empuja] .s-teclas .tecla{display:inline-block;font-size:.8em;padding:.42em .5em .5em}
 .senal[data-tipo=empuja] .s-teclas{margin-bottom:calc(var(--v)*2.6)}
 .senal[data-tipo=empuja] .s-avance{display:block}
 .senal[data-gesto=mantiene] .s-teclas .tecla{transform:translateY(.2em);box-shadow:0 .04em 0 #7c86a8;background:var(--gold)}
+/* nivel 'u': ¡SALTA! (luz que sube hasta la cadera), ¡PÁRATE! (un toque, la barra que sube), ¡DA TODO! (la garra, con su
+   tiempo que se acaba). La barra de abajo es solo presentación: tocar en cualquier punto del tramo rinde lo mismo. */
+.senal[data-tipo=luz] .s-aro,.senal[data-tipo=uno] .s-aro,.senal.sale .s-aro{height:calc(var(--v)*8.5)}
+.senal[data-tipo=uno] .s-avance,.senal.sale .s-avance{display:block}
+.senal.sale .s-avance b{background:#3a4a7a}
+.senal.sale .s-fijo{display:none!important}      /* con la barra de «sale sola», sin el aro punteado (se cruzaban) */
+.senal[data-tipo=uno] .s-teclas,.senal.sale .s-teclas{margin-bottom:calc(var(--v)*2.6)}
+.senal[data-tipo=luz] .s-verbo,.senal[data-tipo=uno] .s-verbo{color:var(--gold)}
+/* FRENO: la garra se usa sola; la señal es un grito, no una orden */
+.senal[data-clave=datodo]{border-top-color:#ff6a5e}
+.senal[data-clave=datodo] .s-verbo{color:#ff6a5e;font-size:calc(var(--v)*3.4)}
+.senal.guardado .s-teclas .tecla{background:var(--teal)}
+.s-pal.gris{color:#a9b2cf;font-size:calc(var(--v)*1.5)}
+/* recuadro fijo de las pantallas pasivas (turno de un rival, veredicto, repetición): un toque sigue */
+.seguir{position:absolute;z-index:5;right:calc(var(--u)*1.2 + var(--sr));bottom:calc(var(--u)*4.4 + var(--sb));font-family:var(--display);font-weight:800;letter-spacing:.1em;text-transform:uppercase;font-size:calc(var(--u)*1.15);color:#0a1020;background:rgba(242,244,255,.92);padding:.4em .8em;border-radius:.3em;pointer-events:none}
+#escena{overscroll-behavior:none}
 @media (prefers-reduced-motion:no-preference){
-  .senal[data-tipo=libre] .s-teclas,.senal.parado .s-teclas{animation:late .7s ease-in-out infinite}
+  .senal[data-tipo=libre] .s-teclas,.senal[data-tipo=luz] .s-teclas,.senal[data-tipo=uno] .s-teclas,.senal.parado .s-teclas{animation:late .7s ease-in-out infinite}
   .senal[data-tipo=empuja] .s-teclas .tecla{animation:golpe .36s ease-in-out infinite}
   .senal[data-tipo=empuja] .s-teclas .tecla:nth-child(2){animation-delay:.12s}.senal[data-tipo=empuja] .s-teclas .tecla:nth-child(3){animation-delay:.24s}
   .s-pal.ya{animation:pal .16s ease-out}
@@ -126,7 +144,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 @media (orientation:portrait){
   /* vertical: la señal va en dos columnas (aro a la izquierda, texto a la derecha), centrada al pie del escenario */
   :where(html:not(.rotado)) .senal{--v:calc(var(--u)*1.15);left:50%;top:auto;bottom:calc(var(--u)*5.2);transform:translateX(-50%);width:min(94cqw,calc(var(--v)*33));background:rgba(6,14,48,.6);text-shadow:0 1px 6px #020814;display:grid;grid-template-columns:auto 1fr;grid-template-areas:"aro paso" "aro verbo" "aro sub" "aro pal";align-items:center;justify-items:center;column-gap:calc(var(--v)*.6);padding:calc(var(--v)*.4) calc(var(--v)*.7)}
-  :where(html:not(.rotado)) .s-aro,:where(html:not(.rotado)) .senal[data-tipo=espera] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=auto] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=nada] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=empuja] .s-aro{grid-area:aro;width:calc(var(--v)*11.4);height:calc(var(--v)*11)}
+  :where(html:not(.rotado)) .s-aro,:where(html:not(.rotado)) .senal[data-tipo=espera] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=auto] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=nada] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=empuja] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=luz] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=uno] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=decide] .s-aro{grid-area:aro;width:calc(var(--v)*11.4);height:calc(var(--v)*11)}
   :where(html:not(.rotado)) .s-aro{--d:calc(var(--v)*6.8)}
   :where(html:not(.rotado)) .s-fijo,:where(html:not(.rotado)) .s-cierra{width:calc(var(--v)*6.8);height:calc(var(--v)*6.8);margin:calc(var(--v)*-3.4) 0 0 calc(var(--v)*-3.4)}
   :where(html:not(.rotado)) .tecla{text-shadow:none}
@@ -140,7 +158,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 }
 #sobre{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(2,4,12,.72);overscroll-behavior:contain}
 
-#capa{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;padding:calc(8px + var(--st)) calc(8px + var(--sr)) 8px calc(8px + var(--sl))}
+/* #tv lleva z-index 1 (encima de la viñeta del FRENO): los paneles y la pantalla de carga van encima de #tv */
+#capa{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;pointer-events:none;padding:calc(8px + var(--st)) calc(8px + var(--sr)) 8px calc(8px + var(--sl))}
 /* Los paneles se desplazan con el dedo (pan-x pan-y: también con el contenido girado, y sin zoom), el arrastre no pasa a la
    página al llegar al borde (overscroll-behavior) y ningún touchmove del juego los frena (telefono.js) */
 .panel{pointer-events:auto;background:rgba(8,13,30,.95);border:1px solid var(--line);border-top:3px solid var(--teal);padding:clamp(10px,2.2cqh,22px);max-width:min(94cqw,760px);width:100%;max-height:100%;overflow:auto;touch-action:pan-x pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
@@ -236,6 +255,9 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
     touch-action:none;-webkit-user-select:none;user-select:none;transition:transform 50ms,box-shadow 50ms}
   :where(html.horiz) #zona.on,:where(html.horiz) #zona.hunde{transform:translateY(5px) scale(.95);border-color:var(--teal);background:radial-gradient(circle at 50% 40%,rgba(53,230,214,.6),rgba(10,40,90,.62) 75%);box-shadow:0 1px 0 rgba(2,4,12,.55),inset 0 0 26px rgba(53,230,214,.5)}
   html:where(.horiz).zurdo #zona{right:auto;left:calc(var(--sl) + var(--bm))}
+  /* «TOCA: SEGUIR» va encima del botón redondo y no sobre él: se pisaban las dos leyendas justo donde apoya el pulgar */
+  :where(html.horiz) .seguir{right:calc(var(--sr) + var(--bm));bottom:calc(var(--sb) + var(--bm)*2 + var(--boton))}
+  html:where(.horiz).zurdo .seguir{right:auto;left:calc(var(--sl) + var(--bm))}
   /* sin botón mientras hay un panel con botones, la pausa, la carga o un campo con el teclado abierto: ahí se tocan otros
      botones. Un panel sin botones («Toca para seguir») deja el botón a la vista y se corre para no quedar debajo. */
   :where(html.horiz) body:has(#capa > .panel button) #zona,:where(html.horiz) body:has(#sobre:not([hidden])) #zona,:where(html.horiz) body:has(#msg:not([hidden])) #zona,html:where(.horiz).escribiendo #zona{display:none}
@@ -268,6 +290,7 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
   :where(html.horiz.bajo) .panel p{line-height:1.32}
   :where(html.horiz.bajo) .pesista{padding:.4em .55em}
   :where(html.horiz.bajo) .pesista .b{height:.75em;margin-bottom:.3em}
+  :where(html.horiz.bajo) .pesista .estilo{display:none}      /* la personalidad del rival queda para el cartel de su turno */
   :where(html.horiz.bajo) .kgsel output{font-size:clamp(26px,9cqh,38px)}
   :where(html.horiz.bajo) .podio{margin:.4em 0}:where(html.horiz.bajo) .podio .p1{padding-bottom:2.2em}:where(html.horiz.bajo) .podio .p2{padding-bottom:1.3em}:where(html.horiz.bajo) .podio .p3{padding-bottom:.6em}
   :where(html.horiz.bajo) .pulso{width:clamp(56px,19cqh,88px);margin:.3em auto}
@@ -276,7 +299,8 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
   /* el podio con sus botones: la tabla completa ya se vio un momento antes (sin botones); acá quedan el podio y los botones */
   :where(html.horiz.bajo) .panel.podio-panel:has(button) .tabla{display:none}
   /* el panel del llamado va al costado: el pesista queda a la vista */
-  :where(html.horiz.bajo) .panel.lado{align-self:center;margin-left:auto;margin-right:0;max-width:min(54cqw,440px)}
+  /* el llamado va abajo y nunca debajo de los botones de sonido, pausa y ayuda (arriba al centro): si no entra, se desplaza */
+  :where(html.horiz.bajo) .panel.lado{align-self:flex-end;margin-left:auto;margin-right:0;max-width:min(54cqw,440px);max-height:calc(100% - 44px)}
 /* teléfono en vertical: «Gira el teléfono» con un dibujo, encima de todo */
 /* (el aviso «Gira el teléfono» ya no existe: en vertical el contenido se gira solo, ver html.rotado) */
 @keyframes girar{0%,22%{transform:rotate(0)}48%,82%{transform:rotate(-90deg)}100%{transform:rotate(0)}}
@@ -288,15 +312,16 @@ html.rotado{--sl:env(safe-area-inset-top,0px);--st:env(safe-area-inset-right,0px
 html.rotado #app{position:fixed;left:0;top:0;flex:none;width:var(--app-w,100vh);height:var(--app-h,100vw);transform-origin:0 0;transform:translateX(var(--app-tx,100vw)) rotate(90deg)}
 
 /* ---------- turno de un rival y marcador ---------- */
-.turno{position:absolute;left:50%;top:calc(var(--u)*5 + var(--st));transform:translateX(-50%);display:flex;align-items:center;gap:.7em;background:rgba(6,14,48,.92);border-bottom:calc(var(--u)*.3) solid var(--c,var(--gold));padding:calc(var(--u)*.45) calc(var(--u)*1.1);max-width:min(92cqw,calc(var(--u)*46));white-space:nowrap}
+.turno{position:absolute;left:50%;top:calc(var(--u)*5 + var(--st));transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;row-gap:.15em;align-items:center;gap:.7em;background:rgba(6,14,48,.92);border-bottom:calc(var(--u)*.3) solid var(--c,var(--gold));padding:calc(var(--u)*.45) calc(var(--u)*1.1);max-width:min(92cqw,calc(var(--u)*46));white-space:nowrap}
 .turno i{width:1.8em;height:1.15em;flex:none}
 .turno b{font-weight:800;font-size:calc(var(--u)*1.5);letter-spacing:.05em;color:#fff}
-.turno span{font-family:var(--body);text-transform:none;font-size:calc(var(--u)*1.05);color:var(--mute);overflow:hidden;text-overflow:ellipsis}
+.turno em{font-style:normal;font-weight:800;font-size:calc(var(--u)*1.15);letter-spacing:.04em;color:var(--gold)}
+.turno span{font-family:var(--body);text-transform:none;font-size:calc(var(--u)*1.05);color:var(--mute);flex-basis:100%;text-align:center;white-space:normal}      /* en su línea: con la apuesta del rival al lado se cortaba «mira o toca para saltar» */
 .marcador{position:absolute;left:calc(var(--u)*1.2 + var(--sl));top:calc(var(--u)*4.4 + var(--st));background:rgba(6,14,48,.88);border-left:calc(var(--u)*.28) solid var(--c,var(--teal));padding:calc(var(--u)*.3) calc(var(--u)*.8);display:flex;flex-direction:column;max-width:46%}
 .marcador b{font-weight:800;font-size:calc(var(--u)*1.05);letter-spacing:.05em;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .marcador span{font-weight:700;font-size:calc(var(--u)*.95);letter-spacing:.05em;color:var(--gold)}
 body:has(.etiqueta:not([hidden])) .marcador{top:calc(var(--u)*7 + var(--st))}
-html.turno-rival #marcador{top:calc(var(--u)*9.2 + var(--st))}      /* debajo del cartel del turno del rival: con «Si Brenner levanta…» lo pisaba */
+html.turno-rival #marcador{top:calc(var(--u)*10.6 + var(--st))}      /* debajo del cartel del turno del rival: con «Si Brenner levanta…» lo pisaba */
 /* durante el turno de un rival no hay botón de levantar ni señal: tocar solo saltea (y lo dice el cartel) */
 html.turno-rival #zona,html.turno-rival #senal{display:none!important}      /* el acuse queda: dice que el toque llegó (y que saltea) */
 
@@ -324,5 +349,187 @@ html.editando #app{visibility:hidden}
 :where(html.horiz.bajo) body:has(#veredicto:not([hidden])) :is(#rival,#etiqueta,#guia,#marcador),
 :where(html.horiz.bajo) body:has(#turno:not([hidden])) #rival,
 :where(html.horiz.bajo) body:has(#senal:not([hidden])) #rival{display:none}
-:where(html.horiz.bajo) .panel.lado :is(p.frase,p.reloj){display:none}
+:where(html.horiz.bajo) .panel.lado :is(p.frase,p.reloj,p.garra,p.sugiere){display:none}      /* la garra la muestra la energía durante el intento */
 :where(html.horiz.bajo) .veredicto small{font-size:max(13px,calc(var(--u)*1.25))}
+
+/* ---------- 'u': margen a la vista, FRENO y pisotón (ui/margen.js; docs/JUEGO.md, Gameplay 2, «Emoción») ---------- */
+.margen{position:absolute;z-index:3;left:50%;top:calc(var(--u)*4.6 + var(--st));transform:translateX(-50%);display:flex;align-items:center;gap:calc(var(--u)*.6);background:rgba(6,14,48,.86);padding:calc(var(--u)*.35) calc(var(--u)*.9);border-bottom:calc(var(--u)*.25) solid var(--teal);pointer-events:none;white-space:nowrap}
+/* con la energía a la vista, el cartel de los cambios de los rivales baja: si no, la energía le tapaba el nombre */
+body:has(#margen:not([hidden])) .rival{top:calc(var(--u)*10.6 + var(--st))}
+.margen .m-t{font-weight:800;font-size:calc(var(--u)*.95);letter-spacing:.12em;color:var(--mute)}
+.margen .m-d{display:flex;gap:calc(var(--u)*.35)}
+.margen .m-d i{display:block;width:calc(var(--u)*2.1);height:calc(var(--u)*2.1);border-radius:50%;background:conic-gradient(var(--teal) calc(var(--f,1)*360deg),rgba(255,255,255,.08) 0);box-shadow:inset 0 0 0 calc(var(--u)*.17) rgba(255,255,255,.4)}
+.margen .m-d.bajo i{box-shadow:inset 0 0 0 calc(var(--u)*.17) var(--red)}
+.margen .m-g{font-weight:800;font-size:calc(var(--u)*.9);letter-spacing:.1em;padding:.18em .5em;border:1px solid var(--gold);color:var(--gold);text-transform:uppercase}
+.margen .m-g[data-estado=gastada],.margen .m-g[data-estado=usada]{opacity:.28;border-color:var(--mute);color:var(--mute)}
+.margen .m-p{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:calc(var(--u)*.35);font-weight:800;font-size:calc(var(--u)*1.35);letter-spacing:.04em;color:#fff;background:rgba(6,14,48,.9);padding:.12em .55em;text-shadow:0 1px 4px #000;display:none}
+.margen .m-p.on{display:block}
+.margen .m-p.oro{color:var(--gold)}
+.margen .m-p.mal{color:#ff6a5f}
+.margen .m-p.gris{color:var(--mute)}
+.margen.freno{border-color:var(--gold)}
+.margen.freno .m-g{background:var(--gold);color:#111;opacity:1}
+.margen.vale{border-color:var(--ok)}
+.margen.vale .m-d i{background:conic-gradient(var(--ok) calc(var(--f,1)*360deg),rgba(255,255,255,.08) 0)}
+.margen.limite{border-color:var(--gold);box-shadow:0 0 calc(var(--u)*1.4) rgba(255,210,63,.5)}
+.margen.limite .m-d i{background:conic-gradient(var(--gold) calc(var(--f,1)*360deg),rgba(255,255,255,.08) 0)}
+.margen.cae{border-color:var(--red)}
+.margen.cae .m-d i:first-child{box-shadow:inset 0 0 0 calc(var(--u)*.17) var(--red);background:rgba(226,35,26,.35)}
+/* el FRENO: la escena se oscurece por los bordes mientras late la garra */
+#escena.freno::after{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 30%,rgba(0,0,0,.5) 62%,rgba(0,0,0,.8) 100%)}
+@media (prefers-reduced-motion:no-preference){
+  .margen.freno .m-g{animation:latidoG .62s ease-in-out infinite}
+  .margen.cae .m-d i:first-child{animation:parpadea .5s steps(2,jump-none) 6}
+  .margen .m-p.on{animation:palM .2s ease-out}
+  #escena.freno::after{animation:latidoV .62s ease-in-out infinite}
+  #gl.sacude{animation:sacude .12s linear}
+}
+@keyframes palM{from{transform:translateX(-50%) scale(1.25)}to{transform:translateX(-50%)}}
+@keyframes latidoG{0%,100%{transform:scale(1)}14%{transform:scale(1.22)}28%{transform:scale(1)}42%{transform:scale(1.12)}}
+@keyframes latidoV{0%,100%{opacity:.85}14%{opacity:1}42%{opacity:.95}}
+@keyframes parpadea{0%{opacity:1}100%{opacity:.15}}
+@keyframes sacude{0%{transform:translate(0,0)}25%{transform:translate(4px,-2px)}50%{transform:translate(-4px,2px)}75%{transform:translate(2px,1px)}100%{transform:translate(0,0)}}
+
+/* ---------- la barrita del nivel 'b' (docs/JUEGO.md, Gameplay 3; ui/barrita.js) ----------
+   Abajo al centro, encima del zócalo. Rojo a rayas en las puntas, amarillo liso y verde con borde blanco: se distinguen
+   también sin color. El puntero es una aguja blanca con un triángulo arriba; la marca del toque queda donde pegaste. */
+.barrita{position:absolute;z-index:3;left:50%;bottom:calc(var(--u)*5.6 + var(--sb));transform:translateX(-50%);width:min(74cqw,calc(var(--u)*56));pointer-events:none;font-family:var(--display);text-transform:uppercase}
+.barrita .b-cab{display:flex;align-items:center;justify-content:center;gap:.7em;min-height:calc(var(--u)*2.6);margin-bottom:calc(var(--u)*.9);text-shadow:0 1px 6px #000,0 0 2px #000}
+.barrita .b-nombre{font-weight:700;font-size:calc(var(--u)*1.05);letter-spacing:.12em;color:var(--mute);white-space:nowrap}
+.barrita .b-verbo{font-weight:800;font-size:calc(var(--u)*2.1);letter-spacing:.04em;color:#fff;white-space:nowrap}
+.barrita .b-tecla{font-size:calc(var(--u)*.95)}
+.barrita[data-estado=espera] .b-verbo{color:var(--mute)}
+.barrita .b-pista{position:relative;height:calc(var(--u)*3.4);border-radius:calc(var(--u)*.5);background:repeating-linear-gradient(135deg,#d0392f 0 9px,#9e2620 9px 18px);box-shadow:0 0 0 2px rgba(255,255,255,.6),0 6px 18px rgba(0,0,0,.65)}
+.barrita .b-am{position:absolute;top:0;bottom:0;background:#f4c430}
+.barrita .b-ve{position:absolute;top:-4px;bottom:-4px;background:#22c56b;border:3px solid #fff;border-radius:5px;box-shadow:0 0 14px rgba(34,197,107,.65)}
+.barrita.en-verde .b-ve{background:#3ee68a;box-shadow:0 0 22px rgba(62,230,138,.95)}
+.barrita[data-estado=espera] .b-pista{filter:saturate(.55) brightness(.8)}
+.barrita .b-punt{position:absolute;top:calc(var(--u)*-1.1);bottom:calc(var(--u)*-.5);width:0}
+.barrita .b-punt::before{content:'';position:absolute;left:-4px;top:calc(var(--u)*.9);bottom:0;width:8px;background:#fff;border-radius:4px;box-shadow:0 0 0 2px #0a1020,0 0 12px rgba(255,255,255,.8)}
+.barrita .b-punt::after{content:'';position:absolute;left:calc(var(--u)*-.85);top:0;border:calc(var(--u)*.85) solid transparent;border-bottom:0;border-top-color:#fff;filter:drop-shadow(0 0 2px #0a1020)}
+.barrita[data-zona]:not([data-zona='']) .b-punt{opacity:.35}
+.barrita .b-marca{position:absolute;top:50%;width:calc(var(--u)*2.4);height:calc(var(--u)*2.4);margin:calc(var(--u)*-1.2) 0 0 calc(var(--u)*-1.2);border-radius:50%;border:calc(var(--u)*.35) solid #fff;background:rgba(10,16,32,.55);box-shadow:0 0 0 2px #0a1020}
+.barrita .b-marca[data-zona=verde]{border-color:#fff;background:#22c56b}
+.barrita .b-marca[data-zona=amarillo]{border-color:#0a1020;background:#f4c430}
+.barrita .b-marca[data-zona=rojo]{border-color:#fff;background:#d0392f;border-radius:3px;transform:rotate(45deg)}
+.barrita .b-pal{position:absolute;left:0;right:0;top:0;width:max-content;margin:0 auto;padding:0 .5em;background:rgba(6,14,48,.88);border-radius:4px;height:calc(var(--u)*2.6);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:calc(var(--u)*2.5);letter-spacing:.05em;text-shadow:0 2px 8px #000,0 0 2px #000;opacity:0}
+.barrita .b-pal.on{opacity:1}
+.barrita .b-pal.verde{color:#5cf29b}.barrita .b-pal.amarillo{color:#ffd54a}.barrita .b-pal.rojo{color:#ff6a5f}
+.barrita .b-fant{position:absolute;top:50%;transform:translate(-50%,-50%);pointer-events:none}
+.barrita .b-fant i{display:block;width:calc(var(--u)*4.4);height:calc(var(--u)*4.4);border-radius:50%;border:3px dashed rgba(255,255,255,.95);background:rgba(255,255,255,.08)}
+.barrita .b-fant kbd{display:none}
+.barrita[data-zona=verde] .b-cab,.barrita[data-zona=amarillo] .b-cab,.barrita[data-zona=rojo] .b-cab{visibility:hidden}
+.barrita .b-fant.ya i{background:#3ee68a;border-color:#fff;transform:scale(1.15)}
+.barrita.lento .b-nombre::after{content:' · ' attr(data-lento)}
+.verde-b{display:flex;align-items:center;gap:.4em .9em;flex-wrap:wrap}
+.verde-b>span{color:var(--mute)}
+.mini-b{display:inline-flex;align-items:center;gap:.4em}
+.mini-b em{font-style:normal;color:var(--mute);font-size:.85em}
+.mini-b b{font-size:.9em}
+.mb-pista{position:relative;display:inline-block;width:6.5em;height:.95em;border-radius:3px;background:repeating-linear-gradient(135deg,#d0392f 0 5px,#9e2620 5px 10px);box-shadow:0 0 0 1px rgba(255,255,255,.5)}
+.mb-am{position:absolute;top:0;bottom:0;background:#f4c430}
+.mb-ve{position:absolute;top:-2px;bottom:-2px;background:#22c56b;border:2px solid #fff;border-radius:2px}
+#escena.verde::after{content:'';position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 calc(var(--u)*7) rgba(62,230,138,.6);z-index:2}
+@media (prefers-reduced-motion:no-preference){
+  .barrita.golpe .b-pista{animation:b-golpe .22s ease-out}
+  .barrita .b-pal.on{animation:b-pal .25s ease-out}
+  .barrita[data-zona=amarillo] .b-pista{animation:b-tiembla .3s linear 2}
+  .barrita .b-fant:not(.ya) i{animation:late .9s ease-in-out infinite}
+}
+@keyframes b-golpe{0%{transform:scale(1.07)}100%{transform:scale(1)}}
+@keyframes b-pal{0%{transform:scale(1.5);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes b-tiembla{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+/* con la barrita a la vista, la guía (presentación y práctica) va encima de ella */
+body:has(#barrita:not([hidden])) .guia{bottom:calc(var(--u)*15.5 + var(--sb))}
+@media (pointer:coarse){
+  /* teléfono de costado: entre el zócalo y el botón redondo, sin pasar por debajo del botón */
+  :where(html.horiz) .barrita{left:calc(var(--sl) + var(--u)*1.6);right:calc(var(--boton) + var(--bm)*2 + var(--sr));width:auto;transform:none;bottom:calc(var(--u)*6.2 + var(--sb))}
+  html:where(.horiz).zurdo .barrita{left:calc(var(--boton) + var(--bm)*2 + var(--sl));right:calc(var(--sr) + var(--u)*1.6)}
+  :where(html.horiz.bajo) .barrita .b-pista{height:calc(var(--u)*3.6)}
+  :where(html.horiz.bajo) .barrita .b-verbo{font-size:calc(var(--u)*2)}
+  :where(html.horiz.bajo) body:has(#barrita:not([hidden])) .guia{bottom:calc(var(--u)*15 + var(--sb))}
+  :where(html:not(.horiz):not(.rotado)) .barrita{width:min(92cqw,calc(var(--u)*56))}
+}
+/* teléfono acostado: el verde del panel en una sola línea (sin palabras) y, en 'b', sin la línea de la garra (se ve en la
+   energía durante el levantamiento): así el panel del llamado entra en 375 px de alto */
+:where(html.horiz.bajo) .verde-b{gap:.2em .6em;margin:.2em 0}
+:where(html.horiz.bajo) .mini-b em,:where(html.horiz.bajo) .mini-b b{display:none}
+:where(html.horiz.bajo) .mb-pista{width:4.6em;height:.8em}
+:where(html.horiz.bajo) .panel:has(.verde-b) p.garra{display:none}
+:where(html.horiz.bajo) .panel:has(.verde-b) .discos .justo{display:none}      /* en 'b' el verde dice más que «lo más duro» */
+.verde-b .cansancio{color:#ff8a80;font-weight:700;margin-left:auto}
+
+/* ---------- menos carteles mientras se juega (13-nov, pedido del dueño: «en mobile los carteles me tapan mucho al pesista» y
+   «menos ruido visual»). Solo en 'b' y 'u' (html.juego-u, main.js); Clásico queda como estaba. html[data-pantalla] lo pone
+   main.js (visita). Una sola indicación principal por momento y todo a los bordes: el pesista y la barra se ven enteros.
+   Lo mide tools/tapa.mjs (check_barra y check_telefono). ---------- */
+/* durante el levantamiento propio: fuera el título, el reloj, el marcador, los cambios de los rivales y el zócalo (el panel ya
+   dijo los kilos); la energía queda chica arriba a la izquierda */
+html.juego-u[data-pantalla=intento] :is(.bug,.relojbox,#marcador,#rival,#etiqueta,#zocalo){display:none!important}
+html.juego-u .margen{--u:clamp(7px,1.3cqh,13px);left:calc(var(--u)*1.4 + var(--sl));top:calc(var(--u)*1.4 + var(--st));transform:none;background:rgba(6,14,48,.72)}
+html.juego-u .margen .m-p{left:0;transform:none;font-size:calc(var(--u)*1.25)}
+@media (prefers-reduced-motion:no-preference){html.juego-u .margen .m-p.on{animation:palM2 .2s ease-out}}
+@keyframes palM2{from{transform:scale(1.2)}to{transform:none}}
+/* con la energía arriba a la izquierda, el título del evento no va (en el veredicto, el turno de un rival tampoco lo pisa) */
+html.juego-u body:has(#margen:not([hidden])) .bug{display:none}
+/* la barrita: abajo de todo, debajo de los pies; el nombre y el verbo en una línea chica a la izquierda */
+html.juego-u .barrita{bottom:calc(var(--u)*1.1 + var(--sb));width:min(62cqw,calc(var(--u)*52))}
+/* el nombre y el verbo van encima de la pista, a la izquierda y fuera de la caja: la barrita ocupa solo la pista */
+html.juego-u .barrita .b-cab{position:absolute;left:0;bottom:100%;justify-content:flex-start;min-height:calc(var(--u)*1.9);margin:0 0 calc(var(--u)*.55);gap:.55em}
+html.juego-u .barrita .b-nombre{font-size:calc(var(--u)*.95)}
+html.juego-u .barrita .b-verbo{font-size:calc(var(--u)*1.45)}
+html.juego-u .barrita .b-pista{height:calc(var(--u)*2.6)}
+html.juego-u .barrita .b-pal{left:0;right:auto;top:auto;bottom:calc(100% + var(--u)*.4);margin:0;height:calc(var(--u)*1.9);font-size:calc(var(--u)*1.7);background:rgba(6,14,48,.7)}
+html.juego-u .barrita .b-fant i{width:calc(var(--u)*3.4);height:calc(var(--u)*3.4)}
+/* la ayuda de primera vez y la presentación arriba a la derecha (el reloj no se muestra en el intento), nunca sobre el pecho */
+html.juego-u .guia,html.juego-u body:has(#barrita:not([hidden])) .guia{top:calc(var(--u)*1.4 + var(--st));bottom:auto;left:auto;right:calc(var(--u)*1.4 + var(--sr));transform:none;text-align:right;max-width:min(46cqw,calc(var(--u)*38));font-size:calc(var(--u)*1.1);padding:calc(var(--u)*.4) calc(var(--u)*.9);background:rgba(6,14,48,.78);border-bottom-width:calc(var(--u)*.2)}
+/* la señal que queda en 'b' (el esfuerzo de pararse) va a la izquierda, a media altura y más chica */
+html.juego-u .senal{--v:calc(var(--u)*.8);left:calc(var(--u)*1.4 + var(--sl));top:46%;background:rgba(6,14,48,.72)}
+/* AGUANTA y ¡ABAJO! no piden nada: en 'b' y 'u' no se muestran (la barra arriba y las luces ya lo dicen); ¡DA TODO! sí */
+html.juego-u .senal[data-tipo=auto]:not([data-clave=datodo]){display:none}
+html.juego-u .senal .s-sub{font-size:calc(var(--v)*1.25)}
+/* el veredicto, a la izquierda a media altura, más chico y semitransparente: la barra arriba y la cara quedan a la vista */
+html.juego-u .veredicto{left:calc(var(--u)*1.4 + var(--sl));top:42%;transform:none;text-align:left;font-size:calc(var(--u)*1.75);max-width:min(30cqw,calc(var(--u)*26));padding:calc(var(--u)*.5) calc(var(--u)*1);background:rgba(6,14,48,.8)}
+html.juego-u .veredicto small{font-size:calc(var(--u)*1.02)}
+html.juego-u .veredicto.arriba{top:42%;font-size:calc(var(--u)*1.4)}
+@media (prefers-reduced-motion:no-preference){html.juego-u :is(.veredicto,.guia){animation:entraL .18s ease-out}}
+@keyframes entraL{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+/* con el veredicto a la vista, nada más a la izquierda: ni el marcador, ni los cambios de los rivales, ni la etiqueta */
+html.juego-u body:has(#veredicto:not([hidden])) :is(#marcador,#rival,#etiqueta){display:none!important}
+/* turno de un rival: una línea arriba a la izquierda (en lugar del título), sin la instrucción (la dice «Toca: seguir») */
+/* sin llegar a los botones de sonido, pausa y ayuda (arriba al centro): la apuesta baja a la segunda línea si no entra */
+html.juego-u .turno{left:calc(var(--u)*1.4 + var(--sl));top:calc(var(--u)*1.4 + var(--st));transform:none;justify-content:flex-start;max-width:min(calc(50% - 82px - var(--u)*1.4 - var(--sl)),calc(var(--u)*46));padding:calc(var(--u)*.35) calc(var(--u)*.8);background:rgba(6,14,48,.82);white-space:normal}
+html.juego-u .turno b{font-size:calc(var(--u)*1.15)}
+html.juego-u .turno em{font-size:calc(var(--u)*.95)}
+html.juego-u .turno span{display:none}
+html.juego-u.turno-rival .bug{display:none}
+html.juego-u.turno-rival #marcador{left:calc(var(--u)*1.4 + var(--sl));top:calc(var(--u)*6.8 + var(--st));max-width:min(calc(50% - 82px - var(--u)*1.4 - var(--sl)),calc(var(--u)*30))}
+/* en el llamado el título del panel ya dice quién, qué intento y cuántos kilos: sin zócalo (tapaba las piernas del pesista) */
+html.juego-u[data-pantalla=llamado] #zocalo{display:none!important}
+html.juego-u .marcador{background:rgba(6,14,48,.78)}
+/* el recuadro «Toca: seguir» más chico */
+html.juego-u .seguir{font-size:calc(var(--u)*.95);padding:.3em .65em;background:rgba(242,244,255,.85)}
+@media (pointer:coarse){
+  /* teléfono acostado: la barrita de la izquierda hasta el botón redondo, pegada abajo; sin el verbo (el botón dice TOCA) */
+  html.juego-u:where(.horiz) .barrita{left:calc(var(--sl) + var(--u)*1.4);right:calc(var(--boton) + var(--bm)*2 + var(--sr));width:auto;bottom:calc(var(--u)*.9 + var(--sb))}
+  html.juego-u:where(.horiz).zurdo .barrita{left:calc(var(--boton) + var(--bm)*2 + var(--sl));right:calc(var(--sr) + var(--u)*1.4)}
+  html.juego-u:where(.horiz.bajo) .barrita .b-pista{height:calc(var(--u)*2.5)}
+  html.juego-u:where(.horiz.bajo) .barrita .b-verbo,html.juego-u:where(.horiz) .barrita .b-tecla{display:none}
+  html.juego-u:where(.horiz.bajo) .barrita .b-cab{min-height:calc(var(--u)*1.6);margin-bottom:calc(var(--u)*.45)}
+  /* el aro de práctica de la primera vez, más chico */
+  html.juego-u:where(.horiz.bajo) .barrita .b-fant i{width:calc(var(--u)*3);height:calc(var(--u)*3)}
+  html.juego-u:where(.horiz.bajo) .barrita .b-pal{height:calc(var(--u)*1.6);font-size:calc(var(--u)*1.5)}
+  html.juego-u:where(.horiz.bajo) body:has(#barrita:not([hidden])) .guia{bottom:auto}
+  html.juego-u:where(.horiz.bajo) .senal{--v:calc(var(--u)*.78);left:calc(var(--u)*1.4 + var(--sl));top:34%}
+  html.juego-u:where(.horiz.bajo) .veredicto{max-width:min(34cqw,calc(var(--u)*30));top:36%}
+  html.juego-u:where(.horiz.bajo) .veredicto small{font-size:max(12px,calc(var(--u)*1.1))}
+  html.juego-u:where(.horiz.bajo) .margen{--u:clamp(7px,2cqh,9.5px)}
+  html.juego-u:where(.horiz) .seguir{bottom:calc(var(--sb) + var(--bm) + var(--boton) + var(--u)*.8)}
+  /* turno de un rival en el teléfono acostado: el cartel ocupa dos líneas arriba; el marcador va abajo a la izquierda, donde
+     estaba el zócalo (el cartel ya dice quién y cuántos kilos) */
+  html.juego-u:where(.horiz.bajo).turno-rival #zocalo{display:none!important}
+  html.juego-u:where(.horiz.bajo).turno-rival #marcador{top:auto;bottom:calc(var(--u)*1.2 + var(--sb));left:calc(var(--u)*1.4 + var(--sl))}
+  html:where(.horiz.bajo).juego-u.zurdo.turno-rival #marcador{left:calc(var(--boton) + var(--bm)*2 + var(--sl))}
+  /* el acuse (la tecla que se hunde) sube por encima de la barrita, junto al botón */
+  html.juego-u:where(.horiz.bajo) body:has(#barrita:not([hidden])) .acuse{bottom:calc(var(--u)*5.4 + var(--sb))}
+}

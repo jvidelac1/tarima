@@ -787,13 +787,477 @@ Decisión del dueño: grabar solo la página, en una parte de las sesiones, sin 
 - **Estimación, sin datos todavía:** que el muro en el intervalo convierta más que el del podio. Se mira con el embudo `muro_visto (momento=tras_arranque)` → `anotar_ok`/`encuesta_enviada` → `envion_ok` → `final_fin`, contra `muro_cerrado`.
 - **Pendiente.** Publicar (lo corre el orquestador con `tools/desplegar.sh`: migración remota 0003 y Worker antes que Pages). Las páginas viejas en caché del navegador no saben pedir `/api/envion`: con la regla nueva, juegan la final gratis entera una vez (la partida queda `arranque` en la base) hasta que recarguen.
 
+### Gameplay 2: control «un toque, un tramo», aprendizaje y ritmo (13-nov, rama `gameplay`)
+
+Diseño: `docs/JUEGO.md`, sección Gameplay 2. Gesto exacto y pruebas: `docs/CONTROLES.md`, sección `'u'`. El nivel `'u'` es el Fácil por defecto; `'c'` (Clásico) no cambió y `'f'` (círculos) quedó solo para recalcular registros viejos (`?ctl=f`). Nada publicado en Cloudflare.
+
+**Qué se hizo.**
+- **Núcleo** (`attempt.js`, métodos `_u…`; `rules.js`, `UNO`): margen en milésimas de disco (3 discos + «el día» ±0,9), gasto por tramo `base × r(I) × cuerpo`, contactos guardados y apoyados, doble de 120/80 ms, confirmación de 300 ms, ¡TIRA! sola a los ~25 s, ¡ARRIBA! sola a los 6 s, FRENO de 2,5 s con la garra (una por levantamiento, `match.js` la apaga), sin nulos. `res.uno` lleva margen, día, gastos, garra, `tramo_caida` y `tramo_mayor`. En `'u'` tocar no gasta Resto.
+- **Capa y señal** (`controles.js`): identidad para el núcleo; `senal(m, t, 'u')` con tipos `libre`, `luz`, `uno`, `decide`, `espera` y `auto`; `QUE_U` da la palabra de cada contacto.
+- **Entrada** (`input.js`): Espacio y Enter del levantamiento en captura con `preventDefault`, primer evento repetido cuenta como apretar, gracia de 400 ms del dedo cancelado, bordes que no cuentan (`BORDES`), `vibrate(12)`, foco al escenario al cerrar el llamado, tic de audio en el mismo manejador.
+- **Juego** (`main.js`): `'u'` por defecto (un `'f'` guardado se lee como `'u'`); Opciones «Fácil» y «Clásico (exigente)»; sin tarjeta ni tutorial aparte; panel del llamado con «Llegas con ●●○», lo más duro, la garra, «ESPACIO: levantar N kg» y, en la primera final, confirmar dos veces un peso con el que no llega; el envión en «Más opciones» con sus discos; presentación en una línea y ayudas de primera vez dentro del primer intento; «el día» al agarrar la barra; línea de caída con tramo y gasto (`mensajes.js`, `explicar(res, 'u', …)`); sin repetición propia; analítica nueva (MVP.md, 6.3).
+- **Ritmo** (`ritmo.js`, compartido con la prueba): rival resumido (1 s antes de su última explosión hasta la recepción, veredicto de 1 s), en fila de 1,2 s desde el tercero seguido, entero solo el que se juega el oro o una medalla (uno por tramo, desde 1 s antes de la explosión, fases lentas ×5, veredicto cortado a 2,6 s, repetición solo si cae); veredicto propio de 2,95 s si vale y tVer + 2,4 s si cae; carga de la barra sin espera; recuadro «ESPACIO: seguir» / «Toca: seguir»; eventos `rival_salteado` y `veredicto_salteado`.
+
+**Medido** (sin navegador en la Mac, y en Actions; números del 13-nov):
+- **A** (play_human, 600 por casilla, 3 pesistas × teclado y dedo × 88 a 103 %, arranque y dos tiempos: 43 200 casos × 6 bots): 0 resultados distintos entre reactivo, tardío, fantasma, mantiene y machacador; 0 caídas por entrada; el ausente solo pierde ¼ + ½ disco y saca 100 % al 90 %.
+- **B**: el novato con el dedo y la apertura sugerida, 100 % en arranque y dos tiempos con los tres.
+- **C** (con `CUERPO_NEUTRO`): 100 % hasta el 95 %, ~95 % al 97 %, ~50 % al 100 %, ~5 % al 103 %. Se cumple, pero lo recalibra quien defina los pesistas.
+- **H** (teclado_test y dedo_test, 10 000 secuencias cada una): 0 sin resolver, 0 contados dos veces, 0 sin palabra, bordes que no cuentan, ráfaga de confirmación que nunca arranca el tirón.
+- **J** (ritmo_test, 360 finales): final mediana ~111 s (meta ≤ 150), espera mediana 5,8 s, p90 13,5 s, máxima 19,3 s (meta ≤ 10 · 15 · 20), rival no decisivo ≤ 2,9 s, decisivo ≤ 7,5 s, intento propio p90 6,4 s (arranque) y 9,6 s (dos tiempos). Con paneles de 2,5 s por decisión: el tiempo real de una persona en el panel no está medido.
+- **G y L** (sim_test): 1000 finales `'u'` recalculadas iguales, `sim_ref.json` y `sim_ref_facil.json` idénticos, `sim_ref_uno.json` nuevo, toda caída con tramo y sin tiempos.
+- Con navegador (Actions, run 43369376557 y teléfono 43369376591, todo en verde): check_game (teclado, dedo y «sin tocar»), check_recorrido (final de 98,6 s del primer llamado al podio, espera máxima 12,7 s), check_telefono (dos dedos = un contacto, borde que no cuenta), check_iphone, check_toques, check_fluidez (primera vez sin tutorial), check_muro y check_muro_medio (muro.yml), servidor.yml. Capturas del llamado, ¡TIRA!, ¡SALTA!, ¡PÁRATE! en el iPhone acostado y el turno del rival, miradas.
+- **I** (check_toques): la tecla dibujada se hunde dentro del manejador en el 100 % de las pulsaciones, y el manejador entero (acuse, núcleo y palabra) tarda 2,7 ms (p95). Del timeStamp al cuadro siguiente da 72 ms por software (SwiftShader, hilo principal ocupado): queda como nota; con placa se exige ≤ 17 ms. **Sin medir con placa ni en un teléfono de verdad.**
+
+**Ganchos para quien sigue (pesistas y emoción).**
+- **Pesistas:** `rules.js` → `cuerpoDe(f)` lee `sim.json → atletas.<id>.cuerpoJuego` `{tiron, arriba, pararse, movil}` (milésimas) y, sin él, `CUERPO_NEUTRO` (el promedio de la tabla de G2.5). `match.js` lo pasa en `ctx.cuerpo` y el panel usa el mismo `previsto()`. Agregar `cuerpoJuego` cambia la huella de sim.json (`tools/build_sim_data.mjs`) y hay que regenerar `sim_ref_uno.json` (`node tools/sim_test.mjs --update` reescribe las tres referencias: revisar que `sim_ref.json` y `sim_ref_facil.json` no cambien). Faltan `tools/margen_cal.mjs` y `tools/chance_test.mjs` (metas C, D y F), las tarjetas de roster.js sin Energía y los textos `pesista.*.conviene`, que todavía hablan de «toques a destiempo» y «tocas preciso» (contradicen `'u'`).
+- **Emoción:** `E.alTramo(entrada, m)` en `main.js` se llama cada vez que cierra un tramo (`{t, tramo, gasto, m}` o `{t, tramo, garra, m}`; está en `m.U.log`) para los discos que se apagan; el FRENO es la fase `'freno'` (la barra tiembla con 0,55 y suena `aviso`); el pisotón suena `recepcion`; «al límite» está en `res.uno.al_limite`. Cámara lenta, luces de a una con suspenso, apuesta de los rivales en el resumen y Clásico ofrecido tras dos victorias: sin hacer.
+
+**Apartamientos del diseño.**
+- ¡SALTA! cierra en la recepción y no en la explosión (con medio segundo, el que reacciona tarde perdía el ¼; meta A).
+- «Bajar a X kg» después de una caída no existe: la barra nunca baja (`p.minimo`). El panel dice lo que da el mismo peso.
+- En el ritmo, «decisivo» es solo oro o medalla (con «pasa adelante» eran el 45 % de los turnos) y se ve entero uno por tramo entre dos levantamientos propios.
+- El tutorial guiado de `'f'` y el metrónomo de Clásico siguen en el código; en `'u'` no se usan.
+
+### Gameplay 2, segunda parte: pesistas y emoción (13-nov, rama `gameplay`)
+
+Lo que cambia entre pesistas son los kilos y el cuerpo, nunca la precisión de los dedos (la meta A sigue en 0 diferencias entre maneras de tocar).
+
+**Pesistas.**
+- `sim.json → atletas.<id>.cuerpoJuego` (lo escribe `tools/build_sim_data.mjs`), con los factores del diseño **fijos**: Compacto 1,1 / 0,7 / 0,85 (tirón / arriba / pararse) y movilidad alta; Largo 0,5 / 0,9 / 1,2; Potente 1,0 / 1,35 / 0,6. El envión de la casa es la tijera para los tres: el squat de Compacto rinde igual hasta el 97 % y peor desde el 100 % (meta D), así que queda como opción en «Más opciones».
+- La base de cada tramo se recalibró con los cuerpos reales: `UNO.base` 1000 / 1700 / 1800 (antes 900 / 1500 / 2000). Herramienta: `tools/margen_cal.mjs` (exacta, sin bots; `--buscar` recorre la grilla).
+- `rules.js → chanceUno()`: chance exacta de que suba un peso (suma los días con los que llega, con la garra si queda). El panel la muestra como «7 de 10» (`deDiez`, en `ui/mensajes.js`: «10 de 10» solo desde 99,5 %).
+- Huella de sim.json nueva (`83f90ed0`): `sim_ref.json` y `sim_ref_facil.json` cambian solo esa línea (las 21 tablas de Clásico y Fácil de círculos son las mismas); `sim_ref_uno.json` regenerada. Ningún servidor recalcula registros (el Worker no importa `web/js/sim`).
+- Tarjeta en `'u'`: una línea por pesista (`pesista.<id>.u`) y tres barras, tirón / arriba / pararse (fácil en dorado, difícil en rojo), en lugar de Energía y Margen. Clásico conserva su tarjeta.
+- En el levantamiento, la primera vez que un pesista pasa por su punto fuerte o débil, se dice debajo de los discos (una vez por pesista y dispositivo: `tarima.visto.u_fuerte_<id>` y `u_debil_<id>`).
+
+**Emoción** (solo presentación; el núcleo y el registro no cambian).
+- `ui/margen.js` (nuevo): los discos de margen arriba al centro. Al agarrar la barra suben o bajan con «el día» y lo dicen. Cada tramo que cierra apaga lo que gastó, con su palabra («tirón −½»). La garra se ve como una ficha. Al caer, el disco que faltó se pone en rojo y dice «Faltó ¾»; si vale, los discos quedan en verde, o en dorado si fue al límite.
+- FRENO: la escena se oscurece por los bordes, la ficha de la garra late, suena un latido cada 0,62 s y no suena nada más. Si la persona toca, se oye un golpe y la tribuna estalla (`sonido.garra`).
+- ¡PÁRATE!: golpe de bajo y un grito corto (`sonido.pisoton`), y la imagen se sacude 4 px durante 120 ms. Sin sacudida si la persona pidió movimiento reducido.
+- Válido al límite: las luces salen más espaciadas (0,45 s), con un latido en cada una, y el veredicto sigue en 2,95 s (`veredictoPropio(ok, fin, limite)`).
+- Panel: «Te falta ½ disco: depende del día · 5 de 10». La Cuenta muestra la chance del peso del oro, de la plata o de pasar al frente. En la primera final, un peso de menos de 5 de 10 pide confirmar dos veces («¿Seguro? 169 kg sube 4 de 10»).
+- Rivales: «191 kg, cómodo / justo / al límite» en el cartel de su turno, según la intensidad (95 % y 99 %).
+
+**Medido** (sin navegador en la Mac, una prueba a la vez; las cuatro corren también en Actions, grupo `nucleo`):
+- **C** (play_human y margen_cal): con el novato del dedo, 100 % hasta el 95 %, 97,6 % al 97 %, 53,7 % al 100 % y 6,1 % al 103 %. Al 100 %, en arranque y en dos tiempos: Compacto 73 y 86, Largo 30 y 59, Potente 17 y 59. Al 97 % ningún pesista queda más de 10 puntos abajo del promedio. Las curvas de margen_cal (exactas) y las de play_human (núcleo y bots) coinciden.
+- **D**: tramo que más gastó en las caídas del 100 al 103 %: Largo, pararse en el 100 %; Potente, arriba en el 100 %; Compacto, repartido (tirón 7, arriba 58 y pararse 36 %). Al 100 %, entre pesistas hay hasta 56 puntos de diferencia.
+- **E** (`tools/pesistas_test.mjs`, nuevo; 200 finales por pesista, estrategia y nivel): con rivales normales, el lector (lee la chance y La Cuenta) gana el oro 55 a 83 puntos más seguido que el prudente (+2 kg) y que el codicioso (+5 kg), que no ganan nunca contra rivales normales; el lector gana el 83 % con Compacto, el 55 % con Largo y el 58 % con Potente. Con rivales amistosos, el lector gana el oro en el 97 al 98 % de las finales con los tres. Con el plan del entrenador (lo que el panel trae puesto: +4 y +3 kg) se caen 0 % de las barras (meta ≤ 12 %), pero gana el oro solo en el 20 al 43 % contra amistosos y nunca contra normales: **para decidir** si el panel debería proponer el peso de La Cuenta cuando la chance es buena.
+- **F** (`tools/chance_test.mjs`, nuevo; 30 000 intentos con el núcleo): en cada «X de 10», el error entre lo medido y lo prometido es de 2,7 puntos como mucho.
+- **J** (ritmo_test): sin cambios. Final mediana de 111 s, espera máxima de 19,3 s, veredicto propio de 2,95 s si vale y de 3,7 s si cae.
+- A, B, G, H, L: siguen en verde (play_human, sim_test, dedo_test, teclado_test, caida_test, perf_test, servidor_test).
+
+**Apartamientos del diseño.**
+- Compacto: la tarjeta dice «Su arranque máximo es el más bajo», no «Levanta menos kilos». Los techos de los tres suman 380 a 382 kg y Compacto tiene el dos tiempos más alto, así que la frase del diseño no era cierta. A igual intensidad, Compacto es el más fácil: es el que viene marcado para quien empieza.
+- Envión de la casa de Compacto: tijera (el diseño ya lo preveía si la meta D no confirmaba el squat).
+- La fase fuerte y la débil se avisan con «Largo: tirón, su punto fuerte» o «Potente: arriba, su punto débil», no con «salto fácil».
+- La apuesta de los rivales sale de la intensidad que pidieron (≤ 95 % cómodo, ≤ 99 % justo, después al límite), no de la tabla de `'u'`: ellos juegan en Clásico.
+- Sin hacer: la cámara lenta (meta K, necesita perf_test con placa), el magnesio del pisotón y Clásico ofrecido después de dos finales ganadas.
+
+### Gameplay 2.1: lo que encontraron los verificadores, corregido (13-nov, rama `gameplay`)
+
+**Qué cambió** (diseño: `docs/JUEGO.md`, G2.R; gesto: `docs/CONTROLES.md`, sección `'u'`). Todo en el nivel `'u'`; Clásico y los rivales no cambian.
+- **Ningún toque cambia el resultado.** ¡TIRA! y ¡ARRIBA! salen solas a los 2 s (con una barra que muestra cuánto falta); ¡SALTA! y ¡PÁRATE! ya no dan ni quitan energía (el ¼ y el ½ quedaron dentro de la base). El FRENO es una pausa de 1 s sin nada que tocar: la garra se usa sola, y solo si con ella el resto del levantamiento llega; si no alcanzaría, no se gasta.
+- **Suerte por tramo** (`rules.js → ruidoDe`) en lugar de «el día» revelado al agarrar: cada tramo gasta lo suyo ± una suerte que se ve recién cuando cierra («pararse −1½ · pesó más»). La línea de caída nombra un solo tramo, lo que gastó y, si tocó, la mala suerte o que la garra no alcanzaba.
+- **Energía** en lugar de «discos» (en inglés eran «plates», como los de la barra). Glosario de `'u'` con energía, garra y suerte; la presentación de `'u'` ya no habla de la energía de Clásico.
+- **Pesistas** en `rules.js → CUERPOS_U` (sim.json vuelve a la huella de mvp, `09c9b907`; los registros de `'u'` llevan `uno: HUELLA_U` y `replay.js` la exige). Recalibrados para que ninguno domine y cada uno pida otra estrategia: Compacto fiable, Potente irregular.
+- **El entrenador declara el peso** (`web/js/sim/entrenador.js`, nuevo): al cerrar cada levantamiento propio, `match.js` declara en `'u'` lo que propone (lee la chance, La cuenta, y el cansancio y la garra del intento siguiente), así que el orden ya cuenta con ese peso y casi nunca hay «desplazado». Al abrir el llamado el panel lo vuelve a mirar (con lo que hicieron los rivales en el medio); si la persona ya cambió los kilos, respeta su peso. Se cambia con ← →.
+- **Entrada:** los toques cerca de los bordes cuentan (con acuse); la gracia de 400 ms del dedo cancelado es solo de `'u'`; la tecla del acuse sale en el idioma; el acuse se mide en cada aparato (`toques.pinta`, en `?depura=1` y en `intento_propio` como `acuse_p95_ms`).
+- **Teléfono y pantalla:** «TOCA: SEGUIR» encima del botón redondo; el cartel de los rivales baja cuando se ve la energía; el turno del rival con la instrucción en su línea; tarjetas de `'u'` en 667×375 solo con lo que cambia el juego; panel del llamado más bajo; `#capa` y `#msg` encima de `#tv`; AGUANTA y ¡DA TODO! sin tecla dibujada; «Te sobra / te falta» sin «—»; el segundo «¿Seguro?» espera 400 ms y no lo activa una ráfaga vieja; «Después vas tú» en lugar de «tu reloj vuelve a empezar».
+- **Actions:** muro.yml y servidor.yml también corren en cada push a `gameplay`.
+
+**Medido** (sin navegador en la Mac, una prueba a la vez):
+- **A** (play_human, 600 por casilla): 43 200 casos × 6 bots, **0** resultados distintos entre reactivo, tardío, fantasma, mantiene, machacador y **ausente**; 0 caídas por entrada. Con el bot humano de los verificadores (lognormal, distracciones, toques largos), **0 %** de sus caídas entre el 95 y el 102 % se deben al dedo (antes 17,5 % el novato y 29 % el lento), y la chance del panel coincide con lo real a ±3 puntos (antes 10 a 17 de más).
+- **B:** 100 % en el primer arranque y el primer dos tiempos con los tres. **C:** 100 % hasta el 95 %, 98 % al 97 %, 57 % al 100 %, 7 % al 103 %. **D:** Largo cae al pararse (93 %), Potente arriba (98 %), Compacto repartido; entre el 97 y el 103 % los pesistas difieren hasta 34 puntos.
+- Kilos que suben 9 / 5 / 2 de cada 10 veces (total): Compacto 376 / 380 / 383, Largo 377 / 382 / 385, Potente 371 / 383 / 391.
+- **E** (pesistas_test, 200 finales): con rivales normales, lo que trae el panel gana el oro 55 / 58 / 64 % (Compacto / Largo / Potente), 24 a 39 puntos más que el prudente (+2 kg) y 27 a 41 más que un codicioso de verdad (pide lo que sube 3 de 10); con amistosos, 99 a 100 %. Barras caídas con el panel: 6 a 13 % (meta M ≤ 15).
+- **F** (chance_test, 30 000 intentos): error ≤ 1 punto en cada «X de 10».
+- **J** (ritmo_test, 360 finales por jugador): el novato que a veces no toca, final mediana 113 s, espera mediana 5,8 s, p90 13,3 s y máxima 19,9 s, intento propio p90 6,8 s (arranque) y 10,3 s (dos tiempos); el ausente, que no toca nunca, final mediana 130 s e intento p90 8,9 y 13,8 s (antes: 309 s y 45,8 s). Barras caídas con el panel: 8,9 %. Veredicto de una caída propia: tVer + 2,4 s, ahora medido.
+- **H** (teclado_test y dedo_test, 10 000 secuencias): 0 sin resolver, 0 dobles, 0 sin palabra, los toques del borde anotados; Clásico suelta en el acto un dedo cancelado y `'u'` espera la gracia.
+- **L** (sim_test): `sim_ref.json` y `sim_ref_facil.json` **idénticos a mvp, huella incluida**; `sim_ref_uno.json` regenerada; 1000 finales `'u'` recalculadas iguales. servidor_test: 244 controles bien.
+- **Actions** (sin cambios de juego después de estos commits): pruebas.yml 43394719554 sobre `f113362`, los cuatro grupos en verde; telefono.yml 43393312835, muro.yml 43393281641 y servidor.yml 43393281668 sobre `c4fa8f8`, en verde. Capturas miradas: llamado y ¡TIRA! en Android 667×375 (el panel ya no queda debajo de los botones de arriba), «TOCA: SEGUIR» encima del botón y el cartel de los rivales debajo de la energía (Android 667×375 y Safari 844×340), tarjetas de inicio en el iPhone 667×375 en inglés (sin cortes), glosario de `'u'` en inglés, FRENO («pararse −1¼ · pesó más», «¡DA TODO! la garra te salva»), panel en inglés y línea de caída («Ran out of energy in the pull (used 3½)…»).
+- check_toques (Actions, por software): 34 pulsaciones anotadas y resueltas, manejador p95 2,7 ms, acuse medido por el juego p95 77 ms (SwiftShader: nota, como antes).
+
+**Cómo probarlo.** `cd web && python3 -m http.server 8000` y abrir `http://localhost:8000/juego.html` (con `?depura=1` se ve el acuse medido de cada toque). Elegir un pesista, confirmar con Espacio lo que trae el panel y no tocar nada: el levantamiento sale solo. Después probar machacar, mantener o tocar con calma: el resultado es el mismo. En el celular, lo mismo con el pulgar en cualquier parte de la pantalla. Lo que cambia la final es el peso que se pide y el pesista.
+
+**Lo que queda estimado o sin medir.**
+- El acuse en aparatos de verdad: Actions dibuja por software (~80 ms del evento al cuadro). Desde ahora cada `intento_propio` trae `acuse_p95_ms` del aparato de la persona; la meta I (≤ 17 ms) se confirma con esos datos.
+- Las amplitudes de suerte y los cuerpos son de diseño, calibrados con bots; el tiempo real de una persona en el panel sigue estimado (2,5 s en ritmo_test).
+- Sigue sin hacer: cámara lenta (meta K), magnesio del pisotón, Clásico ofrecido después de dos victorias.
+- La segunda parte decía que el squat de Compacto «rinde peor desde el 100 %»: no era así (margen_cal daba +1 al 100 %). Hoy da 0 a +6 puntos y la casa sigue en tijera.
+- Lo que no se tocó a propósito: los textos `pesista.*.conviene` hablan de precisión, pero solo se ven en Clásico, donde la precisión sí cuenta. Clásico también recibe el ritmo nuevo de los rivales (resumen y fila); en el navegador solo lo cubre la práctica de Clásico de check_game.
+- En check_telefono aparecen notas de descargas de modelos cortadas (`requestfailed … .glb net::ERR_ABORTED`): la prueba recarga la página antes de que terminen de bajar (sin tutorial se llega antes a la recarga). No es un error del juego.
+
+### Barrita (13-nov, noche, rama `gameplay`): el Fácil por defecto es `'b'`
+
+Pedido del dueño: «un puntero que se mueve en la barrita; si tocás muy lejos falla, más o menos cerca regular, en el verde
+perfecto. Al usuario le gusta tirar él». Diseño: `docs/JUEGO.md`, «Gameplay 3». `'u'` sigue en el núcleo (`?ctl=u`, sus
+registros se recalculan igual) y Clásico no cambió. Nada publicado en Cloudflare ni fusionado a mvp.
+
+**Cómo se juega.** El panel trae el peso del entrenador, la chance «X de 10» y el verde que vas a tener con esos kilos (una
+barrita chica por barrita). Al confirmar, el pesista se agacha (PREPÁRATE, la barrita quieta) y arranca el puntero. Tocas
+(Espacio/Enter o el dedo en cualquier parte de la escena) y el pesista tira **en ese instante**. Verde: ¡PERFECTO! (campanazo,
+tribuna, la escena se ilumina de verde); amarillo: REGULAR (−600 de energía, la barrita tiembla); rojo: LEJOS (−1500). Queda la
+marca de dónde pegaste. Arranque: una barrita (tirón). Dos tiempos: la cargada y, con la barra en los hombros (RESPIRA), el
+envión. Pararse, quedar firme y la garra salen solos. Sin tocar, el puntero va más lento desde los 8 s y al minuto el pesista
+tira solo como REGULAR (nunca se cae por no tocar; con mucho peso, el regular puede no alcanzar). Primera final: la
+presentación en una línea y un aro punteado sobre el verde que se llena cuando el puntero pasa (una vez por dispositivo).
+
+**Dónde está.**
+- Núcleo: `rules.js → BARRA` (pasada 1,4 s, lenta 1,7 s desde 8 s, gracia 250 ms, doble 120 ms, zonas por intensidad y
+  pesista, costo de cada zona, gasto ×0,9, persona típica), `posBarra`, `zonasBarra`, `zonaBarra`, `cuerpoBarra`,
+  `repartoBarra` y `chanceBarra` (exacta por programación dinámica, enteros), `HUELLA_B` (registros `ctl: 'b'` con `barra:`;
+  `replay.js` la exige). `attempt.js`: `this.B` y `_bContacto`/`_bPega` sobre la máquina de `'u'`; `res.uno.barras` dice zona,
+  posición y si salió sola. `match.js` y `entrenador.js`: `'b'` usa `cuerpoBarra` y `chanceBarra`.
+- Juego: `ui/barrita.js` (nuevo; `#barrita`, CSS al final de `juego.css`), `controles.js` (`senalB`, `QUE_B`,
+  `proximoCentro`), `main.js` (`esU()` para lo que comparten `'u'` y `'b'`; la barrita en `correrIntento`, el verde del panel,
+  la tarjeta con «Verde tirón / Verde envión»), `input.js` (`sinRepeticion`), `audio.js` (`subida`, `pega`),
+  `stage.js` (`acercar`: la cámara se acerca a 0,93 mientras corre el puntero), textos `barra.*` en `es.js` y `en.js`.
+- Pesistas (ancho del verde, `BARRA.pesistas`): Compacto parejo (1 / 1), Largo 1,25 en el tirón y 0,8 en el envión, Potente
+  al revés (0,75 / 1,3). Medio ancho del verde: 170 ms con la apertura, 75 ms al 100 % (por el factor del pesista; 1,4 el primer intento
+  de la primera final).
+
+**Segunda vuelta (pedidos del dueño del mediodía).**
+- **Cansancio** (`rules.js → BARRA.fatiga`, `fatigaDe`, `sumarFatiga`; `match.js` lo lleva por pesista en `a.fatiga`): cada
+  intento cansa un cuarto de lo que costaron sus toques (amarillo +150, rojo +375), +250 si usó la garra y un cuarto de lo que
+  quedó por debajo de ½ de energía; en pasos de 50, tope ¾ por levantamiento; del arranque pasa la mitad al dos tiempos. El
+  intento siguiente empieza con esa energía de menos (`ctx.fatiga`). Se ve en el panel («Cansancio −¼» junto al verde, y la
+  chance y «Te sobra» ya lo cuentan), en la energía al empezar y en la línea de caída si sin él se paraba («Venía cansado
+  (−¼)»). Abrir pesado, pegar lejos o salvarse con la garra te deja más cansado.
+- **Esfuerzo al pararse** (`BARRA.esfuerzo`, `pideEsfuerzo`): solo desde el 95 % y si al empezar a pararse la energía que
+  quedaría sin suerte baja de 0,1, la señal ¡PÁRATE! pide 3 toques en 3 s (sin apuro: 2 por segundo alcanzan), con la barra
+  que se llena y «¡VAMOS!» en cada uno y «¡DE PIE!» (pisotón) al terminar. Hecho: pararse cuesta 300 menos. No hecho: cuesta
+  lo de siempre (cae solo si no alcanzaba). `chanceBarra` lo cuenta (la persona típica lo hace 95 de cada 100).
+- **Enviones**: split (tijera) el más fácil, power intermedio, squat el más difícil para todos (`BARRA.envion` y
+  `verdeEnvion`: gasto 0,7 / 0,85 + ¼ / 0,95 + ½, verde ×1 / ×0,9 / ×0,8; la movilidad alta solo achica la diferencia del
+  squat). En «Más opciones» dice «más fácil / intermedio / más difícil»; el panel propone split.
+- **Bienvenida**: la parte de arriba (`.bv-cuerpo`) se desplaza y la fila Jugar / Opciones / Cómo se juega queda fuera de ella:
+  ya no tapa las tarjetas (al repintar se conserva su desplazamiento). Las tarjetas en `'b'` llevan la frase en su propio
+  bloque y debajo el verde de cada barrita (en el teléfono acostado, solo la frase); en pantallas de menos de 820 px de alto,
+  sin la franja de colores ni la nota del nombre. Medido en `check_barra` a 1280×720, 1280×600, 1440×700, 1800×560, 667×375 y
+  844×390: las tarjetas se ven enteras sin desplazar y nada se pisa.
+- El entrenador es un poco más prudente en `'b'` (9,3 de 10 en el segundo intento, 8 de 10 en el tercero). Gasto ×0,925.
+
+**Medido** (sin navegador, `node tools/barra_bots.mjs --n=600`; perfiles: novato ±120 ms y 40 ms tarde, 5 % de despistes,
+esfuerzo a 2 toques por segundo; medio ±70; bueno ±35; típico ±105, el que supone el panel). Válidos % (verde % de los toques),
+dos tiempos con split:
+
+| perfil · pesista | arr. 90 % | arr. 97 % | arr. 100 % | arr. 103 % | dt 90 % | dt 97 % | dt 100 % | dt 103 % |
+|---|---|---|---|---|---|---|---|---|
+| novato · Compacto | 100 (82) | 93 (56) | 64 (45) | 6 | 100 (81) | 86 (59) | 37 (42) | 4 |
+| novato · Largo | 100 (87) | 97 (69) | 65 (52) | 9 | 100 (78) | 84 (57) | 37 (43) | 6 |
+| novato · Potente | 100 (67) | 78 (45) | 37 (33) | 7 | 99 (77) | 79 (57) | 51 (44) | 20 |
+| medio · Compacto | 100 (97) | 99 (82) | 82 (69) | 11 | 100 (96) | 97 (85) | 68 (69) | 13 |
+| medio · Largo | 100 (99) | 99 (91) | 83 (78) | 15 | 100 (94) | 96 (82) | 64 (67) | 15 |
+| medio · Potente | 100 (90) | 91 (72) | 52 (57) | 11 | 100 (94) | 95 (80) | 72 (67) | 37 |
+| bueno · Compacto | 100 (100) | 100 (99) | 98 (97) | 18 | 100 (100) | 100 (100) | 95 (96) | 31 |
+| bueno · Largo | 100 (100) | 100 (100) | 96 (99) | 21 | 100 (99) | 100 (99) | 92 (94) | 32 |
+| bueno · Potente | 100 (100) | 97 (97) | 69 (89) | 18 | 100 (100) | 100 (98) | 89 (93) | 58 |
+
+- Metas: novato con la apertura (90 %) ≥ 99 % válidos y 67 a 88 % verde; al 100 % el novato entre 37 y 65 % y el bueno
+  siempre más (69 a 98 %). Verde del novato al 97 %: tirón Largo 69 / Compacto 56 / Potente 45 %; envión Potente 71 /
+  Compacto 59 / Largo 46 %. Mantener, no tocar y el doble toque: 100 % al 90 %; el machacador pega en el rojo.
+- Esfuerzo (novato): nunca hasta el 92 %; arranque 6 % de los intentos al 95 %, 27 % al 97 %, 66 % al 100 %; dos tiempos 0 a
+  11 % hasta el 100 %. Lo hace el 93 a 97 %; con 2 toques por segundo, el 100 % (602 de 602).
+- Envión al 97 % (novato, válidos): split 84 a 87 %, power 64 a 67 %, squat 38 a 55 %; el bueno, 98-99 / 88-99 / 78-98: el
+  orden se cumple con los tres pesistas.
+- Finales enteras con cansancio (apertura 90 %, después lo que trae el panel; rivales normales): el novato termina con total el
+  100 % de las finales con los tres pesistas; válidos por intento arranque 100 / 91-97 / 77-82 % y dos tiempos 99-100 /
+  88-92 / 63-75 %; cansancio medio al tercer intento ¼ (novato), ⅛ (medio), casi nada (bueno).
+- `chance_test` (30 000 intentos, con cansancio de 0 a ¾ y esfuerzo): error ≤ 3,7 puntos con la persona típica (meta ≤ 5).
+- `ritmo_test` (360 finales): novato, final mediana 131 s (≤ 150), espera máxima 19,9 s (≤ 20), intento propio p90 9,1 s
+  arranque y 13,7 s dos tiempos (metas de `'b'` ≤ 10 y ≤ 15: la barrita y el esfuerzo), barras caídas con el panel 13,3 %
+  (≤ 15). El «lento» (espera siempre al puntero lento) es informativo: final de 201 s.
+- `teclado_test` y `dedo_test` (10 000 secuencias, `'b'` y `'u'`): 0 sin resolver, 0 dobles, 0 sin palabra, 0 barritas
+  disparadas dos veces. `sim_test`: `sim_ref.json`, `sim_ref_facil.json` y `sim_ref_uno.json` idénticos; `sim_ref_barra.json`
+  regenerada. `play_human` (`'u'`), `perf_test` y `servidor_test` en verde.
+- Navegador (`check_barra`, Actions): con el reloj verdadero, entre dónde se veía el puntero al apretar y dónde lo juzgó el
+  núcleo hubo 21 y 25 ms (por software); dos Espacios a 60 ms cuentan uno; cada barrita sale donde se tocó en computadora y
+  teléfono, en español y en inglés.
+
+**Actions** (13-nov, sobre `c987907` de la rama `gameplay`): pruebas.yml 43463056525 (núcleo con check_game,
+teléfono, iPhone y recorrido, toques con check_fluidez, check_barra y check_toques), muro.yml 43463057206, telefono.yml
+43463056930; servidor.yml 43457300744. Capturas de la barrita en el artefacto `pruebas-out-toques` (`out/barra/`): miradas en
+computadora y teléfono acostado, español e inglés.
+
+**Cómo probarlo.** `cd web && python3 -m http.server 8000` → `http://localhost:8000/juego.html` (un `tarima.ctl` guardado que
+no sea Clásico abre en la barrita; `?ctl=u` vuelve a `'u'`). Sin navegador: `node tools/barra_bots.mjs`,
+`node tools/chance_test.mjs`, `node tools/ritmo_test.mjs`. Con navegador (Actions, grupo «toques»): `tools/check_barra.mjs`
+(computadora en español e inglés, teléfono 667×375 y 844×390; capturas en `out/barra/`).
+
+**Apartamientos y pendientes.**
+- «Los kilos que elijas deciden el resto» dice «lo demás»: `sim_test` no deja «resto» (es la palabra vieja del Resto).
+- «Te sobra ¾ de energía» del panel es sin el costo del toque (si pegas en el verde) pero con el cansancio; la chance cuenta todo.
+- Esperar al puntero lento es más fácil (más ms de verde): cuesta tiempo de la final, no se castiga.
+- Sin medir con personas ni en un teléfono de verdad: la persona típica (±105 ms) es una estimación; cada `intento_propio`
+  manda `barra_1`, `barra_2`, `barra_pos_1/2` y `barra_sola` para calibrarla con datos.
+- La diferencia entre dónde se ve el puntero y dónde lo juzga el núcleo se mide en `check_barra` con el reloj verdadero; por
+  software (Actions) los cuadros son largos.
+- Pendiente: una chance por persona (con su propia puntería), cámara lenta en el toque, vibración distinta por zona en iPhone
+  (no tiene vibrate).
+
+### Rivales con su propia estrategia de kilos (13-nov, rama `rivales`)
+
+Pedido del dueño: «que los otros levantadores tengan su propia estrategia de pesos, no que siempre usen lo mismo que yo».
+
+**Diagnóstico** (`tools/rivales_test.mjs`, 500 finales por estrategia y nivel en `'b'`, el novato de `barra_bots.mjs`; y una contrafáctica: antes de cada llamado, qué pediría cada rival si el jugador hubiera declarado ±3 kg).
+- No copiaban el NIVEL de kilos: la correlación entre los kilos del jugador y los de cada rival en el mismo intento es −0,19 a 0,14 con todas las estrategias (con la que pide kilos al azar, −0,15 a 0,07), y los intentos a ±1 kg del jugador (6 a 21 %; codicioso 1 a 3 %) son los mismos que con el rival de otra final. Se parecen porque los tres pesistas tienen techos a 2 kg y abren entre el 91 y el 96 %.
+- Lo que se ve como espejo son los **cambios**: `decidir` con estilo «pasa» (Brenner) y «orgullo» (Marangi) declaraba un kilo más que lo que tuviera declarado otro pesista a 2 kg o menos. El 21 % de las decisiones de los rivales cambiaba si el jugador declaraba otra cosa (35 % las de Brenner, 31 % las de Marangi, 0 % Ventura), 41 a 54 % de los cambios caían justo en lo declarado por el jugador o un kilo más, y eso son 0,8 a 1,4 avisos «X pide N kg» por final. El tercer dos tiempos salía de los kilos del puntero (33 % depende de la marca del jugador). La apertura no salía de la del jugador ni el entrenador compartía plan: el amistoso solo baja 3,5 %.
+
+**Qué cambió** (`web/js/sim/ai.js` → `PERSONALIDADES`, `planRival`, `decidirPlan`; tabla en docs/JUEGO.md 7.3). Cada rival tiene la personalidad de su ficha y un plan sembrado por final (apertura, adónde quiere llegar en el segundo y el tercero, si se guarda, si sube tras un nulo) que sale de su techo visible, su forma y su Resto. Ventura «va a lo seguro», Brenner «hace cuentas» (se guarda en el tercer arranque cuatro finales de cada diez; en el dos tiempos asegura si va primero y pide lo justo para pasar en el último si va atrás), Marangi «arriesga» (abre alto, el tercero por encima del 100 %, «va por todo»). La tabla solo cuenta en el dos tiempos y en totales; nunca miran lo declarado por otro. La palabra sale en el cartel del turno del rival («191 kg, justo · va a lo seguro») y en «Tus rivales hoy» de la presentación (claves `rival.estilo.*` en `es.js` y `en.js`).
+- **Compatibilidad.** `new Partida(..., { ia: HUELLA_IA })` usa los rivales nuevos y el registro lleva `ia`; sin `ia`, los de siempre. `replay.js` rechaza otra huella (`'huella de las reglas de los rivales'`). `tools/sim_ref*.json` no cambiaron y siguen pasando; `tools/sim_ref_rivales.json` es la referencia nueva (`sim_test` 14). La lógica de `planRival`/`decidirPlan` no entra en la huella: si cambia, subir `IA.version` y borrar `sim_ref_rivales.json` para regenerarlo. `main.js` solo cambió en tres líneas (la huella al crear la Partida, el cartel del turno y la presentación). El muro no se tocó.
+- `pesistas_test` y `ritmo_test` ahora juegan contra los rivales nuevos; `balance.mjs --rivales` sigue con los viejos.
+
+**Mediciones antes → después** (novato, 500 finales por estrategia y nivel; oro del jugador):
+
+| | Amistoso | Normal |
+|---|---|---|
+| Panel (entrenador) | 92 → 93 % | 24 → 29 % |
+| Prudente (+2) | 90 → 91 % | 8 → 13 % |
+| Fijo (93 %, +4 +3) | 94 → 92 % | 10 → 12 % |
+| Codicioso | 81 → 84 % | 28 → 27 % |
+| Azar | 91 → 91 % | 9 → 13 % |
+
+- Jugador «medio» (300 finales): panel 99 → 97 % y 36 → 37 %; prudente 96 → 96 % y 10 → 17 %.
+- Decisiones de rivales que cambian si el jugador declara ±3 kg: **21 % → 0 %**; con 3 kg más de marca: 5 → 4 % (la tabla del último dos tiempos). Cambios espejo por final: 0,8–1,4 → 0,02–0,12. Correlación de kilos: −0,06 a 0,17 (antes −0,19 a 0,14): baja antes y después, no era ahí el espejo. Distancia media al jugador en el mismo intento: 4 a 7 kg (codicioso 9 a 13).
+- Rivales en Normal (total medio ± desvío · válidos): Ventura 372 ±3,8 · 88 %, Brenner 371 ±4,2 · 81 %, Marangi 376 ±7,1 · 77 % (antes 371 · 86 %, 372 · 66 %, 374 · 76 %). En Amistoso, sin marca: Ventura 3 %, Brenner 5 %, Marangi 12 % (antes 4, 20 y 6 %).
+- Variedad: 8 a 11 aperturas de arranque distintas por rival y 305 a 322 planes distintos cada 333 finales.
+- `pesistas_test` ('u', rivales normales, panel): Compacto 46 %, Largo 50 %, Potente 67 % (antes 55 / 58 / 64); parejos 22 puntos (meta ≤ 25), E en verde. Quien elige Potente enfrenta a Ventura y Brenner, los dos más previsibles: es el par más fácil.
+
+**Pruebas.** Sin navegador, de a una en la Mac: `sim_test` (14 secciones; las referencias viejas sin cambios), `rivales_test`, `pesistas_test`, `ritmo_test`, `chance_test`, `play_human`, en verde. Actions, pruebas.yml sobre `rivales` (run 43462071474): núcleo (con `rivales_test`, nuevo paso), teléfono, iPhone y recorrido en verde; falla `check_barra` (tarjetas que «tapan» y barrita angosta en 1280×720), igual que en `gameplay` en 026e385 (run 43452015428), sin relación con los rivales. La primera corrida (43459362229) encontró que la línea nueva de la presentación no entraba en Safari 844×340: la palabra va en la misma línea que la apertura y en el teléfono acostado se oculta. Capturas miradas: «Tus rivales hoy» con «hace cuentas» y «arriesga», y el cartel «Turno de Ilya Brenner (rival) · 154 kg, cómodo · hace cuentas».
+
+**Pendientes.** Las personalidades van atadas al pesista: quien juega con Ventura nunca enfrenta al conservador. Marangi casi nunca queda sin marca en Normal (1 %): «a veces se queda sin marca» se ve en Amistoso. El tercer dos tiempos que reacciona a la tabla todavía cae algunas veces en un kilo más que el jugador (0,1 por final con el plan fijo): es la cuenta del total, no una copia. Jugarlo y mirar si las palabras se leen en el cartel del turno del teléfono.
+
+### Carteles en el teléfono (13-nov, tarde, rama `gameplay`)
+
+Pedido del dueño: «en mobile los carteles me tapan mucho al pesista» y «menos ruido visual: el user entra, juega con el setup
+mínimo y ya». Todo en CSS al final de `web/css/juego.css` (bajo `html.juego-u`, que main.js pone en 'b' y 'u'; Clásico no
+cambia) y `html[data-pantalla]` (lo pone `visita`). Vale para teléfono y computadora.
+- **Durante el intento propio**: sin título del evento, reloj, marcador, cambios de los rivales ni zócalo; la energía, chica
+  arriba a la izquierda; la barrita pegada abajo (en el teléfono, del borde al botón redondo, sin verbo: el botón dice TOCA;
+  el nombre de la barrita y ¡PERFECTO! encima, a la izquierda); la ayuda de primera vez arriba a la derecha; AGUANTA y ¡ABAJO!
+  no se muestran; el esfuerzo de pararse a la izquierda, a media altura.
+- **Veredicto** a la izquierda, a media altura y semitransparente; con él no hay marcador ni cambios de rivales. Un rival en
+  'b' muestra solo la causa si falla (las luces ya están arriba).
+- **Turno del rival** en una línea arriba a la izquierda, sin «mira o toca para saltar» (lo dice «Toca: seguir») y sin
+  llegar a los botones de sonido, pausa y ayuda; el marcador debajo.
+- **Llamado**: sin selector de idioma, sin zócalo, sin la línea de la garra, «sin apuro» ni «lo más duro» en 'b'.
+- **Bienvenida**: Jugar grande; Opciones, Cómo se juega y Privacidad como enlaces chicos; sin título del evento ni reloj;
+  tarjetas solo con una frase corta. Nombre opcional y pesista elegido: un toque y se juega.
+- **Medición** (`tools/tapa.mjs`, nuevo, en `check_barra` y `check_telefono`): caja del pesista proyectada desde three
+  (`stage.js → cajas()`: cuerpo, torso y barra) contra las cajas de la interfaz visible (opacidad > 0,5) y los textos a la
+  vista. Falla si tapa más del 15 % del cuerpo con la barrita (quieta, corriendo, recién tocada) o en el levantamiento, o más
+  del 20 % del torso en el llamado. `TAPA_INFORMA=1`: solo informa.
+
+| Cuerpo tapado (textos a la vista) | antes | después |
+|---|---|---|
+| Teléfono 667×375 · barrita corriendo | 64–77 % (13) | 0 % (5) |
+| Teléfono 844×340 (Safari con barra) · corriendo | 65 % (13) | 15 % (5) |
+| Teléfonos 740×360, 844×390, 932×430 · corriendo | 40–71 % (12–13) | 0–13 % (4–5) |
+| Teléfonos · barrita quieta | 27–50 % (12–13) | 0–8 % (4–5) |
+| Teléfonos · levantamiento | 35–43 % (11–12) | 0–15 % (4–5) |
+| Teléfonos · veredicto propio | 35–37 %, torso 69 % (16) | 3–4 %, torso 0 % (13–15) |
+| Teléfonos · turno del rival | 6–22 %, torso 21–54 % (17) | 0–3 %, torso 0 % (15) |
+| Teléfonos · llamado | 6–13 %, torso 0 % (25) | 0 %, torso 0 % (18) |
+| Computadora · llamado | 1–2 %, torso 0 % (33) | 0 %, torso 0 % (22) |
+| Computadora 1280×720 · corriendo / levantamiento | 27 % / 23 % (14 / 12) | 0 % / 0 % (6 / 4) |
+| Computadora · veredicto propio | 22–24 %, torso 52 % (16) | 1–2 %, torso 0 % (14) |
+| Bienvenida en el teléfono | 18 textos, 3 botones grandes | 16 textos, 1 botón grande (Jugar) |
+
+La barra (con los discos) queda tapada 15–17 % en el teléfono durante la barrita (la pista pasa por debajo de los discos) y
+0–8 % en la computadora. Presentación y apertura (antes de la primera barra) siguen tapando al pesista: son paneles.
+
+### Dificultad (13-nov, tarde, rama `gameplay`)
+
+Pedido del dueño: «si es fácil así está bien; si es un poco más difícil, que requiera un poco más de interacción a nivel tocar
+espacio». Diseño y tabla de parámetros: `docs/JUEGO.md`, G3.D. Se elige solo en Opciones (fila «Dificultad: Fácil · Medio ·
+Difícil · Clásico»; no en la bienvenida, por pedido de menos ruido), queda en `tarima.dificultad` (`?dif=` para pruebas), Fácil
+por defecto. Difícil trae rivales parejos salvo que se hayan elegido a mano. `dificultad` es súper propiedad de la analítica
+(`analitica.propiedades`) y va en `final_inicio` e `intento_propio` (más `barra_3`).
+- **Fácil** = lo de antes, bit a bit (`sim_ref*.json` idénticos, `HUELLA_B` igual).
+- **Medio**: barrita de atrapar arriba en el arranque y de pararse en el dos tiempos, puntero de 1,2 s, verde 80 %, esfuerzo
+  desde el 92 % con 5 toques en 3 s. **Difícil**: barrita en cada fase (tirón, atrapar, pararse; cargada, pararse, envión),
+  puntero de 1,0 s sin ponerse lento, verde 65 %, esfuerzo desde el 88 % con 6 toques en 3 s.
+- Núcleo: `rules.js → NIVELES_B`, `reglasB`, `HUELLAS_B` (registro con `dif` y su huella; `replay.js` rechaza otro nivel o
+  huella), fase `'barra'` en `attempt.js` para atrapar y pararse (el pesista quieto en el fondo; sin tocar, al minuto sale
+  regular). Referencia nueva `tools/sim_ref_dificultad.json` (sim_test 15).
+
+**Medido** (sin navegador; `barra_bots --n=400`, válidos % con la apertura sugerida / al 97 % / al 100 %; arranque · dos tiempos):
+
+| perfil | Fácil (90 %) | Medio (89 %) | Difícil (88 %) |
+|---|---|---|---|
+| novato Compacto | 100/94/61 · 100/85/35 | 100/86/33 · 100/69/11 | 100/61/11 · 100/62/8 |
+| novato Largo | 100/98/65 · 100/85/36 | 100/92/34 · 100/57/11 | 100/59/9 · 100/50/6 |
+| novato Potente | 100/78/36 · 99/80/50 | 100/53/16 · 100/66/30 | 100/45/11 · 100/59/23 |
+| medio Compacto | 100/99/82 · 100/98/67 | 100/98/59 · 100/91/40 | 100/96/40 · 100/90/31 |
+| medio Largo | 100/99/84 · 100/96/62 | 100/99/66 · 100/88/31 | 100/95/38 · 100/86/28 |
+| medio Potente | 100/89/50 · 100/95/72 | 100/77/35 · 100/88/52 | 100/71/26 · 100/85/47 |
+| bueno Compacto | 100/100/97 · 100/100/95 | 100/100/89 · 100/100/79 | 100/100/81 · 100/100/70 |
+| bueno Largo | 100/100/96 · 100/100/93 | 100/100/93 · 100/99/79 | 100/100/78 · 100/99/65 |
+| bueno Potente | 100/96/68 · 100/99/89 | 100/92/54 · 100/99/82 | 100/89/45 · 100/97/76 |
+
+- Metas: con la apertura, Medio novato 100 % (≥ 90) y medio 100 % (≥ 95); Difícil novato 100 % (≥ 75) y bueno 100 % (≥ 95);
+  en los tres el bueno le gana al novato por 15 puntos o más al 100 % (y 25 sumando 97 y 100).
+- Oro en finales enteras (lo que trae el panel; «lee» = el entrenador con la puntería propia, cambiando kilos con ← →):
+  Fácil contra tranquilos novato 87 %, contra parejos bueno 25 % (lee 76 %); Medio contra tranquilos novato 59 %, medio 80 %,
+  bueno 88 %; Difícil (parejos) bueno 4 % con el panel y **44 % si pide lo que su puntería permite**, novato 0 %.
+- Esfuerzo a ritmo cómodo: 2, 2,5 y 3 toques por segundo alcanzan siempre (Fácil, Medio, Difícil).
+- `chance_test` (30 000 intentos por nivel): error máximo por grupo 1,9 / 2,2 / 4,2 puntos (meta ≤ 5). La persona típica del
+  panel: ±105 / ±100 / ±90 ms.
+- `ritmo_test` (novato, 360 finales por nivel): final mediana 131 / 140 / 141 s (metas ≤ 150 / 165 / 180), intento propio p90
+  8,8 · 13,7 / 11,3 · 15,3 / 13,1 · 14,6 s, barras caídas con el panel 14,8 / 16,7 / 23,5 % (metas ≤ 15 / 18 / 25), espera
+  máxima 19,4 / 20,0 / 20,2 s (metas ≤ 20 / 21 / 21: en Medio y Difícil hay más turnos de rivales seguidos).
+- `teclado_test` y `dedo_test` (10 000 secuencias por nivel): 0 sin resolver, 0 dobles, 0 barritas con dos contactos.
+- `sim_test` (15 secciones), `pesistas_test`, `rivales_test`, `play_human`, `servidor_test`: en verde.
+
+**Actions** (sobre `35da06a`, todo en verde): pruebas.yml 43485459305 (núcleo, toques con check_barra en los tres niveles,
+teléfono, iPhone y recorrido), telefono.yml 43485459388, muro.yml 43485459235; servidor.yml 43478579221 (sobre `e4f8ac8`). El
+antes de la tabla de carteles se midió en una rama temporal (`medir-antes`, ya borrada) con el juego de `483b3d7` y la misma
+herramienta (corridas 43476794242, 43476802773 y 43479846657). Capturas miradas: teléfono acostado y computadora, en español e
+inglés, Fácil, Medio y Difícil (atrapar con la barra arriba, pararse desde el fondo, Opciones, turno del rival, veredicto).
+
+**Pendiente.** En Difícil el panel propone kilos para la persona típica y quien apunta bien tiene que subirlos a mano para
+ganar (una chance por persona sigue pendiente). Medio y Difícil se midieron con bots, no con personas. Los metas de ritmo de
+Medio y Difícil (espera ≤ 21 s, caídas ≤ 18 y ≤ 25 %) son nuevas y propias de esos niveles.
+
+### Carga: pantalla de carga y modelos comprimidos (13-nov, rama `carga`)
+
+Pedido del dueño: tarda en cargar (2/3 de los jugadores en el celular, muchos con datos móviles) y mientras carga se ve feo.
+
+- **Modelos** (`tools/comprimir_modelos.sh`, hay que correrlo después de `export_web.py`; `build.sh` lo hace solo). Antes
+  `web/models` pesaba 23,7 MB y el juego bajaba todo. Ahora:
+
+  | archivo | antes | después |
+  |---|---|---|
+  | `ventura.glb` (visor, Alta/Media) | 11,12 MB | 6,19 MB |
+  | `brenner.glb` | 10,02 MB | 5,58 MB |
+  | `ventura_1024.glb` (juego en Baja/Móvil) | — | 3,43 MB |
+  | `brenner_1024.glb` | — | 3,03 MB |
+  | `ventura_mask` PNG → WebP 1024 sin pérdida | 1,31 MB | 0,25 MB |
+  | `brenner_mask` | 1,22 MB | 0,24 MB |
+
+  Qué pesaba: geometría y animación ~6,8 MB por GLB (posición/normal/UV/pesos en float32, morphs correctivos dispersos,
+  1,4 MB de claves) y ~4,3 MB de texturas JPEG (normal y ORM del cuerpo a 2048). Geometría: meshopt con filtro exponencial
+  sobre float32 (posiciones a <0,05 mm, normales a 0,03°, rotaciones a 0,002°), sin cuantizar posiciones (athlete.js usa
+  las matrices de enlace y mide metros por UV), índices/JOINTS/tiempos sin pérdida, pelo y pestañas sin reordenar. Texturas
+  del liviano a 1024: el juego en automático arranca en Baja o Móvil (`tex: 1024`) y ya las achicaba al cargar; color y
+  pelo en WebP, normal y ORM en JPEG 4:4:4. Verificado además con el lector de gltf-transform: mismos 56 nodos, 53
+  articulaciones, morphs `corr_*`, acción `Poses` con 160 canales (diferencia máxima 1,5e-5, tiempos idénticos).
+- **Lo que baja el juego** (`tools/check_carga.mjs`, teléfono 844 × 390, sin caché): 24,63 MB → 7,94 MB. Modelos bajados,
+  antes → después: con 4G (9 Mbps, 85 ms) 33,2 → 21,6 s (run 43455353457) y 39,4 → 27,7 s (run 43459886954); con red
+  lenta (1,6 Mbps, 150 ms) 133,7 → 51,3 s y 138,0 → 55,6 s; última corrida (run 43461772198): 34,5 → 21,0 s y
+  135,0 → 52,1 s. La bienvenida sale a los 12–21 s en el runner en los dos
+  casos: ahí manda el dibujo por software, no la red. El primer cuadro salió 0,1–0,4 s más tarde que antes (más CSS y el
+  SVG animado dibujados por software; el SVG ya no está).
+- **Pantalla de carga** (`#msg`, `web/js/game/ui/carga.js`, `web/css/carga.css`): ~~un pesista de costado que hace un arranque
+  en bucle~~ (sacado el 13-nov a la noche a pedido del dueño: «le sacaría el pesista ese que hiciste que no me gustó»; se
+  borró `tools/carga_svg.py` y la marca TARIMA quedó más grande en su lugar), luz de tarima que respira, barra con
+  los bytes reales de los GLB y máscaras (porcentaje y «0,4 / 7,0 MB»), y una frase cada 4,2 s: cómo se juega y 11 datos de
+  halterofilia (claves `carga.como` y `carga.dato_1..11`). `carga.js` se carga aparte con `async`, antes que three.js; el HTML
+  ya muestra la pantalla antes de cualquier JavaScript. La bienvenida ya salía antes de que bajaran los modelos: ahora,
+  detrás de ella, una barrita de 3 px arriba muestra el avance, y si se toca «Jugar» antes de tiempo vuelve la pantalla con
+  la barra y las frases. Movimiento reducido: sin fundidos. Capturas en el artefacto
+  `carga-medir` (667 × 375, 844 × 390, escritorio en inglés, movimiento reducido).
+- **Visor antes y después** (`carga.yml`, run 43455353457, `check_viewer` en los dos lados, 141 capturas cada uno): verdes;
+  caras, pelo, barba, piel, manos, zapatillas y discos iguales a la vista (diferencia media por píxel 1,2 de 255; lo más
+  distinto son cuadros tomados en plena reproducción). Dos diferencias medidas: (1) los metros por unidad de UV del cuerpo
+  (escala del mosaico de poros y trama) pasan de 1,81 a 1,78 en Ventura y de 1,88 a 1,84 en Brenner: `metersPerUv` toma la
+  mediana de una muestra de triángulos y el reordenado cambia cuáles; es un 2 % en un mosaico de 12 mm, invisible.
+  (2) `check_viewer` avisaba «el índice 0 del envión no duplica el último de la cargada (huesos 1,0°)»: no era una pose
+  distinta sino cuaterniones a 4e-5 de la unidad (`angleTo` de un cuaternión consigo mismo da 1° si no es unitario);
+  athlete.js ahora normaliza al muestrear; en la segunda corrida (run 43464414582) el aviso ya no sale y los avisos son
+  los mismos 5 de antes. Esa corrida quedó en rojo en los DOS lados (también con los modelos viejos) por pedidos de GLB
+  abortados (`requestfailed ... net::ERR_ABORTED`, páginas que se cierran mientras baja un modelo): falla intermitente de
+  `check_viewer` en el runner, no de la compresión. Juego (`pruebas.yml`, runs 43456941473 y 43459952561): núcleo, teléfono,
+  iPhone/recorrido, check_fluidez, check_toques y capturas en verde; las capturas con el 3D salen iguales a las de
+  `gameplay` (diferencia media 0,15 de 255 en las escenas quietas). `check_barra` falla igual que en `gameplay` 026e385
+  (tarjetas y barrita en 1280 × 720: trabajo en curso de la barrita, no de esta rama).
+- **Pendiente / sin medir**: Pages manda los GLB y WebP con `max-age=0, must-revalidate` (cada visita revalida; un
+  `_headers` con caché más larga obligaría a cambiar el nombre de los archivos en cada exportación). KTX2 no se probó (pide
+  el transcodificador de Basis, ~0,5 MB, y athlete.js achica y suelta las texturas en un lienzo). Nada de esto se probó en
+  un teléfono real: los tiempos son del runner con la red emulada.
+
+### Todo verde, la barra sube; carga sin pesista (13-nov, noche, rama `gameplay`)
+
+Dos pedidos del dueño después de probar todo («está todo perfecto» salvo esto), antes de publicar:
+
+1. **Pantalla de carga sin el pesista**: «le dejaría la pantalla de carga, le sacaría el pesista ese que hiciste que no me
+   gustó». Fuera el SVG de `juego.html`, sus animaciones de `carga.css` y `tools/carga_svg.py`. Quedan el fondo, la luz que
+   respira, la marca TARIMA (más grande: es lo único arriba), la barra con los bytes y las frases. `check_carga` revisa que
+   la pantalla no tenga ningún dibujo (`svg`, `img`, `canvas`) y que nada se pise ni se salga en 667×375, 844×390 y 1280×720.
+2. **La incongruencia**: «tocás espacio, llega perfecto y capaz se le cae la barra». Regla nueva (`rules.js → BARRA.verdeSalva`,
+   `BARRA.version` 1.1; en los tres niveles):
+   - **Si todas las barritas de un levantamiento salen en verde, la barra sube siempre.** Ni la energía, ni la suerte del tramo,
+     ni el cansancio la tiran.
+   - Mientras todo lo jugado va en verde, un tramo que se queda sin energía se completa igual: la energía queda en 0, la garra
+     no se gasta y la energía dice «tirón −1 · ¡lo salva el verde!». Lo que faltó cansa igual (`res.uno.protegido`; `fatigaDe`
+     lo cuenta como si hubiera faltado).
+   - El esfuerzo de pararse **no aparece** mientras todo va en verde (no podría hacerla caer): el pesista se para solo y ese
+     tramo cuesta lo mismo que con el esfuerzo hecho (`res.uno.esfuerzo_solo`; la energía dice «pararse −½ · ¡de pie!»). Se eligió
+     esto y no el «¡DE PIE!» automático porque no toca la interfaz del esfuerzo y deja la energía igual de justa que si se
+     hubiera hecho.
+   - Con una barrita amarilla o roja (o una que salió sola, que es regular) vuelven las reglas de siempre desde ese tramo
+     (garra incluida). Las caídas siempre tienen un toque que falló y la línea lo nombra con su barrita: «173 kg es el 99 % y
+     pegaste en el amarillo en el envión (−½): se quedó sin energía en el envión» (con dos: «el amarillo en la cargada y en el
+     rojo en el envión»). Claves `explica.b.toque`, `explica.b.y`, `barra.en.*`; se borraron `explica.b.verde*` (ya no puede pasar).
+   - Por encima del techo el verde se cierra (antes se quedaba en ±60 ms al 103 % y seguía así; con la regla, cualquiera que
+     pegue bien levantaría cualquier peso): `BARRA.tI/tVerde` = ±75 ms al 100 %, ±30 al 103 %, nada al 106 %. Hasta el 100 % no
+     cambió nada.
+   - `chanceBarra` lleva en la programación dinámica «todo verde hasta acá» (incluye la probabilidad de todo verde); el panel
+     «X de 10» y el entrenador la usan. Panel sin llegar en 'b': «Te falta ½: con todo en verde sube igual». Ayuda y «Cómo se
+     juega» lo dicen («Todo en verde: la barra sube siempre»).
+   - Huellas nuevas: `HUELLA_B` (Fácil) y las de Medio y Difícil (`HUELLAS_B`) cambian con la versión. `sim_ref_barra.json` y
+     `sim_ref_dificultad.json` regeneradas; `sim_ref_rivales.json` regenerada porque 3 de sus 9 partidas son de 'b' (cambió una, la
+     semilla 28000012; las de 'c' y 'u' iguales). `sim_ref.json`, `sim_ref_facil.json` y `sim_ref_uno.json` idénticas.
+
+**Medido** (`barra_bots --n=400`; válidos % con la apertura sugerida / al 97 % / al 100 %; arranque · dos tiempos). Hasta el
+100 % casi igual que antes (la regla solo salva intentos todo verde que se quedaban sin energía, y muchos de esos ya los salvaba
+la garra):
+
+| perfil | Fácil (90 %) | Medio (89 %) | Difícil (88 %) |
+|---|---|---|---|
+| novato Compacto | 100/94/62 · 100/85/35 | 100/86/33 · 100/69/11 | 100/61/11 · 100/62/8 |
+| novato Largo | 100/98/67 · 100/85/36 | 100/92/34 · 100/57/11 | 100/59/9 · 100/50/6 |
+| novato Potente | 100/79/46 · 99/80/52 | 100/54/18 · 100/66/30 | 100/45/11 · 100/59/23 |
+| medio Compacto | 100/99/82 · 100/98/67 | 100/98/59 · 100/91/40 | 100/96/40 · 100/90/31 |
+| medio Largo | 100/99/86 · 100/96/63 | 100/99/66 · 100/88/31 | 100/95/39 · 100/86/28 |
+| medio Potente | 100/92/65 · 100/95/74 | 100/77/40 · 100/88/52 | 100/72/28 · 100/85/48 |
+| bueno Compacto | 100/100/97 · 100/100/95 | 100/100/89 · 100/100/79 | 100/100/81 · 100/100/70 |
+| bueno Largo | 100/100/99 · 100/100/94 | 100/100/94 · 100/99/80 | 100/100/78 · 100/99/65 |
+| bueno Potente | 100/99/93 · 100/100/96 | 100/94/69 · 100/99/87 | 100/89/53 · 100/97/77 |
+
+Al 103 %: Fácil bueno 44–67 % arranque y 35–48 % dos tiempos (antes 18–21 y 31–58), novato 15–22 y 4–12; Medio y Difícil, el
+bueno 2–24 %, el novato 0–4 %.
+
+**Todo verde** (% de los intentos con todas sus barritas en verde, los tres pesistas juntos; apertura / 97 / 100 / 103 %):
+
+| perfil | Fácil arr. · dt | Medio arr. · dt | Difícil arr. · dt |
+|---|---|---|---|
+| novato | 77/57/42/19 · 62/32/16/4 | 39/18/9/1 · 23/7/2/0 | 9/3/1/0 · 9/2/1/0 |
+| típico (panel) | 84/64/49/22 · 70/40/22/6 | 51/25/13/2 · 36/12/4/0 | 19/6/2/0 · 19/6/1/0 |
+| medio | 95/82/68/31 · 90/67/42/11 | 74/43/28/4 · 68/29/11/2 | 36/12/4/0 · 34/12/4/0 |
+| bueno | 100/99/95/57 · 99/98/89/35 | 99/89/71/18 · 98/84/57/8 | 88/55/30/2 · 88/52/27/3 |
+
+Intentos todo verde que se quedaban sin energía (los salva el verde): 0–6 % hasta el 97 %; al 100 %, Fácil novato 20 % del
+arranque y 5 % del dos tiempos, bueno 44 y 28 %. Ninguna caída con todo verde en ninguna casilla (`barra_bots` lo exige).
+
+- Metas: la de Fácil «novato al 100 % entre 30 y 65 %» pasa a **30 a 70** (Largo en el arranque da 67 %). Las demás, iguales y
+  en verde. Oro en finales: Fácil amistoso novato con el panel 89 % (antes 87), normales bueno que lee su puntería 87 % (76);
+  Medio amistoso novato 60 % (59); Difícil bueno que lee 48 % (44), novato 0 %.
+- `chance_test` (30 000 intentos por nivel): error máximo por grupo 2,0 / 2,9 / 3,7 puntos (meta ≤ 5). `ritmo_test` (novato):
+  final mediana 131 / 140 / 141 s, barras caídas con el panel 14,1 / 16,4 / 23,7 % (metas ≤ 15 / 18 / 25). `pesistas_test`,
+  `rivales_test`, `dedo_test`, `teclado_test`, `play_human`, `servidor_test`: en verde, de a una en la Mac.
+- `sim_test` (nuevo: 270 intentos al 99–103 % con el puntero en el centro, cansancio de 0 a ¾ y
+  los tres niveles: todos válidos, 242 salvados por el verde; la chance de quien siempre pega en el verde es 10 de 10; toda
+  caída de 'b' nombra zona y barrita de cada toque que falló en los dos idiomas), `check_game` (el tercer arranque, 25 kg de
+  más pegando en el amarillo, cae con «pegaste en el amarillo en el tirón»; captura `caida_amarillo`).
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.
 2. Tiempo del clip = índice de fase (1 s de clip por fase), con `sub` muestras resueltas por fase (hoy 10). Las claves empiezan en el cuadro 1 (t = 1/30 s). El índice 0 de cada envión duplica el último de la cargada.
 3. `web/data/poses.json` por personaje: `h`, `seg`, `sub`, `grip`, `corr`, y por segmento `start`, `poses` (nombre, torso, altura de barra, cadera) y `tt` (segundos reales por muestra, creciente).
 4. La barra y los discos los dibuja el visor por código, centrados en el hueso `Bar`.
-5. GLB con dos nodos de malla (`Human` con los morphs, `Human_parts`) y materiales `Body`, `Eyes`, `Hair`, `Lashes` (mezcla alfa, sin reordenar capas), zapatillas y cinturón. `web/models/<nombre>_mask.png`: R piel, G tela, B pelo.
+5. GLB con dos nodos de malla (`Human` con los morphs, `Human_parts`) y materiales `Body`, `Eyes`, `Hair`, `Lashes` (mezcla alfa, sin reordenar capas), zapatillas y cinturón. `web/models/<nombre>_mask.png`: R piel, G tela, B pelo. En `web/` todo eso pasa por `tools/comprimir_modelos.sh` (meshopt, `<nombre>_1024.glb`, máscara en WebP; `poses.json` lleva `mask` y `glb1024`).
 6. Morphs correctivos `corr_armUp_L/R` (45° a 130°) y `corr_knee_L/R` (60° a 140°); los rangos viajan en `poses.json` (`corr`).
 
 ## Próximos pasos

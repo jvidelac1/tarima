@@ -71,6 +71,23 @@ Medido el 11 de noviembre de 2026. Con GPU, 0 cuadros con superposición en los 
 - **Núcleos en contenedores.** Algunos pods limitan la CPU por cuota y `nproc` muestra todos los núcleos del anfitrión. El build lee la cuota de `/sys/fs/cgroup/cpu.max`; igual conviene fijar `TARIMA_THREADS`.
 - **Prueba del visor por software.** Tarda mucho más y no exige fps, tiempos ni desenfoque de movimiento. Por defecto captura las páginas de escritorio a media densidad de píxeles; `TARIMA_SOFT_DPR=1` las deja a tamaño completo y tarda más del doble.
 
+### Modelos comprimidos
+
+`tools/export_web.py` deja `web/models` sin comprimir; **después hay que correr `tools/comprimir_modelos.sh`** (build.sh lo
+hace solo al final, salvo con `TARIMA_SIN_COMPRIMIR=1`). Instala una vez `sharp` y `meshoptimizer` (versiones fijas) en
+`~/.cache/tarima-comprimir` y, por personaje:
+
+- `<nombre>.glb`: geometría, morphs y animación con `EXT_meshopt_compression` (filtro exponencial sobre float32, sin
+  cuantizar posiciones ni tocar las matrices de enlace; índices, JOINTS y tiempos sin pérdida); texturas sin tocar.
+- `<nombre>_1024.glb`: lo mismo con las texturas a 1024 px (color y pelo en WebP, normal y ORM en JPEG 4:4:4). Es el que
+  baja el juego con calidad Baja o Móvil, que ya achicaba las texturas a 1024 al cargar.
+- `<nombre>_mask.webp`: la máscara a 1024 px sin pérdida; `poses.json` apunta a ella y al GLB liviano (`glb1024`).
+
+Al decodificar mide el error contra el original y falla si algo pasa su tope (líneas `ERR`). El visor y el juego decodifican
+con `web/vendor/three/addons/libs/meshopt_decoder.module.js`. Comparación antes/después en Actions:
+`gh workflow run carga.yml -R jvidelac1/tarima --ref <rama>` (medición de la carga con la red limitada y el visor con los
+modelos de antes y de después).
+
 ### Pruebas en GitHub Actions
 
 `.github/workflows/pruebas.yml` corre en cada push a `demo` (y a pedido) en `ubuntu-latest`, con Node 22 y el Chrome del runner. No usa Blender ni build: los modelos y three están en el repo. Pasos: `tools/sim_test.mjs`, `tools/play_human.mjs`, `tools/check_game.mjs` y `tools/check_fluidez.mjs --tutorial`. Tarda unos 12 minutos.
@@ -115,7 +132,9 @@ blender/
   pose_only.py  corre solo poses.py sobre un s3b.blend ya generado
   ctl3.py       renders de control de la malla en fases reales
 tools/
-  export_web.py     GLB reempaquetado, máscaras y web/data/poses.json
+  export_web.py     GLB reempaquetado, máscaras y web/data/poses.json (sin comprimir)
+  comprimir_modelos.sh  comprime web/models: hay que correrlo después de cada export_web.py (build.sh lo hace solo)
+  check_carga.mjs   carga del juego con la red limitada: bytes, tiempos y capturas de la pantalla de carga
   verify_build.py   verifica que web/ corresponde al último build
   check_viewer.mjs  prueba automática del visor (npm install; usa el Chrome del sistema)
   check_game.mjs, check_fluidez.mjs   pruebas del juego con navegador (corren también en GitHub Actions)
@@ -124,7 +143,8 @@ tools/
 web/
   index.html, css/, js/   visor (three.js r187, módulos ES)
   vendor/three/           three.js vendorizado
-  models/                 GLB y máscaras exportados
+  models/                 GLB comprimidos (<nombre>.glb para el visor y calidad Alta/Media, <nombre>_1024.glb para el
+                          juego en Baja/Móvil), máscaras en WebP y normales de detalle
   data/poses.json         fases, tiempos y medidas que usa el visor
 docs/img/         renders de control del primer prototipo
 ```

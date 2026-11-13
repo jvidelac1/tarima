@@ -6,6 +6,7 @@
 #   2. blender/finish.py  texturas (blender/tex.py, dentro del mismo proceso), pelo, pestañas, zapatillas, cinturón,
 #                         correctivos, poses (blender/poses.py), check() y GLB
 #   3. tools/export_web.py  GLB reempaquetado, máscara y web/data/poses.json
+#   4. tools/comprimir_modelos.sh  geometría con meshopt, GLB liviano con texturas a 1024 y máscara en WebP (TARIMA_SIN_COMPRIMIR=1 lo saltea)
 # Variables:
 #   FAST=1            saltea las hojas de poses de costado y de frente (los renders de control de WANT se hacen igual)
 #   TARIMA_OUT=dir    carpeta de salida (por defecto out/)
@@ -61,4 +62,8 @@ if [ "$FAIL" -ne 0 ] && [ "${EXPORT_BAD:-}" != "1" ]; then
 fi
 echo "== export a web/ =="
 "$PY" tools/export_web.py "${NAMES[@]}" || { echo "ERROR export_web.py falló"; exit 1; }
+if [ "${TARIMA_SIN_COMPRIMIR:-}" != "1" ]; then
+  echo "== compresión de web/models =="
+  tools/comprimir_modelos.sh "${NAMES[@]}" || { echo "ERROR comprimir_modelos.sh falló (web/models quedó sin comprimir)"; exit 1; }
+fi
 exit "$FAIL"

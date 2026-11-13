@@ -401,7 +401,7 @@ export class Escena {
   /** Carga (una sola vez) el modelo que usa un pesista. Los dos modelos quedan en memoria. */
   cargar(id) {
     const mod = PLANTEL[id].modelo;
-    return this.cargas[mod] ||= Athlete.load(mod, this.poses[mod], { aniso: Math.min(this.Q.aniso || 4, this.renderer.capabilities.getMaxAnisotropy()), maxTex: this.Q.tex })
+    return this.cargas[mod] ||= Athlete.load(mod, this.poses[mod], { aniso: Math.min(this.Q.aniso || 4, this.renderer.capabilities.getMaxAnisotropy()), maxTex: this.Q.tex, progreso: this.alProgreso })
       .then(a => { a.root.visible = false; a.root.traverse(o => { if (o.isMesh && o.castShadow) o.layers.enable(CAPA_SOMBRA); if (o.isMesh) [].concat(o.material).forEach(conBorde); }); this.scene.add(a.root); this.atletas[mod] = a; return a; });
   }
   /** Pone en escena a un pesista (o a nadie, con null). Marangi comparte la instancia de Brenner con la tela de color plano. */
@@ -512,6 +512,8 @@ export class Escena {
   manosBarra() { const a = this.activo; if (!a) return 0; a.midWorld(['LeftHand', 'RightHand'], v2); const b = this.barbell.group.position; return Math.hypot(v2.y - b.y, v2.z - b.z); }
   /** Altura (m) de la barra en una muestra global del clip (para las líneas de ayuda). */
   alturaMuestra(g) { return this.activo?.barPos[g]?.y ?? 0; }
+  /** Acercamiento sutil de la cámara (1 = el plano tal cual; 0,92 = un poco más cerca), amortiguado por el rig. */
+  acercar(z = 1) { if (this.rig) this.rig.zoomT = z; }
   camara(clave) { this.plano = null; this.encuadre = null; this.rig.setShot(null); this.rig.cut(CAM[clave] ?? 0); }
   /**
    * Primer plano por clave (SHOTS del visor o PLANOS del juego). `encuadre`: {x, y} fracción del lienzo (desde arriba a la
@@ -538,6 +540,25 @@ export class Escena {
   pantalla(y = this.barY, x = 0) {
     v.set(x, y, this.barZ ?? 0).project(this.rig.camera);
     return { x: (v.x + 1) / 2 * this.canvas.clientWidth, y: (1 - v.y) / 2 * this.canvas.clientHeight };
+  }
+  /**
+   * Cajas del pesista y de la barra en la página (px CSS), proyectadas con la cámara de este cuadro. Para las pruebas que
+   * miden cuánto tapa la interfaz (check_barra, check_telefono). Cuerpo: todos los huesos menos `Bar`, con 6 % de la estatura
+   * de más a cada lado (la carne alrededor del hueso); `torso`: de la cabeza a la cadera. Barra: las puntas y los discos.
+   * null sin pesista, o con el contenido girado (las cajas no se pueden comparar con las de la página).
+   */
+  cajas() {
+    const a = this.activo; if (!a || document.documentElement.classList.contains('rotado')) return null;
+    const cam = this.rig.camera, R = this.canvas.getBoundingClientRect(), W = this.canvas.clientWidth, H = this.canvas.clientHeight;
+    const px = p => { p.project(cam); return { x: R.left + (p.x + 1) / 2 * W, y: R.top + (1 - p.y) / 2 * H }; };
+    const caja = ps => ({ l: Math.min(...ps.map(p => p.x)), r: Math.max(...ps.map(p => p.x)), t: Math.min(...ps.map(p => p.y)), b: Math.max(...ps.map(p => p.y)) });
+    a.root.updateMatrixWorld(true); cam.updateMatrixWorld();
+    const nombre = b => b.name.replace(/^mixamorig:?/, ''), huesos = a.bones.filter(b => b !== a.barBone && !/_end$/i.test(nombre(b)) || nombre(b) === 'HeadTop_End');
+    const cuerpo = caja(huesos.map(b => px(b.getWorldPosition(v)))), m = (cuerpo.b - cuerpo.t) * .06;
+    const T = new Set(['Head', 'HeadTop_End', 'Neck', 'Spine', 'Spine1', 'Spine2', 'Hips', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm']);
+    const torso = caja(huesos.filter(b => T.has(nombre(b))).map(b => px(b.getWorldPosition(v))));
+    const y = this.barY ?? 1, z = this.barZ ?? 0, barra = caja([-1.1, 1.1].flatMap(x => [-.225, .225].map(d => px(v.set(x, y + d, z)))));
+    return { cuerpo: { l: cuerpo.l - m, r: cuerpo.r + m, t: cuerpo.t - m, b: cuerpo.b + m * .3 }, torso: { l: torso.l - m, r: torso.r + m, t: torso.t - m, b: torso.b }, barra };
   }
   /**
    * Nivel de detalle del pesista según los píxeles por metro con que se lo ve (lo mismo que hace el visor): en plano general

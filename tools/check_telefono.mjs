@@ -12,6 +12,9 @@
 //  - En vertical (390 × 844, teléfono con la rotación trabada): el contenido se gira 90° (html.rotado) y se juega igual,
 //    con toques sobre el botón; al girar el teléfono de verdad, se usa la orientación real.
 // Sin --dibujo el 3D no se dibuja solo (?dibujo=0, como check_game): antes de cada captura se fuerza un cuadro.
+// Cuánto tapa la interfaz al pesista (tools/tapa.mjs) en el llamado, con la barrita quieta y corriendo, en el levantamiento, en el
+// veredicto y en el turno de un rival, por tamaño de pantalla (tabla al final y out/telefono/tapa.json). Falla
+// si se pasa del umbral (cuerpo ≤ 15 % durante la barrita y el levantamiento, torso ≤ 20 % en el llamado).
 // Uso: node tools/check_telefono.mjs [--headed] [--solo=nombre] [--capturas=out/telefono] [--dibujo]
 import http from 'node:http';
 import fs from 'node:fs';
@@ -20,13 +23,16 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { launchOptions } from './browser.mjs';
 import { sinApi } from './sin_api.mjs';
+import { medirEnPagina, fila, revisar as revisarTapa } from './tapa.mjs';
+/** Señales de un toque (la libre de siempre y las de 'u': ¡SALTA!, ¡PÁRATE!, ¡DA TODO!): un toque y la señal se va. */
+const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const SOLO = arg('solo'), HEADED = process.argv.includes('--headed'), DIBUJO = process.argv.includes('--dibujo'), OUT = path.resolve(ROOT, arg('capturas') || 'out/telefono');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.svg': 'image/svg+xml' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.svg': 'image/svg+xml' };
 const server = http.createServer((req, res) => {
   if (sinApi(req, res)) return;      // /api/estado y /api/partida: juego sin límite (tools/sin_api.mjs)
   const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname), file = path.join(WEB, rel.endsWith('/') ? rel + 'index.html' : rel);
@@ -36,7 +42,7 @@ const server = http.createServer((req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/`;
 fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT, { recursive: true });
-const problemas = [], notas = [];
+const problemas = [], notas = [], TAPA = [], INFORMA = process.env.TAPA_INFORMA === '1';      // TAPA_INFORMA=1: solo informa (para medir un antes)
 const browser = await chromium.launch(launchOptions({ headed: HEADED }));
 
 const CASOS = [
@@ -45,6 +51,7 @@ const CASOS = [
   { nombre: 'zurdo_740x360', w: 740, h: 360, dpr: 3, url: '&mano=izq', hastaIntentos: 2 },
   // iPhone en Safari de costado, con la barra de direcciones a la vista: quedan unos 340 px de alto
   { nombre: 'safari_844x340', w: 844, h: 340, dpr: 3, seguras: { top: 0, right: 47, bottom: 21, left: 47 }, hastaIntentos: 2 },
+  { nombre: 'android_932x430', w: 932, h: 430, dpr: 3, hastaIntentos: 2 },
   { nombre: 'vertical_390x844', w: 390, h: 844, dpr: 3, vertical: true, hastaIntentos: 2 },
 ];
 
@@ -109,7 +116,7 @@ async function correr(C) {
       const caja = el => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
       const cruza = (a, b) => a.l < b.r - 1 && a.r > b.l + 1 && a.t < b.b - 1 && a.b > b.t + 1;
       const o = { scroll: se.scrollWidth > W + 1 || se.scrollHeight > H + 1 || scrollX !== 0 || scrollY !== 0, fuera: [], seguras: [], cruces: [], panel: null, zona: ve($('zona')) };
-      const ids = ['zona', 'senal', 'zocalo', 'acuse', 'guia', 'veredicto', 'cartel', 'rival', 'etiqueta', 'pausa', 'ayudab', 'sonidob', 'saltar'], B = {};
+      const ids = ['zona', 'senal', 'barrita', 'margen', 'zocalo', 'acuse', 'guia', 'veredicto', 'cartel', 'rival', 'etiqueta', 'pausa', 'ayudab', 'sonidob', 'saltar', 'turno', 'marcador'], B = {};
       for (const id of ids) if (ve($(id))) B[id] = caja($(id));
       for (const k of ['bug', 'relojbox']) { const el = document.querySelector('.' + k); if (ve(el)) B[k] = caja(el); }
       for (const [id, b] of Object.entries(B)) {
@@ -117,7 +124,7 @@ async function correr(C) {
         // lo que se toca o se lee no va debajo de la muesca ni de la barra de inicio (el veredicto y el cartel van centrados)
         if (!['veredicto', 'cartel'].includes(id) && (b.l < seg.left - 1 || b.r > W - seg.right + 1 || b.b > H - seg.bottom + 1)) o.seguras.push(id);
       }
-      for (const [a, b] of [['zona', 'senal'], ['zona', 'zocalo'], ['zona', 'acuse'], ['zona', 'guia'], ['zona', 'rival'], ['zona', 'pausa'], ['zona', 'saltar'], ['zona', 'sonidob'], ['sonidob', 'pausa'], ['sonidob', 'bug'], ['sonidob', 'senal'], ['ayudab', 'relojbox'], ['senal', 'zocalo'], ['senal', 'guia'], ['senal', 'etiqueta'], ['senal', 'bug'], ['zocalo', 'acuse'], ['guia', 'zocalo'], ['acuse', 'guia']])
+      for (const [a, b] of [['zona', 'barrita'], ['barrita', 'zocalo'], ['barrita', 'guia'], ['barrita', 'margen'], ['zona', 'senal'], ['zona', 'zocalo'], ['zona', 'acuse'], ['zona', 'guia'], ['zona', 'rival'], ['zona', 'pausa'], ['zona', 'saltar'], ['zona', 'sonidob'], ['sonidob', 'pausa'], ['sonidob', 'bug'], ['sonidob', 'senal'], ['ayudab', 'relojbox'], ['senal', 'zocalo'], ['senal', 'guia'], ['senal', 'etiqueta'], ['senal', 'bug'], ['zocalo', 'acuse'], ['guia', 'zocalo'], ['acuse', 'guia'], ['turno', 'sonidob'], ['turno', 'pausa'], ['turno', 'ayudab'], ['turno', 'marcador'], ['margen', 'guia'], ['margen', 'senal'], ['veredicto', 'margen'], ['veredicto', 'turno']])
         if (B[a] && B[b] && cruza(B[a], B[b])) o.cruces.push(`${a}/${b}`);
       const pn = document.querySelector('#capa .panel') || (ve($('sobre')) ? $('sobre').querySelector('.panel') : null);
       if (pn) {
@@ -177,7 +184,13 @@ async function correr(C) {
   }
 
   // ---------- la partida ----------
-  const vistas = new Set(), pantallas = new Set(); let firma = '', dedosProbados = false, campoSolo = false, nIntentos = 0, ultToque = 0, hecho = '', revisadas = 0;
+  // cuánto tapa la interfaz al pesista, una vez por momento
+  const medidos = new Set(), tapa = async momento => {
+    if (medidos.has(momento)) return; medidos.add(momento); await page.waitForTimeout(300);      // las entradas animadas (0,18 s) terminan
+    const x = await J(medirEnPagina).catch(e => ({ error: String(e) })); if (!x) return; if (x.error) { notas.push(`${tag} tapa ${momento}: ${x.error}`); return; }
+    TAPA.push({ p: C.nombre, momento, x }); const r = revisarTapa(momento, x); if (r && !INFORMA) mal(r);
+  };
+  const vistas = new Set(), pantallas = new Set(); let firma = '', dedosProbados = false, bordesProbados = false, campoSolo = false, nIntentos = 0, ultToque = 0, hecho = '', revisadas = 0;
   const hasta = s => s.pantalla === 'fin' || (C.hastaIntentos && nIntentos >= C.hastaIntentos);
   for (let n = 0; n < 60000; n++) {
     const s = await J(() => JUEGO.estado());
@@ -190,20 +203,32 @@ async function correr(C) {
       firma = clave; pantallas.add(s.pantalla);
       if (s.panel) await av(450);
       const R = await revisar(clave.replace(/\|+/g, ' ').trim()); revisadas++;
+      const sg = I && I.propio ? I.senal : null;
+      if (s.panel && ['inicio', 'presentacion', 'apertura', 'intervalo'].includes(s.pantalla)) await tapa(s.pantalla);
+      if (s.panel && s.pantalla === 'llamado') await tapa('llamado'); else if (sg && sg.tipo === 'barra') { await av(500); await tapa('corre'); } else if (sg && sg.tipo === 'espera' && sg.barra) await tapa('quieta');
+      else if (s.pantalla === 'decision') { await av(1200); await tapa('veredicto'); } else if (s.pantalla === 'rival') { await av(900); await tapa('rival'); }
       if (I && I.propio && !R.zona) mal(`en el intento («${I.senal?.verbo || I.fase}») no se ve el botón táctil`);
       await foto(clave.replace(/\|+/g, '_'));
     }
     if (I && I.propio && s.modo !== 'panel') {
-      const g = I.senal; if (!g) { await av(20); continue; }
+      const g = I.senal; if (!g) { if (['tiron', 'vuelo', 'pelea', 'empuje', 'flexion'].includes(I.fase) && !medidos.has('levanta')) { await tapa('levanta'); await foto('levanta'); } await av(20); continue; }
       vistas.add(g.verbo);
-      if (C.dedos && !dedosProbados && g.tipo === 'empuja') {      // dos dedos a la vez: dos toques
+      if (C.dedos && !dedosProbados && (g.tipo === 'luz' || g.tipo === 'barra')) {
+        if (g.tipo === 'barra') await ir(g.objetivo);      // 'b': después de la gracia de la barrita      // dos dedos a la vez en ¡SALTA!: dos toques anotados, un solo contacto («doble»)
         dedosProbados = true; const t0 = await J(() => JUEGO.toques.total), p = await punto();
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.x, y: p.y, id: 1 }, { x: p.x - 30, y: p.y - 20, id: 2 }] }); await av(30);
-        const t1 = await J(() => JUEGO.toques.total); await sube(); await av(30);
-        if (t1 - t0 !== 2) mal(`dos dedos a la vez contaron ${t1 - t0} toques (se esperaban 2)`); else console.log(`${tag} dos dedos a la vez: 2 toques`);
+        const t1 = await J(() => ({ total: JUEGO.toques.total, motivos: JUEGO.toques.ultimos.slice(-2).map(x => x.motivo) })); await sube(); await av(30);
+        if (t1.total - t0 !== 2 || !t1.motivos.includes('doble')) mal(`dos dedos a la vez: ${t1.total - t0} toques anotados, motivos ${t1.motivos.join(', ')} (se esperaban 2 anotados y uno «doble»)`); else console.log(`${tag} dos dedos a la vez: 2 toques anotados, un solo contacto (${t1.motivos.join(', ')})`);
         ultToque = s.ahora; continue;
       }
-      if (C.campos && !campoSolo && I.parado) {      // un campo sin panel abierto: solo input.js decide (main.js no toca teclas sin panel)
+      if (C.partida && !bordesProbados && (g.clave === 'tira' || g.tipo === 'barra')) {      // un toque en el borde cuenta como cualquier otro, con su acuse (Gameplay 2.1)
+        bordesProbados = true; if (g.tipo === 'barra') await ir(g.objetivo); const t0 = await J(() => ({ total: JUEGO.toques.total, ent: JUEGO.estado().intento?.entradas })), H = (await page.viewportSize()).height;
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 6, y: Math.round(H / 2), id: 1 }] }); await av(30); await sube(); await av(30);
+        const t1 = await J(() => ({ total: JUEGO.toques.total, ent: JUEGO.estado().intento?.entradas, fase: JUEGO.estado().intento?.fase }));
+        if (t1.total !== t0.total + 1 || t1.ent === t0.ent || t1.fase === 'tension') mal(`un toque en el borde de la pantalla no contó: ${JSON.stringify({ antes: t0, despues: t1 })}`); else console.log(`${tag} un toque en el borde cuenta (tira)`);
+        continue;
+      }
+      if (C.campos && !campoSolo && (g.clave === 'tira' || g.tipo === 'barra')) {      // un campo sin panel abierto: solo input.js decide (main.js no toca teclas sin panel)
         campoSolo = true; const t0 = await J(() => JUEGO.toques.total);
         await J(() => { const i = document.createElement('input'); i.id = 'prueba-campo2'; i.type = 'text'; i.style.cssText = 'position:fixed;left:30%;top:40%;z-index:20;width:40%'; document.body.append(i); });
         await page.locator('#prueba-campo2').tap(); await page.keyboard.type('a b@c.de '); await page.keyboard.press('Enter');
@@ -214,7 +239,8 @@ async function correr(C) {
         continue;
       }
       if (I.parado) { await av(80); await toque(); continue; }
-      if (g.tipo === 'libre') { await av(150); await toque(); continue; }
+      if (g.tipo === 'barra') { await ir(g.objetivo); await toque(); continue; }      // 'b': toca cuando el puntero pasa por el centro del verde
+      if (UNTOQUE.has(g.tipo)) { await av(150); await toque(); continue; }
       if (g.tipo === 'cierre') { const k = g.clave + g.desde; if (I.seDetiene || hecho === k) { await av(30); continue; } await ir(g.objetivo); await toque(); hecho = k; continue; }
       if (g.tipo === 'empuja') { if (s.ahora - ultToque >= 150) { await toque(); ultToque = s.ahora; } else await av(16); continue; }
       await av(30); continue;
@@ -232,6 +258,7 @@ async function correr(C) {
   if (!enBoton) mal('ningún toque cayó sobre el botón táctil');
   if (C.partida && (fin.propios.filter(x => / valido/.test(x)).length < 3)) mal(`tocando cada señal en su momento salieron pocos válidos: ${fin.propios.join(' · ')}`);
   if (C.dedos && !dedosProbados) mal('no se llegó a probar dos dedos a la vez');
+  if (C.partida && !bordesProbados) mal('no se llegó a probar un toque en el borde');
   if (C.campos && !campoSolo) mal('no se llegó a probar un campo sin panel');
   // la última pantalla (el podio con sus botones) también se revisa
   if (fin.s.pantalla === 'fin') { await av(3000); await revisar('fin (podio con botones)'); }
@@ -247,6 +274,7 @@ async function correr(C) {
 try { for (const C of CASOS.filter(c => !SOLO || c.nombre === SOLO)) await correr(C); }
 catch (e) { problemas.push('excepción de la prueba: ' + (e.stack || e.message)); }
 await browser.close(); server.close();
+if (TAPA.length) { console.log('\nCuánto tapa la interfaz al pesista (caja proyectada desde three; tools/tapa.mjs):'); for (const id of [...new Set(TAPA.map(x => x.p))]) { console.log(`  [${id}]`); for (const x of TAPA.filter(y => y.p === id)) console.log('    ' + fila(x.momento, x.x)); } fs.writeFileSync(path.join(OUT, 'tapa.json'), JSON.stringify(TAPA, null, 1)); }
 for (const n of notas) console.log('nota: ' + n);
 if (problemas.length) { console.log(`\nFALLÓ (${problemas.length}):`); for (const p of problemas.slice(0, 40)) console.log('  ' + p); process.exit(1); }
 console.log('\nOK: teléfono de costado (dos tamaños y mano izquierda) y en vertical con el contenido girado, jugado con toques, campos de texto con el editor de arriba y dos dedos, sin cortes ni superposiciones');

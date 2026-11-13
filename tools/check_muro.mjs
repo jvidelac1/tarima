@@ -20,6 +20,8 @@ import { launchOptions } from './browser.mjs';
 import { iniciarServidorLocal } from './servidor_local.mjs';
 import ES from '../web/js/game/i18n/es.js';
 import EN from '../web/js/game/i18n/en.js';
+/** Señales de un toque (la libre de siempre y las de 'u': ¡SALTA!, ¡PÁRATE!, ¡DA TODO!): un toque y la señal se va. */
+const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
@@ -92,7 +94,8 @@ async function escenario(L) {
       if (I && I.propio && s.modo !== 'panel') {
         const g = I.senal; if (!g) { await av(20); continue; }
         if (I.parado) { await av(80); await toque(); continue; }
-        if (g.tipo === 'libre') { await av(150); await toque(); continue; }
+        if (g.tipo === 'barra') { await ir(g.objetivo); await toque(); continue; }      // 'b': toca cuando el puntero pasa por el centro del verde
+        if (UNTOQUE.has(g.tipo)) { await av(150); await toque(); continue; }
         if (g.tipo === 'cierre') { const k = g.clave + g.desde; if (I.seDetiene || hecho === k) { await av(30); continue; } await ir(g.objetivo); await toque(); hecho = k; continue; }
         if (g.tipo === 'empuja') { if (s.ahora - ultToque >= 150) { await toque(); ultToque = s.ahora; } else await av(16); continue; }
         await av(30); continue;
@@ -136,6 +139,7 @@ async function escenario(L) {
   await pulsa('#btn-revancha');
   s = await jugar(enMuro, 'final 2');
   await av(300); await foto('muro_podio');
+  { const ic = (await eventos()).filter(e => e.ev === 'idioma_cambiado'); if (ic.length) mal(`el idioma cambió solo durante las finales: ${JSON.stringify(ic.map(e => e.props))}`); }
   const muro1 = await J(() => ({ titulo: document.querySelector('#capa .panel h1')?.textContent, correo: !!document.getElementById('correo'), encuesta: !!document.getElementById('btn-encuesta'), zona: getComputedStyle(document.getElementById('zona')).display, idioma: !!document.querySelector('#capa .panel .idi') }));
   if (!muro1.correo || !muro1.encuesta) mal(`el muro de la final 2 no tiene los dos caminos: ${JSON.stringify(muro1)}`);
   if (!muro1.idioma) mal('el muro no tiene el selector ES · EN');

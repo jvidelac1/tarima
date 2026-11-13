@@ -16,6 +16,7 @@
 <meta name="apple-mobile-web-app-title" content="Tarima">
 <link rel="stylesheet" href="css/juego.css">
 <link rel="stylesheet" href="css/bienvenida.css">
+<link rel="stylesheet" href="css/carga.css">
 <script type="importmap">
 { "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/addons/" } }
 </script>
@@ -31,8 +32,10 @@
     <div class="relojbox"><div class="luces" id="luces" aria-label="Decisión de los jueces"><i></i><i></i><i></i></div><div class="reloj" id="reloj">0:30</div></div>
     <div class="etiqueta" id="etiqueta" hidden></div>
     <div class="cartel" id="cartel" hidden></div>
+    <div class="margen" id="margen" hidden aria-hidden="true"></div>
     <div class="veredicto" id="veredicto" hidden></div>
     <div class="senal" id="senal" hidden aria-live="off"></div>
+    <div class="barrita" id="barrita" hidden aria-hidden="true"></div>
     <div class="guia" id="guia" hidden></div>
     <div class="rival" id="rival" hidden></div>
     <div class="turno" id="turno" hidden aria-live="polite"></div>
@@ -52,12 +55,20 @@
   <button id="saltar" hidden tabindex="-1">Saltar práctica <kbd class="tecla ch">ESC</kbd></button>
   <div id="sobre" hidden></div>
   <div id="sinfoco" hidden>El juego no recibe el teclado · haz clic aquí</div>
-  <div id="msg">Tarima</div>
+  <div id="msg" class="carga">
+    <div class="carga-luz" aria-hidden="true"></div>
+    <div class="carga-marca" aria-hidden="true">Tarima</div>
+    <p class="carga-titulo" id="msg-txt"></p>
+    <div class="carga-prog indet" id="carga-prog" role="progressbar" aria-valuemin="0" aria-valuemax="100"><div class="carga-fila"><div class="carga-barra"><i id="carga-barra-i"></i></div><span class="carga-pct" id="carga-pct"></span></div><div class="carga-det" id="carga-det"></div></div>
+    <p class="carga-dato" id="carga-dato"></p>
+  </div>
 </div>
 <div id="zona" aria-label="Zona de toque del levantamiento"><span id="zona-txt">Toca</span></div>
 <div id="instalar" hidden role="status"><span id="instalar-t"></span><button id="instalar-ok" type="button">OK</button></div>
+<div id="carga-mini" hidden aria-hidden="true"><i></i></div>
 </div>
 <div id="editor" hidden><label for="editor-campo"><span id="editor-t"></span></label><div class="fila"><input id="editor-campo" autocomplete="off"><button class="ir" id="editor-listo" type="button">Listo</button></div></div>
+<script type="module" async src="js/game/ui/carga.js"></script>
 <script type="module" src="js/game/telefono.js"></script>
 <script type="module" src="js/game/main.js"></script>
 </body>

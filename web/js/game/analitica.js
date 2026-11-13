@@ -30,6 +30,8 @@ export const EVENTOS = new Set([
   'compartir', 'invitacion_vista', 'invitacion_abierta', 'invitacion_cerrada', 'muro_visto', 'muro_ahora_no', 'mail_foco',
   'anotar_envio', 'anotar_ok', 'anotar_error', 'survey shown', 'encuesta_enviada', 'survey dismissed', 'privacidad_abierta',
   'medicion_desactivada', 'error_juego',
+  // Gameplay 2 (docs/JUEGO.md G2.7): un toque saltea el turno de un rival o el veredicto propio
+  'rival_salteado', 'veredicto_salteado',
 ]);
 
 export const BANDERAS = { 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio' };
@@ -183,6 +185,8 @@ export function crearAnalitica(o = {}) {
   let grabar = false;
   const cola = [];
   const avisados = new Set();
+  // súper propiedades del juego (hoy, `dificultad`): van en todos los eventos desde que se fijan, también en window.JUEGO.eventos
+  const fijas = {};
 
   const registro = () => {
     if (!ventana) return null;
@@ -196,7 +200,7 @@ export function crearAnalitica(o = {}) {
   function ev(nombre, props = {}) {
     if (typeof nombre !== 'string' || !nombre) return;
     if (!EVENTOS.has(nombre) && !avisados.has(nombre)) { avisados.add(nombre); g.console?.warn?.(`analitica: evento fuera de la lista de docs/MVP.md 6.3: ${nombre}`); }
-    const p = limpiarProps(props);
+    const p = { ...fijas, ...limpiarProps(props) };
     const t = ahora();
     const reg = registro();
     if (reg) reg.push({ ev: nombre, props: p, t });
@@ -210,6 +214,13 @@ export function crearAnalitica(o = {}) {
     if (typeof lista_id !== 'string' || !/^[0-9a-f]{8,64}$/i.test(lista_id)) return;
     if (estado === 'esperando') { cola.push(['id', lista_id]); return; }
     if (estado === 'activa') { try { ph.identify(lista_id); } catch { /* nada */ } }
+  }
+
+  /** Súper propiedades del juego (por ejemplo `{ dificultad: 'medio' }`): van en cada evento y en PostHog con register. */
+  function propiedades(props) {
+    const p = limpiarProps(props || {}); Object.assign(fijas, p);
+    if (estado === 'esperando') { cola.push(['reg', p]); return; }
+    if (estado === 'activa') { try { ph.register(p); } catch { /* nada */ } }
   }
 
   /** Pantalla actual como súper propiedad: así `$pageleave` dice dónde se fue la gente. */
@@ -368,7 +379,7 @@ export function crearAnalitica(o = {}) {
 
   return {
     get estado() { return estado; },
-    ev, identificar, visita, iniciar, apagar, activa, grabando, bandera, idSesion, encuestaVista, encuestaCerrada, consentir,
+    ev, identificar, visita, propiedades, iniciar, apagar, activa, grabando, bandera, idSesion, encuestaVista, encuestaCerrada, consentir,
     desactivarMedicion, activarMedicion, medicionActivada, instalarErrores,
   };
 }

@@ -25,7 +25,7 @@ let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ ch
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const SOLO = arg('solo'), HEADED = process.argv.includes('--headed'), OUT = path.resolve(ROOT, arg('capturas') || 'out/iphone');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 const server = http.createServer((req, res) => {
   if (sinApi(req, res)) return;
   const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname), file = path.join(WEB, rel.endsWith('/') ? rel + 'index.html' : rel);
@@ -119,10 +119,11 @@ async function correr(C) {
   if (Math.abs(D0.alto - D0.vv) > 1) mal(`el cuerpo mide ${D0.alto} px y lo visible ${D0.vv} px`);
   await toca('#btn-opciones'); await av(450);
   const P = () => J(() => {
-    const pn = document.querySelector('#capa .panel'), r = pn.getBoundingClientRect(), pie = pn.querySelector('.pie')?.getBoundingClientRect();
+    // la bienvenida se desplaza en su parte de arriba (.bv-cuerpo); la fila de botones queda fuera
+    const pn0 = document.querySelector('#capa .panel'), pn = pn0.querySelector('.bv-cuerpo') || pn0, r = pn.getBoundingClientRect(), pie = pn0.querySelector('.pie')?.getBoundingClientRect();
     return { st: Math.round(pn.scrollTop), max: pn.scrollHeight - pn.clientHeight, caja: [r.left, r.top, r.right, r.bottom].map(Math.round), pie: pie ? Math.round(pie.top) : null, opciones: !!pn.querySelector('.opciones'),
       verOpc: (() => { const o = pn.querySelector('.opciones'); if (!o) return false; const q = o.getBoundingClientRect(); return q.top < (pie ? pie.top : r.bottom) && q.bottom > r.top; })(),
-      ta: getComputedStyle(pn).touchAction, ob: getComputedStyle(pn).overscrollBehaviorY };
+      ta: getComputedStyle(pn0).touchAction, ob: getComputedStyle(pn).overscrollBehaviorY };
   });
   let p = await P();
   console.log(`${tag} Opciones abierto: desplazamiento ${p.st} de ${p.max} px, touch-action «${p.ta}», overscroll «${p.ob}», opciones a la vista ${p.verOpc}`);
@@ -133,7 +134,7 @@ async function correr(C) {
   // con un dedo sobre una tarjeta de pesista (un botón): hacia abajo hasta arriba de todo, después hacia arriba hasta el fondo
   // el dedo empieza sobre un botón que se vea entero entre el borde de arriba del panel y la fila de abajo
   const dedo = () => J(() => {
-    const pn = document.querySelector('#capa .panel'), r = pn.getBoundingClientRect(), tope = pn.querySelector('.pie')?.getBoundingClientRect().top ?? r.bottom;
+    const pn0 = document.querySelector('#capa .panel'), pn = pn0.querySelector('.bv-cuerpo') || pn0, r = pn.getBoundingClientRect(), tope = Math.min(r.bottom, pn0.querySelector('.pie')?.getBoundingClientRect().top ?? r.bottom);
     const b = [...pn.querySelectorAll('button')].filter(x => !x.closest('.pie') && x.offsetParent !== null).find(x => { const q = x.getBoundingClientRect(), y = q.top + q.height / 2; return y > r.top + 20 && y < tope - 20; });
     const q = b ? b.getBoundingClientRect() : r;
     return { x: Math.round(q.left + Math.min(q.width / 2, 60)), y: Math.round(b ? q.top + q.height / 2 : (r.top + tope) / 2), banda: Math.round(tope - r.top), en: b ? (b.dataset.id || b.textContent.trim().slice(0, 20)) : 'panel' };
@@ -155,11 +156,11 @@ async function correr(C) {
 
   // ningún botón del panel queda cortado ni tapado: para cada uno hay un desplazamiento en el que se ve entero y es lo que se toca
   const cortados = await J(({ W, H, seg }) => {
-    const pn = document.querySelector('#capa .panel'), malos = [];
-    for (const b of pn.querySelectorAll('button')) {
+    const pn0 = document.querySelector('#capa .panel'), pn = pn0.querySelector('.bv-cuerpo') || pn0, malos = [];
+    for (const b of pn0.querySelectorAll('button')) {
       if (b.offsetParent === null) continue;
-      const pie = pn.querySelector('.pie'), enPie = pie && pie.contains(b);
-      if (!enPie) { const r0 = b.getBoundingClientRect(), r = pn.getBoundingClientRect(), tope = pie ? pie.getBoundingClientRect().top : r.bottom; pn.scrollTop += (r0.bottom > tope - 4 ? r0.bottom - tope + 8 : 0) + (r0.top < r.top + 4 ? r0.top - r.top - 8 : 0); }
+      const pie = pn0.querySelector('.pie'), enPie = pie && pie.contains(b);
+      if (!enPie) { const r0 = b.getBoundingClientRect(), r = pn.getBoundingClientRect(), tope = Math.min(r.bottom, pie ? pie.getBoundingClientRect().top : r.bottom); pn.scrollTop += (r0.bottom > tope - 4 ? r0.bottom - tope + 8 : 0) + (r0.top < r.top + 4 ? r0.top - r.top - 8 : 0); }
       const q = b.getBoundingClientRect(), x = q.left + q.width / 2, y = q.top + q.height / 2, en = document.elementFromPoint(x, y);
       const fuera = q.left < seg.left - 1 || q.right > W - seg.right + 1 || q.top < -1 || q.bottom > H - seg.bottom + 1;
       if (fuera || !en || !(b === en || b.contains(en))) malos.push(`${(b.textContent || b.getAttribute('aria-label') || '').trim().slice(0, 24)}${fuera ? ' (fuera)' : ''}${en && !(b === en || b.contains(en)) ? ` (tapado por ${en.id || en.className || en.tagName})` : ''}`);

@@ -11,7 +11,9 @@
 // no figura en el registro del juego, o si un toque descartado no tiene motivo o no tuvo acuse.
 // Uso: node tools/check_fluidez.mjs [--cpu=1,4,6] [--q=media] [--tutorial] [--ancho=1920 --alto=930] [--semilla=N] [--json=archivo]
 //   --capturas=dir  guarda una captura por señal, por toque fuera de turno y por panel (ensucia los tiempos: no usar para medir).
-//   --tutorial  además corre, con el almacenamiento vacío, el tutorial entero y verifica que no vuelve a aparecer al recargar.
+//   --tutorial  además corre, con el almacenamiento vacío, la primera vez en 'u': no hay tutorial aparte (ningún levantamiento
+//               antes de la final), el primer intento lleva la línea de presentación y las ayudas de primera vez, y al
+//               recargar no vuelven.
 //   --lastre=ms costo artificial por megapíxel dibujado (ver ?lastre en main.js), como si la placa fuera lenta.
 //   --gobernador  prueba del gobernador de calidad con ese lastre: arranca con 18 ms por megapíxel (la calibración tiene que
 //               bajar la calidad antes del primer intento) y en medio del primer intento lo sube a 40 (la calidad NO puede
@@ -40,7 +42,7 @@ const CAPT = arg('capturas') || '', DEPURA = process.argv.includes('--depura');
 if (CAPT) fs.mkdirSync(CAPT, { recursive: true });
 const GOB = process.argv.includes('--gobernador');
 const TUTORIAL = process.argv.includes('--tutorial'), LASTRE = arg('lastre') || (GOB ? '18' : ''), SOLO_TUT = process.argv.includes('--solo-tutorial'), UMBRAL = +(arg('umbral') || 95);
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
 const server = http.createServer((req, res) => {
   if (sinApi(req, res)) return;      // /api/estado y /api/partida: juego sin límite (tools/sin_api.mjs)
   const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname), file = path.join(WEB, rel);
@@ -93,7 +95,8 @@ function sonda(cfg) {
       // una señal en la que el reloj guiado se va a detener se toca cuando se detiene (más abajo); el resto, en su momento
       if (s && !(I.guiado && I.seDetiene)) {
         const falta = s.tipo === 'cierre' ? (s.objetivo - I.now) / (I.vel || 1) : 0;      // ms reales hasta el cierre
-        if (s.tipo === 'libre') unico = now + cfg.reac;
+        if (s.tipo === 'libre' || s.tipo === 'luz' || s.tipo === 'uno' || s.tipo === 'decide') unico = now + cfg.reac;      // 'u': un toque por señal, cuando quieras
+        else if (s.tipo === 'barra') unico = now + Math.max(0, J.proximoCentro(s.desde, I.now + cfg.reac) - I.now) + gauss(cfg.sd);      // 'b': en el verde
         else if (s.tipo === 'cierre') { unico = Math.max(now + 100, now + falta + cfg.lag + gauss(cfg.sd)); M.cierres.push({ clave: s.clave, ms: Math.round(falta) }); }
       }
       if (s && s.tipo === 'empuja') { if (mash === Infinity) mash = now + 250; } else mash = Infinity;
@@ -114,6 +117,8 @@ function sonda(cfg) {
     setTimeout(() => {
       const I2 = E.intento, T = J.toques ? J.toques.ultimos.find(x => Math.abs(x.t - tJuego) < 2) : null, ac = document.getElementById('acuse');
       k.ent1 = I2 && I2 === I ? I2.ent.length : null; k.reg = T ? { ok: T.ok, motivo: T.motivo, donde: T.donde, nota: T.nota || '' } : null;
+      // en 'u' el juego atiende Espacio en captura antes que esta sonda: lo que agregó se busca por el instante de la pulsación
+      if (T && I2 && I2 === I && (I2.ctl === 'u' || I2.ctl === 'b')) k.agrego = I2.ent.some(e => e[1] === 1 && Math.abs(e[0] - Math.round(T.t - I2.t0)) <= 1);
       k.acuse = ac ? { visible: !ac.hidden && getComputedStyle(ac).display !== 'none', hundida: ac.classList.contains('on'), txt: ac.lastElementChild.textContent } : null;
     }, 0);
   }, true);
@@ -220,7 +225,7 @@ async function medir(cpu, gob = false) {
   const acept = enInt.filter(k => (k.reg ? k.reg.ok : k.ent1 !== null && k.ent1 > k.ent0)), desc = enInt.filter(k => !acept.includes(k));
   // el registro del juego contra lo que de verdad pasó: un toque «aceptado» en el intento tiene que haber agregado entradas, y uno «descartado» no
   // un toque «guardado» (llegó con PREPÁRATE en pantalla) se acepta y su entrada entra recién al aparecer ¡TIRA!
-  const cruzados = enInt.filter(k => k.reg && k.ent1 !== null && k.reg.motivo !== 'guardado' && k.reg.ok !== (k.ent1 > k.ent0));
+  const cruzados = enInt.filter(k => k.reg && k.ent1 !== null && k.reg.motivo !== 'guardado' && k.reg.ok !== (k.agrego ?? (k.ent1 > k.ent0)));
   if (cruzados.length) problemas.push(`${tag} ${cruzados.length} toques del intento con registro que no coincide con las entradas (${cruzados.slice(0, 3).map(k => `${k.fase}: ${k.reg.ok ? 'aceptado' : k.reg.motivo}, entradas ${k.ent0}→${k.ent1}`).join('; ')})`);
   const motivos = {}; for (const k of desc) { const m = k.reg ? (k.reg.motivo || 'SIN MOTIVO') : 'sin registro'; motivos[m] = (motivos[m] || 0) + 1; }
   const sinReg = T.filter(k => info.toques && !k.reg), sinMotivo = T.filter(k => k.reg && !k.reg.ok && !k.reg.motivo), sinAcuse = T.filter(k => info.toques && (!k.acuse || !k.acuse.visible || !k.acuse.hundida || (k.reg && k.reg.ok === false && !k.acuse.txt)));
@@ -255,45 +260,37 @@ async function medir(cpu, gob = false) {
   informe.push(fila); await ctx.close();
 }
 
-/** El tutorial con el almacenamiento vacío: uno solo, corto, y no vuelve al recargar. */
+/**
+ * La primera vez en 'u' (G2.8), con el almacenamiento vacío: no hay tutorial aparte (ningún levantamiento antes de la final,
+ * ni «Saltar la práctica»), el primer intento propio lleva la presentación en una línea y la ayuda de cada señal, sale
+ * válido tocando a los 450 ms de cada señal, y al recargar las ayudas no vuelven.
+ */
 async function tutorial() {
-  const tag = '[tutorial]', ctx = await browser.newContext({ viewport: { width: ANCHO, height: ALTO }, deviceScaleFactor: 1 });
+  const tag = '[primera vez]', ctx = await browser.newContext({ viewport: { width: ANCHO, height: ALTO }, deviceScaleFactor: 1 });
   const { page, errs } = await abrir(ctx, 1, null);
   const ini = await page.evaluate(() => document.querySelector('#capa .panel').textContent.replace(/\s+/g, ' '));
+  // la guía de cada cuadro del primer intento propio
+  await page.evaluate(() => { window.__guias = new Set(); const f = () => { const g = document.getElementById('guia'); if (JUEGO.E.intento?.propio && !g.hidden) window.__guias.add(g.textContent); requestAnimationFrame(f); }; requestAnimationFrame(f); });
   await poner(page, { seed: SEMILLA, reac: 450, lag: 30, sd: 45, per: 170, jit: 25, fuera: false, doble: false });
-  const t0 = Date.now(); let tFin = 0, levs = 0;
-  // Empezar → tutorial → hasta el panel de la presentación (apertura)
-  await jugar(page, r => { if (r.pantalla === 'presentacion' && !tFin) tFin = Date.now(); return r.pantalla === 'presentacion' && r.panel; }, { minutos: 4, eti: 'tut_' });
-  const a = await page.evaluate(() => ({ visitados: JUEGO.E.visitados.slice(), propios: (JUEGO.E.propios || []).map(x => ({ pantalla: x.pantalla, res: x.res })), intentos: __flu.intentos.map(x => ({ pantalla: x.pantalla, lev: x.lev, guiado: x.guiado, n: x.n, dib: x.dib, seg: (x.t1 - x.t0) / 1000 })), guardado: localStorage.getItem('tarima.tutorial') }));
-  levs = a.intentos.length; const seg = (tFin - t0) / 1000;
-  console.log(`${tag} de «Empezar» a la presentación: ${seg.toFixed(0)} s · levantamientos antes de jugar: ${levs} (${a.intentos.map(x => `${x.pantalla} ${x.lev} ${x.seg.toFixed(0)} s`).join(', ')}) · resultado: ${a.propios.map(x => x.res).join(' ')} · guardado tarima.tutorial=${a.guardado}`);
-  if (levs !== 1) problemas.push(`${tag} antes de jugar hay ${levs} levantamientos; tiene que ser uno solo`);
-  if (seg > 60) problemas.push(`${tag} el tutorial tardó ${seg.toFixed(0)} s con un jugador que toca a los 450 ms de cada señal; tiene que durar menos de un minuto`);
-  if (a.guardado !== '1') problemas.push(`${tag} al terminar el tutorial no quedó guardado que ya se hizo`);
-  if (!/saltar la práctica/i.test(ini)) problemas.push(`${tag} el inicio no ofrece saltar la práctica`);
-  // recargar: no se repite
+  const t0 = Date.now(); let tPres = 0;
+  await jugar(page, r => { if (r.pantalla === 'presentacion' && !tPres) tPres = Date.now(); return r.propios >= 1 && !r.propio && r.pantalla !== 'decision'; }, { minutos: 4, eti: 'pv_' });
+  const a = await page.evaluate(() => ({ visitados: JUEGO.E.visitados.slice(), propios: (JUEGO.E.propios || []).map(x => ({ pantalla: x.pantalla, res: x.res })), intentos: __flu.intentos.map(x => ({ pantalla: x.pantalla, lev: x.lev, seg: (x.t1 - x.t0) / 1000 })), guias: [...window.__guias] }));
+  const antes = a.intentos.filter(x => x.pantalla !== 'intento').length, seg = (tPres - t0) / 1000;
+  console.log(`${tag} de «Jugar» a la presentación: ${seg.toFixed(0)} s · levantamientos antes de la final: ${antes} · primer intento: ${a.propios.map(x => x.res).join(' ')} (${a.intentos.map(x => `${x.lev} ${x.seg.toFixed(1)} s`).join(', ')}) · guías: ${a.guias.map(g => `«${g}»`).join(' ')}`);
+  if (antes) problemas.push(`${tag} en 'u' no hay levantamientos antes de la final: hubo ${antes}`);
+  if (/práctica/i.test(ini)) problemas.push(`${tag} el inicio ofrece una práctica aparte: «${ini.slice(0, 200)}»`);
+  if (a.propios[0]?.res !== 'valido') problemas.push(`${tag} el primer intento de la final no salió válido: ${JSON.stringify(a.propios[0])}`);
+  if (!a.guias.some(g => /en el verde/.test(g))) problemas.push(`${tag} el primer intento no mostró la presentación en una línea («… cuando el puntero esté en el verde…»)`);
+  // recargar: las ayudas no vuelven
   await page.reload({ waitUntil: 'load' }); await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 180000 });
-  await poner(page, { seed: SEMILLA, reac: 450, lag: 30, sd: 45, per: 170, jit: 25, fuera: false, doble: false });
-  const ini2 = await page.evaluate(() => document.querySelector('#capa .panel').textContent.replace(/\s+/g, ' '));
-  await jugar(page, r => r.pantalla === 'presentacion' && r.panel, { minutos: 2 });
-  const b = await page.evaluate(() => ({ visitados: JUEGO.E.visitados.slice(), intentos: __flu.intentos.length }));
-  console.log(`${tag} después de recargar: pantallas ${b.visitados.join(' → ')} · levantamientos de tutorial: ${b.intentos} · el inicio ${/repetir la práctica/i.test(ini2) ? 'ofrece «Repetir la práctica»' : 'NO ofrece repetirla'}`);
-  if (b.intentos || b.visitados.includes('tutorial') || b.visitados.includes('guiado')) problemas.push(`${tag} al recargar el tutorial volvió a aparecer`);
-  if (!/repetir la práctica/i.test(ini2)) problemas.push(`${tag} después de hacerla, el inicio no ofrece «Repetir la práctica»`);
-  // «Repetir tutorial» y saltearlo con Esc en medio del levantamiento guiado
-  await page.reload({ waitUntil: 'load' }); await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 180000 }); await dormir(600);
-  for (let i = 0; i < 40 && !await page.evaluate(() => document.activeElement?.id === 'btn-otro'); i++) await page.keyboard.press('Tab');
-  await page.keyboard.press('Enter'); await page.waitForFunction(() => JUEGO.estado().pantalla === 'guiado' && JUEGO.estado().intento, null, { timeout: 60000 }); await dormir(1500);
-  const sv = await page.evaluate(() => { const b = document.getElementById('saltar'); return { visible: !!b && !b.hidden && b.getBoundingClientRect().width > 0, txt: b ? b.textContent.replace(/\s+/g, ' ').trim() : '' }; });
-  const tEsc = Date.now(); await page.keyboard.press('Escape');
-  const salto = await page.waitForFunction(() => JUEGO.estado().pantalla === 'presentacion', null, { timeout: 5000 }).then(() => true, () => false);
-  const c = await page.evaluate(() => ({ pantalla: JUEGO.estado().pantalla, sobre: JUEGO.estado().sobre, propios: (JUEGO.E.propios || []).length, saltar: !document.getElementById('saltar').hidden, errores: JUEGO.E.errores }));
-  console.log(`${tag} «Repetir tutorial» y Esc en medio del guiado: botón visible ${sv.visible} («${sv.txt}») · ${salto ? `a la presentación en ${Date.now() - tEsc} ms` : 'NO salteó'} · pantalla ${c.pantalla}`);
-  if (!sv.visible || !/saltar/i.test(sv.txt) || !/esc/i.test(sv.txt)) problemas.push(`${tag} durante el tutorial no se ve cómo saltearlo (${JSON.stringify(sv)})`);
-  if (!salto || c.sobre || c.propios || c.saltar) problemas.push(`${tag} Esc no salteó el tutorial limpio: ${JSON.stringify(c)}`);
-  for (const e of c.errores.slice(0, 3)) problemas.push(`${tag} ${e}`);
+  await page.evaluate(() => { window.__guias = new Set(); const f = () => { const g = document.getElementById('guia'); if (JUEGO.E.intento?.propio && !g.hidden) window.__guias.add(g.textContent); requestAnimationFrame(f); }; requestAnimationFrame(f); });
+  await poner(page, { seed: SEMILLA + 1, reac: 450, lag: 30, sd: 45, per: 170, jit: 25, fuera: false, doble: false });
+  await jugar(page, r => r.propios >= 1 && !r.propio && r.pantalla !== 'decision', { minutos: 3 });
+  const b = await page.evaluate(() => ({ guias: [...window.__guias] }));
+  console.log(`${tag} después de recargar, guías en el primer intento: ${b.guias.length ? b.guias.map(g => `«${g}»`).join(' ') : 'ninguna'}`);
+  if (b.guias.length) problemas.push(`${tag} al recargar volvieron las ayudas de primera vez: ${b.guias.join(' · ')}`);
   for (const e of errs.slice(0, 5)) problemas.push(`${tag} ${e}`);
-  informe.push({ tutorial: { seg, levantamientos: levs, intentos: a.intentos } }); await ctx.close();
+  informe.push({ primera: { seg, antes, intentos: a.intentos, guias: a.guias } }); await ctx.close();
 }
 
 try {
@@ -305,6 +302,6 @@ await browser.close(); server.close();
 if (arg('json')) { fs.mkdirSync(path.dirname(path.resolve(arg('json'))), { recursive: true }); fs.writeFileSync(arg('json'), JSON.stringify(informe, null, 1)); }
 if (problemas.length) { console.log(`\nFALLA (${problemas.length}):`); for (const p of problemas) console.log(' - ' + p); process.exit(1); }
 console.log(GOB ? '\nOK: la calibración bajó la calidad antes del primer intento, nada cambió con un intento en curso y el gobernador bajó al terminar'
-  : SOLO_TUT ? '\nOK: el tutorial es un solo levantamiento, dura menos de un minuto, se saltea con Esc y no vuelve al recargar'
-    : LOGICA ? '\nOK (modo lógica, sin dibujo: los cuadros por segundo NO se midieron): ningún toque se perdió sin motivo ni sin acuse' + (TUTORIAL ? '; el tutorial es un solo levantamiento, dura menos de un minuto, se saltea con Esc y no vuelve al recargar' : '')
+  : SOLO_TUT ? '\nOK: sin tutorial aparte; el primer intento lleva la presentación y las ayudas, sale válido y al recargar no vuelven'
+    : LOGICA ? '\nOK (modo lógica, sin dibujo: los cuadros por segundo NO se midieron): ningún toque se perdió sin motivo ni sin acuse' + (TUTORIAL ? '; sin tutorial aparte, el primer intento lleva la presentación y las ayudas y al recargar no vuelven' : '')
       : '\nOK: en cada intento se dibujó al menos el ' + UMBRAL + ' % de los cuadros ofrecidos y ningún toque se perdió sin motivo');

@@ -25,11 +25,13 @@ import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { launchOptions } from './browser.mjs';
+/** Señales de un toque (la libre de siempre y las de 'u': ¡SALTA!, ¡PÁRATE!, ¡DA TODO!): un toque y la señal se va. */
+const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.woff2': 'font/woff2', '.glb': 'model/gltf-binary', '.png': 'image/png', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.bin': 'application/octet-stream' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.woff2': 'font/woff2', '.glb': 'model/gltf-binary', '.png': 'image/png', '.webp': 'image/webp', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.bin': 'application/octet-stream' };
 const CLAVE = 'phc_PruebaDeCheckAnalitica123';
 const AGENTE = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
 const LISTA_ID = 'c'.repeat(32);
@@ -418,7 +420,8 @@ async function interactuarJuego(page) {
     if (I && I.propio && s.modo !== 'panel') {
       const g = I.senal;
       if (!g) { await dormir(8); continue; }
-      if (g.tipo === 'libre') { await dormir(200); await espacio(); continue; }
+      if (g.tipo === 'barra') { const falta = g.objetivo - s.ahora - 25; if (falta > 0) await dormir(Math.min(falta, 3000)); await espacio(); continue; }      // 'b': en el verde
+      if (UNTOQUE.has(g.tipo)) { await dormir(200); await espacio(); continue; }
       if (g.tipo === 'cierre') { const kk = g.clave + g.desde; if (I.seDetiene || hecho === kk) { await dormir(8); continue; } const falta = g.objetivo - s.ahora - 25; if (falta > 0) await dormir(Math.min(falta, 2000)); await espacio(); hecho = kk; continue; }
       if (g.tipo === 'empuja') { for (let i = 0; i < 6; i++) { await espacio(); await dormir(40); } continue; }
       await dormir(10); continue;
