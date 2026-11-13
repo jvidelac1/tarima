@@ -1,5 +1,5 @@
 {
- "datos": "83f90ed0",
+ "datos": "09c9b907",
  "casos": [
   {
    "semilla": 3000017,
@@ -29,7 +29,7 @@
    "semilla": 15000085,
    "nivel": "normal",
    "persona": 1,
-   "tabla": "marangi:174+201=375#1 ventura:164+206=370#2 brenner:164+196=360#3"
+   "tabla": "marangi:174+200=374#1 ventura:164+205=369#2 brenner:164+203=367#3"
   },
   {
    "semilla": 18000102,
@@ -47,7 +47,7 @@
    "semilla": 24000136,
    "nivel": "normal",
    "persona": 1,
-   "tabla": "brenner:172+201=373#1 ventura:167+202=369#2 marangi:160+203=363#3"
+   "tabla": "brenner:169+201=370#1 ventura:167+202=369#2 marangi:160+203=363#3"
   },
   {
    "semilla": 27000153,

@@ -14,7 +14,7 @@ const N = +(arg('n') || 30000), r = new Azar(97), G = {};
 const t0 = Date.now();
 for (let k = 0; k < N; k++) {
   const id = ATL[r.ent(3)], lev = r.ent(2) ? 's' : 'c', env = lev === 'c' ? ['split', 'power', 'squat'][r.ent(3)] : undefined, I = 9300 + r.ent(1101), garra = r.ent(4) !== 0;
-  const f = datos.atletas[id], cuerpo = cuerpoDe(f), ch = chanceUno(I, lev, env, cuerpo, { garra });
+  const f = datos.atletas[id], cuerpo = cuerpoDe(id), ch = chanceUno(I, lev, env, cuerpo, { garra });
   const ctx = ctxUno(id, lev, env, I, mezclar(k, 881), { tactil: !!r.ent(2), garraUno: garra });
   const res = verificar(ctx, jugarUno(ctx, BOTS_U.reactivo, mezclar(k, 882))).res, b = deDiez(ch), g = (G[b] ||= { n: 0, v: 0, p: 0 });
   g.n++; g.p += ch / 10; if (res.res === 'valido') g.v++;

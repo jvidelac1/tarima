@@ -12,23 +12,14 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SALIDA = path.join(ROOT, 'web/data/sim.json');
 const TEMPORADA = 1;
 
-/**
- * Fichas del juego (sección 7.1). `ia`: apertura habitual y umbral en milésimas, saltos planeados y estilo de cambios (7.3).
- * `cuerpoJuego` (solo el nivel 'u', docs/JUEGO.md G2.5): cuánto le cuesta cada tramo a ese cuerpo (milésimas sobre la base de
- * rules.js → UNO.base), si la movilidad le alcanza para el squat (`movil`) y su envión de la casa (`casa`, el que el panel
- * propone). Compacto: fuerte arriba de la cabeza, débil en kilos (techo más bajo). Largo: fuerte en el tirón, débil al
- * pararse. Potente: fuerte al pararse, débil arriba de la cabeza. Los rivales siguen en Clásico y no los leen.
- */
+/** Fichas del juego (sección 7.1). `ia`: apertura habitual y umbral en milésimas, saltos planeados y estilo de cambios (7.3). */
 const ATLETAS = {
   ventura: { nombre: 'Dario Ventura', pais: 'Arxenia', codigo: 'ARX', dorsal: 7, modelo: 'ventura', techo: { s: 169, c: 211 }, apertura: { s: 158, c: 197 }, enviones: ['squat', 'split'],
-    attrs: { tec: 9, tem: 6, gar: 6, fon: 7 }, ia: { apertura: 935, saltos: { s: [5, 3], c: [6, 4] }, umbral: 1010, estilo: 'fijo' },
-    cuerpoJuego: { tiron: 1100, arriba: 700, pararse: 850, movil: true, casa: 'split' } },
+    attrs: { tec: 9, tem: 6, gar: 6, fon: 7 }, ia: { apertura: 935, saltos: { s: [5, 3], c: [6, 4] }, umbral: 1010, estilo: 'fijo' } },
   brenner: { nombre: 'Ilya Brenner', pais: 'Novakia', codigo: 'NVK', dorsal: 12, modelo: 'brenner', techo: { s: 175, c: 207 }, apertura: { s: 165, c: 195 }, enviones: ['split', 'power'],
-    attrs: { tec: 7, tem: 8, gar: 5, fon: 8 }, ia: { apertura: 940, saltos: { s: [5, 5], c: [5, 4] }, umbral: 1005, estilo: 'pasa' },
-    cuerpoJuego: { tiron: 500, arriba: 900, pararse: 1200, movil: false, casa: 'split' } },
+    attrs: { tec: 7, tem: 8, gar: 5, fon: 8 }, ia: { apertura: 940, saltos: { s: [5, 5], c: [5, 4] }, umbral: 1005, estilo: 'pasa' } },
   marangi: { nombre: 'Teo Marangi', pais: 'Pelagia', codigo: 'PEL', dorsal: 3, modelo: 'brenner', techo: { s: 172, c: 209 }, apertura: { s: 160, c: 194 }, enviones: ['power', 'split'],
-    attrs: { tec: 5, tem: 9, gar: 9, fon: 5 }, ia: { apertura: 930, saltos: { s: [5, 5], c: [5, 5] }, umbral: 1030, estilo: 'orgullo' },
-    cuerpoJuego: { tiron: 1000, arriba: 1350, pararse: 600, movil: false, casa: 'split' } },
+    attrs: { tec: 5, tem: 9, gar: 9, fon: 5 }, ia: { apertura: 930, saltos: { s: [5, 5], c: [5, 5] }, umbral: 1030, estilo: 'orgullo' } },
 };
 
 function anclas(datos) {

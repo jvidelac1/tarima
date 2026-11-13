@@ -8,7 +8,7 @@ import { idiv, lerpi, mezclar, Azar } from './fixed.js';
 import {
   ventanas, calidad, palabra, alturaExplosion, desvioExplosion, velTiron, exigenciaTabla, alturaTabla, periodoAnillo, errorAnillo, gradoTension,
   anchoFacil, asistFacil, segunHolgura, TENSION, FACIL, ACOMODO_MS, ALTURA_MIN, TOPE_DESVIO, ALTURA_ENVION, NO_DOMINA, EXI_ARRANQUE, EXI_ERROR, PELEA, TRABA, FIJA, HOMBROS, JUEZ, esfuerzoPropio,
-  UNO, CUERPO_NEUTRO, gastoTramo, diaDe,
+  UNO, CUERPO_NEUTRO, TRAMOS, gastoTramo, conSuerte, ruidoDe, garraAlcanza,
 } from './rules.js';
 
 const INF = 2147483647;
@@ -282,17 +282,18 @@ export class Intento {
     }
   }
 
-  // ---------- 'u': un toque, un tramo (docs/JUEGO.md, Gameplay 2) ----------
-  // Cada tramo con toque (¡TIRA!, ¡SALTA!, ¡PÁRATE!, ¡ARRIBA!, y ¡DA TODO! en el FRENO) se cumple con su primer contacto, en
-  // cualquier punto del tramo. Un contacto que llega antes queda guardado (uno solo) para el tramo siguiente; uno apoyado
-  // cumple cada tramo que abre. Ningún contacto tira la barra: lo único que decide es el margen al cerrar cada tramo.
+  // ---------- 'u': un toque, un tramo (docs/JUEGO.md, Gameplay 2 y 2.1) ----------
+  // Cada tramo con toque (¡TIRA!, ¡SALTA!, ¡PÁRATE!, ¡ARRIBA!) se cumple con su primer contacto, en cualquier punto del
+  // tramo, o solo si no se toca. Un contacto que llega antes queda guardado (uno solo) para el tramo siguiente; uno apoyado
+  // cumple cada tramo que abre. NINGÚN contacto cambia el resultado (2.1): deciden la energía al cerrar cada tramo, que
+  // gastan los kilos y el cuerpo, y la suerte de ese tramo (ruidoDe), que se ve recién cuando el tramo termina.
   // Fases (las mismas de siempre, para que sequence.js dibuje igual): acomodo → tension (¡TIRA!) → tiron (¡SALTA! abre a
   // los UNO.saltaDesde ms) → vuelo (explosión en el ancla; ¡SALTA! cierra en la recepción) → pelea (¡PÁRATE!) → fijacion
-  // (arranque) o hombros (¡ARRIBA!) → flexion → empuje → post → fijacion. 'freno': un tramo dejó el margen apenas debajo de
-  // cero y queda la garra: UNO.frenoMs para usarla con un contacto.
+  // (arranque) o hombros (¡ARRIBA!) → flexion → empuje → post → fijacion. 'freno': un tramo dejó la energía apenas debajo de
+  // cero y la garra alcanza: UNO.frenoMs de pausa dramática y la garra se usa sola (no hay que tocar nada).
   _uIni() {
-    const c = this.c, dia = diaDe(c.semilla), m0 = UNO.margen + dia;
-    return { cuerpo: c.cuerpo || CUERPO_NEUTRO, dia, m0, m: m0, gastos: {}, log: [], garra: c.garraUno === false ? 'gastada' : 'disponible',
+    const c = this.c, cuerpo = c.cuerpo || CUERPO_NEUTRO, suerte = TRAMOS[c.lev].map((_, i) => ruidoDe(c.semilla, i, cuerpo.ruido || 0));
+    return { cuerpo, suerte, dia: suerte.reduce((a, x) => a + x, 0), m0: UNO.margen, m: UNO.margen, gastos: {}, suertes: {}, log: [], garra: c.garraUno === false ? 'gastada' : 'disponible', noAlcanza: false,
       guarda: 0, ign: 0, ultBaja: -INF, contactos: [], salto: null, pisoton: null, caida: null, freno: null, tiraSola: false, arribaSola: false };
   }
   _uEntrada(t, v) {
@@ -315,7 +316,7 @@ export class Intento {
         if (U.salto === null && !U.guarda) { U.guarda = 1; return 'salta'; }
         return this._uGuarda();
       case 'pelea': if (M.mov !== 'j' && !M.pelea.cerrado && U.pisoton === null) { this._uPisa(t); return 'pisoton'; } return this._uGuarda();
-      case 'freno': this._uGarra(t); return 'garra';
+      case 'freno': return 'garra';      // la garra ya está en camino: el contacto solo grita con ella
       case 'hombros': if (M.abierto) { this._uArriba(t); return 'arriba'; } return this._uGuarda();
       default: return this._uGuarda();
     }
@@ -370,20 +371,20 @@ export class Intento {
     M.tPost = t + M.an.post; this.fase = 'post';
   }
   _uArriba(t) { const M = this.M; M.tp = t; M.tx = t + idiv(M.an.dip * 1000, this.vel); this.fase = 'flexion'; }
-  _uFija(t) { this.fij = { ts: t, abajo: true, desde: t, upPend: null, firme: true, tFirme: t, tb: t + FIJA.firmeMs + this.chicharra }; this.fase = 'fijacion'; }
+  _uFija(t) { this.fij = { ts: t, abajo: true, desde: t, upPend: null, firme: true, tFirme: t, tb: t + FIJA.firmeMs + Math.min(this.chicharra, UNO.chicharraMax) }; this.fase = 'fijacion'; }
   /**
    * Cierra un tramo: gasta su margen y sigue, ofrece la garra (FRENO) o deja caer la barra ahí. `sigue(t)` es lo que viene
    * después si el tramo se salva.
    */
   _uCierra(t, tramo, sigue) {
-    const U = this.U, c = this.c;
-    const g = gastoTramo(tramo, c.I, c.lev, c.env, U.cuerpo, { salto: U.salto !== null, pisoton: U.pisoton !== null });
-    U.gastos[tramo] = g; U.m -= g; U.log.push({ t, tramo, gasto: g, m: U.m });
+    const U = this.U, c = this.c, orden = TRAMOS[c.lev], i = orden.indexOf(tramo);
+    const g0 = gastoTramo(tramo, c.I, c.lev, c.env, U.cuerpo), g = conSuerte(g0, U.suerte[i]);
+    U.gastos[tramo] = g; U.suertes[tramo] = g - g0; U.m -= g; U.log.push({ t, tramo, gasto: g, suerte: g - g0, m: U.m });
     if (U.m >= 0) return sigue(t);
     if (U.m >= UNO.frenoMin && U.garra === 'disponible') {
-      U.freno = { t0: t, hasta: t + UNO.frenoMs, tramo, sigue }; this.fase = 'freno';
-      if (this.n > 0) this._uGarra(t);      // la tecla o el dedo apoyado la usan
-      return;
+      // la garra se usa sola si con ella el resto llega (sin suerte); si no alcanzaría, no se gasta
+      if (garraAlcanza(U.m, orden.slice(i + 1).map(x => gastoTramo(x, c.I, c.lev, c.env, U.cuerpo)))) { U.freno = { t0: t, hasta: t + UNO.frenoMs, tramo, sigue }; this.fase = 'freno'; return; }
+      U.noAlcanza = true;
     }
     return this._uCae(t, tramo);
   }
@@ -412,7 +413,7 @@ export class Intento {
     const M = this.M, U = this.U;
     switch (this.fase) {
       case 'acomodo': return this.tSet;
-      case 'tension': return Math.max(this.tSet, this.tConf + (this.c.reloj || UNO.relojSin) - UNO.tiraSolo);
+      case 'tension': return this.tSet + UNO.tiraSolo;
       case 'tiron': return M.saltaAbierta ? M.tx : Math.min(M.tSalta, M.tx);
       case 'vuelo': case 'empuje': return M.tc;
       case 'flexion': return M.tx;
@@ -440,7 +441,7 @@ export class Intento {
         if (!p.cerrado) { p.Pc = this._uP(d); p.P = p.Pc; p.cerrado = true; return this._uCierra(d, 'pararse', t => this._uDePie(t)); }
         return this._uEnPie(d);
       }
-      case 'freno': { const f = U.freno; U.freno = null; U.garra = 'guardada'; return this._uCae(d, f.tramo); }
+      case 'freno': return this._uGarra(d);
       case 'hombros':
         if (!M.abierto) { M.abierto = true; if (this._uAbre()) this._uArriba(d); return; }
         U.arribaSola = true; return this._uArriba(d);
@@ -452,7 +453,7 @@ export class Intento {
   _uRes() {
     const U = this.U, g = U.gastos; let mayor = null; for (const k of Object.keys(g)) if (mayor === null || g[k] > g[mayor]) mayor = k;
     const cuenta = {}; for (const x of U.contactos) cuenta[x.que] = (cuenta[x.que] || 0) + 1;
-    return { margen_ini: U.m0, dia: U.dia, gastos: { ...g }, margen_fin: U.m, garra: U.garra, tramo_caida: U.caida, tramo_mayor: mayor, salto: U.salto !== null, pisoton: U.pisoton !== null,
+    return { margen_ini: U.m0, dia: U.dia, gastos: { ...g }, suertes: { ...U.suertes }, margen_fin: U.m, garra: U.garra, garra_no_alcanza: U.noAlcanza, tramo_caida: U.caida, tramo_mayor: mayor, salto: U.salto !== null, pisoton: U.pisoton !== null,
       tira_sola: U.tiraSola, arriba_sola: U.arribaSola, al_limite: !U.caida && U.m < UNO.alLimite, contactos: cuenta };
   }
 

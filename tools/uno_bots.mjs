@@ -29,7 +29,7 @@ export const CON_TOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 export function ctxUno(id, lev, env, I, sem, extra = {}) {
   const f = datos.atletas[id], r = new Azar(mezclar(sem, 23));
   return { lev, env: lev === 'c' ? env : undefined, I, tec: f.attrs.tec, temple: 0, garra: f.attrs.gar, anclas: datos.modelos[f.modelo], semilla: sem, cal: 0, primera: false, domina: lev === 's' || f.enviones.includes(env),
-    jueces: [r.entre(900, 1100), r.entre(900, 1100), r.entre(900, 1100)], reloj: 30000, ctl: 'u', cuerpo: cuerpoDe(f), garraUno: true, ...extra };
+    jueces: [r.entre(900, 1100), r.entre(900, 1100), r.entre(900, 1100)], reloj: 30000, ctl: 'u', cuerpo: cuerpoDe(id), garraUno: true, ...extra };
 }
 
 export const BOTS_U = {

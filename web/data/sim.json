@@ -101,13 +101,6 @@
     },
     "umbral": 1010,
     "estilo": "fijo"
-   },
-   "cuerpoJuego": {
-    "tiron": 1100,
-    "arriba": 700,
-    "pararse": 850,
-    "movil": true,
-    "casa": "split"
    }
   },
   "brenner": {
@@ -148,13 +141,6 @@
     },
     "umbral": 1005,
     "estilo": "pasa"
-   },
-   "cuerpoJuego": {
-    "tiron": 500,
-    "arriba": 900,
-    "pararse": 1200,
-    "movil": false,
-    "casa": "split"
    }
   },
   "marangi": {
@@ -195,15 +181,8 @@
     },
     "umbral": 1030,
     "estilo": "orgullo"
-   },
-   "cuerpoJuego": {
-    "tiron": 1000,
-    "arriba": 1350,
-    "pararse": 600,
-    "movil": false,
-    "casa": "split"
    }
   }
  },
- "huella": "83f90ed0"
+ "huella": "09c9b907"
 }

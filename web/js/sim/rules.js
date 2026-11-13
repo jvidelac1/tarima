@@ -2,7 +2,7 @@
 //   tiempo en ms · intensidad en diezmilésimas (10000 = 100 %) · esfuerzo, exigencia y calidad en milésimas ·
 //   altura y desvío de la barra en mm · Resto en décimas de punto · kilos enteros · techos en gramos.
 // Los valores son los iniciales del documento de diseño; el informe de balance (tools/balance.mjs) es la herramienta para ajustarlos.
-import { idiv, rdiv, lerpi, clampi, mezclar, Azar } from './fixed.js';
+import { idiv, rdiv, lerpi, clampi, mezclar, Azar, huella, canonico } from './fixed.js';
 
 export const VERSION = '1.0';
 
@@ -151,92 +151,111 @@ export const anchoFacil = I => segunHolgura(I, FACIL.ancho, FACIL.anchoTecho);
 export const CONTROLES = ['c', 'f', 'u'];
 
 /**
- * Nivel de control «Un toque, un tramo» (`'u'`, docs/JUEGO.md, sección Gameplay 2). Ningún toque tiene un momento justo:
- * cada contacto cumple un tramo entero y vale en cualquier punto de él; si llega antes, queda guardado. Si la barra sube o
- * no lo decide el MARGEN (milésimas de disco: 1 disco = 1000), que se comen los tramos según los kilos y el cuerpo.
- *   margen     margen inicial de todos (3 discos). «El día» (`dia`, triangular de ±dia) se le suma; se revela al agarrar
- *   diaCorte   desde cuánto el día se anuncia «liviana» o «pesada»
+ * Nivel de control «Un toque, un tramo» (`'u'`, docs/JUEGO.md, sección Gameplay 2 y su revisión 2.1). Ningún toque tiene un
+ * momento justo y NINGÚN toque cambia el resultado: los contactos solo acompañan (arrancan antes, aceleran la subida) y
+ * cada tramo con toque sale solo si no se toca. Si la barra sube o no lo deciden la ENERGÍA (milésimas: 1 punto = 1000),
+ * los kilos y el cuerpo del pesista, y un poco de suerte en cada tramo que se ve recién cuando ese tramo termina.
+ *   margen     energía inicial de todos (3 puntos)
  *   base       gasto de cada tramo al 100 % del techo del momento; `r(I)` lo escala (0 hasta `rDesde`, 1 en `rHasta`, y sigue).
- *              Calibrada el 13-nov con tools/margen_cal.mjs sobre los factores de cuerpo fijos de sim.json (metas C y D; antes
- *              900/1500/2000, pensada para un cuerpo promedio): 1000/1700/1800
+ *              Calibrada con tools/margen_cal.mjs sobre los cuerpos de CUERPOS_U (13-nov, 2.1: 940/1600/1700)
  *   envion     el tramo «arriba» del dos tiempos: factor `k` (milésimas) y gasto fijo `mas`; el squat suma `squatMovil` si la
- *              movilidad es alta (negativo: devuelve margen) y `squatRigido` si no
- *   sinSalto   gasto de más del tirón sin contacto en ¡SALTA!   · pisoton  lo que devuelve el contacto de ¡PÁRATE!
- *   garra      lo que suma la garra (una por levantamiento) · frenoMs  lo que dura el FRENO · frenoMin  hasta dónde se ofrece
+ *              movilidad es alta (negativo: devuelve energía) y `squatRigido` si no
+ *   pararseMenos  lo que el tramo de pararse gasta de menos (antes era el premio del pisotón; ahora vale siempre)
+ *   ruidoPaso  la suerte de cada tramo va en pasos de estos milésimos, entre −ruido y +ruido de cada cuerpo (uniforme)
+ *   garra      lo que suma la garra (una por levantamiento). Se usa SOLA cuando un tramo deja la energía apenas debajo de
+ *              cero (hasta `frenoMin`) y con ella el resto del levantamiento llega (sin suerte); si no alcanzaría, no se
+ *              gasta y queda para otro intento. `frenoMs`: la pausa dramática del FRENO (solo presentación: no hay que tocar)
  *   alLimite   menos que esto al terminar: «al límite» (vale igual; la presentación pone suspenso)
  *   confMs     contactos después de confirmar que son parte de la confirmación · dobleTecla, dobleDedo  dos contactos más
  *              cerca que esto son uno solo
- *   saltaDesde ms después del contacto de ¡TIRA! en que abre ¡SALTA! (antes, el contacto queda guardado). ¡SALTA! cierra en
- *              la recepción: así el tramo dura más de un segundo y nadie lo pierde por reaccionar tarde
- *   tiraSolo   ¡TIRA! sale solo cuando al reloj le quedan estos ms (sin reloj, `relojSin`) · respiraMs  RESPIRA con la barra
- *              en los hombros · arribaSolo  ¡ARRIBA! sale solo a estos ms de abrir
+ *   saltaDesde ms después del contacto de ¡TIRA! en que un contacto cuenta como ¡SALTA! (antes, queda guardado)
+ *   tiraSolo   ¡TIRA! sale solo a estos ms de aparecer · respiraMs  RESPIRA con la barra en los hombros · arribaSolo
+ *              ¡ARRIBA! sale solo a estos ms de abrir. Sin tocar no se pierde nada: solo se espera un poco más
  *   pararseMs  el tramo de ¡PÁRATE! cierra a lo sumo a estos ms de empezar la subida (antes, si hubo pisotón, a los
  *              `pisotonCierre` ms del pisotón y no antes de `pararseMin`). `pDuda`: hasta dónde sube la barra antes del cierre
  *   subeMs     del cierre a quedar de pie, con pisotón y sin él · squatMs  la subida del squat jerk (automática)
+ *   chicharraMax  AGUANTA dura a lo sumo esto antes de ¡ABAJO! (la chicharra de los jueces; en Clásico, hasta FIJA.chMax)
  */
 export const UNO = {
-  margen: 3000, dia: 900, diaCorte: 300,
-  base: { tiron: 1000, arriba: 1700, pararse: 1800 }, rDesde: 8500, rHasta: 10000,
+  margen: 3000,
+  base: { tiron: 940, arriba: 1600, pararse: 1700 }, rDesde: 8500, rHasta: 10000,
   envion: { split: { k: 800, mas: 0 }, power: { k: 1000, mas: 500 }, squat: { k: 1000, mas: 0 } }, squatMovil: -250, squatRigido: 500,
-  sinSalto: 250, pisoton: 500, garra: 500, frenoMs: 2500, frenoMin: -500, alLimite: 250,
+  pararseMenos: 500, ruidoPaso: 50, garra: 500, frenoMs: 1000, frenoMin: -500, alLimite: 250,
   confMs: 300, dobleTecla: 120, dobleDedo: 80,
-  saltaDesde: 250, tiraSolo: 5000, relojSin: 30000, respiraMs: 450, arribaSolo: 6000,
-  pararseMs: 1500, pararseMin: 700, pisotonCierre: 300, pDuda: 550000, subeMs: { con: 550, sin: 950 }, squatMs: 900,
+  saltaDesde: 250, tiraSolo: 2000, respiraMs: 450, arribaSolo: 2000,
+  pararseMs: 1000, pararseMin: 600, pisotonCierre: 300, pDuda: 550000, subeMs: { con: 550, sin: 750 }, squatMs: 900, chicharraMax: 800,
 };
 /**
- * Cuerpo de juego de un pesista en `'u'` (milésimas por tramo; `movil`: movilidad alta, para el squat; `casa`: el envión que
- * el panel propone). Lo trae sim.json en `atletas.<id>.cuerpoJuego` (tools/build_sim_data.mjs); sin él vale CUERPO_NEUTRO,
- * el promedio de los tres. match.js lo pasa en `ctx.cuerpo`, y lo que muestra el panel sale de `previsto()` y `chanceUno()`.
+ * Cuerpo de juego de cada pesista en `'u'` (milésimas por tramo sobre UNO.base; `ruido`: amplitud de la suerte de cada
+ * tramo, en pasos de UNO.ruidoPaso; `movil`: movilidad alta, para el squat; `casa`: el envión que el panel propone).
+ * Vive acá y no en sim.json: así la huella de sim.json no cambia y los registros viejos de 'c' y 'f' se siguen recalculando
+ * (replay.js). Los registros de 'u' llevan su propia huella (HUELLA_U). Los rivales juegan en Clásico y no los leen.
+ *   Compacto (ventura)  fuerte arriba de la cabeza, techo más bajo; FIABLE: poca suerte (±200 por tramo)
+ *   Largo (brenner)     fuerte en el tirón, débil al pararse; suerte normal (±250)
+ *   Potente (marangi)   fuerte al pararse, débil arriba de la cabeza; IRREGULAR: mucha suerte para los dos lados (±600)
+ * Calibrados el 13-nov (Gameplay 2.1, scratchpad g21/kg50.mjs y tools/pesistas_test.mjs) para que ninguno domine: total que
+ * sube 9 de 10 veces 376 / 377 / 371 kg, 5 de 10 380 / 382 / 383, 2 de 10 383 / 385 / 391. Compacto es el seguro; Potente,
+ * el que puede dar la sorpresa cuando hace falta (y el que más se cae si se le pide de más).
  */
-export const CUERPO_NEUTRO = { tiron: 870, arriba: 980, pararse: 880, movil: false, casa: 'split' };
-export const cuerpoDe = f => ({ ...CUERPO_NEUTRO, ...(f && f.cuerpoJuego ? f.cuerpoJuego : {}) });
+export const CUERPOS_U = {
+  ventura: { tiron: 1290, arriba: 740, pararse: 970, ruido: 4, movil: true, casa: 'split' },
+  brenner: { tiron: 550, arriba: 900, pararse: 1260, ruido: 5, movil: false, casa: 'split' },
+  marangi: { tiron: 950, arriba: 1300, pararse: 600, ruido: 12, movil: false, casa: 'split' },
+};
+export const CUERPO_NEUTRO = { tiron: 870, arriba: 980, pararse: 880, ruido: 5, movil: false, casa: 'split' };
+/** Cuerpo de juego del pesista `id` (o de una ficha que traiga `cuerpoJuego`, para pruebas); sin datos, CUERPO_NEUTRO. */
+export const cuerpoDe = x => ({ ...CUERPO_NEUTRO, ...(typeof x === 'string' ? CUERPOS_U[x] || {} : x && x.cuerpoJuego ? x.cuerpoJuego : {}) });
+/** Huella de las reglas de 'u' (UNO y los cuerpos): va en la cabecera de los registros de 'u' y replay.js la exige. */
+export const HUELLA_U = huella(canonico({ UNO, CUERPOS_U, CUERPO_NEUTRO }));
 /** r(I) en milésimas: 0 hasta UNO.rDesde, 1000 en UNO.rHasta, y sigue en línea recta (1200 al 103 %). */
 export const rUno = I => (I <= UNO.rDesde ? 0 : idiv((I - UNO.rDesde) * 1000, UNO.rHasta - UNO.rDesde));
 /** Tramos de cada levantamiento, en orden. */
 export const TRAMOS = { s: ['tiron', 'arriba', 'pararse'], c: ['tiron', 'pararse', 'arriba'] };
-/**
- * Gasto de un tramo (milésimas de disco). `o.salto`: hubo contacto en ¡SALTA! (si no, el tirón suma UNO.sinSalto);
- * `o.pisoton`: hubo contacto en ¡PÁRATE! (el tramo gasta UNO.pisoton menos, sin bajar de 0).
- */
-export function gastoTramo(tramo, I, lev, env, cuerpo, o = {}) {
+/** Gasto de un tramo sin suerte (milésimas). No depende de cómo se toque. */
+export function gastoTramo(tramo, I, lev, env, cuerpo) {
   const r = rUno(I), k = cuerpo[tramo] ?? 1000;
   let g = idiv(UNO.base[tramo] * r * k, 1000000);
-  if (tramo === 'tiron' && !o.salto) g += UNO.sinSalto;
   if (tramo === 'arriba' && lev === 'c') { const E = UNO.envion[env] || UNO.envion.split; g = idiv(g * E.k, 1000) + E.mas + (env === 'squat' ? (cuerpo.movil ? UNO.squatMovil : UNO.squatRigido) : 0); }
-  if (tramo === 'pararse' && o.pisoton) g = Math.max(0, g - UNO.pisoton);
+  if (tramo === 'pararse') g = Math.max(0, g - UNO.pararseMenos);
   return g;
 }
+/** Gasto con la suerte `ruido` (milésimas): un tramo que no gasta nada no tiene suerte, y ninguno devuelve energía. */
+export const conSuerte = (g, ruido) => (g > 0 ? Math.max(0, g + ruido) : 0);
+/** Suerte del tramo `i` (0, 1, 2) de un intento: uniforme entre −ruido y +ruido pasos, de la semilla del intento. */
+export function ruidoDe(semilla, i, pasos) { if (!pasos) return 0; const r = new Azar(mezclar(semilla, 31, i)); return (r.ent(2 * pasos + 1) - pasos) * UNO.ruidoPaso; }
+/** La garra se usa si deja la energía en ≥ 0 en este tramo y, sin suerte, en todos los que faltan. */
+export function garraAlcanza(m, restantes) { let x = m + UNO.garra; if (x < 0) return false; for (const g of restantes) { x -= g; if (x < 0) return false; } return true; }
 /**
- * Lo que el panel muestra para un peso («llegas con»): día 0, ¡SALTA! y ¡PÁRATE! tocados y sin garra. `fin`: margen al
- * terminar (negativo: no llega); `justo`: el tramo donde el margen queda más bajo; `mayor`: el que más gasta; `gastos`.
+ * Lo que el panel muestra para un peso («llegas con»): sin suerte y sin garra. `fin`: energía al terminar (negativo: no
+ * llega); `justo`: el tramo donde queda más baja; `mayor`: el que más gasta; `gastos`.
  */
-export function previsto(I, lev, env, cuerpo, o = { salto: true, pisoton: true }) {
+export function previsto(I, lev, env, cuerpo) {
   let m = UNO.margen, min = Infinity, justo = null, mayor = null; const gastos = {};
   for (const tr of TRAMOS[lev]) {
-    const g = gastos[tr] = gastoTramo(tr, I, lev, env, cuerpo, o); m -= g;
+    const g = gastos[tr] = gastoTramo(tr, I, lev, env, cuerpo); m -= g;
     if (m < min) { min = m; justo = tr; } if (mayor === null || g > gastos[mayor]) mayor = tr;
   }
   return { fin: m, min, justo, mayor, gastos };
 }
 /**
- * Chance de que la barra suba (milésimas, 0 a 1000) para quien toca ¡SALTA! y ¡PÁRATE! y usa la garra si se la ofrecen
- * (`o.garra`: todavía la tiene). Exacta: con esos toques, el resultado depende solo de «el día» (diaDe), así que se suma el
- * peso de cada día con el que llega, con las mismas reglas que attempt.js (_uCierra y _uGarra). La usan el panel del llamado
- * («X de 10») y las pruebas (tools/margen_cal.mjs, tools/chance_test.mjs). Enteros: no cambia entre motores.
+ * Chance de que la barra suba (milésimas, 0 a 1000), para cualquiera: como ningún toque cambia el resultado, depende solo de
+ * la suerte de cada tramo (ruidoDe) y de si queda la garra (`o.garra`). Exacta: recorre todas las combinaciones de suerte con
+ * las mismas reglas que attempt.js (_uCierra). La usan el panel del llamado («X de 10») y las pruebas. Enteros.
  */
 export function chanceUno(I, lev, env, cuerpo, o = {}) {
-  const garra0 = o.garra !== false, G = TRAMOS[lev].map(tr => gastoTramo(tr, I, lev, env, cuerpo, { salto: true, pisoton: true }));
-  const h = idiv(UNO.dia, 2), n = 2 * h + 1; let ok = 0;
-  for (let d = -2 * h; d <= 2 * h; d++) {
-    let m = UNO.margen + d, garra = garra0, cae = false;
-    for (const g of G) { m -= g; if (m >= 0) continue; if (m >= UNO.frenoMin && garra) { garra = false; m += UNO.garra; continue; } cae = true; break; }
-    if (!cae) ok += n - (d < 0 ? -d : d);
-  }
-  return idiv(ok * 1000, n * n);
+  const garra0 = o.garra !== false, G = TRAMOS[lev].map(tr => gastoTramo(tr, I, lev, env, cuerpo)), k = cuerpo.ruido || 0, n = 2 * k + 1;
+  let ok = 0;
+  const paso = (i, m, garra) => {
+    if (i === G.length) { ok++; return; }
+    for (let j = 0; j < n; j++) {
+      let x = m - conSuerte(G[i], (j - k) * UNO.ruidoPaso), g = garra;
+      if (x < 0) { if (g && x >= UNO.frenoMin && garraAlcanza(x, G.slice(i + 1))) { x += UNO.garra; g = false; } else continue; }
+      paso(i + 1, x, g);
+    }
+  };
+  paso(0, UNO.margen, garra0);
+  return idiv(ok * 1000, n * n * n);
 }
-/** «El día» de un intento (milésimas de disco): triangular entre −UNO.dia y +UNO.dia, de la semilla del intento. */
-export function diaDe(semilla) { const r = new Azar(mezclar(semilla, 31)), h = idiv(UNO.dia, 2); return r.entre(-h, h) + r.entre(-h, h); }
-export const diaTxt = dia => (dia >= UNO.diaCorte ? 'liviana' : dia <= -UNO.diaCorte ? 'pesada' : 'normal');
 
 /** Causas con su texto. Las de fallo y las de nulo (secciones 5.2 y 5.3). */
 export const CAUSAS = {

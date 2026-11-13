@@ -1,7 +1,7 @@
 // Recalcula una partida entera desde su registro (docs/JUEGO.md, sección 9.6). Lo usan las pruebas y, en la etapa 5, el
 // servidor: el cliente manda lo que el jugador tocó, nunca un resultado. Cualquier registro que no cierre se rechaza.
 import { Partida } from './match.js';
-import { VERSION, NIVELES, RELOJ, CONTROLES } from './rules.js';
+import { VERSION, NIVELES, RELOJ, CONTROLES, HUELLA_U } from './rules.js';
 
 const MAX_ENT = 4000, MAX_MS = 240000;
 const entero = x => Number.isInteger(x);
@@ -35,6 +35,8 @@ export function recalcular(reg, datos, o = {}) {
     if (reg.datos !== datos.huella || reg.temporada !== datos.temporada) return { ok: false, error: 'huella o temporada de sim.json' };
     if (!NIVELES[reg.nivel] || !entero(reg.cal) || reg.cal < 0 || reg.cal > 100 || !entero(reg.semilla)) return { ok: false, error: 'cabecera' };
     if (reg.ctl !== undefined && !CONTROLES.includes(reg.ctl)) return { ok: false, error: 'nivel de control desconocido' };
+    // 'u' tiene sus reglas fuera de sim.json (rules.js → UNO y CUERPOS_U): su huella va aparte
+    if (reg.ctl === 'u' && reg.uno !== HUELLA_U) return { ok: false, error: "huella de las reglas de 'u'" };
     if (!Array.isArray(reg.atletas) || !Array.isArray(reg.aperturas) || reg.aperturas.length !== 3 || !Array.isArray(reg.llamados) || reg.llamados.length > 40) return { ok: false, error: 'forma del registro' };
     const p = new Partida(datos, { semilla: reg.semilla, nivel: reg.nivel, cal: reg.cal, primera: reg.primera, ctl: reg.ctl, tactil: reg.tactil === true, atletas: reg.atletas });
     const abrir = lev => { p.at.forEach((a, i) => { if (a.ctrl === 'persona') p.abrir(i, lev, reg.aperturas[i][lev]); else if (reg.aperturas[i][lev] !== a.decl[lev]) throw new Error('la apertura de un rival no coincide'); }); p.empezar(); };

@@ -3,7 +3,7 @@
 // de cada tramo (rules.js → UNO.base), que calibra tools/margen_cal.mjs; acá se confirman con el núcleo de verdad.
 import { jugarUno, ctxUno, BOTS_U, firma, verificar, ATL, datos } from './uno_bots.mjs';
 import { mezclar, Azar } from '../web/js/sim/fixed.js';
-import { gastoTramo, UNO, cuerpoDe } from '../web/js/sim/rules.js';
+import { cuerpoDe } from '../web/js/sim/rules.js';
 
 const CAUSAS_U = new Set(['sin_altura', 'atras', 'fondo', 'aplastado', 'codos']);
 const INTS = [8800, 9000, 9500, 9700, 10000, 10300];
@@ -15,11 +15,11 @@ export function medirUno({ n = 600 } = {}) {
   const t0 = Date.now(), mal = [], info = [];
   console.log(`Nivel 'u' (un toque, un tramo) · ${n} intentos por casilla · pesistas ${ATL.join(', ')} · teclado y dedo`);
   // ---------- A: sin coordinación ----------
-  let casos = 0, distintos = 0, entrada = 0, ausDif = 0; const ejemplo = [];
+  let casos = 0, distintos = 0, entrada = 0; const ejemplo = [];
   const curva = {};      // I → lev → id → {v, n, caida: {tramo: n}, mayor: {tramo: n}}
   const aus90 = { v: 0, n: 0 };
   for (const I of INTS) for (const lev of ['s', 'c']) for (const id of ATL) for (const dedo of [false, true]) for (let k = 0; k < n; k++) {
-    const f = datos.atletas[id], env = lev === 'c' ? (k % 2 ? cuerpoDe(f).casa : 'split') : undefined;
+    const f = datos.atletas[id], env = lev === 'c' ? (k % 2 ? cuerpoDe(id).casa : 'split') : undefined;
     const sem = mezclar(I, k, ATL.indexOf(id), dedo ? 7 : 3, lev === 's' ? 1 : 2), ctx = ctxUno(id, lev, env, I, sem, dedo ? { tactil: true } : {});
     const out = {};
     for (const [b, B] of Object.entries(BOTS_U)) {
@@ -29,10 +29,8 @@ export function medirUno({ n = 600 } = {}) {
     }
     casos++;
     const ref = firma(out.reactivo);
-    for (const b of ['tardio', 'fantasma', 'mantiene', 'machacador']) if (firma(out[b]) !== ref) { distintos++; if (ejemplo.length < 4) ejemplo.push(`${b} ≠ reactivo: ${id} ${lev} ${I / 100} % ${firma(out[b])} vs ${ref}`); }
-    // el ausente: lo único distinto es el ¼ del salto flojo y el ½ del pisotón (y lo que eso cambie en el resultado)
-    { const a = out.ausente.uno, r = out.reactivo.uno, gp = gastoTramo('pararse', ctx.I, lev, env, ctx.cuerpo, {}), espera = UNO.sinSalto + Math.min(UNO.pisoton, gp);
-      if (out.ausente.res === 'valido' && out.reactivo.res === 'valido' && a.garra === r.garra && r.margen_fin - a.margen_fin !== espera) ausDif++; }
+    // Gameplay 2.1: ningún toque cambia el resultado, así que también el ausente (no toca nunca) da lo mismo
+    for (const b of ['tardio', 'fantasma', 'mantiene', 'machacador', 'ausente']) if (firma(out[b]) !== ref) { distintos++; if (ejemplo.length < 4) ejemplo.push(`${b} ≠ reactivo: ${id} ${lev} ${I / 100} % ${firma(out[b])} vs ${ref}`); }
     if (I === 9000) { aus90.n++; if (out.ausente.res === 'valido') aus90.v++; }
     // curva y pesistas: el reactivo con el dedo (el novato del celular)
     if (dedo) {
@@ -41,10 +39,9 @@ export function medirUno({ n = 600 } = {}) {
       if (res.uno.garra === 'usada') C.garra++;
     }
   }
-  console.log(`A. ${casos} casos × 6 bots: resultados distintos entre reactivo, tardío, fantasma, mantiene y machacador: ${distintos} · caídas con causa de entrada o sin tramo: ${entrada} · ausente fuera de ¼ + ½: ${ausDif} · ausente al 90 %: ${f1(pc(aus90.v, aus90.n))} %   meta 0 · 0 · 0 · ≥ 95 %`);
+  console.log(`A. ${casos} casos × 6 bots: resultados distintos entre reactivo, tardío, fantasma, mantiene, machacador y ausente: ${distintos} · caídas con causa de entrada o sin tramo: ${entrada} · ausente al 90 %: ${f1(pc(aus90.v, aus90.n))} %   meta 0 · 0 · ≥ 95 %`);
   if (distintos) mal.push(`A: ${distintos} casos con resultado distinto según cómo se toca (${ejemplo.join(' · ')})`);
   if (entrada) mal.push(`A: ${entrada} fallos por causa de entrada o sin tramo (${ejemplo.join(' · ')})`);
-  if (ausDif) mal.push(`A: el ausente difiere en algo más que ¼ + ½ disco en ${ausDif} casos`);
   if (pc(aus90.v, aus90.n) < 95) mal.push(`A: el ausente saca ${pc(aus90.v, aus90.n).toFixed(1)} % al 90 % (meta ≥ 95 %)`);
 
   // ---------- B: primer intento ----------
@@ -52,7 +49,7 @@ export function medirUno({ n = 600 } = {}) {
     for (const id of ATL) for (const lev of ['s', 'c']) {
       let v = 0; const N = n;
       for (let k = 0; k < N; k++) {
-        const r = new Azar(mezclar(k, 61)), f = datos.atletas[id], I = 8880 + r.ent(241), env = lev === 'c' ? cuerpoDe(f).casa : undefined;
+        const r = new Azar(mezclar(k, 61)), f = datos.atletas[id], I = 8880 + r.ent(241), env = lev === 'c' ? cuerpoDe(id).casa : undefined;
         const ctx = ctxUno(id, lev, env, I, mezclar(k, 62, ATL.indexOf(id), lev === 's' ? 1 : 2), { tactil: true, primera: true });
         const S = jugarUno(ctx, BOTS_U.reactivo, mezclar(k, 63)); if (verificar(ctx, S).res.res === 'valido') v++;
       }
@@ -79,15 +76,16 @@ export function medirUno({ n = 600 } = {}) {
   // ---------- D: dónde caen (informativo) ----------
   { const tabla = {}; for (const I of [10000, 10300]) for (const lev of ['s', 'c']) for (const id of ATL) { const C = curva[I][lev][id], T = (tabla[id] ||= { n: 0 }); for (const [k, x] of Object.entries(C.mayor)) { T[k] = (T[k] || 0) + x; T.n += x; } }
     console.log('D. tramo que más gastó en las caídas del 100 al 103 %: ' + ATL.map(id => { const T = tabla[id]; return `${id}: ${['tiron', 'arriba', 'pararse'].map(k => `${k} ${pc(T[k] || 0, T.n).toFixed(0)} %`).join(', ')}`; }).join(' · '));
-    const al100 = ['s', 'c'].map(lev => { const xs = ATL.map(id => pc(curva[10000][lev][id].v, curva[10000][lev][id].n)); return Math.max(...xs) - Math.min(...xs); });
+    // los pesistas se distinguen por la forma de la curva (Gameplay 2.1): entre el 97 y el 103 %, en algún punto dos difieren ≥ 15
+    const al100 = [9700, 10000, 10300].flatMap(I => ['s', 'c'].map(lev => { const xs = ATL.map(id => pc(curva[I][lev][id].v, curva[I][lev][id].n)); return Math.max(...xs) - Math.min(...xs); }));
     // cada pesista cae donde dice su tarjeta: Largo al pararse, Potente arriba de la cabeza; Compacto, repartido
     const de = (id, k) => pc(tabla[id][k] || 0, tabla[id].n), dmal = [];
     if (de('brenner', 'pararse') < 70) dmal.push(`Largo cae por pararse en ${de('brenner', 'pararse').toFixed(0)} % (meta ≥ 70)`);
     if (de('marangi', 'arriba') < 70) dmal.push(`Potente cae por arriba en ${de('marangi', 'arriba').toFixed(0)} % (meta ≥ 70)`);
     for (const k of ['tiron', 'arriba', 'pararse']) if (de('ventura', k) > 60) dmal.push(`Compacto cae por ${k} en ${de('ventura', k).toFixed(0)} % (meta ≤ 60)`);
-    if (Math.max(...al100) < 15) dmal.push(`al 100 % los pesistas difieren ${Math.max(...al100).toFixed(0)} puntos (meta ≥ 15)`);
+    if (Math.max(...al100) < 15) dmal.push(`entre el 97 y el 103 % los pesistas difieren a lo sumo ${Math.max(...al100).toFixed(0)} puntos (meta ≥ 15)`);
     if (dmal.length) mal.push(`D: ${dmal.join(' · ')}`);
-    info.push(`D: al 100 %, la mayor diferencia entre pesistas es de ${Math.max(...al100).toFixed(0)} puntos (meta ≥ 15): ${dmal.length ? 'NO se cumple' : 'se cumple'}`); }
+    info.push(`D: entre el 97 y el 103 %, la mayor diferencia entre pesistas es de ${Math.max(...al100).toFixed(0)} puntos (meta ≥ 15): ${dmal.length ? 'NO se cumple' : 'se cumple'}`); }
 
   // ---------- novato / medio / bueno por tramo (informativo) ----------
   { const NIV = { novato: { ...BOTS_U.reactivo, sd: 120, lag: 60 }, medio: BOTS_U.reactivo, bueno: { reac: 170, sd: 30 } };

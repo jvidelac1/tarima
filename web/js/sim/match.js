@@ -4,7 +4,7 @@
 import { idiv, rdiv, clampi, mezclar, Azar } from './fixed.js';
 import { simular } from './attempt.js';
 import { gestos, decidir, elegirEnvion } from './ai.js';
-import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad, cuerpoDe } from './rules.js';
+import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad, cuerpoDe, HUELLA_U } from './rules.js';
 
 const LEVS = ['s', 'c'];
 
@@ -35,7 +35,7 @@ export class Partida {
     if (this.guion.tipo === 'tocado') this.at[quien].resto = RESTO.tocado;
     if (this.guion.tipo === 'forma') this.at[quien].forma = { s: 2, c: 2 };
     this.fase = 'presentacion'; this.lev = 's'; this.seq = 0; this.barra = 0; this.ultimo = -1; this.llamado = null; this.nLlamado = 0;
-    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}),
+    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : {}),
       atletas: cfg.atletas.map(x => ({ id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego' })), aperturas: this.at.map(a => ({ s: a.decl.s, c: a.decl.c })), llamados: [] };
   }
 
@@ -128,8 +128,8 @@ export class Partida {
     if (L.lev === 'c' && !['split', 'power', 'squat'].includes(env)) throw new Error('envión inválido');
     return { lev: L.lev, env: L.lev === 'c' ? env : undefined, I, tec: f.attrs.tec, temple: L.et.length ? f.attrs.tem : 0, garra: f.attrs.gar, anclas: a.modelo, semilla: L.sem,
       cal: persona ? this.cfg.cal : 0, primera: persona && this.cfg.primera && L.n === 1, domina: L.lev === 's' || f.enviones.includes(env), jueces: this.jueces, reloj: L.reloj, ctl: persona ? this.cfg.ctl : 'c', ...(persona && this.cfg.tactil ? { tactil: true } : {}),
-      // 'u': el cuerpo de juego del pesista (gancho: sim.json → cuerpoJuego) y si todavía tiene la garra de este levantamiento
-      ...(persona && this.cfg.ctl === 'u' ? { cuerpo: cuerpoDe(f), garraUno: a.garraUno[L.lev] } : {}) };
+      // 'u': el cuerpo de juego del pesista (rules.js → CUERPOS_U) y si todavía tiene la garra de este levantamiento
+      ...(persona && this.cfg.ctl === 'u' ? { cuerpo: cuerpoDe(a.id), garraUno: a.garraUno[L.lev] } : {}) };
   }
   /** ¿Puede el pesista del llamado pedir `kg` en el instante `ms`? Devuelve el motivo si no. */
   cambioValido(ms, kg) {
