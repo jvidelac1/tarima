@@ -58,6 +58,8 @@ export class Partida {
 
   // ---------- consultas ----------
   techoDia(i, lev) { const a = this.at[i]; return (a.f.techo[lev] + a.forma[lev]) * 1000; }
+  /** Intensidad (diezmilésimas) que tendría ahora `kg` para el pesista i: la misma que usa el intento (panel de 'u'). */
+  intensidadDe(i, lev, kg) { return intensidad(kg, techoMomento(this.techoDia(i, lev), this.at[i].resto)); }
   /** Techo visible (g): el de ficha corregido por el Resto. Con `signo`, suma 1 kg por el signo de la forma del día (lo que usan los rivales). */
   techoVisible(i, lev, signo = true) { const a = this.at[i], s = a.forma[lev]; return techoMomento(a.f.techo[lev] * 1000, a.resto) + (signo ? (s > 0 ? 1000 : s < 0 ? -1000 : 0) : 0); }
   /** Mínimo que puede pedir: 1 kg más tras un válido, lo mismo tras un nulo, y nunca menos de lo que ya está en la barra. */

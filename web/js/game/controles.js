@@ -113,7 +113,7 @@ export function tocar(ctx, conf, ent, t, v, ctl) {
  * gris (`gris`: el contacto no hizo nada nuevo). Nunca hay dos imperativos: estas son palabras, no órdenes.
  */
 export const QUE_U = {
-  tira: { clave: 'palabra.vamos' }, salta: { clave: 'palabra.bien' }, pisoton: { clave: 'palabra.pisoton' }, arriba: { clave: 'palabra.arriba' }, garra: { clave: 'palabra.garra' },
+  tira: { clave: 'palabra.vamos' }, salta: { clave: 'palabra.salto' }, pisoton: { clave: 'palabra.pisoton' }, arriba: { clave: 'palabra.eso' }, garra: { clave: 'palabra.garra' },
   guardado: { clave: 'palabra.guardado', gris: true }, listo: { clave: 'palabra.listo', gris: true }, doble: { clave: 'palabra.doble', gris: true }, espera: { clave: 'palabra.guardado', gris: true },
 };
 
@@ -125,7 +125,8 @@ export const PASOS_U = { s: 3, c: 4 };
  * La señal de 'u'. Tipos: 'espera' (PREPÁRATE, RESPIRA), 'libre' (¡TIRA!, ¡ARRIBA!: cuando quieras; `vence`: cuándo sale
  * solo), 'luz' (¡SALTA!: el tramo va de `abre` a `hasta`; `luz` es donde salta el pesista, solo presentación), 'uno'
  * (¡PÁRATE!: un toque, de `desde` a `hasta`; `avance` 0..1), 'decide' (¡DA TODO!: usar la garra, de `desde` a `hasta`) y
- * 'auto' (AGUANTA, ¡ABAJO!). null entre tramos: la palabra del toque anterior queda sola, sin una orden al lado.
+ * 'auto' (AGUANTA, ¡ABAJO!). `sale` (en las libres): al llegar a `vence` el juego lo hace solo, sin cuenta regresiva
+ * ni castigo. null entre tramos: la palabra del toque anterior queda sola, sin una orden al lado.
  * `guardado`: hay un contacto guardado que va a cumplir el tramo que viene.
  */
 function senalU(m, now) {
@@ -133,7 +134,7 @@ function senalU(m, now) {
   const tira = () => Math.max(m.tSet, m.tConf + (c.reloj || UNO.relojSin) - UNO.tiraSolo);
   switch (m.fase) {
     case 'acomodo': return { clave: 'prep', verbo: t('senal.prep'), tipo: 'espera', guardado: g };
-    case 'tension': return { clave: 'tira', verbo: t('senal.tira'), sub: t('senal.tira_u'), paso: 1, de, tipo: 'libre', vence: tira(), guardado: g };
+    case 'tension': return { clave: 'tira', verbo: t('senal.tira'), sub: t('senal.tira_u'), paso: 1, de, tipo: 'libre', vence: tira(), sale: true, guardado: g };
     case 'tiron': case 'vuelo':
       if (U.salto !== null) return null;
       return { clave: 'salta', verbo: t('senal.salta'), sub: t('senal.salta_sub'), paso: 2, de, tipo: 'luz', desde: M.tp, abre: M.tSalta, luz: M.tx, hasta: M.tx + M.an.rec, guardado: g };
@@ -145,7 +146,7 @@ function senalU(m, now) {
     case 'freno': return { clave: 'datodo', verbo: t('senal.datodo'), sub: t('senal.datodo_sub'), tipo: 'decide', desde: U.freno.t0, hasta: U.freno.hasta, tramo: U.freno.tramo };
     case 'hombros':
       if (!M.abierto) return { clave: 'respira', verbo: t('senal.respira'), tipo: 'espera', guardado: g };
-      return { clave: 'arriba', verbo: t('senal.arriba'), sub: t('senal.arriba_u'), paso: 4, de, tipo: 'libre', vence: M.tDev, guardado: g };
+      return { clave: 'arriba', verbo: t('senal.arriba'), sub: t('senal.arriba_u'), paso: 4, de, tipo: 'libre', vence: M.tDev, sale: true, guardado: g };
     case 'post': return { clave: 'aguanta', verbo: t('senal.aguanta'), sub: t('senal.aguanta_sub'), tipo: 'auto' };
     case 'fijacion': return now >= m.fij.tb ? { clave: 'abajo', verbo: t('senal.abajo'), sub: t('senal.abajo_sub'), tipo: 'auto' } : { clave: 'aguanta', verbo: t('senal.aguanta'), sub: t('senal.aguanta_sub'), tipo: 'auto' };
     default: return null;

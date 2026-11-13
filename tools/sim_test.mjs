@@ -306,7 +306,7 @@ function jugar(semilla, nivel, persona, estilo = {}) {
   for (const [k, v] of Object.entries(es)) { ok(!VOSEO.test(v), `voseo en es.${k}: «${v}»`); ok(!JERGA.test(v), `jerga en es.${k}: «${v}»`); }
   for (const [k, v] of [...Object.entries(es), ...Object.entries(en)]) ok(!/pagar para levantar|pay to lift/i.test(v), `promesa de monetización en ${k}`);
   // con las variables comunes resueltas no queda ninguna llave
-  const vars = { nombre: 'Ana', quien: 'Ana', rival: 'Teo', n: 2, de: 3, kg: 150, lo: 140, hi: 155, min: 150, c: 1, s: 5, b: 2, lev: 'x', pos: '2nd', ms: 30, k: 1, controles: 'x', veredicto: 'x', causa: 'x', a: 'x', medalla: 'x', total: 300, marcas_s: '✅', marcas_c: '❌', link: 'x', envion: 'x', verbo: 'x', cuando: 'x', cuanto: 'x', ajuste: 'x', lado: 'x', grado: 'x', sugerido: 'x' };
+  const vars = { nombre: 'Ana', quien: 'Ana', rival: 'Teo', n: 2, de: 3, kg: 150, lo: 140, hi: 155, min: 150, c: 1, s: 5, b: 2, lev: 'x', pos: '2nd', ms: 30, k: 1, controles: 'x', veredicto: 'x', causa: 'x', a: 'x', medalla: 'x', total: 300, marcas_s: '✅', marcas_c: '❌', link: 'x', envion: 'x', verbo: 'x', cuando: 'x', cuanto: 'x', ajuste: 'x', lado: 'x', grado: 'x', sugerido: 'x', donde: 'x', mayor: 'x', discos: 'x', pct: 97, tramo: 'x' };
   for (const l of ['es', 'en']) for (const tactil of [false, true]) for (const k of ke) { const v = tr(l, k, { ...vars, tactil }); ok(!/[{}]/.test(v) && v.trim().length > 0, `${l}.${k} queda «${v}»`); }
   // la señal sale en el idioma elegido, y los pasos de «Cómo se juega» también
   { const ctx = { lev: 's', I: 9000, tec: 7, temple: 0, garra: 6, anclas: datos.modelos.ventura, semilla: 5, cal: 0, primera: false, domina: true, jueces: [1000, 1000, 1000], reloj: 30000, ctl: 'f' };

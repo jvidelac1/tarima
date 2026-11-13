@@ -85,7 +85,14 @@ export class Boton {
   /** @param {HTMLElement[]} zonas elementos que reciben punteros */
   constructor(zonas) {
     this.contactos = new Map(); this.oye = null; this.via = 'teclado'; this.activo = true;
-    const sube = (id, e) => { const via = this.contactos.get(id); if (via === undefined) return; this.contactos.delete(id); this.oye?.(reloj.deEvento(e), 0, via); };
+    /**
+     * `intento`: hay un levantamiento propio en curso (docs/JUEGO.md G2.2). Espacio y Enter son del levantamiento: se
+     * atienden en captura sobre window, con preventDefault y sin que lleguen a ningún botón ni al teclado de los paneles; y
+     * si el primer evento de una tecla es una repetición (el foco llegó con la tecla ya apretada), cuenta como apretar.
+     * `bordes`: con el dedo, los toques a menos de BORDES px del borde no cuentan (gestos del sistema, barra de inicio, menú).
+     */
+    this.intento = false; this.bordes = false; this.gracia = new Map();
+    const sube = (id, e) => { const via = this.contactos.get(id); if (via === undefined) return; this.contactos.delete(id); const g = this.gracia.get(id); if (g) { clearTimeout(g); this.gracia.delete(id); } this.oye?.(reloj.deEvento(e), 0, via); };
     const baja = (id, e, via) => {
       if (this.contactos.has(id)) sube(id, e);
       this.contactos.set(id, via); this.via = via; this.oye?.(reloj.deEvento(e), 1, via);
@@ -93,8 +100,20 @@ export class Boton {
     };
     // por código físico o por carácter: un teclado remapeado que manda ' ' con otro código también vale
     const esEspacio = e => e.code === 'Space' || e.key === ' ', esTecla = e => esEspacio(e) || e.code === 'Enter' || e.key === 'Enter';
+    const idTecla = e => 'k' + (e.code || e.key);
     // en captura y antes que el teclado de los paneles: la pulsación queda anotada (y con acuse) pase lo que pase después
-    this._k0 = e => { if (esTecla(e) && !enCampo(e) && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) toques.nuevo(reloj.deEvento(e), 'teclado', esEspacio(e) ? 'ESPACIO' : 'ENTER'); };
+    this._k0 = e => {
+      if (!esTecla(e) || enCampo(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (this.intento) {
+        // el levantamiento es dueño de la tecla: ni desplaza la página ni activa un botón con foco
+        e.preventDefault(); e.stopImmediatePropagation();
+        if (e.repeat && this.contactos.has(idTecla(e))) return;      // la repetición del sistema no es un toque nuevo
+        toques.nuevo(reloj.deEvento(e), 'teclado', esEspacio(e) ? 'ESPACIO' : 'ENTER');
+        if (!this.activo) { toques.resolver(false, 'pausa'); return; }
+        baja(idTecla(e), e, 'teclado'); return;
+      }
+      if (!e.repeat) toques.nuevo(reloj.deEvento(e), 'teclado', esEspacio(e) ? 'ESPACIO' : 'ENTER');
+    };
     this._kd = e => {
       if (!esTecla(e) || enCampo(e)) return;
       const T = toques.abierto, pend = !e.repeat && T && T.ok === null;
@@ -102,24 +121,39 @@ export class Boton {
       if (e.defaultPrevented || e.target.closest?.('button,input,select,textarea,label,a')) { if (pend) toques.resolver(true, 'boton', true); return; }
       e.preventDefault(); if (e.repeat) return;
       if (!this.activo) { if (pend) toques.resolver(false, 'pausa'); return; }
-      baja('k' + (e.code || e.key), e, 'teclado');
+      baja(idTecla(e), e, 'teclado');
     };
-    this._ku = e => { if (esTecla(e) && (!enCampo(e) || this.contactos.has('k' + (e.code || e.key)))) { sube('k' + (e.code || e.key), e); toques.suelta(); } };
+    this._ku = e => { if (esTecla(e) && (!enCampo(e) || this.contactos.has(idTecla(e)))) { if (this.intento) e.preventDefault(); sube(idTecla(e), e); toques.suelta(); } };
     this._pd = e => {
       // un panel con botones o campos es para tocar esos botones; uno sin nada que tocar («Toca para seguir») cuenta como toque
       if (!this.activo || (e.pointerType === 'mouse' && e.button !== 0) || e.target.closest?.('button,input,select,textarea,label,a,[contenteditable]') || e.target.closest?.('.panel')?.querySelector('button,input,textarea,select,a')) return;
-      const via = e.pointerType === 'mouse' ? 'mouse' : 'tactil'; e.preventDefault(); toques.nuevo(reloj.deEvento(e), via, via === 'mouse' ? 'CLIC' : 'TOQUE'); baja('p' + e.pointerId, e, via);
+      const via = e.pointerType === 'mouse' ? 'mouse' : 'tactil';
+      if (via === 'tactil' && this.bordes && enBorde(e)) return;      // gesto del sistema o del navegador: no es un contacto
+      e.preventDefault(); toques.nuevo(reloj.deEvento(e), via, via === 'mouse' ? 'CLIC' : 'TOQUE');
+      if (via === 'tactil' && this.intento) { try { navigator.vibrate?.(12); } catch { /* sin vibración */ } }
+      baja('p' + e.pointerId, e, via);
     };
     this._pu = e => { if (this.contactos.has('p' + e.pointerId)) { sube('p' + e.pointerId, e); toques.suelta(); } };
+    // el sistema canceló el puntero (lupa, desplazamiento, gesto): lo ya contado no se anula, y el dedo sigue apoyado
+    // GRACIA_MS por si vuelve; después se levanta
+    this._pc = e => {
+      const id = 'p' + e.pointerId; if (!this.contactos.has(id) || this.gracia.has(id)) return;
+      this.gracia.set(id, setTimeout(() => { this.gracia.delete(id); if (this.contactos.has(id)) { sube(id, null); toques.suelta(); } }, GRACIA_MS));
+    };
     this._todo = e => { for (const id of [...this.contactos.keys()]) sube(id, e); };
     this._vis = () => { if (document.visibilityState !== 'visible') this._todo(null); };
-    addEventListener('keydown', this._k0, true); addEventListener('keydown', this._kd); addEventListener('keyup', this._ku);
+    addEventListener('keydown', this._k0, true); addEventListener('keydown', this._kd); addEventListener('keyup', this._ku, true);
     for (const z of zonas) { z.addEventListener('pointerdown', this._pd); z.addEventListener('contextmenu', e => e.preventDefault()); }
-    addEventListener('pointerup', this._pu); addEventListener('pointercancel', this._pu); addEventListener('blur', this._todo); document.addEventListener('visibilitychange', this._vis);
+    addEventListener('pointerup', this._pu); addEventListener('pointercancel', this._pc); addEventListener('blur', this._todo); document.addEventListener('visibilitychange', this._vis);
   }
   /** Hay un contacto que vale como gesto (teclado o dedo). */
   get apretado() { for (const v of this.contactos.values()) if (v !== 'mouse') return true; return false; }
 }
+/** Gracia de un puntero cancelado por el sistema (ms) y bordes de la pantalla que no cuentan (px): arriba, costados, abajo. */
+export const GRACIA_MS = 400;
+export const BORDES = { arriba: 56, lado: 24, abajo: 20 };
+/** El toque cae en un borde de la pantalla (docs/JUEGO.md G2.3). */
+export function enBorde(e, w = innerWidth, h = innerHeight) { const x = e.clientX, y = e.clientY; return y < BORDES.arriba || y > h - BORDES.abajo || x < BORDES.lado || x > w - BORDES.lado; }
 
 // ---------- teclado de los paneles ----------
 const visibles = raiz => [...raiz.querySelectorAll('button:not(:disabled)')].filter(b => b.offsetParent !== null);

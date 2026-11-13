@@ -99,8 +99,22 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 .senal[data-tipo=empuja] .s-teclas{margin-bottom:calc(var(--v)*2.6)}
 .senal[data-tipo=empuja] .s-avance{display:block}
 .senal[data-gesto=mantiene] .s-teclas .tecla{transform:translateY(.2em);box-shadow:0 .04em 0 #7c86a8;background:var(--gold)}
+/* nivel 'u': ¡SALTA! (luz que sube hasta la cadera), ¡PÁRATE! (un toque, la barra que sube), ¡DA TODO! (la garra, con su
+   tiempo que se acaba). La barra de abajo es solo presentación: tocar en cualquier punto del tramo rinde lo mismo. */
+.senal[data-tipo=luz] .s-aro,.senal[data-tipo=uno] .s-aro,.senal[data-tipo=decide] .s-aro{height:calc(var(--v)*8.5)}
+.senal[data-tipo=luz] .s-avance,.senal[data-tipo=uno] .s-avance,.senal[data-tipo=decide] .s-avance{display:block}
+.senal[data-tipo=luz] .s-teclas,.senal[data-tipo=uno] .s-teclas,.senal[data-tipo=decide] .s-teclas{margin-bottom:calc(var(--v)*2.6)}
+.senal[data-tipo=luz] .s-verbo,.senal[data-tipo=uno] .s-verbo,.senal[data-tipo=decide] .s-verbo{color:var(--gold)}
+.senal[data-tipo=luz] .s-avance b{background:linear-gradient(90deg,#1d6f7a,var(--gold))}
+.senal[data-tipo=decide]{border-top-color:#ff6a5e}
+.senal[data-tipo=decide] .s-avance b{background:#ff6a5e}
+.senal.guardado .s-teclas .tecla{background:var(--teal)}
+.s-pal.gris{color:#a9b2cf;font-size:calc(var(--v)*1.5)}
+/* recuadro fijo de las pantallas pasivas (turno de un rival, veredicto, repetición): un toque sigue */
+.seguir{position:absolute;z-index:5;right:calc(var(--u)*1.2 + var(--sr));bottom:calc(var(--u)*4.4 + var(--sb));font-family:var(--display);font-weight:800;letter-spacing:.1em;text-transform:uppercase;font-size:calc(var(--u)*1.15);color:#0a1020;background:rgba(242,244,255,.92);padding:.4em .8em;border-radius:.3em;pointer-events:none}
+#escena{overscroll-behavior:none}
 @media (prefers-reduced-motion:no-preference){
-  .senal[data-tipo=libre] .s-teclas,.senal.parado .s-teclas{animation:late .7s ease-in-out infinite}
+  .senal[data-tipo=libre] .s-teclas,.senal[data-tipo=luz] .s-teclas,.senal[data-tipo=uno] .s-teclas,.senal[data-tipo=decide] .s-teclas,.senal.parado .s-teclas{animation:late .7s ease-in-out infinite}
   .senal[data-tipo=empuja] .s-teclas .tecla{animation:golpe .36s ease-in-out infinite}
   .senal[data-tipo=empuja] .s-teclas .tecla:nth-child(2){animation-delay:.12s}.senal[data-tipo=empuja] .s-teclas .tecla:nth-child(3){animation-delay:.24s}
   .s-pal.ya{animation:pal .16s ease-out}
@@ -126,7 +140,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 @media (orientation:portrait){
   /* vertical: la señal va en dos columnas (aro a la izquierda, texto a la derecha), centrada al pie del escenario */
   :where(html:not(.rotado)) .senal{--v:calc(var(--u)*1.15);left:50%;top:auto;bottom:calc(var(--u)*5.2);transform:translateX(-50%);width:min(94cqw,calc(var(--v)*33));background:rgba(6,14,48,.6);text-shadow:0 1px 6px #020814;display:grid;grid-template-columns:auto 1fr;grid-template-areas:"aro paso" "aro verbo" "aro sub" "aro pal";align-items:center;justify-items:center;column-gap:calc(var(--v)*.6);padding:calc(var(--v)*.4) calc(var(--v)*.7)}
-  :where(html:not(.rotado)) .s-aro,:where(html:not(.rotado)) .senal[data-tipo=espera] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=auto] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=nada] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=empuja] .s-aro{grid-area:aro;width:calc(var(--v)*11.4);height:calc(var(--v)*11)}
+  :where(html:not(.rotado)) .s-aro,:where(html:not(.rotado)) .senal[data-tipo=espera] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=auto] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=nada] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=empuja] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=luz] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=uno] .s-aro,:where(html:not(.rotado)) .senal[data-tipo=decide] .s-aro{grid-area:aro;width:calc(var(--v)*11.4);height:calc(var(--v)*11)}
   :where(html:not(.rotado)) .s-aro{--d:calc(var(--v)*6.8)}
   :where(html:not(.rotado)) .s-fijo,:where(html:not(.rotado)) .s-cierra{width:calc(var(--v)*6.8);height:calc(var(--v)*6.8);margin:calc(var(--v)*-3.4) 0 0 calc(var(--v)*-3.4)}
   :where(html:not(.rotado)) .tecla{text-shadow:none}
