@@ -1109,6 +1109,12 @@ por defecto. Difícil trae rivales parejos salvo que se hayan elegido a mano. `d
 - `teclado_test` y `dedo_test` (10 000 secuencias por nivel): 0 sin resolver, 0 dobles, 0 barritas con dos contactos.
 - `sim_test` (15 secciones), `pesistas_test`, `rivales_test`, `play_human`, `servidor_test`: en verde.
 
+**Actions** (sobre `35da06a`, todo en verde): pruebas.yml 43485459305 (núcleo, toques con check_barra en los tres niveles,
+teléfono, iPhone y recorrido), telefono.yml 43485459388, muro.yml 43485459235; servidor.yml 43478579221 (sobre `e4f8ac8`). El
+antes de la tabla de carteles se midió en una rama temporal (`medir-antes`, ya borrada) con el juego de `483b3d7` y la misma
+herramienta (corridas 43476794242, 43476802773 y 43479846657). Capturas miradas: teléfono acostado y computadora, en español e
+inglés, Fácil, Medio y Difícil (atrapar con la barra arriba, pararse desde el fondo, Opciones, turno del rival, veredicto).
+
 **Pendiente.** En Difícil el panel propone kilos para la persona típica y quien apunta bien tiene que subirlos a mano para
 ganar (una chance por persona sigue pendiente). Medio y Difícil se midieron con bots, no con personas. Los metas de ritmo de
 Medio y Difícil (espera ≤ 21 s, caídas ≤ 18 y ≤ 25 %) son nuevas y propias de esos niveles.
