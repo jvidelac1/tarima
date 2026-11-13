@@ -371,13 +371,16 @@ async function idiomas() {
   if (ay.dt.length !== 12 || !ay.dt.includes(EN['glosario.rm.t']) || ay.dt[0] !== EN['glosario.barrita.t'] || !ay.dt.includes(EN['glosario.u_energia.t'])) mal(`la ayuda en inglés: ${JSON.stringify(ay)}`);
   await page.screenshot({ path: path.join(OUT, 'idioma_ayuda_en.png') }).catch(() => null);
   await ctx.close();
-  // el caso del dueño: el inglés primero en la lista del navegador y el español después → español
-  const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, locale: 'en-US' }); await ctx2.addInitScript(() => { Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en', 'es-419'] }); });
+  // inglés por defecto aunque el navegador esté en español (decisión del dueño del 13 de noviembre); ?lang=es da español
+  const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, locale: 'es-AR' }); await ctx2.addInitScript(() => { Object.defineProperty(navigator, 'languages', { get: () => ['es-AR', 'es', 'en'] }); });
   const p2 = await ctx2.newPage(); await p2.goto(`${base}juego.html?dibujo=0&q=baja`, { waitUntil: 'load' }); await p2.evaluate(() => window.JUEGO.listo);
   const l2 = await p2.evaluate(() => ({ lang: document.documentElement.lang, jugar: document.getElementById('btn-empezar')?.textContent.trim() }));
-  if (l2.lang !== 'es' || l2.jugar !== ES['bienvenida.jugar']) mal(`con el inglés primero y el español después en el navegador no salió en español: ${JSON.stringify(l2)}`);
+  if (l2.lang !== 'en' || l2.jugar !== EN['bienvenida.jugar']) mal(`con el navegador en español no salió en inglés (el idioma por defecto): ${JSON.stringify(l2)}`);
+  await p2.goto(`${base}juego.html?dibujo=0&q=baja&lang=es`, { waitUntil: 'load' }); await p2.evaluate(() => window.JUEGO.listo);
+  const l3 = await p2.evaluate(() => ({ lang: document.documentElement.lang, jugar: document.getElementById('btn-empezar')?.textContent.trim() }));
+  if (l3.lang !== 'es' || l3.jugar !== ES['bienvenida.jugar']) mal(`?lang=es no dio español: ${JSON.stringify(l3)}`);
   await ctx2.close();
-  console.log(`${tag} navegador en inglés → ${EN['bienvenida.jugar']} · inglés y después español → ${l2.jugar} · selector → ${ES['bienvenida.jugar']}, guardado y recordado al recargar · ?lang=en manda · ayuda: ${ay.h2} (${ay.dt.length} palabras)`);
+  console.log(`${tag} navegador en inglés → ${EN['bienvenida.jugar']} · navegador en español → ${l2.jugar} · ?lang=es → ${l3.jugar} · selector → ${ES['bienvenida.jugar']}, guardado y recordado al recargar · ?lang=en manda · ayuda: ${ay.h2} (${ay.dt.length} palabras)`);
 }
 
 try {

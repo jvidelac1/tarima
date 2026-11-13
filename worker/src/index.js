@@ -128,7 +128,7 @@ async function limitar(env, regla, i, ahora) {
 }
 
 const metricas = env => env.POSTHOG_KEY
-  ? { clave: env.POSTHOG_KEY, host: PREFIJO, ui: 'https://' + String(env.POSTHOG_HOST || 'us.i.posthog.com').replace('.i.', '.'), encuesta: env.ENCUESTA_ID || null }
+  ? { clave: env.POSTHOG_KEY, host: PREFIJO, ui: 'https://' + String(env.POSTHOG_HOST || 'us.i.posthog.com').replace('.i.', '.') }
   : null;
 
 // Banderas del dispositivo: se refrescan cada 24 h; las de experimento quedan fijas una vez asignadas.
@@ -228,7 +228,7 @@ async function envion(a) {
     if (!fila) throw new ErrorHttp(400, 'pase');
     const dec = R.decidirEnvion({
       etapa: fila.etapa, anotado: !!s.dev.lista_id, encuesta: !!s.dev.encuesta_en, encuesta_usada: !!fila.encuesta_usada,
-      encuesta_disponible: s.dec.encuesta_disponible, regla: s.cfg.etapa,
+      encuesta_disponible: s.dec.encuesta_disponible, regla: s.cfg.etapa, bono: s.cfg.bono,
     });
     if (!dec.puede) {
       log('info', { msg: 'envion', via: 'muro' });
@@ -295,6 +295,9 @@ async function anotar({ request, env, ctx, url, b, ahora }) {
   return json({ estado, lista_id: fila.id, confirmar }, 200, setCookie(uuid));
 }
 
+// La encuesta opcional después de anotarse (docs/MVP.md 5.4). Una por dispositivo (tabla `encuestas`); con
+// BONO_ENCUESTA 0 (producción) no da nada y no gasta los lugares de encuesta de la IP. Las respuestas van a PostHog
+// como `encuesta_respuesta`, sin el correo.
 async function encuesta({ request, env, ctx, b, i, ahora }) {
   if (env.TURNSTILE === '1' && !(await turnstile(env, b.turnstile))) throw new ErrorHttp(400, 'turnstile');
   const v = R.validarEncuesta(b.r);
@@ -303,24 +306,19 @@ async function encuesta({ request, env, ctx, b, i, ahora }) {
   const d = await codigoDispositivo(env, uuid);
   const dev = await D.asegurarDispositivo(env.DB, d, ahora);
   if (dev.encuesta_en) throw new ErrorHttp(409, 'ya_respondida');
-  const anotado = !!dev.lista_id;
   const cfg = R.config(env, {});
-  if (!anotado && (await D.encuestasDeIp(env.DB, i, ahora)) >= cfg.encuestas_por_ip) throw new ErrorHttp(409, 'ya_respondida');
-  if (!(await D.registrarEncuesta(env.DB, { d, i: anotado ? null : i, ahora }))) throw new ErrorHttp(409, 'ya_respondida');
+  const premio = !dev.lista_id && cfg.bono > 0;
+  if (premio && (await D.encuestasDeIp(env.DB, i, ahora)) >= cfg.encuestas_por_ip) throw new ErrorHttp(409, 'ya_respondida');
+  if (!(await D.registrarEncuesta(env.DB, { d, i: premio ? i : null, ahora }))) throw new ErrorHttp(409, 'ya_respondida');
 
   const sesion = typeof b.sesion === 'string' && /^[\w.:-]{1,200}$/.test(b.sesion) ? b.sesion : 'enc_' + crypto.randomUUID();
   ctx.waitUntil(mandarEncuesta(env, { r: v.r, sesion, idioma: R.idioma(b.idioma), pais: paisDe(request, env) }));
-  return json({ estado: 'ok', bono: anotado ? 0 : cfg.bono }, 200, setCookie(uuid));
+  return json({ estado: 'ok', bono: premio ? cfg.bono : 0 }, 200, setCookie(uuid));
 }
 
 async function mandarEncuesta(env, { r, sesion, idioma, pais }) {
-  let ids = null;
-  try { ids = env.ENCUESTA_PREGUNTAS ? JSON.parse(env.ENCUESTA_PREGUNTAS) : null; } catch { ids = null; }
-  if (!env.ENCUESTA_ID || !ids || !env.POSTHOG_KEY) { log('info', { msg: 'encuesta_sin_posthog' }); return; }
-  await capturar(env, {
-    event: 'survey sent', distinct_id: sesion,
-    properties: R.propsEncuesta({ r, ids, encuestaId: env.ENCUESTA_ID, envio: crypto.randomUUID(), idioma, pais }),
-  });
+  if (!env.POSTHOG_KEY) { log('info', { msg: 'encuesta_sin_posthog' }); return; }
+  await capturar(env, { event: 'encuesta_respuesta', distinct_id: sesion, properties: R.propsRespuesta({ r, idioma, pais }) });
 }
 
 // Baja desde la página de privacidad. Responde siempre lo mismo, para no revelar quién está en la lista.
@@ -377,10 +375,10 @@ async function tokenDePagina(request, env, regla, tk, tipo) {
 function paginaError(request, status, error) {
   const idi = idiomaPagina(request);
   const clave = status === 429 ? 'pagina.limite' : 'pagina.error';
-  return pagina(idi, l => ({ titulo: t(l, clave), html: '' }), { status: error === 'metodo' ? 405 : status });
+  return pagina(idi, l => ({ titulo: t(l, clave), html: '' }), { status: error === 'metodo' ? 405 : status, request });
 }
 
-const paginaTokenInvalido = request => pagina(idiomaPagina(request), l => ({ titulo: t(l, 'baja.token_invalido'), html: '' }), { status: 400 });
+const paginaTokenInvalido = request => pagina(idiomaPagina(request), l => ({ titulo: t(l, 'baja.token_invalido'), html: '' }), { status: 400, request });
 
 async function paginaBaja(request, env, ctx, url) {
   if (request.method !== 'GET' && request.method !== 'POST') throw new ErrorHttp(405, 'metodo');
@@ -397,19 +395,19 @@ async function paginaBaja(request, env, ctx, url) {
   const idi = idiomaPagina(request, fila?.idioma);
 
   if (request.method === 'GET') {
-    if (!fila) return pagina(idi, l => ({ titulo: t(l, 'baja.ok'), html: '' }));
+    if (!fila) return pagina(idi, l => ({ titulo: t(l, 'baja.ok'), html: '' }), { request });
     const v = via === 'formulario' ? '<input type="hidden" name="v" value="f">' : '';
     return pagina(idi, l => ({
       titulo: t(l, 'baja.pregunta'),
-      html: `<form method="post" action="/baja"><input type="hidden" name="t" value="${tk}">${v}<button type="submit">${t(l, 'baja.boton')}</button></form>`,
+      html: `<form method="post" action="/baja?lang=${l}"><input type="hidden" name="t" value="${tk}">${v}<button type="submit">${t(l, 'baja.boton')}</button></form>`,
       extra: '',
-    }));
+    }), { request });
   }
   if (await D.borrarDeLista(env.DB, id)) {
     log('info', { msg: 'baja', via });
     ctx.waitUntil(capturar(env, { event: 'baja', distinct_id: 'baja_' + crypto.randomUUID(), properties: { via, $process_person_profile: false } }));
   }
-  return pagina(idi, l => ({ titulo: t(l, 'baja.ok'), html: '<p><a class="b" href="/">' + t(l, 'confirmado.volver') + '</a></p>' }));
+  return pagina(idi, l => ({ titulo: t(l, 'baja.ok'), html: `<p><a class="b" href="/?lang=${l}">` + t(l, 'confirmado.volver') + '</a></p>' }));
 }
 
 // GET muestra un botón y POST confirma, como en la baja: los escáneres de links del correo (de empresas y de algunos
@@ -425,9 +423,9 @@ async function paginaConfirmar(request, env, ctx, url) {
   if (request.method === 'GET' && !fila.confirmado_en) {
     return pagina(idi, l => ({
       titulo: t(l, 'confirmar.pregunta'),
-      html: `<form method="post" action="/confirmar"><input type="hidden" name="t" value="${tk}"><button type="submit">${t(l, 'confirmar.boton')}</button></form>`,
+      html: `<form method="post" action="/confirmar?lang=${l}"><input type="hidden" name="t" value="${tk}"><button type="submit">${t(l, 'confirmar.boton')}</button></form>`,
       extra: '',
-    }));
+    }), { request });
   }
   const ahora = ahoraS();
   if (request.method === 'POST' && (await D.confirmar(env.DB, id, ahora))) {
@@ -436,8 +434,8 @@ async function paginaConfirmar(request, env, ctx, url) {
   }
   return pagina(idi, l => ({
     titulo: t(l, 'confirmado.texto'),
-    html: '<p><a class="b" href="/">' + t(l, 'confirmado.volver') + '</a></p>',
-  }));
+    html: `<p><a class="b" href="/?lang=${l}">` + t(l, 'confirmado.volver') + '</a></p>',
+  }), { request });
 }
 
 // ---------- mails ----------

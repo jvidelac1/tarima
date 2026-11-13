@@ -10,8 +10,9 @@ const ORIGEN = 'https://tarima.test';
 let nIp = 0;
 const nuevaIp = () => `198.51.${100 + Math.floor(nIp / 250)}.${(nIp++ % 250) + 1}`;
 const uuid = () => crypto.randomUUID();
-// Las pruebas de siempre corren con la regla vieja (2 finales enteras, encuesta +2), que se recupera con estas variables;
-// la de producción (worker/wrangler.jsonc: el arranque gratis) va en «muro en el medio de la final», con P().
+// Las pruebas de siempre corren con la regla vieja (2 finales enteras) y con la maquinaria del bono de la encuesta (+2),
+// que se recupera con estas variables; la de producción (worker/wrangler.jsonc: el arranque gratis, correo obligatorio y
+// la encuesta sin premio, BONO_ENCUESTA 0) va en «muro en el medio de la final», con P().
 const VIEJA = { GRATIS_ETAPA: 'final', GRATIS: '2', BONO_ENCUESTA: '2' };
 const E = (extra = {}) => Object.assign({}, env, VIEJA, extra);
 const P = (extra = {}) => Object.assign({}, env, extra);
@@ -66,7 +67,7 @@ async function llamar(ruta, cuerpo, o = {}) {
 }
 
 const pedirPartida = (dispositivo, ip, o = {}) => llamar('/api/partida', { dispositivo, idioma: 'es' }, { ip, ...o });
-const RESP_OK = { q1: ['sedes', 'pesista_propio'], q2: ['nada'], q3: 'telefono', q4: 'cosmeticos', q5: 'Más rivales <b>y</b> sedes' };
+const RESP_OK = { plataforma: 'app', features: ['sedes_campeonatos', 'pesista_propio'], otra: 'Más rivales <b>y</b> sedes, ana@correo.com' };
 
 describe('sitio', () => {
   it('el sitio lo sirve Pages: el Worker no tiene assets y lo que no es suyo da 404', async () => {
@@ -121,8 +122,8 @@ describe('estado y cookie', () => {
     for (const p of ['HttpOnly', 'Secure', 'SameSite=Strict', 'Path=/api', 'Max-Age=15552000']) expect(c).toContain(p);
   });
   it('con clave, devuelve la configuración pública de PostHog', async () => {
-    const r = await llamar('/api/estado', {}, { ip: nuevaIp(), e: E({ POSTHOG_KEY: 'phc_prueba', ENCUESTA_ID: 'enc-1' }) });
-    expect(r.j.metricas).toEqual({ clave: 'phc_prueba', host: '/qx', ui: 'https://us.posthog.com', encuesta: 'enc-1' });
+    const r = await llamar('/api/estado', {}, { ip: nuevaIp(), e: E({ POSTHOG_KEY: 'phc_prueba' }) });
+    expect(r.j.metricas).toEqual({ clave: 'phc_prueba', host: '/qx', ui: 'https://us.posthog.com' });
   });
   it('si llega la cookie, gana la cookie', async () => {
     const ip = nuevaIp(), a = uuid(), b = uuid();
@@ -223,33 +224,28 @@ describe('encuesta', () => {
       const x = await llamar('/api/encuesta', { dispositivo: a, r }, { ip: nuevaIp() });
       expect([x.status, x.j]).toEqual([400, { error }]);
     };
-    await mal({ q1: ['sedes'], q2: ['largo'], q3: 'telefono' }, 'incompleta');
-    await mal({ ...RESP_OK, q1: [] }, 'incompleta');
-    await mal({ ...RESP_OK, q2: ['nada', 'largo'] }, 'formato');
-    await mal({ ...RESP_OK, q1: ['sedes', 'carrera', 'realismo'] }, 'formato');
-    await mal({ ...RESP_OK, q3: 'heladera' }, 'formato');
-    await mal({ ...RESP_OK, q5: 'x'.repeat(281) }, 'formato');
-    await mal({ ...RESP_OK, q9: 'x' }, 'formato');
+    await mal({}, 'incompleta');
+    await mal({ plataforma: '', features: [], otra: ' ' }, 'incompleta');
+    await mal({ ...RESP_OK, plataforma: 'consola' }, 'formato');
+    await mal({ ...RESP_OK, features: ['realismo'] }, 'formato');
+    await mal({ ...RESP_OK, features: ['sedes_campeonatos', 'sedes_campeonatos'] }, 'formato');
+    await mal({ ...RESP_OK, otra: 'x'.repeat(2001) }, 'formato');
+    await mal({ q1: ['sedes'], q2: ['nada'], q3: 'compu', q4: 'no' }, 'formato');
     expect((await llamar('/api/estado', { dispositivo: a }, { ip })).j.encuesta_disponible).toBe(true);
   });
-  it('la manda a PostHog el Worker, con etiquetas canónicas y sin datos personales', async () => {
+  it('la manda a PostHog el Worker como encuesta_respuesta, sin ENCUESTA_ID, sin @ ni datos personales', async () => {
     const ip = nuevaIp(), a = uuid();
-    const e = E({ POSTHOG_KEY: 'phc_prueba', ENCUESTA_ID: 'enc-1', ENCUESTA_PREGUNTAS: JSON.stringify({ q1: 'p1', q2: 'p2', q3: 'p3', q4: 'p4', q5: 'p5' }) });
-    const r = await llamar('/api/encuesta', { dispositivo: a, sesion: 'ses-abc', idioma: 'en', r: RESP_OK }, { ip, e });
+    const r = await llamar('/api/encuesta', { dispositivo: a, sesion: 'ses-abc', idioma: 'en', r: RESP_OK }, { ip, e: E({ POSTHOG_KEY: 'phc_prueba' }) });
     expect(r.j.estado).toBe('ok');
     const s = salidas.find(x => x.url.pathname === '/i/v0/e/');
     expect(s.url.hostname).toBe('us.i.posthog.com');
     const ev = JSON.parse(s.cuerpo);
-    expect(ev).toMatchObject({ api_key: 'phc_prueba', event: 'survey sent', distinct_id: 'ses-abc' });
+    expect(ev).toMatchObject({ api_key: 'phc_prueba', event: 'encuesta_respuesta', distinct_id: 'ses-abc' });
     expect(ev.properties).toMatchObject({
-      $survey_id: 'enc-1', $survey_completed: true, $process_person_profile: false, idioma: 'en',
-      $survey_response_p1: ['Finales en sedes distintas', 'Crear mi propio pesista'],
-      $survey_response_p2: ['Nada, me gustó'],
-      $survey_response_p3: 'En el teléfono',
-      $survey_response_p4: 'Gratis, con cosas opcionales para tu pesista (ropa, cinturones)',
-      $survey_response_p5: 'Más rivales y sedes',
+      plataforma: 'app', features: ['pesista_propio', 'sedes_campeonatos'], otra: 'Más rivales y sedes, …',
+      idioma: 'en', $process_person_profile: false,
     });
-    expect(ev.properties.$survey_questions).toHaveLength(5);
+    expect(s.cuerpo).not.toContain('@');
     expect(s.cuerpo).not.toContain(ip);
     expect(s.cuerpo).not.toContain(a);
   });
@@ -257,25 +253,26 @@ describe('encuesta', () => {
 
 
 describe('muro en el medio de la final (GRATIS_ETAPA=arranque, la regla de producción)', () => {
-  const ENC = { q1: ['sedes'], q2: ['nada'], q3: 'compu', q4: 'no' };
+  const ENC = { plataforma: 'web', features: ['mujeres_categorias'] };
   const partidaP = (dispositivo, ip, o = {}) => llamar('/api/partida', { dispositivo, idioma: 'es' }, { ip, e: P(), ...o });
   const envion = (dispositivo, pase, ip, o = {}) => llamar('/api/envion', { dispositivo, pase, idioma: 'es' }, { ip, e: P(), ...o });
   const fila = async id => env.DB.prepare('SELECT fuente, etapa, envion_por FROM partidas WHERE id = ?').bind(id).first();
 
   it('worker/wrangler.jsonc trae la regla del arranque gratis', () => {
-    expect([env.GRATIS_ETAPA, env.GRATIS, env.BONO_ENCUESTA]).toEqual(['arranque', '1', '1']);
+    expect([env.GRATIS_ETAPA, env.GRATIS, env.BONO_ENCUESTA]).toEqual(['arranque', '1', '0']);
+    expect(env.ENCUESTA_ID).toBeUndefined();
   });
   it('un arranque gratis; el dos tiempos sin correo es muro; la final siguiente, muro antes de empezar', async () => {
     const ip = nuevaIp(), a = uuid();
     const est = await llamar('/api/estado', { dispositivo: a }, { ip, e: P() });
-    expect(est.j).toMatchObject({ puede: true, quedan: 1, etapa: 'arranque', regla: { etapa: 'arranque', gratis: 1, bono: 1 } });
+    expect(est.j).toMatchObject({ puede: true, quedan: 1, etapa: 'arranque', encuesta_disponible: false, regla: { etapa: 'arranque', gratis: 1, bono: 0 } });
     const p = await partidaP(a, ip);
-    expect(p.j).toMatchObject({ estado: 'ok', fuente: 'gratis', etapa: 'arranque', quedan: 0, encuesta_disponible: true });
+    expect(p.j).toMatchObject({ estado: 'ok', fuente: 'gratis', etapa: 'arranque', quedan: 0, encuesta_disponible: false });
     const pase = await leerPase(env, p.j.pase, Math.floor(Date.now() / 1000));
     expect(pase).toMatchObject({ e: 'arranque', n: 1 });
     expect(await fila(pase.p)).toEqual({ fuente: 'gratis', etapa: 'arranque', envion_por: null });
-    expect((await envion(a, p.j.pase, ip)).j).toMatchObject({ estado: 'muro', motivo: 'envion', encuesta_disponible: true });
-    expect((await partidaP(a, ip)).j).toMatchObject({ estado: 'muro', motivo: 'dispositivo' });
+    expect((await envion(a, p.j.pase, ip)).j).toMatchObject({ estado: 'muro', motivo: 'envion', encuesta_disponible: false });
+    expect((await partidaP(a, ip)).j).toMatchObject({ estado: 'muro', motivo: 'dispositivo', encuesta_disponible: false });
     // Borrar los datos: otro dispositivo en la misma red tiene su arranque, nunca el dos tiempos del primero.
     const b = uuid(), pb = await partidaP(b, ip);
     expect(pb.j.etapa).toBe('arranque');
@@ -285,23 +282,26 @@ describe('muro en el medio de la final (GRATIS_ETAPA=arranque, la regla de produ
   it('anotarse en el intervalo da el dos tiempos de esa final y juego libre', async () => {
     const ip = nuevaIp(), a = uuid();
     const p = await partidaP(a, ip);
-    await llamar('/api/anotar', { dispositivo: a, email: 'intervalo@buendominio.com', aviso: true, consentimiento: '2026-11-c', idioma: 'es' }, { ip, e: P() });
+    await llamar('/api/anotar', { dispositivo: a, email: 'intervalo@buendominio.com', aviso: true, consentimiento: '2026-11-d', idioma: 'es' }, { ip, e: P() });
     const v = await envion(a, p.j.pase, ip);
     expect(v.j).toMatchObject({ estado: 'ok', via: 'lista', lista: true });
     expect(await leerPase(env, v.j.pase, Math.floor(Date.now() / 1000))).toMatchObject({ e: 'completa' });
     expect((await envion(a, p.j.pase, ip)).j.via).toBe('ya');
     expect((await partidaP(a, ip)).j).toMatchObject({ estado: 'ok', fuente: 'lista', etapa: 'completa', quedan: null });
   });
-  it('la encuesta en el intervalo termina esa final y suma una completa, una sola vez', async () => {
+  it('correo obligatorio: la encuesta (BONO_ENCUESTA 0) no da el dos tiempos ni finales, ni gasta la IP', async () => {
     const ip = nuevaIp(), a = uuid();
     const p = await partidaP(a, ip);
-    expect((await llamar('/api/encuesta', { dispositivo: a, r: ENC }, { ip, e: P() })).j).toEqual({ estado: 'ok', bono: 1 });
-    expect((await envion(a, p.j.pase, ip)).j).toMatchObject({ estado: 'ok', via: 'encuesta', quedan: 1 });
-    expect((await partidaP(a, ip)).j).toMatchObject({ estado: 'ok', fuente: 'encuesta', etapa: 'completa', quedan: 0 });
-    expect((await partidaP(a, ip)).j).toMatchObject({ estado: 'muro', encuesta_disponible: false });
+    expect((await llamar('/api/encuesta', { dispositivo: a, r: ENC }, { ip, e: P() })).j).toEqual({ estado: 'ok', bono: 0 });
+    expect((await envion(a, p.j.pase, ip)).j).toMatchObject({ estado: 'muro', motivo: 'envion', encuesta_disponible: false });
+    expect((await partidaP(a, ip)).j).toMatchObject({ estado: 'muro', motivo: 'dispositivo', encuesta_disponible: false });
     const d = await codigoDispositivo(env, a);
     expect((await env.DB.prepare('SELECT fuente, etapa, envion_por FROM partidas WHERE d = ? ORDER BY id').bind(d).all()).results)
-      .toEqual([{ fuente: 'gratis', etapa: 'completa', envion_por: 'encuesta' }, { fuente: 'encuesta', etapa: 'completa', envion_por: null }]);
+      .toEqual([{ fuente: 'gratis', etapa: 'arranque', envion_por: null }]);
+    expect(await env.DB.prepare('SELECT i FROM encuestas WHERE d = ?').bind(d).first()).toEqual({ i: null });
+    // Con el correo, sí.
+    await llamar('/api/anotar', { dispositivo: a, email: 'despues-encuesta@buendominio.com', aviso: true, consentimiento: '2026-11-d', idioma: 'en' }, { ip, e: P() });
+    expect((await envion(a, p.j.pase, ip)).j).toMatchObject({ estado: 'ok', via: 'lista' });
   });
   it('la API a mano: pase adulterado, vencido o sin pase no dan el dos tiempos', async () => {
     const ip = nuevaIp(), a = uuid();
@@ -334,7 +334,7 @@ describe('muro en el medio de la final (GRATIS_ETAPA=arranque, la regla de produ
 describe('lista de espera', () => {
   const alta = (email, o = {}) => llamar('/api/anotar', {
     dispositivo: o.dispositivo ?? uuid(), sesion: 's', email, nombre: o.nombre, idioma: o.idioma ?? 'es',
-    aviso: o.aviso ?? true, novedades: o.novedades ?? false, consentimiento: o.consentimiento ?? '2026-11-c', web: o.web,
+    aviso: o.aviso ?? true, novedades: o.novedades ?? false, consentimiento: o.consentimiento ?? '2026-11-d', web: o.web,
   }, { ip: o.ip ?? nuevaIp(), e: o.e, cookie: o.cookie });
 
   it('rechaza formato, aviso, descartables y dominios sin correo', async () => {
@@ -364,7 +364,7 @@ describe('lista de espera', () => {
     expect(r.j).toMatchObject({ estado: 'nuevo', confirmar: false });
     expect(r.j.lista_id).toMatch(/^[0-9a-f]{32}$/);
     const fila = await env.DB.prepare('SELECT * FROM lista WHERE id = ?').bind(r.j.lista_id).first();
-    expect(fila).toMatchObject({ email: 'juana.perez+tarima@buendominio.com', nombre: 'Juana Pérez', idioma: 'es', novedades: 1, consentimiento_version: '2026-11-c', confirmado_en: null, confirmar_mandado_en: null });
+    expect(fila).toMatchObject({ email: 'juana.perez+tarima@buendominio.com', nombre: 'Juana Pérez', idioma: 'es', novedades: 1, consentimiento_version: '2026-11-d', confirmado_en: null, confirmar_mandado_en: null });
 
     expect((await llamar('/api/estado', { dispositivo: a }, { ip })).j).toMatchObject({ puede: true, lista: true, lista_id: r.j.lista_id, quedan: null });
     for (let k = 0; k < 4; k++) expect((await pedirPartida(a, ip)).j).toMatchObject({ estado: 'ok', fuente: 'lista', quedan: null });
@@ -469,6 +469,14 @@ describe('lista de espera', () => {
       expect(await (await llamar(ruta, null, { metodo: 'GET', ct: null, origin: null, e: e() })).res.text()).toContain('Done! Your spot is confirmed.');
       const malo = await llamar('/confirmar?t=' + 'a'.repeat(32) + '.' + 'b'.repeat(40), null, { metodo: 'GET', ct: null, origin: null });
       expect(malo.status).toBe(400);
+      // Inglés por defecto aunque el navegador pida español, con el enlace al español; ?lang=es lo pone en español.
+      const pag = await (await llamar('/confirmar?t=x', null, { metodo: 'GET', ct: null, origin: null, headers: { 'accept-language': 'es-AR,es;q=0.9' } })).res.text();
+      expect(pag).toContain('<html lang="en">');
+      expect(pag).toContain('href="/confirmar?t=x&amp;lang=es"');
+      expect(pag).toContain('Ver en español');
+      const es = await (await llamar('/confirmar?t=x&lang=es', null, { metodo: 'GET', ct: null, origin: null })).res.text();
+      expect(es).toContain('<html lang="es">');
+      expect(es).toContain('View in English');
     });
 
     it('el mismo mail desde otro dispositivo: misma respuesta que un alta, un mail por día y sin revelar nada', async () => {

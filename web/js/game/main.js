@@ -59,7 +59,7 @@ const esU = c => c === 'u' || c === 'b';
 const CAL_TACTIL = 60;
 
 // ---------- idioma, nombre y eventos (docs/MVP.md, secciones 3, 4.1 y 6.3) ----------
-// El idioma se fija antes de pintar nada: ?lang= primero, después lo elegido a mano en este dispositivo y por último el navegador.
+// El idioma se fija antes de pintar nada: ?lang= primero, después lo elegido a mano en este dispositivo; si no, inglés.
 fijarTactil(tactil());
 fijarIdioma(detectarIdioma({ lang: params.get('lang'), guardado: guardado.get('tarima.idioma'), navegador: navigator.languages?.length ? navigator.languages : [navigator.language] }));
 /**
@@ -1314,7 +1314,7 @@ async function cierre(p) {
 /** P9 · el muro, por el gancho. true: puede jugar otra final (se vuelve a pedir el pase). */
 async function mostrarMuro(origen, r = {}) {
   E.forzar = true; let sigue = false;
-  try { sigue = !!await ganchos.muro({ origen, motivo: r.motivo, encuesta_disponible: r.encuesta_disponible, nombre: nombreJugador(), capa: $('capa'), t }); } catch (e) { console.warn('ganchos.muro:', e); }
+  try { sigue = !!await ganchos.muro({ origen, motivo: r.motivo, nombre: nombreJugador(), capa: $('capa'), t }); } catch (e) { console.warn('ganchos.muro:', e); }
   capa.quitar(); return sigue;
 }
 
@@ -1356,7 +1356,7 @@ async function partida(cfg) {
   while (p.fase !== 'fin') {
     if (p.fase === 'intervalo') {
       limpiarVeredicto(); tablero(p);      // en el intervalo el tablero se esconde: la tabla completa está en el panel
-      if (!await trasArranque(p)) { cortarFinal(p); return 'inicio'; }      // sin correo ni encuesta: la final termina con el arranque
+      if (!await trasArranque(p)) { cortarFinal(p); return 'inicio'; }      // sin correo: la final termina con el arranque
       await intervalo(p); continue;
     }
     const L = { ...p.llamado }, a = p.at[L.a];
@@ -1381,7 +1381,7 @@ async function iniciar() {
   alCambiarIdioma(() => { pintarFijos(); senalUI?.repintar(); barritaUI?.repintar(); if (E.sobre) pintarSobre(E.sobre.tipo); E.repintar?.(); if (TB.p && !TB.congelado) tablero(TB.p); if ($('saltar-rival') && !$('saltar-rival').hidden) botonSaltar(true); });
   addEventListener('resize', () => { if (TB.p && !TB.congelado) tablero(TB.p); });      // teléfono acostado: el tablero compacto
   // P0: el estado del servidor (y la medición) en paralelo con los datos; el muro al cargar si corresponde
-  const origen = params.get('lang') ? 'url' : guardado.get('tarima.idioma') ? 'guardado' : 'navegador';
+  const origen = params.get('lang') ? 'url' : guardado.get('tarima.idioma') ? 'guardado' : 'defecto';
   const arranque = conexion.arranque({ idioma: idiomaActual(), idioma_origen: origen, version: VERSION_JUEGO, pantalla: () => E.pantalla });
   const [poses, sim] = await Promise.all(['data/poses.json', 'data/sim.json'].map(u => fetch(u).then(r => { if (!r.ok) throw new Error(u + ': ' + r.status); return r.json(); })));
   datos = leerDatos(sim);

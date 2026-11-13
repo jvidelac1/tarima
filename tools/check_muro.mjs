@@ -1,14 +1,15 @@
-// Prueba de punta a punta del muro con la REGLA VIEJA (GRATIS_ETAPA='final', GRATIS=2, BONO_ENCUESTA=2: la que se
-// recupera cambiando esas variables del Worker; la de producción, el arranque gratis, la prueba tools/check_muro_medio.mjs)
-// (docs/MVP.md, secciones 2, 5 y 7), con el Worker de verdad sobre una D1 falsa
-// (tools/servidor_local.mjs: sin cuenta de Cloudflare, sin red y sin PostHog). Dos jugadores nuevos, cada uno con su
-// propio servidor (base vacía):
+// Prueba de punta a punta del muro con la REGLA VIEJA (GRATIS_ETAPA='final', GRATIS=2: la que se recupera cambiando esas
+// variables del Worker; la de producción, el arranque gratis, la prueba tools/check_muro_medio.mjs) (docs/MVP.md,
+// secciones 2, 5 y 7), con el Worker de verdad sobre una D1 falsa (tools/servidor_local.mjs: sin cuenta de Cloudflare,
+// sin red y sin PostHog). Correo obligatorio (decisión del dueño del 13 de noviembre): el muro solo pide el correo y la
+// encuesta, opcional, sale en el panel de «anotado». Dos jugadores nuevos, cada uno con su propio servidor (base vacía):
 //  - en: computadora (1280 × 720), navegador en inglés, todo con teclado. Juega 2 finales (después de la primera, la
-//    invitación del podio y «1 free final left»), ve el muro en el podio, recarga y lo sigue viendo (al cargar), contesta
-//    la encuesta, juega 2 finales más, vuelve el muro sin la encuesta, deja el correo y queda libre: la final siguiente
-//    sale con fuente «lista», y al recargar la bienvenida dice «unlimited play».
-//  - es: teléfono de costado (844 × 390, táctil), navegador con el inglés primero y el español después (el caso del
-//    dueño: tiene que salir en español), todo con toques; los campos se escriben en el editor de arriba (telefono.js).
+//    invitación del podio y «1 free final left»), ve el muro en el podio (solo el correo), recarga y lo sigue viendo (al
+//    cargar), deja el correo, contesta la encuesta del anotado con el teclado y queda libre: la final siguiente sale con
+//    fuente «lista», y al recargar la bienvenida dice «unlimited play».
+//  - es: teléfono de costado (844 × 390, táctil), en español con ?lang=es (el navegador en español solo no alcanza: el
+//    juego abre en inglés), todo con toques; los campos se escriben en el editor de arriba (telefono.js); saltea la
+//    encuesta del anotado.
 // Además: la cuenta en la base (partidas, encuesta, lista), que ningún evento lleve el correo o el nombre, y capturas de
 // cada momento en out/muro/<idioma>/.
 // Uso: node tools/check_muro.mjs [--solo=en|es] [--headed]
@@ -36,13 +37,14 @@ const CORREO = { en: 'player.one@pruebas-tarima.com', es: 'ana.prueba@pruebas-ta
 
 async function escenario(L) {
   const tactil = L === 'es', D = L === 'es' ? ES : EN, tag = `[${L}]`, dir = path.join(OUT, L); fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
-  const srv = await iniciarServidorLocal({ silencio: true, vars: { GRATIS_ETAPA: 'final', GRATIS: '2', BONO_ENCUESTA: '2' } });
+  const srv = await iniciarServidorLocal({ silencio: true, vars: { GRATIS_ETAPA: 'final', GRATIS: '2' } });
+  if (srv.env.BONO_ENCUESTA !== '0') problemas.push(`${tag} el servidor local no tiene BONO_ENCUESTA 0 (${srv.env.BONO_ENCUESTA})`);
   const base = srv.url.replace(/\/$/, '');
   const ctx = await browser.newContext(tactil
     ? { viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, locale: 'en-US' }
     : { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, locale: 'en-US' });
-  // el teléfono del caso del dueño: el inglés primero en la lista de idiomas del navegador y el español después
-  if (tactil) await ctx.addInitScript(() => { Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en', 'es-AR'] }); });
+  // el teléfono con el navegador en español: el español sale por ?lang=es (sin eso, el juego abre en inglés)
+  if (tactil) await ctx.addInitScript(() => { Object.defineProperty(navigator, 'languages', { get: () => ['es-AR', 'es', 'en'] }); });
   const page = await ctx.newPage(), cdp = tactil ? await ctx.newCDPSession(page) : null;
   const mal = txt => { const m = `${tag} ${txt}`; if (!problemas.includes(m)) problemas.push(m); };
   page.on('console', m => { if (m.type() === 'error') mal(`console.error: ${m.text()}`); });
@@ -54,7 +56,7 @@ async function escenario(L) {
   const foto = async nombre => { await J(() => { try { window.JUEGO?.escena?.cuadro?.(0, true); } catch { /* sin escena */ } }).catch(() => null); await page.screenshot({ path: path.join(dir, `${String(++nFoto).padStart(2, '0')}_${nombre}.png`) }).catch(() => null); };
   const eventos = () => J(() => (window.JUEGO?.eventos || []).map(e => ({ ev: e.ev, props: e.props })));
   const abrir = async () => {
-    await page.goto(`${base}/?dibujo=0&q=baja&semilla=2026111${tactil ? 3 : 2}`, { waitUntil: 'load' });
+    await page.goto(`${base}/?dibujo=0&q=baja&semilla=2026111${tactil ? '3&lang=es' : 2}`, { waitUntil: 'load' });
     if (!await J(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
     await J(() => JUEGO.test.manual());
   };
@@ -143,12 +145,12 @@ async function escenario(L) {
   await av(300); await foto('muro_podio');
   { const ic = (await eventos()).filter(e => e.ev === 'idioma_cambiado'); if (ic.length) mal(`el idioma cambió solo durante las finales: ${JSON.stringify(ic.map(e => e.props))}`); }
   const muro1 = await J(() => ({ titulo: document.querySelector('#capa .panel h1')?.textContent, correo: !!document.getElementById('correo'), encuesta: !!document.getElementById('btn-encuesta'), zona: getComputedStyle(document.getElementById('zona')).display, idioma: !!document.querySelector('#capa .panel .idi') }));
-  if (!muro1.correo || !muro1.encuesta) mal(`el muro de la final 2 no tiene los dos caminos: ${JSON.stringify(muro1)}`);
+  if (!muro1.correo || muro1.encuesta) mal(`el muro de la final 2 tiene que pedir solo el correo: ${JSON.stringify(muro1)}`);
   if (!muro1.idioma) mal('el muro no tiene el selector ES · EN');
   if (tactil && muro1.zona !== 'none') mal('en el muro se ve el botón de levantar');
   const nombreVisto = tactil ? 'Ana' : D['bienvenida.nombre_defecto'];
   if (!muro1.titulo?.includes(nombreVisto)) mal(`el título del muro no lleva el nombre «${nombreVisto}»: «${muro1.titulo}»`);
-  { const m = await ultimo('muro_visto'); if (!m || m.origen !== 'podio' || m.caminos !== 'mail+encuesta') mal(`muro_visto en el podio: ${JSON.stringify(m)}`); }
+  { const m = await ultimo('muro_visto'); if (!m || m.origen !== 'podio' || m.caminos !== 'mail') mal(`muro_visto en el podio: ${JSON.stringify(m)}`); }
 
   // ---------- 4. recarga: el muro sigue (lo dice el servidor) ----------
   await abrir();
@@ -157,33 +159,9 @@ async function escenario(L) {
   if (!(await eventos()).some(e => e.ev === 'juego_abierto' && e.props.pantalla_inicial === 'muro')) mal('al recargar, juego_abierto no dice pantalla_inicial=muro');
   { const m = await ultimo('muro_visto'); if (!m || m.origen !== 'carga') mal(`muro_visto al recargar: ${JSON.stringify(m)}`); }
 
-  // ---------- 5. la encuesta: +2 finales ----------
-  await pulsa('#btn-encuesta'); await esperar(() => !!document.getElementById('btn-enviar'), 'la encuesta');
-  await foto('encuesta');
-  await pulsa('#btn-enviar'); await av(100);      // sin contestar: tiene que pedir las 4 primeras
-  if (await texto('#capa .panel #err') !== D['encuesta.falta']) mal(`enviar la encuesta vacía no pidió las 4 primeras: «${await texto('#capa .panel #err')}»`);
-  for (const sel of ['.op[data-q="q1"][data-o="mujeres_categorias"]', '.op[data-q="q1"][data-o="sedes"]', '.op[data-q="q2"][data-o="largo"]', '.op[data-q="q3"][data-o="telefono"]', '.op[data-q="q4"][data-o="cosmeticos"]']) await marca(sel);
-  await escribir('#q5', 'Más pesistas');
-  await foto('encuesta_contestada');
-  await pulsa('#btn-enviar');
-  await esperar(() => JUEGO.estado().pantalla === 'inicio' && !!document.getElementById('btn-empezar'), 'la bienvenida después de la encuesta');
-  await foto('bienvenida_con_2');
-  { const e = await ultimo('encuesta_enviada'); if (!e || e.con_premio !== true) mal(`encuesta_enviada: ${JSON.stringify(e)}`); }
-  const q2 = await texto('#capa .quedan');
-  if (q2 !== D['bienvenida.quedan'].replace('{n}', '2')) mal(`después de la encuesta la bienvenida dice «${q2}» (se esperaba «${D['bienvenida.quedan'].replace('{n}', '2')}»)`);
-
-  // ---------- 6. finales 3 y 4 (las de la encuesta) y el muro sin la encuesta ----------
-  s = await jugar(enFin, 'final 3');
-  { const p = await ultimo('partida_pedida'); if (p?.fuente !== 'encuesta') mal(`la final 3 no salió con fuente «encuesta»: ${JSON.stringify(p)}`); }
-  await av(400);
-  if (await texto('#btn-revancha') !== D['podio.otra_quedan']) mal(`después de la final 3 el botón dice «${await texto('#btn-revancha')}»`);
-  await pulsa('#btn-revancha');
-  s = await jugar(enMuro, 'final 4');
-  await av(300); await foto('muro_solo_correo');
-  const muro2 = await J(() => ({ encuesta: !!document.getElementById('btn-encuesta'), txt: document.querySelector('#capa .panel')?.textContent || '' }));
-  if (muro2.encuesta) mal('después de usar las finales de la encuesta el muro sigue ofreciendo la encuesta');
-  if (!muro2.txt.includes(D['muro.solo_mail'])) mal(`el segundo muro no dice «${D['muro.solo_mail']}»`);
-  { const m = await ultimo('muro_visto'); if (!m || m.caminos !== 'mail') mal(`muro_visto después de la encuesta: ${JSON.stringify(m)}`); }
+  { const m = await J(() => ({ encuesta: !!document.getElementById('btn-encuesta'), txt: document.querySelector('#capa .panel')?.textContent || '' }));
+    if (m.encuesta || /no email|answer \d|survey|sin correo|contesta \d/i.test(m.txt)) mal(`el muro al recargar ofrece la encuesta: «${m.txt.slice(0, 160)}»`);
+    if (/\bmonth|\bmes\b|\bmensual/i.test(m.txt)) mal('el muro dice la frecuencia de las novedades'); }
 
   // ---------- 7. deja el correo: juego libre ----------
   await pulsa('#btn-anotar'); await av(100);      // sin correo: error de formato, sin mandar nada
@@ -193,15 +171,27 @@ async function escenario(L) {
   if (await texto('#capa .panel #err') !== D['lista.error_aviso']) mal(`anotarse sin la casilla de aviso no dio su error: «${await texto('#capa .panel #err')}»`);
   await marca('#aviso'); await foto('muro_con_correo');
   await pulsa('#btn-anotar');
-  await esperar(() => !!document.getElementById('btn-seguir'), 'el panel de anotado');
-  await foto('anotado');
+  await esperar(() => !!document.getElementById('btn-enviar') && !!document.getElementById('btn-saltar'), 'el panel de anotado con la encuesta');
+  await foto('anotado_encuesta');
   const anot = await texto('#capa .panel h2');
   if (anot !== D['lista.ok'].replace('{nombre}', nombreVisto)) mal(`el panel de anotado dice «${anot}»`);
   { const a = await ultimo('anotar_ok'); if (!a || a.estado !== 'nuevo' || a.pantalla !== 'muro') mal(`anotar_ok: ${JSON.stringify(a)}`); }
-  await pulsa('#btn-seguir');
+  { const x = await J(() => [...document.querySelectorAll('#capa .panel fieldset legend')].map(l => l.textContent.trim()));
+    if (JSON.stringify(x) !== JSON.stringify([D['encuesta.plataforma'], D['encuesta.features']])) mal(`las preguntas de la encuesta: ${JSON.stringify(x)}`); }
+  if (tactil) await pulsa('#btn-saltar');
+  else {
+    // con teclado: una plataforma, dos propuestas y el texto libre
+    for (const sel of ['.op[data-q="plataforma"][data-o="web"]', '.op[data-q="features"][data-o="mujeres_categorias"]', '.op[data-q="features"][data-o="pesista_propio"]']) await marca(sel);
+    await escribir('#otra', 'Online duels');
+    await foto('encuesta_contestada');
+    await pulsa('#btn-enviar');
+    // «¡Gracias!» un momento (todavía en la pantalla del muro) y sigue solo
+    await esperar(() => !document.querySelector('#capa .panel.anotado'), 'el fin del panel de anotado');
+  }
   s = await jugar(x => ['presentacion', 'apertura'].includes(x.pantalla), 'la final después de anotarse', 4);
   { const p = await ultimo('partida_pedida'); if (p?.fuente !== 'lista') mal(`la final después de anotarse no salió con fuente «lista»: ${JSON.stringify(p)}`); }
   await foto('final_libre');
+  { const e = (await eventos()).filter(x => ['encuesta_enviada', 'encuesta_salteada'].includes(x.ev)).map(x => x.ev); if (JSON.stringify(e) !== JSON.stringify([tactil ? 'encuesta_salteada' : 'encuesta_enviada'])) mal(`eventos de la encuesta: ${JSON.stringify(e)}`); }
   { const todos = await eventos(), sucio = todos.filter(e => JSON.stringify(e.props).includes('@') || /\bAna\b/.test(JSON.stringify(e.props)));
     if (sucio.length) mal(`eventos con el correo o el nombre: ${JSON.stringify(sucio.slice(0, 3))}`); }
 
@@ -214,8 +204,8 @@ async function escenario(L) {
 
   // ---------- lo que quedó en el servidor y en las métricas ----------
   const db = { partidas: await srv.db.prepare('SELECT COUNT(*) n FROM partidas').first('n'), lista: await srv.db.prepare('SELECT COUNT(*) n FROM lista').first('n'), encuestas: await srv.db.prepare('SELECT COUNT(*) n FROM encuestas').first('n'), fuentes: (await srv.db.prepare('SELECT fuente, COUNT(*) n FROM partidas GROUP BY fuente ORDER BY fuente').all()).results.map(r => `${r.fuente}:${r.n}`).join(' ') };
-  if (db.lista !== 1 || db.encuestas !== 1) mal(`en la base: ${JSON.stringify(db)}`);
-  console.log(`${tag} idioma ${L} · 4 finales gratis (2 + 2 de la encuesta) · muro en el podio, al recargar y sin encuesta · anotado y libre · base: ${JSON.stringify(db)} · ${nFoto} capturas en ${path.relative(ROOT, dir)}`);
+  if (db.lista !== 1 || db.encuestas !== (tactil ? 0 : 1) || db.fuentes !== 'gratis:2 lista:1') mal(`en la base: ${JSON.stringify(db)}`);
+  console.log(`${tag} idioma ${L} · 2 finales gratis · muro en el podio y al recargar, solo con el correo · anotado, encuesta ${tactil ? 'salteada' : 'contestada'} y libre · base: ${JSON.stringify(db)} · ${nFoto} capturas en ${path.relative(ROOT, dir)}`);
   await ctx.close();
   await extras(L, base).catch(e => notas.push(`${tag} capturas extra: ${e.message}`));
   await srv.cerrar();

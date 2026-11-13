@@ -49,18 +49,22 @@ class Base {
   encuesta(d, i, ahora) {
     const dev = this.dev(d, ahora), cfg = R.config(this.env, dev.flags);
     if (dev.encuesta_en) return 'ya_respondida';
-    if (!dev.lista_id && this.contar(d, i, ahora).encuestas_i >= cfg.encuestas_por_ip) return 'ya_respondida';
-    this.encuestas.push({ d, i: dev.lista_id ? null : i, en: ahora });
+    const premio = !dev.lista_id && cfg.bono > 0;
+    if (premio && this.contar(d, i, ahora).encuestas_i >= cfg.encuestas_por_ip) return 'ya_respondida';
+    this.encuestas.push({ d, i: premio ? i : null, en: ahora });
     dev.encuesta_en = ahora;
-    return dev.lista_id ? 0 : cfg.bono;
+    return premio ? cfg.bono : 0;
   }
   anotar(d, ahora, id = 'L' + d) { this.dev(d, ahora).lista_id = id; }
   jugarHastaMuro(d, i, ahora, max = 50) { const fuentes = []; for (let k = 0; k < max; k++) { const r = this.partida(d, i, ahora); if (!r.puede) return { fuentes, muro: r }; fuentes.push(r.fuente); } return { fuentes, muro: null }; }
 }
 
 const T0 = 1_800_000_000, DIA = R.DIA;
+// La maquinaria del bono de la encuesta (BONO_ENCUESTA > 0) se sigue probando con la regla vieja y bono 2; en producción
+// el bono es 0 (decisión del dueño del 13 de noviembre: correo obligatorio), ver «2c».
+const VIEJA = { BONO_ENCUESTA: '2' };
 {
-  const b = new Base();
+  const b = new Base(VIEJA);
   // Jugador común: 2 finales y muro; recargar o volver otro día no cambia nada.
   let r = b.jugarHastaMuro('A', 'casa', T0);
   igual(r.fuentes, ['gratis', 'gratis'], 'dos gratis');
@@ -82,7 +86,7 @@ const T0 = 1_800_000_000, DIA = R.DIA;
 }
 {
   // Encuesta: +2 por dispositivo y +2 a la IP; una vez; después solo el mail.
-  const b = new Base();
+  const b = new Base(VIEJA);
   b.jugarHastaMuro('A', 'casa', T0);
   igual(b.encuesta('A', 'casa', T0), 2, 'bono de la encuesta');
   igual(b.encuesta('A', 'casa', T0), 'ya_respondida', 'una sola vez por dispositivo');
@@ -103,7 +107,7 @@ const T0 = 1_800_000_000, DIA = R.DIA;
 }
 {
   // Anotarse: juego libre y sus finales dejan de pesar sobre la red.
-  const b = new Base();
+  const b = new Base(VIEJA);
   for (const d of ['A', 'B', 'C']) b.jugarHastaMuro(d, 'casa', T0);
   igual(b.situacion('D', 'casa', T0).motivo, 'ip', 'red llena');
   b.anotar('A', T0);
@@ -118,9 +122,9 @@ const T0 = 1_800_000_000, DIA = R.DIA;
 }
 {
   // Casa con dos jugadores, y bandera de 1 final gratis.
-  const b = new Base();
+  const b = new Base(VIEJA);
   igual(b.jugarHastaMuro('A', 'casa', T0).fuentes.length + b.jugarHastaMuro('B', 'casa', T0).fuentes.length, 4, 'casa con dos jugadores: 2 y 2');
-  const c = new Base({ GRATIS: '2' });
+  const c = new Base({ ...VIEJA, GRATIS: '2' });
   c.dev('A', T0).flags = { 'muro-partidas-gratis': '1' };
   igual(c.jugarHastaMuro('A', 'casa', T0).fuentes, ['gratis'], 'bandera de 1 final');
   c.encuesta('A', 'casa', T0);
@@ -131,7 +135,8 @@ const T0 = 1_800_000_000, DIA = R.DIA;
   igual(e.jugarHastaMuro('B', 'casa', T0).fuentes.length, 1, 'TOPE_IP=4');
   igual(e.encuesta('B', 'casa', T0), 1, 'BONO_ENCUESTA=1');
   igual(e.encuesta('A', 'casa', T0), 'ya_respondida', 'ENCUESTAS_POR_IP=1');
-  igual(R.config({ GRATIS: 'x', TOPE_IP: '-3' }, { 'muro-partidas-gratis': 'z' }), { etapa: 'final', gratis: 2, tope_ip: 6, bono: 2, encuestas_por_ip: 3 }, 'valores inválidos: por defecto (y la regla vieja)');
+  igual(R.config({ GRATIS: 'x', TOPE_IP: '-3' }, { 'muro-partidas-gratis': 'z' }), { etapa: 'final', gratis: 2, tope_ip: 6, bono: 0, encuestas_por_ip: 3 }, 'valores inválidos: por defecto (y la regla vieja, sin bono de encuesta)');
+  igual(R.config({ BONO_ENCUESTA: 'x' }).bono, 0, 'BONO_ENCUESTA inválido o ausente: 0');
   igual(R.config({ GRATIS_ETAPA: 'cualquiera' }).etapa, 'final', 'GRATIS_ETAPA desconocida: la regla vieja');
 }
 
@@ -148,13 +153,16 @@ const T0 = 1_800_000_000, DIA = R.DIA;
       const p = this.partidas.find(x => x.id === id && x.d === d);
       if (!p) return 'pase';
       const dev = this.dev(d, ahora), sit = this.situacion(d, i, ahora);
-      const dec = R.decidirEnvion({ etapa: p.etapa, anotado: !!dev.lista_id, encuesta: !!dev.encuesta_en, encuesta_usada: this.partidas.some(x => x.d === d && x.envion_por === 'encuesta'), encuesta_disponible: sit.encuesta_disponible, regla: R.config(this.env).etapa });
+      const cfg = R.config(this.env);
+      const dec = R.decidirEnvion({ etapa: p.etapa, anotado: !!dev.lista_id, encuesta: !!dev.encuesta_en, encuesta_usada: this.partidas.some(x => x.d === d && x.envion_por === 'encuesta'), encuesta_disponible: sit.encuesta_disponible, regla: cfg.etapa, bono: cfg.bono });
       if (dec.puede && dec.via !== 'ya') { p.etapa = 'completa'; p.envion_por = dec.via; }
       return dec;
     }
   }
-  const PROD = { GRATIS_ETAPA: 'arranque', GRATIS: '1', BONO_ENCUESTA: '1', TOPE_IP: '6', ENCUESTAS_POR_IP: '3' };
-  igual(R.config(PROD), { etapa: 'arranque', gratis: 1, tope_ip: 6, bono: 1, encuestas_por_ip: 3 }, 'config de producción');
+  const PROD = { GRATIS_ETAPA: 'arranque', GRATIS: '1', BONO_ENCUESTA: '0', TOPE_IP: '6', ENCUESTAS_POR_IP: '3' };
+  // Con bono 1: la maquinaria del bono en el intervalo (no es producción).
+  const BONO1 = { ...PROD, BONO_ENCUESTA: '1' };
+  igual(R.config(PROD), { etapa: 'arranque', gratis: 1, tope_ip: 6, bono: 0, encuestas_por_ip: 3 }, 'config de producción');
   igual(R.config(PROD, { 'muro-partidas-gratis': '2' }).gratis, 1, 'con el arranque gratis la bandera muro-partidas-gratis no se usa');
   igual(R.config({ ...PROD, GRATIS_ETAPA: 'final', GRATIS: '2' }, { 'muro-partidas-gratis': '1' }).gratis, 1, 'con la regla vieja la bandera vuelve a valer');
   {
@@ -163,7 +171,7 @@ const T0 = 1_800_000_000, DIA = R.DIA;
     const r = b.partida('A', 'casa', T0);
     igual([r.puede, r.fuente, r.etapa, r.quedan], [true, 'gratis', 'arranque', 1], 'arranque gratis');
     const e = b.envion('A', 'casa', r.id, T0);
-    igual([e.puede, e.motivo, e.encuesta_disponible], [false, 'envion', true], 'dos tiempos sin correo ni encuesta: muro con encuesta');
+    igual([e.puede, e.motivo, e.encuesta_disponible], [false, 'envion', false], 'dos tiempos sin correo: muro, sin encuesta');
     igual([b.partida('A', 'casa', T0).puede, b.situacion('A', 'casa', T0).motivo], [false, 'dispositivo'], 'la final siguiente empieza con el muro');
     igual(b.envion('A', 'casa', 99, T0), 'pase', 'el dos tiempos de otra partida no existe');
     igual(b.envion('B', 'casa', r.id, T0), 'pase', 'ni el de la partida de otro dispositivo');
@@ -175,8 +183,8 @@ const T0 = 1_800_000_000, DIA = R.DIA;
     igual([l.fuente, l.etapa, l.quedan], ['lista', 'completa', null], 'anotado: finales completas sin límite');
   }
   {
-    // Encuesta en el intervalo: termina esa final y suma una completa; una sola vez por dispositivo.
-    const b = new BaseArranque(PROD);
+    // Con bono 1 (no es producción): la encuesta en el intervalo termina esa final y suma una completa; una vez.
+    const b = new BaseArranque(BONO1);
     const r = b.partida('A', 'casa', T0);
     igual(b.encuesta('A', 'casa', T0), 1, 'la encuesta suma 1 (BONO_ENCUESTA)');
     igual(b.envion('A', 'casa', r.id, T0), { puede: true, via: 'encuesta' }, 'encuesta: dos tiempos de esa final');
@@ -184,7 +192,7 @@ const T0 = 1_800_000_000, DIA = R.DIA;
     igual([x.puede, x.fuente, x.etapa, x.quedan], [true, 'encuesta', 'completa', 1], 'y una final completa más (quedan, antes de entregarla)');
     igual([b.partida('A', 'casa', T0).puede, b.situacion('A', 'casa', T0).encuesta_disponible], [false, false], 'después, muro sin encuesta');
     // Una segunda final en arranque del mismo dispositivo (con GRATIS=2) no recibe otro dos tiempos por la misma encuesta.
-    const c = new BaseArranque({ ...PROD, GRATIS: '2' });
+    const c = new BaseArranque({ ...BONO1, GRATIS: '2' });
     const p1 = c.partida('C', 'otra', T0);
     c.encuesta('C', 'otra', T0);
     igual(c.envion('C', 'otra', p1.id, T0).via, 'encuesta', 'GRATIS=2: la primera pasa con la encuesta');
@@ -192,12 +200,30 @@ const T0 = 1_800_000_000, DIA = R.DIA;
     igual(c.envion('C', 'otra', 50, T0).puede, false, 'la encuesta da el dos tiempos una sola vez por dispositivo');
   }
   {
-    // Encuesta en el muro del principio (ya gastó el arranque y cerró): una final completa.
-    const b = new BaseArranque(PROD);
+    // Con bono 1: encuesta en el muro del principio (ya gastó el arranque y cerró): una final completa.
+    const b = new BaseArranque(BONO1);
     b.partida('A', 'casa', T0);
     b.encuesta('A', 'casa', T0);
     const x = b.partida('A', 'casa', T0);
     igual([x.fuente, x.etapa, x.quedan, b.partida('A', 'casa', T0).puede], ['encuesta', 'completa', 1, false], 'encuesta en el muro del principio: una final completa (quedan antes de entregarla) y después muro');
+  }
+  {
+    // Producción (bono 0, correo obligatorio): contestar la encuesta no da el dos tiempos, no cambia la etapa de la
+    // próxima final, no da finales ni gasta los lugares de encuesta de la IP; el muro nunca ofrece la encuesta.
+    const b = new BaseArranque(PROD);
+    const r = b.partida('A', 'casa', T0);
+    igual(b.situacion('A', 'casa', T0).encuesta_disponible, false, 'bono 0: sin encuesta en el muro');
+    igual(b.encuesta('A', 'casa', T0), 0, 'bono 0: la encuesta no suma');
+    igual(b.encuesta('A', 'casa', T0), 'ya_respondida', 'bono 0: una encuesta por dispositivo');
+    igual(b.contar('X', 'casa', T0).encuestas_i, 0, 'bono 0: la encuesta no cuenta para la IP');
+    igual(b.envion('A', 'casa', r.id, T0), { puede: false, motivo: 'envion', encuesta_disponible: false }, 'bono 0: la encuesta no da el dos tiempos');
+    const s2 = b.situacion('A', 'casa', T0);
+    igual([s2.puede, s2.motivo, s2.encuesta_disponible], [false, 'dispositivo', false], 'bono 0: después de la encuesta sigue el muro, sin encuesta');
+    const n = b.partida('N', 'casa', T0); b.encuesta('N', 'casa', T0);
+    igual([n.etapa, b.situacion('N2', 'casa', T0).etapa], ['arranque', 'arranque'], 'bono 0: las finales siguen saliendo con el arranque');
+    b.anotar('A', T0);
+    igual([b.envion('A', 'casa', r.id, T0).via, b.situacion('A', 'casa', T0).encuesta_disponible], ['lista', false], 'bono 0: con el correo, el dos tiempos');
+    igual(R.decidirEnvion({ etapa: 'arranque', anotado: false, encuesta: true, encuesta_usada: false, encuesta_disponible: true, regla: 'arranque' }).puede, false, 'decidirEnvion sin bono: la encuesta no da el dos tiempos');
   }
   {
     // Borrar los datos (otro dispositivo, misma red): otro arranque gratis, nunca el dos tiempos; la IP frena a las 6.
@@ -208,16 +234,16 @@ const T0 = 1_800_000_000, DIA = R.DIA;
   }
   {
     // La regla vieja por variable: finales completas y el dos tiempos sin pedir nada.
-    const b = new BaseArranque({ GRATIS_ETAPA: 'final', GRATIS: '2', BONO_ENCUESTA: '2' });
+    const b = new BaseArranque({ GRATIS_ETAPA: 'final', GRATIS: '2' });
     const r = b.partida('A', 'casa', T0);
     igual([r.etapa, b.envion('A', 'casa', r.id, T0).via, b.partida('A', 'casa', T0).etapa, b.partida('A', 'casa', T0).puede], ['completa', 'ya', 'completa', false], 'GRATIS_ETAPA=final: 2 finales enteras y muro');
   }
   {
     // Se vuelve a la regla vieja con una final del arranque gratis en juego: su dos tiempos no pide nada.
-    const b = new BaseArranque({ GRATIS_ETAPA: 'arranque', GRATIS: '1', BONO_ENCUESTA: '1' });
+    const b = new BaseArranque({ GRATIS_ETAPA: 'arranque', GRATIS: '1', BONO_ENCUESTA: '0' });
     const r = b.partida('A', 'casa', T0);
     igual(b.envion('A', 'casa', r.id, T0).puede, false, 'regla nueva: dos tiempos negado');
-    b.env = { GRATIS_ETAPA: 'final', GRATIS: '2', BONO_ENCUESTA: '2' };
+    b.env = { GRATIS_ETAPA: 'final', GRATIS: '2' };
     igual(b.envion('A', 'casa', r.id, T0), { puede: true, via: 'ya' }, 'de vuelta a la regla vieja: la final en juego termina gratis');
   }
 }
@@ -249,24 +275,26 @@ const nombres = { '  Juana   Pérez ': 'Juana Pérez', "O'Neil": "O'Neil", 'Jean
   'A': null, ['x'.repeat(15)]: null, '<img>': null, 'Ana1': null, '-Ana': null, 'Rookie': null, 'debutante': null };
 for (const [e, v] of Object.entries(nombres)) igual(R.normalizarNombre(e), v, `nombre ${JSON.stringify(e)}`);
 
-const base = { q1: ['sedes'], q2: ['nada'], q3: 'compu', q4: 'no' };
-igual(R.validarEncuesta(base), { ok: true, r: base }, 'encuesta mínima');
-igual(R.validarEncuesta({ ...base, q5: ' hola\u0007 <script>x</script> mundo ' }).r.q5, 'hola x mundo', 'q5 sin controles ni HTML');
-igual(R.validarEncuesta({ ...base, q5: '   ' }).r.q5, undefined, 'q5 vacía no va');
-igual(R.validarEncuesta({ ...base, q5: 'ñ'.repeat(280) }).ok, true, 'q5 de 280');
+// La encuesta opcional después de anotarse (docs/MVP.md 5.4): plataforma (una), features (varias de 3) y texto libre.
+igual(R.validarEncuesta({ plataforma: 'app' }), { ok: true, r: { plataforma: 'app' } }, 'encuesta: solo la plataforma');
+igual(R.validarEncuesta({ features: ['sedes_campeonatos', 'pesista_propio'] }), { ok: true, r: { features: ['pesista_propio', 'sedes_campeonatos'] } }, 'encuesta: solo features, en orden fijo');
+igual(R.validarEncuesta({ plataforma: 'web', features: ['pesista_propio', 'mujeres_categorias', 'sedes_campeonatos'], otra: 'Más rivales' }), { ok: true, r: { plataforma: 'web', features: ['pesista_propio', 'mujeres_categorias', 'sedes_campeonatos'], otra: 'Más rivales' } }, 'encuesta completa');
+igual(R.validarEncuesta({ plataforma: '', features: [], otra: '  ' }), { ok: false, error: 'incompleta' }, 'encuesta vacía: incompleta');
+igual(R.validarEncuesta({ otra: ' hola\u0007 <script>x</script> mundo ' }).r.otra, 'hola x mundo', 'otra sin controles ni HTML');
+igual(R.validarEncuesta({ otra: 'escribime a ana@correo.com o en https://x.io/a y www.algo.net, tarima.app ok' }).r.otra, 'escribime a … o en … y … … ok', 'otra sin @ ni direcciones web');
+igual(R.validarEncuesta({ otra: '@ana' }), { ok: false, error: 'incompleta' }, 'otra que era solo un usuario: no queda nada');
+igual([...R.validarEncuesta({ otra: 'ñ'.repeat(600) }).r.otra].length, 280, 'otra recortada a 280');
 for (const [r, e] of [
-  [null, 'incompleta'], [{}, 'incompleta'], [{ ...base, q4: undefined }, 'incompleta'], [{ ...base, q1: [] }, 'incompleta'],
-  [{ ...base, q1: 'sedes' }, 'formato'], [{ ...base, q1: ['sedes', 'sedes'] }, 'formato'], [{ ...base, q1: ['a', 'b', 'c'] }, 'formato'],
-  [{ ...base, q2: ['nada', 'largo'] }, 'formato'], [{ ...base, q3: ['compu'] }, 'formato'], [{ ...base, q4: 'toString' }, 'formato'],
-  [{ ...base, q1: ['__proto__'] }, 'formato'], [{ ...base, q5: 'ñ'.repeat(281) }, 'formato'], [{ ...base, q5: 5 }, 'formato'], [{ ...base, extra: 1 }, 'formato'],
+  [null, 'incompleta'], [{}, 'incompleta'], [{ plataforma: 'consola' }, 'formato'], [{ plataforma: ['app'] }, 'formato'],
+  [{ features: 'sedes_campeonatos' }, 'formato'], [{ features: ['sedes_campeonatos', 'sedes_campeonatos'] }, 'formato'], [{ features: ['realismo'] }, 'formato'],
+  [{ features: ['__proto__'] }, 'formato'], [{ plataforma: 'toString' }, 'formato'], [{ otra: 5 }, 'formato'], [{ otra: 'x'.repeat(2001) }, 'formato'],
+  [{ plataforma: 'app', extra: 1 }, 'formato'], [{ q1: ['sedes'] }, 'formato'],
 ]) igual(R.validarEncuesta(r), { ok: false, error: e }, `encuesta inválida ${JSON.stringify(r)?.slice(0, 60)}`);
 {
-  const p = R.propsEncuesta({ r: { q1: ['realismo', 'sedes'], q2: ['largo'], q3: 'tablet', q4: 'unico' }, ids: { q1: 'a', q2: 'b', q3: 'c', q4: 'd', q5: 'e' }, encuestaId: 'S', envio: 'u', idioma: 'en', pais: 'ES' });
-  igual(p.$survey_response_a, ['Más realismo (técnica, jueces, control antidoping)', 'Finales en sedes distintas'], 'etiquetas q1');
-  igual(p.$survey_response_c, 'En una tablet', 'etiqueta q3');
-  ok(!('$survey_response_e' in p), 'q5 ausente no va');
-  igual(p.$survey_questions.map(q => q.id), ['a', 'b', 'c', 'd', 'e'], 'preguntas');
-  igual([p.$survey_id, p.$survey_completed, p.$process_person_profile, p.idioma, p.pais], ['S', true, false, 'en', 'ES'], 'propiedades fijas');
+  const p = R.propsRespuesta({ r: { plataforma: 'app', features: ['pesista_propio'], otra: 'Más rivales' }, idioma: 'en', pais: 'ES' });
+  igual(p, { plataforma: 'app', features: ['pesista_propio'], otra: 'Más rivales', idioma: 'en', pais: 'ES', $process_person_profile: false }, 'propiedades de encuesta_respuesta');
+  igual(R.propsRespuesta({ r: { otra: 'x' }, idioma: 'es' }), { plataforma: null, features: [], otra: 'x', idioma: 'es', pais: null, $process_person_profile: false }, 'encuesta_respuesta sin plataforma ni features');
+  ok(!JSON.stringify(R.ENCUESTA).match(/pag|pay|precio|price|suscrip|subscri|consol|tablet/i), 'la encuesta no habla de precios, pagos, consolas ni tablets');
 }
 
 const def = R.banderasPorDefecto();

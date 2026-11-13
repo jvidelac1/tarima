@@ -2,9 +2,9 @@
 
 Un Worker de Cloudflare, «tarima», **sin dirección pública** (`workers_dev` y `preview_urls` en false, sin rutas), que:
 
-- lleva la cuenta de las finales gratis en el servidor (`/api/estado`, `/api/partida`), por dispositivo y por IP con HMAC, y con la regla del arranque gratis (`GRATIS_ETAPA=arranque`) da el permiso del dos tiempos (`/api/envion`) solo con la lista o la encuesta;
+- lleva la cuenta de las finales gratis en el servidor (`/api/estado`, `/api/partida`), por dispositivo y por IP con HMAC, y con la regla del arranque gratis (`GRATIS_ETAPA=arranque`) da el permiso del dos tiempos (`/api/envion`) solo con la lista (correo obligatorio desde el 13 de noviembre: con `BONO_ENCUESTA=0` la encuesta no desbloquea nada);
 - guarda la lista de espera (`/api/anotar`) con consentimiento, y tiene la confirmación por correo y la baja de un clic listas para cuando haya envío de correos (`/baja`, `/confirmar`, `/api/baja`);
-- registra el desbloqueo por encuesta (`/api/encuesta`) y manda las respuestas a PostHog;
+- registra la encuesta opcional del panel de «anotado» (`/api/encuesta`, una por dispositivo) y manda las respuestas a PostHog como el evento `encuesta_respuesta` (`plataforma`, `features`, `otra`, `idioma`, `pais`), sin el correo;
 - hace de proxy de PostHog en `/qx/*`, para que los bloqueadores no corten las métricas;
 - limpia la base una vez por día (Cron).
 
@@ -103,7 +103,7 @@ Notas:
 
 ### Pasos que siguen siendo del dueño
 
-- **PostHog** (proyecto 606461, US Cloud): activar «Discard client IP data» y aceptar el DPA; crear las banderas `muro-partidas-gratis` (variantes `1` y `2`, con `2` al 100 %), `muro-texto` (`a` y `b`, con `a` al 100 %), `invitacion-podio1` (booleana, prendida) y `grabacion` (`off` y `muestra`, con `off` al 100 %); crear una encuesta de tipo **API** con las 5 preguntas, con las opciones en español exactamente como en `ENCUESTA` de `src/reglas.js`, y poner su id en `ENCUESTA_ID` y los ids de las preguntas en `ENCUESTA_PREGUNTAS` (`{"q1":"<uuid>",…}`) en `wrangler.jsonc`. Sin eso el desbloqueo por encuesta anda igual, pero las respuestas no llegan a PostHog. Sin las banderas valen los valores por defecto.
+- **PostHog** (proyecto 606461, US Cloud): activar «Discard client IP data» y aceptar el DPA; crear las banderas `muro-partidas-gratis` (variantes `1` y `2`, con `2` al 100 %), `muro-texto` (`a` y `b`, con `a` al 100 %), `invitacion-podio1` (booleana, prendida) y `grabacion` (`off` y `muestra`, con `off` al 100 %); las respuestas de la encuesta llegan como el evento propio `encuesta_respuesta` (no hace falta crear una encuesta en PostHog ni `ENCUESTA_ID`; solo `POSTHOG_KEY`). Sin las banderas valen los valores por defecto.
 - **Contacto, responsable y país** en `web/privacidad.html` (buscar `data-completar`).
 - **Correos** (cuando haya dominio propio): `npx wrangler email sending enable <dominio>`, SPF, DKIM y DMARC, sacar el comentario de `"send_email"` en `wrangler.jsonc`, poner `MAIL_DESDE` y publicar. Mientras tanto ninguna alta se borra por no confirmar (ver abajo).
 - **Dominio propio** (opcional): se agrega como dominio del proyecto de Pages. Hoy las métricas van por `liftinggame.pages.dev/qx`; algunos bloqueadores conocen `*.pages.dev`, pero el camino `/qx` no es de PostHog, así que en general pasan.
@@ -133,17 +133,19 @@ Notas:
   - Sale un mail, como mucho uno por día por dirección: otra vez la confirmación si todavía no se confirmó, o el aviso «Ya estás en la lista» si ya se confirmó.
   - No se toca nada de lo guardado: ni el consentimiento ni `novedades`. En el MVP no se verifica la propiedad del mail, así que un tercero no puede anotar a nadie en las novedades.
 - **Banderas y `GRATIS`.** En D1 solo se guarda lo que PostHog asignó. Mientras la bandera `muro-partidas-gratis` no exista o no responda, manda la variable `GRATIS`, y su valor por defecto nunca queda pegado.
-- **Arranque gratis (`GRATIS_ETAPA=arranque`, la regla de producción desde el 12 de noviembre a la noche).** La final gratis sale con `etapa: 'arranque'` (columna `partidas.etapa`, migración 0003, y `e`/`p` en el pase). `/api/envion {dispositivo, pase}` la pasa a `completa` (con `envion_por`) si el dispositivo está en la lista o respondió la encuesta y ninguna otra partida suya usó la encuesta; si no, `{estado:'muro', motivo:'envion'}`. Un pase que no es de ese dispositivo, adulterado o vencido da 400 `{error:'pase'}`. Con este modo la bandera `muro-partidas-gratis` no se usa y `flags` reporta `GRATIS`. Para la regla vieja: `GRATIS_ETAPA "final"`, `GRATIS "2"`, `BONO_ENCUESTA "2"` (o sin `GRATIS_ETAPA`). Ver `docs/MVP.md`, «Cambio del 12 de noviembre (noche)».
+- **Arranque gratis (`GRATIS_ETAPA=arranque`, la regla de producción desde el 12 de noviembre a la noche).** La final gratis sale con `etapa: 'arranque'` (columna `partidas.etapa`, migración 0003, y `e`/`p` en el pase). `/api/envion {dispositivo, pase}` la pasa a `completa` (con `envion_por`) si el dispositivo está en la lista (con `BONO_ENCUESTA` mayor que 0, también si respondió la encuesta y ninguna otra partida suya la usó; en producción es 0); si no, `{estado:'muro', motivo:'envion'}`. Un pase que no es de ese dispositivo, adulterado o vencido da 400 `{error:'pase'}`. Con este modo la bandera `muro-partidas-gratis` no se usa y `flags` reporta `GRATIS`. Para la regla vieja: `GRATIS_ETAPA "final"`, `GRATIS "2"` (o sin `GRATIS_ETAPA`). Ver `docs/MVP.md`, «Cambio del 12 de noviembre (noche)» y «Cambio del 13 de noviembre».
+- **Correo obligatorio (13 de noviembre).** `BONO_ENCUESTA "0"` (también si falta): `encuesta_disponible` es siempre `false`, la encuesta no suma finales, no cambia la etapa de las finales, no da el dos tiempos y no gasta los lugares de encuesta de la IP (`encuestas.i` queda `NULL`).
+- **Páginas `/confirmar` y `/baja`.** En inglés salvo `?lang=es` o que la persona se haya anotado en español (el idioma de la fila de la lista); nunca por `Accept-Language`. Un GET lleva el enlace a la misma página en el otro idioma.
 - **Limpieza.** Los dispositivos se borran a los 180 días sin jugar, estén o no en la lista (lo que promete la página de privacidad). Quien vuelve después pone el mismo mail y recupera el juego libre.
 - **Trampa para bots en `/api/anotar`.** El formulario tiene que llevar un campo escondido `web` (fuera de la vista y con `tabindex=-1` y `autocomplete=off`) que se manda vacío. Si llega con algo, el Worker responde como un alta normal y no guarda nada.
 - **Errores extra.**
-  - `/api/encuesta` devuelve 400 `{error:'formato'}` si alguna respuesta no es un código válido, si viene «nada» con otra opción o si `q5` pasa de 280 caracteres. Las 4 primeras sin contestar siguen dando `incompleta`.
+  - `/api/encuesta` recibe `r: {plataforma?: 'app'|'web', features?: ['pesista_propio'|'mujeres_categorias'|'sedes_campeonatos', …], otra?: texto}`. Devuelve 400 `{error:'formato'}` si algo no es un código válido o viene una clave de más, e `incompleta` si no queda nada. `otra` se limpia (sin controles ni HTML, sin palabras con «@» ni direcciones web, que pasan a «…») y se recorta a 280.
   - Con `TURNSTILE=1` y un token inválido, la respuesta es 400 `{error:'turnstile'}`.
   - Un `consentimiento` con una versión desconocida cuenta como `aviso`.
   - Los POST sin `Origin` del sitio dan 403 `{error:'origen'}`. Sin JSON dan 415, y con más de 4 KB, 413, las dos con `{error:'formato'}`.
 - **`/api/partida` con muro** también devuelve `dispositivo` y `flags`, igual que con `ok`.
 - **`quedan`** es `null` para un dispositivo anotado (juego libre) y `0` en el muro. Para los demás es el mínimo entre lo que le queda al dispositivo y lo que le queda a la red.
-- **Encuesta de un anotado.** Se guarda con `i = NULL`: no da premio, así que no suma al cupo de la IP ni gasta las 3 encuestas de esa red.
+- **Encuesta sin premio** (de un anotado, o de cualquiera con `BONO_ENCUESTA=0`). Se guarda con `i = NULL`: no suma al cupo de la IP ni gasta las 3 encuestas de esa red.
 - **`/api/exportar`.** Es un GET con `Authorization: Bearer <EXPORTAR_CLAVE>` y devuelve un CSV. Tiene un límite de 10 pedidos por hora y las celdas van protegidas contra fórmulas.
 - **Sin servidor.** El juego tiene que tratar 429, 503 y la falta de red como dice la sección 2 (P4). `?muro=firme` es un ayudante del juego y vive en `web/js`, no en el Worker.
 

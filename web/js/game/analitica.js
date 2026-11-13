@@ -9,8 +9,8 @@
 //   Igual, cada evento queda en `window.JUEGO.eventos` para que las pruebas puedan afirmar el embudo.
 // - Ningún evento lleva nombre, correo, IP ni dispositivo: las propiedades con esos nombres o con una «@» se descartan.
 // - Las banderas (6.5) las evalúa el Worker: llegan en /api/estado y se pasan como bootstrap y como `$feature/<bandera>`.
-// - La encuesta va por la API de Surveys: el juego manda `survey shown` y `survey dismissed`; `survey sent` lo manda el
-//   Worker con las respuestas (5.4).
+// - La encuesta (opcional, después de anotarse, 5.4): el juego manda `encuesta_vista`, `encuesta_enviada` y
+//   `encuesta_salteada`; las respuestas las manda el Worker como `encuesta_respuesta` (sin el correo).
 // - Grabación de sesión (6.6): solo en una parte de las cargas, según la bandera `grabacion` (off · tercio · todas),
 //   decidido una vez por carga, que con la persistencia en memoria es una sesión de PostHog. Graba la página (paneles,
 //   botones, textos, toques), nunca el lienzo 3D; los campos van tapados y el texto que tenga el nombre del jugador o
@@ -28,7 +28,7 @@ export const EVENTOS = new Set([
   'juego_abierto', 'carga_lista', 'idioma_cambiado', 'nombre_puesto', 'pesista_elegido', 'opciones_abiertas',
   'tutorial_inicio', 'tutorial_fin', 'tutorial_salteado', 'partida_pedida', 'final_inicio', 'intento_propio', 'final_fin',
   'compartir', 'invitacion_vista', 'invitacion_abierta', 'invitacion_cerrada', 'muro_visto', 'muro_ahora_no', 'mail_foco',
-  'anotar_envio', 'anotar_ok', 'anotar_error', 'survey shown', 'encuesta_enviada', 'survey dismissed', 'privacidad_abierta',
+  'anotar_envio', 'anotar_ok', 'anotar_error', 'encuesta_vista', 'encuesta_enviada', 'encuesta_salteada', 'privacidad_abierta',
   'medicion_desactivada', 'error_juego',
   // Gameplay 2 (docs/JUEGO.md G2.7): un toque saltea el turno de un rival o el veredicto propio
   'rival_salteado', 'veredicto_salteado',
@@ -238,7 +238,6 @@ export function crearAnalitica(o = {}) {
     if (est && est.flags && typeof est.flags === 'object') flags = { ...BANDERAS, ...est.flags };
     const m = est?.metricas;
     const clave = m && typeof m.clave === 'string' && /^phc_[A-Za-z0-9]+$/.test(m.clave) ? m.clave : null;
-    if (m && typeof m.encuesta === 'string' && m.encuesta) encuestaId = m.encuesta;
     if (estado !== 'esperando') return estado === 'activa';
     if (!clave || apagadaPorUsuario() || !ventana) { apagar(); return false; }
     sesion.set(CLAVE_PUBLICA, clave);
@@ -323,10 +322,9 @@ export function crearAnalitica(o = {}) {
     return anonimo;
   }
 
-  // Encuesta por la API de Surveys de PostHog (5.4): el id viene de /api/estado (metricas.encuesta).
-  let encuestaId = null;
-  const encuestaVista = ({ id, con_premio } = {}) => { encuestaId = id || encuestaId; ev('survey shown', { $survey_id: encuestaId, con_premio: !!con_premio }); };
-  const encuestaCerrada = () => ev('survey dismissed', { $survey_id: encuestaId });
+  // La encuesta opcional después de anotarse (5.4): las respuestas no van por acá (las manda el Worker).
+  const encuestaVista = ({ momento = null } = {}) => ev('encuesta_vista', { momento });
+  const encuestaCerrada = ({ momento = null } = {}) => ev('encuesta_salteada', { momento });
 
   /** El día que haya un aviso de consentimiento: con un sí, PostHog puede guardar su id y unir visitas. */
   function consentir() {

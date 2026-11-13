@@ -5,9 +5,10 @@
 //     y después de todo no queda ninguna cookie ni clave de almacenamiento con «ph_» (posthog-js también usa nombres como
 //     __ph_opt_in_out_<clave>).
 //  2. Sin clave: PostHog ni se descarga.
-//  3. web/privacidad.html: idioma (?lang=, botones), responsable y contacto completos (sin marcadores), la grabación de
+//  3. web/privacidad.html: idioma (inglés por defecto aunque el navegador esté en español, ?lang=, botones), responsable y contacto completos (sin marcadores), la grabación de
 //     sesión explicada en los dos idiomas, interruptor de la medición (manda
-//     medicion_desactivada por /qx y deja tarima.medicion=0), formulario de baja contra /api/baja, y sin la promesa de pago.
+//     medicion_desactivada por /qx y deja tarima.medicion=0), formulario de baja contra /api/baja, sin la promesa de pago,
+//     la encuesta opcional de dos preguntas explicada y las novedades sin frecuencia.
 //  4. A 390x844 (teléfono parado) y a 844x390 (acostado) la privacidad no se desplaza de costado.
 //  5. Grabación de sesión (docs/MVP.md 6.6), en una página de prueba con campos, el nombre del jugador en pantalla, un
 //     lienzo y una «señal» que cambia en cada cuadro: con `grabacion=todas` se graba por /qx/s/ (grabador del propio
@@ -112,10 +113,10 @@ const server = http.createServer((req, res) => {
     if (u.pathname === '/api/estado') {
       res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': 'tdv=aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee; Path=/api; HttpOnly; SameSite=Strict' });
       res.end(JSON.stringify({
-        dispositivo: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', puede: true, quedan: null, lista: true, lista_id: LISTA_ID, encuesta_disponible: true,
+        dispositivo: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', puede: true, quedan: null, lista: true, lista_id: LISTA_ID, encuesta_disponible: false,
         flags: { 'muro-partidas-gratis': '2', 'muro-texto': 'b', 'invitacion-podio1': 'on', grabacion: flagGrab },
         contexto: { pais: 'UY', previas: 1, dias: '0' },
-        metricas: conClave ? { clave: CLAVE, host: '/qx', ui: 'https://us.posthog.com', encuesta: 'encuesta-prueba' } : null,
+        metricas: conClave ? { clave: CLAVE, host: '/qx', ui: 'https://us.posthog.com' } : null,
       }));
       return;
     }
@@ -139,10 +140,11 @@ a.ev('juego_abierto', { carga_ms: 5, pantalla_inicial: 'bienvenida', nombre: 'No
 const e = await s.estado({ idioma: 'es' });
 window.__activa = await a.iniciar({ estado: e, idioma: 'es', idioma_origen: 'url', version: 'prueba', pantalla: 'bienvenida' });
 a.visita('muro');
-a.ev('muro_visto', { motivo: 'dispositivo', caminos: 'mail+encuesta', origen: 'podio', variante_texto: a.bandera('muro-texto') });
+a.ev('muro_visto', { motivo: 'dispositivo', caminos: 'mail', origen: 'podio', variante_texto: a.bandera('muro-texto') });
 a.identificar('${LISTA_ID}');
 a.ev('anotar_ok', { estado: 'nuevo', pantalla: 'muro', finales_previas: 2 });
-a.encuestaVista({ con_premio: true });
+a.encuestaVista({ momento: 'tras_arranque' });
+a.ev('encuesta_enviada', { momento: 'tras_arranque', plataforma: 'app', features: 2, otra: true });
 window.__sesion = a.idSesion();
 window.__listo = true;
 </script>`);
@@ -244,7 +246,8 @@ const pedidos1 = [];
   const eventos = llegadas.flatMap(l => l.eventos);
   const nombres = eventos.map(e => e.event);
   ok(llegadas.length > 0, `llegaron pedidos a /qx (${llegadas.map(l => l.ruta).join(' ')})`);
-  for (const ev of ['juego_abierto', 'muro_visto', 'anotar_ok', 'survey shown']) ok(nombres.includes(ev), `llegó ${ev} por /qx`);
+  for (const ev of ['juego_abierto', 'muro_visto', 'anotar_ok', 'encuesta_vista', 'encuesta_enviada']) ok(nombres.includes(ev), `llegó ${ev} por /qx`);
+  ok(!nombres.some(n => /^survey /.test(n)), 'sin eventos de la API de Surveys de PostHog');
   ok(nombres.includes('$identify') || eventos.some(e => e.props.distinct_id === LISTA_ID || e.props.$user_id === LISTA_ID), 'identify con lista_id');
   const todo = JSON.stringify(eventos);
   ok(!todo.includes('NoDebeSalir') && !todo.includes('no@debe.salir'), 'ni el nombre ni el correo llegan a PostHog');
@@ -280,6 +283,15 @@ const pedidos1 = [];
   await page.goto(base + '__prueba.html');
   await page.waitForFunction(() => window.__listo === true, null, { timeout: 20000 });
   const antes = llegadas.length;
+  // Inglés por defecto aunque el navegador esté en español (locale es-AR) y sin idioma guardado.
+  await page.evaluate(() => localStorage.removeItem('tarima.idioma'));
+  await page.goto(base + 'privacidad.html');
+  ok(await page.locator('article[lang=en]').isVisible() && !(await page.locator('article[lang=es]').isVisible()) && (await page.evaluate(() => document.documentElement.lang)) === 'en', 'sin ?lang= ni idioma guardado, la privacidad abre en inglés (navegador en español)');
+  ok(await page.locator('[data-lang=es]').isVisible(), 'con el botón ES a la vista');
+  {
+    const en = await page.locator('article[lang=en]').innerText();
+    ok(/two-question survey/.test(en) && /optional/i.test(en) && !/once a month/i.test(en), 'en inglés: la encuesta opcional de dos preguntas y las novedades sin frecuencia');
+  }
   await page.goto(base + 'privacidad.html?lang=es');
   const html = await page.content();
   ok(!/nunca vas a pagar|never pay to lift/i.test(html), 'sin la promesa de pago');
@@ -292,7 +304,9 @@ const pedidos1 = [];
     const es = await page.locator('article[lang=es] [data-grabacion]').innerText(), en = await page.locator('article[lang=en] [data-grabacion]').textContent();
     ok(/una de cada tres/.test(es) && /3D/.test(es) && /tapados/.test(es) && /correo/.test(es) && /one in three/.test(en) && /3D/.test(en) && /blanked out/.test(en),
       'la privacidad explica la grabación en los dos idiomas: proporción, sin 3D y campos tapados');
-    ok(/2026-11-c/.test(await page.locator('article[lang=es] .version').innerText()), 'la privacidad está en la versión 2026-11-c');
+    ok(/2026-11-d/.test(await page.locator('article[lang=es] .version').innerText()), 'la privacidad está en la versión 2026-11-d');
+    const txt = await page.locator('article[lang=es]').innerText();
+    ok(/dos preguntas/.test(txt) && /opcional/.test(txt) && !/una por mes|al mes/.test(txt) && !/encuesta[^.]*finales/i.test(txt), 'en español: la encuesta opcional de dos preguntas, sin finales de premio, y las novedades sin frecuencia');
   }
   await page.click('article[lang=es] [data-medicion-boton]');
   ok(await page.evaluate(() => localStorage.getItem('tarima.medicion')) === '0', 'el interruptor apaga la medición');

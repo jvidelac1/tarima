@@ -334,7 +334,8 @@ function jugar(semilla, nivel, persona, estilo = {}) {
     ok(sEn.verbo === 'EXPLODE!' && sEs.verbo === '¡EXPLOTA!' && sEn.clave === sEs.clave, `la señal no cambia con el idioma: ${sEn.verbo} / ${sEs.verbo}`);
     ok(pasos('f', true, 'en')[0][1] === 'Tap the screen to start the lift.' && pasos('f', false, 'es')[0][1] === 'Pulsa ESPACIO para empezar el levantamiento.', `pasos: ${JSON.stringify(pasos('f', true, 'en'))}`); }
   // idioma: ?lang= primero, después lo guardado y por último el navegador; lo que no empieza con «es», inglés
-  ok(detectarIdioma({ lang: 'en', guardado: 'es', navegador: ['es-AR'] }) === 'en' && detectarIdioma({ guardado: 'es', navegador: ['en-US'] }) === 'es' && detectarIdioma({ navegador: ['es-MX', 'en'] }) === 'es' && detectarIdioma({ navegador: ['pt-BR', 'es'] }) === 'es' && detectarIdioma({ navegador: ['en-US', 'en', 'es-419'] }) === 'es' && detectarIdioma({ navegador: ['en-US', 'fr'] }) === 'en' && detectarIdioma({ lang: 'fr', navegador: ['es'] }) === 'es', 'detectarIdioma no respeta el orden de prioridad');
+  // inglés por defecto aunque el navegador esté en español (decisión del dueño del 13 de noviembre); español con ?lang=es o lo guardado
+  ok(detectarIdioma({ lang: 'en', guardado: 'es', navegador: ['es-AR'] }) === 'en' && detectarIdioma({ guardado: 'es', navegador: ['en-US'] }) === 'es' && detectarIdioma({ lang: 'es', navegador: ['en-US'] }) === 'es' && detectarIdioma({ navegador: ['es-MX', 'en'] }) === 'en' && detectarIdioma({ navegador: ['es-AR', 'es'] }) === 'en' && detectarIdioma({ navegador: ['en-US', 'en', 'es-419'] }) === 'en' && detectarIdioma({}) === 'en' && detectarIdioma({ lang: 'fr', navegador: ['es'] }) === 'en', 'detectarIdioma no respeta el orden de prioridad (o no da inglés por defecto)');
   console.log(`9. Textos: ${ke.length} claves en español neutro y en inglés, sin voseo ni jerga, todas resueltas con y sin teclado · señal y pasos según el idioma`);
 }
 
