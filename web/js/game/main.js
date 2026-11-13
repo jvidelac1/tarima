@@ -229,9 +229,10 @@ async function calibrar() {
  */
 const capa = {
   poner(html, clase = '', { foco = true } = {}) {
-    const c = $('capa'), prev = c.firstElementChild, act = document.activeElement, clave = prev && prev.contains(act) ? claveDe(act) : null, sc = prev ? prev.scrollTop : 0;
+    // el desplazamiento se conserva al repintar, también el de la parte de arriba de la bienvenida (.bv-cuerpo)
+    const c = $('capa'), prev = c.firstElementChild, act = document.activeElement, clave = prev && prev.contains(act) ? claveDe(act) : null, sc = prev ? prev.scrollTop : 0, sc2 = prev?.querySelector('.bv-cuerpo')?.scrollTop || 0;
     c.innerHTML = `<div class="panel ${clase}">${html}</div>`; E.modo = 'panel'; E.forzar = true;
-    const pn = c.firstElementChild; pn.t0 = prev ? prev.t0 : -1e9; if (prev) pn.scrollTop = sc;
+    const pn = c.firstElementChild; pn.t0 = prev ? prev.t0 : -1e9; if (prev) { pn.scrollTop = sc; const bc = pn.querySelector('.bv-cuerpo'); if (bc) bc.scrollTop = sc2; }
     // `foco: false`: panel donde Espacio es del juego (el metrónomo): nadie queda con foco, y a los botones se llega con Tab
     if (!foco) { pn.dataset.libre = '1'; document.activeElement?.blur?.(); } else if (!E.sobre) enfocar(pn, clave); else E.sobre.foco = null;
     return pn;
