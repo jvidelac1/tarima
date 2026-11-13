@@ -103,6 +103,13 @@ button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px
 :where(html.horiz.bajo) .pesista .med{font-size:.66em;line-height:1.15;grid-template-columns:5.2em minmax(8px,1fr) auto;gap:.3em}
 :where(html.horiz.bajo) .pesista .barra{min-width:8px}
 :where(html.horiz.bajo) .pesista small.conviene{font-size:.68em;line-height:1.2}
+/* teléfono bajo en 'u': solo lo que cambia el juego de cada pesista (lo que le cuesta cada tramo y su frase). Las medidas del
+   cuerpo no entraban en 667×375 y en inglés se cortaban justo los valores («sho», «ea»). Los títulos parten si no entran */
+:where(html.horiz.bajo) .pesista .cuerpo.u .med:not(.tramo){display:none}
+:where(html.horiz.bajo) .pesista .cuerpo.u .med{grid-template-columns:minmax(0,1fr) auto}
+:where(html.horiz.bajo) .pesista .cuerpo.u .barra{display:none}
+:where(html.horiz.bajo) .pesista .cuerpo.u .med.tramo{margin-top:0;padding-top:0;border-top:0}
+:where(html.horiz.bajo) .pesista b{overflow-wrap:anywhere;font-size:1em}
 :where(html.horiz.bajo) .panel.bienvenida .pesista .b{display:none}
 .pesista small.conviene{color:var(--ink);opacity:.85}
 /* muro, lista, encuesta e invitación del podio */

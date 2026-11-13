@@ -26,7 +26,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
   :where(html:not(.rotado)) #capa{position:fixed;inset:0;padding-bottom:calc(8px + var(--sb));z-index:5}
   :where(html:not(.rotado)) .panel{max-height:100%}
 }
-#msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:20px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);pointer-events:none;background:radial-gradient(ellipse at center,#0a1030 0,#03050c 70%)}
+#msg{position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:20px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);pointer-events:none;background:radial-gradient(ellipse at center,#0a1030 0,#03050c 70%)}
 #tv{position:absolute;inset:0;z-index:1;pointer-events:none;font-family:var(--display);text-transform:uppercase}
 .bug{position:absolute;top:calc(var(--u)*1.2 + var(--st));left:calc(var(--u)*1.2 + var(--sl));background:rgba(6,14,48,.88);padding:calc(var(--u)*.4) calc(var(--u)*.9);border-left:calc(var(--u)*.28) solid var(--teal)}
 .bug b{display:block;font-weight:800;font-size:calc(var(--u)*1.25);letter-spacing:.04em;line-height:1.1}
@@ -93,7 +93,9 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 .senal.oro .s-verbo,.senal[data-tipo=libre] .s-verbo,.senal[data-tipo=empuja] .s-verbo{color:var(--gold)}
 .senal[data-tipo=espera] .s-verbo,.senal[data-tipo=auto] .s-verbo{color:var(--mute);font-size:calc(var(--v)*2.6)}
 .senal[data-largo="1"] .s-verbo{font-size:calc(var(--v)*2.3)}
-.senal[data-tipo=espera] .s-teclas,.senal[data-tipo=auto] .s-teclas,.senal[data-tipo=nada] .s-teclas{opacity:.22}
+.senal[data-tipo=espera] .s-teclas,.senal[data-tipo=nada] .s-teclas{opacity:.22}
+/* AGUANTA, ¡ABAJO! y ¡DA TODO! (la garra sola) no piden nada: sin tecla dibujada, que invitaría a tocar */
+.senal[data-tipo=auto] .s-teclas{visibility:hidden}
 .senal[data-tipo=espera],.senal[data-tipo=auto]{border-top-color:var(--line)}
 .senal[data-tipo=empuja] .s-teclas .tecla{display:inline-block;font-size:.8em;padding:.42em .5em .5em}
 .senal[data-tipo=empuja] .s-teclas{margin-bottom:calc(var(--v)*2.6)}
@@ -101,20 +103,21 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 .senal[data-gesto=mantiene] .s-teclas .tecla{transform:translateY(.2em);box-shadow:0 .04em 0 #7c86a8;background:var(--gold)}
 /* nivel 'u': ¡SALTA! (luz que sube hasta la cadera), ¡PÁRATE! (un toque, la barra que sube), ¡DA TODO! (la garra, con su
    tiempo que se acaba). La barra de abajo es solo presentación: tocar en cualquier punto del tramo rinde lo mismo. */
-.senal[data-tipo=luz] .s-aro,.senal[data-tipo=uno] .s-aro,.senal[data-tipo=decide] .s-aro{height:calc(var(--v)*8.5)}
-.senal[data-tipo=luz] .s-avance,.senal[data-tipo=uno] .s-avance,.senal[data-tipo=decide] .s-avance{display:block}
-.senal[data-tipo=luz] .s-teclas,.senal[data-tipo=uno] .s-teclas,.senal[data-tipo=decide] .s-teclas{margin-bottom:calc(var(--v)*2.6)}
-.senal[data-tipo=luz] .s-verbo,.senal[data-tipo=uno] .s-verbo,.senal[data-tipo=decide] .s-verbo{color:var(--gold)}
-.senal[data-tipo=luz] .s-avance b{background:linear-gradient(90deg,#1d6f7a,var(--gold))}
-.senal[data-tipo=decide]{border-top-color:#ff6a5e}
-.senal[data-tipo=decide] .s-avance b{background:#ff6a5e}
+.senal[data-tipo=luz] .s-aro,.senal[data-tipo=uno] .s-aro,.senal.sale .s-aro{height:calc(var(--v)*8.5)}
+.senal[data-tipo=uno] .s-avance,.senal.sale .s-avance{display:block}
+.senal.sale .s-avance b{background:#3a4a7a}
+.senal[data-tipo=uno] .s-teclas,.senal.sale .s-teclas{margin-bottom:calc(var(--v)*2.6)}
+.senal[data-tipo=luz] .s-verbo,.senal[data-tipo=uno] .s-verbo{color:var(--gold)}
+/* FRENO: la garra se usa sola; la señal es un grito, no una orden */
+.senal[data-clave=datodo]{border-top-color:#ff6a5e}
+.senal[data-clave=datodo] .s-verbo{color:#ff6a5e;font-size:calc(var(--v)*3.4)}
 .senal.guardado .s-teclas .tecla{background:var(--teal)}
 .s-pal.gris{color:#a9b2cf;font-size:calc(var(--v)*1.5)}
 /* recuadro fijo de las pantallas pasivas (turno de un rival, veredicto, repetición): un toque sigue */
 .seguir{position:absolute;z-index:5;right:calc(var(--u)*1.2 + var(--sr));bottom:calc(var(--u)*4.4 + var(--sb));font-family:var(--display);font-weight:800;letter-spacing:.1em;text-transform:uppercase;font-size:calc(var(--u)*1.15);color:#0a1020;background:rgba(242,244,255,.92);padding:.4em .8em;border-radius:.3em;pointer-events:none}
 #escena{overscroll-behavior:none}
 @media (prefers-reduced-motion:no-preference){
-  .senal[data-tipo=libre] .s-teclas,.senal[data-tipo=luz] .s-teclas,.senal[data-tipo=uno] .s-teclas,.senal[data-tipo=decide] .s-teclas,.senal.parado .s-teclas{animation:late .7s ease-in-out infinite}
+  .senal[data-tipo=libre] .s-teclas,.senal[data-tipo=luz] .s-teclas,.senal[data-tipo=uno] .s-teclas,.senal.parado .s-teclas{animation:late .7s ease-in-out infinite}
   .senal[data-tipo=empuja] .s-teclas .tecla{animation:golpe .36s ease-in-out infinite}
   .senal[data-tipo=empuja] .s-teclas .tecla:nth-child(2){animation-delay:.12s}.senal[data-tipo=empuja] .s-teclas .tecla:nth-child(3){animation-delay:.24s}
   .s-pal.ya{animation:pal .16s ease-out}
@@ -154,7 +157,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 }
 #sobre{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(2,4,12,.72);overscroll-behavior:contain}
 
-#capa{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;padding:calc(8px + var(--st)) calc(8px + var(--sr)) 8px calc(8px + var(--sl))}
+/* #tv lleva z-index 1 (encima de la viñeta del FRENO): los paneles y la pantalla de carga van encima de #tv */
+#capa{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;pointer-events:none;padding:calc(8px + var(--st)) calc(8px + var(--sr)) 8px calc(8px + var(--sl))}
 /* Los paneles se desplazan con el dedo (pan-x pan-y: también con el contenido girado, y sin zoom), el arrastre no pasa a la
    página al llegar al borde (overscroll-behavior) y ningún touchmove del juego los frena (telefono.js) */
 .panel{pointer-events:auto;background:rgba(8,13,30,.95);border:1px solid var(--line);border-top:3px solid var(--teal);padding:clamp(10px,2.2cqh,22px);max-width:min(94cqw,760px);width:100%;max-height:100%;overflow:auto;touch-action:pan-x pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
@@ -250,6 +254,9 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
     touch-action:none;-webkit-user-select:none;user-select:none;transition:transform 50ms,box-shadow 50ms}
   :where(html.horiz) #zona.on,:where(html.horiz) #zona.hunde{transform:translateY(5px) scale(.95);border-color:var(--teal);background:radial-gradient(circle at 50% 40%,rgba(53,230,214,.6),rgba(10,40,90,.62) 75%);box-shadow:0 1px 0 rgba(2,4,12,.55),inset 0 0 26px rgba(53,230,214,.5)}
   html:where(.horiz).zurdo #zona{right:auto;left:calc(var(--sl) + var(--bm))}
+  /* «TOCA: SEGUIR» va encima del botón redondo y no sobre él: se pisaban las dos leyendas justo donde apoya el pulgar */
+  :where(html.horiz) .seguir{right:calc(var(--sr) + var(--bm));bottom:calc(var(--sb) + var(--bm)*2 + var(--boton))}
+  html:where(.horiz).zurdo .seguir{right:auto;left:calc(var(--sl) + var(--bm))}
   /* sin botón mientras hay un panel con botones, la pausa, la carga o un campo con el teclado abierto: ahí se tocan otros
      botones. Un panel sin botones («Toca para seguir») deja el botón a la vista y se corre para no quedar debajo. */
   :where(html.horiz) body:has(#capa > .panel button) #zona,:where(html.horiz) body:has(#sobre:not([hidden])) #zona,:where(html.horiz) body:has(#msg:not([hidden])) #zona,html:where(.horiz).escribiendo #zona{display:none}
@@ -302,16 +309,16 @@ html.rotado{--sl:env(safe-area-inset-top,0px);--st:env(safe-area-inset-right,0px
 html.rotado #app{position:fixed;left:0;top:0;flex:none;width:var(--app-w,100vh);height:var(--app-h,100vw);transform-origin:0 0;transform:translateX(var(--app-tx,100vw)) rotate(90deg)}
 
 /* ---------- turno de un rival y marcador ---------- */
-.turno{position:absolute;left:50%;top:calc(var(--u)*5 + var(--st));transform:translateX(-50%);display:flex;align-items:center;gap:.7em;background:rgba(6,14,48,.92);border-bottom:calc(var(--u)*.3) solid var(--c,var(--gold));padding:calc(var(--u)*.45) calc(var(--u)*1.1);max-width:min(92cqw,calc(var(--u)*46));white-space:nowrap}
+.turno{position:absolute;left:50%;top:calc(var(--u)*5 + var(--st));transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;row-gap:.15em;align-items:center;gap:.7em;background:rgba(6,14,48,.92);border-bottom:calc(var(--u)*.3) solid var(--c,var(--gold));padding:calc(var(--u)*.45) calc(var(--u)*1.1);max-width:min(92cqw,calc(var(--u)*46));white-space:nowrap}
 .turno i{width:1.8em;height:1.15em;flex:none}
 .turno b{font-weight:800;font-size:calc(var(--u)*1.5);letter-spacing:.05em;color:#fff}
 .turno em{font-style:normal;font-weight:800;font-size:calc(var(--u)*1.15);letter-spacing:.04em;color:var(--gold)}
-.turno span{font-family:var(--body);text-transform:none;font-size:calc(var(--u)*1.05);color:var(--mute);overflow:hidden;text-overflow:ellipsis}
+.turno span{font-family:var(--body);text-transform:none;font-size:calc(var(--u)*1.05);color:var(--mute);flex-basis:100%;text-align:center;white-space:normal}      /* en su línea: con la apuesta del rival al lado se cortaba «mira o toca para saltar» */
 .marcador{position:absolute;left:calc(var(--u)*1.2 + var(--sl));top:calc(var(--u)*4.4 + var(--st));background:rgba(6,14,48,.88);border-left:calc(var(--u)*.28) solid var(--c,var(--teal));padding:calc(var(--u)*.3) calc(var(--u)*.8);display:flex;flex-direction:column;max-width:46%}
 .marcador b{font-weight:800;font-size:calc(var(--u)*1.05);letter-spacing:.05em;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .marcador span{font-weight:700;font-size:calc(var(--u)*.95);letter-spacing:.05em;color:var(--gold)}
 body:has(.etiqueta:not([hidden])) .marcador{top:calc(var(--u)*7 + var(--st))}
-html.turno-rival #marcador{top:calc(var(--u)*9.2 + var(--st))}      /* debajo del cartel del turno del rival: con «Si Brenner levanta…» lo pisaba */
+html.turno-rival #marcador{top:calc(var(--u)*10.6 + var(--st))}      /* debajo del cartel del turno del rival: con «Si Brenner levanta…» lo pisaba */
 /* durante el turno de un rival no hay botón de levantar ni señal: tocar solo saltea (y lo dice el cartel) */
 html.turno-rival #zona,html.turno-rival #senal{display:none!important}      /* el acuse queda: dice que el toque llegó (y que saltea) */
 
@@ -339,11 +346,13 @@ html.editando #app{visibility:hidden}
 :where(html.horiz.bajo) body:has(#veredicto:not([hidden])) :is(#rival,#etiqueta,#guia,#marcador),
 :where(html.horiz.bajo) body:has(#turno:not([hidden])) #rival,
 :where(html.horiz.bajo) body:has(#senal:not([hidden])) #rival{display:none}
-:where(html.horiz.bajo) .panel.lado :is(p.frase,p.reloj){display:none}
+:where(html.horiz.bajo) .panel.lado :is(p.frase,p.reloj,p.garra,p.sugiere){display:none}      /* la garra la muestra la energía durante el intento */
 :where(html.horiz.bajo) .veredicto small{font-size:max(13px,calc(var(--u)*1.25))}
 
 /* ---------- 'u': margen a la vista, FRENO y pisotón (ui/margen.js; docs/JUEGO.md, Gameplay 2, «Emoción») ---------- */
 .margen{position:absolute;z-index:3;left:50%;top:calc(var(--u)*4.6 + var(--st));transform:translateX(-50%);display:flex;align-items:center;gap:calc(var(--u)*.6);background:rgba(6,14,48,.86);padding:calc(var(--u)*.35) calc(var(--u)*.9);border-bottom:calc(var(--u)*.25) solid var(--teal);pointer-events:none;white-space:nowrap}
+/* con la energía a la vista, el cartel de los cambios de los rivales baja: si no, la energía le tapaba el nombre */
+body:has(#margen:not([hidden])) .rival{top:calc(var(--u)*10.6 + var(--st))}
 .margen .m-t{font-weight:800;font-size:calc(var(--u)*.95);letter-spacing:.12em;color:var(--mute)}
 .margen .m-d{display:flex;gap:calc(var(--u)*.35)}
 .margen .m-d i{display:block;width:calc(var(--u)*2.1);height:calc(var(--u)*2.1);border-radius:50%;background:conic-gradient(var(--teal) calc(var(--f,1)*360deg),rgba(255,255,255,.08) 0);box-shadow:inset 0 0 0 calc(var(--u)*.17) rgba(255,255,255,.4)}
