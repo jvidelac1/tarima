@@ -5,13 +5,15 @@ name: Servidor y publicación
 
 on:
   push:
-    branches: [mvp, demo, muro-medio]
+    branches: [mvp, demo, muro-medio, gameplay]
     paths:
       - 'worker/**'
       - 'functions/**'
       - 'wrangler.jsonc'
       - 'web/js/game/servidor.js'
       - 'web/js/game/analitica.js'
+      - 'web/js/game/input.js'
+      - 'web/js/sim/**'
       - 'web/privacidad.html'
       - 'web/vendor/posthog/**'
       - 'tools/servidor_test.mjs'

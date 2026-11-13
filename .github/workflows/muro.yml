@@ -11,12 +11,14 @@ name: Muro y lista (punta a punta)
 
 on:
   push:
-    branches: [mvp, muro-medio]
+    branches: [mvp, muro-medio, gameplay]
     paths:
       - 'web/js/game/conexion.js'
       - 'web/js/game/servidor.js'
       - 'web/js/game/analitica.js'
       - 'web/js/game/main.js'
+      - 'web/js/game/input.js'
+      - 'web/js/sim/**'
       - 'web/js/game/ganchos.js'
       - 'web/js/game/i18n/**'
       - 'web/css/**'
