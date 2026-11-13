@@ -5,7 +5,7 @@
 // cada gesto es UN toque: la capa mira en qué fase está el intento en el instante del toque y lo convierte en lo que el
 // núcleo espera. Soltar la tecla no significa nada, la subida es asistida y la fijación y la bajada son automáticas.
 import { simular } from '../sim/attempt.js';
-import { TENSION, FACIL, UNO } from '../sim/rules.js';
+import { TENSION, FACIL, UNO, BARRA, posBarra } from '../sim/rules.js';
 import { t } from './i18n/t.js';
 
 const INF = 2147483647;
@@ -23,7 +23,7 @@ const no = (motivo, aviso = null) => ({ ent: [], aviso, motivo });
  * del cuadro): la bajada va 150 ms después de la chicharra.
  */
 export function automaticos(m, ctl) {
-  if (ctl === 'u') return [];      // en 'u' el núcleo hace solo AGUANTA y ¡ABAJO!
+  if (ctl === 'u' || ctl === 'b') return [];      // en 'u' y 'b' el núcleo hace solo AGUANTA y ¡ABAJO!
   const f = m.fij;
   if (ctl !== 'f' || m.res || m.fase !== 'fijacion' || !f) return [];
   if (m.n === 0) return f.abajo ? [] : [[f.ts, 1]];      // no debería pasar: el contacto de la recepción queda apoyado
@@ -40,7 +40,7 @@ export function traducir(m, t, v, ctl) {
   if (m.res) return no('termino');
   // 'u': la capa es la identidad. El núcleo decide qué cumple cada contacto (guardado, apoyado, doble); soltar solo cuenta
   // si había algo apoyado
-  if (ctl === 'u') return v ? { ent: [[t, 1]], aviso: null } : m.n > 0 || (m.U && m.U.ign > 0) ? { ent: [[t, 0]], aviso: null } : no('sobra');
+  if (ctl === 'u' || ctl === 'b') return v ? { ent: [[t, 1]], aviso: null } : m.n > 0 || (m.U && m.U.ign > 0) ? { ent: [[t, 0]], aviso: null } : no('sobra');
   if (ctl !== 'f') return v ? { ent: [[t, 1]], aviso: null } : m.n > 0 ? { ent: [[t, 0]], aviso: null } : no('sobra');
   if (!v) return no('sobra');
   const M = m.M;
@@ -105,7 +105,7 @@ export function tocar(ctx, conf, ent, t, v, ctl) {
   for (const e of r.ent) ent.push(e);
   // 'u': qué hizo el contacto, para el acuse (QUE_U): lo dice el núcleo, recalculado con el contacto adentro
   let que = null;
-  if (ctl === 'u' && v && r.ent.length) { const m2 = simular(ctx, conf, ent, t), c = m2.U && m2.U.contactos; que = c && c.length && c[c.length - 1].t === t ? c[c.length - 1].que : m2.res ? 'listo' : 'espera'; }
+  if ((ctl === 'u' || ctl === 'b') && v && r.ent.length) { const m2 = simular(ctx, conf, ent, t), c = m2.U && m2.U.contactos; que = c && c.length && c[c.length - 1].t === t ? c[c.length - 1].que : m2.res ? 'listo' : 'espera'; }
   return { t, aviso: r.aviso, n: r.ent.length, motivo: r.ent.length ? null : r.motivo || 'espera', que };
 }
 /**
@@ -115,6 +115,11 @@ export function tocar(ctx, conf, ent, t, v, ctl) {
 export const QUE_U = {
   tira: { clave: 'palabra.vamos' }, salta: { clave: 'palabra.salto' }, pisoton: { clave: 'palabra.pisoton' }, arriba: { clave: 'palabra.eso' }, garra: { clave: 'palabra.garra' },
   guardado: { clave: 'palabra.guardado', gris: true }, listo: { clave: 'palabra.listo', gris: true }, doble: { clave: 'palabra.doble', gris: true }, espera: { clave: 'palabra.guardado', gris: true },
+};
+/** Acuse de cada contacto en 'b': la zona donde pegó la barrita, o en gris que no hizo nada (nunca hace nada malo). */
+export const QUE_B = {
+  verde: { clave: 'barra.verde', zona: 'verde' }, amarillo: { clave: 'barra.amarillo', zona: 'amarillo' }, rojo: { clave: 'barra.rojo', zona: 'rojo' },
+  listo: { clave: 'palabra.listo', gris: true }, doble: { clave: 'palabra.doble', gris: true }, espera: { clave: 'barra.todavia', gris: true },
 };
 
 /** Pasos con número de cada levantamiento en Fácil (de círculos) y en 'u'. */
@@ -153,6 +158,29 @@ function senalU(m, now) {
 }
 
 /**
+ * La señal de 'b' (la barrita). Tipos: 'barra' (la barrita corre: toca cuando el puntero esté en el verde; `i` 0 tirón o 1
+ * envión, `desde` cuándo arrancó el puntero, `z` las zonas, `pos` dónde está el puntero ahora, `lento` si ya va despacio),
+ * 'espera' (PREPÁRATE y RESPIRA: la barrita está a la vista, quieta, con `z` e `i`) y 'auto' (AGUANTA, ¡ABAJO!, ¡DA TODO!).
+ * Entre medio, null: el pesista hace solo el resto. `de` y `paso`: «1 de 2» en el dos tiempos.
+ */
+function senalB(m, now) {
+  const M = m.M, U = m.U, c = m.c, de = c.lev === 'c' ? 2 : 1, B = U.barras;
+  switch (m.fase) {
+    case 'acomodo': return { clave: 'prep', verbo: t('senal.prep'), tipo: 'espera', i: 0, z: B[0].z, paso: de > 1 ? 1 : undefined, de };
+    case 'tension': { const e = now - B[0].t0; return { clave: 'barra', verbo: t('barra.verbo'), sub: t('barra.sub'), tipo: 'barra', i: 0, z: B[0].z, desde: B[0].t0, pos: posBarra(e), lento: e > BARRA.lentoDesde, paso: de > 1 ? 1 : undefined, de }; }
+    case 'freno': return { clave: 'datodo', verbo: t('senal.datodo'), sub: t('senal.datodo_sub'), tipo: 'auto', desde: U.freno.t0, hasta: U.freno.hasta, tramo: U.freno.tramo };
+    case 'hombros': {
+      if (!M.abierto) return { clave: 'respira', verbo: t('senal.respira'), tipo: 'espera', i: 1, z: B[1].z, paso: 2, de };
+      const e = now - B[1].t0;
+      return { clave: 'barra2', verbo: t('barra.verbo'), sub: t('barra.sub'), tipo: 'barra', i: 1, z: B[1].z, desde: B[1].t0, pos: posBarra(e), lento: e > BARRA.lentoDesde, paso: 2, de };
+    }
+    case 'post': return { clave: 'aguanta', verbo: t('senal.aguanta'), sub: t('senal.aguanta_sub'), tipo: 'auto' };
+    case 'fijacion': return now >= m.fij.tb ? { clave: 'abajo', verbo: t('senal.abajo'), sub: t('senal.abajo_sub'), tipo: 'auto' } : { clave: 'aguanta', verbo: t('senal.aguanta'), sub: t('senal.aguanta_sub'), tipo: 'auto' };
+    default: return null;
+  }
+}
+
+/**
  * La señal del instante `now`: qué hay que hacer y cuándo. `m` es la máquina avanzada hasta `now`. null si no hay nada que
  * mostrar. Es lo único que mira el jugador (y lo único que miran los bots de la prueba de jugabilidad).
  *   tipo 'espera'  no se toca            · 'libre'  cuando quieras
@@ -164,6 +192,7 @@ function senalU(m, now) {
 export function senal(m, now, ctl = 'c') {
   if (!m || m.res) return null;
   if (ctl === 'u') return senalU(m, now);
+  if (ctl === 'b') return senalB(m, now);
   const M = m.M, c = m.c, f = ctl === 'f', de = PASOS[c.lev];
   // `bien`: borde de BIEN (± ms); `lim`: hasta cuándo vale el toque; `abre` (Fácil): desde cuándo vale (antes, «todavía no»)
   // `visto`: donde el círculo se cierra en pantalla. Es el objetivo SIN la corrección de atraso (`c.cal`): el jugador apunta

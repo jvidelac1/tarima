@@ -8,6 +8,9 @@
 //  7. Nivel de control Fácil (docs/CONTROLES.md): la capa de traducción es pura; partidas de referencia jugadas a través
 //     de la capa (tools/sim_ref_facil.json); en vivo, recalculado y avance en pasos irregulares dan lo mismo; un `ctl`
 //     desconocido se rechaza y un registro sin `ctl` es Clásico; toda causa tiene su línea de explicación.
+// 13. Nivel 'b' (la barrita, docs/JUEGO.md, Gameplay 3): partidas de referencia jugadas por los bots de
+//     tools/barra_bots.mjs (tools/sim_ref_barra.json); finales en vivo contra recalculadas; toda caída nombra el tramo y
+//     dónde pegó en la barrita; la posición del puntero y la zona son las de rules.js; la señal en los dos idiomas.
 // 12. Nivel 'u' (docs/JUEGO.md, Gameplay 2): partidas de referencia jugadas por los bots de tools/uno_bots.mjs
 //     (tools/sim_ref_uno.json); 1000 finales en vivo contra recalculadas (meta L); toda caída tiene su tramo y una línea
 //     sin tiempos (meta G); la garra se gasta una vez por levantamiento; la señal en los dos idiomas.
@@ -32,8 +35,10 @@ import { DICCIONARIOS, tr, fijarIdioma, detectarIdioma } from '../web/js/game/i1
 import { toques } from '../web/js/game/input.js';
 import { jugarSenal, jugarFijo, BOTS } from './play_human.mjs';
 import { jugarUno, BOTS_U } from './uno_bots.mjs';
+import { jugarBarra, PERFILES } from './barra_bots.mjs';
+import { posBarra, zonasBarra, zonaBarra, cuerpoBarra, BARRA } from '../web/js/sim/rules.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SIM = path.join(ROOT, 'web/js/sim'), REF = path.join(ROOT, 'tools/sim_ref.json'), REF_F = path.join(ROOT, 'tools/sim_ref_facil.json'), REF_U = path.join(ROOT, 'tools/sim_ref_uno.json');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SIM = path.join(ROOT, 'web/js/sim'), REF = path.join(ROOT, 'tools/sim_ref.json'), REF_F = path.join(ROOT, 'tools/sim_ref_facil.json'), REF_U = path.join(ROOT, 'tools/sim_ref_uno.json'), REF_B = path.join(ROOT, 'tools/sim_ref_barra.json');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const N = +(arg('n') || 1000), UPDATE = process.argv.includes('--update');
 const datos = leerDatos(JSON.parse(fs.readFileSync(path.join(ROOT, 'web/data/sim.json'), 'utf8')));
@@ -72,10 +77,11 @@ function jugar(semilla, nivel, persona, estilo = {}) {
     // persona: a veces cambia kilos (y puede quedar desplazada), a veces deja correr el reloj, a veces toca cualquier cosa
     if (r.ent(4) === 0 && a.cambios < 2) { const kg = Math.max(p.minimo(L.a), L.kg + r.entre(-2, 4)); if (!p.cambioValido(800, kg)) { if (p.cambio(800, kg).desplazado) { bit.push({ a: L.a, lev: L.lev, n: L.n, kg: L.kg, res: 'desplazado' }); continue; } } }
     // en 'u' el juego confirma siempre (no hay reloj en el panel): nunca «se le va el reloj»
-    const env = L.lev === 'c' ? ['split', 'power', 'squat'][r.ent(3)] : undefined, ctx = p.contexto(env), modo = estilo.modo ?? (estilo.ctl === 'u' ? 1 + r.ent(9) : r.ent(10));
+    const env = L.lev === 'c' ? ['split', 'power', 'squat'][r.ent(3)] : undefined, ctx = p.contexto(env), modo = estilo.modo ?? (estilo.ctl === 'u' || estilo.ctl === 'b' ? 1 + r.ent(9) : r.ent(10));
     let rec;
     if (modo === 0) rec = { conf: null, env, ent: [] };                                                    // se le va el reloj
     else if (modo === 1) { const ent = []; let t = 2000; for (let k = 0; k < 60; k++) { t += r.entre(1, 900); ent.push([t, k % 2 ? 0 : 1]); } rec = { conf: 1500, env, ent }; }   // toca cualquier cosa
+    else if (estilo.ctl === 'b') { const B = Object.values(PERFILES)[r.ent(8)], S = jugarBarra(ctx, B, L.sem ^ 0x5bd1e995, { conf: 1000 }); rec = { conf: S.conf, env, ent: S.ent }; }      // 'b': cualquiera de los perfiles
     else if (estilo.ctl === 'u') { const B = Object.values(BOTS_U)[r.ent(6)], S = jugarUno(ctx, B, L.sem ^ 0x5bd1e995, { conf: 1000 }); rec = { conf: S.conf, env, ent: S.ent }; }      // 'u': cualquiera de los bots (confirma después del cambio de kilos)
     else if (estilo.ctl === 'f') { const S = jugarSenal(ctx, { ...BOTS.casual, sd: estilo.sd ?? [30, 80, 160][r.ent(3)] }, L.sem ^ 0x5bd1e995); rec = { conf: S.conf, env, ent: S.ent }; }      // Fácil: un toque por señal, a través de la capa
     else { const g2 = gestos({ ...ctx }, { sd: estilo.sd ?? [20, 35, 60][r.ent(3)], pelea: 60 }, L.sem ^ 0x5bd1e995); rec = { conf: g2.conf, env, ent: g2.ent }; }
@@ -312,7 +318,7 @@ function jugar(semilla, nivel, persona, estilo = {}) {
   for (const [k, v] of Object.entries(es)) { ok(!VOSEO.test(v), `voseo en es.${k}: «${v}»`); ok(!JERGA.test(v), `jerga en es.${k}: «${v}»`); }
   for (const [k, v] of [...Object.entries(es), ...Object.entries(en)]) ok(!/pagar para levantar|pay to lift/i.test(v), `promesa de monetización en ${k}`);
   // con las variables comunes resueltas no queda ninguna llave
-  const vars = { nombre: 'Ana', quien: 'Ana', rival: 'Teo', n: 2, de: 3, kg: 150, lo: 140, hi: 155, min: 150, c: 1, s: 5, b: 2, lev: 'x', pos: '2nd', ms: 30, k: 1, controles: 'x', veredicto: 'x', causa: 'x', a: 'x', medalla: 'x', total: 300, marcas_s: '✅', marcas_c: '❌', link: 'x', envion: 'x', verbo: 'x', cuando: 'x', cuanto: 'x', ajuste: 'x', lado: 'x', grado: 'x', sugerido: 'x', donde: 'x', mayor: 'x', discos: 'x', pct: 97, tramo: 'x', d: '½', tipo: 'x', apuesta: 'x' };
+  const vars = { nombre: 'Ana', quien: 'Ana', rival: 'Teo', n: 2, de: 3, kg: 150, lo: 140, hi: 155, min: 150, c: 1, s: 5, b: 2, lev: 'x', pos: '2nd', ms: 30, k: 1, controles: 'x', veredicto: 'x', causa: 'x', a: 'x', medalla: 'x', total: 300, marcas_s: '✅', marcas_c: '❌', link: 'x', envion: 'x', verbo: 'x', cuando: 'x', cuanto: 'x', ajuste: 'x', lado: 'x', grado: 'x', sugerido: 'x', donde: 'x', mayor: 'x', discos: 'x', pct: 97, tramo: 'x', d: '½', tipo: 'x', apuesta: 'x', zona: 'x' };
   for (const l of ['es', 'en']) for (const tactil of [false, true]) for (const k of ke) { const v = tr(l, k, { ...vars, tactil }); ok(!/[{}]/.test(v) && v.trim().length > 0, `${l}.${k} queda «${v}»`); }
   // la señal sale en el idioma elegido, y los pasos de «Cómo se juega» también
   { const ctx = { lev: 's', I: 9000, tec: 7, temple: 0, garra: 6, anclas: datos.modelos.ventura, semilla: 5, cal: 0, primera: false, domina: true, jueces: [1000, 1000, 1000], reloj: 30000, ctl: 'f' };
@@ -452,6 +458,54 @@ function jugar(semilla, nivel, persona, estilo = {}) {
     const m2 = simular(ctx, 0, [[1500, 1], [1560, 0]], 1600), s2 = senal(m2, 1600, 'u'); ok(s2 && s2.clave === 'salta' && s2.tipo === 'luz', `después de ¡TIRA! la señal tiene que ser ¡SALTA!: ${JSON.stringify(s2)}`);
     ok(pasos('u', true, 'es').length === 3 && /¡SALTA!/.test(pasos('u', false, 'es')[1][1]), 'pasos de «Cómo se juega» en \'u\''); }
   console.log(`12. 'u': 9 partidas de referencia · ${n} finales en vivo contra recalculadas · ${intentos} intentos propios, ${(validos * 100 / intentos).toFixed(0)} % válidos, caídas ${JSON.stringify(causas)} · garras usadas ${garras} · líneas de caída con tramo y sin tiempos · señal en los dos idiomas`);
+}
+
+// ---------- 13. nivel 'b' (la barrita) ----------
+{
+  const casos = []; for (let k = 0; k < 9; k++) casos.push({ semilla: 5000011 * (k + 1), nivel: NIV[k % 3], persona: k % 3 });
+  const hoy = casos.map(c => ({ ...c, tabla: resumen(jugar(c.semilla, c.nivel, c.persona, { ctl: 'b' }).p.tabla()) }));
+  if (UPDATE || !fs.existsSync(REF_B)) { fs.writeFileSync(REF_B, JSON.stringify({ datos: datos.huella, casos: hoy }, null, 1) + '\n'); console.log("13. referencia de 'b' escrita en tools/sim_ref_barra.json"); }
+  else { const ref = JSON.parse(fs.readFileSync(REF_B, 'utf8')); ok(ref.datos === datos.huella, "la referencia de 'b' es de otra huella"); ref.casos.forEach((c, i) => ok(c.tabla === hoy[i]?.tabla, `referencia 'b' ${i} (semilla ${c.semilla}): guardado «${c.tabla}», hoy «${hoy[i]?.tabla}»`)); }
+  let n = 0, intentos = 0, validos = 0, sinLinea = 0; const zonas = { verde: 0, amarillo: 0, rojo: 0 };
+  for (let k = 0; k < Math.min(N, 600); k++) {
+    const semilla = mezclar(k, 321), persona = k % 3, { p } = jugar(semilla, NIV[k % 3], persona, { ctl: 'b', primera: k % 7 === 0 });
+    const reg = JSON.parse(JSON.stringify(p.reg)), rc = recalcular(reg, datos), t = resumen(p.tabla());
+    ok(reg.ctl === 'b' && typeof reg.barra === 'string', `semilla ${semilla}: el registro no guarda 'b' con su huella`);
+    ok(rc.ok && resumen(rc.tabla) === t, `'b', semilla ${semilla}: recalcular da ${rc.ok ? resumen(rc.tabla) : rc.error} y en vivo ${t}`);
+    if (k < 20) { const g = JSON.parse(JSON.stringify(reg)); g.barra = 'x'; ok(!recalcular(g, datos).ok, "un registro de 'b' con otra huella se acepta"); }
+    for (const lev of ['s', 'c']) for (const x of p.at[persona][lev]) { intentos++; if (x.res === 'valido') validos++; ok(x.res !== 'nulo', `'b' no tiene nulos: ${JSON.stringify(x)}`); }
+    n++;
+  }
+  // la posición del puntero: va y vuelve, empieza a la izquierda, y se pone más lento después de BARRA.lentoDesde
+  ok(posBarra(0) === 0 && posBarra(BARRA.pasada) === 1000 && posBarra(2 * BARRA.pasada) === 0 && posBarra(BARRA.pasada / 2) === 500, 'el puntero no va y vuelve como se dibuja');
+  { let prev = posBarra(0), salto = 0; for (let e = 1; e < 20000; e++) { const x = posBarra(e); salto = Math.max(salto, Math.abs(x - prev)); prev = x; } ok(salto <= 2, `el puntero salta ${salto} milésimas en 1 ms`); }
+  // el toque decide la zona por la posición del puntero en ese instante; caídas con línea que nombra la zona
+  { const r = new Azar(55);
+    for (let k = 0; k < 600; k++) {
+      const lev = k % 2 ? 'c' : 's', id = IDS[k % 3], f = datos.atletas[id], I = 9000 + r.ent(1400), c = cuerpoBarra(id), env = lev === 'c' ? c.casa : undefined;
+      const ctx = { lev, env, I, tec: f.attrs.tec, temple: 0, garra: f.attrs.gar, anclas: datos.modelos[f.modelo], semilla: mezclar(k, 6), cal: 0, primera: false, domina: true, jueces: [1000, 1000, 1000], reloj: 30000, ctl: 'b', cuerpo: c, garraUno: k % 4 !== 0 };
+      const S = jugarBarra(ctx, Object.values(PERFILES)[k % 4], k), res = S.m.res;
+      for (const b of res.uno.barras) { zonas[b.zona]++; ok(b.sola || zonaBarra(b.pos, zonasBarra(I, c, b.i)) === b.zona, `zona mal juzgada: ${JSON.stringify(b)}`); }
+      if (res.res !== 'fallo') continue;
+      for (const l of ['es', 'en']) {
+        const txt = explicar(res, 'b', k % 2 === 0, { lev, quien: 'Ana', kg: 170, pct: Math.round(I / 100) }, l), corta = explicar(res, 'b', false, { lev }, l);
+        const zona = (res.uno.barras.find(b => b.zona === 'rojo') || res.uno.barras.find(b => b.zona === 'amarillo') || { zona: 'verde' }).zona, nombre = tr(l, 'barra.z.' + zona);
+        if (!res.uno.tramo_caida || !txt || !txt.includes(nombre) || !corta.includes(nombre) || /\b(ms|undefined)\b|[{}]/i.test(txt + corta) || txt.length > 140) { sinLinea++; if (sinLinea < 4) console.log(`  MAL: línea de caída de 'b' (${l}): «${txt}» · «${corta}» · ${JSON.stringify(res.uno.barras)}`); }
+      }
+    }
+  }
+  ok(!sinLinea, `${sinLinea} caídas de 'b' sin línea que nombre el tramo y la zona`);
+  ok(zonas.verde && zonas.amarillo && zonas.rojo, `las tres zonas tienen que aparecer: ${JSON.stringify(zonas)}`);
+  // la señal de 'b' sale en el idioma elegido, y un toque en la gracia o en PREPÁRATE no dispara nada
+  { const ctx = { lev: 's', I: 9000, tec: 7, temple: 0, garra: 6, anclas: datos.modelos.ventura, semilla: 5, cal: 0, primera: false, domina: true, jueces: [1000, 1000, 1000], reloj: 30000, ctl: 'b', cuerpo: cuerpoBarra('ventura') };
+    const m = simular(ctx, 0, [], 1300); fijarIdioma('en'); const sEn = senal(m, 1300, 'b'); fijarIdioma('es'); const sEs = senal(m, 1300, 'b');
+    ok(sEn && sEs && sEn.verbo === 'TAP IN THE GREEN' && sEs.verbo === 'TOCA EN EL VERDE' && sEn.tipo === 'barra', `la señal de 'b' no cambia con el idioma: ${sEn?.verbo} / ${sEs?.verbo}`);
+    const m1 = simular(ctx, 0, [[600, 1], [650, 0], [1300, 1], [1350, 0]], 1500); ok(m1.fase === 'tension' && m1.U.contactos.every(x => x.que === 'espera'), `un toque en PREPÁRATE o en la gracia disparó la barrita: ${JSON.stringify(m1.U.contactos)}`);
+    const tv = 1200 + BARRA.pasada / 2, m2 = simular(ctx, 0, [[tv, 1], [tv + 60, 0], [tv + 100, 1]], tv + 200); ok(m2.U.barras[0].zona === 'verde' && m2.fase === 'tiron' && m2.U.contactos.map(x => x.que).join() === 'verde,doble', `un toque con el puntero en el centro tiene que ser verde y el doble no contar: ${JSON.stringify(m2.U.contactos)}`);
+    const m3 = simular(ctx, 0, [[1200 + 300, 1]]); ok(m3.res && m3.res.uno.barras[0].zona === 'rojo' && m3.res.res === 'valido', `un toque lejos con el 90 % sube igual: ${JSON.stringify(m3.res?.uno)}`);
+    const m4 = simular(ctx, 0, []); ok(m4.res && m4.res.res === 'valido' && m4.res.uno.barras[0].sola && m4.res.t > BARRA.soloMs, `sin tocar, tira solo al minuto y regular: ${JSON.stringify(m4.res?.uno?.barras)}`);
+    ok(pasos('b', true, 'es').length === 3 && /verde/.test(pasos('b', false, 'es')[1][1]), 'pasos de «Cómo se juega» en \'b\''); }
+  console.log(`13. 'b': 9 partidas de referencia · ${n} finales en vivo contra recalculadas · ${intentos} intentos propios, ${(validos * 100 / intentos).toFixed(0)} % válidos · zonas ${JSON.stringify(zonas)} · líneas de caída con tramo y zona · puntero y señal en los dos idiomas`);
 }
 
 console.log(fallas.length ? `\nFALLÓ: ${fallas.length} problemas` : `\nOK en ${((Date.now() - t0) / 1000).toFixed(1)} s`);

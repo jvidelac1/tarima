@@ -5,22 +5,22 @@ import { idiv, rdiv, clampi, mezclar, Azar } from './fixed.js';
 import { simular } from './attempt.js';
 import { gestos, decidir, elegirEnvion } from './ai.js';
 import { sugerencia } from './entrenador.js';
-import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad, cuerpoDe, HUELLA_U } from './rules.js';
+import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad, cuerpoDe, cuerpoBarra, HUELLA_U, HUELLA_B } from './rules.js';
 
 const LEVS = ['s', 'c'];
 
 export class Partida {
   /**
    * @param {object} datos  sim.json ya verificado (data.js)
-   * @param {{semilla:number, nivel:string, cal:number, primera:boolean, ctl?:'c'|'f'|'u', atletas:Array<{id:string, ctrl:'persona'|'juego'}>}} cfg
+   * @param {{semilla:number, nivel:string, cal:number, primera:boolean, ctl?:'c'|'f'|'u'|'b', atletas:Array<{id:string, ctrl:'persona'|'juego'}>}} cfg
    *   `ctl`: nivel de control de la persona (ausente = 'c', Clásico). Los rivales juegan siempre con las reglas de Clásico.
-   *   `tactil`: con el dedo (vale para 'f' y 'u'; queda en la cabecera del registro).
+   *   `tactil`: con el dedo (vale para 'f', 'u' y 'b'; queda en la cabecera del registro).
    */
   constructor(datos, cfg) {
     if (!NIVELES[cfg.nivel]) throw new Error('nivel desconocido');
     if (!Array.isArray(cfg.atletas) || cfg.atletas.length !== 3 || new Set(cfg.atletas.map(x => x.id)).size !== 3) throw new Error('la final es de tres pesistas distintos');
     const ctl = cfg.ctl ?? 'c'; if (!CONTROLES.includes(ctl)) throw new Error('nivel de control desconocido');
-    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl, tactil: (ctl === 'f' || ctl === 'u') && !!cfg.tactil };
+    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl, tactil: (ctl === 'f' || ctl === 'u' || ctl === 'b') && !!cfg.tactil };
     const r = new Azar(mezclar(this.cfg.semilla, 7)), N = NIVELES[cfg.nivel];
     this.jueces = [0, 1, 2].map(() => r.entre(900, 1100));
     const tipo = r.ent(3), quien = r.ent(3);
@@ -36,7 +36,7 @@ export class Partida {
     if (this.guion.tipo === 'tocado') this.at[quien].resto = RESTO.tocado;
     if (this.guion.tipo === 'forma') this.at[quien].forma = { s: 2, c: 2 };
     this.fase = 'presentacion'; this.lev = 's'; this.seq = 0; this.barra = 0; this.ultimo = -1; this.llamado = null; this.nLlamado = 0;
-    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : {}),
+    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : ctl === 'b' ? { barra: HUELLA_B } : {}),
       atletas: cfg.atletas.map(x => ({ id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego' })), aperturas: this.at.map(a => ({ s: a.decl.s, c: a.decl.c })), llamados: [] };
   }
 
@@ -129,8 +129,9 @@ export class Partida {
     if (L.lev === 'c' && !['split', 'power', 'squat'].includes(env)) throw new Error('envión inválido');
     return { lev: L.lev, env: L.lev === 'c' ? env : undefined, I, tec: f.attrs.tec, temple: L.et.length ? f.attrs.tem : 0, garra: f.attrs.gar, anclas: a.modelo, semilla: L.sem,
       cal: persona ? this.cfg.cal : 0, primera: persona && this.cfg.primera && L.n === 1, domina: L.lev === 's' || f.enviones.includes(env), jueces: this.jueces, reloj: L.reloj, ctl: persona ? this.cfg.ctl : 'c', ...(persona && this.cfg.tactil ? { tactil: true } : {}),
-      // 'u': el cuerpo de juego del pesista (rules.js → CUERPOS_U) y si todavía tiene la garra de este levantamiento
-      ...(persona && this.cfg.ctl === 'u' ? { cuerpo: cuerpoDe(a.id), garraUno: a.garraUno[L.lev] } : {}) };
+      // 'u' y 'b': el cuerpo de juego del pesista (rules.js → CUERPOS_U; en 'b', con el ancho de cada barrita) y si todavía
+      // tiene la garra de este levantamiento
+      ...(persona && this.cfg.ctl === 'u' ? { cuerpo: cuerpoDe(a.id), garraUno: a.garraUno[L.lev] } : persona && this.cfg.ctl === 'b' ? { cuerpo: cuerpoBarra(a.id), garraUno: a.garraUno[L.lev] } : {}) };
   }
   /** ¿Puede el pesista del llamado pedir `kg` en el instante `ms`? Devuelve el motivo si no. */
   cambioValido(ms, kg) {
@@ -172,7 +173,7 @@ export class Partida {
   _aplicar(ctx, res) {
     // en 'u' tocar de más no cuesta nada: machacar, mantener o tocar con calma dan lo mismo también en el Resto
     const L = this.llamado, a = this.at[L.a], lev = L.lev, valido = res.res === 'valido';
-    const costo = RESTO.base[lev] + Math.max(0, idiv(ctx.I - 9500, 100)) * RESTO.sobre95 + (ctx.ctl === 'u' ? 0 : Math.min(RESTO.topePelea, res.toques * RESTO.toque + idiv(res.fuera * RESTO.fueraSeg, 120))) + (valido ? 0 : RESTO.nulo) + (lev === 'c' ? RESTO.envion[ctx.env] : 0);
+    const costo = RESTO.base[lev] + Math.max(0, idiv(ctx.I - 9500, 100)) * RESTO.sobre95 + (ctx.ctl === 'u' || ctx.ctl === 'b' ? 0 : Math.min(RESTO.topePelea, res.toques * RESTO.toque + idiv(res.fuera * RESTO.fueraSeg, 120))) + (valido ? 0 : RESTO.nulo) + (lev === 'c' ? RESTO.envion[ctx.env] : 0);
     const gasto = Math.max(0, idiv(costo * multFondo(a.f.attrs.fon), 1000)), seq = this.seq++;
     a.resto = Math.max(0, a.resto - gasto);
     a[lev].push({ kg: L.kg, res: res.res, causa: res.causa, luces: res.luces, seq, env: ctx.env, et: L.et, I: ctx.I, gasto });
@@ -188,7 +189,7 @@ export class Partida {
       if (a.ctrl === 'juego') { const k = decidir(this, a.i); if (k !== null) a.decl[lev] = k; }
       // 'u' (Gameplay 2.1): la persona declara lo que propone el entrenador (entrenador.js), no el plan fijo. Así el orden de
       // los llamados ya cuenta con ese peso y el panel no la desplaza al proponerlo
-      else if (this.cfg.ctl === 'u') { const k = sugerencia(this, a.i, lev, ctx.env); if (k !== null) a.decl[lev] = k; }
+      else if (this.cfg.ctl === 'u' || this.cfg.ctl === 'b') { const k = sugerencia(this, a.i, lev, ctx.env); if (k !== null) a.decl[lev] = k; }
     }
     // cambios de los rivales, al cierre de cada intento ajeno
     const avisos = [];

@@ -9,6 +9,7 @@ import {
   ventanas, calidad, palabra, alturaExplosion, desvioExplosion, velTiron, exigenciaTabla, alturaTabla, periodoAnillo, errorAnillo, gradoTension,
   anchoFacil, asistFacil, segunHolgura, TENSION, FACIL, ACOMODO_MS, ALTURA_MIN, TOPE_DESVIO, ALTURA_ENVION, NO_DOMINA, EXI_ARRANQUE, EXI_ERROR, PELEA, TRABA, FIJA, HOMBROS, JUEZ, esfuerzoPropio,
   UNO, CUERPO_NEUTRO, TRAMOS, gastoTramo, conSuerte, ruidoDe, garraAlcanza,
+  BARRA, TRAMO_BARRA, posBarra, zonasBarra, zonaBarra,
 } from './rules.js';
 
 const INF = 2147483647;
@@ -25,12 +26,13 @@ const PASO = k => idiv(k * 25, 3);           // ms del paso k de la pelea (120 p
  * @property {number[]} jueces       umbral de cada juez en milésimas (900 a 1100)
  * @property {number} reloj          ms; 0 = sin reloj (calentamiento)
  * @property {number} [exiFija]      exigencia guionada (calentamiento)
- * @property {'c'|'f'|'u'} [ctl]     nivel de control: 'f' (Fácil de círculos) ensancha las ventanas, vuelve amague el tirón anticipado y da siempre buena tensión.
+ * @property {'c'|'f'|'u'|'b'} [ctl] nivel de control: 'f' (Fácil de círculos) ensancha las ventanas, vuelve amague el tirón anticipado y da siempre buena tensión.
  *                                   'u' (un toque, un tramo): ningún toque tiene momento justo; decide el margen (ver `_u…` abajo).
+ *                                   'b' (la barrita): la energía de 'u', y el toque de cada barrita cuesta según dónde cae (ver `_b…`).
  * @property {boolean} [tactil]      con el dedo: en 'f', ventanas FACIL.tactil más anchas y señal que abre y cierra más tarde; en 'u',
  *                                   dos contactos a menos de UNO.dobleDedo ms son uno (con teclado, UNO.dobleTecla).
  *                                   Ausente o 'c': Clásico, las reglas de siempre (docs/CONTROLES.md, sección 4)
- * @property {object} [cuerpo]       ('u') factores de gasto por tramo del pesista (rules.js, cuerpoDe); sin él, CUERPO_NEUTRO
+ * @property {object} [cuerpo]       ('u', 'b') factores de gasto por tramo del pesista (rules.js, cuerpoDe o cuerpoBarra); sin él, CUERPO_NEUTRO
  * @property {boolean} [garraUno]    ('u') la garra de este levantamiento sigue disponible (false: ya se usó en otro intento)
  */
 export class Intento {
@@ -44,7 +46,7 @@ export class Intento {
     this.gestos = []; this.toques = 0; this.fuera = 0; this.amagues = 0;
     this.temblor = 0; this.trabaMs = -1; this.rodilla = false;
     this.movs = []; this.M = null; this.fij = null;
-    this.U = c.ctl === 'u' ? this._uIni() : null;
+    this.B = c.ctl === 'b'; this.U = c.ctl === 'u' || this.B ? this._uIni() : null;
   }
   get fin() { return this.res !== null; }
 
@@ -294,15 +296,40 @@ export class Intento {
   _uIni() {
     const c = this.c, cuerpo = c.cuerpo || CUERPO_NEUTRO, suerte = TRAMOS[c.lev].map((_, i) => ruidoDe(c.semilla, i, cuerpo.ruido || 0));
     return { cuerpo, suerte, dia: suerte.reduce((a, x) => a + x, 0), m0: UNO.margen, m: UNO.margen, gastos: {}, suertes: {}, log: [], garra: c.garraUno === false ? 'gastada' : 'disponible', noAlcanza: false,
-      guarda: 0, ign: 0, ultBaja: -INF, contactos: [], salto: null, pisoton: null, caida: null, freno: null, tiraSola: false, arribaSola: false };
+      guarda: 0, ign: 0, ultBaja: -INF, contactos: [], salto: null, pisoton: null, caida: null, freno: null, tiraSola: false, arribaSola: false,
+      // 'b': las barritas (zonas, y dónde cayó cada toque) y lo que su toque le suma al gasto de su tramo
+      barras: this.B ? [0, 1].slice(0, c.lev === 'c' ? 2 : 1).map(i => ({ i, z: zonasBarra(c.I, cuerpo, i, !!c.primera), t0: null, t: null, pos: null, zona: null, sola: false })) : null, extra: {} };
   }
   _uEntrada(t, v) {
     const U = this.U;
     if (!v) { if (this.n > 0) this.n--; else if (U.ign > 0) U.ign--; return; }
     // la confirmación y el doble toque son un solo contacto: no cuentan, ni tampoco su soltar
-    if ((this.tConf !== undefined && t < this.tConf + UNO.confMs) || t - U.ultBaja < (this.c.tactil ? UNO.dobleDedo : UNO.dobleTecla)) { U.ign++; U.contactos.push({ t, que: 'doble' }); return; }
+    if ((this.tConf !== undefined && t < this.tConf + UNO.confMs) || t - U.ultBaja < (this.B ? BARRA.doble : this.c.tactil ? UNO.dobleDedo : UNO.dobleTecla)) { U.ign++; U.contactos.push({ t, que: 'doble' }); return; }
     U.ultBaja = t; this.n++; this.toques++;
-    U.contactos.push({ t, que: this._uContacto(t) });
+    U.contactos.push({ t, que: this.B ? this._bContacto(t) : this._uContacto(t) });
+  }
+  // ---------- 'b': la barrita (docs/JUEGO.md, Gameplay 3) ----------
+  // Una barrita por tramo con toque: el tirón (arranque y cargada) en 'tension' y el envión en 'hombros' (cuando abre). El
+  // puntero arranca a la izquierda cuando abre la barrita y va y vuelve (rules.js, posBarra); el primer contacto nuevo
+  // dispara el tramo EN ESE INSTANTE y la posición del puntero en ese instante decide la zona y lo que cuesta de más. Una
+  // tecla o un dedo que ya estaban apoyados no disparan nada (tienen que bajar de nuevo). Los demás contactos no hacen
+  // nada: ¡SALTA!, ¡PÁRATE! y la garra salen solos. Sin ningún toque, a los BARRA.soloMs el pesista tira solo, REGULAR.
+  /** Qué hace un contacto nuevo en t: 'verde', 'amarillo' o 'rojo' (disparó una barrita), 'espera' o 'listo'. */
+  _bContacto(t) {
+    const M = this.M;
+    const U = this.U, i = this.fase === 'tension' ? 0 : this.fase === 'hombros' && M.abierto ? 1 : -1;
+    if (i >= 0 && t < U.barras[i].t0 + BARRA.graciaMs) return 'espera';
+    if (i === 0) { const z = this._bPega(t, 0, false); this._uTira(t); return z; }
+    if (i === 1) { const z = this._bPega(t, 1, false); this._uArriba(t); return z; }
+    if (this.fase === 'llamado' || this.fase === 'acomodo' || (this.fase === 'hombros' && !M.abierto)) return 'espera';
+    return 'listo';
+  }
+  /** Juzga la barrita `i` en t (o la marca REGULAR si salió sola) y anota lo que su tramo gasta de más. */
+  _bPega(t, i, sola) {
+    const U = this.U, b = U.barras[i]; b.t = t; b.sola = sola;
+    b.pos = posBarra(t - b.t0); b.zona = sola ? 'amarillo' : zonaBarra(b.pos, b.z);
+    U.extra[TRAMO_BARRA[i]] = BARRA.costo[b.zona];
+    return b.zona;
   }
   /** Qué hace un contacto nuevo en t: 'tira', 'salta', 'pisoton', 'garra', 'arriba', 'guardado', 'listo' o 'espera'. */
   _uContacto(t) {
@@ -346,7 +373,7 @@ export class Intento {
     const M = this.M, U = this.U;
     M.pelea = { modo: 'pelea', t0, P: 0, T: 0, k: 0, aguja: 0, exi: 0, exiAhora: 0, cerrado: false, tCierre: t0 + UNO.pararseMs, tP0: t0, P0: 0, Pc: 0, tSube: INF, tPie: INF };
     this.fase = 'pelea';
-    if (U.pisoton === null && this._uAbre()) this._uPisa(t0);
+    if (!this.B && U.pisoton === null && this._uAbre()) this._uPisa(t0);
   }
   _uPisa(t) {
     const p = this.M.pelea; this.U.pisoton = t; p.P0 = this._uP(t); p.tP0 = t;
@@ -366,7 +393,7 @@ export class Intento {
     const M = this.M; M.tEnPie = t; M.pelea.P = 1000000;
     if (M.mov === 's') return this._uFija(t);
     if (M.mov === 'c') {
-      this._mov('j', t); const J = this.M; J.ign = t + UNO.respiraMs; J.tDev = J.ign + UNO.arribaSolo; J.abierto = false; this.fase = 'hombros'; return;
+      this._mov('j', t); const J = this.M; J.ign = t + (this.B ? BARRA.respiraMs : UNO.respiraMs); J.tDev = J.ign + (this.B ? BARRA.soloMs : UNO.arribaSolo); J.abierto = false; this.fase = 'hombros'; return;
     }
     M.tPost = t + M.an.post; this.fase = 'post';
   }
@@ -378,8 +405,9 @@ export class Intento {
    */
   _uCierra(t, tramo, sigue) {
     const U = this.U, c = this.c, orden = TRAMOS[c.lev], i = orden.indexOf(tramo);
-    const g0 = gastoTramo(tramo, c.I, c.lev, c.env, U.cuerpo), g = conSuerte(g0, U.suerte[i]);
-    U.gastos[tramo] = g; U.suertes[tramo] = g - g0; U.m -= g; U.log.push({ t, tramo, gasto: g, suerte: g - g0, m: U.m });
+    const g0 = gastoTramo(tramo, c.I, c.lev, c.env, U.cuerpo), gs = conSuerte(g0, U.suerte[i]), extra = U.extra[tramo] || 0, g = gs + extra;
+    // 'b': el gasto del tramo incluye lo que costó su barrita (`toque`); la suerte es solo la del tramo
+    U.gastos[tramo] = g; U.suertes[tramo] = gs - g0; U.m -= g; U.log.push({ t, tramo, gasto: g, suerte: gs - g0, ...(this.B && TRAMO_BARRA.includes(tramo) && U.barras[TRAMO_BARRA.indexOf(tramo)] ? { toque: extra, zona: U.barras[TRAMO_BARRA.indexOf(tramo)].zona } : {}), m: U.m });
     if (U.m >= 0) return sigue(t);
     if (U.m >= UNO.frenoMin && U.garra === 'disponible') {
       // la garra se usa sola si con ella el resto llega (sin suerte); si no alcanzaría, no se gasta
@@ -413,7 +441,7 @@ export class Intento {
     const M = this.M, U = this.U;
     switch (this.fase) {
       case 'acomodo': return this.tSet;
-      case 'tension': return this.tSet + UNO.tiraSolo;
+      case 'tension': return this.tSet + (this.B ? BARRA.soloMs : UNO.tiraSolo);
       case 'tiron': return M.saltaAbierta ? M.tx : Math.min(M.tSalta, M.tx);
       case 'vuelo': case 'empuje': return M.tc;
       case 'flexion': return M.tx;
@@ -428,10 +456,10 @@ export class Intento {
   _uVence(d) {
     const M = this.M, U = this.U;
     switch (this.fase) {
-      case 'acomodo': this._mov(this.c.lev, d); this.fase = 'tension'; if (this._uAbre()) this._uTira(d); return;
-      case 'tension': U.tiraSola = true; return this._uTira(d);
+      case 'acomodo': this._mov(this.c.lev, d); this.fase = 'tension'; if (this.B) { U.barras[0].t0 = d; return; } if (this._uAbre()) this._uTira(d); return;
+      case 'tension': U.tiraSola = true; if (this.B) this._bPega(d, 0, true); return this._uTira(d);
       case 'tiron':
-        if (!M.saltaAbierta && d === M.tSalta) { M.saltaAbierta = true; if (U.salto === null && this._uAbre()) U.salto = d; return; }
+        if (!M.saltaAbierta && d === M.tSalta) { M.saltaAbierta = true; if (!this.B && U.salto === null && this._uAbre()) U.salto = d; return; }
         return this._uExplota(d);
       case 'flexion': return this._uExplota(d);
       case 'vuelo': return this._uRecibe(d);
@@ -443,8 +471,8 @@ export class Intento {
       }
       case 'freno': return this._uGarra(d);
       case 'hombros':
-        if (!M.abierto) { M.abierto = true; if (this._uAbre()) this._uArriba(d); return; }
-        U.arribaSola = true; return this._uArriba(d);
+        if (!M.abierto) { M.abierto = true; if (this.B) { U.barras[1].t0 = d; return; } if (this._uAbre()) this._uArriba(d); return; }
+        U.arribaSola = true; if (this.B) this._bPega(d, 1, true); return this._uArriba(d);
       case 'post': return this._uFija(d);
       case 'fijacion': return this._cierra(d, 'valido', null, [true, true, true]);
     }
@@ -454,7 +482,8 @@ export class Intento {
     const U = this.U, g = U.gastos; let mayor = null; for (const k of Object.keys(g)) if (mayor === null || g[k] > g[mayor]) mayor = k;
     const cuenta = {}; for (const x of U.contactos) cuenta[x.que] = (cuenta[x.que] || 0) + 1;
     return { margen_ini: U.m0, dia: U.dia, gastos: { ...g }, suertes: { ...U.suertes }, margen_fin: U.m, garra: U.garra, garra_no_alcanza: U.noAlcanza, tramo_caida: U.caida, tramo_mayor: mayor, salto: U.salto !== null, pisoton: U.pisoton !== null,
-      tira_sola: U.tiraSola, arriba_sola: U.arribaSola, al_limite: !U.caida && U.m < UNO.alLimite, contactos: cuenta };
+      tira_sola: U.tiraSola, arriba_sola: U.arribaSola, al_limite: !U.caida && U.m < UNO.alLimite, contactos: cuenta,
+      ...(this.B ? { barras: U.barras.filter(b => b.zona).map(b => ({ i: b.i, zona: b.zona, pos: b.pos, v: b.z.v, a: b.z.a, sola: b.sola, extra: BARRA.costo[b.zona] })) } : {}) };
   }
 
   // ---------- resultados ----------

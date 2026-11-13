@@ -28,6 +28,7 @@ export function cuanto(e, l = idiomaActual(), pro = false) {
  */
 export function explicar(res, ctl = 'c', tactil = false, o = {}, l = idiomaActual()) {
   if (ctl === 'u') return lineaU(res, o || {}, l);
+  if (ctl === 'b') return lineaB(res, o || {}, l);
   const r = linea(res, ctl, tactil, o || {}, l); if (!r) return '';
   return tr(l, r[0], { tactil, ...r[1] }).replace(/!\./g, '!');
 }
@@ -113,10 +114,26 @@ function lineaU(res, o, l) {
   return (o.quien && o.kg && o.pct ? tr(l, 'explica.u.cae', { ...v, quien: o.quien, kg: o.kg, pct: o.pct }) : tr(l, 'explica.u.cae_corta', v)) + extra;
 }
 
+/**
+ * Línea de 'b' (docs/JUEGO.md, Gameplay 3): dónde se quedó sin energía y, siempre, dónde pegó en la barrita: «173 kg es el
+ * 99 % y pegaste en el amarillo (−½): se quedó sin energía en el tirón». Con dos barritas nombra la peor (y lo que costaron
+ * las dos). Si pegó en el verde, la culpa es de los kilos. Válido: solo si quedó al límite.
+ */
+function lineaB(res, o, l) {
+  const u = res && res.uno; if (!u) return '';
+  const lev = o.lev || (Object.keys(u.gastos)[1] === 'pararse' ? 'c' : 's');
+  if (res.res === 'valido') return u.al_limite ? tr(l, 'explica.u.limite', { discos: discos(u.margen_fin, l) }) : '';
+  const B = (u.barras || []).filter(b => b.zona !== 'verde'), peor = B.find(b => b.zona === 'rojo') || B[0], extra = B.reduce((a, b) => a + b.extra, 0);
+  const v = { donde: tramoTxt(u.tramo_caida, lev, l), quien: o.quien, kg: o.kg, pct: o.pct };
+  const larga = o.kg && o.pct;
+  if (!peor) return tr(l, larga ? 'explica.b.verde' : 'explica.b.verde_corta', v);
+  return tr(l, larga ? 'explica.b.zona' : 'explica.b.zona_corta', { ...v, zona: tr(l, 'barra.z.' + peor.zona), d: cuartos(extra) });
+}
+
 /** Los tres pasos de «Cómo se juega»: [cantidad de teclas dibujadas, texto]. */
 export function pasos(ctl = 'f', tactil = false, l = idiomaActual()) {
-  const k = ctl === 'u' ? ['u1', 'u2', 'u3'] : ctl === 'f' ? ['f1', 'f2', 'f3'] : ['c1', 'c2', 'c3'];
-  if (ctl === 'u') return k.map(x => [1, tr(l, 'pasos.' + x, { tactil })]);
+  const k = ctl === 'b' ? ['b1', 'b2', 'b3'] : ctl === 'u' ? ['u1', 'u2', 'u3'] : ctl === 'f' ? ['f1', 'f2', 'f3'] : ['c1', 'c2', 'c3'];
+  if (ctl === 'u' || ctl === 'b') return k.map(x => [1, tr(l, 'pasos.' + x, { tactil })]);
   return k.map((x, i) => [i === 2 ? 3 : 1, tr(l, 'pasos.' + x, { tactil })]);
 }
 /** Clave del texto del tutorial guiado en cada parada (Un toque). */

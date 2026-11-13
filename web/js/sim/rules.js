@@ -148,7 +148,7 @@ export const segunHolgura = (I, con, sin) => sin + idiv((con - sin) * holgura(I)
 export const asistFacil = I => (I <= FACIL.holgadoHasta ? FACIL.asist : I >= FACIL.asistHasta ? FACIL.asistTecho : lerpi(I, FACIL.holgadoHasta, FACIL.asistHasta, FACIL.asist, FACIL.asistTecho));
 /** Ancho de las ventanas de Fácil a la intensidad I (milésimas). */
 export const anchoFacil = I => segunHolgura(I, FACIL.ancho, FACIL.anchoTecho);
-export const CONTROLES = ['c', 'f', 'u'];
+export const CONTROLES = ['c', 'f', 'u', 'b'];
 
 /**
  * Nivel de control «Un toque, un tramo» (`'u'`, docs/JUEGO.md, sección Gameplay 2 y su revisión 2.1). Ningún toque tiene un
@@ -261,6 +261,126 @@ export function chanceUno(I, lev, env, cuerpo, o = {}) {
   };
   paso(0, UNO.margen, garra0);
   return idiv(ok * 1000, n * n * n);
+}
+
+/**
+ * Nivel de control «la barrita» (`'b'`, docs/JUEGO.md, sección Gameplay 3): el Fácil por defecto desde el 13-nov (noche).
+ * Usa la misma energía, los mismos cuerpos (CUERPOS_U), la suerte por tramo y la garra de `'u'`, pero el jugador tira él:
+ * UNA barrita en el arranque (el tirón) y DOS en el dos tiempos (la cargada y el envión). Un puntero va y vuelve sobre la
+ * barrita sin reloj que tire la barra; el toque dispara el tramo en ese instante y su posición decide cuánto cuesta:
+ * verde (perfecto) nada de más, amarillo (regular) `costo.amarillo`, rojo (lejos) `costo.rojo`. Pararse y quedar firme
+ * salen solos según la energía que queda. Todo en enteros; la posición del puntero va en milésimas de la barrita (0 a 1000,
+ * el centro del verde en 500).
+ *   pasada       ms que tarda el puntero de una punta a la otra; desde `lentoDesde` ms sin tocar, `pasadaLenta` (más lento)
+ *   soloMs       sin ningún toque, el pesista tira solo a estos ms, como un toque REGULAR (amarillo): no se cae por no tocar,
+ *                pero tampoco conviene esperar. Es el minuto del reloj de la competencia
+ *   respiraMs    con la barra en los hombros, antes de que arranque la barrita del envión
+ *   doble        dos contactos a menos de esto son uno (teclado y dedo)
+ *   graciaMs     un contacto en los primeros ms de una barrita no la dispara (el puntero recién sale de la punta roja: es la
+ *                cola de un toque anterior, no una decisión)
+ *   tI, tVerde, tAmarillo  medio ancho del verde (ms de puntero) según la intensidad, y lo que el amarillo suma a cada lado:
+ *                ancho con la apertura, angosto cerca del techo. Los multiplica el pesista (`pesistas`, milésimas: fuerte en
+ *                esa barrita = más ancho) y el primer intento de la primera final (`primera`)
+ *   costo        energía de más que gasta el tramo según la zona (se suma al gasto del tramo de esa barrita)
+ *   escala       el gasto de cada tramo en 'b' sobre el de 'u' (milésimas)
+ *   tipico       la persona que supone el panel («X de 10»): error de tiempo de campana (`sd` ms, corrida `sesgo` ms) y
+ *                `despiste` milésimas de toques en cualquier lado. La miden tools/barra_bots.mjs y tools/chance_test.mjs
+ */
+export const BARRA = {
+  version: '1.0',
+  pasada: 1400, lentoDesde: 8000, pasadaLenta: 1900, soloMs: 60000, respiraMs: 800, doble: 120, graciaMs: 250,
+  tI: [9000, 9500, 10000, 10300], tVerde: [170, 125, 75, 60], tAmarillo: [220, 180, 140, 130], primera: 1400, topeVerde: 380, topeAmarillo: 470,
+  costo: { verde: 0, amarillo: 600, rojo: 1500 },
+  escala: { tiron: 900, arriba: 900, pararse: 900 },
+  pesistas: { ventura: { tiron: 1000, envion: 1000 }, brenner: { tiron: 1300, envion: 750 }, marangi: { tiron: 750, envion: 1300 } },
+  neutro: { tiron: 1000, envion: 1000 },
+  tipico: { sesgo: 20, sd: 90, despiste: 30 },
+};
+/** Huella de las reglas de 'b' (BARRA, UNO y los cuerpos): va en la cabecera de los registros de 'b' y replay.js la exige. */
+export const HUELLA_B = huella(canonico({ BARRA, UNO, CUERPOS_U, CUERPO_NEUTRO }));
+/** Tramo de cada barrita: la 0 es el tirón (arranque y cargada) y la 1 el envión (tramo «arriba» del dos tiempos). */
+export const TRAMO_BARRA = ['tiron', 'arriba'];
+/**
+ * Cuerpo de juego en 'b': el de 'u' con el gasto escalado (BARRA.escala) y el ancho de cada barrita (`barra`).
+ * Acepta el id del pesista o un cuerpo ya armado (para pruebas).
+ */
+export function cuerpoBarra(x) {
+  const c = typeof x === 'string' || !x || x.cuerpoJuego ? cuerpoDe(x) : { ...CUERPO_NEUTRO, ...x }, E = BARRA.escala;
+  return { ...c, tiron: idiv(c.tiron * E.tiron, 1000), arriba: idiv(c.arriba * E.arriba, 1000), pararse: idiv(c.pararse * E.pararse, 1000),
+    barra: { ...BARRA.neutro, ...(typeof x === 'string' ? BARRA.pesistas[x] : x && x.barra) } };
+}
+/** Posición del puntero (milésimas de la barrita, 0 a 1000) a `e` ms de que arrancó: va y vuelve, empieza a la izquierda. */
+export function posBarra(e) {
+  if (e <= 0) return 0;
+  const L = BARRA.lentoDesde, x = e <= L ? idiv(e * 1000, BARRA.pasada) : idiv(L * 1000, BARRA.pasada) + idiv((e - L) * 1000, BARRA.pasadaLenta), u = x % 2000;
+  return u <= 1000 ? u : 2000 - u;
+}
+/** Medio ancho del verde y del amarillo en ms de puntero (antes de pasarlo a la barrita). */
+function anchosMs(I, k, primera) {
+  const T = BARRA.tI, n = T.length, tab = col => (I <= T[0] ? col[0] : I >= T[n - 1] ? col[n - 1] : (() => { let j = 0; while (I > T[j + 1]) j++; return lerpi(I, T[j], T[j + 1], col[j], col[j + 1]); })());
+  let v = idiv(tab(BARRA.tVerde) * k, 1000), a = v + idiv(tab(BARRA.tAmarillo) * k, 1000);
+  if (primera) { v = idiv(v * BARRA.primera, 1000); a = idiv(a * BARRA.primera, 1000); }
+  return { v, a };
+}
+/**
+ * Zonas de la barrita `i` (0 tirón, 1 envión) a la intensidad I para el cuerpo `cuerpo` (cuerpoBarra): `v` y `a`, medio
+ * ancho del verde y del amarillo en milésimas de la barrita alrededor del centro (500); `vMs` y `aMs`, lo mismo en ms.
+ */
+export function zonasBarra(I, cuerpo, i, primera = false) {
+  const b = (cuerpo && cuerpo.barra) || BARRA.neutro, { v: vMs, a: aMs } = anchosMs(I, i ? b.envion : b.tiron, primera);
+  const v = Math.min(BARRA.topeVerde, idiv(vMs * 1000, BARRA.pasada)), a = Math.min(BARRA.topeAmarillo, Math.max(v + 10, idiv(aMs * 1000, BARRA.pasada)));
+  return { v, a, vMs: idiv(v * BARRA.pasada, 1000), aMs: idiv(a * BARRA.pasada, 1000) };
+}
+/** Zona de una posición del puntero: 'verde', 'amarillo' o 'rojo'. */
+export function zonaBarra(pos, z) { const d = Math.abs(pos - 500); return d <= z.v ? 'verde' : d <= z.a ? 'amarillo' : 'rojo'; }
+
+/** Φ de la normal en millonésimas, de 0 a 4 desvíos en décimos (se interpola). */
+const PHI = [500000, 539828, 579260, 617911, 655422, 691462, 725747, 758036, 788145, 815940, 841345, 864334, 884930, 903199, 919243, 933193, 945201, 955435, 964070, 971284, 977250, 982136, 986097, 989276, 991802, 993790, 995339, 996533, 997445, 998134, 998650, 999032, 999313, 999517, 999663, 999767, 999841, 999892, 999928, 999952, 999968];
+/** Φ(x / den) en millonésimas, en enteros. */
+export function phi(x, den) {
+  const z = idiv(Math.abs(x) * 100, den), k = idiv(z, 10);
+  const p = k >= 40 ? 1000000 : PHI[k] + idiv((PHI[k + 1] - PHI[k]) * (z - 10 * k), 10);
+  return x < 0 ? 1000000 - p : p;
+}
+/**
+ * Cuántos toques de cada 1000 caen en verde, amarillo y rojo para una persona `perfil` ({sesgo, sd, despiste}, en ms y
+ * milésimas) con las zonas `z` (zonasBarra). Enteros que suman 1000.
+ */
+export function repartoBarra(z, perfil = BARRA.tipico) {
+  const { sesgo: s, sd, despiste: d } = perfil, dentro = h => phi(h - s, sd) - phi(-h - s, sd);
+  const gv = dentro(z.vMs), ga = dentro(z.aMs);
+  const uv = idiv((2 * z.v + 1) * 1000000, 1001), ua = idiv((2 * z.a + 1) * 1000000, 1001);
+  const pv = idiv(gv * (1000 - d) + uv * d, 1000000), pva = idiv(ga * (1000 - d) + ua * d, 1000000);
+  return { verde: pv, amarillo: Math.max(0, pva - pv), rojo: Math.max(0, 1000 - pva) };
+}
+/**
+ * Chance (milésimas) de que suba un peso en 'b' para la persona `o.perfil` (por defecto BARRA.tipico): como chanceUno, con
+ * la suerte de cada tramo y la garra, más lo que cuesta cada barrita según dónde suele pegar esa persona. Exacta para ese
+ * perfil (programación dinámica sobre la energía, mismas reglas que attempt.js); enteros.
+ *   o.garra (false: ya se usó) · o.primera (verde más ancho) · o.zonas (forzar zonas, para pruebas)
+ */
+export function chanceBarra(I, lev, env, cuerpo, o = {}) {
+  const T = TRAMOS[lev], G = T.map(tr => gastoTramo(tr, I, lev, env, cuerpo)), k = cuerpo.ruido || 0, n = 2 * k + 1, perfil = o.perfil || BARRA.tipico;
+  // reparto de zonas de la barrita de cada tramo (null: el tramo no tiene barrita)
+  const R = T.map(tr => { const i = TRAMO_BARRA.indexOf(tr); if (i < 0 || (i === 1 && lev !== 'c')) return null; const r = repartoBarra(zonasBarra(I, cuerpo, i, !!o.primera), perfil); return [[r.verde, BARRA.costo.verde], [r.amarillo, BARRA.costo.amarillo], [r.rojo, BARRA.costo.rojo]]; });
+  const memo = new Map();
+  const f = (i, m, garra) => {
+    if (i === G.length) return 1;
+    const key = i * 4 + (garra ? 1 : 0) + ':' + m; let v = memo.get(key); if (v !== undefined) return v;
+    v = 0; const Z = R[i] || [[1, 0]];
+    for (let j = 0; j < n; j++) {
+      const g = conSuerte(G[i], (j - k) * UNO.ruidoPaso);
+      for (const [w, extra] of Z) {
+        if (!w) continue;
+        let x = m - g - extra, gg = garra;
+        if (x < 0) { if (gg && x >= UNO.frenoMin && garraAlcanza(x, G.slice(i + 1))) { x += UNO.garra; gg = false; } else continue; }
+        v += w * f(i + 1, x, gg);
+      }
+    }
+    memo.set(key, v); return v;
+  };
+  let total = n ** G.length; for (const z of R) if (z) total *= z.reduce((a, x) => a + x[0], 0);
+  return idiv(f(0, UNO.margen, o.garra !== false) * 1000, total);
 }
 
 /** Causas con su texto. Las de fallo y las de nulo (secciones 5.2 y 5.3). */

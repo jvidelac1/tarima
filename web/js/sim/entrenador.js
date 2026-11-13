@@ -3,13 +3,13 @@
 // nunca con rivales normales. Ahora lee lo mismo que la persona ve en el panel: la chance de cada peso («X de 10», rules.js →
 // chanceUno) y La cuenta (los kilos que hacen falta para el oro). La persona puede cambiarlo con ← → antes de confirmar.
 // Núcleo: enteros (chances en milésimas), sin DOM ni reloj; lo usan match.js, main.js y tools/pesistas_test.mjs.
-import { chanceUno, cuerpoDe, KG_MAX, RESTO, multFondo, techoMomento, intensidad } from './rules.js';
+import { chanceUno, chanceBarra, cuerpoDe, cuerpoBarra, KG_MAX, RESTO, multFondo, techoMomento, intensidad } from './rules.js';
 import { idiv } from './fixed.js';
 
 /** Chance (milésimas) de `kg` para el pesista `i` en el levantamiento `lev` (con el envión `env`), la misma del panel. */
 export function chanceDe(p, i, lev, kg, env) {
-  const a = p.at[i], c = cuerpoDe(a.id);
-  return chanceUno(p.intensidadDe(i, lev, kg), lev, lev === 'c' ? env || c.casa : undefined, c, { garra: a.garraUno[lev] });
+  const a = p.at[i], b = p.cfg.ctl === 'b', c = b ? cuerpoBarra(a.id) : cuerpoDe(a.id);
+  return (b ? chanceBarra : chanceUno)(p.intensidadDe(i, lev, kg), lev, lev === 'c' ? env || c.casa : undefined, c, { garra: a.garraUno[lev] });
 }
 
 /**
@@ -19,9 +19,9 @@ export function chanceDe(p, i, lev, kg, env) {
  */
 function chanceDespues(p, i, lev, kg, kg2, env) {
   const a = p.at[i], I = p.intensidadDe(i, lev, kg), costo = RESTO.base[lev] + Math.max(0, idiv(I - 9500, 100)) * RESTO.sobre95;
-  const resto = Math.max(0, a.resto - Math.max(0, idiv(costo * multFondo(a.f.attrs.fon), 1000))), c = cuerpoDe(a.id);
+  const b = p.cfg.ctl === 'b', resto = Math.max(0, a.resto - Math.max(0, idiv(costo * multFondo(a.f.attrs.fon), 1000))), c = b ? cuerpoBarra(a.id) : cuerpoDe(a.id);
   const I2 = intensidad(kg2, techoMomento(p.techoDia(i, lev), resto));
-  return chanceUno(I2, lev, lev === 'c' ? env || c.casa : undefined, c, { garra: false });
+  return (b ? chanceBarra : chanceUno)(I2, lev, lev === 'c' ? env || c.casa : undefined, c, { garra: false });
 }
 
 /**
