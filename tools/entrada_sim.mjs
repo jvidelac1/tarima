@@ -45,7 +45,7 @@ export function instalarDOM({ ancho = 844, alto = 390 } = {}) {
  * 80 ms, pointercancel (con y sin dedo que vuelve), doble toque a 100 ms, mantener 10 s, toques en los bordes y la ráfaga
  * de la confirmación. Devuelve los conteos y ejemplos de lo que salió mal.
  */
-export async function probarEntrada({ via = 'teclado', n = 10000, semilla = 1, ctl = 'u' } = {}) {
+export async function probarEntrada({ via = 'teclado', n = 10000, semilla = 1, ctl = 'u', dif = 'facil' } = {}) {
   const dedo = via === 'dedo', W = dedo ? 844 : 1280, Hh = dedo ? 390 : 720;
   const H = instalarDOM({ ancho: W, alto: Hh }); globalThis.document.documentElement = {}; globalThis.document.title = '';
   const { Boton, toques, reloj, BORDES, GRACIA_MS } = await import('../web/js/game/input.js');
@@ -62,7 +62,7 @@ export async function probarEntrada({ via = 'teclado', n = 10000, semilla = 1, c
   let base = 1000;
   for (let k = 0; k < n; k++) {
     const r = new Azar(mezclar(semilla, k, dedo ? 2 : 1)), id = ATL[k % 3], lev = k % 2 ? 'c' : 's';
-    const ctx = (ctl === 'b' ? ctxBarra : ctxUno)(id, lev, lev === 'c' ? 'split' : undefined, 8800 + r.ent(1500), mezclar(k, 3), dedo ? { tactil: true } : {});
+    const ctx = (ctl === 'b' ? ctxBarra : ctxUno)(id, lev, lev === 'c' ? 'split' : undefined, 8800 + r.ent(1500), mezclar(k, 3), { ...(dedo ? { tactil: true } : {}), ...(ctl === 'b' && dif !== 'facil' ? { dif } : {}) });
     const ent = [], conf = 0, t0 = base; base += 200000;
     b.contactos.clear(); for (const g of b.gracia.values()) clearTimeout(g); b.gracia.clear(); b.activo = true; tomados.length = 0;
     b.oye = (t, v, v2) => {

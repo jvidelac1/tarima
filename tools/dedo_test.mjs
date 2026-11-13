@@ -16,11 +16,12 @@ if (!process.argv.includes('--f')) {
   const a = k => (process.argv.find(x => x.startsWith(`--${k}=`)) || '').split('=')[1];
   // desde Gameplay 3, la barrita ('b', por defecto) y 'u'; en 'b', además, cada barrita la dispara un solo contacto
   const t0 = Date.now(), R = { ejemplos: [] }; let mal = 0;
-  for (const ctl of ['b', 'u']) {
-    const X = await probarEntrada({ via: 'dedo', n: +(a('n') || 10000), ctl });
-    console.log(`dedo '${ctl}': ${X.secuencias} secuencias, ${X.pulsaciones} toques (con los del borde) · casos: ${JSON.stringify(X.casos)}`);
+  // y en 'b', los tres niveles de dificultad (Medio y Difícil tienen barritas de más: atrapar y pararse)
+  for (const [ctl, dif] of [['b', 'facil'], ['b', 'medio'], ['b', 'dificil'], ['u', 'facil']]) {
+    const X = await probarEntrada({ via: 'dedo', n: +(a('n') || 10000), ctl, dif });
+    console.log(`dedo '${ctl}'${ctl === 'b' ? ` ${dif}` : ''}: ${X.secuencias} secuencias, ${X.pulsaciones} toques (con los del borde) · casos: ${JSON.stringify(X.casos)}`);
     console.log(`sin resolver ${X.sinResolver} · contados dos veces ${X.dobles} · sin acción ni palabra ${X.sinPalabra} · bordes sin anotar ${X.bordesQueCuentan} · ráfaga de la confirmación que arrancó el tirón ${X.rafagaTira} · registros mal formados ${X.malFormadas} · intentos sin terminar ${X.sinTerminar}${ctl === 'b' ? ` · barritas disparadas ${X.barritas}, con más de un contacto ${X.barritaDoble}` : ''}`);
-    mal += X.sinResolver + X.dobles + X.sinPalabra + X.bordesQueCuentan + X.rafagaTira + X.malFormadas + X.sinTerminar + X.barritaDoble; R.ejemplos.push(...X.ejemplos.map(x => `${ctl}: ${x}`));
+    mal += X.sinResolver + X.dobles + X.sinPalabra + X.bordesQueCuentan + X.rafagaTira + X.malFormadas + X.sinTerminar + X.barritaDoble; R.ejemplos.push(...X.ejemplos.map(x => `${ctl} ${dif}: ${x}`));
   }
   // Clásico: un dedo cancelado por el sistema se suelta en el acto (soltar es un gesto); la gracia de 400 ms es solo de 'u'
   const { probarCancelClasico } = await import('./entrada_sim.mjs'), C = await probarCancelClasico();

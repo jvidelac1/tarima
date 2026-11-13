@@ -14,6 +14,9 @@
 // 14. Rivales con personalidad (web/js/sim/ai.js → PERSONALIDADES, HUELLA_IA): partidas de referencia
 //     (tools/sim_ref_rivales.json); en vivo contra recalculadas; el registro lleva `ia` y otra huella se rechaza; cada turno
 //     de un rival tiene su palabra en los dos idiomas. Las referencias de 2, 7, 12 y 13 (sin `ia`) no cambian.
+// 15. Dificultad de la barrita (rules.js → NIVELES_B): Medio y Difícil con su huella y su referencia
+//     (tools/sim_ref_dificultad.json); en vivo contra recalculadas; un registro con otro nivel u otra huella se rechaza;
+//     cada barrita (atrapar y pararse incluidas) se juzga con las reglas de su nivel; Fácil sigue con la huella de siempre.
 // 12. Nivel 'u' (docs/JUEGO.md, Gameplay 2): partidas de referencia jugadas por los bots de tools/uno_bots.mjs
 //     (tools/sim_ref_uno.json); 1000 finales en vivo contra recalculadas (meta L); toda caída tiene su tramo y una línea
 //     sin tiempos (meta G); la garra se gasta una vez por levantamiento; la señal en los dos idiomas.
@@ -39,9 +42,9 @@ import { toques } from '../web/js/game/input.js';
 import { jugarSenal, jugarFijo, BOTS } from './play_human.mjs';
 import { jugarUno, BOTS_U } from './uno_bots.mjs';
 import { jugarBarra, PERFILES } from './barra_bots.mjs';
-import { posBarra, zonasBarra, zonaBarra, cuerpoBarra, BARRA } from '../web/js/sim/rules.js';
+import { posBarra, zonasBarra, zonaBarra, cuerpoBarra, BARRA, reglasB, HUELLAS_B, HUELLA_B, NIVELES_B } from '../web/js/sim/rules.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SIM = path.join(ROOT, 'web/js/sim'), REF = path.join(ROOT, 'tools/sim_ref.json'), REF_F = path.join(ROOT, 'tools/sim_ref_facil.json'), REF_U = path.join(ROOT, 'tools/sim_ref_uno.json'), REF_B = path.join(ROOT, 'tools/sim_ref_barra.json'), REF_R = path.join(ROOT, 'tools/sim_ref_rivales.json');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SIM = path.join(ROOT, 'web/js/sim'), REF = path.join(ROOT, 'tools/sim_ref.json'), REF_F = path.join(ROOT, 'tools/sim_ref_facil.json'), REF_U = path.join(ROOT, 'tools/sim_ref_uno.json'), REF_B = path.join(ROOT, 'tools/sim_ref_barra.json'), REF_R = path.join(ROOT, 'tools/sim_ref_rivales.json'), REF_D = path.join(ROOT, 'tools/sim_ref_dificultad.json');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const N = +(arg('n') || 1000), UPDATE = process.argv.includes('--update');
 const datos = leerDatos(JSON.parse(fs.readFileSync(path.join(ROOT, 'web/data/sim.json'), 'utf8')));
@@ -64,7 +67,7 @@ const IDS = ['ventura', 'brenner', 'marangi'], NIV = ['amistoso', 'normal', 'dif
 // ---------- jugador simulado ----------
 /** Juega una partida entera. `persona`: índice del pesista manejado por un jugador simulado (o -1: los tres son rivales). Devuelve la partida y su bitácora. */
 function jugar(semilla, nivel, persona, estilo = {}) {
-  const r = new Azar(mezclar(semilla, 9)), cfg = { semilla, nivel, cal: estilo.cal || 0, primera: !!estilo.primera, ...(estilo.ctl ? { ctl: estilo.ctl } : {}), ...(estilo.ia ? { ia: estilo.ia } : {}), atletas: IDS.map((id, i) => ({ id, ctrl: i === persona ? 'persona' : 'juego' })) };
+  const r = new Azar(mezclar(semilla, 9)), cfg = { semilla, nivel, cal: estilo.cal || 0, primera: !!estilo.primera, ...(estilo.ctl ? { ctl: estilo.ctl } : {}), ...(estilo.ia ? { ia: estilo.ia } : {}), ...(estilo.dif ? { dif: estilo.dif } : {}), atletas: IDS.map((id, i) => ({ id, ctrl: i === persona ? 'persona' : 'juego' })) };
   const p = new Partida(datos, cfg), bit = [];
   const abrir = lev => { if (persona >= 0) { const [lo, hi] = p.rangoApertura(persona, lev); p.abrir(persona, lev, r.entre(lo, hi)); } p.empezar(); };
   abrir('s');
@@ -534,6 +537,51 @@ function jugar(semilla, nivel, persona, estilo = {}) {
   ok(Object.keys(PERSONALIDADES).every(id => datos.atletas[id]) && new Set(Object.values(PERSONALIDADES).map(x => x.estilo)).size === 3, 'cada pesista tiene una personalidad distinta');
   try { new Partida(datos, { semilla: 1, nivel: 'normal', cal: 0, primera: false, ia: 'x', atletas: IDS.map(id => ({ id, ctrl: 'juego' })) }); ok(false, 'Partida aceptó otra huella de los rivales'); } catch { /* bien */ }
   console.log(`14. rivales con personalidad (huella ${HUELLA_IA}): 9 partidas de referencia · ${n} finales en vivo contra recalculadas · palabras ${JSON.stringify(palabras)}`);
+}
+
+// ---------- 15. dificultad de la barrita ----------
+{
+  ok(HUELLAS_B.facil === HUELLA_B && HUELLAS_B.medio !== HUELLA_B && HUELLAS_B.dificil !== HUELLAS_B.medio, 'cada nivel de dificultad tiene que tener su huella (Fácil, la de siempre)');
+  const casos = []; for (let k = 0; k < 12; k++) casos.push({ semilla: 9000017 * (k + 1), nivel: NIV[k % 3], persona: k % 3, dif: k % 2 ? 'dificil' : 'medio' });
+  const hoy = casos.map(c => ({ ...c, tabla: resumen(jugar(c.semilla, c.nivel, c.persona, { ctl: 'b', ia: HUELLA_IA, dif: c.dif }).p.tabla()) }));
+  if (UPDATE || !fs.existsSync(REF_D)) { fs.writeFileSync(REF_D, JSON.stringify({ datos: datos.huella, huellas: { medio: HUELLAS_B.medio, dificil: HUELLAS_B.dificil }, casos: hoy }, null, 1) + '\n'); console.log('15. referencia de la dificultad escrita en tools/sim_ref_dificultad.json'); }
+  else { const ref = JSON.parse(fs.readFileSync(REF_D, 'utf8')); ok(ref.datos === datos.huella && ref.huellas.medio === HUELLAS_B.medio && ref.huellas.dificil === HUELLAS_B.dificil, 'la referencia de la dificultad es de otras reglas; si el cambio es intencional: borrarla o --update'); ref.casos.forEach((c, i) => ok(c.tabla === hoy[i]?.tabla, `referencia de dificultad ${i} (semilla ${c.semilla}, ${c.dif}): guardado «${c.tabla}», hoy «${hoy[i]?.tabla}»`)); }
+  let n = 0; const tipos = {}, porNivel = { medio: { i: 0, v: 0 }, dificil: { i: 0, v: 0 } };
+  for (let k = 0; k < Math.min(N, 600); k++) {
+    const dif = k % 2 ? 'dificil' : 'medio', semilla = mezclar(k, 987), persona = k % 3, { p } = jugar(semilla, NIV[k % 3], persona, { ctl: 'b', ia: HUELLA_IA, dif, primera: k % 7 === 0 });
+    const reg = JSON.parse(JSON.stringify(p.reg)), rc = recalcular(reg, datos), t = resumen(p.tabla());
+    ok(reg.dif === dif && reg.barra === HUELLAS_B[dif], `semilla ${semilla}: el registro no guarda el nivel ${dif} con su huella`);
+    ok(rc.ok && resumen(rc.tabla) === t, `${dif}, semilla ${semilla}: recalcular da ${rc.ok ? resumen(rc.tabla) : rc.error} y en vivo ${t}`);
+    if (k < 20) {
+      const g = JSON.parse(JSON.stringify(reg)); g.dif = dif === 'medio' ? 'dificil' : 'medio'; ok(!recalcular(g, datos).ok, 'un registro con otro nivel de dificultad (y la huella del suyo) se acepta');
+      const g2 = JSON.parse(JSON.stringify(reg)); delete g2.dif; ok(!recalcular(g2, datos).ok, 'un registro de Medio o Difícil sin `dif` se acepta como Fácil');
+      const g3 = JSON.parse(JSON.stringify(reg)); g3.dif = 'imposible'; ok(!recalcular(g3, datos).ok, 'un nivel de dificultad desconocido se acepta');
+    }
+    for (const lev of ['s', 'c']) for (const x of p.at[persona][lev]) { porNivel[dif].i++; if (x.res === 'valido') porNivel[dif].v++; }
+    n++;
+  }
+  // un registro de Clásico o de 'u' con `dif` se rechaza
+  { const { p } = jugar(123, 'normal', 0, { ctl: 'u' }); const g = JSON.parse(JSON.stringify(p.reg)); g.dif = 'medio'; ok(!recalcular(g, datos).ok, "un registro de 'u' con `dif` se acepta"); }
+  // cada barrita se juzga con el puntero y las zonas de su nivel; las barritas de cada levantamiento son las de su nivel
+  { const r = new Azar(56);
+    for (let k = 0; k < 600; k++) {
+      const dif = k % 2 ? 'dificil' : 'medio', R = reglasB(dif), lev = k % 4 < 2 ? 'c' : 's', id = IDS[k % 3], f = datos.atletas[id], I = 8800 + r.ent(1500), c = cuerpoBarra(id), env = lev === 'c' ? c.casa : undefined;
+      const ctx = { lev, env, I, tec: f.attrs.tec, temple: 0, garra: f.attrs.gar, anclas: datos.modelos[f.modelo], semilla: mezclar(k, 7), cal: 0, primera: false, domina: true, jueces: [1000, 1000, 1000], reloj: 30000, ctl: 'b', cuerpo: c, garraUno: k % 4 !== 0, dif };
+      const S = jugarBarra(ctx, Object.values(PERFILES)[k % 4], k), res = S.m.res, re = simular(ctx, S.conf, S.ent);
+      ok(JSON.stringify(re.res) === JSON.stringify(res), `${dif}: el intento recalculado no da lo mismo`);
+      for (const b of res.uno.barras) { tipos[b.i] = (tipos[b.i] || 0) + 1; ok(b.sola || zonaBarra(b.pos, zonasBarra(I, c, b.i, false, env || 'split', R)) === b.zona, `${dif}: zona mal juzgada: ${JSON.stringify(b)}`); }
+      if (res.res === 'valido') ok(res.uno.barras.map(b => b.i).join() === R.barritas[lev].join(), `${dif} ${lev}: barritas ${res.uno.barras.map(b => b.i)} y el nivel dice ${R.barritas[lev]}`);
+    }
+    // el puntero de cada nivel va y vuelve en su pasada, y en Difícil nunca se pone lento antes del minuto
+    for (const dif of ['medio', 'dificil']) { const R = reglasB(dif); ok(posBarra(R.pasada, R) === 1000 && posBarra(R.pasada / 2, R) === 500 && posBarra(2 * R.pasada, R) === 0, `${dif}: el puntero no va y vuelve en ${R.pasada} ms`); }
+    ok(reglasB('dificil').lentoDesde >= reglasB('dificil').soloMs, 'en Difícil el puntero no se pone lento');
+    // sin tocar nada, Medio y Difícil también tiran solos (regular) y la apertura sube
+    for (const dif of ['medio', 'dificil']) for (const lev of ['s', 'c']) { const f = datos.atletas.ventura, ctx = { lev, env: lev === 'c' ? 'split' : undefined, I: 8900, tec: f.attrs.tec, temple: 0, garra: f.attrs.gar, anclas: datos.modelos[f.modelo], semilla: 3, cal: 0, primera: false, domina: true, jueces: [1000, 1000, 1000], reloj: 30000, ctl: 'b', cuerpo: cuerpoBarra('ventura'), dif };
+      const m = simular(ctx, 0, []); ok(m.res && m.res.res === 'valido' && m.res.uno.barras.every(b => b.sola) && m.res.uno.barras.length === reglasB(dif).barritas[lev].length, `${dif} ${lev}: sin tocar no sale solo y válido: ${JSON.stringify(m.res?.uno?.barras)}`); }
+    try { new Partida(datos, { semilla: 1, nivel: 'normal', cal: 0, primera: false, ctl: 'b', dif: 'x', atletas: IDS.map(id => ({ id, ctrl: 'juego' })) }); ok(false, 'Partida aceptó un nivel de dificultad desconocido'); } catch { /* bien */ }
+  }
+  ok(tipos[2] && tipos[3] && tipos[0] && tipos[1], `atrapar y pararse tienen que aparecer: ${JSON.stringify(tipos)}`);
+  console.log(`15. dificultad (huellas ${HUELLAS_B.medio} y ${HUELLAS_B.dificil}): 12 partidas de referencia · ${n} finales en vivo contra recalculadas · válidos del jugador Medio ${Math.round(porNivel.medio.v * 100 / porNivel.medio.i)} % y Difícil ${Math.round(porNivel.dificil.v * 100 / porNivel.dificil.i)} % · barritas ${JSON.stringify(tipos)}`);
 }
 
 console.log(fallas.length ? `\nFALLÓ: ${fallas.length} problemas` : `\nOK en ${((Date.now() - t0) / 1000).toFixed(1)} s`);

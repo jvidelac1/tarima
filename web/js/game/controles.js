@@ -160,26 +160,32 @@ function senalU(m, now) {
 
 /**
  * Instante (ms del intento) en que el puntero de una barrita que arrancó en `desde` pasa por el centro del verde por
- * primera vez a partir de `desde_` (más lento desde BARRA.lentoDesde, como posBarra). Lo usan las pruebas y la práctica.
+ * primera vez a partir de `desde_` (más lento desde R.lentoDesde, como posBarra). Lo usan las pruebas y la práctica.
+ * `R`: las reglas de la barrita del nivel (rules.js → reglasB); por defecto, Fácil.
  */
-export function proximoCentro(desde, desde_) {
-  const P = BARRA.pasada, L = BARRA.lentoDesde, PL = BARRA.pasadaLenta, xL = L * 1000 / P;
+export function proximoCentro(desde, desde_, R = BARRA) {
+  const P = R.pasada, L = R.lentoDesde, PL = R.pasadaLenta, xL = L * 1000 / P;
   const e = Math.max(0, desde_ - desde), xe = e <= L ? e * 1000 / P : xL + (e - L) * 1000 / PL;      // en milésimas de pasada
   const x = Math.ceil((xe - 500) / 1000) * 1000 + 500;
   return Math.round(desde + (x <= xL ? x * P / 1000 : L + (x - xL) * PL / 1000));
 }
 
+/** Clave de la señal de cada barrita (0 tirón, 1 envión, 2 atrapar, 3 pararse). */
+const CLAVE_B = ['barra', 'barra2', 'barra_atrapa', 'barra_pararse'];
 /**
- * La señal de 'b' (la barrita). Tipos: 'barra' (la barrita corre: toca cuando el puntero esté en el verde; `i` 0 tirón o 1
- * envión, `desde` cuándo arrancó el puntero, `z` las zonas, `pos` dónde está el puntero ahora, `lento` si ya va despacio),
- * 'espera' (PREPÁRATE y RESPIRA: la barrita está a la vista, quieta, con `z` e `i`) y 'auto' (AGUANTA, ¡ABAJO!, ¡DA TODO!).
- * Entre medio, null: el pesista hace solo el resto. `de` y `paso`: «1 de 2» en el dos tiempos.
+ * La señal de 'b' (la barrita). Tipos: 'barra' (la barrita corre: toca cuando el puntero esté en el verde; `i` 0 tirón, 1
+ * envión, 2 atrapar o 3 pararse (Medio y Difícil), `desde` cuándo arrancó el puntero, `z` las zonas, `pos` dónde está el
+ * puntero ahora, `lento` si ya va despacio, `R` las reglas del nivel), 'espera' (PREPÁRATE y RESPIRA: la barrita está a la
+ * vista, quieta, con `z` e `i`) y 'auto' (AGUANTA, ¡ABAJO!, ¡DA TODO!). Entre medio, null: el pesista hace solo el resto.
+ * `de` y `paso`: «1 de 2» cuando el levantamiento tiene más de una barrita.
  */
 function senalB(m, now) {
-  const M = m.M, U = m.U, c = m.c, de = c.lev === 'c' ? 2 : 1, B = U.barras;
+  const M = m.M, U = m.U, c = m.c, R = m.R, orden = R.barritas[c.lev], de = orden.length, B = i => U.barras.find(b => b.i === i), paso = i => (de > 1 ? orden.indexOf(i) + 1 : undefined);
+  const corre = (i, t0) => { const b = B(i), e = now - b.t0; return { clave: CLAVE_B[i], verbo: t('barra.verbo'), sub: t('barra.sub'), tipo: 'barra', i, z: b.z, desde: b.t0, pos: posBarra(e, R), lento: e > R.lentoDesde, paso: paso(i), de, R }; };
   switch (m.fase) {
-    case 'acomodo': return { clave: 'prep', verbo: t('senal.prep'), tipo: 'espera', i: 0, z: B[0].z, paso: de > 1 ? 1 : undefined, de };
-    case 'tension': { const e = now - B[0].t0; return { clave: 'barra', verbo: t('barra.verbo'), sub: t('barra.sub'), tipo: 'barra', i: 0, z: B[0].z, desde: B[0].t0, pos: posBarra(e), lento: e > BARRA.lentoDesde, paso: de > 1 ? 1 : undefined, de }; }
+    case 'acomodo': return { clave: 'prep', verbo: t('senal.prep'), tipo: 'espera', i: 0, z: B(0).z, paso: paso(0), de, R };
+    case 'tension': return corre(0);
+    case 'barra': return corre(U.pend.i);
     case 'freno': return { clave: 'datodo', verbo: t('senal.datodo'), sub: t('senal.datodo_sub'), tipo: 'auto', desde: U.freno.t0, hasta: U.freno.hasta, tramo: U.freno.tramo };
     case 'pelea': {
       // el esfuerzo de pararse (solo en los intentos exigentes): unos pocos toques sin apuro, con la barra que se llena
@@ -188,9 +194,8 @@ function senalB(m, now) {
       return { clave: 'esfuerzo', verbo: t('senal.parate'), sub: t('barra.esfuerzo_sub', { n: e.meta - e.n }), tipo: 'uno', desde: e.desde, hasta: e.hasta, avance: e.n / e.meta, n: e.n, meta: e.meta };
     }
     case 'hombros': {
-      if (!M.abierto) return { clave: 'respira', verbo: t('senal.respira'), tipo: 'espera', i: 1, z: B[1].z, paso: 2, de };
-      const e = now - B[1].t0;
-      return { clave: 'barra2', verbo: t('barra.verbo'), sub: t('barra.sub'), tipo: 'barra', i: 1, z: B[1].z, desde: B[1].t0, pos: posBarra(e), lento: e > BARRA.lentoDesde, paso: 2, de };
+      if (!M.abierto) return { clave: 'respira', verbo: t('senal.respira'), tipo: 'espera', i: 1, z: B(1).z, paso: paso(1), de, R };
+      return corre(1);
     }
     case 'post': return { clave: 'aguanta', verbo: t('senal.aguanta'), sub: t('senal.aguanta_sub'), tipo: 'auto' };
     case 'fijacion': return now >= m.fij.tb ? { clave: 'abajo', verbo: t('senal.abajo'), sub: t('senal.abajo_sub'), tipo: 'auto' } : { clave: 'aguanta', verbo: t('senal.aguanta'), sub: t('senal.aguanta_sub'), tipo: 'auto' };

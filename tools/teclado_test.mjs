@@ -11,11 +11,12 @@ import { probarEntrada } from './entrada_sim.mjs';
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 // Desde Gameplay 3 corre la barrita ('b', por defecto) y 'u': en 'b', además, cada barrita la dispara un solo contacto.
 const t0 = Date.now(); let mal = 0; const ejemplos = [];
-for (const ctl of ['b', 'u']) {
-  const R = await probarEntrada({ via: 'teclado', n: +(arg('n') || 10000), ctl });
-  console.log(`teclado '${ctl}': ${R.secuencias} secuencias, ${R.pulsaciones} pulsaciones · casos: ${JSON.stringify(R.casos)}`);
+// y en 'b', los tres niveles de dificultad (Medio y Difícil tienen barritas de más: atrapar y pararse)
+for (const [ctl, dif] of [['b', 'facil'], ['b', 'medio'], ['b', 'dificil'], ['u', 'facil']]) {
+  const R = await probarEntrada({ via: 'teclado', n: +(arg('n') || 10000), ctl, dif });
+  console.log(`teclado '${ctl}'${ctl === 'b' ? ` ${dif}` : ''}: ${R.secuencias} secuencias, ${R.pulsaciones} pulsaciones · casos: ${JSON.stringify(R.casos)}`);
   console.log(`sin resolver ${R.sinResolver} · contadas dos veces ${R.dobles} · sin acción ni palabra ${R.sinPalabra} · ráfaga de la confirmación que arrancó el tirón ${R.rafagaTira} · registros mal formados ${R.malFormadas} · intentos sin terminar ${R.sinTerminar}${ctl === 'b' ? ` · barritas disparadas ${R.barritas}, con más de un contacto ${R.barritaDoble}` : ''}`);
-  mal += R.sinResolver + R.dobles + R.sinPalabra + R.rafagaTira + R.malFormadas + R.sinTerminar + R.barritaDoble; ejemplos.push(...R.ejemplos.map(x => `${ctl}: ${x}`));
+  mal += R.sinResolver + R.dobles + R.sinPalabra + R.rafagaTira + R.malFormadas + R.sinTerminar + R.barritaDoble; ejemplos.push(...R.ejemplos.map(x => `${ctl} ${dif}: ${x}`));
 }
 if (mal) { console.log('FALLÓ:\n  ' + ejemplos.join('\n  ')); process.exit(1); }
 console.log(`OK: ninguna pulsación perdida ni contada dos veces (${((Date.now() - t0) / 1000).toFixed(1)} s)`);

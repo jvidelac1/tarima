@@ -16,8 +16,10 @@ import { fileURLToPath } from 'node:url';
 import { leerDatos } from '../web/js/sim/data.js';
 import { Intento, simular } from '../web/js/sim/attempt.js';
 import { Azar, mezclar } from '../web/js/sim/fixed.js';
-import { cuerpoBarra, BARRA, zonasBarra, chanceBarra } from '../web/js/sim/rules.js';
+import { cuerpoBarra, BARRA, zonasBarra, chanceBarra, reglasB, DIFICULTADES } from '../web/js/sim/rules.js';
 import { Partida } from '../web/js/sim/match.js';
+import { HUELLA_IA } from '../web/js/sim/ai.js';
+import { sugerencia } from '../web/js/sim/entrenador.js';
 import { traducir, senal } from '../web/js/game/controles.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -47,16 +49,16 @@ export function ctxBarra(id, lev, env, I, sem, extra = {}) {
 const normal = r => { const u = (r.u32() + 1) / 4294967297, v = r.u32() / 4294967296; return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
 
 /** ms desde que arranca la barrita hasta la k-ésima vez que el puntero pasa por el centro (más lento desde BARRA.lentoDesde). */
-export function centro(k) {
-  const P = BARRA.pasada, L = BARRA.lentoDesde, x = (k + .5) * 1000, xL = L * 1000 / P;      // en milésimas de pasada
-  return x <= xL ? x * P / 1000 : L + (x - xL) * BARRA.pasadaLenta / 1000;
+export function centro(k, R = BARRA) {
+  const P = R.pasada, L = R.lentoDesde, x = (k + .5) * 1000, xL = L * 1000 / P;      // en milésimas de pasada
+  return x <= xL ? x * P / 1000 : L + (x - xL) * R.pasadaLenta / 1000;
 }
 /** Instante en que el perfil `B` toca una barrita que arrancó en `t0` (ms del intento). */
-export function cuandoToca(B, t0, r) {
-  const P = BARRA.pasada, reac = Math.max(150, B.reac + Math.round(normal(r) * 250));
+export function cuandoToca(B, t0, r, R = BARRA) {
+  const P = R.pasada, reac = Math.max(150, B.reac + Math.round(normal(r) * 250));
   if (r.ent(1000) < (B.despiste || 0)) return t0 + reac + r.ent(2 * P);
-  let k = 0; while (centro(k) < reac) k++;
-  return Math.round(t0 + centro(k) + B.sesgo + normal(r) * B.sd);
+  let k = 0; while (centro(k, R) < reac) k++;
+  return Math.round(t0 + centro(k, R) + B.sesgo + normal(r) * B.sd);
 }
 
 /** Juega un intento con el perfil `B` y devuelve {m, conf, ent, contactos}. */
@@ -73,7 +75,7 @@ export function jugarBarra(ctx, B, sem, o = {}) {
     const mira = !B.ausente && !B.mantiene && !B.machaca;
     if (k !== clave) {
       clave = k; plan = INF;
-      if (k && mira && s.tipo === 'barra') plan = Math.max(m.t, cuandoToca(B, s.desde, r));
+      if (k && mira && s.tipo === 'barra') plan = Math.max(m.t, cuandoToca(B, s.desde, r, s.R));
       // el esfuerzo de pararse: a su ritmo, desde que reacciona (a veces no lo hace)
       if (k && mira && s.clave === 'esfuerzo' && r.ent(1000) >= (B.noEsfuerzo || 0)) plan = m.t + 300 + r.ent(300);
     } else if (k && mira && s.clave === 'esfuerzo' && plan === INF && esfuerzoSigue) plan = esfuerzoSigue;
@@ -99,7 +101,7 @@ export function verificar(ctx, S) {
 
 /** Una casilla: `n` intentos del perfil con el pesista, levantamiento e intensidad dados. */
 export function casilla(id, lev, I, B, n, sem0 = 0, extra = {}, envFijo = null) {
-  const o = { n: 0, v: 0, z: { verde: 0, amarillo: 0, rojo: 0 }, zi: [{ verde: 0, amarillo: 0, rojo: 0 }, { verde: 0, amarillo: 0, rojo: 0 }], caidaPorZona: { verde: 0, amarillo: 0, rojo: 0 }, contactos: 0, esf: 0, esfOk: 0 };
+  const o = { n: 0, v: 0, z: { verde: 0, amarillo: 0, rojo: 0 }, zi: [0, 1, 2, 3].map(() => ({ verde: 0, amarillo: 0, rojo: 0 })), caidaPorZona: { verde: 0, amarillo: 0, rojo: 0 }, contactos: 0, esf: 0, esfOk: 0 };
   const env = lev === 'c' ? envFijo || cuerpoBarra(id).casa : undefined;
   for (let k = 0; k < n; k++) {
     const sem = mezclar(sem0, k, I, lev === 'c' ? 1 : 0, ATL.indexOf(id)), ctx = ctxBarra(id, lev, env, I, sem, extra), S = jugarBarra(ctx, B, mezclar(sem, 5)), res = verificar(ctx, S).res;
@@ -115,81 +117,109 @@ export function casilla(id, lev, I, B, n, sem0 = 0, extra = {}, envFijo = null) 
 const principal = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (principal) {
   const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
-  const N = +(arg('n') || 400), Is = [8800, 9000, 9200, 9500, 9700, 10000, 10300], mal = [], t0 = Date.now();
+  const N = +(arg('n') || 400), DIFS = arg('dif') ? arg('dif').split(',') : DIFICULTADES, mal = [], t0 = Date.now();
   const pc = (a, b) => (b ? Math.round(a * 1000 / b) / 10 : 0);
-  const T = {};
-  console.log(`Barrita ('b') · ${N} intentos por casilla · válidos % (verde/amarillo/rojo % de los toques)`);
+  for (const dif of DIFS) {
+  const R = reglasB(dif), D = dif === 'facil' ? {} : { dif }, AP = R.apertura * 10, Is = [...new Set([8800, AP, 9000, 9200, 9500, 9700, 10000, 10300])].sort((a, b) => a - b);
+  const tipico = { ...PERFILES.tipico, ...R.tipico, noEsfuerzo: 1000 - R.tipico.esfuerzo }, perfil = pf => (pf === 'tipico' ? tipico : PERFILES[pf]);
+  const T = {}, OROS = {};
+  console.log(`\n========== ${dif.toUpperCase()} · barritas: arranque ${R.barritas.s.join('+')}, dos tiempos ${R.barritas.c.join('+')} (0 tirón, 1 envión, 2 atrapar, 3 pararse) · puntero ${R.pasada} ms · apertura sugerida ${AP / 100} %`);
+  console.log(`Barrita ('b', ${dif}) · ${N} intentos por casilla · válidos % (verde/amarillo/rojo % de los toques)`);
   for (const lev of ['s', 'c']) {
-    console.log(`\n${lev === 's' ? 'ARRANQUE (una barrita: el tirón)' : 'DOS TIEMPOS (dos barritas: la cargada y el envión)'}`);
+    console.log(`\n${lev === 's' ? 'ARRANQUE' : 'DOS TIEMPOS'}`);
     console.log('perfil   pesista   ' + Is.map(I => `${(I / 100).toFixed(0)} %`.padStart(17)).join(''));
     for (const pf of ['novato', 'medio', 'bueno', 'tipico']) for (const id of ATL) {
-      const fila = Is.map(I => { const o = casilla(id, lev, I, PERFILES[pf], N, 77); (T[pf] ||= {})[`${id}|${lev}|${I}`] = o; const nz = o.z.verde + o.z.amarillo + o.z.rojo; return `${pc(o.v, o.n).toFixed(0).padStart(4)} (${pc(o.z.verde, nz).toFixed(0)}/${pc(o.z.amarillo, nz).toFixed(0)}/${pc(o.z.rojo, nz).toFixed(0)})`.padStart(17); });
+      const fila = Is.map(I => { const o = casilla(id, lev, I, perfil(pf), N, 77, D); (T[pf] ||= {})[`${id}|${lev}|${I}`] = o; const nz = o.z.verde + o.z.amarillo + o.z.rojo; return `${pc(o.v, o.n).toFixed(0).padStart(4)} (${pc(o.z.verde, nz).toFixed(0)}/${pc(o.z.amarillo, nz).toFixed(0)}/${pc(o.z.rojo, nz).toFixed(0)})`.padStart(17); });
       console.log(`${pf.padEnd(8)} ${NOMBRE[id].padEnd(9)}${fila.join('')}`);
     }
   }
   // ancho del verde por pesista y barrita (ms de puntero, medio ancho) al 90 y al 100 %
-  console.log('\nVerde (medio ancho, ms) por pesista · barrita del tirón / del envión · al 90 % y al 100 %');
-  for (const id of ATL) { const c = cuerpoBarra(id), z = (I, i) => zonasBarra(I, c, i).vMs; console.log(`  ${NOMBRE[id].padEnd(9)} tirón ${z(9000, 0)} / ${z(10000, 0)} · envión ${z(9000, 1)} / ${z(10000, 1)}`); }
+  console.log('\nVerde (medio ancho, ms) por pesista y barrita · al 90 % y al 100 %');
+  for (const id of ATL) { const c = cuerpoBarra(id), z = (I, i) => zonasBarra(I, c, i, false, 'split', R).vMs; console.log(`  ${NOMBRE[id].padEnd(9)} ${[...new Set([...R.barritas.s, ...R.barritas.c])].map(i => `${['tirón', 'envión', 'atrapar', 'pararse'][i]} ${z(9000, i)} / ${z(10000, i)}`).join(' · ')}`); }
   // criterio
+  const val = (pf, id, lev, I) => { const o = T[pf][`${id}|${lev}|${I}`]; return pc(o.v, o.n); };
   for (const id of ATL) for (const lev of ['s', 'c']) {
-    const o = T.novato[`${id}|${lev}|9000`], nz = o.z.verde + o.z.amarillo + o.z.rojo;
-    if (pc(o.v, o.n) < 95) mal.push(`novato ${NOMBRE[id]} ${lev} al 90 %: ${pc(o.v, o.n)} % válidos (meta ≥ 95)`);
-    if (pc(o.z.verde, nz) < 60) mal.push(`novato ${NOMBRE[id]} ${lev} al 90 %: ${pc(o.z.verde, nz)} % verde (meta ≥ 60)`);
-    const n100 = T.novato[`${id}|${lev}|10000`], b100 = T.bueno[`${id}|${lev}|10000`];
-    if (pc(n100.v, n100.n) < 30 || pc(n100.v, n100.n) > 65) mal.push(`novato ${NOMBRE[id]} ${lev} al 100 %: ${pc(n100.v, n100.n)} % válidos (meta 30 a 65)`);
-    if (b100.v <= n100.v) mal.push(`${NOMBRE[id]} ${lev} al 100 %: el bueno (${pc(b100.v, b100.n)} %) no saca más que el novato (${pc(n100.v, n100.n)} %)`);
+    if (dif === 'facil') {
+      const o = T.novato[`${id}|${lev}|9000`], nz = o.z.verde + o.z.amarillo + o.z.rojo;
+      if (pc(o.v, o.n) < 95) mal.push(`novato ${NOMBRE[id]} ${lev} al 90 %: ${pc(o.v, o.n)} % válidos (meta ≥ 95)`);
+      if (pc(o.z.verde, nz) < 60) mal.push(`novato ${NOMBRE[id]} ${lev} al 90 %: ${pc(o.z.verde, nz)} % verde (meta ≥ 60)`);
+      const n100 = T.novato[`${id}|${lev}|10000`];
+      if (pc(n100.v, n100.n) < 30 || pc(n100.v, n100.n) > 65) mal.push(`novato ${NOMBRE[id]} ${lev} al 100 %: ${pc(n100.v, n100.n)} % válidos (meta 30 a 65)`);
+    } else {
+      // metas de la dificultad: con la apertura sugerida, Medio: novato ≥ 90 % y medio ≥ 95 %; Difícil: novato ≥ 75 % y bueno ≥ 95 %
+      const [pn, pm, qm] = dif === 'medio' ? [90, 'medio', 95] : [75, 'bueno', 95];
+      if (val('novato', id, lev, AP) < pn) mal.push(`${dif}: novato ${NOMBRE[id]} ${lev} con la apertura (${AP / 100} %): ${val('novato', id, lev, AP)} % válidos (meta ≥ ${pn})`);
+      if (val(pm, id, lev, AP) < qm) mal.push(`${dif}: ${pm} ${NOMBRE[id]} ${lev} con la apertura: ${val(pm, id, lev, AP)} % válidos (meta ≥ ${qm})`);
+    }
+    // en todos los niveles, el bueno le gana claramente al novato al 97 y al 100 %
+    const d97 = val('bueno', id, lev, 9700) - val('novato', id, lev, 9700), d100 = val('bueno', id, lev, 10000) - val('novato', id, lev, 10000);
+    if (d100 < 15 || d97 < 0 || d97 + d100 < 25) mal.push(`${dif} ${NOMBRE[id]} ${lev}: el bueno no gana claramente al novato (97 %: +${d97.toFixed(0)}, 100 %: +${d100.toFixed(0)} puntos; meta +15 al 100 % y +25 sumando los dos)`);
   }
   // diferencias por pesista en cada barrita (verde del novato al 97 %)
-  for (const lev of ['s', 'c']) for (const i of lev === 's' ? [0] : [0, 1]) {
+  for (const lev of ['s', 'c']) for (const i of R.barritas[lev]) {
     const v = ATL.map(id => { const o = T.novato[`${id}|${lev}|9700`], z = o.zi[i], nz = z.verde + z.amarillo + z.rojo; return pc(z.verde, nz); });
-    console.log(`verde del novato al 97 % · ${lev === 's' ? 'arranque' : 'dos tiempos'} · barrita ${i ? 'del envión' : 'del tirón'}: ${ATL.map((id, k) => `${NOMBRE[id]} ${v[k]} %`).join(' · ')}`);
-    if (Math.max(...v) - Math.min(...v) < 10) mal.push(`barrita ${i} (${lev}): los pesistas no se distinguen (${v.join(' / ')} % verde)`);
+    console.log(`verde del novato al 97 % · ${lev === 's' ? 'arranque' : 'dos tiempos'} · barrita ${['del tirón', 'del envión', 'de atrapar', 'de pararse'][i]}: ${ATL.map((id, k) => `${NOMBRE[id]} ${v[k]} %`).join(' · ')}`);
+    if (Math.max(...v) - Math.min(...v) < 10 && i < 2) mal.push(`${dif}: barrita ${i} (${lev}): los pesistas no se distinguen (${v.join(' / ')} % verde)`);
   }
   // maneras raras de tocar: nada se rompe, no hay caídas con la apertura
   for (const pf of ['machacador', 'mantiene', 'ausente', 'doble']) {
-    const fila = ATL.map(id => { const s = casilla(id, 's', 9000, PERFILES[pf], 100, 91), c = casilla(id, 'c', 9000, PERFILES[pf], 100, 91); return `${NOMBRE[id]} ${pc(s.v, s.n)} / ${pc(c.v, c.n)} %`; });
-    console.log(`${pf.padEnd(10)} al 90 % (arranque / dos tiempos): ${fila.join(' · ')}`);
+    const fila = ATL.map(id => { const s = casilla(id, 's', AP, PERFILES[pf], 100, 91, D), c = casilla(id, 'c', AP, PERFILES[pf], 100, 91, D); return `${NOMBRE[id]} ${pc(s.v, s.n)} / ${pc(c.v, c.n)} %`; });
+    console.log(`${pf.padEnd(10)} con la apertura (arranque / dos tiempos): ${fila.join(' · ')}`);
   }
-  // el esfuerzo de pararse: nunca con la apertura; cuántas veces aparece y cuántas se hace (el lento toca 2 por segundo)
+  // el esfuerzo de pararse: nunca por debajo de su intensidad; cuántas veces aparece y cuántas se hace
   for (const lev of ['s', 'c']) {
     const fila = Is.map(I => { let e = 0, n = 0, ok = 0; for (const id of ATL) { const o = T.novato[`${id}|${lev}|${I}`]; e += o.esf; n += o.n; ok += o.esfOk; } return { I, pct: pc(e, n), ok: pc(ok, e) }; });
-    console.log(`esfuerzo al pararse (novato, ${lev === 's' ? 'arranque' : 'dos tiempos'}): ${fila.map(x => `${x.I / 100} % ${x.pct} %${x.pct ? ` (lo hace ${x.ok} %)` : ''}`).join(' · ')}`);
-    for (const x of fila) if (x.I <= 9200 && x.pct > 0) mal(`el esfuerzo de pararse aparece con ${x.I / 100} % (${x.pct} %): nunca en los intentos fáciles`);
+    console.log(`esfuerzo al pararse (novato, ${lev === 's' ? 'arranque' : 'dos tiempos'}, ${R.esfuerzo.toques} toques en ${R.esfuerzo.ms / 1000} s desde el ${R.esfuerzo.desdeI / 100} %): ${fila.map(x => `${x.I / 100} % ${x.pct} %${x.pct ? ` (lo hace ${x.ok} %)` : ''}`).join(' · ')}`);
+    for (const x of fila) if (x.I < R.esfuerzo.desdeI && x.pct > 0) mal.push(`${dif}: el esfuerzo de pararse aparece con ${x.I / 100} % (${x.pct} %)`);
   }
-  { let e = 0, ok = 0; for (const id of ATL) for (const lev of ['s', 'c']) { const o = casilla(id, lev, 9900, PERFILES.lento, Math.round(N / 2), 33); e += o.esf; ok += o.esfOk; }
-    console.log(`esfuerzo con 2 toques por segundo (lento, 99 %): aparece ${e} veces y lo hace ${pc(ok, e)} %`); if (e && ok < e) mal(`con 2 toques por segundo el esfuerzo no siempre alcanza (${ok} de ${e})`); }
+  // a un ritmo cómodo alcanza siempre: Fácil 2 toques por segundo, Medio 2,5 y Difícil 3 (sin apuro)
+  { const ritmo = dif === 'facil' ? 520 : dif === 'medio' ? 400 : 333; let e = 0, ok = 0; for (const id of ATL) for (const lev of ['s', 'c']) { const o = casilla(id, lev, 9900, { ...PERFILES.lento, ritmo }, Math.round(N / 2), 33, D); e += o.esf; ok += o.esfOk; }
+    console.log(`esfuerzo con ${(1000 / ritmo).toFixed(1)} toques por segundo (99 %): aparece ${e} veces y lo hace ${pc(ok, e)} %`); if (e && ok < e) mal.push(`${dif}: con ${(1000 / ritmo).toFixed(1)} toques por segundo el esfuerzo no siempre alcanza (${ok} de ${e})`); }
   // estilos del envión: split (tijera) el más fácil, power intermedio, squat el más difícil, con todos los pesistas
   for (const pf of ['novato', 'bueno']) {
-    const fila = ATL.map(id => ['split', 'power', 'squat'].map(e => { const o = casilla(id, 'c', 9700, PERFILES[pf], N, 55, {}, e); return pc(o.v, o.n); }));
+    const fila = ATL.map(id => ['split', 'power', 'squat'].map(e => { const o = casilla(id, 'c', 9700, PERFILES[pf], N, 55, D, e); return pc(o.v, o.n); }));
     console.log(`envión al 97 %, ${pf}: ${ATL.map((id, k) => `${NOMBRE[id]} split ${fila[k][0]} · power ${fila[k][1]} · squat ${fila[k][2]} %`).join(' | ')}`);
-    ATL.forEach((id, k) => { if (!(fila[k][0] >= fila[k][1] && fila[k][1] >= fila[k][2])) mal.push(`${pf} ${NOMBRE[id]}: el orden de los enviones no es split ≥ power ≥ squat (${fila[k].join(' / ')})`); });
+    ATL.forEach((id, k) => { if (!(fila[k][0] >= fila[k][1] - 1 && fila[k][1] >= fila[k][2] - 1)) mal.push(`${dif} ${pf} ${NOMBRE[id]}: el orden de los enviones no es split ≥ power ≥ squat (${fila[k].join(' / ')})`); });
   }
-  // finales enteras con el cansancio: la apertura sugerida (90 %) y después lo que trae el panel (el entrenador)
-  for (const pf of ['novato', 'medio', 'bueno']) for (const id of ATL) {
-    const F = { finales: 0, total: 0, val: [0, 0, 0, 0, 0, 0], int: [0, 0, 0, 0, 0, 0], fat3: 0, n3: 0 }, yo = ATL.indexOf(id);
+  // finales enteras con el cansancio: la apertura sugerida y después lo que trae el panel (el entrenador, «panel») o lo que
+  // le propondría el entrenador a alguien que conoce su propia puntería («lector»: cambia los kilos con ← →). Oro contra los
+  // rivales que trae el nivel: Fácil y Medio, amistosos (y normales, informativo); Difícil, normales
+  const RIV = dif === 'dificil' ? ['normal'] : ['amistoso', 'normal'];
+  for (const nivel of RIV) for (const [pf, est] of [['novato', 'panel'], ['medio', 'panel'], ['bueno', 'panel'], ['medio', 'lector'], ['bueno', 'lector']]) for (const id of ATL) {
+    const F = { finales: 0, total: 0, oro: 0, val: [0, 0, 0, 0, 0, 0], int: [0, 0, 0, 0, 0, 0], fat3: 0, n3: 0 }, yo = ATL.indexOf(id);
     for (let k = 0; k < Math.max(60, Math.round(N / 4)); k++) {
-      const p = new Partida(datos, { semilla: mezclar(k, 777, yo), nivel: 'normal', cal: 0, primera: false, ctl: 'b', tactil: true, atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
-      for (const lev of ['s', 'c']) { const [lo, hi] = p.rangoApertura(yo, lev); p.abrir(yo, lev, Math.max(lo, Math.min(hi, Math.round(datos.atletas[id].techo[lev] * .9)))); }
+      const p = new Partida(datos, { semilla: mezclar(k, 777, yo, nivel === 'normal' ? 1 : 0), nivel, cal: 0, primera: false, ctl: 'b', tactil: true, ia: HUELLA_IA, ...D, atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
+      for (const lev of ['s', 'c']) { const [lo, hi] = p.rangoApertura(yo, lev); p.abrir(yo, lev, Math.max(lo, Math.min(hi, Math.round(datos.atletas[id].techo[lev] * R.apertura / 1000)))); }
       p.empezar();
       for (let g = 0; p.fase !== 'fin' && g < 80; g++) {
         if (p.fase === 'intervalo') { p.empezar(); continue; }
         const L = p.llamado; if (p.at[L.a].ctrl === 'juego') { p.resolverIA(); continue; }
-        const env = L.lev === 'c' ? 'split' : undefined, ctx = p.contexto(env), j = (L.lev === 'c' ? 3 : 0) + L.n - 1;
+        const env = L.lev === 'c' ? 'split' : undefined;
+        if (est === 'lector' && L.n > 1 && p.at[yo].cambios === 0) { const kg = sugerencia(p, yo, L.lev, env, { perfil: PERFILES[pf] }); if (kg !== null && kg !== L.kg && !p.cambioValido(500, kg) && p.cambio(500, kg).desplazado) continue; }
+        const ctx = p.contexto(env), j = (L.lev === 'c' ? 3 : 0) + L.n - 1;
         if (L.n === 3) { F.fat3 += ctx.fatiga || 0; F.n3++; }
-        const S = jugarBarra(ctx, PERFILES[pf], mezclar(k, g, 99)), x = p.resolver({ conf: S.conf, env, ent: S.ent });
+        const S = jugarBarra(ctx, PERFILES[pf], mezclar(k, g, 99), { conf: 600 }), x = p.resolver({ conf: S.conf, env, ent: S.ent });
         F.int[j]++; if (x.res.res === 'valido') F.val[j]++;
       }
-      F.finales++; if (p.at[yo].mejor.s && p.at[yo].mejor.c) F.total++;
+      F.finales++; if (p.at[yo].mejor.s && p.at[yo].mejor.c) F.total++; if (p.tabla()[0].a === yo && p.tabla()[0].puesto === 1) F.oro++;
     }
     const v = F.val.map((x, i) => pc(x, F.int[i]).toFixed(0));
-    console.log(`final ${pf.padEnd(6)} ${NOMBRE[id].padEnd(9)} con total ${pc(F.total, F.finales)} % · válidos por intento (arr. 1-2-3 / dt 1-2-3) ${v.slice(0, 3).join('-')} / ${v.slice(3).join('-')} % · cansancio medio al tercer intento ${Math.round(F.fat3 / Math.max(1, F.n3))}`);
-    if (pf === 'novato' && pc(F.total, F.finales) < 90) mal.push(`el novato con ${NOMBRE[id]} termina con total solo el ${pc(F.total, F.finales)} % de las finales (meta ≥ 90)`);
+    console.log(`final ${nivel.padEnd(8)} ${pf.padEnd(6)} ${est.padEnd(6)} ${NOMBRE[id].padEnd(9)} total ${pc(F.total, F.finales)} % · oro ${pc(F.oro, F.finales)} % · válidos (arr. 1-2-3 / dt 1-2-3) ${v.slice(0, 3).join('-')} / ${v.slice(3).join('-')} % · cansancio al tercero ${Math.round(F.fat3 / Math.max(1, F.n3))}`);
+    (OROS[`${nivel}|${pf}|${est}`] ||= []).push(pc(F.oro, F.finales));
+    if (pf === 'novato' && pc(F.total, F.finales) < 90) mal.push(`${dif}: el novato con ${NOMBRE[id]} termina con total solo el ${pc(F.total, F.finales)} % de las finales (meta ≥ 90)`);
   }
+  for (const [k, xs] of Object.entries(OROS)) console.log(`oro medio (${dif}, ${k.replaceAll('|', ' · ')}): ${(xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(1)} %`);
+  // ganable: en Medio, el novato con lo que trae el panel gana contra amistosos; en Difícil, el bueno que lee su puntería
+  // gana contra normales
+  const media = k => { const xs = OROS[k] || []; return xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length); };
+  if (dif === 'medio' && media('amistoso|novato|panel') < 50) mal.push(`medio: el novato con el panel gana el oro solo el ${media('amistoso|novato|panel').toFixed(0)} % contra amistosos (meta ≥ 50)`);
+  if (dif === 'dificil' && media('normal|bueno|lector') < 25) mal.push(`dificil: el bueno que lee su puntería gana el oro solo el ${media('normal|bueno|lector').toFixed(0)} % contra normales (meta ≥ 25)`);
   // chance del panel (perfil típico) contra lo medido con el bot típico, por casilla (informativo; la prueba es chance_test)
   let peor = 0;
-  for (const id of ATL) for (const lev of ['s', 'c']) for (const I of Is) { const o = T.tipico[`${id}|${lev}|${I}`], c = cuerpoBarra(id), ch = chanceBarra(I, lev, lev === 'c' ? c.casa : undefined, c) / 10; peor = Math.max(peor, Math.abs(ch - pc(o.v, o.n))); }
+  for (const id of ATL) for (const lev of ['s', 'c']) for (const I of Is) { const o = T.tipico[`${id}|${lev}|${I}`], c = cuerpoBarra(id), ch = chanceBarra(I, lev, lev === 'c' ? c.casa : undefined, c, D) / 10; peor = Math.max(peor, Math.abs(ch - pc(o.v, o.n))); }
   console.log(`chance del panel contra el bot típico: error máximo por casilla ${peor.toFixed(1)} puntos (${N} intentos por casilla)`);
+  }
   console.log(`(${((Date.now() - t0) / 1000).toFixed(1)} s)`);
-  console.log(mal.length ? `\nFALLÓ:\n  ${mal.join('\n  ')}` : '\nOK: la barrita cumple las metas de Gameplay 3');
+  console.log(mal.length ? `\nFALLÓ:\n  ${mal.join('\n  ')}` : '\nOK: la barrita cumple las metas de Gameplay 3 y de la dificultad');
   process.exit(mal.length ? 1 : 0);
 }

@@ -315,8 +315,49 @@ export const BARRA = {
 };
 /** Huella de las reglas de 'b' (BARRA, UNO y los cuerpos): va en la cabecera de los registros de 'b' y replay.js la exige. */
 export const HUELLA_B = huella(canonico({ BARRA, UNO, CUERPOS_U, CUERPO_NEUTRO }));
-/** Tramo de cada barrita: la 0 es el tirón (arranque y cargada) y la 1 el envión (tramo «arriba» del dos tiempos). */
-export const TRAMO_BARRA = ['tiron', 'arriba'];
+/**
+ * Niveles de dificultad de la barrita (pedido del dueño del 13-nov: «si es un poco más difícil, que requiera un poco más de
+ * interacción»). Fácil es BARRA tal cual (sus registros y su huella no cambian). Medio y Difícil cambian solo esto:
+ *   barritas     qué barritas tiene cada levantamiento, en orden (0 tirón, 1 envión, 2 atrapar la barra arriba en el arranque,
+ *                3 pararse del fondo). Atrapar y pararse corren con el pesista quieto en el fondo: nada de coordinar con el
+ *                movimiento; el toque cierra ese tramo (atrapar) o lo arranca (pararse)
+ *   pasada, pasadaLenta, lentoDesde  el puntero (más rápido; en Difícil nunca se pone lento: lentoDesde = soloMs)
+ *   verde, amarillo  milésimas del ancho (en la barrita) del verde y del amarillo de Fácil a la misma intensidad
+ *   costo, costoExtra  lo que cuestan las zonas de tirón y envión (si falta, BARRA.costo) y las de atrapar y pararse: con más
+ *                barritas, cada toque regular cuesta menos (el total que se puede perder sigue parecido)
+ *   esfuerzo, tipico  el esfuerzo de pararse (desde qué intensidad y cuántos toques) y la persona típica del panel: quien
+ *                elige Medio o Difícil suele apuntar mejor (±100 y ±90 ms en lugar de ±105); chance_test la mide en cada nivel
+ * PESISTAS_B2: ancho del verde de atrapar y pararse por pesista (como BARRA.pesistas): Compacto fuerte arriba, Largo débil
+ *                al pararse, Potente fuerte al pararse y débil arriba (los mismos puntos fuertes de CUERPOS_U)
+ *   apertura     milésimas del techo de la apertura que sugiere la presentación
+ */
+export const DIFICULTADES = ['facil', 'medio', 'dificil'];
+const PESISTAS_B2 = { ventura: { atrapa: 1150, pararse: 1000 }, brenner: { atrapa: 1000, pararse: 850 }, marangi: { atrapa: 850, pararse: 1150 } };
+export const NIVELES_B = {
+  medio: {
+    version: '1.0', barritas: { s: [0, 2], c: [0, 3, 1] }, pasada: 1200, pasadaLenta: 1500, lentoDesde: 8000, verde: 800, amarillo: 1000,
+    costoExtra: { verde: 0, amarillo: 350, rojo: 900 }, esfuerzo: { desdeI: 9200, umbral: 100, toques: 5, ms: 3000, premio: 350 },
+    tipico: { sesgo: 28, sd: 100, despiste: 38, esfuerzo: 930 }, apertura: 890,
+  },
+  dificil: {
+    version: '1.0', barritas: { s: [0, 2, 3], c: [0, 3, 1] }, pasada: 1000, pasadaLenta: 1000, lentoDesde: 60000, verde: 650, amarillo: 900,
+    costo: { verde: 0, amarillo: 450, rojo: 1200 }, costoExtra: { verde: 0, amarillo: 300, rojo: 800 }, esfuerzo: { desdeI: 8800, umbral: 100, toques: 6, ms: 3000, premio: 400 },
+    tipico: { sesgo: 25, sd: 90, despiste: 35, esfuerzo: 900 }, apertura: 880,
+  },
+};
+const FACIL_B = { barritas: { s: [0], c: [0, 1] }, verde: 1000, amarillo: 1000, costoExtra: BARRA.costo, apertura: 900 };
+const CACHE_B = {};
+/** Reglas de la barrita del nivel `dif` ('facil' si falta): BARRA con lo que cambia el nivel. */
+export function reglasB(dif) {
+  const d = NIVELES_B[dif] ? dif : 'facil';
+  return CACHE_B[d] ||= Object.freeze({ ...BARRA, ...FACIL_B, ...(NIVELES_B[d] || {}), dif: d });
+}
+/** Huella de las reglas de 'b' de cada nivel: Fácil, la de siempre; Medio y Difícil, con lo que cambian. */
+export const HUELLAS_B = { facil: HUELLA_B, medio: huella(canonico({ BARRA, UNO, CUERPOS_U, CUERPO_NEUTRO, nivel: NIVELES_B.medio, extra: PESISTAS_B2 })), dificil: huella(canonico({ BARRA, UNO, CUERPOS_U, CUERPO_NEUTRO, nivel: NIVELES_B.dificil, extra: PESISTAS_B2 })) };
+/** Tramo de cada barrita: 0 el tirón (arranque y cargada), 1 el envión y 2 atrapar (tramo «arriba»), 3 pararse. */
+export const TRAMO_BARRA = ['tiron', 'arriba', 'arriba', 'pararse'];
+/** La barrita de `lev` que cierra (o arranca) el tramo `tramo` en las reglas `R`, o -1. */
+export const barritaDeTramo = (R, lev, tramo) => { for (const i of R.barritas[lev]) if (TRAMO_BARRA[i] === tramo) return i; return -1; };
 /**
  * Cuerpo de juego en 'b': el de 'u' con el gasto escalado (BARRA.escala) y el ancho de cada barrita (`barra`).
  * Acepta el id del pesista o un cuerpo ya armado (para pruebas).
@@ -324,7 +365,7 @@ export const TRAMO_BARRA = ['tiron', 'arriba'];
 export function cuerpoBarra(x) {
   const c = typeof x === 'string' || !x || x.cuerpoJuego ? cuerpoDe(x) : { ...CUERPO_NEUTRO, ...x }, E = BARRA.escala;
   return { ...c, tiron: idiv(c.tiron * E.tiron, 1000), arriba: idiv(c.arriba * E.arriba, 1000), pararse: idiv(c.pararse * E.pararse, 1000),
-    barra: { ...BARRA.neutro, ...(typeof x === 'string' ? BARRA.pesistas[x] : x && x.barra) }, envion: BARRA.envion, squatMov: BARRA.squatMov };
+    barra: { ...BARRA.neutro, atrapa: 1000, pararse: 1000, ...(typeof x === 'string' ? { ...BARRA.pesistas[x], ...PESISTAS_B2[x] } : x && x.barra) }, envion: BARRA.envion, squatMov: BARRA.squatMov };
 }
 /** Cansancio (energía, milésimas) que deja un levantamiento en 'b' (`uno`: res.uno del núcleo). */
 export function fatigaDe(uno) {
@@ -332,8 +373,8 @@ export function fatigaDe(uno) {
   const f = idiv(toques, 4) + (uno.garra === 'usada' ? F.garra : 0) + (uno.margen_fin < F.bajo ? idiv(F.bajo - Math.max(uno.margen_fin, -F.bajo), 4) : 0);
   return idiv(f, F.paso) * F.paso;
 }
-/** ¿Pide el esfuerzo de pararse? `m`: energía al empezar a pararse; `gPararse`: lo que cuesta pararse sin suerte. */
-export const pideEsfuerzo = (I, m, gPararse) => I >= BARRA.esfuerzo.desdeI && gPararse > 0 && m - gPararse < BARRA.esfuerzo.umbral;
+/** ¿Pide el esfuerzo de pararse? `m`: energía al empezar a pararse; `gPararse`: lo que cuesta pararse sin suerte (con su barrita). */
+export const pideEsfuerzo = (I, m, gPararse, R = BARRA) => I >= R.esfuerzo.desdeI && gPararse > 0 && m - gPararse < R.esfuerzo.umbral;
 /** Agrega el cansancio `f` de un intento del levantamiento `lev` a `fat` ({s, c}): todo en el mismo, la mitad del arranque al dos tiempos. */
 export function sumarFatiga(fat, lev, f) {
   const T = BARRA.fatiga.tope, P = BARRA.fatiga.paso;
@@ -341,29 +382,36 @@ export function sumarFatiga(fat, lev, f) {
   return fat;
 }
 /** Posición del puntero (milésimas de la barrita, 0 a 1000) a `e` ms de que arrancó: va y vuelve, empieza a la izquierda. */
-export function posBarra(e) {
+export function posBarra(e, R = BARRA) {
   if (e <= 0) return 0;
-  const L = BARRA.lentoDesde, x = e <= L ? idiv(e * 1000, BARRA.pasada) : idiv(L * 1000, BARRA.pasada) + idiv((e - L) * 1000, BARRA.pasadaLenta), u = x % 2000;
+  const L = R.lentoDesde, x = e <= L ? idiv(e * 1000, R.pasada) : idiv(L * 1000, R.pasada) + idiv((e - L) * 1000, R.pasadaLenta), u = x % 2000;
   return u <= 1000 ? u : 2000 - u;
 }
-/** Medio ancho del verde y del amarillo en ms de puntero (antes de pasarlo a la barrita). */
+/** Medio ancho del verde y del amarillo en ms de puntero de Fácil (antes de pasarlo a la barrita). */
 function anchosMs(I, k, primera) {
   const T = BARRA.tI, n = T.length, tab = col => (I <= T[0] ? col[0] : I >= T[n - 1] ? col[n - 1] : (() => { let j = 0; while (I > T[j + 1]) j++; return lerpi(I, T[j], T[j + 1], col[j], col[j + 1]); })());
   let v = idiv(tab(BARRA.tVerde) * k, 1000), a = v + idiv(tab(BARRA.tAmarillo) * k, 1000);
   if (primera) { v = idiv(v * BARRA.primera, 1000); a = idiv(a * BARRA.primera, 1000); }
   return { v, a };
 }
+/** Factor del pesista (milésimas) para el ancho de la barrita `i` (0 tirón, 1 envión, 2 atrapar, 3 pararse). */
+function factorBarra(b, i, env) { return i === 0 ? b.tiron : i === 1 ? idiv(b.envion * (BARRA.verdeEnvion[env] || 1000), 1000) : i === 2 ? b.atrapa ?? 1000 : b.pararse ?? 1000; }
 /**
- * Zonas de la barrita `i` (0 tirón, 1 envión) a la intensidad I para el cuerpo `cuerpo` (cuerpoBarra): `v` y `a`, medio
- * ancho del verde y del amarillo en milésimas de la barrita alrededor del centro (500); `vMs` y `aMs`, lo mismo en ms.
+ * Zonas de la barrita `i` a la intensidad I para el cuerpo `cuerpo` (cuerpoBarra): `v` y `a`, medio ancho del verde y del
+ * amarillo en milésimas de la barrita alrededor del centro (500); `vMs` y `aMs`, lo mismo en ms del puntero de las reglas `R`.
+ * El ancho en la barrita es el de Fácil por R.verde y R.amarillo: con un puntero más rápido, el mismo ancho dura menos.
  */
-export function zonasBarra(I, cuerpo, i, primera = false, env = 'split') {
-  const b = (cuerpo && cuerpo.barra) || BARRA.neutro, k = i ? idiv(b.envion * (BARRA.verdeEnvion[env] || 1000), 1000) : b.tiron, { v: vMs, a: aMs } = anchosMs(I, k, primera);
-  const v = Math.min(BARRA.topeVerde, idiv(vMs * 1000, BARRA.pasada)), a = Math.min(BARRA.topeAmarillo, Math.max(v + 10, idiv(aMs * 1000, BARRA.pasada)));
-  return { v, a, vMs: idiv(v * BARRA.pasada, 1000), aMs: idiv(a * BARRA.pasada, 1000) };
+export function zonasBarra(I, cuerpo, i, primera = false, env = 'split', R = BARRA) {
+  const b = (cuerpo && cuerpo.barra) || BARRA.neutro, { v: vMs, a: aMs } = anchosMs(I, factorBarra(b, i, env), primera);
+  let v = Math.min(BARRA.topeVerde, idiv(vMs * 1000, BARRA.pasada)), a = Math.min(BARRA.topeAmarillo, Math.max(v + 10, idiv(aMs * 1000, BARRA.pasada)));
+  if (R.verde !== undefined && R.verde !== 1000) v = idiv(v * R.verde, 1000);
+  if (R.amarillo !== undefined && R.amarillo !== 1000) a = Math.max(v + 10, idiv(a * R.amarillo, 1000));
+  return { v, a, vMs: idiv(v * R.pasada, 1000), aMs: idiv(a * R.pasada, 1000) };
 }
 /** Zona de una posición del puntero: 'verde', 'amarillo' o 'rojo'. */
 export function zonaBarra(pos, z) { const d = Math.abs(pos - 500); return d <= z.v ? 'verde' : d <= z.a ? 'amarillo' : 'rojo'; }
+/** Lo que cuesta de más la zona `zona` de la barrita `i` en las reglas `R`. */
+export const costoBarra = (R, i, zona) => (i >= 2 ? R.costoExtra : R.costo)[zona];
 
 /** Φ de la normal en millonésimas, de 0 a 4 desvíos en décimos (se interpola). */
 const PHI = [500000, 539828, 579260, 617911, 655422, 691462, 725747, 758036, 788145, 815940, 841345, 864334, 884930, 903199, 919243, 933193, 945201, 955435, 964070, 971284, 977250, 982136, 986097, 989276, 991802, 993790, 995339, 996533, 997445, 998134, 998650, 999032, 999313, 999517, 999663, 999767, 999841, 999892, 999928, 999952, 999968];
@@ -385,22 +433,27 @@ export function repartoBarra(z, perfil = BARRA.tipico) {
   return { verde: pv, amarillo: Math.max(0, pva - pv), rojo: Math.max(0, 1000 - pva) };
 }
 /**
- * Chance (milésimas) de que suba un peso en 'b' para la persona `o.perfil` (por defecto BARRA.tipico): como chanceUno, con
- * la suerte de cada tramo y la garra, más lo que cuesta cada barrita según dónde suele pegar esa persona. Exacta para ese
+ * Chance (milésimas) de que suba un peso en 'b' para la persona `o.perfil` (por defecto la típica del nivel): como chanceUno,
+ * con la suerte de cada tramo y la garra, más lo que cuesta cada barrita según dónde suele pegar esa persona. Exacta para ese
  * perfil (programación dinámica sobre la energía, mismas reglas que attempt.js); enteros.
- *   o.garra (false: ya se usó) · o.primera (verde más ancho) · o.zonas (forzar zonas, para pruebas)
+ *   o.garra (false: ya se usó) · o.primera (verde más ancho) · o.zonas (forzar zonas, para pruebas) · o.dif (nivel)
  */
 export function chanceBarra(I, lev, env, cuerpo, o = {}) {
-  const T = TRAMOS[lev], G = T.map(tr => gastoTramo(tr, I, lev, env, cuerpo)), k = cuerpo.ruido || 0, n = 2 * k + 1, perfil = o.perfil || BARRA.tipico;
+  const Rg = reglasB(o.dif), T = TRAMOS[lev], G = T.map(tr => gastoTramo(tr, I, lev, env, cuerpo)), k = cuerpo.ruido || 0, n = 2 * k + 1, perfil = o.perfil || Rg.tipico;
   // reparto de zonas de la barrita de cada tramo (null: el tramo no tiene barrita)
-  const R = T.map(tr => { const i = TRAMO_BARRA.indexOf(tr); if (i < 0 || (i === 1 && lev !== 'c')) return null; const r = repartoBarra(zonasBarra(I, cuerpo, i, !!o.primera, env), perfil); return [[r.verde, BARRA.costo.verde], [r.amarillo, BARRA.costo.amarillo], [r.rojo, BARRA.costo.rojo]]; });
-  const memo = new Map();
+  const R = T.map(tr => { const i = barritaDeTramo(Rg, lev, tr); if (i < 0) return null; const r = repartoBarra(zonasBarra(I, cuerpo, i, !!o.primera, env, Rg), perfil); return [[r.verde, costoBarra(Rg, i, 'verde')], [r.amarillo, costoBarra(Rg, i, 'amarillo')], [r.rojo, costoBarra(Rg, i, 'rojo')]]; });
+  const memo = new Map(), E = Rg.esfuerzo, pe = perfil.esfuerzo ?? 1000;
   const f = (i, m, garra) => {
     if (i === G.length) return 1;
     const key = i * 4 + (garra ? 1 : 0) + ':' + m; let v = memo.get(key); if (v !== undefined) return v;
     v = 0; let Z = R[i] || [[1000, 0]];
-    // pararse con esfuerzo (intento exigente): lo hace la persona típica `perfil.esfuerzo` de cada 1000 veces
-    if (T[i] === 'pararse' && pideEsfuerzo(I, m, G[i])) { const pe = perfil.esfuerzo ?? 1000; Z = [[pe, -BARRA.esfuerzo.premio], [1000 - pe, 0]]; }
+    // pararse con esfuerzo (intento exigente): lo hace la persona típica `perfil.esfuerzo` de cada 1000 veces. Con barrita de
+    // pararse, el esfuerzo se decide con lo que costó esa barrita (cada zona se parte en «lo hace» y «no lo hace»)
+    if (T[i] === 'pararse') {
+      const Z2 = [];
+      for (const [w, ex] of Z) { if (pideEsfuerzo(I, m, G[i] + ex, Rg)) { const si = idiv(w * pe, 1000); Z2.push([si, ex - E.premio], [w - si, ex]); } else Z2.push([w, ex]); }
+      Z = Z2;
+    }
     for (let j = 0; j < n; j++) {
       const g = conSuerte(G[i], (j - k) * UNO.ruidoPaso);
       for (const [w, extra] of Z) {

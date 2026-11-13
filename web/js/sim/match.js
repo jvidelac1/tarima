@@ -5,7 +5,7 @@ import { idiv, rdiv, clampi, mezclar, Azar } from './fixed.js';
 import { simular } from './attempt.js';
 import { gestos, decidir, elegirEnvion, planRival, decidirPlan, estiloRival, HUELLA_IA } from './ai.js';
 import { sugerencia } from './entrenador.js';
-import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad, cuerpoDe, cuerpoBarra, HUELLA_U, HUELLA_B, fatigaDe, sumarFatiga } from './rules.js';
+import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad, cuerpoDe, cuerpoBarra, HUELLA_U, HUELLAS_B, NIVELES_B, fatigaDe, sumarFatiga } from './rules.js';
 
 const LEVS = ['s', 'c'];
 
@@ -17,13 +17,16 @@ export class Partida {
    *   `tactil`: con el dedo (vale para 'f', 'u' y 'b'; queda en la cabecera del registro).
    *   `ia`: HUELLA_IA para los rivales con personalidad (ai.js → PERSONALIDADES); ausente, los rivales de siempre (así se
    *   siguen recalculando los registros viejos, que no la traen). Va en la cabecera del registro.
+   *   `dif`: en 'b', el nivel de dificultad ('facil' si falta; 'medio' o 'dificil', rules.js → NIVELES_B). Va en la cabecera
+   *   (solo si no es Fácil, así los registros de Fácil no cambian) con la huella de las reglas de ese nivel.
    */
   constructor(datos, cfg) {
     if (!NIVELES[cfg.nivel]) throw new Error('nivel desconocido');
     if (!Array.isArray(cfg.atletas) || cfg.atletas.length !== 3 || new Set(cfg.atletas.map(x => x.id)).size !== 3) throw new Error('la final es de tres pesistas distintos');
     const ctl = cfg.ctl ?? 'c'; if (!CONTROLES.includes(ctl)) throw new Error('nivel de control desconocido');
     if (cfg.ia !== undefined && cfg.ia !== HUELLA_IA) throw new Error('reglas de los rivales desconocidas');
-    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl, tactil: (ctl === 'f' || ctl === 'u' || ctl === 'b') && !!cfg.tactil, ia: cfg.ia ?? null };
+    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl, tactil: (ctl === 'f' || ctl === 'u' || ctl === 'b') && !!cfg.tactil, ia: cfg.ia ?? null, dif: ctl === 'b' && NIVELES_B[cfg.dif] ? cfg.dif : 'facil' };
+    if (cfg.dif !== undefined && cfg.dif !== 'facil' && this.cfg.dif !== cfg.dif) throw new Error('nivel de dificultad desconocido');
     const r = new Azar(mezclar(this.cfg.semilla, 7)), N = NIVELES[cfg.nivel];
     this.jueces = [0, 1, 2].map(() => r.entre(900, 1100));
     const tipo = r.ent(3), quien = r.ent(3);
@@ -45,7 +48,7 @@ export class Partida {
       a.decl = { ...a.plan.decl };
     }
     this.fase = 'presentacion'; this.lev = 's'; this.seq = 0; this.barra = 0; this.ultimo = -1; this.llamado = null; this.nLlamado = 0;
-    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : ctl === 'b' ? { barra: HUELLA_B } : {}), ...(this.cfg.ia ? { ia: this.cfg.ia } : {}),
+    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : ctl === 'b' ? { barra: HUELLAS_B[this.cfg.dif], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}) } : {}), ...(this.cfg.ia ? { ia: this.cfg.ia } : {}),
       atletas: cfg.atletas.map(x => ({ id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego' })), aperturas: this.at.map(a => ({ s: a.decl.s, c: a.decl.c })), llamados: [] };
   }
 
@@ -143,7 +146,7 @@ export class Partida {
       cal: persona ? this.cfg.cal : 0, primera: persona && this.cfg.primera && L.n === 1, domina: L.lev === 's' || f.enviones.includes(env), jueces: this.jueces, reloj: L.reloj, ctl: persona ? this.cfg.ctl : 'c', ...(persona && this.cfg.tactil ? { tactil: true } : {}),
       // 'u' y 'b': el cuerpo de juego del pesista (rules.js → CUERPOS_U; en 'b', con el ancho de cada barrita) y si todavía
       // tiene la garra de este levantamiento
-      ...(persona && this.cfg.ctl === 'u' ? { cuerpo: cuerpoDe(a.id), garraUno: a.garraUno[L.lev] } : persona && this.cfg.ctl === 'b' ? { cuerpo: cuerpoBarra(a.id), garraUno: a.garraUno[L.lev], fatiga: a.fatiga[L.lev] } : {}) };
+      ...(persona && this.cfg.ctl === 'u' ? { cuerpo: cuerpoDe(a.id), garraUno: a.garraUno[L.lev] } : persona && this.cfg.ctl === 'b' ? { cuerpo: cuerpoBarra(a.id), garraUno: a.garraUno[L.lev], fatiga: a.fatiga[L.lev], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}) } : {}) };
   }
   /** ¿Puede el pesista del llamado pedir `kg` en el instante `ms`? Devuelve el motivo si no. */
   cambioValido(ms, kg) {
