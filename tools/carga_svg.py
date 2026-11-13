@@ -1,6 +1,6 @@
 """Genera el pesista de la pantalla de carga (web/juego.html, #msg): un arranque en bucle, de costado, en SVG + CSS.
 Las poses se dan como cadera, inclinación del tronco y posición de la barra; rodilla y codo salen por cinemática inversa en
-cada cuadro, así el pie no se desliza y la barra va en las manos. Escribe web/css/carga_lev.css y el SVG por pantalla.
+cada cuadro, así el pie no se desliza y la barra va en las manos. Escribe el final de web/css/carga.css (desde la marca) y el SVG por pantalla.
 Uso: python3 tools/carga_svg.py      (después pegar el SVG en juego.html si cambió la geometría)"""
 import math, os
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -12,6 +12,8 @@ K = [(0.00, (78, 128), 60, (106, 158)),      # en posición, la barra en el piso
      (0.30, (82, 114), 48, (104, 134)),      # la barra pasa las rodillas
      (0.40, (90, 108), 15, (100, 110)),      # en la cadera
      (0.46, (95, 101), -8, (102, 96)),       # extensión
+     (0.50, (93, 112), 2, (104, 70)),        # tirón alto: codos arriba
+     (0.53, (88, 135), 20, (99, 40)),        # se mete abajo de la barra
      (0.56, (84, 146), 28, (94, 46)),        # recibe abajo, brazos estirados
      (0.66, (84, 146), 28, (94, 46)),
      (0.82, (94, 104), 3, (92, -3)),         # de pie, la barra arriba
@@ -38,14 +40,26 @@ def ang_down(p, q):   # rotación que lleva (0,1) a la dirección p→q (SVG, y 
     return math.degrees(math.atan2(-(q[0] - p[0]), q[1] - p[1]))
 
 frames = []
-N = 40
+N = 60
+prev_elbow = None
 for i in range(N + 1):
     t = i / N; H, th, B = pose(t)
     knee = ik(H, ANK, THIGH, SHIN, -1)                  # la rodilla va hacia adelante (+x)
     psi = th; S = (H[0] + TORSO * math.sin(math.radians(psi)), H[1] - TORSO * math.cos(math.radians(psi)))
-    elbow = ik(S, B, UP, FORE, 1)                       # el codo hacia atrás
+    # el codo: de las dos soluciones, la más cercana a la del cuadro anterior (sin saltos de un lado al otro)
+    cands = [ik(S, B, UP, FORE, 1), ik(S, B, UP, FORE, -1)]
+    elbow = cands[0] if prev_elbow is None else min(cands, key=lambda e: math.hypot(e[0] - prev_elbow[0], e[1] - prev_elbow[1]))
+    prev_elbow = elbow
     fm, fp = ang_down(H, knee), ang_down(knee, ANK); fb, fa = ang_down(S, elbow), ang_down(elbow, B)
     frames.append((t, H, fm, fp - fm, psi, fb - psi, fa - fb))
+
+# ángulos sin saltos de 360° entre cuadros (atan2 da -180..180 y CSS interpola de largo: el brazo daría una vuelta entera)
+for j in range(2, 7):
+    for i in range(1, len(frames)):
+        prev, cur = frames[i - 1][j], frames[i][j]
+        while cur - prev > 180: cur -= 360
+        while cur - prev < -180: cur += 360
+        frames[i] = frames[i][:j] + (cur,) + frames[i][j + 1:]
 
 def kf(name, f):
     lines = [f'{t * 100:g}%{{transform:{f(x)}}}' for t, *x in frames]
@@ -61,7 +75,9 @@ quieta = {'r': f'translate({r(H[0])}px,{r(H[1])}px)', 'm': f'rotate({r(fm)}deg)'
 css.append('.lev g{transform-box:view-box;transform-origin:0 0}')
 css.append(''.join(f'.lev .l{k}{{transform:{v};animation:lev-{k} 3.6s linear infinite}}' for k, v in quieta.items()))
 css.append('@media (prefers-reduced-motion:reduce){.lev g{animation:none!important}}')
-open(os.path.join(ROOT, 'web', 'css', 'carga_lev.css'), 'w').write('\n'.join(css) + '\n')
+MARCA = '/* ---- pesista: desde acá lo escribe tools/carga_svg.py ---- */'
+dst = os.path.join(ROOT, 'web', 'css', 'carga.css'); cur = open(dst).read()
+open(dst, 'w').write(cur.split(MARCA)[0].rstrip('\n') + '\n' + MARCA + '\n' + '\n'.join(css) + '\n')
 svg = f'''<svg class="lev" viewBox="0 -26 200 210" aria-hidden="true" focusable="false"><defs><radialGradient id="lev-luz" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#35e6d6" stop-opacity=".22"/><stop offset="1" stop-color="#35e6d6" stop-opacity="0"/></radialGradient></defs><ellipse cx="100" cy="178" rx="92" ry="9" fill="url(#lev-luz)"/><path d="M14 177H186" stroke="#1b2548" stroke-width="3"/><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M90 175L{ANK[0]:g} {ANK[1]:g}L114 175Z" stroke-width="6" fill="currentColor"/><g class="lr"><g class="lm"><path d="M0 0V{THIGH}" stroke-width="14"/><g transform="translate(0 {THIGH})"><g class="lp"><path d="M0 0V{SHIN}" stroke-width="10"/></g></g></g><g class="lt"><path d="M0 0V-{TORSO}" stroke-width="17"/><circle cx="7" cy="-{TORSO + 14}" r="9" fill="currentColor" stroke="none"/><g transform="translate(0 -{TORSO})"><g class="lb"><path d="M0 0V{UP}" stroke-width="9"/><g transform="translate(0 {UP})"><g class="la"><path d="M0 0V{FORE}" stroke-width="8"/><g transform="translate(0 {FORE})"><circle r="18" stroke="#ffd23f" stroke-width="6"/><circle r="4" fill="#ffd23f" stroke="none"/></g></g></g></g></g></g></g></g></svg>'''
 open(os.path.join(ROOT, 'out', 'carga_lev.svg') if os.path.isdir(os.path.join(ROOT, 'out')) else os.devnull, 'w').write(svg)
 print(svg)

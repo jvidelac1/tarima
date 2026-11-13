@@ -150,9 +150,12 @@ if (nueva && CAPTURAS) {
     await page.waitForTimeout(500); await foto(page, `${C.nombre}_despues`);
     await ctx.close();
   }
-  // el pesista: siete instantes del arranque, con la animación detenida
+  // el pesista: siete instantes del arranque, con la animación detenida (main.js vacío: la bienvenida no lo tapa)
   {
-    const { ctx, page } = await abrir({ w: 844, h: 390, dpr: 3 });
+    const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true }), page = await ctx.newPage();
+    page.on('pageerror', e => problemas.push(`[pesista] pageerror: ${e.message}`));
+    await page.route('**/js/game/main.js', r => r.fulfill({ contentType: 'text/javascript', body: '' }));
+    await page.goto(base + URL0, { waitUntil: 'load' });
     await espera(page, () => document.querySelector('#msg .lev'), 20000);
     const caja = await page.evaluate(() => { const b = document.querySelector('#msg .lev').getBoundingClientRect(); return { x: b.x - 10, y: b.y - 6, width: b.width + 20, height: b.height + 12 }; });
     for (const f of [0, .3, .4, .46, .56, .82, .95]) {
