@@ -147,7 +147,8 @@ if (nueva && CAPTURAS) {
     const fuera = await espera(page, () => document.getElementById('msg').hidden, 400000);
     if (!fuera) problemas.push(`${tag} la pantalla de carga no se fue al terminar de bajar`);
     const pcts = await page.evaluate(() => window.__carga.pct); if (pcts.some((x, i) => i && x < pcts[i - 1])) problemas.push(`${tag} el porcentaje no fue siempre para arriba: ${pcts.join(' ')}`);
-    await page.waitForTimeout(500); await foto(page, `${C.nombre}_despues`);
+    await page.waitForTimeout(900); await foto(page, `${C.nombre}_despues`);
+    if (await page.evaluate(() => !document.getElementById('carga-mini').hidden)) problemas.push(`${tag} la barrita de arriba sigue a la vista después de la carga`);
     await ctx.close();
   }
   // el pesista: siete instantes del arranque, con la animación detenida (main.js vacío: la bienvenida no lo tapa)

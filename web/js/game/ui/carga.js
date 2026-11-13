@@ -26,7 +26,7 @@ const orden = ['carga.como', ...Array.from({ length: DATOS }, (_, i) => `carga.d
 /** Peso estimado (bytes) mientras un archivo no dijo su tamaño: lo justo para que la barra no salte al principio. */
 const ESTIMADO = { glb: 3.3e6, mask: 2.5e5 };
 
-const S = { claves: new Map(), esperadas: [], visible: true, i: 0, reloj: null, fin: null, titulo: null, error: false };
+const S = { claves: new Map(), esperadas: [], visible: true, i: 0, reloj: null, fin: null, titulo: null, error: false, mini: true };
 const el = {};
 function nodos() {
   for (const k of ['msg', 'msg-txt', 'carga-prog', 'carga-barra-i', 'carga-pct', 'carga-det', 'carga-dato', 'carga-mini']) el[k] = $(k);
@@ -60,9 +60,9 @@ function pintar() {
       el['carga-prog'].setAttribute('aria-valuenow', String(a.listo ? 100 : pct));
     } else { el['carga-pct'].textContent = ''; el['carga-det'].textContent = t('carga.bajando'); }
   }
-  // la barrita de arriba: solo con la pantalla oculta y mientras falte bajar algo
+  // la barrita de arriba: solo detrás de la bienvenida (hasta que la pantalla vuelve al tocar «Jugar») y mientras falte bajar algo
   if (el['carga-mini']) {
-    const ver = !S.visible && !S.error && a && !a.listo;
+    const ver = S.mini && !S.visible && !S.error && a && !a.listo;
     if (ver) { el['carga-mini'].hidden = false; el['carga-mini'].firstElementChild.style.width = Math.floor(a.f * 100) + '%'; el['carga-mini'].classList.remove('fuera'); }
     else if (!el['carga-mini'].hidden && !el['carga-mini'].classList.contains('fuera')) {
       el['carga-mini'].firstElementChild.style.width = '100%'; el['carga-mini'].classList.add('fuera');
@@ -97,7 +97,7 @@ export const cargaUI = {
   get bajado() { const a = avance(); return !!(a && a.listo); },
   mostrar(clave) {
     if (!el.msg && !nodos()) return;
-    clearTimeout(S.fin); S.visible = true; S.error = false;
+    clearTimeout(S.fin); S.visible = true; S.error = false; S.mini = false;
     if (clave !== undefined) S.titulo = clave;
     el.msg.classList.remove('saliendo', 'error'); el.msg.hidden = false; pintar(); dato(false); rotar(true);
   },

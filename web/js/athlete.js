@@ -237,10 +237,12 @@ export class Athlete {
   static async load(name, data, { aniso = 8, maxTex = 4096, progreso = null } = {}) {
     // con texturas de 1024 como tope se baja el GLB que ya las trae a 1024 (el mismo modelo, un tercio del peso)
     const url = maxTex <= 1024 && data.glb1024 ? data.glb1024 : `models/${name}.glb`;
-    const avisa = clave => progreso ? e => { try { progreso(clave, e.loaded, e.lengthComputable ? e.total : 0); } catch { /* el aviso no frena la carga */ } } : undefined;
+    const bajado = {}, avisa = clave => progreso ? e => { bajado[clave] = e.loaded; try { progreso(clave, e.loaded, e.lengthComputable ? e.total : 0); } catch { /* el aviso no frena la carga */ } } : undefined;
     // la máscara es opcional; solo se pide si el build avisa que existe (evita un 404 en consola). Baja a la par del GLB.
     const maskBlob = data.mask ? bajar(typeof data.mask === 'string' ? data.mask : `models/${name}_mask.png`, avisa(name + ':mask')).catch(() => null) : null;
     const [gltf, detail] = await Promise.all([loader.loadAsync(url, avisa(name + ':glb')), loadDetail(aniso), MeshoptSimplifier.ready.catch(() => null)]);
+    // sin Content-Length (servidor que comprime o manda por partes) el total no se sabe hasta el final: se avisa que terminó
+    if (progreso) { const n = bajado[name + ':glb'] || 1; avisa(name + ':glb')({ loaded: n, total: n, lengthComputable: true }); }
     let mask = null;
     if (maskBlob) {
       try {
