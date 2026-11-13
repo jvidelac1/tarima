@@ -4,48 +4,65 @@
 
 **Esto manda sobre el resto del documento.** El diseño está en `docs/JUEGO.md`, sección Gameplay 2. Lo de abajo describe lo implementado en la rama `gameplay` y cómo se mide. El Fácil de círculos (`'f'`) salió de Opciones y queda en el núcleo solo para recalcular registros viejos (`?ctl=f` lo abre para las pruebas). Clásico (`'c'`) no cambió.
 
-### El gesto exacto
+### El gesto exacto (revisión 2.1 del 13-nov: **ningún toque cambia el resultado**)
 
-Un levantamiento son 3 toques en el arranque y 4 en el dos tiempos. **Ningún toque tiene un momento justo:** cada uno cumple un tramo entero y vale en cualquier punto de él.
+Un levantamiento son 3 toques en el arranque y 4 en el dos tiempos, y **todos son opcionales**: si no tocas, el pesista lo hace
+solo un poco después, sin perder nada. Tocar solo acompaña (arranca antes, acelera la subida, suena y se ve). Lo que decide
+si la barra sube son los kilos, el pesista y la suerte de cada tramo, que se ve recién cuando ese tramo termina.
 
 | Paso | Señal (tipo) | Cuándo vale el toque | Si no tocas |
 |---|---|---|---|
 | — | PREPÁRATE (`espera`, 1,2 s) | el toque queda **guardado** para ¡TIRA! | sigue |
-| 1 | ¡TIRA! (`libre`) «toca cuando quieras» | cualquier momento | sale sola con 5 s de reloj por delante (a los ~25 s); no hay nulo |
-| 2 | ¡SALTA! (`luz`) «toca otra vez» | desde 250 ms después de ¡TIRA! hasta la **recepción** (un toque antes queda guardado) | salto flojo: ¼ de disco más de gasto |
-| 3 | ¡PÁRATE! (`uno`) «toca una vez» | desde la recepción hasta que el tramo cierra (1,5 s de subida; con el pisotón, antes) | se para más lento y sin la devolución de ½ disco |
+| 1 | ¡TIRA! (`libre`) «toca o espera» | cualquier momento; una barra muestra lo que falta para que salga sola | sale sola a los 2 s |
+| 2 | ¡SALTA! (`luz`) «toca otra vez» | desde 250 ms después de ¡TIRA! hasta la recepción; sin barra que se llene (no hay momento justo) | salta igual |
+| 3 | ¡PÁRATE! (`uno`) «toca una vez» | desde la recepción hasta que el tramo cierra (1 s; con el pisotón, antes) | se para igual, un poco más lento |
 | — | RESPIRA (`espera`, 0,45 s), solo dos tiempos | el toque queda guardado para ¡ARRIBA! | sigue |
-| 4 | ¡ARRIBA! (`libre`) «toca cuando estés listo», solo dos tiempos | cualquier momento | sale solo a los 6 s |
-| — | ¡DA TODO! (`decide`), solo en el FRENO | 2,5 s para usar la garra | la barra cae y la garra queda para otro intento |
-| — | AGUANTA y ¡ABAJO! (`auto`) | — | automáticos |
+| 4 | ¡ARRIBA! (`libre`) «toca o espera», solo dos tiempos | cualquier momento | sale sola a los 2 s |
+| — | ¡DA TODO! (`auto`), solo en el FRENO | nada que tocar: la garra se usa sola | pausa de 1 s y la garra salva el tramo |
+| — | AGUANTA y ¡ABAJO! (`auto`, sin tecla dibujada) | — | automáticos (AGUANTA dura a lo sumo 1,1 s) |
 
-¡SALTA! cierra en la recepción y no en la explosión (el diseño decía la explosión): con el tirón de 0,73 a 0,85 s, el tramo quedaba en medio segundo y un jugador que reacciona tarde (+600 ms, meta A) perdía el ¼ de disco. Así dura de 1,2 a 1,6 s.
+**Regla del contacto** (`attempt.js`, `_uEntrada`): un contacto es un keydown de Espacio o Enter, un pointerdown (también cerca
+de los bordes), o la tecla o el dedo que ya están apoyados cuando abre un tramo. El primero cumple el tramo; uno de más queda
+guardado (uno solo) para el tramo siguiente, y si no queda ninguno sale «listo» en gris. Dos contactos a menos de 120 ms
+(teclado) o de 80 ms (dedo) son uno («doble»), y los de los 300 ms después de confirmar son parte de la confirmación. Machacar,
+mantener, tocar con calma o no tocar dan **el mismo resultado** (meta A, con el ausente incluido).
 
-**Regla del contacto** (`attempt.js`, `_uEntrada`): un contacto es un keydown de Espacio o Enter, un pointerdown en la zona, o la tecla o el dedo que ya están apoyados cuando abre un tramo. El primero cumple el tramo; uno de más queda guardado (uno solo) para el tramo siguiente, y si no queda ninguno sale «listo» en gris. Dos contactos a menos de 120 ms (teclado) o de 80 ms (dedo) son uno («doble»), y los de los 300 ms después de confirmar son parte de la confirmación. Mantener cumple cada tramo que abre (también la garra). El núcleo hace todo esto, así que el registro lo recalcula igual en cualquier lado.
-
-**Qué decide.** El margen (`rules.js`, `UNO`): 3 discos más «el día» (±0,9, se revela al agarrar la barra), menos lo que se come cada tramo según la intensidad y el cuerpo del pesista. La capa (`controles.js`) es la identidad en `'u'`; la palabra de cada contacto (`QUE_U`) sale en la placa del pulgar: ¡VAMOS!, ¡BIEN!, ¡PISOTÓN!, ¡ESO!, ¡GARRA! o, en gris, «guardado», «listo», «doble».
+**Qué decide.** La energía (`rules.js`, `UNO`): 3 puntos, menos lo que gasta cada tramo según la intensidad y el cuerpo del
+pesista (`CUERPOS_U`), más o menos su suerte (uniforme, ±200 Compacto, ±250 Largo, ±600 Potente). Si un tramo la deja apenas
+debajo de cero (hasta −½) y con la garra el resto llega, la garra se usa sola (FRENO); si no alcanzaría, no se gasta y queda
+para otro intento. La capa (`controles.js`) es la identidad en `'u'`; la palabra de cada contacto (`QUE_U`) sale en la placa
+del pulgar: ¡VAMOS!, ¡BIEN!, ¡PISOTÓN!, ¡ESO!, ¡GARRA! o, en gris, «guardado», «listo», «doble».
 
 ### Espacio en la computadora (`input.js`, `Boton`)
 
-- Durante un levantamiento propio (`boton.intento`), Espacio y Enter se atienden en **captura sobre window**, con `preventDefault` y `stopImmediatePropagation`: no desplazan la página ni activan un botón aunque tenga el foco (lo prueba `check_toques`).
+- Durante un levantamiento propio (`boton.intento`), Espacio y Enter se atienden en **captura sobre window**, con `preventDefault`: no desplazan la página ni activan un botón aunque tenga el foco (lo prueba `check_toques`).
 - Si el primer evento de una tecla es una repetición (el foco llegó con la tecla apretada), cuenta como apretar. Las repeticiones de una tecla apoyada no cuentan.
 - Al cerrar el panel del llamado se suelta el foco (`soltarFoco`) y el escenario lo toma (`tabindex=-1`).
 - Acuse en el mismo manejador: la tecla dibujada se hunde y suena el tic; después, la palabra del núcleo.
 
 ### El dedo en el celular
 
-- Toda la pantalla cuenta, menos 56 px arriba, 24 px a cada costado y 20 px abajo (`BORDES`, `enBorde`): ahí están los gestos del sistema, y un toque ahí no es un contacto.
+- Toda la pantalla cuenta, **también cerca de los bordes** (2.1): como ningún toque cambia el resultado, no hay nada que proteger,
+  y descartarlos en silencio era un toque sin acuse. Un gesto del sistema que llega a la página cuenta como un toque más.
 - El contacto cuenta en `pointerdown` (con `preventDefault`); `navigator.vibrate(12)` donde exista.
-- Un `pointercancel` no anula lo contado: el dedo sigue apoyado 400 ms (`GRACIA_MS`) por si vuelve.
+- Un `pointercancel` no anula lo contado: en `'u'` el dedo sigue apoyado 400 ms (`GRACIA_MS`) por si vuelve. En Clásico se
+  suelta en el acto, como siempre (soltar es un gesto); lo prueba `dedo_test`.
 - Sin corrección de atraso: no hay ventanas.
+
+### El acuse, medido en cada aparato
+
+`input.js → toques.pinta`: de cada pulsación, los ms desde el instante del evento hasta el cuadro siguiente (cuando la tecla
+hundida ya se pinta). Se ve en `?depura=1` («acuse p95») y va en cada `intento_propio` como `acuse_p95_ms` y `acuse_n`: así se
+mide en los teléfonos y computadoras de la gente, no solo en Actions (que dibuja por software y da ~80 ms por eso).
 
 ### Cómo se mide (sin navegador, en la Mac o en Actions)
 
 | Prueba | Qué mide |
 |---|---|
-| `node tools/play_human.mjs` | metas A (cinco maneras de tocar dan el mismo resultado; el ausente solo pierde ¼ + ½ disco) y B (primer intento del novato); informa C (curva), D (dónde caen los pesistas) y novato · medio · bueno por tramo |
+| `node tools/play_human.mjs` | metas A (seis maneras de tocar, el ausente incluido, dan el mismo resultado) y B (primer intento del novato); informa C (curva), D (dónde caen los pesistas) y novato · medio · bueno por tramo |
 | `node tools/teclado_test.mjs`, `node tools/dedo_test.mjs` | meta H: 10 000 secuencias cada una por la clase `Boton` de verdad en un DOM de mentira (`tools/entrada_sim.mjs`) |
-| `node tools/ritmo_test.mjs` | meta J: duración de la final, esperas, turnos de rival, veredicto e intento propio |
+| `node tools/ritmo_test.mjs` | meta J: duración de la final, esperas, turnos de rival, veredicto e intento propio, con el novato que a veces no toca y con el ausente |
+| `node tools/pesistas_test.mjs`, `node tools/chance_test.mjs`, `node tools/margen_cal.mjs` | metas C a F: pesistas parejos y distintos, lo que trae el panel (el entrenador) contra el prudente y el codicioso, chance del panel honesta |
 | `node tools/sim_test.mjs` | `'c'` y `'f'` idénticos (`sim_ref.json`, `sim_ref_facil.json`), `sim_ref_uno.json`, 1000 finales `'u'` recalculadas, líneas de caída sin tiempos (meta G) |
 
 `play_human.mjs --f` y `dedo_test.mjs --f` siguen midiendo el Fácil de círculos (línea de base).

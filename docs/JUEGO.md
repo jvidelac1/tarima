@@ -6,6 +6,30 @@
 
 Se sintetizó a partir de tres propuestas (accesible, emoción y profundidad), tres juicios y cuatro diagnósticos (otros juegos, control actual, ritmo de la final y pesistas), todos del 13 de noviembre. Ganó por puntaje agregado **«Un toque, un tramo»** (la propuesta accesible), con injertos de las otras dos. Cómo se resolvieron las contradicciones está en G2.12. Todo número es un valor inicial. Los del margen salen de un modelo chico sin el núcleo (G2.4) y se recalibran con los bots.
 
+### G2.R Revisión 2.1 (13-nov, después de los verificadores): manda sobre G2.1 a G2.6
+
+Tres verificadores encontraron que quedaban toques con plazo que cambiaban el resultado (el FRENO de 2,5 s con la garra, ¡SALTA!
+y ¡PÁRATE! con su ¼ y ½ disco), que «el día» revelado al agarrar decidía la barra antes del primer toque, y que un pesista
+dominaba. Cambios, todos en el nivel `'u'` (Clásico y los rivales no cambian):
+
+1. **Ningún toque cambia el resultado.** Los toques acompañan (arrancan antes, aceleran la subida). ¡TIRA! y ¡ARRIBA! salen solas
+   a los 2 s; ¡SALTA! y ¡PÁRATE! no tienen premio ni castigo. Meta A: seis maneras de tocar, la de no tocar incluida, dan lo mismo.
+2. **La garra se usa sola**, y solo si con ella el resto del levantamiento llega (sin suerte); si no alcanzaría, queda para otro
+   intento. El FRENO es una pausa de 1 s sin nada que tocar.
+3. **Suerte por tramo en lugar de «el día».** Cada tramo gasta lo suyo más o menos una suerte uniforme que se ve recién al cerrar
+   ese tramo («pararse −1½ · pesó más»). El resultado se va viendo de a un tramo. La chance del panel («X de 10») es exacta
+   para cualquiera, porque no depende de cómo se toque.
+4. **Pesistas parejos y distintos.** Los cuerpos viven en `rules.js → CUERPOS_U` (no en sim.json, que vuelve a la huella de mvp).
+   Compacto: fiable (±200 de suerte por tramo), techo bajo. Largo: suerte normal (±250), le cuesta pararse. Potente: irregular
+   (±600), le cuesta arriba de la cabeza; el que puede dar la sorpresa. Kilos que suben 9 de 10 veces: 376 / 377 / 371; 5 de
+   10: 380 / 382 / 383; 2 de 10: 383 / 385 / 391.
+5. **El panel trae puesto el peso del entrenador** (`web/js/game/entrenador.js`): el más alto que sube 9 de 10 en el segundo
+   intento (dejando lugar al tercero), 7½ de 10 en el tercero, y el del oro cuando la chance lo justifica. Quien confirma con
+   Espacio gana con rivales normales (48 a 58 % de las finales) y se le caen 5 a 10 % de las barras.
+6. La unidad se llama **energía** («Te sobra 1½ de energía»), no «discos» (que eran también los de la barra).
+
+Medidas y apartamientos: HANDOFF.md, «Gameplay 2.1».
+
 ### G2.0 La regla del dueño
 
 > «Lo peor de todo es coordinar el movimiento con los círculos, a mí me costó bastante, empujar al final también, debe ser sencillo sin tanta coordinación, que la complejidad venga por el tipo de pesista, los pesos utilizados, y el push desde el celular debe estar perfectamente pensado, lo mismo para el space desde la computadora, si es difícil es algo negativo.»

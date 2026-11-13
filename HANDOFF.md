@@ -853,6 +853,38 @@ Lo que cambia entre pesistas son los kilos y el cuerpo, nunca la precisión de l
 - La apuesta de los rivales sale de la intensidad que pidieron (≤ 95 % cómodo, ≤ 99 % justo, después al límite), no de la tabla de `'u'`: ellos juegan en Clásico.
 - Sin hacer: la cámara lenta (meta K, necesita perf_test con placa), el magnesio del pisotón y Clásico ofrecido después de dos finales ganadas.
 
+### Gameplay 2.1: lo que encontraron los verificadores, corregido (13-nov, rama `gameplay`)
+
+**Qué cambió** (diseño: `docs/JUEGO.md`, G2.R; gesto: `docs/CONTROLES.md`, sección `'u'`). Todo en el nivel `'u'`; Clásico y los rivales no cambian.
+- **Ningún toque cambia el resultado.** ¡TIRA! y ¡ARRIBA! salen solas a los 2 s (con una barra que muestra cuánto falta); ¡SALTA! y ¡PÁRATE! ya no dan ni quitan energía (el ¼ y el ½ quedaron dentro de la base). El FRENO es una pausa de 1 s sin nada que tocar: la garra se usa sola, y solo si con ella el resto del levantamiento llega; si no alcanzaría, no se gasta.
+- **Suerte por tramo** (`rules.js → ruidoDe`) en lugar de «el día» revelado al agarrar: cada tramo gasta lo suyo ± una suerte que se ve recién cuando cierra («pararse −1½ · pesó más»). La línea de caída nombra un solo tramo, lo que gastó y, si tocó, la mala suerte o que la garra no alcanzaba.
+- **Energía** en lugar de «discos» (en inglés eran «plates», como los de la barra). Glosario de `'u'` con energía, garra y suerte; la presentación de `'u'` ya no habla de la energía de Clásico.
+- **Pesistas** en `rules.js → CUERPOS_U` (sim.json vuelve a la huella de mvp, `09c9b907`; los registros de `'u'` llevan `uno: HUELLA_U` y `replay.js` la exige). Recalibrados para que ninguno domine y cada uno pida otra estrategia: Compacto fiable, Potente irregular.
+- **El panel trae el peso del entrenador** (`web/js/game/entrenador.js`, nuevo): lee la chance, La cuenta y el cansancio y la garra del intento siguiente. Se cambia con ← →.
+- **Entrada:** los toques cerca de los bordes cuentan (con acuse); la gracia de 400 ms del dedo cancelado es solo de `'u'`; la tecla del acuse sale en el idioma; el acuse se mide en cada aparato (`toques.pinta`, en `?depura=1` y en `intento_propio` como `acuse_p95_ms`).
+- **Teléfono y pantalla:** «TOCA: SEGUIR» encima del botón redondo; el cartel de los rivales baja cuando se ve la energía; el turno del rival con la instrucción en su línea; tarjetas de `'u'` en 667×375 solo con lo que cambia el juego; panel del llamado más bajo; `#capa` y `#msg` encima de `#tv`; AGUANTA y ¡DA TODO! sin tecla dibujada; «Te sobra / te falta» sin «—»; el segundo «¿Seguro?» espera 400 ms y no lo activa una ráfaga vieja; «Después vas tú» en lugar de «tu reloj vuelve a empezar».
+- **Actions:** muro.yml y servidor.yml también corren en cada push a `gameplay`.
+
+**Medido** (sin navegador en la Mac, una prueba a la vez):
+- **A** (play_human, 600 por casilla): 43 200 casos × 6 bots, **0** resultados distintos entre reactivo, tardío, fantasma, mantiene, machacador y **ausente**; 0 caídas por entrada. Con el bot humano de los verificadores (lognormal, distracciones, toques largos), **0 %** de sus caídas entre el 95 y el 102 % se deben al dedo (antes 17,5 % el novato y 29 % el lento), y la chance del panel coincide con lo real a ±3 puntos (antes 10 a 17 de más).
+- **B:** 100 % en el primer arranque y el primer dos tiempos con los tres. **C:** 100 % hasta el 95 %, 98 % al 97 %, 57 % al 100 %, 7 % al 103 %. **D:** Largo cae al pararse (93 %), Potente arriba (98 %), Compacto repartido; entre el 97 y el 103 % los pesistas difieren hasta 34 puntos.
+- Kilos que suben 9 / 5 / 2 de cada 10 veces (total): Compacto 376 / 380 / 383, Largo 377 / 382 / 385, Potente 371 / 383 / 391.
+- **E** (pesistas_test, 200 finales): con rivales normales, lo que trae el panel gana el oro 48 / 54 / 58 % (Compacto / Largo / Potente), 48 a 58 puntos más que el prudente y 22 a 35 más que un codicioso de verdad (pide lo que sube 3 de 10); con amistosos, 98 a 100 %. Barras caídas con el panel: 5 a 10 % (meta M ≤ 15). Si la persona cambió los kilos y quedó desplazada, el panel respeta su peso.
+- **F** (chance_test, 30 000 intentos): error ≤ 1 punto en cada «X de 10».
+- **J** (ritmo_test, 360 finales por jugador): el novato que a veces no toca, final mediana 124 s, espera máxima 16,7 s, intento propio p90 6,8 s (arranque) y 10,3 s (dos tiempos); el ausente, que no toca nunca, final mediana 141 s e intento p90 8,9 y 13,8 s (antes: 309 s y 45,8 s). Veredicto de una caída propia: tVer + 2,4 s, ahora medido.
+- **H** (teclado_test y dedo_test, 10 000 secuencias): 0 sin resolver, 0 dobles, 0 sin palabra, los toques del borde anotados; Clásico suelta en el acto un dedo cancelado y `'u'` espera la gracia.
+- **L** (sim_test): `sim_ref.json` y `sim_ref_facil.json` **idénticos a mvp, huella incluida**; `sim_ref_uno.json` regenerada; 1000 finales `'u'` recalculadas iguales. servidor_test: 244 controles bien.
+- Actions sobre el push `6e8397d`: ACTIONS_PENDIENTE
+
+**Cómo probarlo.** `cd web && python3 -m http.server 8000` y abrir `http://localhost:8000/juego.html` (con `?depura=1` se ve el acuse medido de cada toque). Elegir un pesista, confirmar con Espacio lo que trae el panel y no tocar nada: el levantamiento sale solo. Después probar machacar, mantener o tocar con calma: el resultado es el mismo. En el celular, lo mismo con el pulgar en cualquier parte de la pantalla. Lo que cambia la final es el peso que se pide y el pesista.
+
+**Lo que queda estimado o sin medir.**
+- El acuse en aparatos de verdad: Actions dibuja por software (~80 ms del evento al cuadro). Desde ahora cada `intento_propio` trae `acuse_p95_ms` del aparato de la persona; la meta I (≤ 17 ms) se confirma con esos datos.
+- Las amplitudes de suerte y los cuerpos son de diseño, calibrados con bots; el tiempo real de una persona en el panel sigue estimado (2,5 s en ritmo_test).
+- Sigue sin hacer: cámara lenta (meta K), magnesio del pisotón, Clásico ofrecido después de dos victorias.
+- La segunda parte decía que el squat de Compacto «rinde peor desde el 100 %»: no era así (margen_cal daba +1 al 100 %). Hoy da 0 a +6 puntos y la casa sigue en tijera.
+- Lo que no se tocó a propósito: los textos `pesista.*.conviene` hablan de precisión, pero solo se ven en Clásico, donde la precisión sí cuenta.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.
