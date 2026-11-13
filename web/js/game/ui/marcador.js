@@ -3,7 +3,7 @@
 // Puro, sin DOM: lo prueba tools/sim_test.mjs. main.js pone los nombres (el del jugador va escapado).
 //
 // - Vas primero: «Vas ganando», con la ventaja solo contra quien ya tiene marca. Si el rival que está en la tarima te pasa
-//   con los kilos que pidió: «Brenner intenta 161 kg: si lo levanta, te pasa».
+//   con los kilos que pidió: «Si Brenner levanta 161 kg, te pasa».
 // - Va primero otro: «Va ganando X» y cuántos kilos te faltan para pasarlo (o que sin arranque válido no hay total).
 // - Empatados: «Empatados en N kg».
 

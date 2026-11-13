@@ -373,7 +373,7 @@ function jugar(semilla, nivel, persona, estilo = {}) {
   const falso = { fase: 's', lev: 's', at: p.at, tabla: () => [{ a: 0, s: 159, total: 0 }, { a: 1, s: 0, total: 0 }, { a: 2, s: 0, total: 0 }], puestoSi: (i, lev, kg) => (kg > 159 ? 1 : 2), cuenta: () => ({}) };
   const m = marcadorDe(falso, 0, { a: 1, lev: 's', kg: 161, et: ['frente'] });
   ok(m.clave === 'marcador.ganas_solo' && m.sub?.clave === 'marcador.te_pasa' && m.sub.kg === 161 && m.sub.rival === 1, `caso de la captura: ${JSON.stringify(m)}`);
-  ok(tr('es', m.clave) === 'Vas ganando' && tr('es', m.sub.clave, { rival: 'Ilya Brenner', kg: 161 }) === 'Ilya Brenner intenta 161 kg: si lo levanta, te pasa', 'caso de la captura: el texto');
+  ok(tr('es', m.clave) === 'Vas ganando' && tr('es', m.sub.clave, { rival: 'Brenner', kg: 161 }) === 'Si Brenner levanta 161 kg, te pasa', 'caso de la captura: el texto');
   ok(amenaza(falso, 0, { a: 1, lev: 's', kg: 159 }) === false, 'con los mismos kilos no te pasa (gana quien los levantó primero)');
 
   // Identidad: el color y la bandera del jugador no son los de ningún rival; las telas de los tres se distinguen.

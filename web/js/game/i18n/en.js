@@ -449,7 +449,7 @@ export default {
   'marcador.gana': '{rival} is winning',
   'marcador.falta': 'To pass: {kg} kg',
   'marcador.ganas_solo': 'You’re winning',
-  'marcador.te_pasa': '{rival} tries {kg} kg: if he makes it, he passes you',
+  'marcador.te_pasa': 'If {rival} lifts {kg} kg, he passes you',
   'marcador.empate': 'Tied at {kg} kg',
   'marcador.sin_total': 'No good snatch means no total',
   'rival.repeticion': 'Replay · {rival}',
