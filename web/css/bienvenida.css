@@ -163,3 +163,9 @@ fieldset.pregunta legend{font-family:var(--display);font-weight:700;text-transfo
 /* ES · EN se desplaza con lo de arriba (si no, las tarjetas pasaban por debajo de los botones de idioma) */
 .panel.bienvenida>.bv-cuerpo{position:relative}
 .panel.bienvenida>.bv-cuerpo .idiomas{top:0;right:0}
+/* bienvenida con lo mínimo (13-nov, «el user entra, juega con el setup mínimo y ya»): Jugar grande; Opciones, Cómo se juega y
+   Privacidad chicos y a un costado */
+.panel .pie .secundarios{display:flex;align-items:center;flex-wrap:wrap;gap:0 .9em;margin-left:auto}
+.panel .pie .secundarios button.link{color:var(--mute);font-family:var(--body);font-weight:600;font-size:clamp(12px,1.8cqh,14px);min-height:36px;text-decoration-color:rgba(147,160,204,.5)}
+.panel .pie .secundarios button.link[aria-expanded=true]{color:var(--teal)}
+.panel .pie a.legal{margin-left:0;color:var(--mute);font-size:clamp(11px,1.6cqh,13px);text-underline-offset:3px;padding:.4em 0}

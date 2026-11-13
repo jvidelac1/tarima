@@ -458,3 +458,70 @@ body:has(#barrita:not([hidden])) .guia{bottom:calc(var(--u)*15.5 + var(--sb))}
 :where(html.horiz.bajo) .panel:has(.verde-b) p.garra{display:none}
 :where(html.horiz.bajo) .panel:has(.verde-b) .discos .justo{display:none}      /* en 'b' el verde dice más que «lo más duro» */
 .verde-b .cansancio{color:#ff8a80;font-weight:700;margin-left:auto}
+
+/* ---------- menos carteles mientras se juega (13-nov, pedido del dueño: «en mobile los carteles me tapan mucho al pesista» y
+   «menos ruido visual»). Solo en 'b' y 'u' (html.juego-u, main.js); Clásico queda como estaba. html[data-pantalla] lo pone
+   main.js (visita). Una sola indicación principal por momento y todo a los bordes: el pesista y la barra se ven enteros.
+   Lo mide tools/tapa.mjs (check_barra y check_telefono). ---------- */
+/* durante el levantamiento propio: fuera el título, el reloj, el marcador, los cambios de los rivales y el zócalo (el panel ya
+   dijo los kilos); la energía queda chica arriba a la izquierda */
+html.juego-u[data-pantalla=intento] :is(.bug,.relojbox,#marcador,#rival,#etiqueta,#zocalo){display:none!important}
+html.juego-u .margen{--u:clamp(7px,1.3cqh,13px);left:calc(var(--u)*1.4 + var(--sl));top:calc(var(--u)*1.4 + var(--st));transform:none;background:rgba(6,14,48,.72)}
+html.juego-u .margen .m-p{left:0;transform:none;font-size:calc(var(--u)*1.25)}
+@media (prefers-reduced-motion:no-preference){html.juego-u .margen .m-p.on{animation:palM2 .2s ease-out}}
+@keyframes palM2{from{transform:scale(1.2)}to{transform:none}}
+/* con la energía arriba a la izquierda, el título del evento no va (en el veredicto, el turno de un rival tampoco lo pisa) */
+html.juego-u body:has(#margen:not([hidden])) .bug{display:none}
+/* la barrita: abajo de todo, debajo de los pies; el nombre y el verbo en una línea chica a la izquierda */
+html.juego-u .barrita{bottom:calc(var(--u)*1.1 + var(--sb));width:min(62cqw,calc(var(--u)*52))}
+/* el nombre y el verbo van encima de la pista, a la izquierda y fuera de la caja: la barrita ocupa solo la pista */
+html.juego-u .barrita .b-cab{position:absolute;left:0;bottom:100%;justify-content:flex-start;min-height:calc(var(--u)*1.9);margin:0 0 calc(var(--u)*.55);gap:.55em}
+html.juego-u .barrita .b-nombre{font-size:calc(var(--u)*.95)}
+html.juego-u .barrita .b-verbo{font-size:calc(var(--u)*1.45)}
+html.juego-u .barrita .b-pista{height:calc(var(--u)*2.6)}
+html.juego-u .barrita .b-pal{left:0;right:auto;top:auto;bottom:calc(100% + var(--u)*.4);margin:0;height:calc(var(--u)*1.9);font-size:calc(var(--u)*1.7);background:rgba(6,14,48,.7)}
+html.juego-u .barrita .b-fant i{width:calc(var(--u)*3.4);height:calc(var(--u)*3.4)}
+/* la ayuda de primera vez y la presentación arriba a la derecha (el reloj no se muestra en el intento), nunca sobre el pecho */
+html.juego-u .guia,html.juego-u body:has(#barrita:not([hidden])) .guia{top:calc(var(--u)*1.4 + var(--st));bottom:auto;left:auto;right:calc(var(--u)*1.4 + var(--sr));transform:none;text-align:right;max-width:min(46cqw,calc(var(--u)*38));font-size:calc(var(--u)*1.1);padding:calc(var(--u)*.4) calc(var(--u)*.9);background:rgba(6,14,48,.78);border-bottom-width:calc(var(--u)*.2)}
+/* la señal que queda en 'b' (el esfuerzo de pararse) va a la izquierda, a media altura y más chica */
+html.juego-u .senal{--v:calc(var(--u)*.8);left:calc(var(--u)*1.4 + var(--sl));top:46%;background:rgba(6,14,48,.72)}
+/* AGUANTA y ¡ABAJO! no piden nada: en 'b' y 'u' no se muestran (la barra arriba y las luces ya lo dicen); ¡DA TODO! sí */
+html.juego-u .senal[data-tipo=auto]:not([data-clave=datodo]){display:none}
+html.juego-u .senal .s-sub{font-size:calc(var(--v)*1.25)}
+/* el veredicto, a la izquierda a media altura, más chico y semitransparente: la barra arriba y la cara quedan a la vista */
+html.juego-u .veredicto{left:calc(var(--u)*1.4 + var(--sl));top:42%;transform:none;text-align:left;font-size:calc(var(--u)*1.75);max-width:min(30cqw,calc(var(--u)*26));padding:calc(var(--u)*.5) calc(var(--u)*1);background:rgba(6,14,48,.8)}
+html.juego-u .veredicto small{font-size:calc(var(--u)*1.02)}
+html.juego-u .veredicto.arriba{top:42%;font-size:calc(var(--u)*1.4)}
+@media (prefers-reduced-motion:no-preference){html.juego-u :is(.veredicto,.guia){animation:entraL .18s ease-out}}
+@keyframes entraL{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+/* con el veredicto a la vista, nada más a la izquierda: ni el marcador, ni los cambios de los rivales, ni la etiqueta */
+html.juego-u body:has(#veredicto:not([hidden])) :is(#marcador,#rival,#etiqueta){display:none!important}
+/* turno de un rival: una línea arriba a la izquierda (en lugar del título), sin la instrucción (la dice «Toca: seguir») */
+html.juego-u .turno{left:calc(var(--u)*1.4 + var(--sl));top:calc(var(--u)*1.4 + var(--st));transform:none;justify-content:flex-start;max-width:min(58cqw,calc(var(--u)*46));padding:calc(var(--u)*.35) calc(var(--u)*.8);background:rgba(6,14,48,.82);white-space:normal}
+html.juego-u .turno b{font-size:calc(var(--u)*1.15)}
+html.juego-u .turno em{font-size:calc(var(--u)*.95)}
+html.juego-u .turno span{display:none}
+html.juego-u.turno-rival .bug{display:none}
+html.juego-u.turno-rival #marcador{left:calc(var(--u)*1.4 + var(--sl));top:calc(var(--u)*4.6 + var(--st));max-width:min(40cqw,calc(var(--u)*30))}
+html.juego-u .marcador{background:rgba(6,14,48,.78)}
+/* el recuadro «Toca: seguir» más chico */
+html.juego-u .seguir{font-size:calc(var(--u)*.95);padding:.3em .65em;background:rgba(242,244,255,.85)}
+@media (pointer:coarse){
+  /* teléfono acostado: la barrita de la izquierda hasta el botón redondo, pegada abajo; sin el verbo (el botón dice TOCA) */
+  html.juego-u:where(.horiz) .barrita{left:calc(var(--sl) + var(--u)*1.4);right:calc(var(--boton) + var(--bm)*2 + var(--sr));width:auto;bottom:calc(var(--u)*.9 + var(--sb))}
+  html.juego-u:where(.horiz).zurdo .barrita{left:calc(var(--boton) + var(--bm)*2 + var(--sl));right:calc(var(--sr) + var(--u)*1.4)}
+  html.juego-u:where(.horiz.bajo) .barrita .b-pista{height:calc(var(--u)*2.5)}
+  html.juego-u:where(.horiz.bajo) .barrita .b-verbo,html.juego-u:where(.horiz) .barrita .b-tecla{display:none}
+  html.juego-u:where(.horiz.bajo) .barrita .b-cab{min-height:calc(var(--u)*1.6);margin-bottom:calc(var(--u)*.45)}
+  /* el aro de práctica de la primera vez, más chico */
+  html.juego-u:where(.horiz.bajo) .barrita .b-fant i{width:calc(var(--u)*3);height:calc(var(--u)*3)}
+  html.juego-u:where(.horiz.bajo) .barrita .b-pal{height:calc(var(--u)*1.6);font-size:calc(var(--u)*1.5)}
+  html.juego-u:where(.horiz.bajo) body:has(#barrita:not([hidden])) .guia{bottom:auto}
+  html.juego-u:where(.horiz.bajo) .senal{--v:calc(var(--u)*.78);left:calc(var(--u)*1.4 + var(--sl));top:34%}
+  html.juego-u:where(.horiz.bajo) .veredicto{max-width:min(34cqw,calc(var(--u)*30));top:36%}
+  html.juego-u:where(.horiz.bajo) .veredicto small{font-size:max(12px,calc(var(--u)*1.1))}
+  html.juego-u:where(.horiz.bajo) .margen{--u:clamp(7px,2cqh,9.5px)}
+  html.juego-u:where(.horiz) .seguir{bottom:calc(var(--sb) + var(--bm) + var(--boton) + var(--u)*.8)}
+  /* el acuse (la tecla que se hunde) sube por encima de la barrita, junto al botón */
+  html.juego-u:where(.horiz.bajo) body:has(#barrita:not([hidden])) .acuse{bottom:calc(var(--u)*5.4 + var(--sb))}
+}

@@ -9,7 +9,7 @@
 //     el puntero pasa por el verde.
 // Sin animaciones si la persona pidió movimiento reducido (el puntero se mueve igual: es el juego).
 import { t } from '../i18n/t.js';
-import { posBarra } from '../../sim/rules.js';
+import { posBarra, BARRA } from '../../sim/rules.js';
 
 const HTML = `<div class="b-cab"><span class="b-nombre"></span><b class="b-verbo"></b><kbd class="tecla b-tecla"></kbd></div>
 <div class="b-pista"><i class="b-am"></i><i class="b-ve"></i><i class="b-marca"></i><i class="b-punt"></i><div class="b-fant"><i></i><kbd class="tecla"></kbd></div></div>
@@ -18,7 +18,7 @@ const HTML = `<div class="b-cab"><span class="b-nombre"></span><b class="b-verbo
 export class Barrita {
   /** @param {HTMLElement} el  contenedor (#barrita) @param {{reduce?:boolean}} o */
   constructor(el, o = {}) {
-    this.el = el; this.reduce = !!o.reduce; this.tactil = false; this.clave = null; this.hasta = 0; this.zonaPintada = null; this.vistas = new Set();
+    this.el = el; this.reduce = !!o.reduce; this.tactil = false; this.clave = null; this.hasta = 0; this.zonaPintada = null; this.vistas = new Set(); this.R = BARRA;
     if (!el) return;
     el.innerHTML = HTML; const q = s => el.querySelector(s);
     this.nombre = q('.b-nombre'); this.verbo = q('.b-verbo'); this.tecla = q('.b-tecla'); this.pista = q('.b-pista'); this.am = q('.b-am'); this.ve = q('.b-ve'); this.marca = q('.b-marca'); this.punt = q('.b-punt'); this.pal = q('.b-pal'); this.fant = q('.b-fant');
@@ -46,11 +46,13 @@ export class Barrita {
     if (ult && !this.vistas.has(ult.i)) { this.vistas.add(ult.i); this.hasta = ahora + 1400; }      // la que salió sola (sin toque)
     if (!viva && !(ult && this.hasta && ahora < this.hasta)) return this.ocultar();
     const el = this.el; el.hidden = false;
-    const i = viva ? viva.i : ult.i, b = B[i], clave = `${i}|${b.zona || ''}|${viva ? viva.tipo : 'fin'}`;
+    const i = viva ? viva.i : ult.i, b = B.find(x => x.i === i), clave = `${i}|${b.zona || ''}|${viva ? viva.tipo : 'fin'}`;
     if (clave !== this.clave) {
       this.clave = clave; this._zonas(b.z);
       el.dataset.estado = viva ? viva.tipo : 'fin'; el.dataset.zona = b.zona || '';
-      this.nombre.textContent = t(`barra.nombre.${lev}${i}`) + (lev === 'c' ? ` · ${t('practica.paso', { n: i + 1, de: 2 })}` : '');
+      // «Cargada · 1 de 2»: el número solo si el levantamiento tiene más de una barrita
+      const de = B.length, k = B.indexOf(b) + 1;
+      this.nombre.textContent = t(`barra.nombre.${lev}${i}`) + (de > 1 ? ` · ${t('practica.paso', { n: k, de })}` : '');
       this.verbo.textContent = b.zona ? '' : viva.verbo;      // PREPÁRATE / RESPIRA con la barrita quieta; TOCA EN EL VERDE cuando corre
       if (b.zona) {
         this.marca.hidden = false; this.marca.style.left = `${b.pos / 10}%`; this.marca.dataset.zona = b.zona;
@@ -59,7 +61,7 @@ export class Barrita {
       } else { this.marca.hidden = true; this.pal.textContent = ''; this.pal.className = 'b-pal'; }
     }
     if (viva && viva.tipo === 'barra' && !b.zona) {
-      const pos = posBarra(now + adelanto - viva.desde); this._puntero(pos);
+      const pos = posBarra(now + adelanto - viva.desde, viva.R || this.R); this._puntero(pos);
       el.classList.toggle('lento', !!viva.lento);
       const dentro = Math.abs(pos - 500) <= b.z.v; el.classList.toggle('en-verde', dentro);
       this.fant.hidden = !fantasma; if (fantasma) this.fant.classList.toggle('ya', dentro);

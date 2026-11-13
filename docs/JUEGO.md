@@ -26,6 +26,35 @@ barrita y si tocás muy lejos, falla; más o menos cerca, regular; en el verde, 
   **Enviones**: split el más fácil, power intermedio, squat el más difícil.
 - Medidas, ajustes y lo que falta: HANDOFF.md, «Barrita».
 
+### G3.D Dificultad: Fácil · Medio · Difícil (13-nov, tarde)
+
+Pedido del dueño: «si es fácil así está bien; si es un poco más difícil, que requiera un poco más de interacción a nivel tocar
+espacio». Se elige en Opciones (fila «Dificultad»: Fácil · Medio · Difícil · Clásico), queda en el dispositivo
+(`tarima.dificultad`) y va como súper propiedad `dificultad` en la analítica. Fácil por defecto. La regla del dueño sigue: nada
+de coordinar con el movimiento del pesista ni carreras de toques; lo de más son barritas legibles y toques cómodos.
+
+| | Fácil (`BARRA`) | Medio | Difícil |
+|---|---|---|---|
+| Barritas del arranque | tirón | tirón, atrapar arriba | tirón, atrapar arriba, pararse |
+| Barritas del dos tiempos | cargada, envión | cargada, pararse, envión | cargada, pararse, envión |
+| Puntero de punta a punta | 1,4 s (1,7 desde los 8 s) | 1,2 s (1,5 desde los 8 s) | 1,0 s, nunca lento |
+| Verde (ancho en la barrita) | el de siempre | 80 % | 65 % (amarillo 90 %) |
+| Costo amarillo / rojo (tirón y envión) | 600 / 1500 | 600 / 1500 | 450 / 1200 |
+| Costo amarillo / rojo (atrapar y pararse) | — | 350 / 900 | 300 / 800 |
+| Esfuerzo al pararse | desde 95 %, 3 toques en 3 s | desde 92 %, 5 en 3 s | desde 88 %, 6 en 3 s |
+| Persona típica del panel | ±105 ms | ±100 ms | ±90 ms |
+| Apertura sugerida | 90 % | 89 % | 88 % |
+| Rivales al elegirla | los que estaban | los que estaban | parejos si estaban los tranquilos |
+
+- **Atrapar** y **pararse** corren con el pesista quieto en el fondo (la barra arriba en el arranque, en los hombros en la
+  cargada): el toque cierra el tramo «arriba» (atrapar) o arranca la subida (pararse); sin tocar, al minuto salen solos como
+  regular. Con barrita de pararse, el esfuerzo (si toca) viene después y cuenta lo que costó esa barrita.
+- **Ancho por pesista** de las barritas nuevas (`rules.js → PESISTAS_B2`): Compacto atrapa con verde ancho, Largo se para con
+  verde angosto, Potente al revés (atrapa angosto, se para ancho): los mismos puntos fuertes y débiles de la energía.
+- **Núcleo**: `rules.js → NIVELES_B`, `reglasB(dif)`; cada nivel tiene su huella (`HUELLAS_B`; Fácil, la de siempre) y el
+  registro lleva `dif` solo si no es Fácil. `chanceBarra(…, { dif })` y el entrenador usan las reglas y la persona típica del
+  nivel. Referencia: `tools/sim_ref_dificultad.json` (sim_test 15).
+
 ## Gameplay 2 (13 de noviembre)
 
 **Esta sección manda** sobre el resto del documento y sobre la parte de Fácil de [CONTROLES.md](CONTROLES.md) para el nivel de control nuevo **`'u'` («un toque, un tramo»)**, que pasa a ser el modo por defecto. Clásico (`'c'`) no cambia. El Fácil de círculos (`'f'`) sale de Opciones y queda en el núcleo solo para recalcular registros viejos.
