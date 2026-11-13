@@ -63,7 +63,7 @@ export function jugarUno(ctx, B, sem, o = {}) {
       if (s && CON_TOQUE.has(s.tipo) && !B.ausente && !B.mantiene && !B.machaca) {
         let d = Math.max(120, B.reac + r.campana(B.sd)) + lag;
         if (r.ent(10) === 0 && !B.sinDistraccion) d += 400;              // a veces mira tarde
-        if (s.tipo === 'libre' && r.ent(15) === 0) d = INF;             // a veces no toca una señal libre: sale sola
+        if (s.tipo === 'libre' && r.ent(15) === 0 && !B.siempre) d = INF;      // a veces no toca una señal libre: sale sola
         plan = m.t + d;
       }
     }

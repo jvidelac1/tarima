@@ -61,13 +61,26 @@ jobs:
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/sim_test.mjs 2>&1 | tee out/logs/sim_test.log
 
-      - name: Jugador humano simulado (play_human)
+      - name: Jugador humano simulado (play_human, nivel 'u': metas A y B)
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/play_human.mjs 2>&1 | tee out/logs/play_human.log
 
-      - name: Toques con el dedo, sin navegador (dedo_test)
+      - name: Toques con el dedo, sin navegador (dedo_test, nivel 'u')
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/dedo_test.mjs 2>&1 | tee out/logs/dedo_test.log
+
+      - name: Espacio en la computadora, sin navegador (teclado_test, nivel 'u')
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/teclado_test.mjs 2>&1 | tee out/logs/teclado_test.log
+
+      - name: Ritmo de la final, sin navegador (ritmo_test)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/ritmo_test.mjs 2>&1 | tee out/logs/ritmo_test.log
+
+      - name: Fácil de círculos, línea de base para registros viejos (play_human --f, no bloquea)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        continue-on-error: true
+        run: node tools/play_human.mjs --f --n=600 2>&1 | tee out/logs/play_human_f.log
 
       - name: Lógica de fluidez sin navegador (perf_test)
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}

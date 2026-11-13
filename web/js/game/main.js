@@ -21,7 +21,7 @@ import { Partida } from '../sim/match.js';
 import { simular } from '../sim/attempt.js';
 import { recalcular, resumen } from '../sim/replay.js';
 import { EVENTO, KG_MAX, RELOJ, PLAN, exigenciaTabla, previsto, cuerpoDe, diaTxt } from '../sim/rules.js';
-import { RITMO, FASES_RAPIDAS, esDecisivo, tramoResumen, veredictoPropio } from './ritmo.js';
+import { RITMO, FASES_RAPIDAS, esDecisivo, modoRival, tramoResumen, veredictoPropio, desdeDecisivo } from './ritmo.js';
 import { t, esc, fijarIdioma, detectarIdioma, idiomaActual, fijarTactil, alCambiarIdioma, IDIOMAS } from './i18n/t.js';
 import { ganchos } from './ganchos.js';
 import { telefono } from './telefono.js';
@@ -374,7 +374,7 @@ const RIVAL_FASES = FASES_RAPIDAS, RIVAL_RAPIDO = RITMO.rapido;
  * `guia`: reloj del intento llevado por la presentación (tutorial); sin ella, el reloj es el del juego.
  * @returns {Promise<{conf:number|null, ent:number[][], res:object, grab:object[]}>}
  */
-function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = reloj.ahora(), panelAbierto = null, guia = null, resumen = false }) {
+function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = reloj.ahora(), panelAbierto = null, guia = null, resumen = false, decisivo = false }) {
   return new Promise(resolver => {
     const P = escena.P, ent = gestos ? gestos.ent : [], propio = !gestos, grab = [], mk = marcas(P, lev, env), ctl = propio ? ctx.ctl || 'c' : 'c', facil = propio && ctl === 'f', uno = propio && ctl === 'u', T = tactil();
     // 'u': ayudas de primera vez (una vez cada una en este dispositivo) y la presentación en una línea en el primer intento (G2.8)
@@ -391,7 +391,8 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
     const todo = gestos ? simular(ctx, gestos.conf, gestos.ent) : null;
     // resumen (G2.7): desde 1 s antes de su última explosión hasta poco después de la recepción; después, corte al final
     const corte = gestos && resumen ? tramoResumen(todo) : null;
-    const tv0 = gestos ? (corte ? corte.de : Math.max(0, gestos.conf - 500, (todo.movs[0]?.tp || 0) - RIVAL_ANTES)) : 0;
+    // el decisivo con «Rápida»: desde 1 s antes de su primera explosión, y las fases lentas a RITMO.decisivo.rapido
+    const tv0 = gestos ? (corte ? corte.de : decisivo ? desdeDecisivo(todo, gestos.conf) : Math.max(0, gestos.conf - 500, (todo.movs[0]?.tp || 0) - RIVAL_ANTES)) : 0, rapidez = decisivo ? RITMO.decisivo.rapido : RIVAL_RAPIDO;
     let vr = null, aPrev = 0, saltar = false;
     // reloj guiado: lineal a tramos; `tope` es el instante del intento donde se detiene
     const R = guia ? { tb: reloj.ahora(), vb: conf ?? 0, vel: 1, tope: Infinity, clave: null } : null;
@@ -436,7 +437,7 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
     }
     E.modo = propio ? 'intento' : 'tv'; if (panelAbierto) E.modo = 'panel';
     enCuadro = (ahora, dt) => {
-      if (gestos) { vr = vr === null ? tv0 : vr + (ahora - aPrev) * (RIVAL_FASES.has(visto.fase) ? RIVAL_RAPIDO : 1); aPrev = ahora; if (corte && vr >= corte.a && vr < todo.res.t - 30) saltar = true; if (saltar && todo.res) { saltar = false; vr = Math.max(vr, todo.res.t - 30); } }
+      if (gestos) { vr = vr === null ? tv0 : vr + (ahora - aPrev) * (RIVAL_FASES.has(visto.fase) ? rapidez : 1); aPrev = ahora; if (corte && vr >= corte.a && vr < todo.res.t - 30) saltar = true; if (saltar && todo.res) { saltar = false; vr = Math.max(vr, todo.res.t - 30); } }
       const now = guia ? Math.round(vt(ahora)) : gestos ? Math.round(vr) : Math.round(ahora - t0), m = propio ? alDia(ctx, conf, ent, now, ctl) : simular(ctx, conf, ent, now), M = m.M;
       const s = propio ? senalDe(m, now, ctl) : null; sAhora = s; let leyenda = '';
       if (guardadoT !== null && s && s.tipo === 'libre' && s.clave === 'tira') {
@@ -583,7 +584,8 @@ async function decision(a, lev, res, et, propio, o = {}) {
   // propio no se espera a que la barra termine de rebotar (fin.dur llega a 4,3 s): luces, ovación, la cámara gira y sigue.
   // El primer NO VALE suma 1,5 s para leer cuándo vale un levantamiento.
   // 'u' (G2.7): el válido propio no llega a 3 s y el fallo dura tVer + 2,4 s (la barra termina de caer detrás del panel siguiente)
-  const total = R0 ? R0.total : o.corto ? tVer + .9 : uno ? veredictoPropio(ok, !!fin).total : Math.max(tVer + (propio ? (linea ? (o.rep ? 1.6 : 4.2) : 1.9) + (primerNoVale ? 1.5 : 0) : 1.3), fin && !(propio && ok) ? fin.dur : 0);
+  const total0 = R0 ? R0.total : o.corto ? tVer + .9 : uno ? veredictoPropio(ok, !!fin).total : Math.max(tVer + (propio ? (linea ? (o.rep ? 1.6 : 4.2) : 1.9) + (primerNoVale ? 1.5 : 0) : 1.3), fin && !(propio && ok) ? fin.dur : 0);
+  const total = o.max ? Math.min(total0, Math.max(o.max, tVer + .4)) : total0;      // el decisivo con «Rápida»: la barra que rebota se corta
   if (fin && !ok) escena.primerPlano('caida');
   const t0 = reloj.ahora(), d = [null, null, null], hito = { luz: 0, ver: false, caida: !fin || !ok, rev: false };
   const avanzar = (t, dt, vivo) => {
@@ -921,7 +923,7 @@ async function llamadoPropio(p, L) {
   if (!E.finalIniciada) { E.finalIniciada = true; ev('final_inicio', { n: E.finalN, fuente: E.pase?.fuente ?? null, pesista: TIPO[a.id], nivel: p.cfg.nivel, ritmo: E.cfg?.ritmo, ctl: p.cfg.ctl }); }
   await escena.mostrar(a.id); escena.setCarga(L.kg, L.lev); escena.posar(poseParado(escena.P, L.lev), L.lev); zocalo(a, L); etiqueta(L.et); setLuces(null);
   const corre = p.cfg.ctl === 'c', uno = p.cfg.ctl === 'u'; let t0 = reloj.ahora(), ctx = null, env, kgFinal = L.kg, desplazado = false, corrida = null;
-  E.rivalesSeguidos = 0;
+  E.rivalesSeguidos = 0; E.rivalesEnteros = 0;
   const elegido = new Promise(res => panelLlamado(p, L, t0, res, corre)); if (uno) relojLibre(); else setReloj(L.reloj);
   escena.primerPlano('medio', encuadreLibre()); E.forzar = true;      // plano americano del pesista en la parte que el panel deja libre
   const vence = new Promise(res => { if (corre) enCuadro = ahora => { setReloj(L.reloj - (ahora - t0)); if (ahora - t0 >= L.reloj) { enCuadro = null; res(null); } }; });
@@ -993,8 +995,8 @@ function turno(a) {
  */
 async function llamadoRival(p, L, cfg) {
   const a = p.at[L.a], antes = lider(p), x = p.resolverIA(), pasa = x.res.res === 'valido' && antes !== L.a && lider(p) === L.a;
-  const rapida = cfg.ritmo !== 'completa', decisivo = esDecisivo(L.et, pasa), seguidos = E.rivalesSeguidos = (E.rivalesSeguidos || 0) + 1;
-  const modo = decisivo || !rapida ? 'entero' : seguidos >= RITMO.filaDesde ? 'fila' : 'resumen';
+  const rapida = cfg.ritmo !== 'completa', decisivo = esDecisivo(L.et), seguidos = E.rivalesSeguidos = (E.rivalesSeguidos || 0) + 1;
+  const modo = modoRival({ et: L.et, seguidos, enteros: E.rivalesEnteros || 0, rapida }); if (modo === 'entero') E.rivalesEnteros = (E.rivalesEnteros || 0) + 1;
   setReloj(L.reloj); setLuces(null);
   if (modo === 'fila') {
     // ni 3D ni veredicto aparte: el resultado en una línea, con su color, y sigue
@@ -1008,12 +1010,13 @@ async function llamadoRival(p, L, cfg) {
   // un toque (una ráfaga nueva, pasados 400 ms) saltea el turno entero: el resultado ya está decidido
   let salta = false; const ts = reloj.ahora(), oye = (tt, v) => { if (!v) return; if (tt - ts >= 400 && toques.rafaga(tt) >= ts && E.intento) { toques.resolver(true, 'sigue'); salta = true; E.intento.alFinal(); } else toques.resolver(false, 'espera'); };
   boton.oye = oye;
-  const r = await correrIntento(x.ctx, { a, lev: L.lev, env: x.env, gestos: { conf: x.conf, ent: x.ent }, resumen: modo === 'resumen' });
+  const r = await correrIntento(x.ctx, { a, lev: L.lev, env: x.env, gestos: { conf: x.conf, ent: x.ent }, resumen: modo === 'resumen', decisivo: rapida && modo === 'entero' });
   if (boton.oye === oye) boton.oye = null;
   if (salta) ev('rival_salteado', { modo });
-  await decision(a, L.lev, r.res, L.et, false, { fin: armarFinal(r, L.lev), corto: salta, resumen: modo === 'resumen' && !salta });
+  await decision(a, L.lev, r.res, L.et, false, { fin: armarFinal(r, L.lev), corto: salta, resumen: modo === 'resumen' && !salta, max: rapida ? RITMO.decisivo.veredicto : 0 });
   marcador(p);
-  if (!salta && decisivo && (r.res.res !== 'valido' || pasa)) await repeticion(L.lev, r, pasa ? t('rival.pasa', { rival: quien(a) }) : '', { rival: true, titulo: t('rival.repeticion', { rival: quien(a) }) });
+  // repetición: con «Rápida», solo del decisivo que cae; con «Completa», como antes (cae o pasa adelante)
+  if (!salta && modo === 'entero' && (r.res.res !== 'valido' || (!rapida && pasa))) await repeticion(L.lev, r, pasa ? t('rival.pasa', { rival: quien(a) }) : '', { rival: true, titulo: t('rival.repeticion', { rival: quien(a) }) });
   seguir(false); turno(null); etiqueta(null); zocalo(null);
 }
 
