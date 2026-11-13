@@ -68,17 +68,27 @@ function uuid4() {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
-// exp del pase (segundos), sin verificar la firma: el pase es del servidor y acá solo se usa para saber hasta cuándo
-// se puede reanudar la final.
-export function expDelPase(pase) {
+// Cuerpo del pase, sin verificar la firma: el pase es del servidor y acá solo se usa para saber hasta cuándo se puede
+// reanudar la final y con qué etapa salió.
+function cuerpoDelPase(pase) {
   const m = typeof pase === 'string' && pase.match(/^v1\.([A-Za-z0-9_-]+)\./);
   if (!m) return null;
   try {
     const b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
     const txt = typeof atob === 'function' ? atob(b64) : Buffer.from(b64, 'base64').toString('binary');
     const j = JSON.parse(txt);      // el cuerpo del pase es JSON en ASCII
-    return Number.isFinite(j.exp) ? j.exp : null;
+    return j && typeof j === 'object' ? j : null;
   } catch { return null; }
+}
+// exp del pase (segundos).
+export function expDelPase(pase) {
+  const j = cuerpoDelPase(pase);
+  return j && Number.isFinite(j.exp) ? j.exp : null;
+}
+// Etapa con la que el Worker entregó la final ('arranque' | 'completa'), o null si el pase no la dice (pases viejos).
+export function etapaDelPase(pase) {
+  const e = cuerpoDelPase(pase)?.e;
+  return e === 'arranque' || e === 'completa' ? e : null;
 }
 
 // Revisión liviana del correo antes de mandarlo (la de verdad la hace el Worker).
@@ -353,7 +363,10 @@ export function crearServidor(o = {}) {
   function paseParaReanudar() {
     const p = leerJson(sesion, CLAVES.pase);
     if (!p || !p.pase) return null;
-    if (p.etapa === 'arranque') {
+    // La etapa es la de la pestaña o la del propio pase: una pestaña que pidió el pase con el juego anterior (sin `etapa`
+    // guardada) y recarga con el nuevo tampoco reanuda el arranque gratis como si fuera una final completa.
+    const etapa = p.etapa === 'arranque' || etapaDelPase(p.pase) === 'arranque' ? 'arranque' : 'completa';
+    if (etapa === 'arranque') {
       sesion.del(CLAVES.pase);
       const f = firmaDelPase(p.pase), v = leerVivos();
       if (f && v[f] && (v[f].suelto || ahora() - v[f].t >= VIVO_MS)) { delete v[f]; guardarVivos(v); }
@@ -366,7 +379,7 @@ export function crearServidor(o = {}) {
     p.reanudado = true;
     sesion.set(CLAVES.pase, JSON.stringify(p));
     tomarPase(p.pase);
-    return { pase: p.pase, n: p.n, fuente: p.fuente, etapa: p.etapa === 'arranque' ? 'arranque' : 'completa' };
+    return { pase: p.pase, n: p.n, fuente: p.fuente, etapa };
   }
   function finalTerminada() {
     sesion.del(CLAVES.pase);

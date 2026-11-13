@@ -14,7 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { crearServidor, expDelPase, pareceCorreo, sugerirCorreo, CONSENTIMIENTO } from '../web/js/game/servidor.js';
+import { crearServidor, expDelPase, etapaDelPase, pareceCorreo, sugerirCorreo, CONSENTIMIENTO } from '../web/js/game/servidor.js';
 import { crearAnalitica, nombreVisible, limpiarProps, fuenteTrafico, dominioReferente, detalleError, proporcionGrabacion, taparTexto, taparAtributo, BLOQUEO_GRABACION, BANDERAS } from '../web/js/game/analitica.js';
 import { reenviar } from '../functions/_reenviar.js';
 import { onRequest as raiz } from '../functions/index.js';
@@ -205,6 +205,20 @@ igual(expDelPase('basura'), null, 'pase inválido');
   local.setItem('tarima.pase_vivo', JSON.stringify({ f1: { c: 'otra', t: Date.now() - 1000, suelto: true, exp } }));
   igual(base({ local, sesion }).paseParaReanudar(), null, 'el arranque gratis no se reanuda');
   igual([sesion.getItem('tarima.pase'), local.getItem('tarima.pase_vivo')], [null, null], 'y su pase se borra');
+}
+{
+  // Pestaña que pidió el pase con el juego anterior (sin `etapa` guardada) y recarga con el nuevo: manda la del pase.
+  const local = new Mem(), sesion = new Mem();
+  const exp = Math.floor(Date.now() / 1000) + 3600;
+  const paseA = `v1.${b64url(JSON.stringify({ d: 'abc', n: 1, f: 'gratis', e: 'arranque', p: 7, exp }))}.fA`;
+  igual([etapaDelPase(paseA), etapaDelPase(paseFalso(exp)), etapaDelPase('basura')], ['arranque', null, null], 'etapa del pase');
+  sesion.setItem('tarima.pase', JSON.stringify({ pase: paseA, n: 1, fuente: 'gratis', exp, reanudado: false }));
+  local.setItem('tarima.pase_vivo', JSON.stringify({ fA: { c: 'otra', t: Date.now() - 1000, suelto: true, exp } }));
+  igual(base({ local, sesion }).paseParaReanudar(), null, 'pase del arranque guardado por el juego anterior: no se reanuda');
+  const paseC = `v1.${b64url(JSON.stringify({ d: 'abc', n: 2, f: 'gratis', e: 'completa', p: 8, exp }))}.fC`;
+  sesion.setItem('tarima.pase', JSON.stringify({ pase: paseC, n: 2, fuente: 'gratis', exp, reanudado: false }));
+  local.setItem('tarima.pase_vivo', JSON.stringify({ fC: { c: 'otra', t: Date.now() - 1000, suelto: true, exp } }));
+  igual(base({ local, sesion }).paseParaReanudar()?.etapa, 'completa', 'y uno completo sin etapa guardada sí se reanuda');
 }
 
 // pase: muro
