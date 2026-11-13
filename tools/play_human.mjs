@@ -11,8 +11,18 @@
 // techo: machacador ≤ 25 % y casual entre 35 y 70 %. Además: una subida fallada no dura más que el tope de Fácil, y con todos
 // los toques en el borde de BIEN y un toque cada 250 ms en ¡EMPUJÁ! se levanta siempre hasta el 100 %.
 // Cada intento se recalcula con simular() y tiene que dar lo mismo. Sale con error si el criterio no se cumple.
-// Uso: node tools/play_human.mjs [--n=2000] [--imin=8800 --imax=9200] [--info]   (--info agrega filas que no son criterio:
+// Uso: node tools/play_human.mjs --f [--n=2000] [--imin=8800 --imax=9200] [--info]   (--info agrega filas que no son criterio:
 //   95, 97 y 103 %, maneras de tocar a ciegas, seguir tocando después de ¡EMPUJÁ!, ritmos de ¡EMPUJÁ!, tutorial y Clásico)
+//
+// Sin --f mide el nivel 'u' (por defecto desde Gameplay 2, docs/JUEGO.md G2.9) con los bots de tools/uno_bots.mjs:
+//   A. sin coordinación: con la misma semilla, reactivo, tardío, fantasma, mantiene y machacador dan el MISMO resultado en el
+//      100 % de los casos (3 pesistas × teclado y dedo × 88 a 103 %); el ausente solo pierde ¼ + ½ disco y saca ≥ 95 % al 90 %;
+//      cero fallos con causa de entrada (anticipado, devuelve, reloj, sin_apoyo, tarde).
+//   B. primer intento: el novato (dedo, reactivo) con la apertura sugerida (90 % ± la forma del día) saca ≥ 97 % en arranque y
+//      en dos tiempos con los tres pesistas.
+//   Informativo (lo calibran los factores de cuerpo, tools/margen_cal.mjs): C (curva), D (dónde caen los pesistas) y la
+//   tabla de novato / medio / bueno por tramo.
+// Uso: node tools/play_human.mjs [--n=600]
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -162,7 +172,11 @@ const senalDe = B => (c, s) => jugarSenal(c, B, s);
 const ciego = prox => (c, s) => jugarCiego(c, prox, s);
 const nunca = (c, s) => jugarCiego(c, () => 1e9, s);
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) && !process.argv.includes('--f')) {
+  const { medirUno } = await import('./uno_metas.mjs');
+  process.exit(medirUno({ n: +(arg('n') || 600) }) ? 0 : 1);
+}
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) && process.argv.includes('--f')) {
   const t0 = Date.now(), mal = [], tijera = [COLS[0], COLS[1]];
   const cumple = (nombre, xs, min, max) => { for (const x of xs) if (x.pct < min || x.pct > max) mal.push(`${nombre}, ${x.nombre}: ${x.pct.toFixed(1)} % (meta ${min === max ? min + ' %' : max >= 100 ? min + ' % o más' : min <= 0 ? max + ' % o menos' : `entre ${min} y ${max} %`})`); };
   const metaTxt = (min, max) => (min === max ? `meta ${min} %` : max >= 100 ? `meta ≥ ${min} %` : min <= 0 ? `meta ≤ ${max} %` : `meta ${min} a ${max} %`);
