@@ -1,0 +1,111 @@
+# Carga del juego y modelos comprimidos, antes y después (a pedido). «Antes» es web/ en el punto donde esta rama sale de
+# `gameplay` (git merge-base): mismas pruebas, mismo runner.
+#  - medir: tools/check_carga.mjs con la red de un 4G y de una red lenta: bytes, bienvenida y modelos bajados; capturas de
+#    la pantalla de carga (solo después). Artefacto carga-medir: out/carga/{antes,despues}/.
+#  - visor: tools/check_viewer.mjs (dibujo por software) con los GLB de antes y de después, para comparar personajes, piel,
+#    malla, cara y discos en las capturas. Artefactos visor-antes y visor-despues: out/viewer/.
+# Uso: gh workflow run carga.yml -R jvidelac1/tarima --ref carga
+name: Carga y modelos comprimidos
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  medir:
+    name: Carga con la red limitada (antes y después)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TARIMA_ANGLE: swiftshader
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Chrome
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || true)"
+          if [ -z "$CHROME" ]; then
+            wget -q -O "$RUNNER_TEMP/chrome.deb" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+            sudo apt-get update -q && sudo apt-get install -y -q "$RUNNER_TEMP/chrome.deb"
+            CHROME="$(command -v google-chrome)"
+          fi
+          echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
+      - name: web/ de antes
+        run: |
+          BASE="$(git merge-base HEAD origin/gameplay)"; echo "antes: $BASE"
+          mkdir -p "$RUNNER_TEMP/antes" && git archive "$BASE" web | tar -x -C "$RUNNER_TEMP/antes"
+          mkdir -p out/logs; echo "$BASE" > out/logs/base.txt
+      - name: Después (con capturas)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 30
+        run: node tools/check_carga.mjs --etiqueta=despues 2>&1 | tee out/logs/carga_despues.log
+      - name: Antes (solo mediciones, no bloquea)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        timeout-minutes: 15
+        run: node tools/check_carga.mjs --web="$RUNNER_TEMP/antes/web" --etiqueta=antes --sin-capturas 2>&1 | tee out/logs/carga_antes.log
+      - name: Resumen
+        if: ${{ always() }}
+        run: |
+          { echo "### Carga del juego"; for f in carga_antes carga_despues; do [ -f "out/logs/$f.log" ] || continue; echo; echo "**$f**"; echo '```'; grep -E '^(CARGA|  models|MAL|NOTA|check_carga|\[)' "out/logs/$f.log" | head -40; echo '```'; done; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: carga-medir
+          path: out/
+          retention-days: 14
+
+  visor:
+    name: Visor con los modelos de ${{ matrix.lado }} (dibujo por software)
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        lado: [antes, despues]
+    env:
+      TARIMA_ANGLE: swiftshader
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Chrome
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || true)"
+          if [ -z "$CHROME" ]; then
+            wget -q -O "$RUNNER_TEMP/chrome.deb" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+            sudo apt-get update -q && sudo apt-get install -y -q "$RUNNER_TEMP/chrome.deb"
+            CHROME="$(command -v google-chrome)"
+          fi
+          echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
+      - name: web/ de antes
+        if: ${{ matrix.lado == 'antes' }}
+        run: |
+          BASE="$(git merge-base HEAD origin/gameplay)"; echo "antes: $BASE"
+          rm -rf web && git checkout "$BASE" -- web
+      - name: check_viewer
+        timeout-minutes: 60
+        run: mkdir -p out/logs && node tools/check_viewer.mjs 2>&1 | tee out/logs/check_viewer.log
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: visor-${{ matrix.lado }}
+          path: out/
+          retention-days: 14
