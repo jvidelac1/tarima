@@ -718,7 +718,7 @@ async function decision(a, lev, res, et, propio, o = {}) {
   // un rival resumido (G2.7): luces de golpe y la línea enseguida
   // 'u' al límite: las luces se prenden de a una con suspenso (más espaciadas) y el veredicto dura lo mismo (≤ 3 s)
   if (uno) margenUI.fin(res, reloj.ahora());
-  const R0 = o.resumen ? RITMO.resumen : null, paso = R0 ? 0 : limite ? veredictoPropio(true, !!fin, true).paso : lento ? .55 : .3, tLuz = R0 ? R0.luz : fin && !ok ? .45 : fin ? .2 : .25, tVer = R0 ? R0.ver : tLuz + 2 * paso + .25;
+  const R0 = o.resumen ? (o.rival ? { ...RITMO.resumen, total: RITMO.rival.saltado } : RITMO.resumen) : null, paso = R0 ? 0 : limite ? veredictoPropio(true, !!fin, true).paso : lento ? .55 : .3, tLuz = R0 ? R0.luz : fin && !ok ? .45 : fin ? .2 : .25, tVer = R0 ? R0.ver : tLuz + 2 * paso + .25;
   const tCaida = fin ? fin.pl.suelta : 0, tRev = ok && fin ? tCaida + 1.1 : Infinity;
   // la línea se lee 4,2 s; si después viene la repetición (`o.rep`), que la vuelve a mostrar, acá solo 1,6 s. En un válido
   // propio no se espera a que la barra termine de rebotar (fin.dur llega a 4,3 s): luces, ovación, la cámara gira y sigue.
