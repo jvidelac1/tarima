@@ -115,21 +115,25 @@ function lineaU(res, o, l) {
 }
 
 /**
- * Línea de 'b' (docs/JUEGO.md, Gameplay 3): dónde se quedó sin energía y, siempre, dónde pegó en la barrita: «173 kg es el
- * 99 % y pegaste en el amarillo (−½): se quedó sin energía en el tirón». Con dos barritas nombra la peor (y lo que costaron
- * las dos). Si pegó en el verde, la culpa es de los kilos. Válido: solo si quedó al límite.
+ * Línea de 'b' (docs/JUEGO.md, Gameplay 3): dónde se quedó sin energía y, siempre, cada barrita que no salió verde y en qué
+ * barrita fue: «173 kg es el 99 % y pegaste en el amarillo en el envión (−½): se quedó sin energía en el envión». Con todas
+ * las barritas en verde la barra no se cae (rules.js, BARRA.verdeSalva), así que una caída siempre tiene un toque que nombrar.
+ * Válido: solo si quedó al límite.
  */
 function lineaB(res, o, l) {
   const u = res && res.uno; if (!u) return '';
   const lev = o.lev || (Object.keys(u.gastos)[1] === 'pararse' ? 'c' : 's');
   if (res.res === 'valido') return u.al_limite ? tr(l, 'explica.u.limite', { discos: discos(u.margen_fin, l) }) : '';
-  const B = (u.barras || []).filter(b => b.zona !== 'verde'), peor = B.find(b => b.zona === 'rojo') || B[0], extra = B.reduce((a, b) => a + b.extra, 0);
-  const v = { donde: tramoTxt(u.tramo_caida, lev, l), quien: o.quien, kg: o.kg, pct: o.pct };
+  const B = (u.barras || []).filter(b => b.zona !== 'verde'), extra = B.reduce((a, b) => a + b.extra, 0);
+  const v = { donde: tramoTxt(u.tramo_caida, lev, l), quien: o.quien, kg: o.kg, pct: o.pct, d: cuartos(u.gastos[u.tramo_caida] || 0) };
   const larga = o.kg && o.pct;
   // el cansancio se nombra si sin él se paraba
   const cansado = u.fatiga && u.margen_fin + u.fatiga >= 0 ? tr(l, 'explica.b.cansado', { d: cuartos(u.fatiga) }) : '';
-  if (!peor) return tr(l, larga ? 'explica.b.verde' : 'explica.b.verde_corta', v) + cansado;
-  return tr(l, larga ? 'explica.b.zona' : 'explica.b.zona_corta', { ...v, zona: tr(l, 'barra.z.' + peor.zona), d: cuartos(extra) }) + cansado;
+  // no debería pasar (todo verde sube): la línea de 'u', sin toques
+  if (!B.length) return (larga ? tr(l, 'explica.u.cae', v) : tr(l, 'explica.u.cae_corta', v)) + cansado;
+  // «el amarillo en el envión», «el amarillo en la cargada y en el rojo en el envión»: cada toque que falló, en orden
+  const toques = B.map(b => tr(l, 'explica.b.toque', { zona: tr(l, 'barra.z.' + b.zona), en: tr(l, `barra.en.${lev}${b.i}`) })).join(tr(l, 'explica.b.y'));
+  return tr(l, larga ? 'explica.b.zona' : 'explica.b.zona_corta', { ...v, toques, d: cuartos(extra) }) + cansado;
 }
 
 /** Los tres pasos de «Cómo se juega»: [cantidad de teclas dibujadas, texto]. */

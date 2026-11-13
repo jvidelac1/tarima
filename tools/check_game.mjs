@@ -96,7 +96,7 @@ async function corrida(via) {
     const av = async ms => { if (manual) await J(ms => JUEGO.test.avanzar(ms), ms); else await page.waitForTimeout(ms); };
     const ir = async t => { if (manual) await J(t => JUEGO.test.hasta(t, 8), t); else { const d = t - await J(() => JUEGO.reloj.ahora()); if (d > 0) await page.waitForTimeout(d); } };
     const toque = async () => { await baja(); await av(30); await sube(); };
-    let ultToque = 0, metro = false, llamado = '', hecho = '', firma = '', traza = '';
+    let ultToque = 0, metro = false, llamado = '', hecho = '', firma = '', traza = '', fotoCaida = false;
     for (let n = 0; n < 80000; n++) {
       const s = await J(() => JUEGO.estado());
       if (s.errores.length) throw new Error('error en el juego: ' + s.errores[0]);
@@ -172,6 +172,8 @@ async function corrida(via) {
           await av(hizo ? 350 : 200); continue;
         }
       }
+      // una captura de la caída con el amarillo (la línea que nombra el toque)
+      if (!fotoCaida) { const v = await J(() => { const e = document.getElementById('veredicto'); return e && !e.hidden ? e.textContent : ''; }); if (/pegaste en el amarillo en|hit the yellow on/i.test(v)) { fotoCaida = true; await foto('caida_amarillo'); console.log(`${tag} caída con el amarillo: «${v}»`); } }
       await av(['rival', 'decision', 'repeticion', 'repeticion_rival'].includes(s.pantalla) ? 450 : 200);
       if (['rival', 'decision', 'repeticion', 'repeticion_rival', 'carga', 'desplazado'].includes(s.pantalla) && n % 3 === 0 && !(I && I.propio)) { await baja(); await av(20); await sube(); }      // el toque de saltear
     }
@@ -251,9 +253,10 @@ async function corrida(via) {
   // en 'u' un fallo no sale de tocar mal: sale de pedir mucho. El tercer arranque pide 25 kg de más (se cae, con su línea),
   // y el primer dos tiempos se juega sin tocar nada (sale solo y vale: no tocar nunca tira la barra)
   const pesado = clave => /Arranque · intento 3/.test(clave), ausente = clave => /Dos tiempos · intento 1/.test(clave);
-  // 'b': dónde pega cada barrita. El segundo arranque en el amarillo; el tercero (25 kg de más) en el verde, y se cae igual
-  // (la línea dice «pegaste en el verde, pero…»); el segundo dos tiempos, la cargada en el rojo (la punta) y el envión en el verde
-  const dondePega = (clave, i) => (/Arranque · intento 2/.test(clave) ? 'amarillo' : /Dos tiempos · intento 2/.test(clave) && i === 0 ? 'rojo' : 'verde');
+  // 'b': dónde pega cada barrita. El segundo y el tercer arranque en el amarillo: el tercero (25 kg de más) se cae y la línea
+  // nombra ese toque («pegaste en el amarillo en el tirón»; todo en verde subiría siempre, BARRA.verdeSalva); el segundo dos
+  // tiempos, la cargada en el rojo (la punta) y el envión en el verde
+  const dondePega = (clave, i) => (/Arranque · intento [23]/.test(clave) ? 'amarillo' : /Dos tiempos · intento 2/.test(clave) && i === 0 ? 'rojo' : 'verde');
   const fin = await jugar(s => s.pantalla === 'fin', true, { cambia: true, envion, pesado, ausente, zona: dondePega });
   const r = await J(() => ({ registro: JUEGO.registro, tabla: JUEGO.E.p.tabla().map(f => `${f.id}:${f.s}+${f.c}=${f.total}#${f.puesto ?? '-'}`).join(' '), monitor: JUEGO.E.monitor, visitados: JUEGO.E.visitados, cal: JUEGO.E.cfg.cal, propios: JUEGO.E.propios || [],
     modelos: Object.keys(JUEGO.escena.atletas).sort().join(','), mios: JUEGO.E.p.at[JUEGO.E.yo].s.concat(JUEGO.E.p.at[JUEGO.E.yo].c).map(x => `${x.kg}${x.res === 'valido' ? '✓' : '✗' + (x.causa || '')}`).join(' ') }));
@@ -285,7 +288,9 @@ async function corrida(via) {
   if (!/✓/.test(marcas[0] || '') || !/✓/.test(marcas[3] || '')) mal(`las aperturas tienen que valer: ${r.mios}`);
   // toda caída dice dónde pegó en la barrita y dónde se quedó sin energía (nunca un tiempo)
   for (const x of r.propios.filter(y => y.res === 'fallo')) if (!/se quedó sin energía en /i.test(x.linea || '') || !/pegaste en el (verde|amarillo|rojo)/i.test(x.linea || '') || /ms\b/.test(x.linea || '')) mal(`una caída sin la línea de la barrita y el tramo: ${JSON.stringify(x)}`);
-  if (!f || !/^Pegaste en el verde, pero /.test(f.linea)) mal(`el arranque con 25 kg de más (pegando en el verde) no cayó con «Pegaste en el verde, pero…»: ${r.mios} · ${JSON.stringify(f)}`); else console.log(`${tag} línea del fallo por kilos: «${f.linea}»`);
+  if (!f || !/pegaste en el amarillo en el tirón \(−[^)]+\): se quedó sin energía en /i.test(f.linea)) mal(`el arranque con 25 kg de más (pegando en el amarillo) no cayó con «…pegaste en el amarillo en el tirón (−…): se quedó sin energía en…»: ${r.mios} · ${JSON.stringify(f)}`); else console.log(`${tag} línea del fallo por kilos: «${f.linea}»`);
+  // todo verde, la barra sube: ningún intento con todas sus barritas en verde puede caer
+  for (const x of r.propios) if (x.res !== 'valido' && x.uno?.barras?.length && x.uno.barras.every(b => b.zona === 'verde')) mal(`todo en verde y se cayó: ${JSON.stringify(x)}`);
   if (!aus || aus.res !== 'valido') mal(`el dos tiempos sin tocar no salió solo (regular) y válido: ${JSON.stringify(aus)}`); else console.log(`${tag} dos tiempos sin tocar: ${aus.res} · barritas ${aus.uno.barras.map(b => b.zona + (b.sola ? ' sola' : '')).join(', ')} · margen ${aus.uno.margen_fin}`);
   // cada barrita quedó en la zona donde se tocó (el núcleo juzga el instante del evento con la misma función que dibuja)
   { const vistas2 = r.propios.flatMap(x => (x.uno?.barras || []).filter(b => !b.sola).map(b => b.zona)), quer = pedidas.map(x => x.z);
