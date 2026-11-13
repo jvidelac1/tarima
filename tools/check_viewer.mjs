@@ -26,7 +26,7 @@ const QUALITY = arg('quality') || 'alta', ONLY = arg('only'), HEADED = process.a
 // Sin --min-fps la prueba exige igual un piso (alta 45, media 55, baja 58), salvo que la máquina esté saturada: ahí la medición no
 // vale y se informa como no concluyente. Con --min-fps=N se exige siempre.
 const FPS_FLOOR = { alta: 45, media: 55, baja: 58 }, loadNow = () => os.loadavg()[0] / os.cpus().length;
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.txt': 'text/plain' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.txt': 'text/plain' };
 
 const server = http.createServer((req, res) => {
   const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname), file = path.join(WEB, rel.endsWith('/') ? rel + 'index.html' : rel);

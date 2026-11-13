@@ -42,7 +42,7 @@ const CAPT = arg('capturas') || '', DEPURA = process.argv.includes('--depura');
 if (CAPT) fs.mkdirSync(CAPT, { recursive: true });
 const GOB = process.argv.includes('--gobernador');
 const TUTORIAL = process.argv.includes('--tutorial'), LASTRE = arg('lastre') || (GOB ? '18' : ''), SOLO_TUT = process.argv.includes('--solo-tutorial'), UMBRAL = +(arg('umbral') || 95);
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
 const server = http.createServer((req, res) => {
   if (sinApi(req, res)) return;      // /api/estado y /api/partida: juego sin límite (tools/sin_api.mjs)
   const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname), file = path.join(WEB, rel);
