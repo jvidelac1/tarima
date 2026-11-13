@@ -18,6 +18,7 @@
 // esperas y lo demás es informativo). --ctl=u mide 'u' como antes.
 // Uso: node tools/ritmo_test.mjs [--semillas=60] [--panel=2.5] [--ctl=b|u]
 import { Partida } from '../web/js/sim/match.js';
+import { HUELLA_IA } from '../web/js/sim/ai.js';      // los rivales del juego (con personalidad)
 import { Intento, simular } from '../web/js/sim/attempt.js';
 import { mezclar } from '../web/js/sim/fixed.js';
 import { RITMO, FASES_RAPIDAS, esDecisivo, modoRival, tramoResumen, veredictoPropio, desdeDecisivo } from '../web/js/game/ritmo.js';
@@ -52,7 +53,7 @@ for (const [quien, NOVATO] of Object.entries(JUGADORES)) {
 const peores = [], filas = [], decisivos = [], esperas = [], finales = [], rivalesNo = [], verOk = [], verMal = [], intS = [], intC = [], caidasPlan = { n: 0, caidas: 0 };
 for (const nivel of ['amistoso', 'normal']) for (const id of ATL) for (let k = 0; k < SEM; k++) {
   const yo = ATL.indexOf(id), semilla = mezclar(k, 4242, yo, nivel === 'normal' ? 1 : 0);
-  const p = new Partida(datos, { semilla, nivel, cal: 0, primera: false, ctl: CTL, tactil: true, atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
+  const p = new Partida(datos, { semilla, nivel, cal: 0, primera: false, ctl: CTL, tactil: true, ia: HUELLA_IA, atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
   const f = datos.atletas[id];
   for (const lev of ['s', 'c']) { const [lo, hi] = p.rangoApertura(yo, lev); p.abrir(yo, lev, Math.max(lo, Math.min(hi, Math.round(f.techo[lev] * .9)))); }
   p.empezar();
