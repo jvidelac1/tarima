@@ -251,7 +251,8 @@ async function escenario(L) {
       if (JSON.stringify(aEncuesta[0]).includes('@')) mal('a /api/encuesta viajó una «@»');
     }
     { const e = await ultimo('encuesta_enviada'); if (!e || e.momento !== 'inicio' || e.plataforma !== 'app' || e.features !== 2 || e.otra !== true) mal(`encuesta_enviada: ${JSON.stringify(e)}`); }
-    { const n = await srv.db.prepare('SELECT COUNT(*) n, SUM(i IS NULL) sin_ip FROM encuestas').first(); if (n.n !== 1 || n.sin_ip !== 1) mal(`encuestas en la base: ${JSON.stringify(n)}`); }
+    // la mandada a mano (otro dispositivo) y la suya, las dos sin el código de la IP (sin bono)
+    { const n = await srv.db.prepare('SELECT COUNT(*) n, SUM(i IS NULL) sin_ip FROM encuestas').first(); if (n.n !== 2 || n.sin_ip !== 2) mal(`encuestas en la base: ${JSON.stringify(n)}`); }
     if ((await J(() => JUEGO.estado())).idioma !== 'es') mal('después de elegir ES el juego no quedó en español');
     await pulsa('#btn-empezar');
     s = await jugar(x => ['presentacion', 'apertura'].includes(x.pantalla), 'la final después de anotarse', 6);
@@ -263,8 +264,8 @@ async function escenario(L) {
   { const todos = await eventos(), sucio = todos.filter(e => JSON.stringify(e.props).includes('@') || /\bAna\b/.test(JSON.stringify(e.props)));
     if (sucio.length) mal(`eventos con el correo o el nombre: ${JSON.stringify(sucio.slice(0, 3))}`); }
   const db = { partidas: (await partidas()).join(' '), lista: await srv.db.prepare('SELECT COUNT(*) n FROM lista').first('n'), encuestas: await srv.db.prepare('SELECT COUNT(*) n FROM encuestas').first('n') };
-  // en: la única encuesta es la mandada a mano (otro dispositivo); es: esa no existe (otro servidor) y está la suya
-  if (db.lista !== 1 || db.encuestas !== 1) mal(`en la base: ${JSON.stringify(db)}`);
+  // en: la única encuesta es la mandada a mano (otro dispositivo); es: esa y la suya
+  if (db.lista !== 1 || db.encuestas !== (tactil ? 2 : 1)) mal(`en la base: ${JSON.stringify(db)}`);
   console.log(`${tag} ${tactil ? 'arranque · muro solo con correo · Not now · tabla y fin · muro al empezar · recarga · correo · encuesta en inglés y en español, contestada · final completa por la lista' : 'arranque · muro solo con correo · API a mano negada (dos tiempos y encuesta) · correo · encuesta salteada · dos tiempos en la misma final · podio'} · base: ${JSON.stringify(db)} · ${nFoto} capturas en ${path.relative(ROOT, dir)}`);
   await ctx.close();
   await srv.cerrar();
