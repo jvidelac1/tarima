@@ -2,15 +2,16 @@
 // tools/browser.mjs: placa real si la hay (pod con NVIDIA), software si no.
 // Por software (GitHub Actions, contenedor sin placa) verifica lo mismo: lógica, toques, paneles y tutorial; no mide cuadros
 // por segundo, y un intento a velocidad real que no sale válido queda como nota.
-//  - teclado (Fácil): partida completa SIN MOUSE con el reloj inyectado: menús con Tab, flechas y Enter; el tutorial (un
-//    arranque guiado); cada levantamiento con toques cortos de Espacio, mirando solo la señal que expone JUEGO.estado().
-//    Después, con el reloj verdadero: pausa (Esc), ayuda (H), el tutorial repetido y el primer intento de la final.
+//  - teclado (Fácil, 'u': «un toque, un tramo»): partida completa SIN MOUSE con el reloj inyectado: menús con Tab, flechas y
+//    Enter; cada levantamiento con un toque corto de Espacio por señal (¡TIRA!, ¡SALTA!, ¡PÁRATE!, ¡ARRIBA!), mirando solo la
+//    señal que expone JUEGO.estado(). Sin tutorial aparte. El primer dos tiempos se juega SIN TOCAR (sale solo y vale) y el
+//    tercer arranque pide 25 kg de más (se cae, con la línea que nombra el tramo). Después, con el reloj verdadero: pausa
+//    (Esc), ayuda (H) y el primer intento de otra final.
 //  - tactil (Fácil): lo mismo en un teléfono de costado (844 × 390: en vertical solo se ve «Gira el teléfono»), con toques
-//    sobre el botón táctil (o sobre el escenario cuando un panel con botones lo esconde) y sobre los botones.
+//    sobre el escenario y sobre los botones.
 //  - clasico: metrónomo y un intento de práctica con el esquema de mantener y soltar.
-//  - lento (Fácil, con Brenner): el arranque guiado tocando ¡EMPUJÁ! cada 600 ms tiene que salir válido a la primera; en la
-//    final, 40 s con el panel del llamado abierto no gastan reloj; y después de confirmar, sin tocar, la señal cuenta los
-//    últimos segundos y el nulo por reloj lleva su línea.
+//  - lento (Fácil, con Brenner): en la final, 40 s con el panel del llamado abierto no gastan reloj (no hay reloj); y
+//    después de confirmar, sin tocar nada, el levantamiento sale solo y vale (en 'u' no hay nulo por reloj).
 //  - idioma: con ?lang=en la bienvenida sale en inglés; el selector ES · EN la pasa a español sin recargar, lo recuerda y
 //    actualiza <html lang> y <title>. Las demás corridas fijan ?lang=es y comparan con las claves de web/js/game/i18n/es.js.
 //  - Falla ante errores de consola, excepciones, 404 o pedidos externos; si no se visitan todos los estados; si un panel
@@ -29,6 +30,8 @@ import { leerDatos } from '../web/js/sim/data.js';
 import { recalcular, resumen } from '../web/js/sim/replay.js';
 import ES from '../web/js/game/i18n/es.js';
 import EN from '../web/js/game/i18n/en.js';
+/** Señales de un toque (la libre de siempre y las de 'u': ¡SALTA!, ¡PÁRATE!, ¡DA TODO!): un toque y la señal se va. */
+const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
@@ -50,7 +53,8 @@ fs.mkdirSync(OUT, { recursive: true });
 const problemas = [], notas = [];
 const browser = await chromium.launch(launchOptions({ headed: HEADED }));
 
-const ESTADOS = ['inicio', 'presentacion', 'apertura', 'llamado', 'intento', 'decision', 'repeticion', 'rival', 'intervalo', 'clasificacion', 'ceremonia', 'fin'];
+// en 'u' no hay repetición de los intentos propios (la línea dice dónde cayó; no hay un momento que mirar)
+const ESTADOS = ['inicio', 'presentacion', 'apertura', 'llamado', 'intento', 'decision', 'rival', 'intervalo', 'clasificacion', 'ceremonia', 'fin'];
 
 async function corrida(via) {
   if (via === 'idioma') return idiomas();
@@ -116,7 +120,7 @@ async function corrida(via) {
           continue;
         }
         // Fácil: un toque por señal. La prueba no mira nada más que la señal.
-        if (!g) { await av(20); continue; }
+        if (!g || o.ausente?.(llamado)) { await av(o.ausente?.(llamado) ? 100 : 20); continue; }
         if (!tactil && !clicProbado && g.tipo === 'libre' && !I.guiado) {      // un clic en el escenario no es un gesto
           clicProbado = true; await page.mouse.click(640, 260); await av(60); const d = (await J(() => JUEGO.estado())).intento;
           if (!d || d.entradas !== I.entradas || d.fase !== I.fase) mal(`un clic en el escenario cambió el intento (entradas ${I.entradas} → ${d?.entradas}, fase ${I.fase} → ${d?.fase})`);
@@ -126,7 +130,7 @@ async function corrida(via) {
           escProbado = true; await page.keyboard.press('Escape'); await av(60); if ((await J(() => JUEGO.estado())).sobre) mal('Esc abrió la pausa en medio del intento'); continue;
         }
         if (I.parado) { await av(80); await toque(); continue; }      // tutorial: el reloj está detenido esperando el toque
-        if (g.tipo === 'libre') { await av(150); await toque(); continue; }
+        if (UNTOQUE.has(g.tipo)) { await av(150); await toque(); continue; }
         if (g.tipo === 'cierre') {
           const k = g.clave + g.desde;
           if (I.seDetiene || hecho === k || (g.clave === 'explota' && o.sinExplotar?.(llamado)) || (g.clave === 'recibi' && o.sinRecibir?.(llamado))) { await av(manual ? 30 : 15); continue; }
@@ -149,7 +153,8 @@ async function corrida(via) {
             if (s.pantalla === 'llamado') {      // el panel único: a veces sube un kilo (cuenta como cambio) y elige envión
               llamado = P.firma;
               if (o.cambia && /intento 2/.test(llamado)) { if (tactil) await pulsa('#kg-mas'); else { const k0 = await page.locator('#kg-val').textContent(); await page.keyboard.press('ArrowRight'); if (+(await page.locator('#kg-val').textContent()) !== +k0 + 1) mal('la flecha derecha no sumó un kilo'); } }
-              if (o.envion && /Dos tiempos/.test(llamado)) await pulsa(`.envion[data-env="${o.envion(llamado)}"]`);
+              if (o.pesado?.(llamado)) for (let i = 0; i < 5; i++) { if (tactil) await pulsa('#kg-mas5'); else await page.keyboard.press('ArrowUp'); }
+              if (o.envion && /Dos tiempos/.test(llamado)) { await pulsa('#btn-mas'); await pulsa(`.envion[data-env="${o.envion(llamado)}"]`); }
             }
           }
           let hizo = false; for (const sel of o.botones || ['#capa .panel button.ir']) if (await pulsa(sel)) { hizo = true; break; }
@@ -198,45 +203,41 @@ async function corrida(via) {
   }
 
   if (lento) {
-    // ---- el arranque guiado no se puede fallar, ni con el pesista de menos garra y un toque cada 600 ms en ¡EMPUJÁ!
+    // ---- 'u': el panel del llamado no tiene reloj, y sin tocar nada el levantamiento sale solo y vale
     if (!await pulsa('.pesista[data-id="brenner"]')) mal('no se pudo elegir a Brenner');
-    await jugar(s => s.pantalla === 'presentacion' && s.panel, true, { empujeCada: 600 });
-    const g = await J(() => JUEGO.E.propios || []);
-    console.log(`${tag} arranque guiado con Brenner y un toque cada 600 ms en ¡EMPUJÁ!: ${g.map(x => x.res + (x.causa ? ':' + x.causa : '')).join(' ')}`);
-    if (g.length !== 1 || g[0].pantalla !== 'guiado' || g[0].res !== 'valido') mal(`el arranque guiado con toques lentos no salió válido a la primera: ${JSON.stringify(g)}`);
-    // ---- la final: el panel del llamado no gasta reloj
-    await jugar(s => s.pantalla === 'llamado' && s.panel, true, { botones: ['#btn-saltear', '#capa .panel button.ir'] });
+    await jugar(s => s.pantalla === 'llamado' && s.panel, true);
     await J(() => JUEGO.test.avanzar(450));
     const a1 = await J(() => ({ reloj: document.getElementById('reloj').textContent, txt: document.querySelector('#capa .panel').textContent }));
     await J(() => JUEGO.test.avanzar(40000, 100));
     const a2 = await J(() => ({ s: JUEGO.estado(), reloj: document.getElementById('reloj').textContent }));
     console.log(`${tag} panel del llamado: reloj ${a1.reloj}; 40 s después, ${a2.reloj} (pantalla ${a2.s.pantalla})`);
-    if (a2.s.pantalla !== 'llamado' || !a2.s.panel || a2.reloj !== a1.reloj || !/^0:(30|45)$/.test(a1.reloj)) mal(`con el panel del llamado abierto el reloj corrió o venció: ${a1.reloj} → ${a2.reloj}, pantalla ${a2.s.pantalla}`);
-    if (!/arranca cuando confirmas/.test(a1.txt) || !/ENTER/.test(a1.txt)) mal(`el panel del llamado no dice cuándo arranca el reloj: «${a1.txt.replace(/\s+/g, ' ').slice(0, 300)}»`);
-    // ---- confirmar y no tocar: cuenta regresiva en la señal y nulo por reloj con su línea
-    await page.keyboard.press('Enter'); let aviso = '', ultimo = null;
-    for (let i = 0; i < 100 && !ultimo; i++) {
+    if (a2.s.pantalla !== 'llamado' || !a2.s.panel || a2.reloj !== a1.reloj) mal(`con el panel del llamado abierto el reloj corrió o venció: ${a1.reloj} → ${a2.reloj}, pantalla ${a2.s.pantalla}`);
+    if (!/Sin reloj/.test(a1.txt) || !/ESPACIO: levantar \d+ kg/.test(a1.txt) || !/Llegas con/.test(a1.txt)) mal(`el panel del llamado no dice «Sin reloj», «ESPACIO: levantar N kg» y «Llegas con»: «${a1.txt.replace(/\s+/g, ' ').slice(0, 300)}»`);
+    // ---- confirmar con Espacio (el foco está en «levantar») y no tocar nada más
+    await page.keyboard.press('Space'); let quedan = '', ultimo = null, x0 = null;
+    for (let i = 0; i < 120 && !ultimo; i++) {
       await J(() => JUEGO.test.avanzar(500));
-      const x = await J(() => ({ senal: document.getElementById('senal').hidden ? '' : document.getElementById('senal').textContent.replace(/\s+/g, ' '), reloj: document.getElementById('reloj').textContent, propios: JUEGO.E.propios || [], err: JUEGO.estado().errores }));
+      const x = await J(() => ({ senal: document.getElementById('senal').hidden ? '' : document.getElementById('senal').textContent.replace(/\s+/g, ' '), propios: JUEGO.E.propios || [], err: JUEGO.estado().errores, I: JUEGO.estado().intento }));
       if (x.err.length) throw new Error('error en el juego: ' + x.err[0]);
-      if (!aviso && /Quedan \d+ s/.test(x.senal)) aviso = `${x.senal.trim()} (reloj ${x.reloj})`;
-      if (x.propios.length > 1) ultimo = x.propios[x.propios.length - 1];
+      if (!x0 && x.I) x0 = x.I;
+      if (!quedan && /Quedan \d+ s/.test(x.senal)) quedan = x.senal;
+      if (x.propios.length) ultimo = x.propios[x.propios.length - 1];
     }
-    console.log(`${tag} sin tocar después de confirmar: aviso «${aviso}» · ${ultimo ? `${ultimo.res}:${ultimo.causa} · «${ultimo.linea}»` : 'no terminó'}`);
-    if (!aviso) mal('la señal no avisó que se acababa el reloj');
-    if (!ultimo || ultimo.res !== 'nulo' || ultimo.causa !== 'reloj' || !/desde que confirmas/.test(ultimo.linea)) mal(`el nulo por reloj no salió con su línea: ${JSON.stringify(ultimo)}`);
-    await foto('reloj'); await cerrar(); return;
+    console.log(`${tag} sin tocar después de confirmar: ${ultimo ? `${ultimo.res}${ultimo.causa ? ':' + ultimo.causa : ''} · ¡TIRA! sola ${ultimo.uno?.tira_sola} · margen ${ultimo.uno?.margen_fin}` : 'no terminó'}`);
+    if (!x0) mal('Espacio en el panel no empezó el levantamiento');
+    if (quedan) mal(`en 'u' no hay cuenta regresiva: «${quedan}»`);
+    if (!ultimo || ultimo.res !== 'valido' || !ultimo.uno?.tira_sola) mal(`sin tocar, el levantamiento no salió solo y válido: ${JSON.stringify(ultimo)}`);
+    await foto('solo'); await cerrar(); return;
   }
 
   // ---- 1. Fácil: partida completa con el reloj inyectado, sin mouse
   const t0 = Date.now();
   if (!await pulsa(`.pesista[data-id="${tactil ? 'brenner' : 'ventura'}"]`) || !await pulsa('#btn-opciones') || !await pulsa('.nivel[data-n="normal"]')) mal('no se pudo elegir pesista y nivel (en «Opciones»)');
-  if (tactil) await pulsa('#btn-otro');      // táctil: saltea el tutorial (lo juega después, con el reloj verdadero)
   const envion = tactil ? () => 'split' : clave => (/intento 1/.test(clave) ? 'split' : /intento 2/.test(clave) ? 'squat' : 'power');
-  // con teclado, en el tercer arranque no se toca la explosión a propósito: tiene que ser un fallo, con su corte y su línea;
-  // y en el tercer dos tiempos no se toca el ¡ATRÁPALA! de la cargada: un fallo con explosión, que tiene repetición
-  const sinExplotar = tactil ? null : clave => /Arranque · intento 3/.test(clave), sinRecibir = tactil ? null : clave => /Dos tiempos · intento 3/.test(clave);
-  const fin = await jugar(s => s.pantalla === 'fin', true, { cambia: true, envion, sinExplotar, sinRecibir });
+  // en 'u' un fallo no sale de tocar mal: sale de pedir mucho. El tercer arranque pide 25 kg de más (se cae, con su línea),
+  // y el primer dos tiempos se juega sin tocar nada (sale solo y vale: no tocar nunca tira la barra)
+  const pesado = clave => /Arranque · intento 3/.test(clave), ausente = clave => /Dos tiempos · intento 1/.test(clave);
+  const fin = await jugar(s => s.pantalla === 'fin', true, { cambia: true, envion, pesado, ausente });
   const r = await J(() => ({ registro: JUEGO.registro, tabla: JUEGO.E.p.tabla().map(f => `${f.id}:${f.s}+${f.c}=${f.total}#${f.puesto ?? '-'}`).join(' '), monitor: JUEGO.E.monitor, visitados: JUEGO.E.visitados, cal: JUEGO.E.cfg.cal, propios: JUEGO.E.propios || [],
     modelos: Object.keys(JUEGO.escena.atletas).sort().join(','), mios: JUEGO.E.p.at[JUEGO.E.yo].s.concat(JUEGO.E.p.at[JUEGO.E.yo].c).map(x => `${x.kg}${x.res === 'valido' ? '✓' : '✗' + (x.causa || '')}`).join(' ') }));
   const seg = (Date.now() - t0) / 1000;
@@ -244,14 +245,11 @@ async function corrida(via) {
   console.log(`${tag} intentos del jugador: ${r.mios} · controles ${r.registro.ctl} · corrección de atraso ${r.cal} ms · llamados ${r.registro.llamados.length}`);
   console.log(`${tag} señales vistas: ${[...vistas].join(' ')} · paneles con foco verificado: ${[...paneles].join(', ')}`);
   if (seg > 90) notas.push(`${tag} la partida tardó ${seg.toFixed(0)} s`);
-  if (r.registro.ctl !== 'f') mal(`el registro no quedó en Fácil (ctl ${r.registro.ctl})`);
+  if (r.registro.ctl !== 'u') mal(`el registro no quedó en Fácil, «un toque, un tramo» (ctl ${r.registro.ctl})`);
   if (tactil && !r.visitados.includes('rival')) mal('final completa: no se mostró ningún intento de un rival');
   // la repetición es solo de los fallos: con el dedo los seis salen válidos y no tiene que haber ninguna
-  for (const e of ESTADOS.concat(tactil ? [] : ['tarjeta', 'tutorial', 'guiado']).filter(e => !(tactil && e === 'repeticion'))) if (!r.visitados.includes(e)) mal(`no se visitó el estado «${e}»`);
-  { const fl = r.propios.filter(x => x.pantalla !== 'guiado'), conRep = fl.filter(x => x.rep);
-    if (conRep.some(x => x.res === 'valido')) mal(`un levantamiento válido tuvo repetición: ${JSON.stringify(conRep)}`);
-    if (!tactil && !fl.some(x => x.rep && x.res !== 'valido')) mal(`el dos tiempos sin ¡ATRÁPALA! no tuvo repetición: ${JSON.stringify(fl)}`);
-    console.log(`${tag} repeticiones: ${conRep.map(x => `${x.res}:${x.causa}`).join(' ') || 'ninguna'} (solo los fallos con explosión)`); }
+  for (const e of ESTADOS) if (!r.visitados.includes(e)) mal(`no se visitó el estado «${e}»`);
+  for (const e of ['tarjeta', 'tutorial', 'guiado', 'repeticion']) if (r.visitados.includes(e)) mal(`en 'u' no tiene que aparecer «${e}» (sin tutorial aparte ni repetición propia)`);
   const rc = recalcular(r.registro, datos);
   if (!rc.ok) mal(`el registro exportado no recalcula: ${rc.error}`); else if (resumen(rc.tabla) !== r.tabla) mal(`recalculado «${resumen(rc.tabla)}», en pantalla «${r.tabla}»`);
   if (r.modelos !== 'brenner,ventura') mal(`modelos en memoria: ${r.modelos}`);
@@ -259,17 +257,15 @@ async function corrida(via) {
   if (r.monitor.barraMin < .2249) mal(`la barra quedó bajo la tarima: centro a ${(r.monitor.barraMin * 1000).toFixed(1)} mm`);
   if (r.monitor.manosMax > .16) mal(`la barra se separó de las manos: ${(r.monitor.manosMax * 1000).toFixed(0)} mm`);
   console.log(`${tag} barra: mínimo ${(r.monitor.barraMin * 1000).toFixed(1)} mm · manos a barra, máximo ${(r.monitor.manosMax * 1000).toFixed(0)} mm · ${r.monitor.cuadros} cuadros medidos · altura máxima por pantalla: ${Object.entries(r.monitor.alto).map(([k, v]) => `${k} ${v.toFixed(2)} m`).join(', ')}`);
-  for (const v of ['tira', 'explota', 'recibi', 'empuja', 'aguanta', 'abajo', 'flexiona', 'arriba'].map(k => ES['senal.' + k])) if (!vistas.has(v)) mal(`no apareció la señal «${v}»`);
-  // el que toca cada señal en su momento tiene que levantar todo (salvo los dos fallos a propósito)
-  const esperado = tactil ? 6 : 4, validos = (r.mios.match(/✓/g) || []).length;
-  if (validos < esperado) mal(`tocando cada señal en su momento salieron ${validos} válidos de ${esperado}: ${r.mios}`);
+  for (const v of ['tira', 'salta', 'parate', 'aguanta', 'abajo', 'arriba'].map(k => ES['senal.' + k])) if (!vistas.has(v)) mal(`no apareció la señal «${v}»`);
+  for (const v of ['explota', 'recibi', 'empuja', 'flexiona'].map(k => ES['senal.' + k])) if (vistas.has(v)) mal(`en 'u' apareció la señal de círculos «${v}»`);
+  // los que se pidieron con kilos razonables valen todos (también el dos tiempos sin tocar); el de 25 kg de más se cae
+  const validos = (r.mios.match(/✓/g) || []).length, f = r.propios.find(x => x.res === 'fallo'), aus = r.propios.find(x => x.uno && x.uno.tira_sola);
+  if (validos < 5) mal(`con kilos razonables tienen que valer todos: ${validos} válidos de 6 (${r.mios})`);
+  if (!f || !/^Se cayó en /.test(f.linea) || /ms\b|tarde|temprano/i.test(f.linea)) mal(`el arranque con 25 kg de más no cayó con una línea que nombre el tramo: ${r.mios} · ${JSON.stringify(f)}`); else console.log(`${tag} línea del fallo por kilos: «${f.linea}»`);
+  if (!aus || aus.res !== 'valido' || !aus.uno.arriba_sola) mal(`el dos tiempos sin tocar no salió solo y válido: ${JSON.stringify(aus)}`); else console.log(`${tag} dos tiempos sin tocar: ${aus.res} · margen ${aus.uno.margen_fin} (salto ${aus.uno.salto}, pisotón ${aus.uno.pisoton})`);
   if (!tactil) {
     if (!clicProbado) mal('no se llegó a probar el clic en el escenario');
-    const tut = r.propios.filter(x => x.pantalla === 'guiado' || x.pantalla === 'practica');
-    if (tut.length !== 1 || tut[0].pantalla !== 'guiado' || tut[0].res !== 'valido') mal(`tutorial: se esperaba un solo levantamiento (el guiado), válido: ${JSON.stringify(tut)}`);
-    if (!(r.monitor.alto.guiado > 1.5)) mal(`en el tutorial la barra no subió: ${JSON.stringify(r.monitor.alto)}`);
-    const f = r.propios.find(x => x.res === 'fallo');
-    if (!/✗sin_altura/.test(r.mios) || !f || !/No tocaste ¡EXPLOTA!/.test(f.linea)) mal(`el arranque sin explosión no dio «sin altura» con su línea: ${r.mios} · ${JSON.stringify(f)}`); else console.log(`${tag} línea del fallo a propósito: «${f.linea}»`);
     if (!r.registro.llamados.some(c => c.cambios?.length)) notas.push(`${tag} la partida no tuvo ningún cambio de kilos`);
   }
   // el nombre del jugador en la tabla y en el podio (con teclado, el que escribió; con el dedo, el de siempre), y los eventos del embudo
@@ -277,46 +273,34 @@ async function corrida(via) {
     const x = await J(() => ({ titulo: document.querySelector('#capa .panel h1')?.textContent || '', fila: document.querySelector('#capa .tabla tr.yo td.n')?.textContent || '', botones: [...document.querySelectorAll('#capa .panel button')].map(b => b.id), eventos: (JUEGO.eventos || []).map(e => e.ev) }));
     if (!x.titulo.includes(quien) || !x.fila.includes(quien)) mal(`el podio o la tabla no llevan el nombre «${quien}»: «${x.titulo}» · «${x.fila}»`);
     for (const b of ['btn-revancha', 'btn-cambiar', 'btn-compartir']) if (!x.botones.includes(b)) mal(`el podio no tiene #${b}: ${x.botones.join(', ')}`);
-    for (const e of ['juego_abierto', 'nombre_puesto', 'pesista_elegido', 'partida_pedida', 'final_inicio', 'intento_propio', 'final_fin'].concat(tactil ? [] : ['opciones_abiertas', 'tutorial_inicio', 'tutorial_fin'])) if (!x.eventos.includes(e)) mal(`falta el evento «${e}» (hubo: ${[...new Set(x.eventos)].join(', ')})`);
+    for (const e of ['juego_abierto', 'nombre_puesto', 'pesista_elegido', 'partida_pedida', 'final_inicio', 'intento_propio', 'final_fin'].concat(tactil ? [] : ['opciones_abiertas'])) if (!x.eventos.includes(e)) mal(`falta el evento «${e}» (hubo: ${[...new Set(x.eventos)].join(', ')})`);
     console.log(`${tag} podio: «${x.titulo}» · eventos: ${x.eventos.length} (${[...new Set(x.eventos)].join(', ')})`); }
   await foto('fin');
 
-  // ---- 2. con el reloj verdadero: pausa, ayuda, tutorial guiado y una práctica a velocidad real
+  // ---- 2. con el reloj verdadero: pausa, ayuda y el primer intento de otra final a velocidad real
   await J(() => JUEGO.test.real()); await page.waitForTimeout(700);
   await pulsa('#btn-cambiar'); await page.waitForFunction(() => JUEGO.estado().pantalla === 'inicio'); await page.waitForTimeout(500);
-  // la pausa: con Esc desde el inicio; con el dedo, en el veredicto del tutorial (el botón no se muestra sobre un panel grande ni dentro del intento)
   await J(() => { JUEGO.E.visitados.length = 0; JUEGO.E.propios = []; }); const tr0 = Date.now();
-  if (tactil) { await pulsa('#btn-otro'); await jugar(s => s.pantalla === 'decision', false); await page.waitForTimeout(300); await page.locator('#pausa').tap(); } else await page.keyboard.press('Escape');
-  const p1 = await J(() => ({ sobre: JUEGO.estado().sobre, t: JUEGO.reloj.ahora(), foco: document.activeElement?.id })); await page.waitForTimeout(300);
-  const p2 = await J(() => JUEGO.reloj.ahora());
-  if (p1.sobre !== 'pausa' || p1.foco !== 'so-seguir') mal(`la pausa no abrió con foco en «Seguir»: ${JSON.stringify(p1)}`); else if (p2 !== p1.t) mal(`el reloj siguió corriendo en pausa (${(p2 - p1.t).toFixed(0)} ms)`);
-  if (tactil) await page.locator('#so-seguir').tap(); else await page.keyboard.press('Enter');
-  await page.waitForTimeout(250);
-  const p3 = await J(() => ({ sobre: JUEGO.estado().sobre, t: JUEGO.reloj.ahora(), foco: JUEGO.estado().foco }));
-  if (p3.sobre || !(p3.t > p2 + 100) || (!tactil && !p3.foco)) mal(`al volver de la pausa: ${JSON.stringify(p3)} (antes ${p2.toFixed(0)})`);
   if (!tactil) {
+    await page.keyboard.press('Escape');
+    const p1 = await J(() => ({ sobre: JUEGO.estado().sobre, t: JUEGO.reloj.ahora(), foco: document.activeElement?.id })); await page.waitForTimeout(300);
+    const p2 = await J(() => JUEGO.reloj.ahora());
+    if (p1.sobre !== 'pausa' || p1.foco !== 'so-seguir') mal(`la pausa no abrió con foco en «Seguir»: ${JSON.stringify(p1)}`); else if (p2 !== p1.t) mal(`el reloj siguió corriendo en pausa (${(p2 - p1.t).toFixed(0)} ms)`);
+    await page.keyboard.press('Enter'); await page.waitForTimeout(250);
+    const p3 = await J(() => ({ sobre: JUEGO.estado().sobre, t: JUEGO.reloj.ahora(), foco: JUEGO.estado().foco }));
+    if (p3.sobre || !(p3.t > p2 + 100) || !p3.foco) mal(`al volver de la pausa: ${JSON.stringify(p3)} (antes ${p2.toFixed(0)})`);
     await page.keyboard.press('h'); const a1 = await J(() => ({ sobre: JUEGO.estado().sobre, txt: document.getElementById('sobre').textContent })); await foto('ayuda');
     const glosario = await J(() => document.querySelectorAll('#sobre .glosario dt').length);
     if (glosario !== 7) mal(`el glosario de «Cómo se juega» tiene ${glosario} palabras (son 7)`);
-    if (a1.sobre !== 'ayuda' || !/Cómo se juega/.test(a1.txt) || !/ESPACIO/.test(a1.txt)) mal(`H no abrió «Cómo se juega»: ${JSON.stringify(a1).slice(0, 200)}`);
+    if (a1.sobre !== 'ayuda' || !/Cómo se juega/.test(a1.txt) || !/ESPACIO/.test(a1.txt) || !/¡SALTA!/.test(a1.txt) || /círculo/.test(a1.txt)) mal(`H no abrió «Cómo se juega» de 'u': ${JSON.stringify(a1).slice(0, 300)}`);
     await page.keyboard.press('h'); if (await J(() => JUEGO.estado().sobre)) mal('H no cerró la ayuda');
+    if (await page.locator('#btn-otro').count()) mal('en \'u\' el inicio no tiene que ofrecer práctica aparte');
   }
-  if (!tactil) {
-    const otro = await page.locator('#btn-otro').textContent();
-    if (otro.trim() !== ES['opciones.repetir_practica']) mal(`después del tutorial el inicio no ofrece repetirlo (dice «${otro}»)`);
-    await pulsa('#btn-otro'); await page.waitForFunction(() => JUEGO.estado().pantalla === 'guiado'); await page.waitForTimeout(300);
-    if (!await page.locator('#saltar').isVisible()) mal('durante el tutorial no se ve el botón «Saltear tutorial»');
-  }
-  await jugar(s => s.pantalla === 'presentacion' && s.panel, false);      // el arranque guiado, en cámara lenta
-  const tTut = (Date.now() - tr0) / 1000; await foto('presentacion');
-  await jugar(s => (s.visitados.includes('llamado') || s.visitados.includes('intento')) && s.pantalla === 'decision' && s.visitados.includes('intento'), false);      // el primer intento propio de la final, a velocidad real
-  await page.waitForFunction(() => (JUEGO.E.propios || []).length >= 2, null, { timeout: 20000 }).catch(() => null); await foto('real');
+  await jugar(s => s.visitados.includes('intento') && s.pantalla === 'decision', false);      // el primer intento propio de la final, a velocidad real
+  await page.waitForFunction(() => (JUEGO.E.propios || []).length >= 1, null, { timeout: 20000 }).catch(() => null); await foto('real');
   const real = await J(() => ({ propios: JUEGO.E.propios, v: JUEGO.E.visitados.slice() }));
-  console.log(`${tag} tutorial en tiempo real: ${tTut.toFixed(1)} s hasta la presentación · con el primer intento de la final: ${((Date.now() - tr0) / 1000).toFixed(1)} s · ${real.propios.map(x => `${x.pantalla} ${x.res}${x.causa ? ':' + x.causa : ''}`).join(' · ')}`);
-  if (real.propios.length < 2 || real.propios[0].pantalla !== 'guiado' || real.propios[0].res !== 'valido') mal(`el arranque guiado en tiempo real no salió válido: ${JSON.stringify(real.propios[0])}`);
-  if (real.propios.filter(x => x.pantalla === 'guiado' || x.pantalla === 'practica').length !== 1) mal(`el tutorial tiene que ser un solo levantamiento: ${JSON.stringify(real.propios)}`);
-  if (tTut > 60) mal(`el tutorial tardó ${tTut.toFixed(0)} s en tiempo real; tiene que durar menos de un minuto`);
-  if (real.propios[1]?.res !== 'valido') (isSoftware(gl) ? notas : problemas).push(`${tag} el primer intento de la final a velocidad real no salió válido: ${JSON.stringify(real.propios[1])}`);
+  console.log(`${tag} primer intento de otra final en tiempo real: ${((Date.now() - tr0) / 1000).toFixed(1)} s · ${real.propios.map(x => `${x.pantalla} ${x.res}${x.causa ? ':' + x.causa : ''}`).join(' · ')}`);
+  if (real.propios[0]?.res !== 'valido') (isSoftware(gl) ? notas : problemas).push(`${tag} el primer intento de la final a velocidad real no salió válido: ${JSON.stringify(real.propios[0])}`);
   if (!tactil && !escProbado) mal('no se llegó a probar Esc dentro del intento');
   void fin;
   await cerrar();
@@ -365,4 +349,4 @@ try {
 await browser.close(); server.close();
 for (const n of notas) console.log('nota: ' + n);
 if (problemas.length) { console.log(`\nFALLÓ (${problemas.length}):`); for (const p of problemas.slice(0, 30)) console.log('  ' + p); process.exit(1); }
-console.log('\nOK: partida completa en Fácil por teclado (sin mouse) y por toques, un intento en Clásico, y tutorial guiado (uno solo) con toques lentos y reloj del llamado, sin errores de consola ni pedidos externos');
+console.log('\nOK: partida completa en Fácil (\'u\') por teclado (sin mouse) y por toques, un intento en Clásico, y un levantamiento que sale solo sin tocar, sin errores de consola ni pedidos externos');

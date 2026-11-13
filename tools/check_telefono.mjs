@@ -20,6 +20,8 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { launchOptions } from './browser.mjs';
 import { sinApi } from './sin_api.mjs';
+/** Señales de un toque (la libre de siempre y las de 'u': ¡SALTA!, ¡PÁRATE!, ¡DA TODO!): un toque y la señal se va. */
+const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
@@ -177,7 +179,7 @@ async function correr(C) {
   }
 
   // ---------- la partida ----------
-  const vistas = new Set(), pantallas = new Set(); let firma = '', dedosProbados = false, campoSolo = false, nIntentos = 0, ultToque = 0, hecho = '', revisadas = 0;
+  const vistas = new Set(), pantallas = new Set(); let firma = '', dedosProbados = false, bordesProbados = false, campoSolo = false, nIntentos = 0, ultToque = 0, hecho = '', revisadas = 0;
   const hasta = s => s.pantalla === 'fin' || (C.hastaIntentos && nIntentos >= C.hastaIntentos);
   for (let n = 0; n < 60000; n++) {
     const s = await J(() => JUEGO.estado());
@@ -196,14 +198,21 @@ async function correr(C) {
     if (I && I.propio && s.modo !== 'panel') {
       const g = I.senal; if (!g) { await av(20); continue; }
       vistas.add(g.verbo);
-      if (C.dedos && !dedosProbados && g.tipo === 'empuja') {      // dos dedos a la vez: dos toques
+      if (C.dedos && !dedosProbados && g.tipo === 'luz') {      // dos dedos a la vez en ¡SALTA!: dos toques anotados, un solo contacto («doble»)
         dedosProbados = true; const t0 = await J(() => JUEGO.toques.total), p = await punto();
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.x, y: p.y, id: 1 }, { x: p.x - 30, y: p.y - 20, id: 2 }] }); await av(30);
-        const t1 = await J(() => JUEGO.toques.total); await sube(); await av(30);
-        if (t1 - t0 !== 2) mal(`dos dedos a la vez contaron ${t1 - t0} toques (se esperaban 2)`); else console.log(`${tag} dos dedos a la vez: 2 toques`);
+        const t1 = await J(() => ({ total: JUEGO.toques.total, motivos: JUEGO.toques.ultimos.slice(-2).map(x => x.motivo) })); await sube(); await av(30);
+        if (t1.total - t0 !== 2 || !t1.motivos.includes('doble')) mal(`dos dedos a la vez: ${t1.total - t0} toques anotados, motivos ${t1.motivos.join(', ')} (se esperaban 2 anotados y uno «doble»)`); else console.log(`${tag} dos dedos a la vez: 2 toques anotados, un solo contacto (${t1.motivos.join(', ')})`);
         ultToque = s.ahora; continue;
       }
-      if (C.campos && !campoSolo && I.parado) {      // un campo sin panel abierto: solo input.js decide (main.js no toca teclas sin panel)
+      if (C.partida && !bordesProbados && g.clave === 'tira') {      // un toque en el borde (gesto del sistema) no es un contacto
+        bordesProbados = true; const t0 = await J(() => ({ total: JUEGO.toques.total, ent: JUEGO.estado().intento?.entradas })), H = (await page.viewportSize()).height;
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 6, y: Math.round(H / 2), id: 1 }] }); await av(30); await sube(); await av(30);
+        const t1 = await J(() => ({ total: JUEGO.toques.total, ent: JUEGO.estado().intento?.entradas, fase: JUEGO.estado().intento?.fase }));
+        if (t1.total !== t0.total || t1.ent !== t0.ent || t1.fase !== 'tension') mal(`un toque en el borde de la pantalla contó: ${JSON.stringify({ antes: t0, despues: t1 })}`); else console.log(`${tag} un toque en el borde no cuenta`);
+        continue;
+      }
+      if (C.campos && !campoSolo && g.clave === 'tira') {      // un campo sin panel abierto: solo input.js decide (main.js no toca teclas sin panel)
         campoSolo = true; const t0 = await J(() => JUEGO.toques.total);
         await J(() => { const i = document.createElement('input'); i.id = 'prueba-campo2'; i.type = 'text'; i.style.cssText = 'position:fixed;left:30%;top:40%;z-index:20;width:40%'; document.body.append(i); });
         await page.locator('#prueba-campo2').tap(); await page.keyboard.type('a b@c.de '); await page.keyboard.press('Enter');
@@ -214,7 +223,7 @@ async function correr(C) {
         continue;
       }
       if (I.parado) { await av(80); await toque(); continue; }
-      if (g.tipo === 'libre') { await av(150); await toque(); continue; }
+      if (UNTOQUE.has(g.tipo)) { await av(150); await toque(); continue; }
       if (g.tipo === 'cierre') { const k = g.clave + g.desde; if (I.seDetiene || hecho === k) { await av(30); continue; } await ir(g.objetivo); await toque(); hecho = k; continue; }
       if (g.tipo === 'empuja') { if (s.ahora - ultToque >= 150) { await toque(); ultToque = s.ahora; } else await av(16); continue; }
       await av(30); continue;
@@ -232,6 +241,7 @@ async function correr(C) {
   if (!enBoton) mal('ningún toque cayó sobre el botón táctil');
   if (C.partida && (fin.propios.filter(x => / valido/.test(x)).length < 3)) mal(`tocando cada señal en su momento salieron pocos válidos: ${fin.propios.join(' · ')}`);
   if (C.dedos && !dedosProbados) mal('no se llegó a probar dos dedos a la vez');
+  if (C.partida && !bordesProbados) mal('no se llegó a probar un toque en el borde');
   if (C.campos && !campoSolo) mal('no se llegó a probar un campo sin panel');
   // la última pantalla (el podio con sus botones) también se revisa
   if (fin.s.pantalla === 'fin') { await av(3000); await revisar('fin (podio con botones)'); }

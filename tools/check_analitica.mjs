@@ -25,6 +25,8 @@ import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { launchOptions } from './browser.mjs';
+/** Señales de un toque (la libre de siempre y las de 'u': ¡SALTA!, ¡PÁRATE!, ¡DA TODO!): un toque y la señal se va. */
+const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
@@ -418,7 +420,7 @@ async function interactuarJuego(page) {
     if (I && I.propio && s.modo !== 'panel') {
       const g = I.senal;
       if (!g) { await dormir(8); continue; }
-      if (g.tipo === 'libre') { await dormir(200); await espacio(); continue; }
+      if (UNTOQUE.has(g.tipo)) { await dormir(200); await espacio(); continue; }
       if (g.tipo === 'cierre') { const kk = g.clave + g.desde; if (I.seDetiene || hecho === kk) { await dormir(8); continue; } const falta = g.objetivo - s.ahora - 25; if (falta > 0) await dormir(Math.min(falta, 2000)); await espacio(); hecho = kk; continue; }
       if (g.tipo === 'empuja') { for (let i = 0; i < 6; i++) { await espacio(); await dormir(40); } continue; }
       await dormir(10); continue;

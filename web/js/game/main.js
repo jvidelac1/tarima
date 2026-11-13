@@ -378,7 +378,7 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
   return new Promise(resolver => {
     const P = escena.P, ent = gestos ? gestos.ent : [], propio = !gestos, grab = [], mk = marcas(P, lev, env), ctl = propio ? ctx.ctl || 'c' : 'c', facil = propio && ctl === 'f', uno = propio && ctl === 'u', T = tactil();
     // 'u': ayudas de primera vez (una vez cada una en este dispositivo) y la presentación en una línea en el primer intento (G2.8)
-    const AY = {}, presenta = uno && !guardado.get('tarima.visto.u_presenta') ? { hasta: Infinity } : null; if (presenta) primeraVez('u_presenta');
+    const AY = {}, presenta = uno && !guardado.get('tarima.visto.u_presenta') ? { hasta: Infinity } : null; if (presenta) { primeraVez('u_presenta'); primeraVez('u_tira'); }      // la presentación ya dice cómo se tira
     let diaHasta = -1;
     let conf = gestos ? gestos.conf : conf0, pal = null, palT = 0, fin = false, chic = false, camFija = false, sAhora = null, parado = false, ultTecla = -1e9, tRes = null;
     // Un toque de ¡TIRA! que llega antes de tiempo (con PREPÁRATE en pantalla) no se pierde: queda guardado y levanta

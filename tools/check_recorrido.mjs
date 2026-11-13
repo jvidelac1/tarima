@@ -1,10 +1,11 @@
 // Recorrido de un jugador nuevo (revisión de experiencia), con navegador (corre en GitHub Actions, dibujo por software).
-// Juega por teclado una final exprés en Fácil, con tutorial, a 1745×845 (la ventana del Mac del dueño), con el reloj del
+// Juega por teclado una final exprés en Fácil ('u', sin tutorial aparte), a 1745×845 (la ventana del Mac del dueño), con el reloj del
 // juego inyectado. A diferencia de check_game, NO toca entre levantamientos: deja correr veredicto, repetición, avisos,
 // resúmenes de rivales y cambio de carga hasta que aparece el próximo panel que pide algo. Así mide, en segundos del reloj
 // del juego, cuánto pasa sin que el jugador haga nada entre un levantamiento propio y el siguiente, y en qué se va.
 // Además:
-//  - algunos levantamientos se pierden a propósito (no toca ¡RECIBÍ! o ¡EXPLOTÁ!), para ver la barra que cae y la línea;
+//  - el tercer arranque pide 25 kg de más y se cae (en 'u' un fallo sale de los kilos, no de tocar mal), para ver la
+//    barra que cae y la línea;
 //  - en uno de ellos, después del final sigue machacando Espacio cada 120 ms (lo que hace un jugador que venía empujando):
 //    anota si el veredicto con el motivo llegó a verse antes de que el machaque lo saltee;
 //  - por cada señal con círculo anota cuánto antes del cierre aparece, y cuándo abre la ventana;
@@ -12,7 +13,9 @@
 // Criterios (falla si no se cumplen, además de errores de consola o si el recorrido no avanza):
 //  - cuando entre un levantamiento propio y el próximo panel no hay nada de los rivales (el jugador se sigue a sí mismo),
 //    la espera sin tocar es de menos de 6 s;
-//  - machacando Espacio después del fallo, el veredicto con el motivo se ve, y al menos 1 s.
+//  - machacando Espacio después del fallo, el veredicto con el motivo se ve, y al menos 1 s;
+//  - ritmo (G2.7 y meta J de docs/JUEGO.md): ninguna espera sin tocar pasa de 20 s (con rivales en el medio), y la final,
+//    desde el primer panel del llamado hasta el podio, dura 150 s o menos de reloj de juego. Capturas de la pantalla 'rival'.
 // No mide cuadros por segundo.
 // Uso: node tools/check_recorrido.mjs [--headed] [--semilla=N] [--sin-fotos] [--lang=en] (en inglés, capturas en out/recorrido_en)
 import http from 'node:http';
@@ -22,6 +25,8 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { launchOptions } from './browser.mjs';
 import { sinApi } from './sin_api.mjs';
+/** Señales de un toque (la libre de siempre y las de 'u': ¡SALTA!, ¡PÁRATE!, ¡DA TODO!): un toque y la señal se va. */
+const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
@@ -69,23 +74,22 @@ const leerUI = () => J(() => {
 //   arranque 2: no toca ¡RECIBÍ! · arranque 3: no toca ¡EXPLOTÁ! y después del final machaca Espacio
 //   dos tiempos 2: no toca el ¡RECIBÍ! del envión (la barra arriba)
 const PLAN = [
-  { re: /(Arranque · intento|Snatch · attempt) 2/, omite: c => c === 'recibi', nombre: 'arranque 2 sin ¡RECIBÍ!' },
-  { re: /(Arranque · intento|Snatch · attempt) 3/, omite: c => c === 'explota', machaca: true, nombre: 'arranque 3 sin ¡EXPLOTÁ!, machacando después' },
-  { re: /(Dos tiempos · intento|Clean & jerk · attempt) 2/, omite: c => c === 'recibi2', nombre: 'dos tiempos 2 sin el ¡RECIBÍ! del envión' },
+  { re: /(Arranque · intento|Snatch · attempt) 3/, omite: () => false, pesado: true, machaca: true, nombre: 'arranque 3 con 25 kg de más, machacando después' },
 ];
 
 // ---- capturas por pantalla: segundos (reloj del juego) desde que se entra a cada una
-const FOTOS_EN = { decision: [.5, 1.25, 2, 3.5], repeticion: [.6, 3], carga: [.25, .7, 1.4], resumen: [.3, 1.6], desplazado: [.3] };
+const FOTOS_EN = { decision: [.5, 1.25, 2, 3.5], repeticion: [.6, 3], carga: [.25, .7, 1.4], resumen: [.3, 1.6], desplazado: [.3], rival: [.4, 1.5] };
 const seg = [];              // pantallas en orden: {p, t0, t1}
 let actual = null, plan = null, llamadoTxt = '', nLev = 0, enIntento = false, tFin = null, tConfirma = null, fotosPend = [];
 const tramos = [];           // por levantamiento propio: espera hasta el próximo panel, y en qué
 const senales = [];          // por señal con círculo: anticipación y apertura
 const machaque = [], preps = [];          // preps: de Confirmar en el llamado a que aparece ¡TIRÁ!
-let senalPrev = '', senalesFoto = 0;
+let senalPrev = '', senalesFoto = 0, tLlamado0 = null, tPodio = null;
 
 for (let n = 0; n < 60000; n++) {
   const s = await J(() => JUEGO.estado());
   if (s.errores.length) { problemas.push('error en el juego: ' + s.errores[0]); break; }
+  if (s.pantalla === 'clasificacion' && tPodio === null) tPodio = s.ahora;
   if (s.pantalla === 'fin' && s.panel) { await foto('fin'); break; }
   // cambio de pantalla
   if (s.pantalla !== actual) {
@@ -107,7 +111,7 @@ for (let n = 0; n < 60000; n++) {
     }
     if (!g) { await av(20); continue; }
     if (I.parado) { await av(80); await toque(); continue; }
-    if (g.tipo === 'libre') { await av(150); await toque(); continue; }
+    if (UNTOQUE.has(g.tipo)) { await av(150); await toque(); continue; }
     if (g.tipo === 'cierre') {
       if (I.seDetiene || (plan && plan.omite(g.clave))) { await av(20); continue; }
       if (senalesFoto < 20 && nLev <= 2 && g.objetivo - s.ahora > 250) { await ir(g.objetivo - 200); senalesFoto++; await foto(`senal_${nLev}_${g.clave}_200ms_antes`); }
@@ -142,7 +146,11 @@ for (let n = 0; n < 60000; n++) {
     const P = await J(() => { const pn = document.querySelector('#capa .panel'); return pn ? { titulo: (pn.querySelector('h1,h2')?.textContent || '').trim(), botones: pn.querySelectorAll('button:not(:disabled)').length } : null; });
     if (P && P.botones) {
       if (tFin !== null) { const T = tramos.at(-1); T.espera = Math.round(s.ahora - tFin); T.hasta = `${s.pantalla}: ${P.titulo}`; const entre = seg.slice(T.desde, -1); T.pantallas = entre.map(x => `${x.p} ${((x.t1 - x.t0) / 1000).toFixed(1)}`).join(' · '); T.lista = entre.map(x => x.p); tFin = null; }
-      if (s.pantalla === 'llamado') { llamadoTxt = P.titulo; plan = PLAN.find(x => x.re.test(P.titulo)) || null; await foto(`llamado_${slug(P.titulo)}`); }
+      if (s.pantalla === 'llamado' && llamadoTxt !== P.titulo) {
+        llamadoTxt = P.titulo; plan = PLAN.find(x => x.re.test(P.titulo)) || null; if (tLlamado0 === null) tLlamado0 = s.ahora;
+        await av(450); if (plan && plan.pesado) for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowUp');
+        await foto(`llamado_${slug(P.titulo)}`);
+      }
       await av(300);
       const ok = await J(() => { const b = document.querySelector('#capa .panel button.ir:not(:disabled)'); if (!b) return false; b.focus(); return document.activeElement === b; });
       if (ok) { await page.keyboard.press('Enter'); if (s.pantalla === 'llamado') tConfirma = (await J(() => JUEGO.reloj.ahora())); }
@@ -178,6 +186,14 @@ for (const T of tramos.filter(x => x.machaca)) {
   if (!bien) problemas.push(`machacando Espacio el motivo del fallo se vio ${T.motivoMs} ms (meta ≥ 1 s): ${T.machaca}`);
 }
 if (!tramos.some(x => x.machaca)) problemas.push('no se llegó a probar el machaque después del fallo');
+// ritmo de la final (meta J): espera máxima 20 s, y la final entera 150 s o menos (reloj de juego)
+{ const esperas = tramos.filter(T => T.espera !== undefined && T.lista && !T.lista.includes('intervalo')).map(T => T.espera), max = Math.max(0, ...esperas);
+  const final = tLlamado0 !== null && tPodio !== null ? tPodio - tLlamado0 : null;
+  console.log(`  ${max <= 20000 ? 'cumple' : 'NO    '} espera máxima sin tocar: ${(max / 1000).toFixed(1)} s (esperas: ${esperas.map(x => (x / 1000).toFixed(1)).join(', ')}) · meta ≤ 20 s`);
+  console.log(`  ${final !== null && final <= 150000 ? 'cumple' : 'NO    '} final del primer llamado al podio: ${final === null ? '?' : (final / 1000).toFixed(1) + ' s'} · meta ≤ 150 s`);
+  if (max > 20000) problemas.push(`una espera sin tocar de ${(max / 1000).toFixed(1)} s (meta ≤ 20 s)`);
+  if (final === null || final > 150000) problemas.push(`la final duró ${final === null ? '?' : (final / 1000).toFixed(1) + ' s'} de reloj de juego (meta ≤ 150 s)`);
+  const f = fin.propios.find(x => x.res === 'fallo'); if (!f || !/^(Se cayó en|Dropped in) /.test(f.linea || '')) problemas.push(`el arranque con 25 kg de más no cayó con la línea del tramo: ${JSON.stringify(f)}`); }
 console.log('\nPANTALLAS (s): ' + seg.map(x => `${x.p} ${(((x.t1 ?? x.t0) - x.t0) / 1000).toFixed(1)}`).join(' · '));
 if (problemas.length) { console.log('\nPROBLEMAS:\n' + problemas.join('\n')); process.exit(1); }
 console.log(`\ncheck_recorrido: terminó (${nFoto} capturas en out/recorrido)`);

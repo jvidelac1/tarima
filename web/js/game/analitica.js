@@ -30,6 +30,8 @@ export const EVENTOS = new Set([
   'compartir', 'invitacion_vista', 'invitacion_abierta', 'invitacion_cerrada', 'muro_visto', 'muro_ahora_no', 'mail_foco',
   'anotar_envio', 'anotar_ok', 'anotar_error', 'survey shown', 'encuesta_enviada', 'survey dismissed', 'privacidad_abierta',
   'medicion_desactivada', 'error_juego',
+  // Gameplay 2 (docs/JUEGO.md G2.7): un toque saltea el turno de un rival o el veredicto propio
+  'rival_salteado', 'veredicto_salteado',
 ]);
 
 export const BANDERAS = { 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio' };

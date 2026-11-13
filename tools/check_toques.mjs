@@ -1,14 +1,15 @@
 // Prueba de la entrada en tiempo real (pedido del dueño del 12 de noviembre: «a veces estoy tocando Espacio y es como que no
-// se levanta; revisaría bien que me registre todas las acciones»). Teclado real y reloj real (sin reloj inyectado), con
-// ?dibujo=0 para que el dibujo por software no atrase nada. En los dos primeros intentos propios de una final:
-//  1. Un toque durante PREPÁRATE (antes de ¡TIRA!) no se pierde: queda guardado y el levantamiento arranca solo apenas
-//     aparece ¡TIRA!, sin otro toque. Antes se descartaba con «ESPERA» y no se levantaba nada.
-//  2. Un toque justo al cambiar de señal (pegado al de ¡EXPLOTA!) y un doble toque pegado: se anotan, y si se descartan
-//     (un toque a menos de 60 ms del anterior es un rebote del dedo), con motivo y acuse.
-//  3. Ráfagas en ¡EMPUJA! (8 toques cada 60 ms): todas anotadas.
-//  4. Un toque largo (700 ms apretado) en ¡TIRA! cuenta como uno y arranca el levantamiento.
-//  5. Después de una pausa (Esc en el llamado, Esc para volver) el primer toque de ¡TIRA! funciona.
-//  6. En el turno de un rival: cartel «Turno de X (rival)», sin señal ni botón de levantar; un toque lo saltea.
+// se levanta; revisaría bien que me registre todas las acciones», y regla del 13: «el space desde la computadora tiene que
+// estar perfectamente pensado»). Teclado real y reloj real (sin reloj inyectado), con ?dibujo=0. Nivel 'u' (por defecto).
+// En los dos primeros intentos propios de una final:
+//  1. Un toque durante PREPÁRATE no se pierde: queda «guardado» y el levantamiento arranca solo apenas aparece ¡TIRA!.
+//  2. Un doble toque pegado (el segundo a 40 ms) cuenta como uno: el segundo sale «doble», resuelto y con acuse.
+//  3. Una ráfaga (8 toques cada 60 ms) en ¡SALTA!: todos anotados y resueltos, el resultado no cambia.
+//  4. Un toque largo (700 ms apretado) en ¡TIRA! cuenta como uno y, como sigue apoyado cuando abre ¡SALTA!, también la cumple.
+//  5. Un botón con el foco dentro del intento: Espacio es del levantamiento (el botón no se activa, la página no se mueve).
+//  6. Después de una pausa (Esc en el llamado, Esc para volver) el primer toque de ¡TIRA! funciona.
+//  7. En el turno de un rival: cartel «Turno de X (rival)», sin señal ni botón de levantar; un toque lo saltea.
+//  8. Acuse (meta I de G2.9): del timeStamp del keydown al cambio en pantalla (en el mismo manejador) y al cuadro siguiente.
 // Siempre: cada pulsación que manda la prueba figura en el registro del juego (JUEGO.toques), resuelta (aceptada o
 // descartada con motivo), y cada descartada tuvo su palabra en el acuse; el evento intento_propio lleva cuántos toques
 // hubo y cuántos se descartaron por cada motivo.
@@ -20,6 +21,8 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { launchOptions } from './browser.mjs';
 import { sinApi } from './sin_api.mjs';
+/** Señales de un toque (la libre de siempre y las de 'u': ¡SALTA!, ¡PÁRATE!, ¡DA TODO!): un toque y la señal se va. */
+const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
@@ -48,6 +51,8 @@ if (!await page.evaluate(() => window.JUEGO.listo)) throw new Error('el juego no
 // registro de cada pulsación como la ve el juego, con la palabra del acuse en el momento en que se resuelve
 await page.evaluate(() => {
   const T = window.JUEGO.toques, orig = T.alCambiar; window.__T = [];
+  // acuse: del timeStamp del evento a que la tecla dibujada se hunde (mismo manejador) y al cuadro siguiente
+  window.__A = []; addEventListener('keydown', e => { if (e.code !== 'Space') return; const ts = e.timeStamp; queueMicrotask(() => { const on = document.getElementById('acuse').classList.contains('on'), dom = performance.now() - ts; requestAnimationFrame(t => window.__A.push({ on, dom, pinta: t - ts, intento: !!JUEGO.E.intento?.propio })); }); }, true);
   T.alCambiar = (x, que) => { orig?.(x, que); if (que === 'resuelto' && x) { const a = document.querySelector('#acuse b')?.textContent || ''; const r = window.__T.find(y => y.n === x.n); const o = { n: x.n, ok: x.ok, motivo: x.motivo, donde: x.donde, acuse: a }; if (r) Object.assign(r, o); else window.__T.push(o); } else if (que === 'baja' && x) window.__T.push({ n: x.n, ok: null, motivo: '', donde: x.donde, acuse: '' }); };
 });
 const J = (fn, a) => page.evaluate(fn, a);
@@ -72,24 +77,23 @@ for (;;) {
     // 1. primer intento: un toque con PREPÁRATE en pantalla, y nada más hasta ver si arranca solo
     if (X.k === 1 && g.clave === 'prep' && !X.prep) { X.prep = true; await espacio(); continue; }
     if (X.k === 1 && X.prep && R.guardado === null) {
-      if (I.entradas > X.ent0) R.guardado = { arranco: true, ms: X.tira === null ? 0 : Date.now() - X.tira };      // arrancó sin otro toque
+      if (I.fase === 'tiron' || I.fase === 'vuelo') R.guardado = { arranco: true, ms: X.tira === null ? 0 : Date.now() - X.tira };      // arrancó sin otro toque
       else { if (g.clave === 'tira' && X.tira === null) X.tira = Date.now(); if (X.tira !== null && Date.now() - X.tira > 1500) R.guardado = { arranco: false, ms: Date.now() - X.tira }; await dormir(8); continue; }
     }
-    // 4. segundo intento: toque largo en ¡TIRA!
-    if (X.k === 2 && g.tipo === 'libre' && g.clave === 'tira' && !X.largo) { X.largo = true; const a = await J(() => JUEGO.toques.total); await page.keyboard.down('Space'); enviados++; await dormir(700); await page.keyboard.up('Space'); await dormir(150); const b = await J(() => ({ total: JUEGO.toques.total, fase: JUEGO.estado().intento?.fase, ent: JUEGO.estado().intento?.entradas })); R.largo = { toques: b.total - a, fase: b.fase, entradas: b.ent }; continue; }
-    if (g.tipo === 'libre') { await dormir(200); await espacio(); continue; }
-    // 2. toque justo al cambiar de señal (de ¡EXPLOTA! a ¡ATRÁPALA!), en el primer intento
-    if (X.k === 1 && g.clave !== X.ultClave && X.ultClave === 'explota' && !X.cambioHecho) { X.cambioHecho = true; const a = await J(() => JUEGO.toques.total); await espacio(); await dormir(120); R.cambio = await J(a => window.__T.filter(x => x.n > a), a); X.ultClave = g.clave; continue; }
-    X.ultClave = g.clave;
-    if (g.tipo === 'cierre') {
-      const kk = g.clave + g.desde; if (I.seDetiene || X.hecho === kk) { await dormir(8); continue; }
-      const falta = g.objetivo - s.ahora - 25; if (falta > 0) await dormir(Math.min(falta, 2000)); await espacio(); X.hecho = kk;
-      // doble toque pegado (el segundo a 40 ms), en el segundo intento
-      if (X.k === 2 && !X.dobleHecho) { X.dobleHecho = true; const a = await J(() => JUEGO.toques.total); await dormir(5); await espacio(); await dormir(120); R.doble = await J(a => window.__T.filter(x => x.n >= a), a); }
-      continue;
+    // 4. segundo intento: toque largo en ¡TIRA! (sigue apoyado cuando abre ¡SALTA!: también la cumple)
+    if (X.k === 2 && g.tipo === 'libre' && g.clave === 'tira' && !X.largo) { X.largo = true; const a = await J(() => JUEGO.toques.total); await page.keyboard.down('Space'); enviados++; await dormir(700); await page.keyboard.up('Space'); await dormir(150); const b = await J(() => ({ total: JUEGO.toques.total, fase: JUEGO.estado().intento?.fase, ent: JUEGO.estado().intento?.entradas, uno: JUEGO.estado().intento?.uno })); R.largo = { toques: b.total - a, fase: b.fase, entradas: b.ent, salto: b.uno?.salto }; continue; }
+    // 2. primer intento: doble toque pegado en ¡SALTA!
+    if (X.k === 1 && g.clave === 'salta' && !X.dobleHecho) { X.dobleHecho = true; const a = await J(() => JUEGO.toques.total); await espacio(25); await dormir(15); await espacio(25); await dormir(120); R.doble = await J(a => window.__T.filter(x => x.n > a), a); continue; }
+    // 3. segundo intento: ráfaga en ¡PÁRATE!
+    if (X.k === 2 && g.clave === 'parate' && !X.rafaga) { X.rafaga = true; for (let i = 0; i < 8; i++) { await espacio(25); await dormir(35); } R.rafagas++; continue; }
+    // 5. primer intento: un botón con el foco cuando aparece ¡PÁRATE!; Espacio es del levantamiento
+    if (X.k === 1 && !R.foco && g.clave === 'parate') {
+      await J(() => { const b = document.createElement('button'); b.id = '__b'; b.textContent = 'x'; b.style.cssText = 'position:fixed;left:0;top:0'; window.__clics = 0; b.onclick = () => window.__clics++; document.body.appendChild(b); b.focus(); window.__y0 = scrollY; });
+      const a = await J(() => JUEGO.toques.total); await espacio(); await dormir(120);
+      R.foco = await J(a => ({ clics: window.__clics, mueve: scrollY !== window.__y0, anotado: window.__T.filter(x => x.n > a).map(x => x.motivo), pisoton: !!JUEGO.estado().intento?.uno?.pisoton || (JUEGO.E.propios || []).at(-1)?.uno?.pisoton }), a);
+      await J(() => document.getElementById('__b')?.remove()); continue;
     }
-    // 3. ráfagas en ¡EMPUJA!
-    if (g.tipo === 'empuja') { if (Date.now() - X.ultEmp > 400) { for (let i = 0; i < 8; i++) { await espacio(25); await dormir(35); } R.rafagas++; X.ultEmp = Date.now(); } else await dormir(10); continue; }
+    if (UNTOQUE.has(g.tipo)) { await dormir(200); await espacio(); continue; }
     await dormir(10); continue;
   }
   if (estadoIntento && !(I && I.propio)) estadoIntento = null;
@@ -106,7 +110,7 @@ for (;;) {
   await dormir(30);
 }
 await dormir(1600);
-const fin = await J(() => ({ total: JUEGO.toques.total, T: window.__T, eventos: JUEGO.eventos.filter(e => e.ev === 'intento_propio').map(e => e.props), propios: (JUEGO.E.propios || []).map(x => `${x.res}${x.causa ? ':' + x.causa : ''}`) }));
+const fin = await J(() => ({ total: JUEGO.toques.total, T: window.__T, A: window.__A, eventos: JUEGO.eventos.filter(e => e.ev === 'intento_propio').map(e => e.props), propios: (JUEGO.E.propios || []).map(x => `${x.res}${x.causa ? ':' + x.causa : ''}`) }));
 await browser.close(); server.close();
 
 // ---------- veredicto ----------
@@ -118,17 +122,26 @@ if (sinAcuse.length) mal(`${sinAcuse.length} descartadas sin palabra en el acuse
 if (!R.guardado) mal('no se llegó a probar el toque durante PREPÁRATE');
 else if (!R.guardado.arranco) mal(`un toque durante PREPÁRATE no levantó: con ¡TIRA! en pantalla ${R.guardado.ms} ms y nada`);
 const g = fin.T.find(x => x.motivo === 'guardado'); if (R.guardado && !g) mal('el toque durante PREPÁRATE no quedó como «guardado»');
-if (!R.largo) mal('no se llegó a probar el toque largo'); else if (R.largo.toques !== 1 || !R.largo.entradas) mal(`el toque largo en ¡TIRA!: ${JSON.stringify(R.largo)}`);
+if (!R.largo) mal('no se llegó a probar el toque largo'); else if (R.largo.toques !== 1 || !R.largo.entradas || !R.largo.salto) mal(`el toque largo en ¡TIRA! tiene que contar uno y cumplir ¡SALTA! al seguir apoyado: ${JSON.stringify(R.largo)}`);
+if (!R.doble) mal('no se llegó a probar el doble toque'); else if (R.doble.length !== 2 || R.doble[1].motivo !== 'doble' || R.doble.some(x => x.ok === null)) mal(`el doble toque pegado no salió «doble»: ${JSON.stringify(R.doble)}`);
+if (!R.rafagas) mal('no se llegó a probar la ráfaga en ¡PÁRATE!');
+if (!R.foco) notas.push('no se llegó a probar Espacio con un botón enfocado'); else if (R.foco.clics || R.foco.mueve || !R.foco.anotado.length || !R.foco.pisoton) mal(`con un botón enfocado, Espacio tiene que ser del levantamiento: ${JSON.stringify(R.foco)}`);
 if (!R.pausa || !R.pausa.abrio || !R.pausa.cerro) mal(`la pausa en el llamado: ${JSON.stringify(R.pausa)}`);
-if (!R.rafagas) notas.push('no hubo ¡EMPUJA! en estos intentos: las ráfagas no se probaron');
 if (!rivalVisto) mal('no se vio el turno de un rival'); else if (!rivalVisto.ve || rivalVisto.senal || !/rival/i.test(rivalVisto.txt)) mal(`en el turno de un rival: ${JSON.stringify(rivalVisto)}`);
+// acuse (meta I): en el mismo manejador (la tecla ya está hundida al salir del evento) y pintado en el cuadro siguiente
+{ const A = fin.A.filter(x => x.intento), p95 = xs => { const v = xs.slice().sort((a, b) => a - b); return v.length ? v[Math.min(v.length - 1, Math.floor(v.length * .95))] : 0; };
+  const sinHundir = A.filter(x => !x.on).length, dom = p95(A.map(x => x.dom)), pinta = p95(A.map(x => x.pinta));
+  console.log(`acuse en el intento: ${A.length} pulsaciones · tecla hundida al salir del manejador en ${A.length - sinHundir} · p95 hasta el cambio ${dom.toFixed(1)} ms · p95 hasta el cuadro siguiente ${pinta.toFixed(1)} ms (meta ≤ 17 ms a 60 Hz)`);
+  if (!A.length) mal('no se midió el acuse');
+  if (sinHundir) mal(`${sinHundir} pulsaciones sin acuse en el mismo manejador`);
+  if (pinta > 17.5) (pinta > 50 ? problemas : notas).push(`acuse: p95 de ${pinta.toFixed(1)} ms hasta el cuadro siguiente (meta ≤ 17 ms; por software los cuadros no van a 60 Hz)`); }
 const ip = fin.eventos[0];
 if (!ip || !Number.isFinite(ip.toques) || !Number.isFinite(ip.aceptados) || !Number.isFinite(ip.descartados)) mal(`intento_propio sin la cuenta de toques: ${JSON.stringify(ip)}`);
 const motivos = {}; for (const x of fin.T) if (x.ok === false) motivos[x.motivo] = (motivos[x.motivo] || 0) + 1;
 console.log(`pulsaciones: ${enviados} mandadas, ${fin.total} anotadas, ${fin.T.filter(x => x.ok).length} aceptadas · descartadas por motivo: ${JSON.stringify(motivos)}`);
-console.log(`PREPÁRATE → ¡TIRA!: ${JSON.stringify(R.guardado)} · toque largo: ${JSON.stringify(R.largo)} · al cambiar de señal: ${JSON.stringify(R.cambio)} · doble: ${JSON.stringify(R.doble)} · ráfagas en ¡EMPUJA!: ${R.rafagas} · pausa: ${JSON.stringify(R.pausa)}`);
+console.log(`PREPÁRATE → ¡TIRA!: ${JSON.stringify(R.guardado)} · toque largo: ${JSON.stringify(R.largo)} · doble: ${JSON.stringify(R.doble)} · ráfagas en ¡PÁRATE!: ${R.rafagas} · botón con foco: ${JSON.stringify(R.foco)} · pausa: ${JSON.stringify(R.pausa)}`);
 console.log(`turno de un rival: ${JSON.stringify(rivalVisto)} · intentos propios: ${fin.propios.join(' · ')}`);
 console.log(`intento_propio: ${fin.eventos.map(e => JSON.stringify({ toques: e.toques, aceptados: e.aceptados, descartados: e.descartados, ...Object.fromEntries(Object.entries(e).filter(([k]) => k.startsWith('desc_'))), guardados: e.guardados })).join(' · ')}`);
 for (const n of notas) console.log('nota: ' + n);
 if (problemas.length) { console.log(`\nFALLÓ (${problemas.length}):`); for (const p of problemas) console.log('  ' + p); process.exit(1); }
-console.log('\nOK: toques en tiempo real anotados y resueltos, con motivo y acuse; PREPÁRATE guarda el toque, el toque largo vale uno, la pausa no rompe nada y el turno del rival se ve como tal');
+console.log('\nOK: toques en tiempo real anotados y resueltos, con acuse en el mismo manejador; PREPÁRATE guarda el toque, el doble vale uno, el largo vale uno y cumple ¡SALTA!, un botón con foco no se lleva Espacio, la pausa no rompe nada y el turno del rival se ve como tal');

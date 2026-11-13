@@ -8,6 +8,9 @@
 //  7. Nivel de control Fácil (docs/CONTROLES.md): la capa de traducción es pura; partidas de referencia jugadas a través
 //     de la capa (tools/sim_ref_facil.json); en vivo, recalculado y avance en pasos irregulares dan lo mismo; un `ctl`
 //     desconocido se rechaza y un registro sin `ctl` es Clásico; toda causa tiene su línea de explicación.
+// 12. Nivel 'u' (docs/JUEGO.md, Gameplay 2): partidas de referencia jugadas por los bots de tools/uno_bots.mjs
+//     (tools/sim_ref_uno.json); 1000 finales en vivo contra recalculadas (meta L); toda caída tiene su tramo y una línea
+//     sin tiempos (meta G); la garra se gasta una vez por levantamiento; la señal en los dos idiomas.
 //  9. Textos (docs/MVP.md, sección 4): los dos idiomas tienen las mismas claves, el español es neutro (sin voseo) y sin jerga,
 //     ninguna clave queda sin resolver, y explicar() y la señal arman frases completas en los dos idiomas.
 import fs from 'node:fs';
@@ -28,8 +31,9 @@ import { tableroHTML } from '../web/js/game/ui/tablero.js';
 import { DICCIONARIOS, tr, fijarIdioma, detectarIdioma } from '../web/js/game/i18n/t.js';
 import { toques } from '../web/js/game/input.js';
 import { jugarSenal, jugarFijo, BOTS } from './play_human.mjs';
+import { jugarUno, BOTS_U } from './uno_bots.mjs';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SIM = path.join(ROOT, 'web/js/sim'), REF = path.join(ROOT, 'tools/sim_ref.json'), REF_F = path.join(ROOT, 'tools/sim_ref_facil.json');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SIM = path.join(ROOT, 'web/js/sim'), REF = path.join(ROOT, 'tools/sim_ref.json'), REF_F = path.join(ROOT, 'tools/sim_ref_facil.json'), REF_U = path.join(ROOT, 'tools/sim_ref_uno.json');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const N = +(arg('n') || 1000), UPDATE = process.argv.includes('--update');
 const datos = leerDatos(JSON.parse(fs.readFileSync(path.join(ROOT, 'web/data/sim.json'), 'utf8')));
@@ -67,10 +71,12 @@ function jugar(semilla, nivel, persona, estilo = {}) {
     if (a.ctrl === 'juego') { const x = p.resolverIA(); bit.push({ a: L.a, lev: L.lev, n: L.n, kg: L.kg, res: x.res.res }); continue; }
     // persona: a veces cambia kilos (y puede quedar desplazada), a veces deja correr el reloj, a veces toca cualquier cosa
     if (r.ent(4) === 0 && a.cambios < 2) { const kg = Math.max(p.minimo(L.a), L.kg + r.entre(-2, 4)); if (!p.cambioValido(800, kg)) { if (p.cambio(800, kg).desplazado) { bit.push({ a: L.a, lev: L.lev, n: L.n, kg: L.kg, res: 'desplazado' }); continue; } } }
-    const env = L.lev === 'c' ? ['split', 'power', 'squat'][r.ent(3)] : undefined, ctx = p.contexto(env), modo = estilo.modo ?? r.ent(10);
+    // en 'u' el juego confirma siempre (no hay reloj en el panel): nunca «se le va el reloj»
+    const env = L.lev === 'c' ? ['split', 'power', 'squat'][r.ent(3)] : undefined, ctx = p.contexto(env), modo = estilo.modo ?? (estilo.ctl === 'u' ? 1 + r.ent(9) : r.ent(10));
     let rec;
     if (modo === 0) rec = { conf: null, env, ent: [] };                                                    // se le va el reloj
     else if (modo === 1) { const ent = []; let t = 2000; for (let k = 0; k < 60; k++) { t += r.entre(1, 900); ent.push([t, k % 2 ? 0 : 1]); } rec = { conf: 1500, env, ent }; }   // toca cualquier cosa
+    else if (estilo.ctl === 'u') { const B = Object.values(BOTS_U)[r.ent(6)], S = jugarUno(ctx, B, L.sem ^ 0x5bd1e995, { conf: 1000 }); rec = { conf: S.conf, env, ent: S.ent }; }      // 'u': cualquiera de los bots (confirma después del cambio de kilos)
     else if (estilo.ctl === 'f') { const S = jugarSenal(ctx, { ...BOTS.casual, sd: estilo.sd ?? [30, 80, 160][r.ent(3)] }, L.sem ^ 0x5bd1e995); rec = { conf: S.conf, env, ent: S.ent }; }      // Fácil: un toque por señal, a través de la capa
     else { const g2 = gestos({ ...ctx }, { sd: estilo.sd ?? [20, 35, 60][r.ent(3)], pelea: 60 }, L.sem ^ 0x5bd1e995); rec = { conf: g2.conf, env, ent: g2.ent }; }
     const x = p.resolver(rec); bit.push({ a: L.a, lev: L.lev, n: L.n, kg: p.at[L.a][L.lev].slice(-1)[0].kg, res: x.res.res });
@@ -396,6 +402,56 @@ function jugar(semilla, nivel, persona, estilo = {}) {
   ok(JSON.stringify(CUERPO.brenner) !== JSON.stringify(CUERPO.marangi) || ficha('brenner') !== ficha('marangi'), `Largo y Potente se ven iguales en la tarjeta: ${ficha('brenner')}`);
   for (const l of ['es', 'en']) for (const k of Object.keys(FICHA)) for (const n of ['alto', 'medio', 'bajo']) ok(tr(l, `ficha.${k}.${n}`) !== `ficha.${k}.${n}`, `falta ${l}.ficha.${k}.${n}`);
   console.log(`11. Marcador: ${JSON.stringify(vistos)} en 360 partidas, sin ventaja contra quien no levantó ni «Vas ganando» con otro primero · identidad propia del jugador · Largo ${ficha('brenner')} y Potente ${ficha('marangi')}`);
+}
+
+// ---------- 12. nivel 'u' ----------
+{
+  const casos = []; for (let k = 0; k < 9; k++) casos.push({ semilla: 3000017 * (k + 1), nivel: NIV[k % 3], persona: k % 3 });
+  const hoy = casos.map(c => ({ ...c, tabla: resumen(jugar(c.semilla, c.nivel, c.persona, { ctl: 'u' }).p.tabla()) }));
+  if (UPDATE || !fs.existsSync(REF_U)) { fs.writeFileSync(REF_U, JSON.stringify({ datos: datos.huella, casos: hoy }, null, 1) + '\n'); console.log("12. referencia de 'u' escrita en tools/sim_ref_uno.json"); }
+  else { const ref = JSON.parse(fs.readFileSync(REF_U, 'utf8')); ok(ref.datos === datos.huella, "la referencia de 'u' es de otra huella"); ref.casos.forEach((c, i) => ok(c.tabla === hoy[i]?.tabla, `referencia 'u' ${i} (semilla ${c.semilla}): guardado «${c.tabla}», hoy «${hoy[i]?.tabla}»`)); }
+  // 1000 finales en vivo contra recalculadas; caídas con tramo y línea; la garra, una por levantamiento
+  let n = 0, intentos = 0, validos = 0, caidas = 0, sinLinea = 0, garras = 0, distintas = 0; const causas = {};
+  for (let k = 0; k < N; k++) {
+    const semilla = mezclar(k, 123), persona = k % 3, { p } = jugar(semilla, NIV[k % 3], persona, { ctl: 'u', primera: k % 7 === 0 });
+    const reg = JSON.parse(JSON.stringify(p.reg)), rc = recalcular(reg, datos), t = resumen(p.tabla());
+    ok(reg.ctl === 'u', `semilla ${semilla}: el registro no guarda 'u'`);
+    ok(rc.ok && resumen(rc.tabla) === t, `'u', semilla ${semilla}: recalcular da ${rc.ok ? resumen(rc.tabla) : rc.error} y en vivo ${t}`);
+    if (k < 100) { const g = JSON.parse(JSON.stringify(reg)); g.ctl = 'f'; const r2 = recalcular(g, datos); if (!r2.ok || resumen(r2.tabla) !== t) distintas++; }
+    const a = p.at[persona];
+    for (const lev of ['s', 'c']) {
+      let usadas = 0;
+      for (const x of a[lev]) {
+        intentos++; if (x.res === 'valido') validos++; ok(x.res !== 'nulo', `'u' no tiene nulos: ${JSON.stringify(x)}`);
+        if (x.res === 'fallo') { caidas++; causas[x.causa] = (causas[x.causa] || 0) + 1; }
+      }
+      // la garra: una por levantamiento (match.js la apaga al usarla)
+      usadas = a.garraUno[lev] ? 0 : 1; garras += usadas;
+    }
+    n++;
+  }
+  // meta G: toda caída de 'u' nombra el tramo y lo que gastó, nunca un tiempo (en los dos idiomas)
+  { const r = new Azar(77);
+    for (let k = 0; k < 400; k++) {
+      const lev = k % 2 ? 'c' : 's', id = IDS[k % 3], f = datos.atletas[id], I = 9600 + r.ent(900), env = lev === 'c' ? ['split', 'power', 'squat'][k % 3] : undefined;
+      const ctx = { lev, env, I, tec: f.attrs.tec, temple: 0, garra: f.attrs.gar, anclas: datos.modelos[f.modelo], semilla: mezclar(k, 5), cal: 0, primera: false, domina: true, jueces: [1000, 1000, 1000], reloj: 30000, ctl: 'u', garraUno: k % 4 !== 0 };
+      const S = jugarUno(ctx, Object.values(BOTS_U)[k % 6], k), res = S.m.res;
+      if (res.res !== 'fallo') continue;
+      for (const l of ['es', 'en']) {
+        const txt = explicar(res, 'u', k % 2 === 0, { lev, quien: 'Ana', kg: 170, pct: Math.round(I / 100) }, l), corta = explicar(res, 'u', false, { lev }, l);
+        if (!res.uno.tramo_caida || !txt || /\b(ms|tarde|temprano|late|early|undefined)\b|[{}]/i.test(txt + corta) || txt.length > 130) { sinLinea++; if (sinLinea < 4) console.log(`  MAL: línea de caída de 'u' (${l}): «${txt}» · «${corta}» · ${JSON.stringify(res.uno)}`); }
+      }
+    }
+  }
+  ok(!sinLinea, `${sinLinea} caídas de 'u' sin línea que nombre el tramo, o con un tiempo`);
+  ok(distintas > 10, `cambiar 'u' por 'f' en el registro casi no cambia el resultado (${distintas} de 100)`);
+  // la señal de 'u' sale en el idioma elegido
+  { const ctx = { lev: 's', I: 9000, tec: 7, temple: 0, garra: 6, anclas: datos.modelos.ventura, semilla: 5, cal: 0, primera: false, domina: true, jueces: [1000, 1000, 1000], reloj: 30000, ctl: 'u' };
+    const m = simular(ctx, 0, [], 1300); fijarIdioma('en'); const sEn = senal(m, 1300, 'u'); fijarIdioma('es'); const sEs = senal(m, 1300, 'u');
+    ok(sEn && sEs && sEn.verbo === 'PULL!' && sEs.verbo === '¡TIRA!' && sEn.tipo === 'libre', `la señal de 'u' no cambia con el idioma: ${sEn?.verbo} / ${sEs?.verbo}`);
+    const m2 = simular(ctx, 0, [[1500, 1], [1560, 0]], 1600), s2 = senal(m2, 1600, 'u'); ok(s2 && s2.clave === 'salta' && s2.tipo === 'luz', `después de ¡TIRA! la señal tiene que ser ¡SALTA!: ${JSON.stringify(s2)}`);
+    ok(pasos('u', true, 'es').length === 3 && /¡SALTA!/.test(pasos('u', false, 'es')[1][1]), 'pasos de «Cómo se juega» en \'u\''); }
+  console.log(`12. 'u': 9 partidas de referencia · ${n} finales en vivo contra recalculadas · ${intentos} intentos propios, ${(validos * 100 / intentos).toFixed(0)} % válidos, caídas ${JSON.stringify(causas)} · garras usadas ${garras} · líneas de caída con tramo y sin tiempos · señal en los dos idiomas`);
 }
 
 console.log(fallas.length ? `\nFALLÓ: ${fallas.length} problemas` : `\nOK en ${((Date.now() - t0) / 1000).toFixed(1)} s`);
