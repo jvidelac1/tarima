@@ -2,8 +2,26 @@
 // navegador. Un bot que mira el círculo en pantalla (`visto`) toca con el atraso del dedo y de la pantalla (60 ms) y un
 // desvío de campana; se mide qué parte de sus toques sale PERFECTO o BIEN y cuántos levantamientos valen, antes (corrección
 // de 40 ms que corría también el círculo, sin ventanas del dedo) y ahora (corrección de 60 ms y FACIL.tactil).
-// Uso: node tools/dedo_test.mjs [--n=600]   Sale con error si «ahora» no mejora a «antes» o si las aperturas bajan de 95 %.
-import { BOTS, jugarSenal, ctxDe } from './play_human.mjs';
+// Uso: node tools/dedo_test.mjs --f [--n=600]   Sale con error si «ahora» no mejora a «antes» o si las aperturas bajan de 95 %.
+//
+// Sin --f prueba el dedo en 'u' (por defecto desde Gameplay 2, docs/JUEGO.md G2.3 y meta H): 10 000 secuencias al azar de
+// dedos sobre intentos enteros, por la clase Boton de verdad en un DOM de mentira (tools/entrada_sim.mjs): dos dedos a
+// menos de 80 ms, pointercancel con y sin dedo que vuelve (400 ms de gracia), doble toque a 100 ms, mantener 10 s,
+// machacar y toques en los bordes de la pantalla. Criterio: 0 toques sin resolver, 0 contados dos veces, el 100 % con
+// acción o palabra, los bordes nunca cuentan y la ráfaga de la confirmación nunca arranca el tirón.
+// Uso: node tools/dedo_test.mjs [--n=10000]
+if (!process.argv.includes('--f')) {
+  const { probarEntrada } = await import('./entrada_sim.mjs');
+  const a = k => (process.argv.find(x => x.startsWith(`--${k}=`)) || '').split('=')[1];
+  const t0 = Date.now(), R = await probarEntrada({ via: 'dedo', n: +(a('n') || 10000) });
+  console.log(`dedo: ${R.secuencias} secuencias, ${R.pulsaciones} toques fuera del borde · casos: ${JSON.stringify(R.casos)}`);
+  console.log(`sin resolver ${R.sinResolver} · contados dos veces ${R.dobles} · sin acción ni palabra ${R.sinPalabra} · bordes que contaron ${R.bordesQueCuentan} · ráfaga de la confirmación que arrancó el tirón ${R.rafagaTira} · registros mal formados ${R.malFormadas} · intentos sin terminar ${R.sinTerminar}`);
+  const mal = R.sinResolver + R.dobles + R.sinPalabra + R.bordesQueCuentan + R.rafagaTira + R.malFormadas + R.sinTerminar;
+  if (mal) { console.log('FALLÓ:\n  ' + R.ejemplos.join('\n  ')); process.exit(1); }
+  console.log(`OK: con el dedo ningún toque se pierde ni cuenta dos veces, y los bordes no cuentan (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
+  process.exit(0);
+}
+const { BOTS, jugarSenal, ctxDe } = await import('./play_human.mjs');
 import { mezclar, Azar } from '../web/js/sim/fixed.js';
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const N = +(arg('n') || 600), ATL = ['ventura', 'brenner', 'marangi'], COLS = [['s', 'split'], ['c', 'split']];

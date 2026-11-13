@@ -153,7 +153,7 @@ export class Boton {
 export const GRACIA_MS = 400;
 export const BORDES = { arriba: 56, lado: 24, abajo: 20 };
 /** El toque cae en un borde de la pantalla (docs/JUEGO.md G2.3). */
-export function enBorde(e, w = innerWidth, h = innerHeight) { const x = e.clientX, y = e.clientY; return y < BORDES.arriba || y > h - BORDES.abajo || x < BORDES.lado || x > w - BORDES.lado; }
+export function enBorde(e, w = innerWidth, h = innerHeight) { const x = e.clientX, y = e.clientY; return y < BORDES.arriba || y >= h - BORDES.abajo || x < BORDES.lado || x >= w - BORDES.lado; }
 
 // ---------- teclado de los paneles ----------
 const visibles = raiz => [...raiz.querySelectorAll('button:not(:disabled)')].filter(b => b.offsetParent !== null);
