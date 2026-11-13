@@ -17,7 +17,9 @@ export function instalarEnPagina() {
   const ahora = () => Math.round(window.JUEGO?.reloj?.ahora?.() ?? performance.now());
   const visible = e => {
     if (!e || e.closest('[hidden]')) return false;
-    let o = 1; for (let x = e; x && x.nodeType === 1; x = x.parentElement) { const c = getComputedStyle(x); if (c.display === 'none' || c.visibility === 'hidden') return false; o *= +c.opacity; }
+    // un cartel que está entrando con su animación (opacidad de 0 a 1 en 0,18 s) ya cuenta como visible: con el reloj del juego
+    // inyectado la animación corre en tiempo real y, si no, el cartel parecería aparecer más tarde de lo que aparece
+    let o = 1; for (let x = e; x && x.nodeType === 1; x = x.parentElement) { const c = getComputedStyle(x); if (c.display === 'none' || c.visibility === 'hidden') return false; if (!(x === e && c.animationName !== 'none' && x.getAnimations?.().some(a => a.playState === 'running'))) o *= +c.opacity; }
     const r = e.getBoundingClientRect(); return o > .5 && r.width > 2 && r.height > 2;
   };
   const texto = (k, e) => (SIN_TEXTO.has(k) ? '' : k === 'panel' ? (e.querySelector('h1,h2')?.textContent || e.className).trim() : e.textContent.replace(/\s+/g, ' ').trim().slice(0, 90));
