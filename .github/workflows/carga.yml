@@ -8,6 +8,8 @@
 name: Carga y modelos comprimidos
 
 on:
+  push:
+    branches: [carga]
   workflow_dispatch:
 
 permissions:
