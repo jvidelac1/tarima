@@ -315,7 +315,7 @@ async function corrida(via) {
     if (p3.sobre || !(p3.t > p2 + 100) || !p3.foco) mal(`al volver de la pausa: ${JSON.stringify(p3)} (antes ${p2.toFixed(0)})`);
     await page.keyboard.press('h'); const a1 = await J(() => ({ sobre: JUEGO.estado().sobre, txt: document.getElementById('sobre').textContent })); await foto('ayuda');
     const glosario = await J(() => document.querySelectorAll('#sobre .glosario dt').length);
-    if (glosario !== 10) mal(`el glosario de «Cómo se juega» tiene ${glosario} palabras (en 'b' son 10: la barrita, la energía, la garra y la suerte)`);
+    if (glosario !== 11) mal(`el glosario de «Cómo se juega» tiene ${glosario} palabras (en 'b' son 11: la barrita, el cansancio, la energía, la garra y la suerte)`);
     if (a1.sobre !== 'ayuda' || !/Cómo se juega/.test(a1.txt) || !/ESPACIO/.test(a1.txt) || !/verde/.test(a1.txt) || /círculo|¡SALTA!/.test(a1.txt)) mal(`H no abrió «Cómo se juega» de 'b': ${JSON.stringify(a1).slice(0, 300)}`);
     await page.keyboard.press('h'); if (await J(() => JUEGO.estado().sobre)) mal('H no cerró la ayuda');
     if (await page.locator('#btn-otro').count()) mal('en \'u\' el inicio no tiene que ofrecer práctica aparte');
@@ -356,7 +356,7 @@ async function idiomas() {
   await J(() => document.getElementById('btn-ayuda').click()); await page.waitForTimeout(150);
   const ay = await J(() => ({ dt: [...document.querySelectorAll('#sobre .glosario dt')].map(d => d.textContent), h2: document.querySelector('#sobre h2')?.textContent }));
   // en 'u' el glosario suma la energía del levantamiento, la garra y la suerte (9 palabras; Clásico tiene 7)
-  if (ay.dt.length !== 10 || ay.dt[0] !== EN['glosario.barrita.t'] || !ay.dt.includes(EN['glosario.u_energia.t'])) mal(`la ayuda en inglés: ${JSON.stringify(ay)}`);
+  if (ay.dt.length !== 11 || ay.dt[0] !== EN['glosario.barrita.t'] || !ay.dt.includes(EN['glosario.u_energia.t'])) mal(`la ayuda en inglés: ${JSON.stringify(ay)}`);
   await page.screenshot({ path: path.join(OUT, 'idioma_ayuda_en.png') }).catch(() => null);
   await ctx.close();
   // el caso del dueño: el inglés primero en la lista del navegador y el español después → español

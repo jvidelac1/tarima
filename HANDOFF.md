@@ -912,38 +912,65 @@ presentación en una línea y un aro punteado sobre el verde que se llena cuando
   `proximoCentro`), `main.js` (`esU()` para lo que comparten `'u'` y `'b'`; la barrita en `correrIntento`, el verde del panel,
   la tarjeta con «Verde tirón / Verde envión»), `input.js` (`sinRepeticion`), `audio.js` (`subida`, `pega`),
   `stage.js` (`acercar`: la cámara se acerca a 0,93 mientras corre el puntero), textos `barra.*` en `es.js` y `en.js`.
-- Pesistas (ancho del verde, `BARRA.pesistas`): Compacto parejo (1 / 1), Largo 1,3 en el tirón y 0,75 en el envión, Potente al
+- Pesistas (ancho del verde, `BARRA.pesistas`): Compacto parejo (1 / 1), Largo 1,25 en el tirón y 0,8 en el envión, Potente
   revés. Medio ancho del verde: 170 ms con la apertura, 75 ms al 100 % (por 1,3 o 0,75 según el pesista; 1,4 el primer intento
   de la primera final).
 
-**Medido** (sin navegador, `node tools/barra_bots.mjs --n=600`; perfiles: novato ±120 ms y 40 ms tarde, 5 % de despistes;
-medio ±70; bueno ±35; típico ±105, el que supone el panel). Válidos % (verde % de los toques):
+**Segunda vuelta (pedidos del dueño del mediodía).**
+- **Cansancio** (`rules.js → BARRA.fatiga`, `fatigaDe`, `sumarFatiga`; `match.js` lo lleva por pesista en `a.fatiga`): cada
+  intento cansa un cuarto de lo que costaron sus toques (amarillo +150, rojo +375), +250 si usó la garra y un cuarto de lo que
+  quedó por debajo de ½ de energía; en pasos de 50, tope ¾ por levantamiento; del arranque pasa la mitad al dos tiempos. El
+  intento siguiente empieza con esa energía de menos (`ctx.fatiga`). Se ve en el panel («Cansancio −¼» junto al verde, y la
+  chance y «Te sobra» ya lo cuentan), en la energía al empezar y en la línea de caída si sin él se paraba («Venía cansado
+  (−¼)»). Abrir pesado, pegar lejos o salvarse con la garra te deja más cansado.
+- **Esfuerzo al pararse** (`BARRA.esfuerzo`, `pideEsfuerzo`): solo desde el 95 % y si al empezar a pararse la energía que
+  quedaría sin suerte baja de 0,1, la señal ¡PÁRATE! pide 3 toques en 3 s (sin apuro: 2 por segundo alcanzan), con la barra
+  que se llena y «¡VAMOS!» en cada uno y «¡DE PIE!» (pisotón) al terminar. Hecho: pararse cuesta 300 menos. No hecho: cuesta
+  lo de siempre (cae solo si no alcanzaba). `chanceBarra` lo cuenta (la persona típica lo hace 95 de cada 100).
+- **Enviones**: split (tijera) el más fácil, power intermedio, squat el más difícil para todos (`BARRA.envion` y
+  `verdeEnvion`: gasto 0,7 / 0,85 + ¼ / 0,95 + ½, verde ×1 / ×0,9 / ×0,8; la movilidad alta solo achica la diferencia del
+  squat). En «Más opciones» dice «más fácil / intermedio / más difícil»; el panel propone split.
+- **Bienvenida**: la parte de arriba (`.bv-cuerpo`) se desplaza y la fila Jugar / Opciones / Cómo se juega queda fuera de ella:
+  ya no tapa las tarjetas. Las tarjetas en `'b'` llevan la frase en su propio bloque y solo el verde de cada barrita; en
+  pantallas de menos de 820 px de alto, sin la franja de colores ni la nota del nombre.
+- El entrenador es un poco más prudente en `'b'` (9,3 de 10 en el segundo intento, 8 de 10 en el tercero). Gasto ×0,925.
+
+**Medido** (sin navegador, `node tools/barra_bots.mjs --n=600`; perfiles: novato ±120 ms y 40 ms tarde, 5 % de despistes,
+esfuerzo a 2 toques por segundo; medio ±70; bueno ±35; típico ±105, el que supone el panel). Válidos % (verde % de los toques),
+dos tiempos con split:
 
 | perfil · pesista | arr. 90 % | arr. 97 % | arr. 100 % | arr. 103 % | dt 90 % | dt 97 % | dt 100 % | dt 103 % |
 |---|---|---|---|---|---|---|---|---|
-| novato · Compacto | 100 (82) | 92 (56) | 48 (45) | 2 | 100 (81) | 83 (59) | 36 (43) | 4 |
-| novato · Largo | 100 (89) | 96 (72) | 55 (56) | 3 | 100 (77) | 82 (56) | 33 (44) | 5 |
-| novato · Potente | 100 (67) | 78 (45) | 35 (33) | 6 | 99 (77) | 78 (57) | 46 (43) | 16 |
-| medio · Compacto | 100 (97) | 99 (82) | 70 (69) | 3 | 100 (96) | 96 (85) | 67 (69) | 10 |
-| medio · Largo | 100 (99) | 98 (92) | 73 (80) | 4 | 100 (93) | 96 (81) | 59 (66) | 12 |
-| medio · Potente | 100 (90) | 91 (72) | 51 (57) | 10 | 100 (94) | 93 (80) | 68 (67) | 31 |
-| bueno · Compacto | 100 (100) | 100 (99) | 93 (97) | 5 | 100 (100) | 100 (100) | 95 (96) | 23 |
-| bueno · Largo | 100 (100) | 100 (100) | 85 (99) | 6 | 100 (99) | 100 (98) | 90 (94) | 27 |
-| bueno · Potente | 100 (100) | 97 (97) | 66 (89) | 18 | 100 (100) | 99 (98) | 85 (93) | 50 |
+| novato · Compacto | 100 (82) | 93 (56) | 64 (45) | 6 | 100 (81) | 86 (59) | 37 (42) | 4 |
+| novato · Largo | 100 (87) | 97 (69) | 65 (52) | 9 | 100 (78) | 84 (57) | 37 (43) | 6 |
+| novato · Potente | 100 (67) | 78 (45) | 37 (33) | 7 | 99 (77) | 79 (57) | 51 (44) | 20 |
+| medio · Compacto | 100 (97) | 99 (82) | 82 (69) | 11 | 100 (96) | 97 (85) | 68 (69) | 13 |
+| medio · Largo | 100 (99) | 99 (91) | 83 (78) | 15 | 100 (94) | 96 (82) | 64 (67) | 15 |
+| medio · Potente | 100 (90) | 91 (72) | 52 (57) | 11 | 100 (94) | 95 (80) | 72 (67) | 37 |
+| bueno · Compacto | 100 (100) | 100 (99) | 98 (97) | 18 | 100 (100) | 100 (100) | 95 (96) | 31 |
+| bueno · Largo | 100 (100) | 100 (100) | 96 (99) | 21 | 100 (99) | 100 (99) | 92 (94) | 32 |
+| bueno · Potente | 100 (100) | 97 (97) | 69 (89) | 18 | 100 (100) | 100 (98) | 89 (93) | 58 |
 
-- Metas: novato con la apertura (90 %) ≥ 99 % válidos y 65 a 89 % verde; al 100 % el novato entre 33 y 55 % y el bueno
-  siempre más (66 a 95 %). Verde del novato al 97 % por barrita: tirón Largo 72 / Compacto 56 / Potente 45 %; envión Potente 71
-  / Compacto 59 / Largo 42 %. Machacar, mantener, no tocar y el doble toque: 100 % válidos al 90 % en el arranque; el
-  machacador pega en el rojo y en el dos tiempos de Compacto se le cae el 80 % (hay que mirar el puntero).
-- `chance_test`: con la persona típica, error ≤ 2,9 puntos en cada «X de 10» (meta ≤ 5). Con el novato la chance promete
-  hasta 8 puntos de más (en «5 de 10» sube 4,2 de 10) y con el bueno hasta 38 de menos: la chance es la de una persona
-  típica (algo más torpe que el medio, a propósito), no la de quien juega.
-- `ritmo_test` (360 finales): novato, final mediana 130 s (meta ≤ 150), espera máxima 19,0 s (≤ 20), p90 13,4 s, intento
-  propio p90 8,8 s arranque y 13,7 s dos tiempos (metas de `'b'` ≤ 9 y ≤ 15: antes ¡TIRA! salía sola a los 2 s), barras caídas
-  con el panel 14,2 % (≤ 15). Informativo: quien espera siempre al puntero lento hace la final en 201 s y se le cae el 10 %.
-- `teclado_test` y `dedo_test` (10 000 secuencias cada uno, `'b'` y `'u'`): 0 sin resolver, 0 dobles, 0 sin palabra, 0
-  barritas disparadas por más de un contacto. `sim_test`: `sim_ref.json`, `sim_ref_facil.json` y `sim_ref_uno.json` idénticos;
-  `sim_ref_barra.json` nuevo; 600 finales `'b'` recalculadas iguales; toda caída nombra el tramo y la zona.
+- Metas: novato con la apertura (90 %) ≥ 99 % válidos y 67 a 88 % verde; al 100 % el novato entre 37 y 65 % y el bueno
+  siempre más (69 a 98 %). Verde del novato al 97 %: tirón Largo 69 / Compacto 56 / Potente 45 %; envión Potente 71 /
+  Compacto 59 / Largo 46 %. Mantener, no tocar y el doble toque: 100 % al 90 %; el machacador pega en el rojo.
+- Esfuerzo (novato): nunca hasta el 92 %; arranque 6 % de los intentos al 95 %, 27 % al 97 %, 66 % al 100 %; dos tiempos 0 a
+  11 % hasta el 100 %. Lo hace el 93 a 97 %; con 2 toques por segundo, el 100 % (602 de 602).
+- Envión al 97 % (novato, válidos): split 84 a 87 %, power 64 a 67 %, squat 38 a 55 %; el bueno, 98-99 / 88-99 / 78-98: el
+  orden se cumple con los tres pesistas.
+- Finales enteras con cansancio (apertura 90 %, después lo que trae el panel; rivales normales): el novato termina con total el
+  100 % de las finales con los tres pesistas; válidos por intento arranque 100 / 91-97 / 77-82 % y dos tiempos 99-100 /
+  88-92 / 63-75 %; cansancio medio al tercer intento ¼ (novato), ⅛ (medio), casi nada (bueno).
+- `chance_test` (30 000 intentos, con cansancio de 0 a ¾ y esfuerzo): error ≤ 3,7 puntos con la persona típica (meta ≤ 5).
+- `ritmo_test` (360 finales): novato, final mediana 131 s (≤ 150), espera máxima 19,9 s (≤ 20), intento propio p90 9,1 s
+  arranque y 13,7 s dos tiempos (metas de `'b'` ≤ 10 y ≤ 15: la barrita y el esfuerzo), barras caídas con el panel 13,3 %
+  (≤ 15). El «lento» (espera siempre al puntero lento) es informativo: final de 201 s.
+- `teclado_test` y `dedo_test` (10 000 secuencias, `'b'` y `'u'`): 0 sin resolver, 0 dobles, 0 sin palabra, 0 barritas
+  disparadas dos veces. `sim_test`: `sim_ref.json`, `sim_ref_facil.json` y `sim_ref_uno.json` idénticos; `sim_ref_barra.json`
+  regenerada. `play_human` (`'u'`), `perf_test` y `servidor_test` en verde.
+- Navegador (`check_barra`, Actions): con el reloj verdadero, entre dónde se veía el puntero al apretar y dónde lo juzgó el
+  núcleo hubo 21 y 25 ms (por software); dos Espacios a 60 ms cuentan uno; cada barrita sale donde se tocó en computadora y
+  teléfono, en español y en inglés.
 
 **Cómo probarlo.** `cd web && python3 -m http.server 8000` → `http://localhost:8000/juego.html` (un `tarima.ctl` guardado que
 no sea Clásico abre en la barrita; `?ctl=u` vuelve a `'u'`). Sin navegador: `node tools/barra_bots.mjs`,
@@ -952,7 +979,7 @@ no sea Clásico abre en la barrita; `?ctl=u` vuelve a `'u'`). Sin navegador: `no
 
 **Apartamientos y pendientes.**
 - «Los kilos que elijas deciden el resto» dice «lo demás»: `sim_test` no deja «resto» (es la palabra vieja del Resto).
-- «Te sobra ¾ de energía» del panel es sin el costo del toque (si pegas en el verde); la chance sí lo cuenta.
+- «Te sobra ¾ de energía» del panel es sin el costo del toque (si pegas en el verde) pero con el cansancio; la chance cuenta todo.
 - Esperar al puntero lento es más fácil (más ms de verde): cuesta tiempo de la final, no se castiga.
 - Sin medir con personas ni en un teléfono de verdad: la persona típica (±105 ms) es una estimación; cada `intento_propio`
   manda `barra_1`, `barra_2`, `barra_pos_1/2` y `barra_sola` para calibrarla con datos.

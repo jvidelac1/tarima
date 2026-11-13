@@ -17,6 +17,7 @@ import { leerDatos } from '../web/js/sim/data.js';
 import { Intento, simular } from '../web/js/sim/attempt.js';
 import { Azar, mezclar } from '../web/js/sim/fixed.js';
 import { cuerpoBarra, BARRA, zonasBarra, chanceBarra } from '../web/js/sim/rules.js';
+import { Partida } from '../web/js/sim/match.js';
 import { traducir, senal } from '../web/js/game/controles.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -26,12 +27,14 @@ export const NOMBRE = { ventura: 'Compacto', brenner: 'Largo', marangi: 'Potente
 const INF = 2147483647;
 
 export const PERFILES = {
-  novato: { sd: 120, sesgo: 40, despiste: 50, reac: 900 },
-  medio: { sd: 70, sesgo: 20, despiste: 20, reac: 600 },
-  bueno: { sd: 35, sesgo: 5, despiste: 5, reac: 400 },
-  tipico: { ...BARRA.tipico, reac: 700 },
+  // `ritmo`: ms entre toques del esfuerzo de pararse (2 por segundo alcanzan); `noEsfuerzo`: de cada 1000, cuántas veces no lo hace
+  novato: { sd: 120, sesgo: 40, despiste: 50, reac: 900, ritmo: 500, noEsfuerzo: 60 },
+  medio: { sd: 70, sesgo: 20, despiste: 20, reac: 600, ritmo: 400, noEsfuerzo: 20 },
+  bueno: { sd: 35, sesgo: 5, despiste: 5, reac: 400, ritmo: 300, noEsfuerzo: 5 },
+  tipico: { ...BARRA.tipico, reac: 700, ritmo: 450, noEsfuerzo: 1000 - BARRA.tipico.esfuerzo },
   machacador: { machaca: 125 }, mantiene: { mantiene: true }, ausente: { ausente: true },
-  doble: { sd: 70, sesgo: 20, despiste: 20, reac: 600, doble: true },
+  doble: { sd: 70, sesgo: 20, despiste: 20, reac: 600, ritmo: 400, noEsfuerzo: 20, doble: true },
+  lento: { sd: 120, sesgo: 40, despiste: 50, reac: 900, ritmo: 520, noEsfuerzo: 0 },      // 2 toques por segundo en el esfuerzo
 };
 
 /** Contexto de un intento en 'b' para el pesista `id` (sin Partida: intensidad dada, garra disponible). */
@@ -64,16 +67,23 @@ export function jugarBarra(ctx, B, sem, o = {}) {
   const agenda = (t, v) => { cola.push([t, v]); cola.sort((a, b) => a[0] - b[0] || b[1] - a[1]); };
   const toque = (t, dur) => { agenda(t, 1); if (dur < INF) agenda(t + dur, 0); };
   if (B.mantiene) toque(conf + 400, INF);
-  let machaca = B.machaca ? conf + 200 : INF, clave = null, plan = INF, contactos = 0;
+  let machaca = B.machaca ? conf + 200 : INF, clave = null, plan = INF, contactos = 0, esfuerzoSigue = null;
   for (let g = 0; !m.res && g < 100000; g++) {
-    const s = senal(m, m.t, 'b'), k = s && s.tipo === 'barra' ? `${s.clave}:${s.desde}` : '';
-    if (k !== clave) { clave = k; plan = k && !B.ausente && !B.mantiene && !B.machaca ? Math.max(m.t, cuandoToca(B, s.desde, r)) : INF; }
+    const s = senal(m, m.t, 'b'), k = s && (s.tipo === 'barra' || s.clave === 'esfuerzo') ? `${s.clave}:${s.desde}` : '';
+    const mira = !B.ausente && !B.mantiene && !B.machaca;
+    if (k !== clave) {
+      clave = k; plan = INF;
+      if (k && mira && s.tipo === 'barra') plan = Math.max(m.t, cuandoToca(B, s.desde, r));
+      // el esfuerzo de pararse: a su ritmo, desde que reacciona (a veces no lo hace)
+      if (k && mira && s.clave === 'esfuerzo' && r.ent(1000) >= (B.noEsfuerzo || 0)) plan = m.t + 300 + r.ent(300);
+    } else if (k && mira && s.clave === 'esfuerzo' && plan === INF && esfuerzoSigue) plan = esfuerzoSigue;
+    esfuerzoSigue = null;
     const tc = cola.length ? cola[0][0] : INF, prox = Math.min(m.proximo(), plan, tc, machaca);
     if (prox >= INF) break;
     m.avanzar(prox); if (m.res) break;
     const meter = (t, v) => { const x = traducir(m, t, v, 'b'); for (const e of x.ent) { ent.push(e); m.entrada(e[0], e[1]); } if (v && x.ent.length) contactos++; };
     if (tc === prox) { const [t, v] = cola.shift(); meter(t, v); continue; }
-    if (plan === prox) { plan = INF; toque(prox, 60 + r.ent(80)); if (B.doble) toque(prox + 40 + r.ent(71), 50); continue; }
+    if (plan === prox) { plan = INF; toque(prox, 60 + r.ent(80)); if (B.doble) toque(prox + 40 + r.ent(71), 50); if (s && s.clave === 'esfuerzo') esfuerzoSigue = prox + Math.max(150, (B.ritmo || 450) + Math.round(normal(r) * 60)); continue; }
     if (machaca === prox) { toque(prox, 40); machaca = prox + B.machaca; continue; }
   }
   if (!m.res) throw new Error('el intento no terminó');
@@ -88,12 +98,12 @@ export function verificar(ctx, S) {
 }
 
 /** Una casilla: `n` intentos del perfil con el pesista, levantamiento e intensidad dados. */
-export function casilla(id, lev, I, B, n, sem0 = 0, extra = {}) {
-  const o = { n: 0, v: 0, z: { verde: 0, amarillo: 0, rojo: 0 }, zi: [{ verde: 0, amarillo: 0, rojo: 0 }, { verde: 0, amarillo: 0, rojo: 0 }], caidaPorZona: { verde: 0, amarillo: 0, rojo: 0 }, contactos: 0 };
-  const env = lev === 'c' ? cuerpoBarra(id).casa : undefined;
+export function casilla(id, lev, I, B, n, sem0 = 0, extra = {}, envFijo = null) {
+  const o = { n: 0, v: 0, z: { verde: 0, amarillo: 0, rojo: 0 }, zi: [{ verde: 0, amarillo: 0, rojo: 0 }, { verde: 0, amarillo: 0, rojo: 0 }], caidaPorZona: { verde: 0, amarillo: 0, rojo: 0 }, contactos: 0, esf: 0, esfOk: 0 };
+  const env = lev === 'c' ? envFijo || cuerpoBarra(id).casa : undefined;
   for (let k = 0; k < n; k++) {
     const sem = mezclar(sem0, k, I, lev === 'c' ? 1 : 0, ATL.indexOf(id)), ctx = ctxBarra(id, lev, env, I, sem, extra), S = jugarBarra(ctx, B, mezclar(sem, 5)), res = verificar(ctx, S).res;
-    o.n++; if (res.res === 'valido') o.v++; o.contactos += S.contactos;
+    o.n++; if (res.res === 'valido') o.v++; o.contactos += S.contactos; if (res.uno.esfuerzo) { o.esf++; if (res.uno.esfuerzo.ok) o.esfOk++; }
     let peor = 'verde';
     for (const b of res.uno.barras || []) { o.z[b.zona]++; o.zi[b.i][b.zona]++; if (b.zona === 'rojo' || (b.zona === 'amarillo' && peor === 'verde')) peor = b.zona; }
     if (res.res !== 'valido') o.caidaPorZona[peor]++;
@@ -139,6 +149,41 @@ if (principal) {
   for (const pf of ['machacador', 'mantiene', 'ausente', 'doble']) {
     const fila = ATL.map(id => { const s = casilla(id, 's', 9000, PERFILES[pf], 100, 91), c = casilla(id, 'c', 9000, PERFILES[pf], 100, 91); return `${NOMBRE[id]} ${pc(s.v, s.n)} / ${pc(c.v, c.n)} %`; });
     console.log(`${pf.padEnd(10)} al 90 % (arranque / dos tiempos): ${fila.join(' · ')}`);
+  }
+  // el esfuerzo de pararse: nunca con la apertura; cuántas veces aparece y cuántas se hace (el lento toca 2 por segundo)
+  for (const lev of ['s', 'c']) {
+    const fila = Is.map(I => { let e = 0, n = 0, ok = 0; for (const id of ATL) { const o = T.novato[`${id}|${lev}|${I}`]; e += o.esf; n += o.n; ok += o.esfOk; } return { I, pct: pc(e, n), ok: pc(ok, e) }; });
+    console.log(`esfuerzo al pararse (novato, ${lev === 's' ? 'arranque' : 'dos tiempos'}): ${fila.map(x => `${x.I / 100} % ${x.pct} %${x.pct ? ` (lo hace ${x.ok} %)` : ''}`).join(' · ')}`);
+    for (const x of fila) if (x.I <= 9200 && x.pct > 0) mal(`el esfuerzo de pararse aparece con ${x.I / 100} % (${x.pct} %): nunca en los intentos fáciles`);
+  }
+  { let e = 0, ok = 0; for (const id of ATL) for (const lev of ['s', 'c']) { const o = casilla(id, lev, 9900, PERFILES.lento, Math.round(N / 2), 33); e += o.esf; ok += o.esfOk; }
+    console.log(`esfuerzo con 2 toques por segundo (lento, 99 %): aparece ${e} veces y lo hace ${pc(ok, e)} %`); if (e && ok < e) mal(`con 2 toques por segundo el esfuerzo no siempre alcanza (${ok} de ${e})`); }
+  // estilos del envión: split (tijera) el más fácil, power intermedio, squat el más difícil, con todos los pesistas
+  for (const pf of ['novato', 'bueno']) {
+    const fila = ATL.map(id => ['split', 'power', 'squat'].map(e => { const o = casilla(id, 'c', 9700, PERFILES[pf], N, 55, {}, e); return pc(o.v, o.n); }));
+    console.log(`envión al 97 %, ${pf}: ${ATL.map((id, k) => `${NOMBRE[id]} split ${fila[k][0]} · power ${fila[k][1]} · squat ${fila[k][2]} %`).join(' | ')}`);
+    ATL.forEach((id, k) => { if (!(fila[k][0] >= fila[k][1] && fila[k][1] >= fila[k][2])) mal.push(`${pf} ${NOMBRE[id]}: el orden de los enviones no es split ≥ power ≥ squat (${fila[k].join(' / ')})`); });
+  }
+  // finales enteras con el cansancio: la apertura sugerida (90 %) y después lo que trae el panel (el entrenador)
+  for (const pf of ['novato', 'medio', 'bueno']) for (const id of ATL) {
+    const F = { finales: 0, total: 0, val: [0, 0, 0, 0, 0, 0], int: [0, 0, 0, 0, 0, 0], fat3: 0, n3: 0 }, yo = ATL.indexOf(id);
+    for (let k = 0; k < Math.max(60, Math.round(N / 4)); k++) {
+      const p = new Partida(datos, { semilla: mezclar(k, 777, yo), nivel: 'normal', cal: 0, primera: false, ctl: 'b', tactil: true, atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
+      for (const lev of ['s', 'c']) { const [lo, hi] = p.rangoApertura(yo, lev); p.abrir(yo, lev, Math.max(lo, Math.min(hi, Math.round(datos.atletas[id].techo[lev] * .9)))); }
+      p.empezar();
+      for (let g = 0; p.fase !== 'fin' && g < 80; g++) {
+        if (p.fase === 'intervalo') { p.empezar(); continue; }
+        const L = p.llamado; if (p.at[L.a].ctrl === 'juego') { p.resolverIA(); continue; }
+        const env = L.lev === 'c' ? 'split' : undefined, ctx = p.contexto(env), j = (L.lev === 'c' ? 3 : 0) + L.n - 1;
+        if (L.n === 3) { F.fat3 += ctx.fatiga || 0; F.n3++; }
+        const S = jugarBarra(ctx, PERFILES[pf], mezclar(k, g, 99)), x = p.resolver({ conf: S.conf, env, ent: S.ent });
+        F.int[j]++; if (x.res.res === 'valido') F.val[j]++;
+      }
+      F.finales++; if (p.at[yo].mejor.s && p.at[yo].mejor.c) F.total++;
+    }
+    const v = F.val.map((x, i) => pc(x, F.int[i]).toFixed(0));
+    console.log(`final ${pf.padEnd(6)} ${NOMBRE[id].padEnd(9)} con total ${pc(F.total, F.finales)} % · válidos por intento (arr. 1-2-3 / dt 1-2-3) ${v.slice(0, 3).join('-')} / ${v.slice(3).join('-')} % · cansancio medio al tercer intento ${Math.round(F.fat3 / Math.max(1, F.n3))}`);
+    if (pf === 'novato' && pc(F.total, F.finales) < 90) mal.push(`el novato con ${NOMBRE[id]} termina con total solo el ${pc(F.total, F.finales)} % de las finales (meta ≥ 90)`);
   }
   // chance del panel (perfil típico) contra lo medido con el bot típico, por casilla (informativo; la prueba es chance_test)
   let peor = 0;

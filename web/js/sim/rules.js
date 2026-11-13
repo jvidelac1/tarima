@@ -217,7 +217,11 @@ export const TRAMOS = { s: ['tiron', 'arriba', 'pararse'], c: ['tiron', 'pararse
 export function gastoTramo(tramo, I, lev, env, cuerpo) {
   const r = rUno(I), k = cuerpo[tramo] ?? 1000;
   let g = idiv(UNO.base[tramo] * r * k, 1000000);
-  if (tramo === 'arriba' && lev === 'c') { const E = UNO.envion[env] || UNO.envion.split; g = idiv(g * E.k, 1000) + E.mas + (env === 'squat' ? (cuerpo.movil ? UNO.squatMovil : UNO.squatRigido) : 0); }
+  if (tramo === 'arriba' && lev === 'c') {
+    // 'b' trae su propia tabla de enviones en el cuerpo (cuerpoBarra): split < power < squat para todos; 'u' usa la de UNO
+    const T = cuerpo.envion || UNO.envion, E = T[env] || T.split, mov = cuerpo.envion ? cuerpo.squatMov : null;
+    g = idiv(g * E.k, 1000) + E.mas + (env === 'squat' ? (mov ? (cuerpo.movil ? mov.alta : mov.baja) : cuerpo.movil ? UNO.squatMovil : UNO.squatRigido) : 0);
+  }
   if (tramo === 'pararse') g = Math.max(0, g - UNO.pararseMenos);
   return g;
 }
@@ -232,14 +236,14 @@ export function garraAlcanza(m, restantes) { let x = m + UNO.garra; if (x < 0) r
  * llega); `justo`: el tramo donde queda más baja; `mayor`: el que más gasta; `gastos`; `conGarra`: no llega, pero con la
  * garra (si la tiene) sí.
  */
-export function previsto(I, lev, env, cuerpo) {
-  let m = UNO.margen, min = Infinity, justo = null, mayor = null; const gastos = {};
+export function previsto(I, lev, env, cuerpo, m0 = UNO.margen) {
+  let m = m0, min = Infinity, justo = null, mayor = null; const gastos = {};
   for (const tr of TRAMOS[lev]) {
     const g = gastos[tr] = gastoTramo(tr, I, lev, env, cuerpo); m -= g;
     if (m < min) { min = m; justo = tr; } if (mayor === null || g > gastos[mayor]) mayor = tr;
   }
   // sin suerte y con la garra: ¿la salva? (mismas reglas que _uCierra)
-  let x = UNO.margen, conGarra = false; const G = TRAMOS[lev].map(tr => gastos[tr]);
+  let x = m0, conGarra = false; const G = TRAMOS[lev].map(tr => gastos[tr]);
   for (let i = 0; i < G.length; i++) { x -= G[i]; if (x >= 0) continue; if (!conGarra && x >= UNO.frenoMin && garraAlcanza(x, G.slice(i + 1))) { x += UNO.garra; conGarra = true; continue; } conGarra = false; break; }
   return { fin: m, min, justo, mayor, gastos, conGarra: conGarra && m < 0 };
 }
@@ -283,6 +287,15 @@ export function chanceUno(I, lev, env, cuerpo, o = {}) {
  *                esa barrita = más ancho) y el primer intento de la primera final (`primera`)
  *   costo        energía de más que gasta el tramo según la zona (se suma al gasto del tramo de esa barrita)
  *   escala       el gasto de cada tramo en 'b' sobre el de 'u' (milésimas)
+ *   envion       el tramo «arriba» del dos tiempos en 'b' por estilo: split (tijera) el más fácil, power intermedio, squat el más
+ *                difícil, para todos (`squatMov`: la movilidad alta achica la diferencia del squat sin invertir el orden), y
+ *                `verdeEnvion`: el verde de la barrita del envión por estilo (milésimas)
+ *   fatiga       cansancio: lo que un levantamiento exigió (un cuarto de lo que costaron sus toques, `garra` si la usó y un cuarto
+ *                de lo que quedó por debajo de `bajo`), en pasos de `paso`, se resta a la energía inicial de los intentos
+ *                siguientes del mismo levantamiento; del arranque pasa la mitad al dos tiempos. Tope `tope` por levantamiento
+ *   esfuerzo     en un intento exigente (desde la intensidad `desdeI`, si al empezar a pararse la energía que quedaría sin
+ *                suerte baja de `umbral`), pararse pide `toques` toques en `ms` (sin apuro: 2 por segundo alcanzan). Si los
+ *                hace, el tramo cuesta `premio` menos; si no, cuesta lo de siempre (cae solo si no alcanzaba)
  *   tipico       la persona que supone el panel («X de 10»): error de tiempo de campana (`sd` ms, corrida `sesgo` ms) y
  *                `despiste` milésimas de toques en cualquier lado. La miden tools/barra_bots.mjs y tools/chance_test.mjs
  */
@@ -291,10 +304,14 @@ export const BARRA = {
   pasada: 1400, lentoDesde: 8000, pasadaLenta: 1700, soloMs: 60000, respiraMs: 800, doble: 120, graciaMs: 250,
   tI: [9000, 9500, 10000, 10300], tVerde: [170, 125, 75, 60], tAmarillo: [220, 180, 140, 130], primera: 1400, topeVerde: 380, topeAmarillo: 470,
   costo: { verde: 0, amarillo: 600, rojo: 1500 },
-  escala: { tiron: 900, arriba: 900, pararse: 900 },
-  pesistas: { ventura: { tiron: 1000, envion: 1000 }, brenner: { tiron: 1300, envion: 750 }, marangi: { tiron: 750, envion: 1300 } },
+  escala: { tiron: 925, arriba: 925, pararse: 925 },
+  pesistas: { ventura: { tiron: 1000, envion: 1000 }, brenner: { tiron: 1250, envion: 800 }, marangi: { tiron: 750, envion: 1300 } },
   neutro: { tiron: 1000, envion: 1000 },
-  tipico: { sesgo: 30, sd: 105, despiste: 40 },
+  envion: { split: { k: 700, mas: 0 }, power: { k: 850, mas: 300 }, squat: { k: 950, mas: 600 } }, squatMov: { alta: -200, baja: 0 },
+  verdeEnvion: { split: 1000, power: 900, squat: 800 },
+  fatiga: { bajo: 500, garra: 250, paso: 50, tope: 750 },
+  esfuerzo: { desdeI: 9500, umbral: 100, toques: 3, ms: 3000, premio: 300 },
+  tipico: { sesgo: 30, sd: 105, despiste: 40, esfuerzo: 950 },
 };
 /** Huella de las reglas de 'b' (BARRA, UNO y los cuerpos): va en la cabecera de los registros de 'b' y replay.js la exige. */
 export const HUELLA_B = huella(canonico({ BARRA, UNO, CUERPOS_U, CUERPO_NEUTRO }));
@@ -307,7 +324,21 @@ export const TRAMO_BARRA = ['tiron', 'arriba'];
 export function cuerpoBarra(x) {
   const c = typeof x === 'string' || !x || x.cuerpoJuego ? cuerpoDe(x) : { ...CUERPO_NEUTRO, ...x }, E = BARRA.escala;
   return { ...c, tiron: idiv(c.tiron * E.tiron, 1000), arriba: idiv(c.arriba * E.arriba, 1000), pararse: idiv(c.pararse * E.pararse, 1000),
-    barra: { ...BARRA.neutro, ...(typeof x === 'string' ? BARRA.pesistas[x] : x && x.barra) } };
+    barra: { ...BARRA.neutro, ...(typeof x === 'string' ? BARRA.pesistas[x] : x && x.barra) }, envion: BARRA.envion, squatMov: BARRA.squatMov };
+}
+/** Cansancio (energía, milésimas) que deja un levantamiento en 'b' (`uno`: res.uno del núcleo). */
+export function fatigaDe(uno) {
+  if (!uno) return 0; const F = BARRA.fatiga, toques = (uno.barras || []).reduce((a, b) => a + b.extra, 0);
+  const f = idiv(toques, 4) + (uno.garra === 'usada' ? F.garra : 0) + (uno.margen_fin < F.bajo ? idiv(F.bajo - Math.max(uno.margen_fin, -F.bajo), 4) : 0);
+  return idiv(f, F.paso) * F.paso;
+}
+/** ¿Pide el esfuerzo de pararse? `m`: energía al empezar a pararse; `gPararse`: lo que cuesta pararse sin suerte. */
+export const pideEsfuerzo = (I, m, gPararse) => I >= BARRA.esfuerzo.desdeI && gPararse > 0 && m - gPararse < BARRA.esfuerzo.umbral;
+/** Agrega el cansancio `f` de un intento del levantamiento `lev` a `fat` ({s, c}): todo en el mismo, la mitad del arranque al dos tiempos. */
+export function sumarFatiga(fat, lev, f) {
+  const T = BARRA.fatiga.tope, P = BARRA.fatiga.paso;
+  fat[lev] = Math.min(T, fat[lev] + f); if (lev === 's') fat.c = Math.min(T, fat.c + idiv(idiv(f, 2), P) * P);
+  return fat;
 }
 /** Posición del puntero (milésimas de la barrita, 0 a 1000) a `e` ms de que arrancó: va y vuelve, empieza a la izquierda. */
 export function posBarra(e) {
@@ -326,8 +357,8 @@ function anchosMs(I, k, primera) {
  * Zonas de la barrita `i` (0 tirón, 1 envión) a la intensidad I para el cuerpo `cuerpo` (cuerpoBarra): `v` y `a`, medio
  * ancho del verde y del amarillo en milésimas de la barrita alrededor del centro (500); `vMs` y `aMs`, lo mismo en ms.
  */
-export function zonasBarra(I, cuerpo, i, primera = false) {
-  const b = (cuerpo && cuerpo.barra) || BARRA.neutro, { v: vMs, a: aMs } = anchosMs(I, i ? b.envion : b.tiron, primera);
+export function zonasBarra(I, cuerpo, i, primera = false, env = 'split') {
+  const b = (cuerpo && cuerpo.barra) || BARRA.neutro, k = i ? idiv(b.envion * (BARRA.verdeEnvion[env] || 1000), 1000) : b.tiron, { v: vMs, a: aMs } = anchosMs(I, k, primera);
   const v = Math.min(BARRA.topeVerde, idiv(vMs * 1000, BARRA.pasada)), a = Math.min(BARRA.topeAmarillo, Math.max(v + 10, idiv(aMs * 1000, BARRA.pasada)));
   return { v, a, vMs: idiv(v * BARRA.pasada, 1000), aMs: idiv(a * BARRA.pasada, 1000) };
 }
@@ -362,25 +393,28 @@ export function repartoBarra(z, perfil = BARRA.tipico) {
 export function chanceBarra(I, lev, env, cuerpo, o = {}) {
   const T = TRAMOS[lev], G = T.map(tr => gastoTramo(tr, I, lev, env, cuerpo)), k = cuerpo.ruido || 0, n = 2 * k + 1, perfil = o.perfil || BARRA.tipico;
   // reparto de zonas de la barrita de cada tramo (null: el tramo no tiene barrita)
-  const R = T.map(tr => { const i = TRAMO_BARRA.indexOf(tr); if (i < 0 || (i === 1 && lev !== 'c')) return null; const r = repartoBarra(zonasBarra(I, cuerpo, i, !!o.primera), perfil); return [[r.verde, BARRA.costo.verde], [r.amarillo, BARRA.costo.amarillo], [r.rojo, BARRA.costo.rojo]]; });
+  const R = T.map(tr => { const i = TRAMO_BARRA.indexOf(tr); if (i < 0 || (i === 1 && lev !== 'c')) return null; const r = repartoBarra(zonasBarra(I, cuerpo, i, !!o.primera, env), perfil); return [[r.verde, BARRA.costo.verde], [r.amarillo, BARRA.costo.amarillo], [r.rojo, BARRA.costo.rojo]]; });
   const memo = new Map();
   const f = (i, m, garra) => {
     if (i === G.length) return 1;
     const key = i * 4 + (garra ? 1 : 0) + ':' + m; let v = memo.get(key); if (v !== undefined) return v;
-    v = 0; const Z = R[i] || [[1, 0]];
+    v = 0; let Z = R[i] || [[1000, 0]];
+    // pararse con esfuerzo (intento exigente): lo hace la persona típica `perfil.esfuerzo` de cada 1000 veces
+    if (T[i] === 'pararse' && pideEsfuerzo(I, m, G[i])) { const pe = perfil.esfuerzo ?? 1000; Z = [[pe, -BARRA.esfuerzo.premio], [1000 - pe, 0]]; }
     for (let j = 0; j < n; j++) {
       const g = conSuerte(G[i], (j - k) * UNO.ruidoPaso);
       for (const [w, extra] of Z) {
         if (!w) continue;
-        let x = m - g - extra, gg = garra;
+        let x = m - (extra < 0 ? Math.max(0, g + extra) : g + extra), gg = garra;
         if (x < 0) { if (gg && x >= UNO.frenoMin && garraAlcanza(x, G.slice(i + 1))) { x += UNO.garra; gg = false; } else continue; }
         v += w * f(i + 1, x, gg);
       }
     }
     memo.set(key, v); return v;
   };
-  let total = n ** G.length; for (const z of R) if (z) total *= z.reduce((a, x) => a + x[0], 0);
-  return idiv(f(0, UNO.margen, o.garra !== false) * 1000, total);
+  // cada tramo reparte 1000 (zonas, esfuerzo o nada): el total es n^tramos · 1000^tramos, y se divide sin perder enteros
+  const total = n ** G.length * 1000 ** (G.length - 1);
+  return idiv(f(0, UNO.margen - (o.fatiga || 0), o.garra !== false), total);
 }
 
 /** Causas con su texto. Las de fallo y las de nulo (secciones 5.2 y 5.3). */

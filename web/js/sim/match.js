@@ -5,7 +5,7 @@ import { idiv, rdiv, clampi, mezclar, Azar } from './fixed.js';
 import { simular } from './attempt.js';
 import { gestos, decidir, elegirEnvion } from './ai.js';
 import { sugerencia } from './entrenador.js';
-import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad, cuerpoDe, cuerpoBarra, HUELLA_U, HUELLA_B } from './rules.js';
+import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad, cuerpoDe, cuerpoBarra, HUELLA_U, HUELLA_B, fatigaDe, sumarFatiga } from './rules.js';
 
 const LEVS = ['s', 'c'];
 
@@ -29,7 +29,7 @@ export class Partida {
       const f = datos.atletas[x.id]; if (!f) throw new Error('pesista desconocido: ' + x.id);
       const forma = { s: r.entre(-2, 2), c: r.entre(-2, 2) }, pct = clampi(f.ia.apertura + r.entre(-25, 25), 910, 960) + N.abre;
       const saltos = { s: f.ia.saltos.s.map(k => k + r.entre(-1, 1)), c: f.ia.saltos.c.map(k => k + r.entre(-1, 1)) }, sube1 = [r.ent(3) === 0, r.ent(3) === 0, r.ent(3) === 0, r.ent(3) === 0];
-      const a = { i, id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego', f, modelo: datos.modelos[f.modelo], resto: RESTO.ini, forma, saltos, sube1, s: [], c: [], decl: { s: 0, c: 0 }, mejor: { s: 0, c: 0 }, seqMejor: { s: -1, c: -1 }, ult: { s: -1, c: -1 }, cambios: 0, bono: '', garraUno: { s: true, c: true } };
+      const a = { i, id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego', f, modelo: datos.modelos[f.modelo], resto: RESTO.ini, forma, saltos, sube1, s: [], c: [], decl: { s: 0, c: 0 }, mejor: { s: 0, c: 0 }, seqMejor: { s: -1, c: -1 }, ult: { s: -1, c: -1 }, cambios: 0, bono: '', garraUno: { s: true, c: true }, fatiga: { s: 0, c: 0 } };
       if (a.ctrl === 'juego') { if (N.forma) { forma.s += N.forma; forma.c += N.forma; } a.decl.s = rdiv(f.techo.s * pct, 1000); a.decl.c = rdiv(f.techo.c * pct, 1000); }
       return a;
     });
@@ -131,7 +131,7 @@ export class Partida {
       cal: persona ? this.cfg.cal : 0, primera: persona && this.cfg.primera && L.n === 1, domina: L.lev === 's' || f.enviones.includes(env), jueces: this.jueces, reloj: L.reloj, ctl: persona ? this.cfg.ctl : 'c', ...(persona && this.cfg.tactil ? { tactil: true } : {}),
       // 'u' y 'b': el cuerpo de juego del pesista (rules.js → CUERPOS_U; en 'b', con el ancho de cada barrita) y si todavía
       // tiene la garra de este levantamiento
-      ...(persona && this.cfg.ctl === 'u' ? { cuerpo: cuerpoDe(a.id), garraUno: a.garraUno[L.lev] } : persona && this.cfg.ctl === 'b' ? { cuerpo: cuerpoBarra(a.id), garraUno: a.garraUno[L.lev] } : {}) };
+      ...(persona && this.cfg.ctl === 'u' ? { cuerpo: cuerpoDe(a.id), garraUno: a.garraUno[L.lev] } : persona && this.cfg.ctl === 'b' ? { cuerpo: cuerpoBarra(a.id), garraUno: a.garraUno[L.lev], fatiga: a.fatiga[L.lev] } : {}) };
   }
   /** ¿Puede el pesista del llamado pedir `kg` en el instante `ms`? Devuelve el motivo si no. */
   cambioValido(ms, kg) {
@@ -179,6 +179,7 @@ export class Partida {
     a[lev].push({ kg: L.kg, res: res.res, causa: res.causa, luces: res.luces, seq, env: ctx.env, et: L.et, I: ctx.I, gasto });
     if (valido && L.kg > a.mejor[lev]) { a.mejor[lev] = L.kg; a.seqMejor[lev] = seq; }
     if (res.uno && res.uno.garra === 'usada') a.garraUno[lev] = false;      // 'u': una garra por levantamiento
+    if (ctx.ctl === 'b' && res.uno) sumarFatiga(a.fatiga, lev, fatigaDe(res.uno));      // 'b': lo que exigió este intento cansa a los siguientes
     for (const b of this.at) if (b !== a) b.resto = Math.min(RESTO.ini, b.resto + RESTO.ajeno);
     a.ult[lev] = seq; a.cambios = 0; this.ultimo = a.i; this.barra = L.kg;
     // declaración automática: el plan del entrenador

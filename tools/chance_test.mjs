@@ -36,8 +36,9 @@ for (const pf of ['tipico', 'novato', 'bueno']) {
   const rb = new Azar(98), GB = {}, nB = pf === 'tipico' ? N : Math.round(N / 3);
   for (let k = 0; k < nB; k++) {
     const id = ATL[rb.ent(3)], lev = rb.ent(2) ? 's' : 'c', env = lev === 'c' ? ['split', 'power', 'squat'][rb.ent(3)] : undefined, I = 9300 + rb.ent(1101), garra = rb.ent(4) !== 0;
-    const cuerpo = cuerpoBarra(id), ch = chanceBarra(I, lev, env, cuerpo, { garra });
-    const ctx = ctxBarra(id, lev, env, I, mezclar(k, 991), { tactil: !!rb.ent(2), garraUno: garra });
+    // con cansancio de los intentos anteriores (0 a ¾) y, en los exigentes, el esfuerzo de pararse
+    const fatiga = rb.ent(4) * 250, cuerpo = cuerpoBarra(id), ch = chanceBarra(I, lev, env, cuerpo, { garra, fatiga });
+    const ctx = ctxBarra(id, lev, env, I, mezclar(k, 991), { tactil: !!rb.ent(2), garraUno: garra, fatiga });
     const res = verificarB(ctx, jugarBarra(ctx, PERFILES[pf], mezclar(k, 992))).res, b = deDiez(ch), g = (GB[b] ||= { n: 0, v: 0, p: 0 });
     g.n++; g.p += ch / 10; if (res.res === 'valido') g.v++;
   }

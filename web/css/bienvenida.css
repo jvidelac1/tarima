@@ -40,11 +40,11 @@ button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px
 .panel button[data-sonido="no"][aria-pressed="true"]{color:#ffb4a8}
 /* teléfono de costado (o cualquier pantalla baja y ancha): la bienvenida en dos columnas para que entre sin desplazar */
 @media (min-aspect-ratio:3/2) and (max-height:600px){
-  .panel.bienvenida{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);column-gap:16px;align-content:start}
-  .panel.bienvenida>*{grid-column:1}
-  .panel.bienvenida>#pesista-t{grid-column:2;grid-row:1}
-  .panel.bienvenida>.pesistas{grid-column:2;grid-row:2/span 4;align-self:start;margin-top:0}
-  .panel.bienvenida>.fila,.panel.bienvenida>.opciones{grid-column:1/-1}
+  .panel.bienvenida>.bv-cuerpo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);column-gap:16px;align-content:start}
+  .panel.bienvenida>.bv-cuerpo>*{grid-column:1}
+  .panel.bienvenida>.bv-cuerpo>#pesista-t{grid-column:2;grid-row:1}
+  .panel.bienvenida>.bv-cuerpo>.pesistas{grid-column:2;grid-row:2/span 4;align-self:start;margin-top:0}
+  .panel.bienvenida>.bv-cuerpo>.fila,.panel.bienvenida>.bv-cuerpo>.opciones{grid-column:1/-1}
   .panel.gana{max-width:min(96cqw,760px)}
   .panel.gana .reglas{margin:.2em 0;line-height:1.4}
   .pesistas.rivales .pesista{padding:.35em .5em}
@@ -52,18 +52,18 @@ button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px
   .panel.bienvenida .cabeza{padding-right:0}
   .panel.bienvenida .idiomas{top:10px;right:14px}
   .panel.bienvenida .cabeza{position:static}
-  .panel.bienvenida>#pesista-t{padding-right:6.5em}
+  .panel.bienvenida>.bv-cuerpo>#pesista-t{padding-right:6.5em}
   .panel.bienvenida label.nombre{margin-top:.3em}
   .panel.bienvenida .pesista small{font-size:.74em}
   .glosario div{font-size:clamp(11px,3.3cqh,13px)}
   button.grande{min-height:46px}
 }
 /* lo mismo en el teléfono de costado, también con el contenido girado (html.horiz.bajo lo pone telefono.js) */
-  :where(html.horiz.bajo) .panel.bienvenida{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);column-gap:16px;align-content:start}
-  :where(html.horiz.bajo) .panel.bienvenida>*{grid-column:1}
-  :where(html.horiz.bajo) .panel.bienvenida>#pesista-t{grid-column:2;grid-row:1}
-  :where(html.horiz.bajo) .panel.bienvenida>.pesistas{grid-column:2;grid-row:2/span 4;align-self:start;margin-top:0}
-  :where(html.horiz.bajo) .panel.bienvenida>.fila,:where(html.horiz.bajo) .panel.bienvenida>.opciones{grid-column:1/-1}
+  :where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);column-gap:16px;align-content:start}
+  :where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo>*{grid-column:1}
+  :where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo>#pesista-t{grid-column:2;grid-row:1}
+  :where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo>.pesistas{grid-column:2;grid-row:2/span 4;align-self:start;margin-top:0}
+  :where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo>.fila,:where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo>.opciones{grid-column:1/-1}
   :where(html.horiz.bajo) .panel.gana{max-width:min(96cqw,760px)}
   :where(html.horiz.bajo) .panel.gana .reglas{margin:.2em 0;line-height:1.4}
   :where(html.horiz.bajo) .pesistas.rivales .pesista{padding:.35em .5em}
@@ -71,7 +71,7 @@ button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px
   :where(html.horiz.bajo) .panel.bienvenida .cabeza{padding-right:0}
   :where(html.horiz.bajo) .panel.bienvenida .idiomas{top:10px;right:14px}
   :where(html.horiz.bajo) .panel.bienvenida .cabeza{position:static}
-  :where(html.horiz.bajo) .panel.bienvenida>#pesista-t{padding-right:6.5em}
+  :where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo>#pesista-t{padding-right:6.5em}
   :where(html.horiz.bajo) .panel.bienvenida label.nombre{margin-top:.3em}
   :where(html.horiz.bajo) .panel.bienvenida .pesista small{font-size:.74em}
   :where(html.horiz.bajo) .glosario div{font-size:clamp(11px,3.3cqh,13px)}
@@ -155,3 +155,8 @@ fieldset.pregunta legend{font-family:var(--display);font-weight:700;text-transfo
   .panel.bienvenida .pesistas{margin:.4em 0}
   .panel.bienvenida .pesista small.conviene{font-size:.74em;line-height:1.25}
 }
+/* bienvenida: la parte de arriba se desplaza y la fila de botones queda abajo, fuera de ella (antes era pegajosa y tapaba
+   el final de las tarjetas en pantallas bajas) */
+.panel.bienvenida{display:flex;flex-direction:column;overflow:hidden}
+.panel.bienvenida>.bv-cuerpo{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;padding-bottom:6px}
+.panel.bienvenida>.pie{position:static;flex:none}

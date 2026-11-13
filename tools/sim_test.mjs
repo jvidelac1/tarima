@@ -485,7 +485,7 @@ function jugar(semilla, nivel, persona, estilo = {}) {
       const lev = k % 2 ? 'c' : 's', id = IDS[k % 3], f = datos.atletas[id], I = 9000 + r.ent(1400), c = cuerpoBarra(id), env = lev === 'c' ? c.casa : undefined;
       const ctx = { lev, env, I, tec: f.attrs.tec, temple: 0, garra: f.attrs.gar, anclas: datos.modelos[f.modelo], semilla: mezclar(k, 6), cal: 0, primera: false, domina: true, jueces: [1000, 1000, 1000], reloj: 30000, ctl: 'b', cuerpo: c, garraUno: k % 4 !== 0 };
       const S = jugarBarra(ctx, Object.values(PERFILES)[k % 4], k), res = S.m.res;
-      for (const b of res.uno.barras) { zonas[b.zona]++; ok(b.sola || zonaBarra(b.pos, zonasBarra(I, c, b.i)) === b.zona, `zona mal juzgada: ${JSON.stringify(b)}`); }
+      for (const b of res.uno.barras) { zonas[b.zona]++; ok(b.sola || zonaBarra(b.pos, zonasBarra(I, c, b.i, false, env || 'split')) === b.zona, `zona mal juzgada: ${JSON.stringify(b)}`); }
       if (res.res !== 'fallo') continue;
       for (const l of ['es', 'en']) {
         const txt = explicar(res, 'b', k % 2 === 0, { lev, quien: 'Ana', kg: 170, pct: Math.round(I / 100) }, l), corta = explicar(res, 'b', false, { lev }, l);

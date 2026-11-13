@@ -5,55 +5,55 @@
    "semilla": 5000011,
    "nivel": "amistoso",
    "persona": 0,
-   "tabla": "ventura:162+206=368#1 brenner:170+196=366#2 marangi:166+0=0#-"
+   "tabla": "brenner:170+196=366#1 marangi:166+0=0#- ventura:160+0=0#-"
   },
   {
    "semilla": 10000022,
    "nivel": "normal",
    "persona": 1,
-   "tabla": "marangi:169+204=373#1 ventura:163+203=366#2 brenner:164+199=363#3"
+   "tabla": "marangi:172+203=375#1 ventura:163+206=369#2 brenner:164+194=358#3"
   },
   {
    "semilla": 15000033,
    "nivel": "dificil",
    "persona": 2,
-   "tabla": "ventura:164+209=373#1 brenner:169+203=372#2 marangi:164+195=359#3"
+   "tabla": "brenner:168+202=370#1 ventura:164+202=366#2 marangi:163+195=358#3"
   },
   {
    "semilla": 20000044,
    "nivel": "amistoso",
    "persona": 0,
-   "tabla": "ventura:162+204=366#1 brenner:167+193=360#2 marangi:168+0=0#-"
+   "tabla": "brenner:167+201=368#1 ventura:162+199=361#2 marangi:168+0=0#-"
   },
   {
    "semilla": 25000055,
    "nivel": "normal",
    "persona": 1,
-   "tabla": "marangi:173+204=377#1 ventura:168+202=370#2 brenner:168+0=0#-"
+   "tabla": "marangi:172+205=377#1 ventura:168+202=370#2 brenner:168+0=0#-"
   },
   {
    "semilla": 30000066,
    "nivel": "dificil",
    "persona": 2,
-   "tabla": "brenner:173+205=378#1 ventura:164+206=370#2 marangi:165+204=369#3"
+   "tabla": "brenner:173+205=378#1 ventura:164+204=368#2 marangi:164+200=364#3"
   },
   {
    "semilla": 35000077,
    "nivel": "amistoso",
    "persona": 0,
-   "tabla": "ventura:168+200=368#1 marangi:169+193=362#2 brenner:162+192=354#3"
+   "tabla": "marangi:167+199=366#1 ventura:166+199=365#2 brenner:162+203=365#3"
   },
   {
    "semilla": 40000088,
    "nivel": "normal",
    "persona": 1,
-   "tabla": "marangi:174+206=380#1 ventura:162+205=367#2 brenner:169+197=366#3"
+   "tabla": "marangi:175+202=377#1 ventura:162+202=364#2 brenner:170+193=363#3"
   },
   {
    "semilla": 45000099,
    "nivel": "dificil",
    "persona": 2,
-   "tabla": "brenner:174+203=377#1 ventura:162+209=371#2 marangi:168+202=370#3"
+   "tabla": "ventura:162+214=376#1 brenner:174+201=375#2 marangi:167+192=359#3"
   }
  ]
 }

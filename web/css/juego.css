@@ -411,7 +411,7 @@ body:has(#margen:not([hidden])) .rival{top:calc(var(--u)*10.6 + var(--st))}
 .barrita .b-marca[data-zona=verde]{border-color:#fff;background:#22c56b}
 .barrita .b-marca[data-zona=amarillo]{border-color:#0a1020;background:#f4c430}
 .barrita .b-marca[data-zona=rojo]{border-color:#fff;background:#d0392f;border-radius:3px;transform:rotate(45deg)}
-.barrita .b-pal{position:absolute;left:0;right:0;top:0;height:calc(var(--u)*2.6);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:calc(var(--u)*2.5);letter-spacing:.05em;text-shadow:0 2px 8px #000,0 0 2px #000;opacity:0}
+.barrita .b-pal{position:absolute;left:0;right:0;top:0;width:max-content;margin:0 auto;padding:0 .5em;background:rgba(6,14,48,.88);border-radius:4px;height:calc(var(--u)*2.6);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:calc(var(--u)*2.5);letter-spacing:.05em;text-shadow:0 2px 8px #000,0 0 2px #000;opacity:0}
 .barrita .b-pal.on{opacity:1}
 .barrita .b-pal.verde{color:#5cf29b}.barrita .b-pal.amarillo{color:#ffd54a}.barrita .b-pal.rojo{color:#ff6a5f}
 .barrita .b-fant{position:absolute;top:50%;transform:translate(-50%,-50%);pointer-events:none}
@@ -456,3 +456,4 @@ body:has(#barrita:not([hidden])) .guia{bottom:calc(var(--u)*15.5 + var(--sb))}
 :where(html.horiz.bajo) .mb-pista{width:4.6em;height:.8em}
 :where(html.horiz.bajo) .panel:has(.verde-b) p.garra{display:none}
 :where(html.horiz.bajo) .panel:has(.verde-b) .discos .justo{display:none}      /* en 'b' el verde dice más que «lo más duro» */
+.verde-b .cansancio{color:#ff8a80;font-weight:700;margin-left:auto}

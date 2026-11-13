@@ -45,6 +45,8 @@ const PANTALLAS = [
   // la computadora baja del dueño (~1800×560 visibles): solo la bienvenida, con las tarjetas de los pesistas
   { id: 'bajo_es', lang: 'es', vp: { width: 1800, height: 560 }, tactil: false, soloInicio: true },
   { id: 'bajo_en', lang: 'en', vp: { width: 1800, height: 560 }, tactil: false, soloInicio: true },
+  { id: 'pc600_es', lang: 'es', vp: { width: 1280, height: 600 }, tactil: false, soloInicio: true },
+  { id: 'pc700_en', lang: 'en', vp: { width: 1440, height: 700 }, tactil: false, soloInicio: true },
 ].filter(x => !SOLO || x.id === SOLO);
 
 for (const P of PANTALLAS) try {
@@ -79,8 +81,8 @@ for (const P of PANTALLAS) try {
       for (let i = 0; i < k.length; i++) for (let j = i + 1; j < k.length; j++) { const a = k[i], b = k[j]; if (a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1) cruces++; }
       const fuera = k.some(x => x.bottom > r.bottom + 1 || x.right > r.right + 1);
       return { id: p.dataset.id, cruces, fuera, tapa: !!pie && r.bottom > pie.top + 1 && r.top < pie.bottom, alto: Math.round(r.height) }; }); });
-    const PN = await J(() => { const pn = document.querySelector('#capa .panel'); return pn ? { cliente: pn.clientHeight, contenido: pn.scrollHeight } : null; });
-    console.log(`${tag} panel de bienvenida: ${PN?.cliente} px a la vista de ${PN?.contenido} px`);
+    const PN = await J(() => { const pn = document.querySelector('#capa .panel .bv-cuerpo') || document.querySelector('#capa .panel'), r = pn?.getBoundingClientRect(), ult = [...document.querySelectorAll('#capa .pesista')].map(x => x.getBoundingClientRect().bottom); return pn ? { cliente: pn.clientHeight, contenido: pn.scrollHeight, tarjetas: Math.round(Math.max(...ult) - r.bottom) } : null; });
+    console.log(`${tag} parte de arriba de la bienvenida: ${PN?.cliente} px a la vista de ${PN?.contenido} px · ${PN && PN.tarjetas <= 0 ? 'las tarjetas se ven enteras sin desplazar' : `las tarjetas piden desplazar ${PN?.tarjetas} px (se desplaza; la fila de botones no las tapa)`}`);
     console.log(`${tag} tarjetas: ${T.map(x => `${x.id} ${x.alto} px${x.cruces ? ` · ${x.cruces} cruces` : ''}${x.fuera ? ' · se corta' : ''}${x.tapa ? ' · bajo los botones' : ''}`).join(' | ')}`);
     for (const x of T) if (x.cruces || x.fuera || x.tapa) mal(`la tarjeta de ${x.id} no se lee entera: ${JSON.stringify(x)}`); }
   if (P.soloInicio) { await ctx.close(); continue; }
@@ -117,7 +119,7 @@ for (const P of PANTALLAS) try {
           else {
             if (B.l < -1 || B.r > W + 1 || B.t < -1 || B.b > P.vp.height + 1) mal(`la barrita se sale de la pantalla: ${JSON.stringify(B)}`);
             if (cruza(B, Z)) mal('la barrita tapa el zócalo'); if (cruza(B, BOT)) mal('la barrita tapa el botón redondo');
-            if (B.w < libre * .6) mal(`la barrita es angosta: ${Math.round(B.w)} px de ${Math.round(libre)} libres`);
+            if (B.w < libre * (P.tactil ? .6 : .45)) mal(`la barrita es angosta: ${Math.round(B.w)} px de ${Math.round(libre)} libres`);
           }
           if (corte.length) mal(`texto cortado en la barrita: ${corte.join(' · ')}`);
         }

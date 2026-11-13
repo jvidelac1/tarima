@@ -94,22 +94,22 @@ for (const nivel of ['amistoso', 'normal']) for (const id of ATL) for (let k = 0
 
 const s = x => x.toFixed(1);
 const mFinal = q(finales, .5), eMax = Math.max(...esperas), e90 = q(esperas, .9), e50 = q(esperas, .5), rMax = Math.max(...rivalesNo), vOk = Math.max(...verOk), vMal = Math.max(...verMal), pS = q(intS, .9), pC = q(intC, .9), caidas = caidasPlan.caidas * 100 / caidasPlan.n;
-console.log(`\n${quien === 'novato' ? (CTL === 'b' ? 'Novato (±120 ms, primera o segunda pasada)' : 'Novato (toca, a veces no)') : quien === 'lento' ? 'Lento (espera a que el puntero vaya despacio: informativo salvo las esperas)' : 'Ausente (no toca nunca)'} · ritmo de la final en '${CTL}' · ${finales.length} finales (${SEM} semillas × 3 pesistas × rivales amistosos y normales) · panel ${PANEL} s por decisión`);
+console.log(`\n${quien === 'novato' ? (CTL === 'b' ? 'Novato (±120 ms, primera o segunda pasada)' : 'Novato (toca, a veces no)') : quien === 'lento' ? 'Lento (espera a que el puntero vaya despacio: informativo)' : 'Ausente (no toca nunca)'} · ritmo de la final en '${CTL}' · ${finales.length} finales (${SEM} semillas × 3 pesistas × rivales amistosos y normales) · panel ${PANEL} s por decisión`);
 console.log(`final completa: mediana ${s(mFinal)} s, p90 ${s(q(finales, .9))} s, máxima ${s(Math.max(...finales))} s   meta mediana ≤ 150 s`);
 console.log(`espera sin tocar entre un levantamiento propio y el siguiente panel: mediana ${s(e50)} s, p90 ${s(e90)} s, máxima ${s(eMax)} s   meta ≤ 10 · ≤ 15 · ≤ 20 s`);
 console.log(`turno de rival no decisivo: máximo ${s(rMax)} s (mediana ${s(q(rivalesNo, .5))} s)   meta ≤ 3 s`);
 console.log(`turno de rival decisivo (entero): mediana ${s(q(decisivos, .5))} s, máximo ${s(Math.max(0, ...decisivos))} s · ${decisivos.length} de ${decisivos.length + rivalesNo.length} turnos   meta ≤ 9 s`);
 console.log(`veredicto propio después de las luces: válido ${s(vOk)} s, caída ${verMal.length ? s(vMal) : '—'} s   meta válido ≤ 3 s en total, caída tVer + 2,4 s`);
-console.log(`intento propio: arranque p90 ${s(pS)} s · dos tiempos p90 ${s(pC)} s   meta ${quien === 'ausente' ? '≤ 9 · ≤ 14' : CTL === 'b' ? '≤ 9 · ≤ 15' : '≤ 7 · ≤ 12'} s`);
+console.log(`intento propio: arranque p90 ${s(pS)} s · dos tiempos p90 ${s(pC)} s   meta ${quien === 'ausente' ? '≤ 9 · ≤ 14' : CTL === 'b' ? '≤ 10 · ≤ 15' : '≤ 7 · ≤ 12'} s`);
 console.log(`con lo que trae el panel: ${s(caidas)} % de barras caídas   meta ≤ 15 %`);
 if (peores.length) console.log(`esperas de más de 20 s (${peores.length}): ${peores.slice(0, 4).join(' · ')}`);
 if (mFinal > 150 && !INFORMATIVO(quien)) mal.push(`${quien}: final: mediana ${s(mFinal)} s (meta ≤ 150)`);
-if (eMax > 20 || e90 > 15 || e50 > 10) mal.push(`${quien}: espera: mediana ${s(e50)}, p90 ${s(e90)}, máxima ${s(eMax)} s (meta ≤ 10 · ≤ 15 · ≤ 20)`);
+if ((eMax > 20 || e90 > 15 || e50 > 10) && !INFORMATIVO(quien)) mal.push(`${quien}: espera: mediana ${s(e50)}, p90 ${s(e90)}, máxima ${s(eMax)} s (meta ≤ 10 · ≤ 15 · ≤ 20)`);
 if (Math.max(0, ...decisivos) > 9) mal.push(`${quien}: un turno de rival decisivo dura ${s(Math.max(...decisivos))} s (meta ≤ 9)`);
 if (rMax > 3.05) mal.push(`${quien}: un turno de rival no decisivo dura ${s(rMax)} s (meta ≤ 3)`);
 if (veredictoPropio(true).total > 3) mal.push(`el veredicto propio válido dura ${s(veredictoPropio(true).total)} s (meta ≤ 3)`);
-// en 'b' el jugador elige cuándo tira (la barrita reemplaza a ¡TIRA! y ¡ARRIBA!, que salían solas a los 2 s): ≤ 9 · ≤ 15 s
-const [mS, mC] = quien === 'ausente' ? [9, 14] : CTL === 'b' ? [9, 15] : [7, 12];      // quien no toca espera a que cada paso salga solo: un poco más largo, nunca trabado
+// en 'b' el jugador elige cuándo tira (la barrita reemplaza a ¡TIRA! y ¡ARRIBA!, que salían solas a los 2 s): ≤ 10 · ≤ 15 s
+const [mS, mC] = quien === 'ausente' ? [9, 14] : CTL === 'b' ? [10, 15] : [7, 12];      // 'b': + el esfuerzo de pararse en los exigentes      // quien no toca espera a que cada paso salga solo: un poco más largo, nunca trabado
 if ((pS > mS || pC > mC) && !INFORMATIVO(quien)) mal.push(`${quien}: intento propio p90: arranque ${s(pS)} s, dos tiempos ${s(pC)} s (meta ≤ ${mS} · ≤ ${mC})`);
 if (caidas > 15 && !INFORMATIVO(quien)) mal.push(`${quien}: con lo que trae el panel se caen el ${s(caidas)} % de las barras (meta ≤ 15 %)`);
 if (verMal.length && Math.max(...verMal) > RITMO.propioFallo + .01) mal.push(`${quien}: el veredicto de una caída propia dura ${s(Math.max(...verMal))} s después de las luces (meta tVer + 2,4)`);

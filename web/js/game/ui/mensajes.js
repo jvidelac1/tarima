@@ -126,8 +126,10 @@ function lineaB(res, o, l) {
   const B = (u.barras || []).filter(b => b.zona !== 'verde'), peor = B.find(b => b.zona === 'rojo') || B[0], extra = B.reduce((a, b) => a + b.extra, 0);
   const v = { donde: tramoTxt(u.tramo_caida, lev, l), quien: o.quien, kg: o.kg, pct: o.pct };
   const larga = o.kg && o.pct;
-  if (!peor) return tr(l, larga ? 'explica.b.verde' : 'explica.b.verde_corta', v);
-  return tr(l, larga ? 'explica.b.zona' : 'explica.b.zona_corta', { ...v, zona: tr(l, 'barra.z.' + peor.zona), d: cuartos(extra) });
+  // el cansancio se nombra si sin él se paraba
+  const cansado = u.fatiga && u.margen_fin + u.fatiga >= 0 ? tr(l, 'explica.b.cansado', { d: cuartos(u.fatiga) }) : '';
+  if (!peor) return tr(l, larga ? 'explica.b.verde' : 'explica.b.verde_corta', v) + cansado;
+  return tr(l, larga ? 'explica.b.zona' : 'explica.b.zona_corta', { ...v, zona: tr(l, 'barra.z.' + peor.zona), d: cuartos(extra) }) + cansado;
 }
 
 /** Los tres pasos de «Cómo se juega»: [cantidad de teclas dibujadas, texto]. */

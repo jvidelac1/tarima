@@ -120,6 +120,7 @@ export const QUE_U = {
 export const QUE_B = {
   verde: { clave: 'barra.verde', zona: 'verde' }, amarillo: { clave: 'barra.amarillo', zona: 'amarillo' }, rojo: { clave: 'barra.rojo', zona: 'rojo' },
   listo: { clave: 'palabra.listo', gris: true }, doble: { clave: 'palabra.doble', gris: true }, espera: { clave: 'barra.todavia', gris: true },
+  esfuerzo: { clave: 'palabra.vamos' }, de_pie: { clave: 'barra.de_pie' },
 };
 
 /** Pasos con número de cada levantamiento en Fácil (de círculos) y en 'u'. */
@@ -180,6 +181,12 @@ function senalB(m, now) {
     case 'acomodo': return { clave: 'prep', verbo: t('senal.prep'), tipo: 'espera', i: 0, z: B[0].z, paso: de > 1 ? 1 : undefined, de };
     case 'tension': { const e = now - B[0].t0; return { clave: 'barra', verbo: t('barra.verbo'), sub: t('barra.sub'), tipo: 'barra', i: 0, z: B[0].z, desde: B[0].t0, pos: posBarra(e), lento: e > BARRA.lentoDesde, paso: de > 1 ? 1 : undefined, de }; }
     case 'freno': return { clave: 'datodo', verbo: t('senal.datodo'), sub: t('senal.datodo_sub'), tipo: 'auto', desde: U.freno.t0, hasta: U.freno.hasta, tramo: U.freno.tramo };
+    case 'pelea': {
+      // el esfuerzo de pararse (solo en los intentos exigentes): unos pocos toques sin apuro, con la barra que se llena
+      const p = M.pelea, e = p && p.esf;
+      if (!e || p.cerrado || e.ok || now >= e.hasta) return null;
+      return { clave: 'esfuerzo', verbo: t('senal.parate'), sub: t('barra.esfuerzo_sub', { n: e.meta - e.n }), tipo: 'uno', desde: e.desde, hasta: e.hasta, avance: e.n / e.meta, n: e.n, meta: e.meta };
+    }
     case 'hombros': {
       if (!M.abierto) return { clave: 'respira', verbo: t('senal.respira'), tipo: 'espera', i: 1, z: B[1].z, paso: 2, de };
       const e = now - B[1].t0;

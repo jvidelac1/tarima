@@ -170,8 +170,9 @@ for (let n = 0; n < 60000; n++) {
             if (!a.garraUno[L.lev]) return null;
             const T = R.TRAMOS[L.lev], su = T.map((_, i) => R.ruidoDe(L.sem, i, cu.ruido || 0)), env = L.lev === 'c' ? cu.casa : undefined;
             for (let kg = p.minimo(L.a); kg <= L.kg + 20; kg++) {
-              const I = p.intensidadDe(L.a, L.lev, kg), G = T.map(tr => R.gastoTramo(tr, I, L.lev, env, cu)); let m = R.UNO.margen;
-              for (let i = 0; i < T.length; i++) { m -= R.conSuerte(G[i], su[i]); if (m < 0) { if (m >= R.UNO.frenoMin && R.garraAlcanza(m, G.slice(i + 1))) return kg; break; } }
+              const I = p.intensidadDe(L.a, L.lev, kg), G = T.map(tr => R.gastoTramo(tr, I, L.lev, env, cu)), b = p.cfg.ctl === 'b'; let m = R.UNO.margen - (b ? a.fatiga[L.lev] : 0);
+              // 'b': con el cansancio, y el esfuerzo de pararse hecho (la prueba toca en cada señal) si el intento lo pide
+              for (let i = 0; i < T.length; i++) { const gs = R.conSuerte(G[i], su[i]); m -= b && T[i] === 'pararse' && R.pideEsfuerzo(I, m, G[i]) ? Math.max(0, gs - R.BARRA.esfuerzo.premio) : gs; if (m < 0) { if (m >= R.UNO.frenoMin && R.garraAlcanza(m, G.slice(i + 1))) return kg; break; } }
             }
             return null;
           });
