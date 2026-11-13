@@ -283,8 +283,10 @@ export function chanceUno(I, lev, env, cuerpo, o = {}) {
  *   graciaMs     un contacto en los primeros ms de una barrita no la dispara (el puntero recién sale de la punta roja: es la
  *                cola de un toque anterior, no una decisión)
  *   tI, tVerde, tAmarillo  medio ancho del verde (ms de puntero) según la intensidad, y lo que el amarillo suma a cada lado:
- *                ancho con la apertura, angosto cerca del techo. Los multiplica el pesista (`pesistas`, milésimas: fuerte en
- *                esa barrita = más ancho) y el primer intento de la primera final (`primera`)
+ *                ancho con la apertura, angosto cerca del techo y, por encima del techo, se cierra (desde la versión 1.1, con
+ *                `verdeSalva`: todo verde sube siempre, así que el verde es el que pone el techo): ±30 ms al 103 %, nada al
+ *                106 %. Los multiplica el pesista (`pesistas`, milésimas: fuerte en esa barrita = más ancho) y el primer
+ *                intento de la primera final (`primera`)
  *   costo        energía de más que gasta el tramo según la zona (se suma al gasto del tramo de esa barrita)
  *   escala       el gasto de cada tramo en 'b' sobre el de 'u' (milésimas)
  *   envion       el tramo «arriba» del dos tiempos en 'b' por estilo: split (tijera) el más fácil, power intermedio, squat el más
@@ -298,11 +300,19 @@ export function chanceUno(I, lev, env, cuerpo, o = {}) {
  *                hace, el tramo cuesta `premio` menos; si no, cuesta lo de siempre (cae solo si no alcanzaba)
  *   tipico       la persona que supone el panel («X de 10»): error de tiempo de campana (`sd` ms, corrida `sesgo` ms) y
  *                `despiste` milésimas de toques en cualquier lado. La miden tools/barra_bots.mjs y tools/chance_test.mjs
+ *   verdeSalva   (desde la versión 1.1, pedido del dueño del 13-nov: «tocás espacio, llega perfecto y capaz se le cae la
+ *                barra») TODO VERDE, LA BARRA SUBE: mientras todas las barritas que ya se jugaron en el levantamiento salieron en
+ *                verde, ningún tramo puede tirar la barra (ni la energía, ni la suerte del tramo, ni el cansancio): si la
+ *                energía no alcanza, el tramo se completa igual, la energía queda en 0, la garra no se gasta y lo que faltó
+ *                cansa igual (`protegido`, fatigaDe). El esfuerzo de pararse no aparece mientras va todo en verde: el pesista
+ *                se para solo, con el mismo premio que si lo hubiera hecho. Con una barrita amarilla o roja (o una que salió
+ *                sola, que cuenta como regular) se vuelve a las reglas de siempre desde ese tramo, y la línea de caída nombra
+ *                esa barrita. Si todas las barritas del levantamiento salen verdes, la barra sube siempre
  */
 export const BARRA = {
-  version: '1.0',
+  version: '1.1', verdeSalva: true,
   pasada: 1400, lentoDesde: 8000, pasadaLenta: 1700, soloMs: 60000, respiraMs: 800, doble: 120, graciaMs: 250,
-  tI: [9000, 9500, 10000, 10300], tVerde: [170, 125, 75, 60], tAmarillo: [220, 180, 140, 130], primera: 1400, topeVerde: 380, topeAmarillo: 470,
+  tI: [9000, 9500, 10000, 10300, 10600], tVerde: [170, 125, 75, 30, 0], tAmarillo: [220, 180, 140, 150, 160], primera: 1400, topeVerde: 380, topeAmarillo: 470,
   costo: { verde: 0, amarillo: 600, rojo: 1500 },
   escala: { tiron: 925, arriba: 925, pararse: 925 },
   pesistas: { ventura: { tiron: 1000, envion: 1000 }, brenner: { tiron: 1250, envion: 800 }, marangi: { tiron: 750, envion: 1300 } },
@@ -317,7 +327,7 @@ export const BARRA = {
 export const HUELLA_B = huella(canonico({ BARRA, UNO, CUERPOS_U, CUERPO_NEUTRO }));
 /**
  * Niveles de dificultad de la barrita (pedido del dueño del 13-nov: «si es un poco más difícil, que requiera un poco más de
- * interacción»). Fácil es BARRA tal cual (sus registros y su huella no cambian). Medio y Difícil cambian solo esto:
+ * interacción»). Fácil es BARRA tal cual (su huella es HUELLA_B). Medio y Difícil cambian solo esto:
  *   barritas     qué barritas tiene cada levantamiento, en orden (0 tirón, 1 envión, 2 atrapar la barra arriba en el arranque,
  *                3 pararse del fondo). Atrapar y pararse corren con el pesista quieto en el fondo: nada de coordinar con el
  *                movimiento; el toque cierra ese tramo (atrapar) o lo arranca (pararse)
@@ -370,7 +380,9 @@ export function cuerpoBarra(x) {
 /** Cansancio (energía, milésimas) que deja un levantamiento en 'b' (`uno`: res.uno del núcleo). */
 export function fatigaDe(uno) {
   if (!uno) return 0; const F = BARRA.fatiga, toques = (uno.barras || []).reduce((a, b) => a + b.extra, 0);
-  const f = idiv(toques, 4) + (uno.garra === 'usada' ? F.garra : 0) + (uno.margen_fin < F.bajo ? idiv(F.bajo - Math.max(uno.margen_fin, -F.bajo), 4) : 0);
+  // lo que el verde salvó (todo verde, la energía quedó en 0) cansa como si hubiera faltado
+  const mf = uno.margen_fin - (uno.protegido || 0);
+  const f = idiv(toques, 4) + (uno.garra === 'usada' ? F.garra : 0) + (mf < F.bajo ? idiv(F.bajo - Math.max(mf, -F.bajo), 4) : 0);
   return idiv(f, F.paso) * F.paso;
 }
 /** ¿Pide el esfuerzo de pararse? `m`: energía al empezar a pararse; `gPararse`: lo que cuesta pararse sin suerte (con su barrita). */
@@ -434,40 +446,52 @@ export function repartoBarra(z, perfil = BARRA.tipico) {
 }
 /**
  * Chance (milésimas) de que suba un peso en 'b' para la persona `o.perfil` (por defecto la típica del nivel): como chanceUno,
- * con la suerte de cada tramo y la garra, más lo que cuesta cada barrita según dónde suele pegar esa persona. Exacta para ese
- * perfil (programación dinámica sobre la energía, mismas reglas que attempt.js); enteros.
+ * con la suerte de cada tramo y la garra, más lo que cuesta cada barrita según dónde suele pegar esa persona, y la regla del
+ * verde (BARRA.verdeSalva: mientras todo va en verde ningún tramo cae). Incluye entonces la probabilidad de todo verde. Exacta
+ * para ese perfil (programación dinámica sobre la energía y «todo verde hasta acá», mismas reglas que attempt.js); enteros.
  *   o.garra (false: ya se usó) · o.primera (verde más ancho) · o.zonas (forzar zonas, para pruebas) · o.dif (nivel)
  */
 export function chanceBarra(I, lev, env, cuerpo, o = {}) {
   const Rg = reglasB(o.dif), T = TRAMOS[lev], G = T.map(tr => gastoTramo(tr, I, lev, env, cuerpo)), k = cuerpo.ruido || 0, n = 2 * k + 1, perfil = o.perfil || Rg.tipico;
   // reparto de zonas de la barrita de cada tramo (null: el tramo no tiene barrita)
-  const R = T.map(tr => { const i = barritaDeTramo(Rg, lev, tr); if (i < 0) return null; const r = repartoBarra(zonasBarra(I, cuerpo, i, !!o.primera, env, Rg), perfil); return [[r.verde, costoBarra(Rg, i, 'verde')], [r.amarillo, costoBarra(Rg, i, 'amarillo')], [r.rojo, costoBarra(Rg, i, 'rojo')]]; });
-  const memo = new Map(), E = Rg.esfuerzo, pe = perfil.esfuerzo ?? 1000;
-  const f = (i, m, garra) => {
+  // cada zona: [peso, costo, ¿verde?]
+  const R = T.map(tr => { const i = barritaDeTramo(Rg, lev, tr); if (i < 0) return null; const r = repartoBarra(zonasBarra(I, cuerpo, i, !!o.primera, env, Rg), perfil); return [[r.verde, costoBarra(Rg, i, 'verde'), true], [r.amarillo, costoBarra(Rg, i, 'amarillo'), false], [r.rojo, costoBarra(Rg, i, 'rojo'), false]]; });
+  const memo = new Map(), E = Rg.esfuerzo, pe = perfil.esfuerzo ?? 1000, salva = !!Rg.verdeSalva;
+  // `tv`: todas las barritas jugadas hasta acá salieron verdes (al empezar no se jugó ninguna; el primer tramo siempre tiene la suya)
+  const f = (i, m, garra, tv) => {
     if (i === G.length) return 1;
-    const key = i * 4 + (garra ? 1 : 0) + ':' + m; let v = memo.get(key); if (v !== undefined) return v;
-    v = 0; let Z = R[i] || [[1000, 0]];
+    const key = i * 4 + (garra ? 1 : 0) + (tv ? 2 : 0) + ':' + m; let v = memo.get(key); if (v !== undefined) return v;
+    v = 0; let Z = R[i] || [[1000, 0, true]];
     // pararse con esfuerzo (intento exigente): lo hace la persona típica `perfil.esfuerzo` de cada 1000 veces. Con barrita de
-    // pararse, el esfuerzo se decide con lo que costó esa barrita (cada zona se parte en «lo hace» y «no lo hace»)
+    // pararse, el esfuerzo se decide con lo que costó esa barrita (cada zona se parte en «lo hace» y «no lo hace»). Todo en
+    // verde hasta acá: no aparece y el premio va solo
     if (T[i] === 'pararse') {
       const Z2 = [];
-      for (const [w, ex] of Z) { if (pideEsfuerzo(I, m, G[i] + ex, Rg)) { const si = idiv(w * pe, 1000); Z2.push([si, ex - E.premio], [w - si, ex]); } else Z2.push([w, ex]); }
+      for (const [w, ex, vd] of Z) {
+        if (!pideEsfuerzo(I, m, G[i] + ex, Rg)) { Z2.push([w, ex, vd]); continue; }
+        if (salva && tv && vd) { Z2.push([w, ex - E.premio, vd]); continue; }
+        const si = idiv(w * pe, 1000); Z2.push([si, ex - E.premio, vd], [w - si, ex, vd]);
+      }
       Z = Z2;
     }
     for (let j = 0; j < n; j++) {
       const g = conSuerte(G[i], (j - k) * UNO.ruidoPaso);
-      for (const [w, extra] of Z) {
+      for (const [w, extra, vd] of Z) {
         if (!w) continue;
+        const tv2 = tv && vd;
         let x = m - (extra < 0 ? Math.max(0, g + extra) : g + extra), gg = garra;
-        if (x < 0) { if (gg && x >= UNO.frenoMin && garraAlcanza(x, G.slice(i + 1))) { x += UNO.garra; gg = false; } else continue; }
-        v += w * f(i + 1, x, gg);
+        if (x < 0) {
+          if (salva && tv2) x = 0;      // todo verde: el tramo se completa con la energía en 0
+          else if (gg && x >= UNO.frenoMin && garraAlcanza(x, G.slice(i + 1))) { x += UNO.garra; gg = false; } else continue;
+        }
+        v += w * f(i + 1, x, gg, tv2);
       }
     }
     memo.set(key, v); return v;
   };
   // cada tramo reparte 1000 (zonas, esfuerzo o nada): el total es n^tramos · 1000^tramos, y se divide sin perder enteros
   const total = n ** G.length * 1000 ** (G.length - 1);
-  return idiv(f(0, UNO.margen - (o.fatiga || 0), o.garra !== false), total);
+  return idiv(f(0, UNO.margen - (o.fatiga || 0), o.garra !== false, true), total);
 }
 
 /** Causas con su texto. Las de fallo y las de nulo (secciones 5.2 y 5.3). */

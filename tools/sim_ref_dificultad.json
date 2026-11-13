@@ -1,8 +1,8 @@
 {
  "datos": "09c9b907",
  "huellas": {
-  "medio": "4c36e506",
-  "dificil": "6b11ed28"
+  "medio": "be6d074f",
+  "dificil": "892f7335"
  },
  "casos": [
   {
@@ -87,7 +87,7 @@
    "nivel": "dificil",
    "persona": 2,
    "dif": "dificil",
-   "tabla": "ventura:170+211=381#1 brenner:173+203=376#2 marangi:164+0=0#-"
+   "tabla": "ventura:170+211=381#1 brenner:173+203=376#2 marangi:164+200=364#3"
   }
  ]
 }

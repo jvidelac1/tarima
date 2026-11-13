@@ -8,7 +8,7 @@
 //   ausente (no toca nunca), doble (cada toque son dos a 40–110 ms).
 // Uso: node tools/barra_bots.mjs [--n=400]   tabla por perfil × pesista × % de kilos y criterio de Gameplay 3:
 //   novato con la apertura sugerida (90 %): ≥ 95 % válidos y ≥ 60 % verde, en arranque y dos tiempos con los tres;
-//   al 100 %: novato entre 30 y 65 % válidos y el bueno más que el novato; diferencias por pesista en cada barrita (el
+//   al 100 %: novato entre 30 y 70 % válidos y el bueno más que el novato; diferencias por pesista en cada barrita (el
 //   verde del pesista fuerte en esa barrita, más ancho que el del débil); ninguna caída por no tocar con la apertura.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -101,7 +101,7 @@ export function verificar(ctx, S) {
 
 /** Una casilla: `n` intentos del perfil con el pesista, levantamiento e intensidad dados. */
 export function casilla(id, lev, I, B, n, sem0 = 0, extra = {}, envFijo = null) {
-  const o = { n: 0, v: 0, z: { verde: 0, amarillo: 0, rojo: 0 }, zi: [0, 1, 2, 3].map(() => ({ verde: 0, amarillo: 0, rojo: 0 })), caidaPorZona: { verde: 0, amarillo: 0, rojo: 0 }, contactos: 0, esf: 0, esfOk: 0 };
+  const o = { n: 0, v: 0, z: { verde: 0, amarillo: 0, rojo: 0 }, zi: [0, 1, 2, 3].map(() => ({ verde: 0, amarillo: 0, rojo: 0 })), caidaPorZona: { verde: 0, amarillo: 0, rojo: 0 }, contactos: 0, esf: 0, esfOk: 0, todoVerde: 0, salvados: 0 };
   const env = lev === 'c' ? envFijo || cuerpoBarra(id).casa : undefined;
   for (let k = 0; k < n; k++) {
     const sem = mezclar(sem0, k, I, lev === 'c' ? 1 : 0, ATL.indexOf(id)), ctx = ctxBarra(id, lev, env, I, sem, extra), S = jugarBarra(ctx, B, mezclar(sem, 5)), res = verificar(ctx, S).res;
@@ -109,6 +109,8 @@ export function casilla(id, lev, I, B, n, sem0 = 0, extra = {}, envFijo = null) 
     let peor = 'verde';
     for (const b of res.uno.barras || []) { o.z[b.zona]++; o.zi[b.i][b.zona]++; if (b.zona === 'rojo' || (b.zona === 'amarillo' && peor === 'verde')) peor = b.zona; }
     if (res.res !== 'valido') o.caidaPorZona[peor]++;
+    // todo verde (rules.js, BARRA.verdeSalva): sube siempre; `salvados`: los que se quedaban sin energía (sin la regla, la garra salvaba algunos)
+    if (res.uno.barras?.length && peor === 'verde') { o.todoVerde++; if (res.uno.protegido) o.salvados++; }
   }
   return o;
 }
@@ -133,6 +135,12 @@ if (principal) {
       console.log(`${pf.padEnd(8)} ${NOMBRE[id].padEnd(9)}${fila.join('')}`);
     }
   }
+  // todo verde: cuántos intentos tienen todas sus barritas en verde (y entonces suben siempre) y cuántos de esos se quedaban sin energía
+  console.log('\nTodo verde % de los intentos (los tres pesistas juntos) · entre paréntesis, los que se quedaban sin energía y salvó el verde sin gastar la garra (% de los intentos)');
+  for (const lev of ['s', 'c']) for (const pf of ['novato', 'medio', 'bueno', 'tipico']) {
+    const fila = Is.map(I => { let n = 0, tv = 0, sv = 0; for (const id of ATL) { const o = T[pf][`${id}|${lev}|${I}`]; n += o.n; tv += o.todoVerde; sv += o.salvados; if (o.caidaPorZona.verde) mal.push(`${dif} ${pf} ${NOMBRE[id]} ${lev} ${I / 100} %: ${o.caidaPorZona.verde} caídas con todas las barritas en verde`); } return `${pc(tv, n).toFixed(0).padStart(4)} (${pc(sv, n).toFixed(0)})`.padStart(17); });
+    console.log(`${lev === 's' ? 'arranque' : 'dos t.  '} ${pf.padEnd(8)}${fila.join('')}`);
+  }
   // ancho del verde por pesista y barrita (ms de puntero, medio ancho) al 90 y al 100 %
   console.log('\nVerde (medio ancho, ms) por pesista y barrita · al 90 % y al 100 %');
   for (const id of ATL) { const c = cuerpoBarra(id), z = (I, i) => zonasBarra(I, c, i, false, 'split', R).vMs; console.log(`  ${NOMBRE[id].padEnd(9)} ${[...new Set([...R.barritas.s, ...R.barritas.c])].map(i => `${['tirón', 'envión', 'atrapar', 'pararse'][i]} ${z(9000, i)} / ${z(10000, i)}`).join(' · ')}`); }
@@ -144,7 +152,8 @@ if (principal) {
       if (pc(o.v, o.n) < 95) mal.push(`novato ${NOMBRE[id]} ${lev} al 90 %: ${pc(o.v, o.n)} % válidos (meta ≥ 95)`);
       if (pc(o.z.verde, nz) < 60) mal.push(`novato ${NOMBRE[id]} ${lev} al 90 %: ${pc(o.z.verde, nz)} % verde (meta ≥ 60)`);
       const n100 = T.novato[`${id}|${lev}|10000`];
-      if (pc(n100.v, n100.n) < 30 || pc(n100.v, n100.n) > 65) mal.push(`novato ${NOMBRE[id]} ${lev} al 100 %: ${pc(n100.v, n100.n)} % válidos (meta 30 a 65)`);
+      // (hasta 70: con todo verde sube siempre, el novato que pega en el verde ancho de Largo en el tirón levanta un poco más)
+      if (pc(n100.v, n100.n) < 30 || pc(n100.v, n100.n) > 70) mal.push(`novato ${NOMBRE[id]} ${lev} al 100 %: ${pc(n100.v, n100.n)} % válidos (meta 30 a 70)`);
     } else {
       // metas de la dificultad: con la apertura sugerida, Medio: novato ≥ 90 % y medio ≥ 95 %; Difícil: novato ≥ 75 % y bueno ≥ 95 %
       const [pn, pm, qm] = dif === 'medio' ? [90, 'medio', 95] : [75, 'bueno', 95];
