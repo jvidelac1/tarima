@@ -5,7 +5,20 @@ name: Teléfono (táctil, de costado)
 
 on:
   push:
-    branches: [mvp, telefono-pulido, gameplay, tablero]
+    branches: [main, mvp, telefono-pulido, gameplay, tablero]
+    paths:
+      - 'web/js/game/telefono.js'
+      - 'web/js/game/audio.js'
+      - 'web/css/bienvenida.css'
+      - 'tools/check_iphone.mjs'
+      - 'web/js/game/input.js'
+      - 'web/css/juego.css'
+      - 'web/juego.html'
+      - 'tools/check_telefono.mjs'
+      - 'tools/check_toques.mjs'
+      - '.github/workflows/telefono.yml'
+  pull_request:
+    branches: [main]
     paths:
       - 'web/js/game/telefono.js'
       - 'web/js/game/audio.js'
