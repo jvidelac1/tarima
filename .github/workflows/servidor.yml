@@ -5,7 +5,24 @@ name: Servidor y publicación
 
 on:
   push:
-    branches: [mvp, demo, muro-medio, gameplay]
+    branches: [main, mvp, demo, muro-medio, gameplay]
+    paths:
+      - 'worker/**'
+      - 'functions/**'
+      - 'wrangler.jsonc'
+      - 'web/js/game/servidor.js'
+      - 'web/js/game/analitica.js'
+      - 'web/js/game/input.js'
+      - 'web/js/sim/**'
+      - 'web/privacidad.html'
+      - 'web/vendor/posthog/**'
+      - 'tools/servidor_test.mjs'
+      - 'tools/worker_test.mjs'
+      - 'tools/check_analitica.mjs'
+      - 'tools/desplegar.sh'
+      - '.github/workflows/servidor.yml'
+  pull_request:
+    branches: [main]
     paths:
       - 'worker/**'
       - 'functions/**'

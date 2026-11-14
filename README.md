@@ -1,10 +1,18 @@
 # Tarima
 
-Prototipo de un juego web de halterofilia: dos levantadores ficticios generados por script en Blender, con arranque y dos tiempos resueltos fase por fase sobre cada esqueleto.
+Juego web de halterofilia a un botón, publicado en **https://liftinggame.pages.dev**: una final de tres pesistas ficticios,
+arranque y dos tiempos, con una barrita de timing, energía, rivales con estrategia propia y un muro de mail después del arranque.
 
-El estado del trabajo, lo que está verificado y lo que falta está en [HANDOFF.md](HANDOFF.md).
+**Para trabajar en el proyecto (personas o agentes), empezá por [CONTEXTO.md](CONTEXTO.md):** estado, backlog en Linear,
+cómo trabaja el dueño, infraestructura y comandos. Después [AGENTS.md](AGENTS.md) y [HANDOFF.md](HANDOFF.md).
 
-## Ver el visor
+```bash
+cd web && python3 -m http.server 8000     # jugar: http://localhost:8000/juego.html
+node tools/sim_test.mjs                   # pruebas del núcleo sin navegador
+```
+
+## El visor y los personajes
+### Ver el visor
 
 Los modelos ya están exportados en `web/models/`, no hace falta Blender para mirar.
 

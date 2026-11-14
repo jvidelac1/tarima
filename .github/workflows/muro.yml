@@ -11,7 +11,27 @@ name: Muro y lista (punta a punta)
 
 on:
   push:
-    branches: [mvp, muro-medio, gameplay]
+    branches: [main, mvp, muro-medio, gameplay]
+    paths:
+      - 'web/js/game/conexion.js'
+      - 'web/js/game/servidor.js'
+      - 'web/js/game/analitica.js'
+      - 'web/js/game/main.js'
+      - 'web/js/game/input.js'
+      - 'web/js/sim/**'
+      - 'web/js/game/ganchos.js'
+      - 'web/js/game/i18n/**'
+      - 'web/css/**'
+      - 'worker/src/**'
+      - 'worker/migraciones/**'
+      - 'worker/wrangler.jsonc'
+      - 'functions/**'
+      - 'tools/servidor_local.mjs'
+      - 'tools/check_muro.mjs'
+      - 'tools/check_muro_medio.mjs'
+      - '.github/workflows/muro.yml'
+  pull_request:
+    branches: [main]
     paths:
       - 'web/js/game/conexion.js'
       - 'web/js/game/servidor.js'
