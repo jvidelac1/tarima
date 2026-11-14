@@ -29,15 +29,15 @@ Publicado (ramas `main` y `mvp`, commit `ed11f4a` más este archivo):
 - **Inglés por defecto**; español con el selector o `?lang=es`.
 - Pantalla de carga liviana (barra de progreso real y frases) y modelos comprimidos (7,9 MB).
 
-Listo para publicar, esperando que el dueño lo pruebe (rama **`tablero`**, servida en `localhost:8003` en su Mac):
-- Tablero de competencia (orden de salida, pedido de kilos de cada pesista, estrategia), el levantamiento completo del
-  rival con botón **Skip** (tecla S; Espacio ya no saltea), RM y dificultad en el panel de kilos, y menos cortes de cámara.
+Publicado también (rama `tablero`, ya fusionada): tablero de competencia (orden de salida, pedido de kilos de cada pesista,
+estrategia), el levantamiento completo del rival con botón **Skip** (tecla S; Espacio ya no saltea), RM y dificultad en el
+panel de kilos («MEDIO · 92 % de tu RM (163 kg) · 8 de 10») y menos cortes de cámara (0 cortes bruscos por final).
 
 ## Backlog
 
 En **Linear**, equipo **LIFTINGAME** (clave `LIF`, issues LIF-1 a LIF-29, en Backlog), 5 proyectos: Juego de estrategia, Competencia y comunidad,
 Carrera y progresión, Plataforma y crecimiento, Monetización. Prioridad: Urgent = ya, High = próximas 2 semanas, Medium = el
-mes siguiente, Low = después de validar. Lo urgente: LIF-1 (publicar la rama `tablero`) y LIF-2 (medir el gameplay nuevo con datos reales). Lo próximo en el juego: **orden por rondas** (LIF-3) (los 3 levantan una vez por ronda; dentro
+mes siguiente, Low = después de validar. Lo urgente: LIF-2 (medir el gameplay nuevo con datos reales). Lo próximo en el juego: **orden por rondas** (LIF-3) (los 3 levantan una vez por ronda; dentro
 de la ronda abre el que pidió menos kilos) y **cambios de último momento** (LIF-4); en comunidad: **campeonato semanal** con la misma
 semilla para todos (LIF-8) y **leaderboard** validado en el servidor (LIF-9, LIF-10). La misma lista, con prioridades, está
 en `~/tarima-datos/backlog_tarima.md` en la Mac del dueño.
@@ -61,8 +61,7 @@ en `~/tarima-datos/backlog_tarima.md` en la Mac del dueño.
   `main`, pruebas en verde, y fusionar a `main` (y llevar `mvp` al mismo commit, que es de donde publica `tools/desplegar.sh`
   vía `~/tarima-trabajo/vista`).
 - `mvp` — misma versión que `main` (nombre histórico de la rama publicada).
-- `tablero` — lo último sin publicar (ver arriba): sale de `main` y se fusiona cuando el dueño lo apruebe.
-- `gameplay`, `carga`, `rivales`, `medicion`, `muro-medio` — ya fusionadas; no hace falta mirarlas.
+- `gameplay`, `carga`, `rivales`, `medicion`, `muro-medio`, `tablero` — ya fusionadas; no hace falta mirarlas.
 - `linux`, `arte` — build de los personajes en Blender (no hace falta para el juego: los modelos ya están en `web/models`).
 - En la Mac del dueño hay worktrees en `~/tarima-trabajo/<rama>` (fuera del Escritorio a propósito: el Escritorio se sube a
   iCloud). `~/tarima-trabajo/vista` es el worktree limpio desde el que se publica.

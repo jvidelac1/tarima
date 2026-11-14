@@ -22,11 +22,12 @@ Three lifters. Snatch, then clean & jerk. Three attempts each. Best total takes 
 
 - **Hit the green.** One tap (or **Space**) when the pointer crosses the green zone. Nail every bar in green and **the lift
   goes up — guaranteed.** Miss it, and it's your energy against the iron.
-- **Call your weight.** Before every attempt you see your real odds of making it. Go heavy and you'll feel it on the
-  next lift.
+- **Call your weight.** Every attempt shows your **% of 1RM**, how hard it is (Easy → Very hard) and your real odds.
+  Go heavy and you'll feel it on the next lift.
 - **Pick your body.** **Compact** catches low and holds it overhead. **Long** pulls the bar sky-high but standing up hurts.
   **Powerful** stands up with anything — overhead is another story.
-- **Read your rivals.** One plays it safe, one does the math, one goes all-in.
+- **Read your rivals.** One plays it safe, one does the math, one goes all-in. The live board shows what each one called
+  and what they need to pass you. Watch their full lift — or hit **Skip**.
 
 Easy to learn in five seconds. The strategy is in the numbers.
 
