@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Leé primero `HANDOFF.md`: tiene el estado, los problemas conocidos y los próximos pasos.
+Leé primero `CONTEXTO.md` (qué es, estado, backlog en Linear, cómo trabaja el dueño, infraestructura y comandos) y después `HANDOFF.md` (historia detallada y pendientes).
 
 ## Reglas de trabajo en este repo
 
