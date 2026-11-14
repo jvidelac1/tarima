@@ -1,76 +1,83 @@
 <div align="center">
 
-# 🏋️ Tarima
+<a href="https://liftinggame.pages.dev"><img src="docs/img/banner.svg" alt="LIFTING GAME — One button. Three lifters. One bar that only goes up." width="100%"></a>
 
-**Juego web de halterofilia a un botón.** Una final de tres pesistas, arranque y dos tiempos, en el navegador.
+### Olympic weightlifting, in your browser. One button. No install.
 
-### [▶ Jugar en liftinggame.pages.dev](https://liftinggame.pages.dev)
+<a href="https://liftinggame.pages.dev"><img src="https://img.shields.io/badge/%E2%96%B6%20PLAY%20NOW-liftinggame.pages.dev-22c55e?style=for-the-badge" alt="Play now"></a>
 
-[![Pruebas del juego](https://github.com/jvidelac1/tarima/actions/workflows/pruebas.yml/badge.svg?branch=main)](https://github.com/jvidelac1/tarima/actions/workflows/pruebas.yml)
-[![Teléfono](https://github.com/jvidelac1/tarima/actions/workflows/telefono.yml/badge.svg?branch=main)](https://github.com/jvidelac1/tarima/actions/workflows/telefono.yml)
-[![Servidor](https://github.com/jvidelac1/tarima/actions/workflows/servidor.yml/badge.svg?branch=main)](https://github.com/jvidelac1/tarima/actions/workflows/servidor.yml)
+**522 lifters · 743 finals · 17+ countries — since launch on Nov 12, 2026.**
 
-<img src="docs/img/juego-barrita.jpg" alt="Un pesista agarra la barra; abajo, la barrita con el puntero y la zona verde" width="820">
+[![Game tests](https://github.com/jvidelac1/tarima/actions/workflows/pruebas.yml/badge.svg?branch=main)](https://github.com/jvidelac1/tarima/actions/workflows/pruebas.yml)
+[![Phone](https://github.com/jvidelac1/tarima/actions/workflows/telefono.yml/badge.svg?branch=main)](https://github.com/jvidelac1/tarima/actions/workflows/telefono.yml)
+[![Server](https://github.com/jvidelac1/tarima/actions/workflows/servidor.yml/badge.svg?branch=main)](https://github.com/jvidelac1/tarima/actions/workflows/servidor.yml)
+
+<img src="docs/img/juego-barrita.jpg" alt="A lifter grips the bar; the timing bar with the green zone sits below" width="860">
 
 </div>
 
-## Cómo se juega
+## The final is on. You're up.
 
-1. **Elegí tu pesista.** Compacto, Largo o Potente: cada uno tiene una fase fuerte y una débil, y su propio RM.
-2. **Pedí los kilos.** El panel te dice qué porcentaje de tu RM es, si es fácil o muy difícil, y la chance de levantarlo.
-3. **Tocá en el verde.** Con **Espacio** o **un toque** en el celular, cuando el puntero pasa por la zona verde. Una barrita
-   en el arranque y dos en el dos tiempos. **Si todo sale en verde, la barra sube.** Si no, decide tu energía.
-4. **Ganale a los rivales.** Tres intentos por levantamiento, el mejor total se lleva el oro. Cada rival tiene su estrategia:
-   uno va a lo seguro, otro hace cuentas y otro arriesga.
+Three lifters. Snatch, then clean & jerk. Three attempts each. Best total takes gold.
 
-La dificultad sale de las decisiones (pesista, kilos, riesgo y cansancio), no de la precisión de los dedos.
+- **Hit the green.** One tap (or **Space**) when the pointer crosses the green zone. Nail every bar in green and **the lift
+  goes up — guaranteed.** Miss it, and it's your energy against the iron.
+- **Call your weight.** Before every attempt you see your real odds of making it. Go heavy and you'll feel it on the
+  next lift.
+- **Pick your body.** **Compact** catches low and holds it overhead. **Long** pulls the bar sky-high but standing up hurts.
+  **Powerful** stands up with anything — overhead is another story.
+- **Read your rivals.** One plays it safe, one does the math, one goes all-in.
+
+Easy to learn in five seconds. The strategy is in the numbers.
 
 <div align="center">
-<img src="docs/img/juego-podio.jpg" alt="Podio y tabla final con arranque, dos tiempos y total de los tres pesistas" width="720">
+<img src="docs/img/juego-podio.jpg" alt="Podium and final table: snatch, clean & jerk and total for the three lifters" width="760">
 </div>
 
-## Qué tiene
+## On the platform next
 
-- 3D en el navegador con three.js, sin build: personajes ficticios generados por script en Blender (MakeHuman/MPFB).
-- Pensado para el celular acostado y para la computadora; inglés y español.
-- Dificultad Fácil, Medio, Difícil y Clásico; energía y cansancio entre intentos; rivales con personalidad.
-- Servidor en Cloudflare (Pages + Worker + D1): finales gratis contadas en el servidor y lista de espera por mail.
-- Medición con PostHog sin la IP del jugador ni su mail.
+- 🏆 **Weekly championship** — the same final for everyone, one week to post your best total
+- 🌍 **Global & country leaderboards** — championships won and best totals
+- 📈 **Career mode** — win finals, raise your 1RM, climb weight classes
+- 🏋️‍♀️ **Women lifters and weight classes**
+- 📱 **Mobile app** — the players are voting right now (App Store / Google Play vs. web)
 
-## Correrlo local
+Get in early: **join the early-access list in-game** and play unlimited finals.
+
+## Under the hood
+
+- **3D in the browser**: three.js ES modules, no build step, playable on phone (landscape) and desktop, English & Spanish.
+- **Fictional athletes generated by code**: bodies, rigs and lifts built procedurally in Blender (MakeHuman/MPFB), poses
+  solved by rules and checked frame by frame. 7.9 MB download.
+- **Server-side fairness**: Cloudflare Pages + Workers + D1; free plays are counted on the server, and every final can be
+  recomputed from its record.
+- **Privacy first**: analytics through our own proxy, without the player's IP or email.
+- **Tested like a product**: bots with human-like timing, real-time input tests and full games in headless Chrome on every
+  push (badges above).
+
+## Run it locally
 
 ```bash
 git clone https://github.com/jvidelac1/tarima.git && cd tarima
 cd web && python3 -m http.server 8000
-# http://localhost:8000/juego.html              (sin servidor: se juega la final entera)
-# http://localhost:8000/juego.html?muro=firme   simula el muro de producción
+# open http://localhost:8000/juego.html  (no server: you play the whole final)
 ```
-
-Pruebas sin navegador (Node 22):
 
 ```bash
 npm ci
-node tools/sim_test.mjs         # núcleo del juego y textos
-node tools/servidor_test.mjs    # el Worker con una D1 falsa y el cliente del juego
-node tools/barra_bots.mjs       # la barrita con bots de distinta puntería
+node tools/sim_test.mjs        # game core and texts
+node tools/servidor_test.mjs   # the Worker on a fake D1 with the real game client
+node tools/barra_bots.mjs      # the timing bar with bots of different skill
 ```
 
-Las pruebas con navegador (partida completa, teléfono, iPhone, muro) corren en GitHub Actions en cada push a `main`.
+## Contributing (people and AI agents)
 
-## Trabajar en el proyecto
+**Start with [CONTEXTO.md](CONTEXTO.md)** — state, backlog, how we work, infrastructure and how to ship. Then
+[AGENTS.md](AGENTS.md) and [HANDOFF.md](HANDOFF.md). Design docs (in Spanish): [docs/JUEGO.md](docs/JUEGO.md) (gameplay),
+[docs/MVP.md](docs/MVP.md) (server, wall, privacy, analytics), [docs/CONTROLES.md](docs/CONTROLES.md) (input),
+[docs/VISOR.md](docs/VISOR.md) (character viewer, Blender build, repo layout).
 
-**Empezá por [CONTEXTO.md](CONTEXTO.md)**: estado, backlog, cómo se trabaja acá, infraestructura y cómo publicar.
-Después [AGENTS.md](AGENTS.md) (reglas) y [HANDOFF.md](HANDOFF.md) (historia y pendientes).
+## Third-party licenses
 
-| Documento | Qué tiene |
-|---|---|
-| [docs/JUEGO.md](docs/JUEGO.md) | Diseño del juego: barrita, energía, pesistas, rivales, dificultad |
-| [docs/MVP.md](docs/MVP.md) | Muro, servidor, privacidad y medición |
-| [docs/CONTROLES.md](docs/CONTROLES.md) | Entrada: teclado y toques |
-| [docs/VISOR.md](docs/VISOR.md) | Visor de personajes, build en Blender (macOS y Linux), modelos y estructura del repo |
-
-## Licencias de terceros
-
-- MPFB: código GPL-3.0, assets CC0. No está incluido en el repo, se clona aparte.
-- Los personajes generados con los assets CC0 de MakeHuman no arrastran restricciones.
-- three.js (MIT) y posthog-js (MIT) vendorizados en `web/vendor/`.
+MPFB: GPL-3.0 code, CC0 assets (not included; cloned separately). Characters generated from MakeHuman CC0 assets carry no
+restrictions. three.js and posthog-js (MIT) vendored in `web/vendor/`.
