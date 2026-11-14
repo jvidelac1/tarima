@@ -120,5 +120,5 @@ FIN
 if [ "$OS" = Linux ]; then
   echo "En Linux sin GPU el build hornea y renderiza con Cycles en CPU, y la prueba del visor dibuja por software"
   echo "(SwiftShader): verifica lógica, consola, 404 y capturas, pero no mide fps. Con una NVIDIA, Cycles usa OptiX y la"
-  echo "prueba del visor abre Chrome con Vulkan sobre la placa. Ver la sección de Linux del README."
+  echo "prueba del visor abre Chrome con Vulkan sobre la placa. Ver la sección de Linux de docs/VISOR.md."
 fi

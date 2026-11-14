@@ -1,163 +1,76 @@
-# Tarima
+<div align="center">
 
-Juego web de halterofilia a un botón, publicado en **https://liftinggame.pages.dev**: una final de tres pesistas ficticios,
-arranque y dos tiempos, con una barrita de timing, energía, rivales con estrategia propia y un muro de mail después del arranque.
+# 🏋️ Tarima
 
-**Para trabajar en el proyecto (personas o agentes), empezá por [CONTEXTO.md](CONTEXTO.md):** estado, backlog en Linear,
-cómo trabaja el dueño, infraestructura y comandos. Después [AGENTS.md](AGENTS.md) y [HANDOFF.md](HANDOFF.md).
+**Juego web de halterofilia a un botón.** Una final de tres pesistas, arranque y dos tiempos, en el navegador.
 
-```bash
-cd web && python3 -m http.server 8000     # jugar: http://localhost:8000/juego.html
-node tools/sim_test.mjs                   # pruebas del núcleo sin navegador
-```
+### [▶ Jugar en liftinggame.pages.dev](https://liftinggame.pages.dev)
 
-## El visor y los personajes
-### Ver el visor
+[![Pruebas del juego](https://github.com/jvidelac1/tarima/actions/workflows/pruebas.yml/badge.svg?branch=main)](https://github.com/jvidelac1/tarima/actions/workflows/pruebas.yml)
+[![Teléfono](https://github.com/jvidelac1/tarima/actions/workflows/telefono.yml/badge.svg?branch=main)](https://github.com/jvidelac1/tarima/actions/workflows/telefono.yml)
+[![Servidor](https://github.com/jvidelac1/tarima/actions/workflows/servidor.yml/badge.svg?branch=main)](https://github.com/jvidelac1/tarima/actions/workflows/servidor.yml)
 
-Los modelos ya están exportados en `web/models/`, no hace falta Blender para mirar.
+<img src="docs/img/juego-barrita.jpg" alt="Un pesista agarra la barra; abajo, la barrita con el puntero y la zona verde" width="820">
 
-```bash
-cd web
-python3 -m http.server 8000
-# abrir http://localhost:8000
-```
+</div>
 
-Tiene que ser por servidor local: abriendo `index.html` directo, el navegador bloquea la carga de los GLB.
+## Cómo se juega
 
-## Reconstruir los personajes
+1. **Elegí tu pesista.** Compacto, Largo o Potente: cada uno tiene una fase fuerte y una débil, y su propio RM.
+2. **Pedí los kilos.** El panel te dice qué porcentaje de tu RM es, si es fácil o muy difícil, y la chance de levantarlo.
+3. **Tocá en el verde.** Con **Espacio** o **un toque** en el celular, cuando el puntero pasa por la zona verde. Una barrita
+   en el arranque y dos en el dos tiempos. **Si todo sale en verde, la barra sube.** Si no, decide tu energía.
+4. **Ganale a los rivales.** Tres intentos por levantamiento, el mejor total se lleva el oro. Cada rival tiene su estrategia:
+   uno va a lo seguro, otro hace cuentas y otro arriesga.
 
-En una máquina nueva, `tools/setup.sh` hace los pasos 1 y 2 y verifica que estén Chrome y la tipografía.
+La dificultad sale de las decisiones (pesista, kilos, riesgo y cansancio), no de la precisión de los dedos.
 
-1. Dependencias de Python (3.13, que es la versión del módulo `bpy` 5.2):
+<div align="center">
+<img src="docs/img/juego-podio.jpg" alt="Podio y tabla final con arranque, dos tiempos y total de los tres pesistas" width="720">
+</div>
 
-   ```bash
-   python3 -m venv .venv && source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
+## Qué tiene
 
-2. MPFB, el generador de humanos de MakeHuman:
+- 3D en el navegador con three.js, sin build: personajes ficticios generados por script en Blender (MakeHuman/MPFB).
+- Pensado para el celular acostado y para la computadora; inglés y español.
+- Dificultad Fácil, Medio, Difícil y Clásico; energía y cansancio entre intentos; rivales con personalidad.
+- Servidor en Cloudflare (Pages + Worker + D1): finales gratis contadas en el servidor y lista de espera por mail.
+- Medición con PostHog sin la IP del jugador ni su mail.
 
-   ```bash
-   git clone --depth 1 https://github.com/makehumancommunity/mpfb2.git vendor/mpfb2
-   ```
-
-   Si lo tenés en otro lado, apuntá `MPFB_SRC` a la carpeta `src/mpfb`.
-
-3. Build:
-
-   ```bash
-   ./build.sh                 # los dos personajes
-   ./build.sh ventura         # uno solo
-   FAST=1 ./build.sh ventura  # sin la hoja de poses de costado
-   ```
-
-   Cada personaje tarda unos 20 minutos con la máquina libre. Corré un solo build a la vez. Deja todo en `out/<nombre>/` y copia el GLB y los datos a `web/`.
-
-Si el script de texturas no encuentra una tipografía en negrita, definí `TARIMA_FONT` con la ruta a un `.ttf`.
-
-### Linux
-
-El mismo build corre en Ubuntu 22.04 x86_64 sin pantalla (pod alquilado o contenedor, como root). `tools/setup.sh` instala ahí las bibliotecas que necesita `bpy`, las tipografías, Node, uv y Chrome.
+## Correrlo local
 
 ```bash
-git clone --branch linux https://github.com/jvidelac1/tarima.git && cd tarima
-tools/setup.sh
-TARIMA_THREADS=12 ./build.sh     # los hilos según los núcleos que tenga la máquina
-node tools/check_viewer.mjs
+git clone https://github.com/jvidelac1/tarima.git && cd tarima
+cd web && python3 -m http.server 8000
+# http://localhost:8000/juego.html              (sin servidor: se juega la final entera)
+# http://localhost:8000/juego.html?muro=firme   simula el muro de producción
 ```
 
-Medido el 11 de noviembre de 2026. Con GPU, 0 cuadros con superposición en los dos personajes; sin GPU se corrió solo ventura, también en 0:
-
-| Máquina | Cycles | Build completo (dos personajes, con hojas) | Prueba del visor |
-|---|---|---|---|
-| Pod con RTX 4090, 12 hilos | OptiX | 29 min (unos 14 por personaje) | Chrome con Vulkan sobre la placa, los dos personajes: pasa en 5 min, 59 fps en alta |
-| Pod de 4 vCPU sin GPU | CPU | 33 min solo ventura con `FAST=1` | por software (SwiftShader), solo ventura: pasa en 44 min; verifica lógica, consola, 404 y capturas, no mide fps |
-
-- **Mismas poses que en macOS.** `python3 tools/compare_poses.py <poses.json de macOS> <poses.json de Linux>` da estructura igual y diferencia máxima de 0,0001 s en `tt`; entre el build en CPU y el build con GPU no hay ninguna diferencia. Los GLB no son idénticos byte a byte (el tamaño cambia en menos de 2 KB).
-- **Horneados en CPU a propósito.** Los mapas se hornean en CPU aunque haya GPU, para que den lo mismo en todas las máquinas; la GPU se usa en los renders de control y en las hojas de poses.
-- **Chrome y la placa.** Sin pantalla y con una NVIDIA, Chrome no elige la placa solo y cae a dibujo por software. `tools/browser.mjs` pide `--use-angle=vulkan` cuando existe `/dev/nvidiactl`; `TARIMA_ANGLE` lo cambia (`gl-egl` también funciona, `swiftshader` fuerza software).
-- **Núcleos en contenedores.** Algunos pods limitan la CPU por cuota y `nproc` muestra todos los núcleos del anfitrión. El build lee la cuota de `/sys/fs/cgroup/cpu.max`; igual conviene fijar `TARIMA_THREADS`.
-- **Prueba del visor por software.** Tarda mucho más y no exige fps, tiempos ni desenfoque de movimiento. Por defecto captura las páginas de escritorio a media densidad de píxeles; `TARIMA_SOFT_DPR=1` las deja a tamaño completo y tarda más del doble.
-
-### Modelos comprimidos
-
-`tools/export_web.py` deja `web/models` sin comprimir; **después hay que correr `tools/comprimir_modelos.sh`** (build.sh lo
-hace solo al final, salvo con `TARIMA_SIN_COMPRIMIR=1`). Instala una vez `sharp` y `meshoptimizer` (versiones fijas) en
-`~/.cache/tarima-comprimir` y, por personaje:
-
-- `<nombre>.glb`: geometría, morphs y animación con `EXT_meshopt_compression` (filtro exponencial sobre float32, sin
-  cuantizar posiciones ni tocar las matrices de enlace; índices, JOINTS y tiempos sin pérdida); texturas sin tocar.
-- `<nombre>_1024.glb`: lo mismo con las texturas a 1024 px (color y pelo en WebP, normal y ORM en JPEG 4:4:4). Es el que
-  baja el juego con calidad Baja o Móvil, que ya achicaba las texturas a 1024 al cargar.
-- `<nombre>_mask.webp`: la máscara a 1024 px sin pérdida; `poses.json` apunta a ella y al GLB liviano (`glb1024`).
-
-Al decodificar mide el error contra el original y falla si algo pasa su tope (líneas `ERR`). El visor y el juego decodifican
-con `web/vendor/three/addons/libs/meshopt_decoder.module.js`. Comparación antes/después en Actions:
-`gh workflow run carga.yml -R jvidelac1/tarima --ref <rama>` (medición de la carga con la red limitada y el visor con los
-modelos de antes y de después).
-
-### Pruebas en GitHub Actions
-
-`.github/workflows/pruebas.yml` corre en cada push a `demo` (y a pedido) en `ubuntu-latest`, con Node 22 y el Chrome del runner. No usa Blender ni build: los modelos y three están en el repo. Pasos: `tools/sim_test.mjs`, `tools/play_human.mjs`, `tools/check_game.mjs` y `tools/check_fluidez.mjs --tutorial`. Tarda unos 12 minutos.
-
-**El runner no tiene placa: Chrome dibuja por software (SwiftShader) y ahí no se miden cuadros por segundo.** Verifica núcleo, partida completa por teclado y por toques, registro y acuse de cada toque, paneles, consola y tutorial. La fluidez se mide solo en una máquina con placa.
+Pruebas sin navegador (Node 22):
 
 ```bash
-gh run list -R jvidelac1/tarima --branch demo --limit 3              # últimas corridas: estado, commit e id
-gh run watch <id> -R jvidelac1/tarima --exit-status                  # esperar a que termine (sale con error si falló)
-gh run view <id> -R jvidelac1/tarima                                 # los pasos, y cuál falló
-gh run view <id> -R jvidelac1/tarima --log-failed                    # la salida del paso que falló
-gh run download <id> -R jvidelac1/tarima -D out_ci    # capturas, JSON y registros: una carpeta por grupo (pruebas-out-nucleo, -toques, -telefono, -recorrido)
-gh workflow run pruebas.yml -R jvidelac1/tarima --ref demo           # a pedido, sobre la punta de demo
-gh run rerun <id> -R jvidelac1/tarima                                # repetir una corrida sobre el mismo commit
+npm ci
+node tools/sim_test.mjs         # núcleo del juego y textos
+node tools/servidor_test.mjs    # el Worker con una D1 falsa y el cliente del juego
+node tools/barra_bots.mjs       # la barrita con bots de distinta puntería
 ```
 
-Lo que traen los artefactos `pruebas-out-<grupo>` de «Pruebas del juego» (14 días; las pruebas corren en cuatro máquinas en paralelo):
+Las pruebas con navegador (partida completa, teléfono, iPhone, muro) corren en GitHub Actions en cada push a `main`.
 
-- `logs/*.log`: la salida completa de cada prueba (lo mismo que el log del run). La última línea dice `OK`; si no, hay un bloque `FALLÓ` o `FALLA` con la lista de problemas.
-- `game/*.png`: capturas de `check_game` (fin de la partida, ayuda, presentación, primer intento a velocidad real, Clásico, reloj).
-- `fluidez/fluidez.json`: toques enviados, recibidos, aceptados y descartados con su motivo, y el tutorial. En este modo los cuadros figuran como «sin medir».
-- `capturas/*.jpg`: una captura por panel, por señal y por toque, con el 3D dibujado. Es para mirar el juego sin abrir un navegador. Ese paso no decide el resultado, porque sacar la captura atrasa el toque y los levantamientos pueden fallar.
+## Trabajar en el proyecto
 
-Cómo cambian las pruebas cuando el dibujo es por software (lo detectan solas por el nombre del renderizador):
+**Empezá por [CONTEXTO.md](CONTEXTO.md)**: estado, backlog, cómo se trabaja acá, infraestructura y cómo publicar.
+Después [AGENTS.md](AGENTS.md) (reglas) y [HANDOFF.md](HANDOFF.md) (historia y pendientes).
 
-- `check_fluidez` entra en **modo lógica**: abre el juego con `?dibujo=0`, corre sin estrangular el procesador y no exige ni informa cuadros dibujados. El gobernador de calidad no actúa sin dibujo, así que tampoco se prueba (`--gobernador` pide una placa). `--logica` fuerza el modo en una máquina con placa y `--dibujar` lo impide.
-- `check_game` ya corría sin dibujar. Antes de cada captura fuerza un cuadro del 3D: la imagen muestra la escena y un sombreador roto sale como error de consola y hace fallar la prueba.
-
-## Estructura
-
-```
-blender/
-  common.py     arranque de Blender + MPFB, dispositivo de Cycles, render de control
-  body.py       proporciones, físico y cara de cada personaje (CFG)
-  style.py      colores, nombre e indumentaria (STYLES)
-  make.py       cuerpo, rig y horneado de mapas de apoyo
-  tex.py        texturas: color, relieve, rugosidad/oclusión, máscara
-  geo.py        pesos, subdivisión, morphs correctivos, pelo, pestañas, cinturón
-  shoes.py      zapatillas de halterofilia
-  finish.py     arma todo lo anterior, llama a poses.py y exporta el GLB
-  poses.py      sistema de poses por reglas, trayectoria, tiempos y chequeo de superposiciones
-  pose_only.py  corre solo poses.py sobre un s3b.blend ya generado
-  ctl3.py       renders de control de la malla en fases reales
-tools/
-  export_web.py     GLB reempaquetado, máscaras y web/data/poses.json (sin comprimir)
-  comprimir_modelos.sh  comprime web/models: hay que correrlo después de cada export_web.py (build.sh lo hace solo)
-  check_carga.mjs   carga del juego con la red limitada: bytes, tiempos y capturas de la pantalla de carga
-  verify_build.py   verifica que web/ corresponde al último build
-  check_viewer.mjs  prueba automática del visor (npm install; usa el Chrome del sistema)
-  check_game.mjs, check_fluidez.mjs   pruebas del juego con navegador (corren también en GitHub Actions)
-.github/workflows/
-  pruebas.yml       pruebas del juego en cada push a demo, con dibujo por software
-web/
-  index.html, css/, js/   visor (three.js r187, módulos ES)
-  vendor/three/           three.js vendorizado
-  models/                 GLB comprimidos (<nombre>.glb para el visor y calidad Alta/Media, <nombre>_1024.glb para el
-                          juego en Baja/Móvil), máscaras en WebP y normales de detalle
-  data/poses.json         fases, tiempos y medidas que usa el visor
-docs/img/         renders de control del primer prototipo
-```
+| Documento | Qué tiene |
+|---|---|
+| [docs/JUEGO.md](docs/JUEGO.md) | Diseño del juego: barrita, energía, pesistas, rivales, dificultad |
+| [docs/MVP.md](docs/MVP.md) | Muro, servidor, privacidad y medición |
+| [docs/CONTROLES.md](docs/CONTROLES.md) | Entrada: teclado y toques |
+| [docs/VISOR.md](docs/VISOR.md) | Visor de personajes, build en Blender (macOS y Linux), modelos y estructura del repo |
 
 ## Licencias de terceros
 
 - MPFB: código GPL-3.0, assets CC0. No está incluido en el repo, se clona aparte.
 - Los personajes generados con los assets CC0 de MakeHuman no arrastran restricciones.
+- three.js (MIT) y posthog-js (MIT) vendorizados en `web/vendor/`.
