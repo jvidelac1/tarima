@@ -15,7 +15,7 @@ comunidad, después monetización. Público real: la mayoría en inglés, 2 de c
 
 ## Estado al 13 de noviembre de 2026
 
-Publicado (rama `mvp`, commit `ed11f4a`):
+Publicado (ramas `main` y `mvp`, commit `ed11f4a` más este archivo):
 - **Barrita** como control por defecto: un puntero va y vuelve sin reloj; verde = perfecto, amarillo = regular, rojo = lejos.
   Una barrita en el arranque y dos en el dos tiempos. **Si todas las barritas de un levantamiento salen en verde, la barra
   sube siempre**; si no, decide la energía (kilos × cuerpo del pesista × suerte), y la caída nombra la barrita que falló.
@@ -57,9 +57,13 @@ en `~/tarima-datos/backlog_tarima.md` en la Mac del dueño.
 
 ## Ramas y carpetas
 
-- `mvp` — lo publicado. Toda versión nueva se fusiona acá y se publica desde acá.
-- `tablero` — lo último sin publicar (ver arriba). `gameplay`, `carga`, `rivales`, `medicion`, `muro-medio` ya están en `mvp`.
-- `main` — rama por defecto de GitHub pero **vieja**; no la uses de base. `linux`, `arte` — build de los personajes en Blender.
+- **`main`** — rama por defecto y **punto de partida**: es lo publicado (idéntica a `mvp`). Para trabajar: rama nueva desde
+  `main`, pruebas en verde, y fusionar a `main` (y llevar `mvp` al mismo commit, que es de donde publica `tools/desplegar.sh`
+  vía `~/tarima-trabajo/vista`).
+- `mvp` — misma versión que `main` (nombre histórico de la rama publicada).
+- `tablero` — lo último sin publicar (ver arriba): sale de `main` y se fusiona cuando el dueño lo apruebe.
+- `gameplay`, `carga`, `rivales`, `medicion`, `muro-medio` — ya fusionadas; no hace falta mirarlas.
+- `linux`, `arte` — build de los personajes en Blender (no hace falta para el juego: los modelos ya están en `web/models`).
 - En la Mac del dueño hay worktrees en `~/tarima-trabajo/<rama>` (fuera del Escritorio a propósito: el Escritorio se sube a
   iCloud). `~/tarima-trabajo/vista` es el worktree limpio desde el que se publica.
 
@@ -88,7 +92,7 @@ gh workflow run pruebas.yml -R jvidelac1/tarima --ref <rama>   # pruebas con nav
 # también: telefono.yml, muro.yml, servidor.yml (corren con el push en varias ramas)
 cd web && python3 -m http.server 8000                          # jugar local (sin servidor: final entera, sin muro)
 #   http://localhost:8000/juego.html?muro=firme  simula el muro de producción (solo localhost)
-bash tools/desplegar.sh --seco   # publicación en seco (desde ~/tarima-trabajo/vista en origin/mvp)
+bash tools/desplegar.sh --seco   # publicación en seco (desde un checkout limpio de main/mvp; en la Mac: ~/tarima-trabajo/vista)
 bash tools/desplegar.sh --si     # publica Worker y después Pages (requiere OK del dueño)
 ```
 
