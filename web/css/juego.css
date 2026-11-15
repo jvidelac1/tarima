@@ -589,6 +589,10 @@ body:has(#tablero:not([hidden])) .bug{display:none}
 .tablero .tb-ped small{font-size:calc(var(--u)*.8);color:var(--mute)}
 .tablero .tb-ped .tb-ped-nota{flex-basis:100%}
 @media (pointer:coarse){.tablero .tb-pedido button{min-height:40px;min-width:40px;font-size:15px}}
+/* teléfono acostado: «Cambiar» al costado del tablero, arriba (debajo no entra: abajo a la izquierda va el veredicto) */
+:where(html.horiz.bajo) .tablero .tb-pedido{position:absolute;left:100%;top:0;margin:0 0 0 6px;width:max-content;max-width:42cqw}
+:where(html.horiz.bajo) .tablero .tb-ped{background:rgba(6,14,48,.9);padding:4px}
+:where(html.horiz.bajo) .tablero .tb-ped .tb-ped-nota{display:none}
 @media (prefers-reduced-motion:no-preference){.tb tr.cambio .tb-pide b{animation:tbCambio 1.2s ease-out 2}}
 @keyframes tbCambio{0%{text-shadow:0 0 0 transparent}30%{text-shadow:0 0 12px var(--gold)}100%{text-shadow:0 0 0 transparent}}
 /* lo que el tablero ya dice no se repite: ni marcador, ni cartel del turno, ni avisos sueltos, ni zócalo, ni etiqueta ('b' y 'u') */
