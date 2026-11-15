@@ -188,7 +188,8 @@ export class Ambiente {
   }
   /** Lo que entra con esta calidad: `A` = {polvo: partículas, conos: fuerza de los conos (0 = como estaban), publico: se mueve}. */
   setNivel(A = {}, dof = false) {
-    this.nivel = A; this.polvo.layers.set(dof ? BOKEH_LAYER : 0);      // con profundidad de campo va con los discos de luz, después del desenfoque const n = Math.max(0, Math.min(POLVO_MAX, Math.round(A.polvo || 0)));
+    this.nivel = A; this.polvo.layers.set(dof ? BOKEH_LAYER : 0);      // con profundidad de campo va con los discos de luz, después del desenfoque
+    const n = Math.max(0, Math.min(POLVO_MAX, Math.round(A.polvo || 0)));
     this.polvo.geometry.instanceCount = n ? Math.max(n, N_SOPLO) : 0; this.polvo.visible = n > 0;
     for (const b of this.arena.beams || []) b.base = b.base0 * (A.conos || 1);
     this.publicoVivo = !!A.publico && !this.reduce;
