@@ -1339,6 +1339,40 @@ suben (llamado 32–39, veredicto 10–30) por el tablero.
 datos (`rival_salteado`) cuántos miran a los rivales enteros. El RM es el de la ficha: la «forma del día» y el cansancio no lo
 cambian (sí la chance y la dificultad). Clásico también usa el tablero y el botón (no tiene el «Toca: seguir» de los rivales).
 
+### Panel del llamado liviano y estilo de envión fijo (15-nov, rama `panel`; LIF-31 y LIF-43)
+
+Pedido del dueño (iPhone acostado): el panel ocupaba media pantalla y el envión eran tres botones grandes apilados. Nada
+fusionado a main ni publicado.
+
+- **Panel compacto** ('b' y 'u'; `panelLlamado → uPintar` y `estiloHTML` en main.js, CSS «panel del llamado compacto» al final
+  de `juego.css`, textos `panel.*` y `jerk.*`): a la vista solo el título corto («Dos tiempos · intento 1 de 3», sin el nombre:
+  el tablero dice quién levanta) con **Detalles ▾**, los kilos ± con LEVANTAR, la dificultad y «X de 10», y en el dos tiempos
+  **«Estilo de envión: Tijera ▾»** (un botón; al tocarlo, una fila de tres con la dificultad en una palabra: fácil / medio /
+  difícil, y «Queda fijo para los 3 intentos»; al elegir, el foco vuelve a LEVANTAR). En el detalle: % del RM, el verde de cada
+  barrita, el cansancio, cómo ganar, los avisos y el pedido. «Detalles» se recuerda (`tarima.panel.detalle`). En el teléfono
+  acostado los ±5 no se ven (↑ ↓ siguen sumando 5 con teclado) ni «kg» (lo dice el botón). El entrenador sigue proponiendo
+  split (`casa`); el último estilo elegido se recuerda para la final siguiente. Ya no hay «Más opciones» en 'b'.
+- **Estilo fijo** (LIF-43; `match.js → estiloFijo`, `cfg.envFijo`, cabecera `envFijo: true`): el estilo del primer intento del
+  dos tiempos es el de los tres. `resolver` rechaza otro estilo y `recalcular` también; sin `envFijo` (registros viejos) las
+  reglas de antes. Los rivales, con la regla, eligen el estilo de su peso más alto (`elegirEnvion(f, 10000)`: tijera para los
+  tres) en lugar de power en la apertura y tijera después (antes 109 de cada 200 finales tenían un rival que cambiaba).
+  `entrenador.js → chanceDe` cuenta el estilo fijo aunque le pasen otro. El panel lo muestra con candado y «fijo». Clásico deja
+  deshabilitados los otros estilos.
+- **Medido** (check_telefono, nueva medición del alto del panel del llamado; `out/telefono/panel.json`; ≤ 35 % exigido en
+  667×375 y 844×390):
+
+| alto del panel del llamado | antes | después (detalle plegado) |
+|---|---|---|
+| 667×375 arranque / dos tiempos | 65–75 % / 77 % | 34 % / 36 % (corrida 43771561574; con la fila de kilos más baja de `HEAD`, a verificar en 43773477423) |
+| 844×390 arranque / dos tiempos | 61–66 % / 73 % | 32 % / 34 % (dos tiempos fijo 32 %) |
+
+- Pruebas: sim_test 17 (300 finales con la regla contra recalculadas, registros con el estilo cambiado a mitad rechazados, el
+  entrenador cuenta el fijo); ritmo_test, barra_bots y rivales_test juegan con `envFijo`; check_game elige power con teclado y
+  tijera con el dedo y verifica el candado y el registro; check_telefono abre y cierra «Detalles» y elige el estilo con el dedo.
+- **Pendiente / para el dueño**: los botones chicos del panel en el teléfono miden 28–32 px de alto (Detalles y el estilo; los
+  kilos 38 px), menos que los 44 recomendados: es el precio del 35 %. El estilo se elige recién en el primer dos tiempos (no en
+  el intervalo).
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.
