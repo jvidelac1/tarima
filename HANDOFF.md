@@ -1339,6 +1339,91 @@ suben (llamado 32–39, veredicto 10–30) por el tablero.
 datos (`rival_salteado`) cuántos miran a los rivales enteros. El RM es el de la ficha: la «forma del día» y el cansancio no lo
 cambian (sí la chance y la dificultad). Clásico también usa el tablero y el botón (no tiene el «Toca: seguir» de los rivales).
 
+### Gráficos fase 1: el ambiente (15-nov, rama `graficos`; LIF-36, LIF-25, LIF-38)
+
+Pedido: que se vea «AAA» sin perder cuadros en el celular (2 de cada 3 jugadores), y más cámaras, en especial una desde el
+jurado. Los pesistas no se tocaron. Nada fusionado a `main` ni publicado. Técnicas aprendidas de Saltline (texturas generadas
+al cargar, materiales físicos parchados, reflejo planar, partículas por GPU, cámara con «trauma»); ni una línea copiada.
+
+**Archivos nuevos** (todo lo del juego; el visor solo ve los carteles con la marca nueva):
+- `web/js/game/ambiente.js` — `Ambiente`: se arma apenas existe la arena y antes del primer dibujo.
+  - *Tarima*: sobre la madera que ya dibujaba `arena.js` (vetas, nudos, línea pintada) pinta desgaste en el mismo lienzo:
+    mugre de baja frecuencia (ruido de valor en octavas), la zona gastada donde se paran, las dos franjas machucadas donde
+    caen los discos, pisadas y nubes de magnesio y salpicado fino debajo de la barra.
+  - *Piso de goma*: la alfombra del escenario pasa a baldosas de goma de 1 m (negra con motas, junta, normales por
+    diferencias finitas). En «Baja»/«Móvil» queda horneada con la luz, como antes (512 px: se ven las motas grandes, no la junta).
+  - *Pantalla LED viva* (`CanvasTexture`, 2048×720; 1024×360 en teléfonos): «LIFTING GAME», el levantamiento y el intento a la
+    izquierda; apellido, kilos y país a la derecha; cuando deciden los árbitros, las tres luces en cada panel y un marco blanco
+    o rojo. Recibe lo mismo que el tablero (`arena.setBoard`, `arena.setDecision`: stage.js los envuelve; main.js no cambió).
+    La cinta LED del escenario corre despacio. Carteles de la arena: `EVENT.marca = 'LIFTING GAME'` (config.js).
+  - *Halos* en las tres luces de arbitraje físicas (se ven aunque la calidad no tenga brillo de post).
+  - *Polvo de magnesio*: un solo dibujo instanciado (`InstancedBufferGeometry`); posición, deriva, titilar y luz se calculan
+    en el sombreador de vértices (solo brilla dentro de los conos de la clave y los contraluces); las primeras 48 partículas
+    son el soplo que sale de los discos cuando la barra golpea la tarima. Con profundidad de campo se dibuja después del
+    desenfoque, con los discos de luz de la arena (si no, cada mota era un disco de bokeh: se veía como nieve).
+  - *Conos de luz*: los haces de la arena con otro sombreador (vetas de bruma que bajan) y más fuerza, en las calidades con
+    post. *Público*: las siluetas instanciadas respiran y saltan con la ovación; con un válido, muchos más flashes.
+- `web/js/game/reflejo.js` — `Reflejo`: reflejo planar de la tarima. La escena se dibuja otra vez desde la cámara espejada
+  (plano cercano oblicuo, destino de media precisión con mipmaps) y la cara de arriba de la tarima lo suma con Fresnel y según
+  la rugosidad de cada zona (el magnesio y el desgaste lo apagan y lo desenfocan). Solo con post (color lineal).
+- `web/js/game/camara_viva.js` — `CamaraViva`: temblor por trauma (cuadrado del trauma, se gasta en medio segundo, senos sin
+  azar) cuando la barra golpea la tarima (stage.js lo detecta en `barraSuelta` por el frenazo) y dip con resorte cuando la pose
+  cruza la fase de recepción (`posar`). En fracción del alto de la imagen: máximo 1,4 % y 1,2 %. Se suma después del vigía de
+  cortes: no cuenta como corte ni lo tapa. Con movimiento reducido no hace nada.
+- `stage.js`: plano `jurado` en `PLANOS` (cámara en (0; 0,5; 7,0), sobre la mesa del árbitro central, lente de 26°: del pesista
+  de frente a las tres luces sobre la pantalla); `escena.camara()` acepta también claves de `PLANOS`.
+- `main.js` (lo mínimo): `?calidad=` además de `?q=`; `camPrincipal()` usa la cámara elegida (tecla **C**: general → jurado →
+  frontal → lateral; `?camara=jurado|baja|lado|3/4`; se recuerda en `tarima.camara`); en un válido propio, mientras se prenden
+  las luces, la cámara va al jurado con un movimiento suave de 1,3 s y después gira al público como antes.
+
+**Calidades** (`perf.js`: `AMBIENTE`, `PRESET.ultra`, `ALIAS_CALIDAD`). `?calidad=ultra|alta|media|baja|movil` (o
+low/medium/high) fija la calidad; sin parámetro, automático como antes (calibración y gobernador sin cambios; «Ultra» nunca
+se elige sola). Para comparar en la Mac: `juego.html?calidad=ultra` contra `?calidad=baja`.
+
+| | Móvil | Baja | Media | Alta | Ultra |
+|---|---|---|---|---|---|
+| texturas nuevas, LED viva, halos, cámara viva, jurado | sí | sí | sí | sí | sí |
+| polvo (partículas) | 90 | 220 | 500 | 900 | 1600 |
+| conos de luz | no | no | ×3,4 | ×3,8 | ×4 |
+| público que se mueve | — (horneado) | — | sí | sí | sí |
+| reflejo de la tarima | no | no | no | ½ resolución | completa |
+| post (ya existía): brillo, viñeta, grano, gradación, DoF | viñeta CSS, gradación en el material | igual | sí | + SMAA | + MSAA 4, sombras 2048, densidad 2 |
+
+**Medición.** En Actions todo se dibuja por software (SwiftShader): sirve para ver que compila y cómo se ve, y para una
+relación de costos en la misma máquina; los milisegundos no dicen nada de una placa.
+- **Contra `main` en la misma máquina** (`graficos.yml` con `comparar`, run 43773716868: banco alternado main, rama, main,
+  rama, main, rama; 960×540; costo de un cuadro a 1 MP, mediana de 4 y 2 vueltas):
+
+  | | main (3 corridas) | graficos (3 corridas) |
+  |---|---|---|
+  | Baja | 987 · 984 · 1023 ms (media 998) | 940 · 995 · 942 ms (media 959) |
+  | Móvil | 974 · 1034 · 1009 ms (media 1006) | 940 · 1008 · 930 ms (media 959) |
+
+  «Baja» y «Móvil» cuestan lo mismo que antes dentro del ruido (−4 % y −5 %). «Sin el ambiente nuevo» (polvo y halos
+  ocultos) ahorra 0,7 · 229 · −108 ms en las tres corridas: no se distingue del ruido.
+- **Entre corridas distintas no se puede comparar**: el banco de base (run 43769800891, main) dio Baja 1163 ms a 1 MP y el
+  de después (run 43772443706) 2027 ms en otra máquina; el alternado de arriba muestra que era el runner. Con esa salvedad,
+  lo medido en esas dos corridas (ms a 1 MP, antes → después): Móvil 812 → 845, Media 1300 → 1322, Alta 1461 → 1737 (el
+  reflejo dibuja la escena otra vez), Ultra — → 3320 (nueva). Media, Alta y Ultra con una o dos vueltas: orientativo.
+- **Cuadros por segundo reales: sin medir.** Ni la calibración ni el gobernador cambiaron (pisos de 70 % en computadora y
+  densidad 1 en el teléfono, intactos); «Alta» con reflejo solo se elige sola si la calibración mide que entra.
+- **Cortes** (`check_recorrido`, run 43772428833, con la cámara del jurado en el válido propio): 0 cortes bruscos y 20
+  fundidos mirando todo, 0 y 32 saltando rivales: igual que la base (run 43769795605). Pruebas del juego y del teléfono en verde.
+
+**Capturas miradas** (artefacto `graficos-out`, `tools/banco.mjs --fotos=dir --niveles`: 6 tomas por calidad): 3/4, frontal,
+lateral, jurado con válido y con nulo, reversa. El jurado en «Móvil» ya muestra al pesista de frente, la pantalla con su
+nombre y kilos, las tres luces en la pantalla y las tres físicas arriba.
+
+**Pendiente / sin medir.**
+- **Nada se midió en una placa real.** Falta correr `juego.html?banco=1` en la Mac del dueño y en un teléfono, antes y después.
+  Si el polvo de «Móvil»/«Baja» costara algo medible, se apaga con `AMBIENTE.movil.polvo = 0` (una línea).
+- La cámara no tiene opción en pantalla (solo tecla C y `?camara=`): en el teléfono no se puede elegir. La fila iría en
+  Opciones (bienvenida), que estaba tocando otra rama.
+- El cambio de cámara no deja evento de analítica (la lista de eventos es de otra rama).
+- Conos y reflejo solo se ven de Media/Alta para arriba; en el celular no hay conos (en el camino directo cada capa aditiva
+  paga el tono por píxel). Postproceso: no se agregó nada (brillo, viñeta, grano y gradación ya estaban en Media y Alta).
+- Los árbitros siguen siendo muñecos de cápsulas: por eso el jurado es lo que ve el árbitro y no un plano de ellos.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.

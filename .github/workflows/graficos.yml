@@ -112,7 +112,7 @@ jobs:
           done
           node -e '
             const fs = require("fs");
-            for (const f of fs.readdirSync("out/comparar").sort()) { const B = JSON.parse(fs.readFileSync("out/comparar/" + f));
+            for (const f of fs.readdirSync("out/comparar").filter(f => f.endsWith(".json")).sort()) { const B = JSON.parse(fs.readFileSync("out/comparar/" + f));
               console.log(f, B.calidades.map(c => `${c.nombre}: ${c.ms1MP} ms a 1 MP (fijo ${c.fijoMs} + ${c.porMPms}/MP, ${c.vueltas} vueltas, ${c.ms1MPmin}-${c.ms1MPmax})`).join(" · "), "·", B.variantes.map(v => `${v.nombre}: ahorra ${v.ahorroMs} ms (${v.ahorroMin} a ${v.ahorroMax})`).join(" · ")); }
           ' | tee out/logs/comparar.txt
       - name: Resultado como artefacto
