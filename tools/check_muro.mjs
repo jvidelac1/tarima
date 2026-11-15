@@ -48,7 +48,8 @@ async function escenario(L) {
   if (tactil) await ctx.addInitScript(() => { Object.defineProperty(navigator, 'languages', { get: () => ['es-AR', 'es', 'en'] }); });
   const page = await ctx.newPage(), cdp = tactil ? await ctx.newCDPSession(page) : null;
   const mal = txt => { const m = `${tag} ${txt}`; if (!problemas.includes(m)) problemas.push(m); };
-  page.on('console', m => { if (m.type() === 'error') mal(`console.error: ${m.text()}`); });
+  // los 400 de /api/anotar y /api/encuesta son a propósito (la API a mano, una pregunta sola): el navegador los anota en la consola
+  page.on('console', m => { if (m.type() === 'error' && !/status of 400/.test(m.text())) mal(`console.error: ${m.text()}`); });
   page.on('pageerror', e => mal(`pageerror: ${e.message}`));
   page.on('response', r => { if (r.status() >= 400 && !/\/api\/(anotar|encuesta)$/.test(new URL(r.url()).pathname)) mal(`HTTP ${r.status()}: ${r.url()}`); });
   page.on('request', r => { if (!r.url().startsWith(base) && !/^(data|blob):/.test(r.url())) mal(`pedido externo: ${r.url()}`); });
