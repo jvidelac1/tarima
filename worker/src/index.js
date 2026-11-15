@@ -469,7 +469,7 @@ const puedeMandarMail = env => !!(env.EMAIL?.send && env.MAIL_DESDE);
 async function enviar(env, { to, subject, text, html, baja }) {
   try {
     await env.EMAIL.send({
-      to, from: { email: env.MAIL_DESDE, name: 'Tarima' }, subject, text, html,
+      to, from: { email: env.MAIL_DESDE, name: 'Lifting Game' }, subject, text, html,
       headers: { 'List-Unsubscribe': `<${baja}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
     });
     return true;

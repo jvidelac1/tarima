@@ -518,7 +518,7 @@ describe('lista de espera', () => {
       expect(r.j).toMatchObject({ estado: 'nuevo', confirmar: true });
       expect(enviados).toHaveLength(1);
       const m = enviados[0];
-      expect(m).toMatchObject({ to: 'confirma@buendominio.com', subject: 'Confirm your spot in Tarima', from: { email: 'hola@tarima.test' } });
+      expect(m).toMatchObject({ to: 'confirma@buendominio.com', subject: 'Confirm your spot in Lifting Game', from: { email: 'hola@tarima.test', name: 'Lifting Game' } });
       expect(m.text).toContain('Hi Leonel.');
       expect(m.headers['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
       expect(m.headers['List-Unsubscribe']).toMatch(/^<https:\/\/tarima\.test\/baja\?t=[0-9a-f]{32}\.[0-9a-f]{40}>$/);
@@ -530,7 +530,7 @@ describe('lista de espera', () => {
       expect(g.res.headers.get('referrer-policy')).toBe('no-referrer');
       const html = await g.res.text();
       expect(html).toContain('method="post"');
-      expect(html).toContain('Confirm your spot on the Tarima list?');
+      expect(html).toContain('Confirm your spot on the Lifting Game list?');
       expect(await confirmado()).toBeNull();
       // El correo salió: desde ahora corren los 30 días para confirmar.
       expect((await env.DB.prepare('SELECT confirmar_mandado_en FROM lista WHERE id = ?').bind(r.j.lista_id).first()).confirmar_mandado_en).toBeGreaterThan(0);
@@ -554,11 +554,11 @@ describe('lista de espera', () => {
     it('el mismo mail desde otro dispositivo: misma respuesta que un alta, un mail por día y sin revelar nada', async () => {
       enviados.length = 0;
       const r = await alta('repite@buendominio.com', { e: e(), idioma: 'es' });
-      expect(enviados.map(m => m.subject)).toEqual(['Confirma tu lugar en Tarima']);
+      expect(enviados.map(m => m.subject)).toEqual(['Confirma tu lugar en Lifting Game']);
       // Sin confirmar: se vuelve a mandar la confirmación.
       const r2 = await alta('repite@buendominio.com', { e: e() });
       expect(r2.j).toEqual({ estado: 'nuevo', lista_id: r.j.lista_id, confirmar: true });
-      expect(enviados.map(m => m.subject)).toEqual(['Confirma tu lugar en Tarima', 'Confirma tu lugar en Tarima']);
+      expect(enviados.map(m => m.subject)).toEqual(['Confirma tu lugar en Lifting Game', 'Confirma tu lugar en Lifting Game']);
       // El mismo día no sale otro mail, pero la respuesta no cambia.
       expect((await alta('repite@buendominio.com', { e: e() })).j).toEqual({ estado: 'nuevo', lista_id: r.j.lista_id, confirmar: true });
       expect(enviados).toHaveLength(2);
@@ -566,7 +566,7 @@ describe('lista de espera', () => {
       await env.DB.prepare('UPDATE lista SET confirmado_en = 1 WHERE id = ?').bind(r.j.lista_id).run();
       await env.DB.prepare('DELETE FROM limites').run();
       await alta('repite@buendominio.com', { e: e() });
-      expect(enviados.at(-1).subject).toBe('Ya estás en la lista de Tarima');
+      expect(enviados.at(-1).subject).toBe('Ya estás en la lista de Lifting Game');
       expect(enviados.at(-1).headers['List-Unsubscribe']).toMatch(/\/baja\?t=/);
     });
 
@@ -596,7 +596,7 @@ describe('lista de espera', () => {
       const link = enviados[0].headers['List-Unsubscribe'].slice(1, -1).slice(ORIGEN.length);
       const g = await llamar(link, null, { metodo: 'GET', ct: null, origin: null });
       const html = await g.res.text();
-      expect(html).toContain('¿Te damos de baja de la lista de Tarima?');
+      expect(html).toContain('¿Te damos de baja de la lista de Lifting Game?');
       // Sin la promesa de «nunca vas a pagar»: queda fuera hasta que el dueño defina la monetización.
       expect(html).not.toMatch(/pagar|never pay/i);
       expect(html).toContain('method="post"');
@@ -616,7 +616,7 @@ describe('lista de espera', () => {
       const y = await llamar('/api/baja', { email: 'PIDE-BAJA@buendominio.com' }, { ip: nuevaIp(), e: e() });
       expect([x.status, x.j, y.status, y.j]).toEqual([202, {}, 202, {}]);
       expect(enviados).toHaveLength(1);
-      expect(enviados[0].subject).toBe('Tu enlace para darte de baja de Tarima');
+      expect(enviados[0].subject).toBe('Tu enlace para darte de baja de Lifting Game');
       const link = linkDe(enviados[0], '/baja');
       expect(link).toContain('&v=f');
       const p = await llamar(link.slice(ORIGEN.length), 't=' + new URL(link).searchParams.get('t') + '&v=f', { ct: 'application/x-www-form-urlencoded', origin: ORIGEN, e: E({ POSTHOG_KEY: 'phc_x' }) });

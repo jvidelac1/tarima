@@ -5,22 +5,22 @@ import { escHtml } from './reglas.js';
 
 export const TEXTOS = {
   es: {
-    'mail.confirmar.asunto': 'Confirma tu lugar en Tarima',
-    'mail.confirmar.cuerpo': 'Hola, {nombre}. Toca el botón para confirmar tu lugar en la lista de acceso anticipado de Tarima. Si no fuiste tú, ignora este correo: si no se confirma, borramos tu dirección a los 30 días.',
-    'mail.ya.asunto': 'Ya estás en la lista de Tarima',
-    'mail.ya.cuerpo': 'Alguien, probablemente tú, escribió este correo en Tarima desde otro dispositivo. Ya estabas en la lista de acceso anticipado: ese dispositivo quedó con juego libre y no cambiamos nada más. Si no fuiste tú, no tienes que hacer nada.',
-    'mail.ya.boton': 'Ir a Tarima',
-    'confirmar.pregunta': '¿Confirmas tu lugar en la lista de Tarima?',
+    'mail.confirmar.asunto': 'Confirma tu lugar en Lifting Game',
+    'mail.confirmar.cuerpo': 'Hola, {nombre}. Toca el botón para confirmar tu lugar en la lista de acceso anticipado de Lifting Game. Si no fuiste tú, ignora este correo: si no se confirma, borramos tu dirección a los 30 días.',
+    'mail.ya.asunto': 'Ya estás en la lista de Lifting Game',
+    'mail.ya.cuerpo': 'Alguien, probablemente tú, escribió este correo en Lifting Game desde otro dispositivo. Ya estabas en la lista de acceso anticipado: ese dispositivo quedó con juego libre y no cambiamos nada más. Si no fuiste tú, no tienes que hacer nada.',
+    'mail.ya.boton': 'Ir a Lifting Game',
+    'confirmar.pregunta': '¿Confirmas tu lugar en la lista de Lifting Game?',
     'confirmar.boton': 'Sí, confirmar',
     'mail.confirmar.boton': 'Confirmar',
-    'mail.pie': 'Recibes este correo porque te anotaste en Tarima. Para darte de baja: {link}',
-    'mail.baja.asunto': 'Tu enlace para darte de baja de Tarima',
-    'mail.baja.cuerpo': 'Pediste darte de baja de la lista de Tarima. Toca el botón para confirmarlo. Si no fuiste tú, ignora este correo.',
+    'mail.pie': 'Recibes este correo porque te anotaste en Lifting Game. Para darte de baja: {link}',
+    'mail.baja.asunto': 'Tu enlace para darte de baja de Lifting Game',
+    'mail.baja.cuerpo': 'Pediste darte de baja de la lista de Lifting Game. Toca el botón para confirmarlo. Si no fuiste tú, ignora este correo.',
     'mail.baja.boton': 'Darme de baja',
     'nombre.defecto': 'Debutante',
     'confirmado.texto': '¡Listo! Tu lugar está confirmado.',
     'confirmado.volver': 'Volver al juego',
-    'baja.pregunta': '¿Te damos de baja de la lista de Tarima?',
+    'baja.pregunta': '¿Te damos de baja de la lista de Lifting Game?',
     'baja.boton': 'Sí, darme de baja',
     'baja.ok': 'Listo: te dimos de baja y borramos tu correo. Puedes seguir jugando.',
     'baja.token_invalido': 'Ese enlace ya no sirve. Pide uno nuevo desde la página de privacidad.',
@@ -29,22 +29,22 @@ export const TEXTOS = {
     'pagina.ver_en': 'Ver en español',
   },
   en: {
-    'mail.confirmar.asunto': 'Confirm your spot in Tarima',
-    'mail.confirmar.cuerpo': "Hi {nombre}. Tap the button to confirm your spot on Tarima's early access list. If this wasn't you, just ignore this email: unconfirmed addresses are deleted after 30 days.",
-    'mail.ya.asunto': "You're already on the Tarima list",
-    'mail.ya.cuerpo': "Someone, probably you, entered this email in Tarima on another device. You were already on the early access list: that device now has unlimited play, and nothing else changed. If this wasn't you, there's nothing you need to do.",
-    'mail.ya.boton': 'Go to Tarima',
-    'confirmar.pregunta': 'Confirm your spot on the Tarima list?',
+    'mail.confirmar.asunto': 'Confirm your spot in Lifting Game',
+    'mail.confirmar.cuerpo': "Hi {nombre}. Tap the button to confirm your spot on Lifting Game's early access list. If this wasn't you, just ignore this email: unconfirmed addresses are deleted after 30 days.",
+    'mail.ya.asunto': "You're already on the Lifting Game list",
+    'mail.ya.cuerpo': "Someone, probably you, entered this email in Lifting Game on another device. You were already on the early access list: that device now has unlimited play, and nothing else changed. If this wasn't you, there's nothing you need to do.",
+    'mail.ya.boton': 'Go to Lifting Game',
+    'confirmar.pregunta': 'Confirm your spot on the Lifting Game list?',
     'confirmar.boton': 'Yes, confirm',
     'mail.confirmar.boton': 'Confirm',
-    'mail.pie': "You're getting this because you joined Tarima. Unsubscribe: {link}",
-    'mail.baja.asunto': 'Your link to leave the Tarima list',
-    'mail.baja.cuerpo': "You asked to leave the Tarima list. Tap the button to confirm. If this wasn't you, ignore this email.",
+    'mail.pie': "You're getting this because you joined Lifting Game. Unsubscribe: {link}",
+    'mail.baja.asunto': 'Your link to leave the Lifting Game list',
+    'mail.baja.cuerpo': "You asked to leave the Lifting Game list. Tap the button to confirm. If this wasn't you, ignore this email.",
     'mail.baja.boton': 'Unsubscribe me',
     'nombre.defecto': 'Rookie',
     'confirmado.texto': 'Done! Your spot is confirmed.',
     'confirmado.volver': 'Back to the game',
-    'baja.pregunta': 'Remove you from the Tarima list?',
+    'baja.pregunta': 'Remove you from the Lifting Game list?',
     'baja.boton': 'Yes, unsubscribe me',
     'baja.ok': "Done: you're unsubscribed and your email is deleted. You can keep playing.",
     'baja.token_invalido': 'That link no longer works. Request a new one from the privacy page.',
@@ -88,9 +88,9 @@ export function pagina(idi, cuerpo, { status = 200, request = null } = {}) {
     try { const u = new URL(request.url); u.searchParams.set('lang', otro); enlace = `<p class="otro"><a href="${escHtml(u.pathname + u.search)}" lang="${otro}" hreflang="${otro}">${escHtml(t(otro, 'pagina.ver_en'))}</a></p>`; } catch { enlace = ''; }
   }
   const html = `<!doctype html><html lang="${idi}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex"><title>Tarima · ${escHtml(a.titulo)}</title><style>${CSS}</style></head>
+<meta name="robots" content="noindex"><title>Lifting Game · ${escHtml(a.titulo)}</title><style>${CSS}</style></head>
 <body><main><div class="c"><h1>${escHtml(a.titulo)}</h1>${a.html}<div class="otro" lang="${otro}"><strong>${escHtml(b.titulo)}</strong>${b.extra ? ' ' + b.extra : ''}</div>${enlace}</div>
-<p class="marca">Tarima</p></main></body></html>`;
+<p class="marca">Lifting Game</p></main></body></html>`;
   return new Response(html, {
     status,
     headers: {
@@ -109,7 +109,7 @@ export function armarMail(idi, { cuerpo, boton, link, baja }) {
   const pie = t(idi, 'mail.pie', { link: baja });
   const text = `${cuerpo}\n\n${boton}: ${link}\n\n--\n${pie}\n`;
   const html = `<!doctype html><html lang="${idi}"><body style="margin:0;background:#f6f4ef;font:16px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;color:#1b1b1b">
-<div style="max-width:520px;margin:0 auto;padding:32px 16px"><p style="font-weight:700;font-size:20px;margin:0 0 16px">Tarima</p>
+<div style="max-width:520px;margin:0 auto;padding:32px 16px"><p style="font-weight:700;font-size:20px;margin:0 0 16px">Lifting Game</p>
 <p style="margin:0 0 24px">${escHtml(cuerpo)}</p>
 <p style="margin:0 0 32px"><a href="${escHtml(link)}" style="display:inline-block;background:#c8102e;color:#fff;text-decoration:none;font-weight:600;border-radius:10px;padding:12px 22px">${escHtml(boton)}</a></p>
 <p style="font-size:13px;color:#5d5a54;margin:0">${escHtml(t(idi, 'mail.pie', { link: '' }))}<a href="${escHtml(baja)}" style="color:#5d5a54">${escHtml(baja)}</a></p></div></body></html>`;
