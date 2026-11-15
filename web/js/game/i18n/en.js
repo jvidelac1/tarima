@@ -418,7 +418,7 @@ export default {
   'lista.seguir_envion': 'On to the clean & jerk',
   'lista.nombre': 'Your name',
   'lista.nombre_ph': 'First name (and last name)',
-  'lista.error_nombre': 'Please enter your real name: at least 5 letters, no numbers or symbols.',
+  'lista.error_nombre': 'Please enter your real name: at least 4 letters, no numbers or symbols.',
   'lista.mail': 'Your email',
   'lista.mail_ph': 'name@example.com',
   'lista.aviso': 'Email me when Tarima’s early access opens.',

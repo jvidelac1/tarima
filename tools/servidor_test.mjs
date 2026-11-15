@@ -609,9 +609,11 @@ igual(expDelPase('basura'), null, 'pase inválido');
   igual((await s.anotar({ nombre: 'Lucía Romero', email: 'ana@ejemplo.com', aviso: false })).error, 'aviso', 'aviso obligatorio');
   igual(w.pedidos.length, 0, 'los errores locales no salen');
   // LIF-32: nombre real obligatorio (mínimo 5, sin números ni símbolos, sin «AAAA» ni tecleo al azar); no sale nada si falla
-  for (const malo of [undefined, '', '   ', 'Rookie', 'Joe', 'AAAAA', '*****', '2394932fjdksAAA', 'fjdks', 'asdfgh', 'Test User', 'Nasar1', 'N@sar'])
+  for (const malo of [undefined, '', '   ', 'Rookie', 'Joe', 'AAAA', 'Test', 'Ab1d', 'AAAAA', '*****', '2394932fjdksAAA', 'fjdks', 'asdfgh', 'Test User', 'Nasar1', 'N@sar'])
     igual((await s.anotar({ nombre: malo, email: 'ana@ejemplo.com' })).error, 'nombre', `nombre rechazado: ${JSON.stringify(malo)}`);
   igual(w.pedidos.length, 0, 'un nombre inválido no sale al servidor');
+  // decisión del 15 de noviembre: el mínimo baja a 4 letras (sin cambiar lo demás)
+  { const { nombreReal } = await import('../web/js/game/nombre.js'); igual(['Mila', 'Erin', 'Joon', 'Joe'].map(n => nombreReal(n).ok), [true, true, true, false], 'nombre: «Mila», «Erin» y «Joon» pasan; «Joe», no'); }
   const r = await s.anotar({ email: ' Ana@Ejemplo.com ', nombre: '  Ana   Belén ', idioma: 'es', novedades: true, sesion: 'ph_abc' });
   igual([r.ok, r.estado, r.confirmar], [true, 'nuevo', false], 'alta');
   const c = w.pedidos[0].cuerpo;

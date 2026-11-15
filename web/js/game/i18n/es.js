@@ -433,7 +433,7 @@ export default {
   'lista.seguir_envion': 'Seguir al dos tiempos',
   'lista.nombre': 'Tu nombre',
   'lista.nombre_ph': 'Nombre (y apellido)',
-  'lista.error_nombre': 'Escribe tu nombre real: al menos 5 letras, sin números ni símbolos.',
+  'lista.error_nombre': 'Escribe tu nombre real: al menos 4 letras, sin números ni símbolos.',
   'lista.mail': 'Tu correo',
   'lista.mail_ph': 'nombre@ejemplo.com',
   'lista.aviso': 'Quiero que Tarima me avise por correo cuando abra el acceso anticipado.',

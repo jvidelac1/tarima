@@ -459,11 +459,13 @@ describe('lista de espera', () => {
   });
 
   it('LIF-32: sin un nombre real no hay alta (400 «nombre») y no se guarda nada', async () => {
-    for (const [i, nombre] of [undefined, '', '<img onerror=x>', 'Rookie', 'Joe', 'AAAAA', '*****', '2394932fjdksAAA', 'fjdks', 'Test User', 'Nasar1'].entries()) {
+    for (const [i, nombre] of [undefined, '', '<img onerror=x>', 'Rookie', 'Joe', 'AAAA', 'Test', 'AAAAA', '*****', '2394932fjdksAAA', 'fjdks', 'Test User', 'Nasar1'].entries()) {
       const r = await alta(`malo${i}@buendominio.com`, { nombre });
       expect([r.status, r.j.error]).toEqual([400, 'nombre']);
       expect(await env.DB.prepare('SELECT id FROM lista WHERE email = ?').bind(`malo${i}@buendominio.com`).first()).toBeNull();
     }
+    // desde el 15 de noviembre, 4 letras alcanzan
+    for (const [i, nombre] of ['Mila', 'Erin', 'Joon'].entries()) expect((await alta(`cuatro${i}@buendominio.com`, { nombre })).j.estado).toBe('nuevo');
     const ok = await alta('nasar@buendominio.com', { nombre: 'Nasar' }), otro = await alta('nasar2@buendominio.com', { nombre: 'Nasar' });
     expect([ok.j.estado, otro.j.estado]).toEqual(['nuevo', 'nuevo']);      // puede haber más de un Nasar
   });
