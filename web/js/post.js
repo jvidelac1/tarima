@@ -161,7 +161,7 @@ void main(){
 export class Post {
   constructor(renderer, scene, camera, quality) {
     this.renderer = renderer; this.scene = scene; this.camera = camera; this.q = quality;
-    this.focus = 9; this.time = 0; this.reduceMotion = false; this.skip = {}; this.prof = null;   // skip: {ao,dof,bloom,smaa} para perfilar por pase; prof: marca de etapa (main.js)
+    this.focus = 9; this.cerca = .35; this.time = 0; this.reduceMotion = false; this.skip = {}; this.prof = null;   // skip: {ao,dof,bloom,smaa} para perfilar por pase; prof: marca de etapa (main.js)
     const depth = new THREE.DepthTexture(1, 1); depth.type = THREE.UnsignedIntType; depth.format = THREE.DepthFormat; this.depth = depth;
     // El color de la escena va en R11F_G11F_B10F: HDR sin alfa a 4 bytes por muestra, la mitad que RGBA16F. Con MSAA 4x es el
     // destino más grande del cuadro; el desenfoque, el halo y el compuesto siguen en 16 bits por canal.
@@ -257,7 +257,7 @@ export class Post {
     let read = this.sceneRT;
     // teleobjetivo = menos profundidad de campo: el desenfoque máximo crece con la focal, con tope en píxeles
     const tanF = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2), maxBlur = Math.min(32, this.H / 34, Math.max(6, this.H / 46 * .2217 / tanF));
-    BOKEH.uNear.value = cam.near; BOKEH.uFar.value = cam.far; BOKEH.uFocus.value = this.focus; BOKEH.uMaxBlur.value = maxBlur; BOKEH.uPx.value = this.H / (2 * tanF); BOKEH.uRes.value.set(this.W, this.H); BOKEH.tDepth.value = this.depth; BOKEH.uUseDepth.value = this.dofBlur ? 1 : 0;
+    BOKEH.uNear.value = cam.near; BOKEH.uFar.value = cam.far; BOKEH.uFocus.value = this.focus; BOKEH.uNearScale.value = this.cerca; BOKEH.uMaxBlur.value = maxBlur; BOKEH.uPx.value = this.H / (2 * tanF); BOKEH.uRes.value.set(this.W, this.H); BOKEH.tDepth.value = this.depth; BOKEH.uUseDepth.value = this.dofBlur ? 1 : 0;
     const ao = this.aoMat && !skip.ao, dof = this.dofBlur && !skip.dof;
     P('ao');
     if (ao) {
@@ -270,7 +270,7 @@ export class Post {
     P('dof');
     if (this.mixMat && (ao || dof)) {
       for (const m of [this.dofPre, this.dofBlur, this.mixMat]) {
-        if (!m) continue; const u = m.uniforms; u.uFocus.value = this.focus; u.uMaxBlur.value = maxBlur; if (!u.tDiffuse) continue;
+        if (!m) continue; const u = m.uniforms; u.uFocus.value = this.focus; u.uMaxBlur.value = maxBlur; if (u.uNearScale) u.uNearScale.value = this.cerca;      // `cerca`: cuánto se desenfoca lo que está delante del foco (0,35; el juego lo baja en la vista del jurado) if (!u.tDiffuse) continue;
         u.tDiffuse.value = read.texture; u.uNear.value = cam.near; u.uFar.value = cam.far; u.uAO.value = ao ? AO_INTENSITY : 0;
       }
       this.maxBlur = maxBlur; this.mixMat.uniforms.uDof.value = dof ? 1 : 0;

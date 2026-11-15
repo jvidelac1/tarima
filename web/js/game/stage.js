@@ -621,7 +621,7 @@ export class Escena {
   }
   /** Avanza cámara y entorno; dibuja si `pintar`. */
   cuadro(dt, pintar = true) {
-    this._apuntar(); this.rig.update(dt); this._vigilar(dt); this.viva.aplicar(this.rig.camera, dt, this.rig.focusDistance); this.trace.face(this.rig.camera); this.post.focus = this.rig.focusDistance; this.arena.update(dt, this.rig.camera); this.ambiente.update(dt); this.jueces.update(dt); this._detalle();
+    this._apuntar(); this.rig.update(dt); this._vigilar(dt); this.viva.aplicar(this.rig.camera, dt, this.rig.focusDistance); this.trace.face(this.rig.camera); this.post.focus = this.rig.focusDistance; this.post.cerca = this.plano?.key === 'jurado' ? .1 : .35; this.arena.update(dt, this.rig.camera); this.ambiente.update(dt); this.jueces.update(dt); this._detalle();
     if (!pintar) return;
     const r = this.renderer; r.shadowMap.needsUpdate = this.sombra > 0; if (this.sombra > 0) this.sombra--;
     this._dibujar(dt);
