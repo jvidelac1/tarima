@@ -7,10 +7,13 @@
 //     sesión (6.6): sorteo por la bandera `grabacion`, sin lienzo, campos y nombre tapados, nada sin medición.
 //  3. Las Functions de Pages (functions/): pasan /api/* al Worker con la IP y el país en cabeceras propias, y «/» muestra
 //     el juego.
-//  1b. La regla del arranque gratis (GRATIS_ETAPA='arranque', docs/MVP.md 5.5) con el Worker de verdad (worker/src/index.js)
-//     en Node sobre la D1 falsa de tools/servidor_local.mjs, y con este cliente hablándole: arranque gratis una vez, dos
-//     tiempos negado sin correo, permitido tras anotarse y tras la encuesta, recarga en el intervalo, otra pestaña, otro
-//     dispositivo en la misma IP, la API a mano y la regla vieja por variable.
+//  1b. La regla del arranque gratis (GRATIS_ETAPA='arranque', la del 12 al 15 de noviembre, que se recupera por variables)
+//     con el Worker de verdad (worker/src/index.js) en Node sobre la D1 falsa de tools/servidor_local.mjs, y con este
+//     cliente hablándole: arranque gratis una vez, dos tiempos negado sin correo, permitido tras anotarse, recarga en el
+//     intervalo, otra pestaña, otro dispositivo en la misma IP, la API a mano y la regla vieja por variable.
+//  1c. La regla de producción (LIF-53, worker/wrangler.jsonc): la primera final entera gratis y el cartel, que se
+//     desbloquea con el correo o con las dos preguntas (una vez por dispositivo, 3 por red), y los eventos que manda el
+//     Worker a PostHog (anotar_ok solo para altas nuevas, anotar_repetido, encuesta_respuesta con `desbloquea`).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -65,9 +68,9 @@ const base = o => crearServidor({ host: 'liftinggame.pages.dev', buscar: '', esp
 
 // ---------- 1. servidor.js ----------
 
-igual(CONSENTIMIENTO, '2026-11-d', 'versión del consentimiento');
+igual(CONSENTIMIENTO, '2026-11-e', 'versión del consentimiento');
 ok(VERSIONES_CONSENTIMIENTO.has(CONSENTIMIENTO), 'el Worker acepta la versión que manda el juego');
-ok(['2026-11-a', '2026-11-b', '2026-11-c'].every(v => VERSIONES_CONSENTIMIENTO.has(v)), 'el Worker sigue aceptando las versiones anteriores');
+ok(['2026-11-a', '2026-11-b', '2026-11-c', '2026-11-d'].every(v => VERSIONES_CONSENTIMIENTO.has(v)), 'el Worker sigue aceptando las versiones anteriores');
 {
   const priv = fs.readFileSync(path.join(ROOT, 'web/privacidad.html'), 'utf8');
   ok((priv.match(new RegExp(`class="version">(Versión|Version) ${CONSENTIMIENTO} `, 'g')) || []).length === 2, 'la privacidad muestra la misma versión en los dos idiomas');
@@ -77,6 +80,9 @@ ok(['2026-11-a', '2026-11-b', '2026-11-c'].every(v => VERSIONES_CONSENTIMIENTO.h
   ok(!/navigator\.language/.test(priv), 'la privacidad no elige el idioma por el navegador');
   ok(!/once a month|a month|monthly|una por mes|al mes|por mes|mensual/i.test(priv), 'la privacidad no dice la frecuencia de las novedades');
   ok(/dos preguntas/.test(priv) && /two-question survey/.test(priv), 'la privacidad describe la encuesta de dos preguntas');
+  // LIF-53: la encuesta ahora es un camino del cartel (desbloquea el juego libre) y lo dice
+  ok(/Cualquiera de las dos te deja jugar sin límite/.test(priv) && /Either one lets you play with no limit/.test(priv), 'la privacidad dice que la encuesta desbloquea el juego libre');
+  ok(!/no da ni quita nada|doesn't unlock or change anything/.test(priv), 'la privacidad ya no dice que la encuesta no da nada');
 }
 {
   // Textos del muro y de la encuesta (docs/MVP.md 4.5): el muro solo pide el correo; la encuesta nueva, exacta.
@@ -90,8 +96,10 @@ ok(['2026-11-a', '2026-11-b', '2026-11-c'].every(v => VERSIONES_CONSENTIMIENTO.h
     ['How would you rather play Tarima?', 'Mobile app (App Store / Google Play)', 'In the browser (web game)', 'What would you like the game to have?', 'Create and train your own lifter', 'Women lifters and weight classes', 'New venues and championships', 'Anything else? (optional)'], 'encuesta en inglés');
   igual([ES['encuesta.plataforma'], ES['encuesta.plataforma.app'], ES['encuesta.plataforma.web'], ES['encuesta.features'], ES['encuesta.features.pesista_propio'], ES['encuesta.features.mujeres_categorias'], ES['encuesta.features.sedes_campeonatos'], ES['encuesta.otra']],
     ['¿Cómo prefieres jugar Tarima?', 'App para el celular (App Store / Google Play)', 'En el navegador (juego web)', '¿Qué te gustaría que tenga el juego?', 'Crear y entrenar a tu propio pesista', 'Pesistas mujeres y categorías de peso', 'Nuevas sedes y campeonatos', '¿Algo más? (opcional)'], 'encuesta en español');
+  // LIF-53: el cartel tiene los dos caminos, con los textos que pidió el dueño
   const cx = fs.readFileSync(path.join(ROOT, 'web/js/game/conexion.js'), 'utf8');
-  ok(!/btn-encuesta|camino-encuesta|encuesta_disponible\s*\?\?/.test(cx), 'el muro no tiene el camino de la encuesta');
+  ok(/btn-via-mail/.test(cx) && /btn-via-preguntas/.test(cx), 'el cartel tiene los dos caminos');
+  igual([EN['muro.via.mail'], EN['muro.via.preguntas'], EN['encuesta.saltar'], ES['muro.via.mail'], ES['muro.via.preguntas']], ['Leave your email', 'Answer 2 quick questions', 'Skip', 'Deja tu correo', 'Responde 2 preguntas rápidas'], 'los dos caminos del cartel');
 }
 ok(pareceCorreo('ana@ejemplo.com') && !pareceCorreo('ana@ejemplo') && !pareceCorreo('ana ejemplo.com') && !pareceCorreo('a@b.c'), 'pareceCorreo');
 igual(sugerirCorreo('ana@gmial.com'), 'ana@gmail.com', 'sugerencia gmial');
@@ -109,7 +117,7 @@ igual(expDelPase('basura'), null, 'pase inválido');
   const e = await s.estado({ idioma: 'es' });
   igual([e.fuente, e.puede, e.quedan], ['servidor', true, 2], 'estado del servidor');
   igual(local.getItem('tarima.dispositivo'), UUID, 'guarda el dispositivo que devuelve el Worker (gana la cookie)');
-  igual(s.copia(), { muro: false, quedan: 2, lista: false, motivo: null }, 'copia local después del estado');
+  igual(s.copia(), { muro: false, quedan: 2, lista: false, libre: false, motivo: null }, 'copia local después del estado');
   igual(w.pedidos[0].init.method, 'POST', 'estado es POST');
   igual(w.pedidos[0].init.headers['content-type'], 'application/json', 'estado manda JSON');
   ok(/^[0-9a-f-]{36}$/.test(w.pedidos[0].cuerpo.dispositivo), 'manda un UUID generado por el navegador');
@@ -250,7 +258,7 @@ igual(expDelPase('basura'), null, 'pase inválido');
   const s = base({ fetch: workerFalso({ '/api/partida': [[200, { estado: 'muro', motivo: 'ip', encuesta_disponible: true, dispositivo: UUID }]] }).fetch, local });
   const r = await s.pedirPase({ idioma: 'en' });
   igual([r.estado, r.motivo, r.encuesta_disponible], ['muro', 'ip', true], 'muro del servidor');
-  igual(s.copia(), { muro: true, quedan: 0, lista: false, motivo: 'ip' }, 'copia en muro');
+  igual(s.copia(), { muro: true, quedan: 0, lista: false, libre: false, motivo: 'ip' }, 'copia en muro');
 }
 
 // pase: reintentos (2 en 3 s) y después «sin servidor» UNA vez, solo con historia limpia
@@ -310,10 +318,10 @@ igual(expDelPase('basura'), null, 'pase inválido');
   igual([r1.estado, r2.estado, r3.estado, r3.n, w.pedidos.length], ['ok', 'ok', 'ok', 3, 1], 'sin API: finales sin límite y sin pedir nada más');
 }
 
-// ?muro=firme en localhost: Worker simulado
+// ?muro=firme en localhost: Worker simulado, con 2 finales y el correo obligatorio (libre=0)
 {
   const local = new Mem();
-  const s = base({ host: 'localhost', buscar: '?muro=firme&etapa=final', local, fetch: async () => { throw new Error('no debería salir'); } });
+  const s = base({ host: 'localhost', buscar: '?muro=firme&gratis=2&libre=0', local, fetch: async () => { throw new Error('no debería salir'); } });
   igual(s.modo, 'simulado', 'modo simulado');
   igual((await s.estado({})).quedan, 2, 'simulado: 2 finales');
   const a = await s.pedirPase({}), b = await s.pedirPase({}), c = await s.pedirPase({});
@@ -329,12 +337,28 @@ igual(expDelPase('basura'), null, 'pase inválido');
 }
 
 
-// ?muro=firme en localhost, con la regla de producción (el arranque gratis)
+// ?muro=firme en localhost, con la regla de producción (LIF-53): 1 final entera, el cartel, el correo o las preguntas
 {
   const local = new Mem(), sesion = new Mem();
   const s = base({ host: 'localhost', buscar: '?muro=firme', local, sesion, fetch: async () => { throw new Error('no debería salir'); } });
   const e = await s.estado({});
-  igual([e.quedan, e.etapa, e.regla], [1, 'arranque', { etapa: 'arranque', gratis: 1, bono: 0 }], 'simulado: un arranque gratis');
+  igual([e.quedan, e.etapa, e.encuesta_disponible, e.regla], [1, 'completa', true, { etapa: 'final', gratis: 1, bono: 0, libre: true }], 'simulado: una final entera gratis');
+  const a = await s.pedirPase({});
+  igual([a.estado, a.etapa, a.quedan, (await s.envion({})).via], ['ok', 'completa', 0, 'ya'], 'simulado: la final entera, el dos tiempos sin pedir nada');
+  const m = await s.pedirPase({});
+  igual([m.estado, m.encuesta_disponible], ['muro', true], 'simulado: después, el cartel con las preguntas');
+  igual((await s.encuesta({ r: { plataforma: 'web' } })).error, 'incompleta', 'simulado: una sola pregunta no desbloquea');
+  igual(await s.encuesta({ r: { plataforma: 'web', features: ['pesista_propio'] } }), { ok: true, bono: 0, libre: true }, 'simulado: las dos preguntas desbloquean');
+  const l = await s.pedirPase({});
+  igual([l.estado, l.fuente, l.quedan, s.copia().libre], ['ok', 'encuesta', null, true], 'simulado: juego libre por la encuesta');
+}
+
+// ?muro=firme&etapa=arranque&libre=0 en localhost: la regla del 12 al 15 de noviembre (el arranque gratis, correo obligatorio)
+{
+  const local = new Mem(), sesion = new Mem();
+  const s = base({ host: 'localhost', buscar: '?muro=firme&etapa=arranque&libre=0', local, sesion, fetch: async () => { throw new Error('no debería salir'); } });
+  const e = await s.estado({});
+  igual([e.quedan, e.etapa, e.regla], [1, 'arranque', { etapa: 'arranque', gratis: 1, bono: 0, libre: false }], 'simulado: un arranque gratis');
   const a = await s.pedirPase({});
   igual([a.estado, a.etapa, a.quedan], ['ok', 'arranque', 0], 'simulado: final con etapa arranque');
   igual((await s.envion({})).estado, 'muro', 'simulado: dos tiempos sin correo, muro');
@@ -352,10 +376,12 @@ igual(expDelPase('basura'), null, 'pase inválido');
   console.log = (...a) => { if (typeof a[0] === 'string' && a[0].startsWith('{"')) return; logReal(...a); };      // registros del Worker
   const SECRETOS = { SECRETO_IP: 'ip'.repeat(16), SECRETO_DISPOSITIVO: 'dv'.repeat(16), SECRETO_PASE: 'pa'.repeat(16), SECRETO_BAJA: 'ba'.repeat(16) };
   const vars = varsDelWorker();
-  igual([vars.GRATIS_ETAPA, vars.GRATIS, vars.BONO_ENCUESTA], ['arranque', '1', '0'], 'worker/wrangler.jsonc: la regla de producción es el arranque gratis, con el correo obligatorio (la encuesta sin bono)');
+  igual([vars.GRATIS_ETAPA, vars.GRATIS, vars.TOPE_IP, vars.BONO_ENCUESTA, vars.ENCUESTA_LIBRE, vars.ENCUESTAS_POR_IP], ['final', '1', '6', '0', '1', '3'], 'worker/wrangler.jsonc: la regla de producción es la de LIF-53 (1 final entera gratis; el correo o la encuesta desbloquean)');
+  // 1b prueba la regla del arranque gratis, que se recupera con estas variables
+  const ARRANQUE = { GRATIS_ETAPA: 'arranque', ENCUESTA_LIBRE: '0' };
   /** Un Worker con su base. `api(ruta, cuerpo, ip)` lo llama como la Function de Pages; `fetchDe(ip)` es el fetch de un navegador. */
-  function workerLocal(extra = {}) {
-    const db = d1Falsa(), env = { ...vars, ...SECRETOS, ...extra, DB: db };
+  function workerLocal(extra = {}, prod = false) {
+    const db = d1Falsa(), env = { ...vars, ...(prod ? {} : ARRANQUE), ...SECRETOS, ...extra, DB: db };
     const llamar = async (ruta, init, ip) => {
       const pend = [], ctx = { waitUntil: p => pend.push(Promise.resolve(p).catch(() => null)), passThroughOnException() {} };
       const r = await worker.fetch(new Request(ORIGEN + ruta, { ...init, headers: { ...(init.headers || {}), origin: ORIGEN, 'cf-connecting-ip': ip } }), env, ctx);
@@ -377,7 +403,7 @@ igual(expDelPase('basura'), null, 'pase inválido');
     // Jugador nuevo: el arranque de una final, gratis; el dos tiempos, negado; la próxima final, muro antes de empezar.
     const w = workerLocal(), { s, sesion } = cliente(w, '203.0.113.10');
     const e = await s.estado({ idioma: 'es' });
-    igual([e.puede, e.quedan, e.etapa, e.regla, e.encuesta_disponible], [true, 1, 'arranque', { etapa: 'arranque', gratis: 1, bono: 0 }, false], 'Worker: un dispositivo nuevo tiene un arranque gratis (sin encuesta en el muro)');
+    igual([e.puede, e.quedan, e.etapa, e.regla, e.encuesta_disponible], [true, 1, 'arranque', { etapa: 'arranque', gratis: 1, bono: 0, libre: false }, false], 'Worker: un dispositivo nuevo tiene un arranque gratis (sin encuesta en el muro)');
     igual(e.flags['muro-partidas-gratis'], '1', 'Worker: la bandera de cuántas finales reporta lo que vale con el arranque gratis');
     const p = await s.pedirPase({ idioma: 'es' });
     igual([p.estado, p.fuente, p.etapa, p.quedan, p.encuesta_disponible, JSON.parse(sesion.getItem('tarima.pase')).etapa], ['ok', 'gratis', 'arranque', 0, false, 'arranque'], 'Worker: el pase sale con etapa arranque');
@@ -399,7 +425,7 @@ igual(expDelPase('basura'), null, 'pase inválido');
     // Correo obligatorio: la encuesta (aunque alguien la mande a mano sin anotarse) no da el dos tiempos ni finales.
     const w = workerLocal(), { s } = cliente(w, '203.0.113.11');
     await s.pedirPase({});
-    igual(await s.encuesta({ r: ENC, idioma: 'es' }), { ok: true, bono: 0 }, 'Worker: la encuesta no suma');
+    igual(await s.encuesta({ r: ENC, idioma: 'es' }), { ok: true, bono: 0, libre: false }, 'Worker: la encuesta no suma');
     igual((await s.encuesta({ r: ENC })).error, 'ya_respondida', 'Worker: una encuesta por dispositivo');
     const v = await s.envion({});
     igual([v.estado, v.motivo, v.encuesta_disponible], ['muro', 'envion', false], 'Worker: la encuesta no da el dos tiempos');
@@ -485,6 +511,92 @@ igual(expDelPase('basura'), null, 'pase inválido');
     igual((await s.envion({})).via, 'ya', 'cambio de regla: con GRATIS_ETAPA=final la final en juego termina gratis');
     igual((await s.pedirPase({})).etapa, 'completa', 'cambio de regla: y la siguiente sale completa');
   }
+
+  // ---------- 1c. LIF-53: la regla de producción con el Worker de verdad ----------
+  // PostHog falso: lo que el Worker manda a /i/v0/e/ queda en `capturas`; las banderas, vacías.
+  const fetchReal = globalThis.fetch, capturas = [];
+  globalThis.fetch = async (url, init) => {
+    const u = String(url?.url || url);
+    if (/posthog\.com\/i\/v0\/e\//.test(u)) { capturas.push(JSON.parse(init.body)); return new Response('{}', { status: 200 }); }
+    if (/posthog\.com\/flags/.test(u)) return new Response(JSON.stringify({ flags: {} }), { status: 200 });
+    if (/cloudflare-dns\.com/.test(u)) return new Response(JSON.stringify({ Status: 0, Answer: [{ type: 15, data: '10 mx.prueba.' }] }), { headers: { 'content-type': 'application/dns-json' } });
+    return fetchReal(url, init);
+  };
+  const PH = { POSTHOG_KEY: 'phc_prueba', POSTHOG_HOST: 'us.i.posthog.com' };
+  try {
+    {
+      // Jugador nuevo que contesta las preguntas: la final entera gratis, el cartel, las preguntas y juego libre.
+      const w = workerLocal(PH, true), { s, sesion } = cliente(w, '203.0.113.30');
+      const e = await s.estado({ idioma: 'en' });
+      igual([e.puede, e.quedan, e.etapa, e.libre, e.encuesta_disponible, e.regla], [true, 1, 'completa', false, true, { etapa: 'final', gratis: 1, bono: 0, libre: true }], 'LIF-53: un dispositivo nuevo tiene una final entera gratis');
+      const p = await s.pedirPase({});
+      igual([p.estado, p.fuente, p.etapa, p.quedan, JSON.parse(sesion.getItem('tarima.pase')).etapa], ['ok', 'gratis', 'completa', 0, 'completa'], 'LIF-53: el pase sale completo');
+      igual((await s.envion({})).via, 'ya', 'LIF-53: el dos tiempos de la final gratis no pide nada');
+      s.finalTerminada();
+      const m = await s.pedirPase({});
+      igual([m.estado, m.motivo, m.encuesta_disponible], ['muro', 'dispositivo', true], 'LIF-53: la segunda final: el cartel, con las preguntas como camino');
+      igual((await s.encuesta({ r: { plataforma: 'app', otra: 'Más rivales' } })).error, 'incompleta', 'LIF-53: sin las dos preguntas no desbloquea');
+      igual(await s.encuesta({ r: ENC, idioma: 'en', sesion: 'ph_sesion', momento: 'podio' }), { ok: true, bono: 0, libre: true }, 'LIF-53: las dos preguntas desbloquean');
+      igual([s.copia().libre, s.copia().muro], [true, false], 'LIF-53: juego libre en la copia');
+      const l = await s.pedirPase({});
+      igual([l.estado, l.fuente, l.libre, l.quedan], ['ok', 'encuesta', true, null], 'LIF-53: juego libre por la encuesta');
+      igual((await s.encuesta({ r: ENC })).error, 'ya_respondida', 'LIF-53: una encuesta por dispositivo');
+      const enc = capturas.filter(c => c.event === 'encuesta_respuesta');
+      igual(enc.map(c => [c.distinct_id, c.properties.desbloquea, c.properties.momento, c.properties.plataforma]), [['ph_sesion', true, 'podio', 'app']], 'LIF-53: encuesta_respuesta dice que desbloqueó');
+      igual((await w.db.prepare('SELECT COUNT(*) n, SUM(i IS NOT NULL) con_ip FROM encuestas').first()), { n: 1, con_ip: 1 }, 'LIF-53: la encuesta con desbloqueo guarda el código de la IP (para el tope de la red)');
+    }
+    {
+      // La red: tres encuestas con desbloqueo en 30 días; la cuarta, error 'ip' (queda el correo). Por la API a mano, igual.
+      const w = workerLocal(PH, true), ip = '203.0.113.31', res = [];
+      for (let k = 0; k < 4; k++) {
+        const { s } = cliente(w, ip);
+        await s.pedirPase({}); s.finalTerminada();
+        const m = await s.pedirPase({});
+        await w.db.prepare('DELETE FROM limites').run();      // el límite de pedidos (3 por hora) es otra cosa: acá se mira el tope de la red
+        const r = await s.encuesta({ r: ENC });
+        res.push([m.encuesta_disponible, r.ok ? 'libre' : r.error]);
+      }
+      await w.db.prepare('DELETE FROM limites').run();
+      igual(res, [[true, 'libre'], [true, 'libre'], [true, 'libre'], [false, 'ip']], 'LIF-53: 3 encuestas con desbloqueo por red; la cuarta, no (y el cartel ya no la ofrece)');
+      const a = await w.api('/api/encuesta', { dispositivo: crypto.randomUUID(), r: ENC }, ip);
+      igual([a.status, a.j.error], [409, 'ip'], 'LIF-53: por la API a mano, desde la misma red, tampoco');
+      const b = await w.api('/api/encuesta', { dispositivo: crypto.randomUUID(), r: { plataforma: 'web' } }, '203.0.113.32');
+      igual([b.status, b.j.error], [400, 'incompleta'], 'LIF-53: por la API a mano, sin las dos preguntas, no desbloquea');
+    }
+    {
+      // El correo: juego libre; las preguntas después, optativas (no desbloquean nada ni gastan la red). anotar_ok lo
+      // manda el Worker solo para altas nuevas; un correo que ya estaba, anotar_repetido.
+      capturas.length = 0;
+      const w = workerLocal(PH, true), { s } = cliente(w, '203.0.113.33');
+      await s.pedirPase({}); s.finalTerminada();
+      igual((await s.pedirPase({})).estado, 'muro', 'LIF-53: el cartel');
+      const a = await s.anotar({ nombre: 'Lucía Romero', email: 'lucia@pruebas-tarima.com', idioma: 'es', novedades: false, momento: 'podio', pantalla: 'muro', metricas: true });
+      igual([a.ok, a.estado], [true, 'nuevo'], 'LIF-53: se anota');
+      const l = await s.pedirPase({});
+      igual([l.fuente, l.libre, l.quedan], ['lista', true, null], 'LIF-53: con el correo, juego libre');
+      igual(await s.encuesta({ r: { plataforma: 'web' }, momento: 'podio' }), { ok: true, bono: 0, libre: false }, 'LIF-53: después del correo las preguntas son optativas (y alcanza con una)');
+      igual((await w.db.prepare('SELECT i FROM encuestas').all()).results, [{ i: null }], 'LIF-53: la optativa no gasta la red');
+      // el mismo correo desde otro dispositivo, y otra vez desde el mismo: anotar_repetido (y nada más en D1)
+      const otro = cliente(w, '203.0.113.34').s;
+      igual((await otro.anotar({ nombre: 'Lucía Romero', email: 'lucia@pruebas-tarima.com', metricas: true, momento: 'inicio', pantalla: 'muro' })).estado, 'nuevo', 'el correo repetido desde otro dispositivo: misma respuesta (no revela quién está)');
+      igual((await s.anotar({ nombre: 'Lucía Romero', email: 'lucia@pruebas-tarima.com', metricas: true })).estado, 'ya_estaba', 'desde el mismo: ya_estaba');
+      // sin medición (metricas false), nada
+      await cliente(w, '203.0.113.35').s.anotar({ nombre: 'Beto Gómez', email: 'beto@pruebas-tarima.com', novedades: true, metricas: false });
+      const ev = capturas.filter(c => /^anotar_/.test(c.event)).map(c => [c.event, c.properties.novedades, c.properties.momento, c.properties.pantalla, c.properties.mismo_dispositivo ?? null, /^[0-9a-f]{32}$/.test(c.distinct_id)]);
+      igual(ev, [['anotar_ok', false, 'podio', 'muro', null, true], ['anotar_repetido', null, 'inicio', 'muro', false, true], ['anotar_repetido', null, null, null, true, true]], 'Worker: anotar_ok solo para el alta nueva; anotar_repetido para el correo que ya estaba; nada sin medición');
+      ok(!JSON.stringify(capturas).includes('@'), 'Worker: ningún evento lleva el correo');
+      igual(await w.db.prepare('SELECT COUNT(*) n FROM lista').first('n'), 2, 'en la lista quedaron 2 altas');
+    }
+    {
+      // Volver atrás por variable: ENCUESTA_LIBRE "0" (correo obligatorio): el cartel sin las preguntas.
+      const w = workerLocal({ ...PH, ENCUESTA_LIBRE: '0' }, true), { s } = cliente(w, '203.0.113.36');
+      await s.pedirPase({}); s.finalTerminada();
+      const m = await s.pedirPase({});
+      igual([m.estado, m.encuesta_disponible], ['muro', false], 'ENCUESTA_LIBRE 0: el cartel solo con el correo');
+      igual(await s.encuesta({ r: ENC }), { ok: true, bono: 0, libre: false }, 'ENCUESTA_LIBRE 0: la encuesta no desbloquea');
+      igual((await s.pedirPase({})).estado, 'muro', 'ENCUESTA_LIBRE 0: sigue el cartel');
+    }
+  } finally { globalThis.fetch = fetchReal; }
   console.log = logReal;
 }
 
@@ -504,7 +616,7 @@ igual(expDelPase('basura'), null, 'pase inválido');
   igual([r.ok, r.estado, r.confirmar], [true, 'nuevo', false], 'alta');
   const c = w.pedidos[0].cuerpo;
   igual([c.email, c.aviso, c.novedades, c.consentimiento, c.nombre, c.web, c.sesion], ['Ana@Ejemplo.com', true, true, CONSENTIMIENTO, 'Ana Belén', '', 'ph_abc'], 'cuerpo del alta (nombre limpio)');
-  igual(s.copia(), { muro: false, quedan: null, lista: true, motivo: null }, 'anotado: juego libre en la copia');
+  igual(s.copia(), { muro: false, quedan: null, lista: true, libre: true, motivo: null }, 'anotado: juego libre en la copia');
   igual((await s.anotar({ nombre: 'Lucía Romero', email: 'ana@ejemplo.com' })).error, 'descartable', 'error del Worker');
   igual((await s.anotar({ nombre: 'Lucía Romero', email: 'ana@ejemplo.com' })).error, 'limite', '429');
   igual((await s.anotar({ nombre: 'Lucía Romero', email: 'ana@ejemplo.com' })).error, 'red', 'sin red');
@@ -515,9 +627,9 @@ igual(expDelPase('basura'), null, 'pase inválido');
   const local = new Mem({ 'tarima.muro': '1', 'tarima.quedan': '0' });
   const w = workerFalso({ '/api/encuesta': [[200, { estado: 'ok', bono: 2 }], [409, { error: 'ya_respondida' }], [400, { error: 'incompleta' }]], '/api/baja': [[202, {}], [429, { error: 'limite' }]] });
   const s = base({ fetch: w.fetch, local });
-  igual(await s.encuesta({ r: { plataforma: 'web' }, idioma: 'es', sesion: 's' }), { ok: true, bono: 2 }, 'encuesta con premio (si el Worker lo diera)');
+  igual(await s.encuesta({ r: { plataforma: 'web' }, idioma: 'es', sesion: 's' }), { ok: true, bono: 2, libre: false }, 'encuesta con premio (si el Worker lo diera)');
   igual(w.pedidos.at(-1).cuerpo.r, { plataforma: 'web' }, 'la encuesta manda las respuestas tal cual');
-  igual(s.copia(), { muro: false, quedan: 2, lista: false, motivo: null }, 'la encuesta saca el muro y suma 2');
+  igual(s.copia(), { muro: false, quedan: 2, lista: false, libre: false, motivo: null }, 'la encuesta saca el muro y suma 2');
   igual((await s.encuesta({ r: {} })).error, 'ya_respondida', '409');
   igual((await s.encuesta({ r: {} })).error, 'incompleta', '400 incompleta');
   igual(await s.baja({ email: 'ana@ejemplo.com' }), { ok: true }, 'baja 202');
@@ -594,10 +706,13 @@ igual([dominioReferente('https://l.instagram.com/?u=secreto'), dominioReferente(
   a.ev('anotar_ok', { estado: 'nuevo', email: 'no@va.com' });
   igual(ph.llamadas.at(-1), ['capture', 'anotar_ok', { estado: 'nuevo' }, undefined], 'evento directo y sin correo');
   igual(a.idSesion(), 'ph_distinto', 'idSesion es el de PostHog');
-  a.encuestaVista({ momento: 'tras_arranque' });
-  igual(ph.llamadas.at(-1).slice(1, 3), ['encuesta_vista', { momento: 'tras_arranque' }], 'encuesta_vista, sin id de encuesta de PostHog');
-  a.encuestaCerrada({ momento: 'inicio' });
-  igual(ph.llamadas.at(-1).slice(1, 3), ['encuesta_salteada', { momento: 'inicio' }], 'encuesta_salteada');
+  a.encuestaVista({ momento: 'podio', paso: 'cartel' });
+  igual(ph.llamadas.at(-1).slice(1, 3), ['encuesta_vista', { momento: 'podio', paso: 'cartel' }], 'encuesta_vista, sin id de encuesta de PostHog');
+  a.encuestaCerrada({ momento: 'inicio', paso: 'anotado' });
+  igual(ph.llamadas.at(-1).slice(1, 3), ['encuesta_salteada', { momento: 'inicio', paso: 'anotado' }], 'encuesta_salteada');
+  // LIF-46: al irse de la página el evento sale ya, por sendBeacon
+  a.ev('siguio_jugando', { siguio: false }, { beacon: true });
+  igual(ph.llamadas.at(-1).slice(1), ['siguio_jugando', { siguio: false }, { send_instantly: true, transport: 'sendBeacon' }], 'evento por sendBeacon al irse');
   igual(sesion.getItem('tarima.clave_publica'), 'phc_PRUEBA123', 'la clave pública queda en la pestaña para la privacidad');
   a.consentir();
   igual(ph.llamadas.at(-1), ['set_config', { persistence: 'localStorage+cookie' }], 'consentir cambia la persistencia');

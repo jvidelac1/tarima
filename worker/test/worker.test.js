@@ -11,10 +11,12 @@ let nIp = 0;
 const nuevaIp = () => `198.51.${100 + Math.floor(nIp / 250)}.${(nIp++ % 250) + 1}`;
 const uuid = () => crypto.randomUUID();
 // Las pruebas de siempre corren con la regla vieja (2 finales enteras) y con la maquinaria del bono de la encuesta (+2),
-// que se recupera con estas variables; la de producción (worker/wrangler.jsonc: el arranque gratis, correo obligatorio y
-// la encuesta sin premio, BONO_ENCUESTA 0) va en «muro en el medio de la final», con P().
-const VIEJA = { GRATIS_ETAPA: 'final', GRATIS: '2', BONO_ENCUESTA: '2' };
+// que se recupera con estas variables. La del arranque gratis (12 al 15 de noviembre) va en «muro en el medio de la
+// final», con A(); la de producción (worker/wrangler.jsonc, LIF-53: 1 final entera, el correo o la encuesta) en
+// «primera vez», con P().
+const VIEJA = { GRATIS_ETAPA: 'final', GRATIS: '2', BONO_ENCUESTA: '2', ENCUESTA_LIBRE: '0' };
 const E = (extra = {}) => Object.assign({}, env, VIEJA, extra);
+const A = (extra = {}) => Object.assign({}, env, { GRATIS_ETAPA: 'arranque', ENCUESTA_LIBRE: '0' }, extra);
 const P = (extra = {}) => Object.assign({}, env, extra);
 
 let salidas; // pedidos que el Worker hizo hacia afuera
@@ -193,7 +195,7 @@ describe('encuesta', () => {
     await pedirPartida(a, ip); await pedirPartida(a, ip);
     expect((await pedirPartida(a, ip)).j.estado).toBe('muro');
     const e = await llamar('/api/encuesta', { dispositivo: a, sesion: 'ses-1', idioma: 'es', r: RESP_OK }, { ip });
-    expect(e.j).toEqual({ estado: 'ok', bono: 2 });
+    expect(e.j).toEqual({ estado: 'ok', bono: 2, libre: false });
     expect((await llamar('/api/estado', { dispositivo: a }, { ip })).j).toMatchObject({ puede: true, quedan: 2, encuesta_disponible: false });
     expect((await pedirPartida(a, ip)).j).toMatchObject({ estado: 'ok', fuente: 'encuesta', quedan: 1, n: 3 });
     expect((await pedirPartida(a, ip)).j).toMatchObject({ estado: 'ok', fuente: 'encuesta', quedan: 0 });
@@ -252,20 +254,16 @@ describe('encuesta', () => {
 });
 
 
-describe('muro en el medio de la final (GRATIS_ETAPA=arranque, la regla de producción)', () => {
+describe('muro en el medio de la final (GRATIS_ETAPA=arranque, la regla del 12 al 15 de noviembre)', () => {
   const ENC = { plataforma: 'web', features: ['mujeres_categorias'] };
-  const partidaP = (dispositivo, ip, o = {}) => llamar('/api/partida', { dispositivo, idioma: 'es' }, { ip, e: P(), ...o });
-  const envion = (dispositivo, pase, ip, o = {}) => llamar('/api/envion', { dispositivo, pase, idioma: 'es' }, { ip, e: P(), ...o });
+  const partidaP = (dispositivo, ip, o = {}) => llamar('/api/partida', { dispositivo, idioma: 'es' }, { ip, e: A(), ...o });
+  const envion = (dispositivo, pase, ip, o = {}) => llamar('/api/envion', { dispositivo, pase, idioma: 'es' }, { ip, e: A(), ...o });
   const fila = async id => env.DB.prepare('SELECT fuente, etapa, envion_por FROM partidas WHERE id = ?').bind(id).first();
 
-  it('worker/wrangler.jsonc trae la regla del arranque gratis', () => {
-    expect([env.GRATIS_ETAPA, env.GRATIS, env.BONO_ENCUESTA]).toEqual(['arranque', '1', '0']);
-    expect(env.ENCUESTA_ID).toBeUndefined();
-  });
   it('un arranque gratis; el dos tiempos sin correo es muro; la final siguiente, muro antes de empezar', async () => {
     const ip = nuevaIp(), a = uuid();
-    const est = await llamar('/api/estado', { dispositivo: a }, { ip, e: P() });
-    expect(est.j).toMatchObject({ puede: true, quedan: 1, etapa: 'arranque', encuesta_disponible: false, regla: { etapa: 'arranque', gratis: 1, bono: 0 } });
+    const est = await llamar('/api/estado', { dispositivo: a }, { ip, e: A() });
+    expect(est.j).toMatchObject({ puede: true, quedan: 1, etapa: 'arranque', encuesta_disponible: false, regla: { etapa: 'arranque', gratis: 1, bono: 0, libre: false } });
     const p = await partidaP(a, ip);
     expect(p.j).toMatchObject({ estado: 'ok', fuente: 'gratis', etapa: 'arranque', quedan: 0, encuesta_disponible: false });
     const pase = await leerPase(env, p.j.pase, Math.floor(Date.now() / 1000));
@@ -282,7 +280,7 @@ describe('muro en el medio de la final (GRATIS_ETAPA=arranque, la regla de produ
   it('anotarse en el intervalo da el dos tiempos de esa final y juego libre', async () => {
     const ip = nuevaIp(), a = uuid();
     const p = await partidaP(a, ip);
-    await llamar('/api/anotar', { dispositivo: a, nombre: 'Lucía Romero', email: 'intervalo@buendominio.com', aviso: true, consentimiento: '2026-11-d', idioma: 'es' }, { ip, e: P() });
+    await llamar('/api/anotar', { dispositivo: a, nombre: 'Lucía Romero', email: 'intervalo@buendominio.com', aviso: true, consentimiento: '2026-11-d', idioma: 'es' }, { ip, e: A() });
     const v = await envion(a, p.j.pase, ip);
     expect(v.j).toMatchObject({ estado: 'ok', via: 'lista', lista: true });
     expect(await leerPase(env, v.j.pase, Math.floor(Date.now() / 1000))).toMatchObject({ e: 'completa' });
@@ -292,7 +290,7 @@ describe('muro en el medio de la final (GRATIS_ETAPA=arranque, la regla de produ
   it('correo obligatorio: la encuesta (BONO_ENCUESTA 0) no da el dos tiempos ni finales, ni gasta la IP', async () => {
     const ip = nuevaIp(), a = uuid();
     const p = await partidaP(a, ip);
-    expect((await llamar('/api/encuesta', { dispositivo: a, r: ENC }, { ip, e: P() })).j).toEqual({ estado: 'ok', bono: 0 });
+    expect((await llamar('/api/encuesta', { dispositivo: a, r: ENC }, { ip, e: A() })).j).toEqual({ estado: 'ok', bono: 0, libre: false });
     expect((await envion(a, p.j.pase, ip)).j).toMatchObject({ estado: 'muro', motivo: 'envion', encuesta_disponible: false });
     expect((await partidaP(a, ip)).j).toMatchObject({ estado: 'muro', motivo: 'dispositivo', encuesta_disponible: false });
     const d = await codigoDispositivo(env, a);
@@ -300,7 +298,7 @@ describe('muro en el medio de la final (GRATIS_ETAPA=arranque, la regla de produ
       .toEqual([{ fuente: 'gratis', etapa: 'arranque', envion_por: null }]);
     expect(await env.DB.prepare('SELECT i FROM encuestas WHERE d = ?').bind(d).first()).toEqual({ i: null });
     // Con el correo, sí.
-    await llamar('/api/anotar', { dispositivo: a, nombre: 'Lucía Romero', email: 'despues-encuesta@buendominio.com', aviso: true, consentimiento: '2026-11-d', idioma: 'en' }, { ip, e: P() });
+    await llamar('/api/anotar', { dispositivo: a, nombre: 'Lucía Romero', email: 'despues-encuesta@buendominio.com', aviso: true, consentimiento: '2026-11-d', idioma: 'en' }, { ip, e: A() });
     expect((await envion(a, p.j.pase, ip)).j).toMatchObject({ estado: 'ok', via: 'lista' });
   });
   it('la API a mano: pase adulterado, vencido o sin pase no dan el dos tiempos', async () => {
@@ -322,12 +320,80 @@ describe('muro en el medio de la final (GRATIS_ETAPA=arranque, la regla de produ
   it('la bandera muro-partidas-gratis no cambia la regla del arranque y queda guardada', async () => {
     const ip = nuevaIp(), a = uuid();
     flagsRespuesta = { flags: { 'muro-partidas-gratis': { enabled: true, variant: '2' } } };
-    const r = await llamar('/api/estado', { dispositivo: a }, { ip, e: P({ POSTHOG_KEY: 'phc_prueba' }) });
+    const r = await llamar('/api/estado', { dispositivo: a }, { ip, e: A({ POSTHOG_KEY: 'phc_prueba' }) });
     expect([r.j.quedan, r.j.flags['muro-partidas-gratis']]).toEqual([1, '1']);
     const d = await codigoDispositivo(env, a);
     expect(JSON.parse((await env.DB.prepare('SELECT flags FROM dispositivos WHERE d = ?').bind(d).first()).flags)['muro-partidas-gratis']).toBe('2');
     // De vuelta a la regla vieja, la bandera asignada vale.
     expect((await llamar('/api/estado', { dispositivo: a }, { ip, e: E({ POSTHOG_KEY: 'phc_prueba', GRATIS: '1' }) })).j.quedan).toBe(2);
+  });
+});
+
+describe('primera vez (LIF-53, la regla de producción): la final entera gratis y el cartel con el correo o la encuesta', () => {
+  const ENC = { plataforma: 'app', features: ['pesista_propio'] };
+  const partidaP = (dispositivo, ip, o = {}) => llamar('/api/partida', { dispositivo, idioma: 'es' }, { ip, e: P(), ...o });
+  const encuestaP = (dispositivo, r, ip, o = {}) => llamar('/api/encuesta', { dispositivo, r, idioma: 'en', sesion: 'ses-1', momento: 'podio' }, { ip, e: P(), ...o });
+
+  it('worker/wrangler.jsonc trae la regla de LIF-53', () => {
+    expect([env.GRATIS_ETAPA, env.GRATIS, env.TOPE_IP, env.BONO_ENCUESTA, env.ENCUESTA_LIBRE, env.ENCUESTAS_POR_IP]).toEqual(['final', '1', '6', '0', '1', '3']);
+    expect(env.ENCUESTA_ID).toBeUndefined();
+  });
+  it('una final entera gratis; la segunda, el cartel con las preguntas como camino', async () => {
+    const ip = nuevaIp(), a = uuid();
+    expect((await llamar('/api/estado', { dispositivo: a }, { ip, e: P() })).j).toMatchObject({ puede: true, quedan: 1, etapa: 'completa', libre: false, encuesta_disponible: true, regla: { etapa: 'final', gratis: 1, bono: 0, libre: true } });
+    const p = await partidaP(a, ip);
+    expect(p.j).toMatchObject({ estado: 'ok', fuente: 'gratis', etapa: 'completa', quedan: 0, libre: false });
+    expect((await llamar('/api/envion', { dispositivo: a, pase: p.j.pase }, { ip, e: P() })).j).toMatchObject({ estado: 'ok', via: 'ya' });
+    expect((await partidaP(a, ip)).j).toMatchObject({ estado: 'muro', motivo: 'dispositivo', encuesta_disponible: true });
+  });
+  it('las dos preguntas desbloquean el juego libre, una vez por dispositivo; una sola no alcanza', async () => {
+    const ip = nuevaIp(), a = uuid();
+    await partidaP(a, ip);
+    const incompleta = await encuestaP(a, { plataforma: 'web', otra: 'algo' }, ip);
+    expect([incompleta.status, incompleta.j]).toEqual([400, { error: 'incompleta' }]);
+    expect((await encuestaP(a, ENC, ip)).j).toEqual({ estado: 'ok', bono: 0, libre: true });
+    expect((await llamar('/api/estado', { dispositivo: a }, { ip, e: P() })).j).toMatchObject({ puede: true, libre: true, lista: false, quedan: null, encuesta_disponible: false });
+    for (let k = 0; k < 3; k++) expect((await partidaP(a, ip)).j).toMatchObject({ estado: 'ok', fuente: 'encuesta', etapa: 'completa', libre: true, quedan: null });
+    const otra = await encuestaP(a, ENC, ip);
+    expect([otra.status, otra.j]).toEqual([409, { error: 'ya_respondida' }]);
+  });
+  it('la red: 3 encuestas con desbloqueo en 30 días, y las finales de los que contestaron no pesan sobre ella', async () => {
+    const ip = nuevaIp(), devs = Array.from({ length: 6 }, uuid);
+    for (const d of devs) expect((await partidaP(d, ip)).j.estado).toBe('ok');
+    expect((await partidaP(uuid(), ip)).j.motivo).toBe('ip');
+    for (const d of devs.slice(0, 3)) { await env.DB.prepare('DELETE FROM limites').run(); expect((await encuestaP(d, ENC, ip)).j.libre).toBe(true); }
+    await env.DB.prepare('DELETE FROM limites').run();
+    expect((await partidaP(devs[3], ip)).j.encuesta_disponible).toBe(false);
+    const cuarta = await encuestaP(devs[3], ENC, ip);
+    expect([cuarta.status, cuarta.j]).toEqual([409, { error: 'ip' }]);
+    // las 3 finales de los que contestaron ya no cuentan: hay lugar para 3 dispositivos nuevos más en la red
+    for (let k = 0; k < 3; k++) expect((await partidaP(uuid(), ip)).j.estado).toBe('ok');
+    expect((await partidaP(uuid(), ip)).j.motivo).toBe('ip');
+  });
+  it('el correo: juego libre, y anotar_ok (solo altas nuevas) y anotar_repetido los manda el Worker a PostHog', async () => {
+    const ip = nuevaIp(), a = uuid(), b = uuid(), e = P({ POSTHOG_KEY: 'phc_prueba' });
+    const alta = (dispositivo, extra = {}) => llamar('/api/anotar', { dispositivo, nombre: 'Lucía Romero', email: 'primera@buendominio.com', aviso: true, consentimiento: '2026-11-e', idioma: 'en', metricas: true, momento: 'podio', pantalla: 'muro', ...extra }, { ip: nuevaIp(), e });
+    await partidaP(a, ip);
+    const r = await alta(a, { novedades: true });
+    expect(r.j).toMatchObject({ estado: 'nuevo' });
+    expect((await partidaP(a, ip)).j).toMatchObject({ estado: 'ok', fuente: 'lista', libre: true });
+    expect((await alta(b, { momento: 'inicio' })).j.estado).toBe('nuevo');      // otro dispositivo: la misma respuesta
+    expect((await alta(b, { metricas: false })).j.estado).toBe('ya_estaba');     // sin medición: nada a PostHog
+    const ev = salidas.filter(x => x.url.pathname === '/i/v0/e/').map(x => JSON.parse(x.cuerpo)).filter(x => /^anotar_/.test(x.event));
+    expect(ev.map(x => [x.event, x.distinct_id, x.properties.novedades, x.properties.momento, x.properties.pantalla, x.properties.mismo_dispositivo ?? null]))
+      .toEqual([['anotar_ok', r.j.lista_id, true, 'podio', 'muro', null], ['anotar_repetido', r.j.lista_id, null, 'inicio', 'muro', false]]);
+    expect(JSON.stringify(ev)).not.toContain('@');
+    // después del correo la encuesta es optativa: no desbloquea, no gasta la red y alcanza con una pregunta
+    expect((await encuestaP(a, { plataforma: 'web' }, ip, { e })).j).toEqual({ estado: 'ok', bono: 0, libre: false });
+    const enc = salidas.filter(x => x.url.pathname === '/i/v0/e/').map(x => JSON.parse(x.cuerpo)).find(x => x.event === 'encuesta_respuesta');
+    expect(enc.properties).toMatchObject({ desbloquea: false, momento: 'podio', plataforma: 'web' });
+  });
+  it('volver atrás por variable: ENCUESTA_LIBRE 0 deja el cartel solo con el correo', async () => {
+    const ip = nuevaIp(), a = uuid(), e = P({ ENCUESTA_LIBRE: '0' });
+    await partidaP(a, ip, { e });
+    expect((await partidaP(a, ip, { e })).j).toMatchObject({ estado: 'muro', encuesta_disponible: false });
+    expect((await encuestaP(a, ENC, ip, { e })).j).toEqual({ estado: 'ok', bono: 0, libre: false });
+    expect((await partidaP(a, ip, { e })).j.estado).toBe('muro');
   });
 });
 
@@ -434,7 +500,7 @@ describe('lista de espera', () => {
   it('encuesta de un anotado: sin premio y sin tocar la IP', async () => {
     const ip = nuevaIp(), a = uuid();
     await alta('enc@buendominio.com', { dispositivo: a, ip });
-    expect((await llamar('/api/encuesta', { dispositivo: a, r: RESP_OK }, { ip })).j).toEqual({ estado: 'ok', bono: 0 });
+    expect((await llamar('/api/encuesta', { dispositivo: a, r: RESP_OK }, { ip })).j).toEqual({ estado: 'ok', bono: 0, libre: false });
     const d = await codigoDispositivo(env, a);
     expect(await env.DB.prepare('SELECT i FROM encuestas WHERE d = ?').bind(d).first()).toEqual({ i: null });
   });

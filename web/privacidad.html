@@ -1,11 +1,14 @@
 <!doctype html>
 <!--
-  Privacidad de Tarima (docs/MVP.md 5.2), en inglés (por defecto) y en español neutro. Versión 2026-11-d: es la que manda el juego al
+  Privacidad de Tarima (docs/MVP.md 5.2), en inglés (por defecto) y en español neutro. Versión 2026-11-e: es la que manda el juego al
   anotarse (CONSENTIMIENTO en web/js/game/servidor.js). Si cambia lo que dice este texto, subir la versión en los dos
   lugares y agregarla a VERSIONES_CONSENTIMIENTO en worker/src/reglas.js.
   2026-11-c (12-nov-2026): grabación de sesión de la página en una parte de las visitas (docs/MVP.md 6.6).
   2026-11-d (13-nov-2026): la encuesta opcional después de anotarse (dos preguntas, sin premio) y las novedades sin
   frecuencia. La página abre en inglés aunque el navegador esté en español (?lang=es o el botón ES para el español).
+  2026-11-e (15-nov-2026, LIF-53): la encuesta es uno de los dos caminos del cartel que sale al terminar la final gratis:
+  contestada sin correo, desbloquea el juego libre en ese dispositivo (y para eso se guarda que la contestó, con el código
+  de la IP por 30 días); después del correo sigue siendo opcional.
 
   Datos del responsable completados el 12-nov-2026 (Juan C. Videla, Argentina, contacto por mail).
 -->
@@ -71,7 +74,7 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
   <!-- ================================ ESPAÑOL ================================ -->
   <article lang="es" data-idioma="es" hidden>
     <h1>Privacidad de Tarima</h1>
-    <p class="version">Versión 2026-11-d · 13 de noviembre de 2026</p>
+    <p class="version">Versión 2026-11-e · 15 de noviembre de 2026</p>
 
     <p>Responsable: Juan C. Videla,
       Argentina.
@@ -103,7 +106,8 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
     </div>
 
     <h2>Encuesta</h2>
-    <p>Después de anotarte puedes contestar, si quieres, una encuesta de dos preguntas: cómo prefieres jugar Tarima y qué te gustaría que tenga el juego, más un texto libre opcional. Es opcional: puedes saltearla y no da ni quita nada.</p>
+    <p>Al terminar tu final gratis, para seguir jugando puedes dejar tu correo o contestar una encuesta de dos preguntas: cómo prefieres jugar Tarima y qué te gustaría que tenga el juego, más un texto libre opcional. Cualquiera de las dos te deja jugar sin límite en ese dispositivo. Si dejas tu correo, después puedes contestar la encuesta si quieres, o saltearla.</p>
+    <p>Si la contestas para seguir jugando, en el servidor guardamos que este dispositivo ya la contestó (con el mismo código del dispositivo de las finales gratis, y el código de la IP durante 30 días), para que se conteste una sola vez y no se repita desde la misma conexión. No guardamos tus respuestas con esos códigos.</p>
     <p>Las respuestas van a la medición (PostHog) sin tu correo ni tu nombre. Del texto libre sacamos lo que parezca un correo o una dirección web. No escribas datos personales en él.</p>
 
     <h2>Alojamiento</h2>
@@ -128,7 +132,7 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
   <!-- ================================ ENGLISH ================================ -->
   <article lang="en" data-idioma="en">
     <h1>Tarima privacy</h1>
-    <p class="version">Version 2026-11-d · November 13, 2026</p>
+    <p class="version">Version 2026-11-e · November 15, 2026</p>
 
     <p>Controller: Juan C. Videla,
       Argentina.
@@ -160,7 +164,8 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
     </div>
 
     <h2>Survey</h2>
-    <p>After you join you can, if you want, answer a two-question survey: how you'd rather play Tarima and what you'd like the game to have, plus an optional free-text field. It's optional: you can skip it, and it doesn't unlock or change anything.</p>
+    <p>When your free final ends, to keep playing you can leave your email or answer a two-question survey: how you'd rather play Tarima and what you'd like the game to have, plus an optional free-text field. Either one lets you play with no limit on that device. If you leave your email, you can answer the survey afterwards if you want, or skip it.</p>
+    <p>If you answer it to keep playing, our server stores that this device already answered (with the same device code used for the free finals, and the IP code for 30 days), so it's answered only once and not repeated from the same connection. We don't store your answers with those codes.</p>
     <p>Answers go to our measurement (PostHog) without your email or name. We strip anything that looks like an email or a web address from the free text. Please don't write personal details in it.</p>
 
     <h2>Hosting</h2>

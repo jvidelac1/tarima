@@ -4,9 +4,10 @@
 // Versión del texto de privacidad que acepta quien se anota. 2026-11-b: sin borrado por no confirmar mientras no haya
 // correos, contacto pendiente y el HMAC de la IP explicado (web/privacidad.html). 2026-11-c: grabación de sesión de la
 // página en una parte de las visitas. 2026-11-d: la encuesta opcional después de anotarse (dos preguntas, sin premio) y
-// las novedades sin frecuencia. Las anteriores se siguen aceptando (páginas del juego viejas en caché).
-export const CONSENTIMIENTO = '2026-11-d';
-export const VERSIONES_CONSENTIMIENTO = new Set(['2026-11-a', '2026-11-b', '2026-11-c', CONSENTIMIENTO]);
+// las novedades sin frecuencia. 2026-11-e: la encuesta del cartel también desbloquea el juego libre (LIF-53, decisión del
+// dueño del 15 de noviembre). Las anteriores se siguen aceptando (páginas del juego viejas en caché).
+export const CONSENTIMIENTO = '2026-11-e';
+export const VERSIONES_CONSENTIMIENTO = new Set(['2026-11-a', '2026-11-b', '2026-11-c', '2026-11-d', CONSENTIMIENTO]);
 export const DIA = 86400;            // segundos
 export const VENTANA_IP = 30 * DIA;  // cuenta por IP y retención del código de IP
 export const RETENCION = 180 * DIA;  // partidas y dispositivos sin lista
@@ -24,6 +25,9 @@ export const REFRESCO_FLAGS = DIA;
  * - BONO_ENCUESTA: finales que suma la encuesta (en 'arranque', finales completas, además de terminar la que está en
  *   curso si se contesta en el intervalo). Desde el 13 de noviembre es 0 (decisión del dueño: el correo es obligatorio
  *   y la encuesta no desbloquea nada); también si la variable falta. Con 0 la encuesta no cuenta para nada de la regla.
+ * - ENCUESTA_LIBRE: '1' (decisión del dueño del 15 de noviembre, LIF-53): contestar las dos preguntas del cartel desbloquea
+ *   el juego libre en ese dispositivo, igual que el correo (una vez por dispositivo y hasta ENCUESTAS_POR_IP por red en 30
+ *   días). '0' o sin la variable: la encuesta no desbloquea nada (y vale BONO_ENCUESTA, si es mayor que 0).
  */
 export function config(env = {}, flags = {}) {
   const num = (v, def, min, max) => { const n = Number.parseInt(v, 10); return Number.isFinite(n) && n >= min && n <= max ? n : def; };
@@ -36,6 +40,7 @@ export function config(env = {}, flags = {}) {
     tope_ip: num(env.TOPE_IP, 6, 0, 500),
     bono: num(env.BONO_ENCUESTA, 0, 0, 50),
     encuestas_por_ip: num(env.ENCUESTAS_POR_IP, 3, 0, 100),
+    encuesta_libre: env.ENCUESTA_LIBRE === '1',
   };
 }
 
@@ -48,13 +53,25 @@ export function config(env = {}, flags = {}) {
  * @param {number}  a.usadas_i    partidas con este código de IP en 30 días, de dispositivos sin lista
  * @param {number}  a.encuestas_i encuestas con premio desde este código de IP en 30 días
  * @param {object}  a.cfg         salida de config()
- * @returns {{puede:boolean, fuente?:string, etapa?:'arranque'|'completa', motivo?:string, quedan:number|null, encuesta_disponible:boolean}}
- *   `encuesta_disponible`: la encuesta como camino del muro (da finales). Siempre false con cfg.bono 0 y para los anotados.
+ * @returns {{puede:boolean, fuente?:string, etapa?:'arranque'|'completa', motivo?:string, quedan:number|null, encuesta_disponible:boolean, libre:boolean}}
+ *   `encuesta_disponible`: la encuesta como camino del muro (con ENCUESTA_LIBRE da el juego libre; con BONO_ENCUESTA, finales).
+ *   Siempre false sin premio (ENCUESTA_LIBRE 0 y BONO_ENCUESTA 0), para los anotados y para quien ya la contestó.
  *   `etapa`: con qué permiso sale la final que se pida ahora. 'arranque' solo para una final gratis con
  *   GRATIS_ETAPA='arranque' en un dispositivo sin lista ni encuesta.
+ *   `libre`: juega sin límite (anotado, o con ENCUESTA_LIBRE y la encuesta contestada). Sus finales no cuentan para la IP.
  */
 export function decidir({ anotado, encuesta, usadas_d, usadas_i, encuestas_i, cfg }) {
-  if (anotado) return { puede: true, fuente: 'lista', etapa: 'completa', quedan: null, encuesta_disponible: false };
+  if (anotado) return { puede: true, fuente: 'lista', etapa: 'completa', quedan: null, encuesta_disponible: false, libre: true };
+  // ENCUESTA_LIBRE: la encuesta contestada vale como el correo (juego libre en este dispositivo); sus finales llevan
+  // fuente 'encuesta' y, como las de la lista, no pesan sobre la IP (USADAS_I en datos.js)
+  if (cfg.encuesta_libre && encuesta) return { puede: true, fuente: 'encuesta', etapa: 'completa', quedan: null, encuesta_disponible: false, libre: true };
+  if (cfg.encuesta_libre) {
+    const encuesta_disponible = encuestas_i < cfg.encuestas_por_ip;
+    const quedan = Math.max(0, Math.min(cfg.gratis - usadas_d, cfg.tope_ip - usadas_i));
+    const etapa = cfg.etapa === 'arranque' ? 'arranque' : 'completa';
+    if (usadas_d < cfg.gratis && usadas_i < cfg.tope_ip) return { puede: true, fuente: 'gratis', etapa, quedan, encuesta_disponible, libre: false };
+    return { puede: false, motivo: usadas_d >= cfg.gratis ? 'dispositivo' : 'ip', etapa, quedan: 0, encuesta_disponible, libre: false };
+  }
   const premio = cfg.bono > 0;
   encuesta = !!encuesta && premio;      // sin bono, haber contestado no cambia nada
   const cupo_d = cfg.gratis + (encuesta ? cfg.bono : 0);
@@ -63,9 +80,9 @@ export function decidir({ anotado, encuesta, usadas_d, usadas_i, encuestas_i, cf
   const quedan = Math.max(0, Math.min(cupo_d - usadas_d, cupo_i - usadas_i));
   const etapa = cfg.etapa === 'arranque' && !encuesta ? 'arranque' : 'completa';
   if (usadas_d < cupo_d && usadas_i < cupo_i) {
-    return { puede: true, fuente: usadas_d < cfg.gratis ? 'gratis' : 'encuesta', etapa, quedan, encuesta_disponible };
+    return { puede: true, fuente: usadas_d < cfg.gratis ? 'gratis' : 'encuesta', etapa, quedan, encuesta_disponible, libre: false };
   }
-  return { puede: false, motivo: usadas_d >= cupo_d ? 'dispositivo' : 'ip', etapa, quedan: 0, encuesta_disponible };
+  return { puede: false, motivo: usadas_d >= cupo_d ? 'dispositivo' : 'ip', etapa, quedan: 0, encuesta_disponible, libre: false };
 }
 
 /**
@@ -79,13 +96,16 @@ export function decidir({ anotado, encuesta, usadas_d, usadas_i, encuestas_i, cf
  * @param {'arranque'|'final'} [a.regla]   GRATIS_ETAPA vigente (config().etapa). Con 'final' (se volvió a la regla
  *                                         vieja) las finales que salieron como 'arranque' y siguen en juego terminan gratis.
  * @param {number} [a.bono]                BONO_ENCUESTA vigente (config().bono). Con 0 la encuesta no da el dos tiempos.
+ * @param {boolean} [a.libre]              ENCUESTA_LIBRE vigente (config().encuesta_libre): la encuesta da el juego libre,
+ *                                         y con él el dos tiempos de cualquier final.
  * @returns {{puede:true, via:'ya'|'lista'|'encuesta'} | {puede:false, motivo:'envion', encuesta_disponible:boolean}}
  */
-export function decidirEnvion({ etapa, anotado, encuesta, encuesta_usada, encuesta_disponible, regla = 'arranque', bono = 0 }) {
+export function decidirEnvion({ etapa, anotado, encuesta, encuesta_usada, encuesta_disponible, regla = 'arranque', bono = 0, libre = false }) {
   if (etapa !== 'arranque' || regla === 'final') return { puede: true, via: 'ya' };
   if (anotado) return { puede: true, via: 'lista' };
+  if (libre && encuesta) return { puede: true, via: 'encuesta' };
   if (bono > 0 && encuesta && !encuesta_usada) return { puede: true, via: 'encuesta' };
-  return { puede: false, motivo: 'envion', encuesta_disponible: bono > 0 && !!encuesta_disponible };
+  return { puede: false, motivo: 'envion', encuesta_disponible: (bono > 0 || libre) && !!encuesta_disponible };
 }
 
 // Antigüedad del dispositivo para la propiedad `dias` de PostHog.
@@ -171,7 +191,8 @@ export function normalizarNombre(v) {
 export const idioma = v => (v === 'es' || v === 'en' ? v : 'en');
 
 // ---------- encuesta (docs/MVP.md 5.4) ----------
-// Opcional, en el panel de «anotado» (decisión del dueño del 13 de noviembre): no da finales ni desbloquea nada.
+// Desde el 15 de noviembre (LIF-53) es uno de los dos caminos del cartel: contestada sin correo desbloquea el juego libre
+// (ENCUESTA_LIBRE); después del correo sigue siendo opcional y no da nada.
 // Dos preguntas: cómo prefiere jugar (una opción) y qué le gustaría que tenga el juego (varias), más un texto libre
 // opcional. Las respuestas van a PostHog como el evento `encuesta_respuesta` (propsRespuesta), sin el correo.
 
@@ -229,6 +250,12 @@ export function validarEncuesta(r) {
   if (!Object.keys(limpio).length) return { ok: false, error: 'incompleta' };
   return { ok: true, r: limpio };
 }
+
+/**
+ * ¿Contestó las dos preguntas? (cómo prefiere jugar y al menos una propuesta). Es lo que pide el cartel para desbloquear
+ * el juego libre con ENCUESTA_LIBRE; el texto libre sigue opcional. `r` es la salida limpia de validarEncuesta.
+ */
+export const encuestaCompleta = r => !!(r && r.plataforma && Array.isArray(r.features) && r.features.length);
 
 /** Propiedades del evento `encuesta_respuesta` de PostHog (sin el correo, el nombre ni el dispositivo). */
 export function propsRespuesta({ r, idioma: idi, pais }) {

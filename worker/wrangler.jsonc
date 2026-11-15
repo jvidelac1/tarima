@@ -38,15 +38,21 @@
   "vars": {
     "POSTHOG_HOST": "us.i.posthog.com",
     "POSTHOG_ASSETS": "us-assets.i.posthog.com",
-    // Muro en el medio de la final (decisión del dueño del 12 de noviembre, docs/MVP.md 5.5): la final gratis da solo el
-    // arranque, y el dos tiempos pide el correo. El correo es obligatorio (decisión del 13 de noviembre): la encuesta
-    // ya no es un camino del muro ni desbloquea nada, por eso BONO_ENCUESTA es "0" (con 0, encuesta_disponible es false
-    // y /api/envion no acepta la vía de la encuesta). La encuesta es opcional, después de anotarse.
-    // Para volver a la regla vieja (2 finales enteras gratis) sin tocar código: GRATIS_ETAPA "final", GRATIS "2".
-    "GRATIS_ETAPA": "arranque",
+    // Primera vez (LIF-53, decisión del dueño del 15 de noviembre, docs/MVP.md «Cambio del 15 de noviembre»): la primera
+    // final ENTERA (arranque y dos tiempos) es gratis, una por dispositivo (con el tope de la red, TOPE_IP). Al terminarla
+    // sale el cartel, que se desbloquea con el correo (juego libre) O contestando las dos preguntas de la encuesta
+    // (ENCUESTA_LIBRE "1": juego libre en ese dispositivo, una vez por dispositivo y hasta ENCUESTAS_POR_IP por red en 30
+    // días). BONO_ENCUESTA queda en "0" (la maquinaria vieja del bono de finales no se usa).
+    // Volver atrás sin tocar código:
+    //  - correo obligatorio (la encuesta no desbloquea): ENCUESTA_LIBRE "0".
+    //  - el arranque gratis con el cartel en el intervalo (regla del 12 al 15 de noviembre): GRATIS_ETAPA "arranque" y
+    //    ENCUESTA_LIBRE "0".
+    //  - 2 finales enteras gratis (regla del 12 de noviembre, antes de la noche): GRATIS "2".
+    "GRATIS_ETAPA": "final",
     "GRATIS": "1",
     "TOPE_IP": "6",
     "BONO_ENCUESTA": "0",
+    "ENCUESTA_LIBRE": "1",
     "ENCUESTAS_POR_IP": "3",
     "MAIL_DESDE": "",
     "TURNSTILE": "0",
