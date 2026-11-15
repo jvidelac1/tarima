@@ -65,7 +65,7 @@ function ledWallCanvas(w, h) {
     for (const sx of [0, 1]) {
       const x = sx ? w * .975 : w * .025; g.textAlign = sx ? 'right' : 'left';
       g.fillStyle = sx ? 'rgba(20,10,8,.55)' : 'rgba(6,10,30,.55)'; g.fillRect(sx ? w * .71 : 0, h * .07, w * .29, h * .38);
-      g.font = `800 ${h * .2}px ${DISPLAY}`; g.fillStyle = '#f6f3ea'; g.fillText(EVENT.title, x, h * .2);
+      g.font = `800 ${h * .2}px ${DISPLAY}`; g.fillStyle = '#f6f3ea'; g.fillText(EVENT.marca, x, h * .2, w * .27);
       g.font = `700 ${h * .075}px ${DISPLAY}`; g.fillStyle = sx ? '#ffd23f' : '#6ff0e2'; g.fillText(sx ? EVENT.session.toUpperCase() : 'HALTEROFILIA', x, h * .37);      // sin año: el evento es ficticio y no lleva fecha
       drawLogo(g, sx ? w * .87 : w * .13, h * .68, h * .15, sx ? 'rgba(255,214,120,.85)' : 'rgba(150,235,255,.85)');
     }
@@ -76,7 +76,7 @@ function ledWallCanvas(w, h) {
 function bannerCanvas(w, h) {
   return makeCanvas(w, h, g => {
     g.fillStyle = '#161a2c'; g.fillRect(0, 0, w, h); g.textBaseline = 'middle'; g.textAlign = 'center';
-    for (let i = 0; i < 4; i++) { const cx = w * (i + .5) / 4; drawLogo(g, cx - w * .085, h / 2, h * .26, '#35e6d6'); g.font = `800 ${h * .56}px ${DISPLAY}`; g.fillStyle = '#fff'; g.fillText(EVENT.title, cx + w * .02, h * .54); }
+    for (let i = 0; i < 4; i++) { const cx = w * (i + .5) / 4; drawLogo(g, cx - w * .085, h / 2, h * .26, '#35e6d6'); g.font = `800 ${h * .56}px ${DISPLAY}`; g.fillStyle = '#fff'; g.fillText(EVENT.marca, cx + w * .02, h * .54); }
     g.fillStyle = '#ffd23f'; g.fillRect(0, 0, w, h * .06); g.fillRect(0, h * .94, w, h * .06);
   });
 }
@@ -216,7 +216,7 @@ export class Arena {
     const carpetN = normalFromHeight(noiseCanvas(256, 64, 3, 2), 2.5, { aniso: 4 }); carpetN.repeat.set(26, 22);
     const carpet = new THREE.MeshStandardMaterial({ color: new THREE.Color('#262933'), roughness: .93, normalMap: carpetN, envMapIntensity: .3 });
     const skirt = new THREE.MeshStandardMaterial({ color: new THREE.Color('#0c0d12'), roughness: .9 });
-    const stage = add(new THREE.Mesh(new THREE.BoxGeometry(13, STAGE_Y - FLOOR_Y, 11), [skirt, skirt, carpet, skirt, skirt, skirt]), 'rc'); stage.position.set(0, (STAGE_Y + FLOOR_Y) / 2, 0); this.escenario = stage;
+    const stage = add(new THREE.Mesh(new THREE.BoxGeometry(13, STAGE_Y - FLOOR_Y, 11), [skirt, skirt, carpet, skirt, skirt, skirt]), 'rc'); stage.position.set(0, (STAGE_Y + FLOOR_Y) / 2, 0); this.escenario = stage; this.alfombra = carpet; this.madera = top;
     const floorMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#17181d') });   // piso de sala: gris, nunca negro
     const floor = add(new THREE.Mesh(new THREE.PlaneGeometry(90, 90), floorMat)); floor.rotation.x = -Math.PI / 2; floor.position.y = FLOOR_Y;
     // canto iluminado del escenario (escalón)
@@ -225,14 +225,14 @@ export class Arena {
 
     // banda LED al frente y a los lados del escenario
     const banner = canvasTexture(bannerCanvas(2048, 128), { aniso }); banner.wrapS = THREE.RepeatWrapping;
-    const bannerMat = new THREE.MeshBasicMaterial({ map: banner, color: hdr('#ffffff', .6) });
+    const bannerMat = new THREE.MeshBasicMaterial({ map: banner, color: hdr('#ffffff', .6) }); this.cinta = banner;
     const bandH = .62;
     const bf = add(new THREE.Mesh(new THREE.PlaneGeometry(13, bandH), bannerMat), ''); bf.position.set(0, STAGE_Y - .08 - bandH / 2, 5.52);
     for (const s of [-1, 1]) { const b = add(new THREE.Mesh(new THREE.PlaneGeometry(11, bandH), bannerMat), ''); b.position.set(s * 6.52, STAGE_Y - .08 - bandH / 2, 0); b.rotation.y = s * Math.PI / 2; }
 
     // fondo de escenario: pantalla LED con marco, telón con pliegues, torres de luz a los costados y línea de piso
     const wallTex = canvasTexture(ledWallCanvas(2048, 720), { aniso });
-    const wall = add(new THREE.Mesh(new THREE.PlaneGeometry(10, 3.5), new THREE.MeshBasicMaterial({ map: wallTex, color: hdr('#ffffff', .36) })), ''); wall.position.set(0, STAGE_Y + .35 + 1.75, -5.2);
+    const wall = add(new THREE.Mesh(new THREE.PlaneGeometry(10, 3.5), new THREE.MeshBasicMaterial({ map: wallTex, color: hdr('#ffffff', .36) })), ''); wall.position.set(0, STAGE_Y + .35 + 1.75, -5.2); this.pantalla = wall;
     const frameMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#15161b'), roughness: .5, metalness: .4 });
     const frame = add(new THREE.Mesh(new THREE.BoxGeometry(10.3, 3.8, .25), frameMat), 'r'); frame.position.set(0, wall.position.y, -5.34);
     const drapeTex = canvasTexture(drapeCanvas(), { aniso: 4 }); drapeTex.wrapS = THREE.RepeatWrapping; drapeTex.repeat.set(3, 1);
@@ -471,7 +471,7 @@ export class Arena {
   _drawBoard() {
     const cv = this.boardCanvas, g = cv.getContext('2d'), w = cv.width, h = cv.height, b = this.board;
     g.fillStyle = '#0b0d16'; g.fillRect(0, 0, w, h); g.fillStyle = '#1c2a5c'; g.fillRect(0, 0, w, 96);
-    g.textBaseline = 'middle'; g.textAlign = 'center'; g.fillStyle = '#fff'; g.font = `800 58px ${DISPLAY}`; g.fillText(EVENT.title, w / 2, 50);
+    g.textBaseline = 'middle'; g.textAlign = 'center'; g.fillStyle = '#fff'; g.font = `800 58px ${DISPLAY}`; g.fillText(EVENT.marca, w / 2, 50);
     g.textAlign = 'left'; g.font = `700 44px ${DISPLAY}`; g.fillStyle = '#35e6d6'; g.fillText(b.country || '', 34, 160);
     g.fillStyle = '#fff'; g.font = `800 64px ${DISPLAY}`; g.fillText((b.name || '').toUpperCase().split(' ').pop(), 34, 228);
     g.font = `500 34px ${DISPLAY}`; g.fillStyle = '#c3c9dc'; g.fillText(`${b.lift || ''} · ${b.intento || 'INTENTO ' + (b.attempt || 1)}`.toUpperCase(), 34, 296);      // b.intento: el juego lo pasa en el idioma elegido

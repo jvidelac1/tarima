@@ -1,0 +1,125 @@
+# Gráficos fase 1 (rama graficos): fotos de cada calidad con las cámaras del juego y la vista del jurado, y el banco de
+# medición con el ambiente nuevo. El runner dibuja por software (SwiftShader): las fotos sirven para mirar el aspecto y que
+# los sombreadores compilen; LOS TIEMPOS NO DICEN NADA de una placa real (eso se mide con juego.html?banco=1 en una máquina
+# con placa). A pedido y en cada push a la rama que toque el dibujo.
+name: Gráficos (fotos por calidad y banco, por software)
+
+on:
+  push:
+    branches: [graficos]
+    paths:
+      - 'web/js/**'
+      - 'tools/banco.mjs'
+      - '.github/workflows/graficos.yml'
+  workflow_dispatch:
+    inputs:
+      banco:
+        description: 'Correr también el banco de medición (10 min más)'
+        type: boolean
+        default: false
+      comparar:
+        description: 'Comparar el costo de «Baja» y «Móvil» contra main en la misma máquina (A, B, A, B)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  fotos:
+    name: Fotos por calidad (dibujo por software)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TARIMA_ANGLE: swiftshader
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Dependencias
+        run: npm ci
+      - name: Chrome
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || true)"
+          if [ -z "$CHROME" ]; then
+            wget -q -O "$RUNNER_TEMP/chrome.deb" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+            sudo apt-get update -q && sudo apt-get install -y -q "$RUNNER_TEMP/chrome.deb"
+            CHROME="$(command -v google-chrome)"
+          fi
+          echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
+          mkdir -p out/logs out/graficos
+      - name: Lógica de fluidez sin navegador (perf_test)
+        run: node tools/perf_test.mjs 2>&1 | tee out/logs/perf_test.log
+      - name: Fotos de cada calidad (banco --fotos --niveles)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 25
+        run: node tools/banco.mjs --fotos=out/graficos/fotos --niveles --ancho=1280 --alto=620 2>&1 | tee out/logs/fotos.log
+      - name: Banco de medición con el ambiente (banco)
+        if: ${{ !cancelled() && inputs.banco }}
+        timeout-minutes: 20
+        run: node tools/banco.mjs --ancho=960 --alto=540 --limite=420 --json=out/graficos/banco.json 2>&1 | tee out/logs/banco.log
+      - name: Resultado como artefacto
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: graficos-out
+          path: out/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # El mismo banco con el juego de main y con el de esta rama, alternados en la MISMA máquina (los runners cambian de una
+  # corrida a otra hasta al doble: comparar dos corridas distintas no dice nada). Por software: vale la relación, no los ms.
+  comparar:
+    name: Costo contra main en la misma máquina (por software)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.comparar }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TARIMA_ANGLE: swiftshader
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          path: base
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Dependencias
+        run: npm ci
+      - name: Chrome
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || true)"
+          if [ -z "$CHROME" ]; then
+            wget -q -O "$RUNNER_TEMP/chrome.deb" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+            sudo apt-get update -q && sudo apt-get install -y -q "$RUNNER_TEMP/chrome.deb"
+            CHROME="$(command -v google-chrome)"
+          fi
+          echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
+          mkdir -p out/logs out/comparar
+      - name: Banco alternado (main, rama, main, rama, main, rama)
+        run: |
+          for k in 1 2 3; do
+            node base/tools/banco.mjs --ancho=960 --alto=540 --limite=110 --solo=baja,movil --variantes=sombras --vueltas=3 --json=out/comparar/main_$k.json > out/logs/comparar_main_$k.log 2>&1 || true
+            node tools/banco.mjs --ancho=960 --alto=540 --limite=110 --solo=baja,movil --variantes=ambiente --vueltas=3 --json=out/comparar/rama_$k.json > out/logs/comparar_rama_$k.log 2>&1 || true
+          done
+          node -e '
+            const fs = require("fs");
+            for (const f of fs.readdirSync("out/comparar").filter(f => f.endsWith(".json")).sort()) { const B = JSON.parse(fs.readFileSync("out/comparar/" + f));
+              console.log(f, B.calidades.map(c => `${c.nombre}: ${c.ms1MP} ms a 1 MP (fijo ${c.fijoMs} + ${c.porMPms}/MP, ${c.vueltas} vueltas, ${c.ms1MPmin}-${c.ms1MPmax})`).join(" · "), "·", B.variantes.map(v => `${v.nombre}: ahorra ${v.ahorroMs} ms (${v.ahorroMin} a ${v.ahorroMax})`).join(" · ")); }
+          ' | tee out/logs/comparar.txt
+      - name: Resultado como artefacto
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: comparar-out
+          path: out/
+          if-no-files-found: warn
+          retention-days: 14

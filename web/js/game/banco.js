@@ -28,6 +28,7 @@
 import * as THREE from 'three';
 import { PRESET, MARGEN, ajustar, mpSostenible, perdidos, medirRefresco, metaDe, pasoDe, decidirCalidad } from './perf.js';
 import { PLANTEL } from './roster.js';
+import { tramo } from './sequence.js';
 
 /** Píxeles por metro con que el banco fija el detalle del pesista: malla simplificada y normales de detalle, como en el plano general del juego. */
 const LOD_PLANO = 300;
@@ -86,6 +87,7 @@ export async function correrBanco({ escena, cargas, hz, params, msg }) {
   const B = window.BANCO = { listo: false, version: 3, etapa: 'carga', progreso: '', columnas: COLUMNAS, calidades: [], variantes: [], tandas: [], notas: [], errores: [] };
   const cartel = document.createElement('div'); cartel.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:40;background:rgba(3,5,12,.82);color:#e8ecf8;font:12px/1.3 ui-monospace,Menlo,monospace;padding:6px 10px;pointer-events:none'; document.body.appendChild(cartel);
   const decir = txt => { B.progreso = txt; cartel.textContent = 'Banco de medición · ' + txt; };
+  if (params.get('fotos') === '2') { try { await fotosNiveles(B, { escena, cargas, params, msg, decir }); } catch (e) { B.errores.push(String(e.stack || e)); console.error(e); } cartel.remove(); B.listo = true; return; }
   if (params.get('fotos')) { try { await fotos(B, { escena, cargas, params, msg, decir }); } catch (e) { B.errores.push(String(e.stack || e)); console.error(e); } cartel.remove(); B.listo = true; return; }
   try { await correr(B, { escena, cargas, hz, params, msg, decir }); } catch (e) { B.errores.push(String(e.stack || e)); console.error(e); }
   B.duracionS = num(performance.now() / 1000, 1); B.etapa = 'listo'; cartel.remove();
@@ -115,6 +117,36 @@ async function fotos(B, { escena, cargas, params, msg, decir }) {
       if (f.camara === 'arriba') escena.primerPlano('arriba'); else escena.camara(f.camara);
       escena.setTope(escena.nativoMP * 1e6); escena.bucle(T, 0); escena.sombra = 4;
       for (let k = 0; k < 3; k++) escena.cuadro(k ? 0 : 5, true);      // la cámara llega a su lugar antes del cuadro de la foto
+      return f.nombre;
+    },
+  };
+  B.etapa = 'fotos'; decir(`fotos: ${lista.length}`);
+}
+
+/**
+ * `?fotos=2` (Gráficos fase 1): la misma escena quieta en cada calidad (`?niveles=movil,baja,media,alta,ultra`), con las
+ * cámaras del juego y la vista del jurado con las luces de arbitraje prendidas. tools/banco.mjs --fotos=dir --niveles.
+ * Por software sirven para mirar el aspecto de cada nivel, no el costo.
+ */
+async function fotosNiveles(B, { escena, cargas, params, msg, decir }) {
+  decir('cargando los modelos'); await Promise.all(cargas);
+  const id = PLANTEL[params.get('pesista')] ? params.get('pesista') : 'brenner';
+  await escena.mostrar(id); escena.setCarga(140, 's'); msg.hidden = true;
+  escena.arena.setBoard({ name: id, country: 'NVK', kg: 140, attempt: 2, lift: 'Arranque', intento: 'Intento 2' });
+  const niveles = (params.get('niveles') || 'movil,baja,media,alta,ultra').split(',').map(x => x.trim()).filter(k => PRESET[k]), fin = tramo(escena.P, 'snatch').fin - .05;
+  const tomas = [
+    { n: '3-4', c: '3/4', t: 1.3, luces: null }, { n: 'frontal', c: 'baja', t: 1.3, luces: null }, { n: 'lado', c: 'lado', t: fin, luces: null },
+    { n: 'jurado-vale', c: 'jurado', t: fin, luces: [true, true, true] }, { n: 'jurado-nulo', c: 'jurado', t: fin, luces: [false, true, false] }, { n: 'reversa-vale', c: 'rev', t: fin, luces: [true, true, true] },
+  ];
+  const lista = niveles.flatMap(q => tomas.map(x => ({ ...x, q, nombre: `${q}_${x.n}` }))); let puesta = null;
+  window.BANCO_FOTOS = {
+    lista, listo: true, opacidadSombra: null, opacidadCruda: null,
+    async poner(i) {
+      const f = lista[i];
+      if (puesta !== f.q) { decir(`compilando ${f.q}`); escena.setCalidad(PRESET[f.q]); await escena.precalentar(); puesta = f.q; }
+      escena.arena.setDecision(f.luces); escena.camara(f.c);
+      escena.setTope(escena.nativoMP * 1e6); escena.bucle(f.t, 0); escena.sombra = 4;
+      for (let k = 0; k < 4; k++) escena.cuadro(k ? .016 : 5, true);
       return f.nombre;
     },
   };
@@ -239,6 +271,7 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
   // Las que ya se midieron en la Mac del usuario y dieron cerca de cero (o eran una comprobación) no corren por defecto
   // (`defecto: false`): se piden con ?variantes=publico,velos o ?variantes=todas.
   const MENOS = [
+    { id: 'ambiente', nombre: 'sin el ambiente nuevo (polvo de magnesio y halos de las luces)', poner: () => ocultar([escena.ambiente?.group]) },
     { id: 'sombras', nombre: 'sin sombras', poner: () => { escena.setSombras(false); return () => escena.setSombras(true); } },
     { id: 'haces', nombre: 'sin haces de luz', poner: () => ocultar(A.beamMeshes) },
     { id: 'aniso', nombre: 'anisotropía 1 en todas las texturas', poner: v => anisotropia(1, v) },
@@ -353,7 +386,7 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
 
   // ---------- 1. calidades: Baja, Móvil, Media, Alta, en vueltas, cada una después de una Baja ----------
   B.etapa = 'calidades';
-  const claves = ['baja', 'movil', 'media', 'alta'].filter(k => k === 'baja' || !SOLO.length || SOLO.includes(k)), med1 = {}, pares = {};
+  const claves = ['baja', 'movil', 'media', 'alta', 'ultra'].filter(k => k === 'baja' || !SOLO.length || SOLO.includes(k)), med1 = {}, pares = {};
   for (const k of claves) { med1[k] = []; pares[k] = []; }
   const poner = async (k, primera) => { escena.setCalidad(PRESET[k]); if (primera) await escena.precalentar(); else { await compilar(); } usar(); const eg = errorGL(); if (eg) B.errores.push(`al poner ${k}: error de WebGL ${eg}`); };
   decir('compilando Baja'); await unCuadro(); await poner('baja', true);
