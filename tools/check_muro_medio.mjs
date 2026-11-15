@@ -169,7 +169,7 @@ async function escenario(L) {
 
   if (!tactil) {
     // ---------- 3 (en). se anota en el muro y la MISMA final sigue con el dos tiempos ----------
-    await escribir('#correo', CORREO); await marca('#aviso'); await foto('muro_con_correo');
+    await escribir('#nombre-lista', 'Lucía Romero'); await escribir('#correo', CORREO); await marca('#aviso'); await foto('muro_con_correo');
     if (await texto('#btn-anotar') !== D['muro.arranque.boton']) mal(`el botón del muro dice «${await texto('#btn-anotar')}»`);
     await pulsa('#btn-anotar');
     await esperar(() => !!document.getElementById('btn-saltar'), 'el panel de anotado con la encuesta');
@@ -228,7 +228,7 @@ async function escenario(L) {
       if (m.encuesta || /no email|answer \d|questions|survey/i.test(m.txt)) mal('el muro al recargar ofrece la encuesta'); }
 
     // ---------- 6 (es). se anota con toques; la encuesta del anotado en inglés, después en español, y la contesta ----------
-    await escribir('#correo', CORREO); await marca('#aviso'); await marca('#novedades'); await foto('muro_con_correo');
+    await escribir('#nombre-lista', 'Lucía Romero'); await escribir('#correo', CORREO); await marca('#aviso'); await marca('#novedades'); await foto('muro_con_correo');
     await pulsa('#btn-anotar');
     await esperar(() => !!document.getElementById('btn-enviar'), 'el panel de anotado con la encuesta');
     await foto('anotado_encuesta');

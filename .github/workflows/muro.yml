@@ -15,6 +15,7 @@ on:
     paths:
       - 'web/js/game/conexion.js'
       - 'web/js/game/servidor.js'
+      - 'web/js/game/nombre.js'
       - 'web/js/game/analitica.js'
       - 'web/js/game/main.js'
       - 'web/js/game/input.js'
@@ -35,6 +36,7 @@ on:
     paths:
       - 'web/js/game/conexion.js'
       - 'web/js/game/servidor.js'
+      - 'web/js/game/nombre.js'
       - 'web/js/game/analitica.js'
       - 'web/js/game/main.js'
       - 'web/js/game/input.js'

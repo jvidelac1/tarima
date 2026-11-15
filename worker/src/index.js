@@ -2,6 +2,7 @@
 // encuesta y el proxy de PostHog. El sitio (web/) lo sirve Cloudflare Pages, que le pasa /api/*, /qx/*, /baja y
 // /confirmar por una service binding (../functions/). Ningún registro incluye correo, IP ni dispositivo.
 import * as R from './reglas.js';
+import { nombreReal } from '../../web/js/game/nombre.js';
 import * as D from './datos.js';
 import { DESCARTABLES } from './descartables.js';
 import { codigoDispositivo, codigoIp, idAzar, igualSeguro, leerPase, leerToken, pase, token } from './cripto.js';
@@ -250,6 +251,8 @@ async function anotar({ request, env, ctx, url, b, ahora }) {
     log('info', { msg: 'trampa_bots', ruta: 'anotar' });
     return json({ estado: 'nuevo', lista_id: idAzar(16), confirmar: true });
   }
+  const nr = nombreReal(b.nombre);
+  if (!nr.ok) throw new ErrorHttp(400, 'nombre');
   const email = R.normalizarEmail(b.email);
   if (!email) throw new ErrorHttp(400, 'formato');
   if (b.aviso !== true || !R.VERSIONES_CONSENTIMIENTO.has(b.consentimiento)) throw new ErrorHttp(400, 'aviso');
@@ -268,10 +271,10 @@ async function anotar({ request, env, ctx, url, b, ahora }) {
   if (!fila) {
     const id = idAzar(16);
     nuevo = await D.altaLista(env.DB, {
-      id, email, nombre: R.normalizarNombre(b.nombre), idioma: idi, pais: paisDe(request, env),
+      id, email, nombre: nr.nombre, idioma: idi, pais: paisDe(request, env),
       novedades: b.novedades === true, consentimiento: b.consentimiento, ahora,
     });
-    fila = nuevo ? { id, idioma: idi, nombre: R.normalizarNombre(b.nombre), confirmado_en: null } : await D.buscarEmail(env.DB, email);
+    fila = nuevo ? { id, idioma: idi, nombre: nr.nombre, confirmado_en: null } : await D.buscarEmail(env.DB, email);
     if (!fila) throw new ErrorHttp(503, 'servidor');
   }
   // Un mail que ya está en la lista no cambia nada de lo guardado: ni el consentimiento ni las novedades. En el MVP

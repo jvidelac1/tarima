@@ -321,8 +321,8 @@ igual(expDelPase('basura'), null, 'pase inválido');
   igual((await s.encuesta({ r: {} })).bono, 0, 'simulado: la encuesta no da finales (correo obligatorio)');
   igual((await s.encuesta({ r: {} })).error, 'ya_respondida', 'simulado: encuesta una vez');
   igual((await s.pedirPase({})).estado, 'muro', 'simulado: después de la encuesta sigue el muro');
-  igual((await s.anotar({ email: 'x@noexiste.com' })).error, 'dominio', 'simulado: error de dominio');
-  igual((await s.anotar({ email: 'ana@ejemplo.com' })).estado, 'nuevo', 'simulado: anotarse');
+  igual((await s.anotar({ nombre: 'Lucía Romero', email: 'x@noexiste.com' })).error, 'dominio', 'simulado: error de dominio');
+  igual((await s.anotar({ nombre: 'Lucía Romero', email: 'ana@ejemplo.com' })).estado, 'nuevo', 'simulado: anotarse');
   igual((await s.pedirPase({})).fuente, 'lista', 'simulado: juego libre');
   const fuera = base({ host: 'liftinggame.pages.dev', buscar: '?muro=firme', fetch: workerFalso({}).fetch });
   igual(fuera.modo, 'servidor', '?muro=firme no vale fuera de localhost');
@@ -341,7 +341,7 @@ igual(expDelPase('basura'), null, 'pase inválido');
   igual((await s.encuesta({ r: {} })).bono, 0, 'simulado: la encuesta no suma');
   igual([(await s.envion({})).estado, JSON.parse(sesion.getItem('tarima.pase')).etapa], ['muro', 'arranque'], 'simulado: la encuesta no da el dos tiempos');
   igual((await s.pedirPase({})).estado, 'muro', 'simulado: ni otra final');
-  await s.anotar({ email: 'ana@ejemplo.com' });
+  await s.anotar({ nombre: 'Lucía Romero', email: 'ana@ejemplo.com' });
   igual([(await s.envion({})).via, JSON.parse(sesion.getItem('tarima.pase')).etapa], ['lista', 'completa'], 'simulado: con el correo, el dos tiempos y el pase nuevo en la pestaña');
 }
 
@@ -387,7 +387,7 @@ igual(expDelPase('basura'), null, 'pase inválido');
     igual([(await s.estado({})).puede, (await s.pedirPase({})).estado], [false, 'muro'], 'Worker: la final siguiente empieza con el muro');
     igual((await w.filas()).length, 1, 'Worker: el muro no gasta nada');
     // Se anota en el intervalo: la misma final sigue con el dos tiempos, sin recargar.
-    igual((await s.anotar({ email: 'ana@pruebas-tarima.com', idioma: 'es' })).ok, true, 'Worker: se anota');
+    igual((await s.anotar({ nombre: 'Lucía Romero', email: 'ana@pruebas-tarima.com', idioma: 'es' })).ok, true, 'Worker: se anota');
     const v2 = await s.envion({ idioma: 'es' });
     igual([v2.estado, v2.via, v2.lista, JSON.parse(sesion.getItem('tarima.pase')).etapa], ['ok', 'lista', true, 'completa'], 'Worker: anotado, permiso del dos tiempos de esa final');
     igual((await w.filas()).map(f => [f.etapa, f.envion_por]), [['completa', 'lista']], 'Worker: la partida pasa a completa por la lista');
@@ -406,7 +406,7 @@ igual(expDelPase('basura'), null, 'pase inválido');
     igual((await s.pedirPase({})).estado, 'muro', 'Worker: ni otra final');
     igual((await w.filas()).map(f => [f.fuente, f.etapa, f.envion_por]), [['gratis', 'arranque', null]], 'Worker: lo que quedó en la base');
     igual((await w.db.prepare('SELECT i FROM encuestas').all()).results, [{ i: null }], 'Worker: la encuesta sin bono no gasta los lugares de la IP');
-    await s.anotar({ email: 'enc@pruebas-tarima.com' });
+    await s.anotar({ nombre: 'Lucía Romero', email: 'enc@pruebas-tarima.com' });
     igual((await s.envion({})).via, 'lista', 'Worker: con el correo, el dos tiempos');
   }
   {
@@ -422,7 +422,7 @@ igual(expDelPase('basura'), null, 'pase inválido');
     igual([e.puede, e.motivo, e.contexto.previas], [false, 'dispositivo', 1], 'Worker: al recargar, muro (el que ya jugó lo ve al cargar)');
     igual([(await b.pedirPase({})).estado, (await b.envion({})).estado], ['muro', 'error'], 'recargada, sin pase en la pestaña no hay dos tiempos');
     // Una final completa (anotado) sí se reanuda una vez, como siempre.
-    await b.anotar({ email: 'beto@pruebas-tarima.com' });
+    await b.anotar({ nombre: 'Lucía Romero', email: 'beto@pruebas-tarima.com' });
     await b.pedirPase({}); b.soltarPase();
     const c = base({ fetch: w.fetchDe('203.0.113.12'), local, sesion });
     igual(c.paseParaReanudar()?.etapa, 'completa', 'una final completa se reanuda una vez');
@@ -493,17 +493,21 @@ igual(expDelPase('basura'), null, 'pase inválido');
   const local = new Mem({ 'tarima.muro': '1', 'tarima.quedan': '0' });
   const w = workerFalso({ '/api/anotar': [[200, { estado: 'nuevo', lista_id: 'f'.repeat(32), confirmar: false }], [400, { error: 'descartable' }], [429, { error: 'limite' }], 'red'] });
   const s = base({ fetch: w.fetch, local });
-  igual((await s.anotar({ email: 'mal' })).error, 'formato', 'formato sin pedir nada');
-  igual((await s.anotar({ email: 'ana@ejemplo.com', aviso: false })).error, 'aviso', 'aviso obligatorio');
+  igual((await s.anotar({ nombre: 'Lucía Romero', email: 'mal' })).error, 'formato', 'formato sin pedir nada');
+  igual((await s.anotar({ nombre: 'Lucía Romero', email: 'ana@ejemplo.com', aviso: false })).error, 'aviso', 'aviso obligatorio');
   igual(w.pedidos.length, 0, 'los errores locales no salen');
-  const r = await s.anotar({ email: ' Ana@Ejemplo.com ', nombre: 'Rookie', idioma: 'es', novedades: true, sesion: 'ph_abc' });
+  // LIF-32: nombre real obligatorio (mínimo 5, sin números ni símbolos, sin «AAAA» ni tecleo al azar); no sale nada si falla
+  for (const malo of [undefined, '', '   ', 'Rookie', 'Joe', 'AAAAA', '*****', '2394932fjdksAAA', 'fjdks', 'asdfgh', 'Test User', 'Nasar1', 'N@sar'])
+    igual((await s.anotar({ nombre: malo, email: 'ana@ejemplo.com' })).error, 'nombre', `nombre rechazado: ${JSON.stringify(malo)}`);
+  igual(w.pedidos.length, 0, 'un nombre inválido no sale al servidor');
+  const r = await s.anotar({ email: ' Ana@Ejemplo.com ', nombre: '  Ana   Belén ', idioma: 'es', novedades: true, sesion: 'ph_abc' });
   igual([r.ok, r.estado, r.confirmar], [true, 'nuevo', false], 'alta');
   const c = w.pedidos[0].cuerpo;
-  igual([c.email, c.aviso, c.novedades, c.consentimiento, c.nombre, c.web, c.sesion], ['Ana@Ejemplo.com', true, true, CONSENTIMIENTO, undefined, '', 'ph_abc'], 'cuerpo del alta (sin el nombre por defecto)');
+  igual([c.email, c.aviso, c.novedades, c.consentimiento, c.nombre, c.web, c.sesion], ['Ana@Ejemplo.com', true, true, CONSENTIMIENTO, 'Ana Belén', '', 'ph_abc'], 'cuerpo del alta (nombre limpio)');
   igual(s.copia(), { muro: false, quedan: null, lista: true, motivo: null }, 'anotado: juego libre en la copia');
-  igual((await s.anotar({ email: 'ana@ejemplo.com' })).error, 'descartable', 'error del Worker');
-  igual((await s.anotar({ email: 'ana@ejemplo.com' })).error, 'limite', '429');
-  igual((await s.anotar({ email: 'ana@ejemplo.com' })).error, 'red', 'sin red');
+  igual((await s.anotar({ nombre: 'Lucía Romero', email: 'ana@ejemplo.com' })).error, 'descartable', 'error del Worker');
+  igual((await s.anotar({ nombre: 'Lucía Romero', email: 'ana@ejemplo.com' })).error, 'limite', '429');
+  igual((await s.anotar({ nombre: 'Lucía Romero', email: 'ana@ejemplo.com' })).error, 'red', 'sin red');
 }
 
 // encuesta y baja

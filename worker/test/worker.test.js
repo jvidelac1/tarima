@@ -282,7 +282,7 @@ describe('muro en el medio de la final (GRATIS_ETAPA=arranque, la regla de produ
   it('anotarse en el intervalo da el dos tiempos de esa final y juego libre', async () => {
     const ip = nuevaIp(), a = uuid();
     const p = await partidaP(a, ip);
-    await llamar('/api/anotar', { dispositivo: a, email: 'intervalo@buendominio.com', aviso: true, consentimiento: '2026-11-d', idioma: 'es' }, { ip, e: P() });
+    await llamar('/api/anotar', { dispositivo: a, nombre: 'Lucía Romero', email: 'intervalo@buendominio.com', aviso: true, consentimiento: '2026-11-d', idioma: 'es' }, { ip, e: P() });
     const v = await envion(a, p.j.pase, ip);
     expect(v.j).toMatchObject({ estado: 'ok', via: 'lista', lista: true });
     expect(await leerPase(env, v.j.pase, Math.floor(Date.now() / 1000))).toMatchObject({ e: 'completa' });
@@ -300,7 +300,7 @@ describe('muro en el medio de la final (GRATIS_ETAPA=arranque, la regla de produ
       .toEqual([{ fuente: 'gratis', etapa: 'arranque', envion_por: null }]);
     expect(await env.DB.prepare('SELECT i FROM encuestas WHERE d = ?').bind(d).first()).toEqual({ i: null });
     // Con el correo, sí.
-    await llamar('/api/anotar', { dispositivo: a, email: 'despues-encuesta@buendominio.com', aviso: true, consentimiento: '2026-11-d', idioma: 'en' }, { ip, e: P() });
+    await llamar('/api/anotar', { dispositivo: a, nombre: 'Lucía Romero', email: 'despues-encuesta@buendominio.com', aviso: true, consentimiento: '2026-11-d', idioma: 'en' }, { ip, e: P() });
     expect((await envion(a, p.j.pase, ip)).j).toMatchObject({ estado: 'ok', via: 'lista' });
   });
   it('la API a mano: pase adulterado, vencido o sin pase no dan el dos tiempos', async () => {
@@ -333,7 +333,7 @@ describe('muro en el medio de la final (GRATIS_ETAPA=arranque, la regla de produ
 
 describe('lista de espera', () => {
   const alta = (email, o = {}) => llamar('/api/anotar', {
-    dispositivo: o.dispositivo ?? uuid(), sesion: 's', email, nombre: o.nombre, idioma: o.idioma ?? 'es',
+    dispositivo: o.dispositivo ?? uuid(), sesion: 's', email, nombre: 'nombre' in o ? o.nombre : 'Lucía Romero', idioma: o.idioma ?? 'es',
     aviso: o.aviso ?? true, novedades: o.novedades ?? false, consentimiento: o.consentimiento ?? '2026-11-d', web: o.web,
   }, { ip: o.ip ?? nuevaIp(), e: o.e, cookie: o.cookie });
 
@@ -392,10 +392,14 @@ describe('lista de espera', () => {
     expect(fila.novedades).toBe(0);
   });
 
-  it('el nombre inválido se descarta sin error y el de por defecto no se guarda', async () => {
-    const r1 = await alta('uno@buendominio.com', { nombre: '<img onerror=x>' });
-    const r2 = await alta('dos@buendominio.com', { nombre: 'Rookie' });
-    for (const r of [r1, r2]) expect((await env.DB.prepare('SELECT nombre FROM lista WHERE id = ?').bind(r.j.lista_id).first()).nombre).toBeNull();
+  it('LIF-32: sin un nombre real no hay alta (400 «nombre») y no se guarda nada', async () => {
+    for (const [i, nombre] of [undefined, '', '<img onerror=x>', 'Rookie', 'Joe', 'AAAAA', '*****', '2394932fjdksAAA', 'fjdks', 'Test User', 'Nasar1'].entries()) {
+      const r = await alta(`malo${i}@buendominio.com`, { nombre });
+      expect([r.status, r.j.error]).toEqual([400, 'nombre']);
+      expect(await env.DB.prepare('SELECT id FROM lista WHERE email = ?').bind(`malo${i}@buendominio.com`).first()).toBeNull();
+    }
+    const ok = await alta('nasar@buendominio.com', { nombre: 'Nasar' }), otro = await alta('nasar2@buendominio.com', { nombre: 'Nasar' });
+    expect([ok.j.estado, otro.j.estado]).toEqual(['nuevo', 'nuevo']);      // puede haber más de un Nasar
   });
 
   it('la trampa para bots responde como si nada y no guarda', async () => {
@@ -442,12 +446,12 @@ describe('lista de espera', () => {
 
     it('manda la confirmación con baja de un clic; GET muestra el botón y solo POST confirma', async () => {
       enviados.length = 0;
-      const r = await alta('confirma@buendominio.com', { e: e(), nombre: 'Leo', idioma: 'en' });
+      const r = await alta('confirma@buendominio.com', { e: e(), nombre: 'Leonel', idioma: 'en' });
       expect(r.j).toMatchObject({ estado: 'nuevo', confirmar: true });
       expect(enviados).toHaveLength(1);
       const m = enviados[0];
       expect(m).toMatchObject({ to: 'confirma@buendominio.com', subject: 'Confirm your spot in Tarima', from: { email: 'hola@tarima.test' } });
-      expect(m.text).toContain('Hi Leo.');
+      expect(m.text).toContain('Hi Leonel.');
       expect(m.headers['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
       expect(m.headers['List-Unsubscribe']).toMatch(/^<https:\/\/tarima\.test\/baja\?t=[0-9a-f]{32}\.[0-9a-f]{40}>$/);
       const ruta = linkDe(m, '/confirmar').slice(ORIGEN.length);
@@ -671,8 +675,8 @@ describe('limpieza diaria y registros', () => {
     const e = E({ MAIL_DESDE: 'hola@tarima.test', EMAIL: { send: async () => { throw Object.assign(new Error(`fallo para ${email}`), { code: 'E_X' }); } } });
     await llamar('/api/estado', { dispositivo: a }, { ip, e });
     await pedirPartida(a, ip, { e });
-    await llamar('/api/anotar', { dispositivo: a, email, aviso: true, consentimiento: '2026-11-a', idioma: 'es' }, { ip, e });
-    await llamar('/api/anotar', { dispositivo: a, email: 'x@y.com', aviso: true, consentimiento: '2026-11-a', web: 'bot' }, { ip, e });
+    await llamar('/api/anotar', { dispositivo: a, nombre: 'Lucía Romero', email, aviso: true, consentimiento: '2026-11-a', idioma: 'es' }, { ip, e });
+    await llamar('/api/anotar', { dispositivo: a, nombre: 'Lucía Romero', email: 'x@y.com', aviso: true, consentimiento: '2026-11-a', web: 'bot' }, { ip, e });
     await llamar('/api/encuesta', { dispositivo: a, r: RESP_OK }, { ip, e });
     expect(logs.length).toBeGreaterThan(0);
     const todo = logs.join('\n');

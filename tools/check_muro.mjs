@@ -164,6 +164,14 @@ async function escenario(L) {
     if (/\bmonth|\bmes\b|\bmensual/i.test(m.txt)) mal('el muro dice la frecuencia de las novedades'); }
 
   // ---------- 7. deja el correo: juego libre ----------
+  // LIF-32: nombre real obligatorio. «Ana» (3 letras) no alcanza: el campo viene vacío y anotarse da el error del nombre
+  if (await J(() => document.getElementById('nombre-lista')?.value || '') !== '') mal('el campo del nombre debería venir vacío con un nombre que no alcanza');
+  await pulsa('#btn-anotar'); await av(100);
+  if (await texto('#capa .panel #err') !== D['lista.error_nombre']) mal(`anotarse sin nombre no dio el error del nombre: «${await texto('#capa .panel #err')}»`);
+  await escribir('#nombre-lista', 'AAAAA'); await pulsa('#btn-anotar'); await av(100);
+  if (await texto('#capa .panel #err') !== D['lista.error_nombre']) mal(`«AAAAA» no dio el error del nombre: «${await texto('#capa .panel #err')}»`);
+  await J(() => { const i = document.getElementById('nombre-lista'); if (i) i.value = ''; });
+  await escribir('#nombre-lista', 'Lucía Romero');
   await pulsa('#btn-anotar'); await av(100);      // sin correo: error de formato, sin mandar nada
   if (await texto('#capa .panel #err') !== D['lista.error_formato']) mal(`anotarse sin correo no dio el error de formato: «${await texto('#capa .panel #err')}»`);
   await escribir('#correo', CORREO[L]);

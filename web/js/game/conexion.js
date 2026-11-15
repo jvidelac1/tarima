@@ -14,6 +14,7 @@
 // métricas (analitica.js descarta cualquier propiedad con «@»).
 import { ganchos } from './ganchos.js';
 import { servidor, sugerirCorreo, pareceCorreo } from './servidor.js';
+import { nombreReal } from './nombre.js';
 import { analitica } from './analitica.js';
 import { t, esc, idiomaActual, alCambiarIdioma, IDIOMAS } from './i18n/t.js';
 
@@ -49,6 +50,7 @@ const alIdioma = f => alCambiarIdioma(() => f());
  */
 const formularioHTML = (o = {}) => `<div class="formulario">
   ${o.camino ? `<p class="camino">${o.camino}</p>` : ''}
+  <label class="campo" for="nombre-lista"><span>${t('lista.nombre')}</span><input id="nombre-lista" type="text" autocomplete="name" autocapitalize="words" spellcheck="false" enterkeyhint="next" maxlength="40" placeholder="${esc(t('lista.nombre_ph'))}" value="${esc(o.nombreLista || '')}"></label>
   <label class="campo" for="correo"><span>${t('lista.mail')}</span><input id="correo" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" enterkeyhint="send" maxlength="254" placeholder="${esc(t('lista.mail_ph'))}" value="${esc(o.correo || '')}"></label>
   <p class="sugerencia" hidden><button class="link" type="button" id="sug"></button></p>
   <label class="casilla"><input type="checkbox" id="aviso"${o.aviso ? ' checked' : ''}><span>${t('lista.aviso')}</span></label>
@@ -59,7 +61,7 @@ const formularioHTML = (o = {}) => `<div class="formulario">
   <p class="chica">${t('muro.privado')}</p>
   ${o.otro ? `<p class="chica">${t('muro.otro_dispositivo')}</p>` : ''}
 </div>`;
-const leerFormulario = raiz => ({ correo: raiz.querySelector('#correo')?.value || '', aviso: !!raiz.querySelector('#aviso')?.checked, novedades: !!raiz.querySelector('#novedades')?.checked });
+const leerFormulario = raiz => ({ nombreLista: raiz.querySelector('#nombre-lista')?.value || '', correo: raiz.querySelector('#correo')?.value || '', aviso: !!raiz.querySelector('#aviso')?.checked, novedades: !!raiz.querySelector('#novedades')?.checked });
 
 function atarFormulario(raiz, { pantalla, nombre, alAnotar, momento = null, boton = null }) {
   const inp = raiz.querySelector('#correo'), err = raiz.querySelector('#err'), sug = raiz.querySelector('.sugerencia'), btn = raiz.querySelector('#btn-anotar');
@@ -72,15 +74,17 @@ function atarFormulario(raiz, { pantalla, nombre, alAnotar, momento = null, boto
   btn.addEventListener('click', async () => {
     if (btn.disabled) return;
     const f = leerFormulario(raiz);
+    const nr = nombreReal(f.nombreLista);
+    if (!nr.ok) { error('lista.error_nombre'); analitica.ev('anotar_error', { motivo: 'nombre', causa: nr.motivo }); raiz.querySelector('#nombre-lista')?.focus(); return; }
     if (!pareceCorreo(f.correo)) { error('lista.error_formato'); analitica.ev('anotar_error', { motivo: 'formato' }); return; }
     if (!f.aviso) { error('lista.error_aviso'); analitica.ev('anotar_error', { motivo: 'aviso' }); return; }
     error(null); analitica.ev('anotar_envio', { novedades: f.novedades, sugerencia_usada: usoSugerencia, pantalla });
     btn.disabled = true; btn.textContent = t('lista.enviando');
-    const r = await servidor.anotar({ email: f.correo, nombre, idioma: idiomaActual(), novedades: f.novedades, sesion: analitica.idSesion() });
+    const r = await servidor.anotar({ email: f.correo, nombre: nr.nombre, idioma: idiomaActual(), novedades: f.novedades, sesion: analitica.idSesion() });
     btn.disabled = false; btn.textContent = boton || t('lista.boton');
     if (!r.ok) {
-      const k = { formato: 'lista.error_formato', dominio: 'lista.error_dominio', descartable: 'lista.error_descartable', aviso: 'lista.error_aviso', limite: 'lista.error_limite' }[r.error] || 'lista.error_red';
-      error(k); analitica.ev('anotar_error', { motivo: ['formato', 'dominio', 'descartable', 'aviso', 'limite'].includes(r.error) ? r.error : 'red' }); return;
+      const k = { nombre: 'lista.error_nombre', formato: 'lista.error_formato', dominio: 'lista.error_dominio', descartable: 'lista.error_descartable', aviso: 'lista.error_aviso', limite: 'lista.error_limite' }[r.error] || 'lista.error_red';
+      error(k); analitica.ev('anotar_error', { motivo: ['nombre', 'formato', 'dominio', 'descartable', 'aviso', 'limite'].includes(r.error) ? r.error : 'red' }); return;
     }
     analitica.identificar(r.lista_id);
     analitica.ev('anotar_ok', { estado: r.estado, pantalla, momento, finales_previas: S.previas });
@@ -104,7 +108,7 @@ async function muro(info) {
   const variante = analitica.bandera('muro-texto') === 'b' ? 'b' : 'a';
   analitica.ev('muro_visto', { motivo, momento, caminos: 'mail', origen: info.origen || 'podio', variante_texto: variante, previas: S.previas, gratis_etapa: S.regla.etapa });
   const r = await new Promise(res => {
-    let datos = { aviso: false, novedades: false, correo: '' }, despues = false, cerrado = false;
+    let datos = { aviso: false, novedades: false, correo: '', nombreLista: nombreReal(info.nombre).ok ? info.nombre : '' }, despues = false, cerrado = false;
     const pinta = () => {
       const prev = capa.querySelector('.formulario'); if (prev) datos = leerFormulario(prev);
       const n = S.previas || S.gratis, nombre = esc(info.nombre);
@@ -289,7 +293,7 @@ function podio(info) {
   lugar.querySelector('.cerrar').addEventListener('click', () => { analitica.ev('invitacion_cerrada'); lugar.innerHTML = ''; });
   lugar.querySelector('#btn-invitacion').addEventListener('click', () => {
     analitica.ev('invitacion_abierta');
-    lugar.innerHTML = `<div class="invitacion abierta">${formularioHTML({})}</div>`;
+    lugar.innerHTML = `<div class="invitacion abierta">${formularioHTML({ nombreLista: nombreReal(info.nombre).ok ? info.nombre : '' })}</div>`;
     atarFormulario(lugar, { pantalla: 'invitacion', nombre: info.nombre, alAnotar: r => {
       lugar.innerHTML = `<div class="invitacion"><b>${t(r.estado === 'ya_estaba' ? 'lista.ok_ya' : 'lista.ok', { nombre: esc(info.nombre) })}</b><p>${t('lista.ok_libre')}</p></div>`;
       const b = document.getElementById('btn-revancha'); if (b) b.textContent = t('podio.otra');

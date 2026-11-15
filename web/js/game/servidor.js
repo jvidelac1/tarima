@@ -21,6 +21,8 @@
 //   (2 finales enteras); `?gratis=N` cambia cuántas.
 // Fuera de localhost esos dos modos no existen.
 
+import { nombreReal } from './nombre.js';
+
 export const CONSENTIMIENTO = '2026-11-d';     // versión de web/privacidad.html; el Worker acepta también la «a», la «b» y la «c»
 
 const CLAVES = {
@@ -391,13 +393,15 @@ export function crearServidor(o = {}) {
   // ---------- lista de espera ----------
 
   async function anotar({ email, nombre, idioma, novedades = false, aviso = true, sesion: idSesion, web = '' } = {}) {
+    const nr = nombreReal(nombre);
+    if (!nr.ok) return { ok: false, error: 'nombre' };
     if (!pareceCorreo(email)) return { ok: false, error: 'formato' };
     if (aviso !== true) return { ok: false, error: 'aviso' };
     const cuerpo = {
       dispositivo: dispositivo(), sesion: idSesion || undefined, email: email.trim(), idioma, aviso: true,
       novedades: novedades === true, consentimiento: CONSENTIMIENTO, web,
     };
-    if (typeof nombre === 'string' && nombre.trim() && !/^(debutante|rookie)$/i.test(nombre.trim())) cuerpo.nombre = nombre.trim();
+    cuerpo.nombre = nr.nombre;
     try {
       const { j } = await post('/api/anotar', cuerpo, ESPERA_FORM);
       guardarCopia({ lista: true, muro: false, quedan: null, motivo: null });
@@ -488,6 +492,7 @@ export function crearServidor(o = {}) {
       return ok({ estado: 'ok', via, pase: armarPase(n, 'gratis', 'completa'), quedan, lista: s.lista, dispositivo: b.dispositivo, regla });
     }
     if (ruta === '/api/anotar') {
+      if (!nombreReal(b.nombre).ok) return Promise.reject(new ErrorRed('http', 400, { error: 'nombre' }));
       if (/@(noexiste|mailinator)\./.test(b.email)) return Promise.reject(new ErrorRed('http', 400, { error: /noexiste/.test(b.email) ? 'dominio' : 'descartable' }));
       const ya = s.lista; s.lista = true; guardar();
       return ok({ estado: ya ? 'ya_estaba' : 'nuevo', lista_id: 'simulado', confirmar: false });
