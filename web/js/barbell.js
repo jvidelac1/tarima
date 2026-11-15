@@ -45,7 +45,7 @@ function arcText(g, text, cx, cy, radius, mid, px, weight = 800, flip = false) {
   });
 }
 
-/** Cara de un bumper: color + letras en relieve (marca ficticia TARIMA). Devuelve {map, normalMap, roughnessMap}. */
+/** Cara de un bumper: color + letras en relieve (marca ficticia LIFTING GAME). Devuelve {map, normalMap, roughnessMap}. */
 function plateFace(spec, size, aniso) {
   const label = String(spec.kg).replace('.', ',');
   const draw = (g, s, relief) => {
@@ -59,7 +59,7 @@ function plateFace(spec, size, aniso) {
     g.lineWidth = s * .008; for (const rr of [.985, .56]) { g.beginPath(); g.arc(c, c, R * rr, 0, 7); g.stroke(); }
     arcText(g, label, c, c, R * .78, -Math.PI / 2, s * .2, 800);
     arcText(g, label, c, c, R * .78, Math.PI / 2, s * .2, 800);
-    arcText(g, 'TARIMA', c, c, R * .785, Math.PI, s * .088, 700);
+    arcText(g, 'LIFTING GAME', c, c, R * .785, Math.PI, s * .088, 700);
     arcText(g, 'KG · LB ' + String(Math.round(spec.kg * 2.2046)), c, c, R * .785, 0, s * .062, 700);
     if (relief) {  // ranuras concéntricas finas del caucho
       g.strokeStyle = 'rgba(255,255,255,.22)'; g.lineWidth = 1.5;
@@ -77,7 +77,7 @@ function smallFace(spec, aniso) {
   return canvasTexture(makeCanvas(s, s, g => {
     g.fillStyle = spec.color; g.fillRect(0, 0, s, s); g.fillStyle = spec.ink; g.strokeStyle = spec.ink; g.lineWidth = 3;
     g.beginPath(); g.arc(s / 2, s / 2, s * .47, 0, 7); g.stroke();
-    arcText(g, label + ' KG', s / 2, s / 2, s * .34, -Math.PI / 2, s * .17, 800); arcText(g, 'TARIMA', s / 2, s / 2, s * .34, Math.PI / 2, s * .12, 700);
+    arcText(g, label + ' KG', s / 2, s / 2, s * .34, -Math.PI / 2, s * .17, 800); arcText(g, 'LIFTING GAME', s / 2, s / 2, s * .34, Math.PI / 2, s * .12, 700);
   }), { aniso });
 }
 

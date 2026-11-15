@@ -833,7 +833,7 @@ async function inicio() {
     const abrio = S.verOpciones; S.verOpciones = false;
     // la fila de botones (.pie) va fuera de la parte que se desplaza (.bv-cuerpo): nunca tapa las tarjetas
     const tarjetas = !primera;      // la elección de pesista se ofrece después de la primera final
-    const pn = capa.poner(`<div class="bv-cuerpo"><div class="cabeza">${idiomasHTML()}<h1>Tarima</h1><p class="bajada">${t('bienvenida.bajada')}</p></div>
+    const pn = capa.poner(`<div class="bv-cuerpo"><div class="cabeza">${idiomasHTML()}<h1>Lifting Game</h1><p class="bajada">${t('bienvenida.bajada')}</p></div>
       ${params.has('c') ? `<p class="desafio">${t('bienvenida.desafio')}</p>` : ''}${q ? `<p class="quedan">${q}</p>` : ''}
       ${nombreHTML}
       ${tarjetas ? `<h2 id="pesista-t">${esc(t('pesista.titulo', { nombre: mostrado() }))}</h2>

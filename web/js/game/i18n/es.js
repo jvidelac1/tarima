@@ -9,12 +9,12 @@ export default {
   'var.t.teclado': 'pulsa ESPACIO', 'var.t.tactil': 'toca',
 
   // ---- general y carga
-  'app.titulo': 'Tarima · Halterofilia a un botón',
-  'app.evento': 'Final Tarima · Pretemporada',
+  'app.titulo': 'Lifting Game · Halterofilia a un botón',
+  'app.evento': 'Lifting Game Open · Pretemporada',
   'app.sesion': 'Categoría hasta 90 kg',
   'app.idioma': 'Idioma',
   'app.privacidad': 'Privacidad',
-  'app.noscript': 'Tarima necesita JavaScript activado.',
+  'app.noscript': 'Lifting Game necesita JavaScript activado.',
   'app.lienzo': 'Transmisión 3D del levantamiento',
   'app.zona': 'Zona de toque del levantamiento',
   'app.luces': 'Decisión de los jueces',
@@ -26,7 +26,7 @@ export default {
   'falla.descarga.titulo': 'No pudimos descargar el juego',
   'falla.descarga.texto': 'No llegó una parte del juego. Revisa tu conexión y prueba de nuevo.',
   'falla.webgl.titulo': 'Este navegador no puede mostrar al pesista en 3D',
-  'falla.webgl.texto': 'Tarima necesita gráficos 3D (WebGL) y este navegador no pudo activarlos. Puedes probar esto:',
+  'falla.webgl.texto': 'Lifting Game necesita gráficos 3D (WebGL) y este navegador no pudo activarlos. Puedes probar esto:',
   'falla.webgl.otro': 'Abre el juego en otro navegador: Chrome, Safari, Firefox o Edge.',
   'falla.webgl.actualizar': 'Actualiza este navegador y el sistema de tu dispositivo.',
   'falla.webgl.app': 'Si abriste el enlace dentro de Facebook o Instagram, ábrelo en tu navegador desde el menú ···.',
@@ -368,7 +368,7 @@ export default {
   'podio.otra_quedan_n': 'Jugar otra vez · te quedan {n} finales gratis',
   'podio.cambiar': 'Cambiar de pesista',
   'podio.compartir': 'Compartir resultado',
-  'compartir.texto': 'Tarima · {medalla} · {total} kg\nArranque {marcas_s}\nDos tiempos {marcas_c}\n¿Me ganas? {link}',
+  'compartir.texto': 'Lifting Game · {medalla} · {total} kg\nArranque {marcas_s}\nDos tiempos {marcas_c}\n¿Me ganas? {link}',
   'compartir.copiado': 'Copiado. Pégalo donde quieras.',
   'compartir.error': 'No se pudo copiar. Prueba otra vez.',
 
@@ -403,7 +403,7 @@ export default {
   'muro.titulo_1': '{nombre}, jugaste tu final gratis.',
   'muro.titulo_ip': 'Desde esta conexión ya se jugaron las finales gratis.',
   'muro.promesa': 'Estamos armando el juego completo: tu propio pesista, pesistas mujeres, categorías de peso y sedes nuevas. Tú nos ayudas a elegir qué llega primero.',
-  'muro.promesa_b': 'Tarima recién empieza y lo estamos armando con los primeros que se anotan.',
+  'muro.promesa_b': 'Lifting Game recién empieza y lo estamos armando con los primeros que se anotan.',
   'muro.camino_mail': 'Deja tu correo y sigue jugando sin límite.',
   'muro.camino_mail_b': 'Anótate para seguir jugando gratis, sin límite.',
   'muro.otro_dispositivo': '¿Ya te anotaste en otro dispositivo? Pon el mismo correo.',
@@ -436,7 +436,7 @@ export default {
   'lista.error_nombre': 'Escribe tu nombre real: al menos 4 letras, sin números ni símbolos.',
   'lista.mail': 'Tu correo',
   'lista.mail_ph': 'nombre@ejemplo.com',
-  'lista.aviso': 'Quiero que Tarima me avise por correo cuando abra el acceso anticipado.',
+  'lista.aviso': 'Quiero que Lifting Game me avise por correo cuando abra el acceso anticipado.',
   'lista.novedades': 'También quiero recibir novedades del juego.',
   'lista.legal': 'Usamos tu correo solo para esto; no lo vendemos ni lo compartimos. Te das de baja con un clic. Tus partidas quedan ligadas a un número interno de la lista, nunca a tu correo. Solo mayores de 16.',
   'lista.boton': 'Anotarme y seguir jugando',
@@ -453,7 +453,7 @@ export default {
   'lista.ok_libre': 'Desde ahora juegas sin límite en este dispositivo.',
   'lista.seguir': 'Seguir jugando',
   // ---- encuesta opcional en el panel de anotado (docs/MVP.md 5.4): no da nada, se puede saltear
-  'encuesta.plataforma': '¿Cómo prefieres jugar Tarima?',
+  'encuesta.plataforma': '¿Cómo prefieres jugar Lifting Game?',
   'encuesta.plataforma.app': 'App para el celular (App Store / Google Play)',
   'encuesta.plataforma.web': 'En el navegador (juego web)',
   'encuesta.features': '¿Qué te gustaría que tenga el juego?',
@@ -477,11 +477,11 @@ export default {
 
   // ---- teléfono: girar e instalar (pantalla completa en iPhone)
   'girar.titulo': 'Gira el teléfono',
-  'girar.sub': 'Tarima se juega de costado.',
+  'girar.sub': 'Lifting Game se juega de costado.',
   // el iPhone no deja poner pantalla completa (ningún navegador): instalado en la pantalla de inicio sí. Pasos de cada navegador
-  'instalar.safari': 'Pantalla completa: toca Compartir (o ··· y después Compartir), elige «Agregar a inicio» y abre Tarima desde el ícono.',
-  'instalar.chrome': 'Pantalla completa: toca Compartir en la barra de la dirección, elige «Agregar a la pantalla de inicio» y abre Tarima desde el ícono.',
-  'instalar.otro': 'Pantalla completa: abre Compartir en el menú del navegador, elige «Agregar a inicio» y abre Tarima desde el ícono.',
+  'instalar.safari': 'Pantalla completa: toca Compartir (o ··· y después Compartir), elige «Agregar a inicio» y abre Lifting Game desde el ícono.',
+  'instalar.chrome': 'Pantalla completa: toca Compartir en la barra de la dirección, elige «Agregar a la pantalla de inicio» y abre Lifting Game desde el ícono.',
+  'instalar.otro': 'Pantalla completa: abre Compartir en el menú del navegador, elige «Agregar a inicio» y abre Lifting Game desde el ícono.',
   // sonido: botón de la barra (parlante) y fila de Opciones
   'sonido.prender': 'Prender el sonido',
   'sonido.apagar': 'Apagar el sonido',

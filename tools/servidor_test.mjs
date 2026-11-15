@@ -68,9 +68,9 @@ const base = o => crearServidor({ host: 'liftinggame.pages.dev', buscar: '', esp
 
 // ---------- 1. servidor.js ----------
 
-igual(CONSENTIMIENTO, '2026-11-e', 'versión del consentimiento');
+igual(CONSENTIMIENTO, '2026-11-f', 'versión del consentimiento');
 ok(VERSIONES_CONSENTIMIENTO.has(CONSENTIMIENTO), 'el Worker acepta la versión que manda el juego');
-ok(['2026-11-a', '2026-11-b', '2026-11-c', '2026-11-d'].every(v => VERSIONES_CONSENTIMIENTO.has(v)), 'el Worker sigue aceptando las versiones anteriores');
+ok(['2026-11-a', '2026-11-b', '2026-11-c', '2026-11-d', '2026-11-e'].every(v => VERSIONES_CONSENTIMIENTO.has(v)), 'el Worker sigue aceptando las versiones anteriores');
 {
   const priv = fs.readFileSync(path.join(ROOT, 'web/privacidad.html'), 'utf8');
   ok((priv.match(new RegExp(`class="version">(Versión|Version) ${CONSENTIMIENTO} `, 'g')) || []).length === 2, 'la privacidad muestra la misma versión en los dos idiomas');
@@ -93,9 +93,9 @@ ok(['2026-11-a', '2026-11-b', '2026-11-c', '2026-11-d'].every(v => VERSIONES_CON
   }
   igual([EN['lista.novedades'], ES['lista.novedades']], ['Also send me game news.', 'También quiero recibir novedades del juego.'], 'novedades sin frecuencia');
   igual([EN['encuesta.plataforma'], EN['encuesta.plataforma.app'], EN['encuesta.plataforma.web'], EN['encuesta.features'], EN['encuesta.features.pesista_propio'], EN['encuesta.features.mujeres_categorias'], EN['encuesta.features.sedes_campeonatos'], EN['encuesta.otra']],
-    ['How would you rather play Tarima?', 'Mobile app (App Store / Google Play)', 'In the browser (web game)', 'What would you like the game to have?', 'Create and train your own lifter', 'Women lifters and weight classes', 'New venues and championships', 'Anything else? (optional)'], 'encuesta en inglés');
+    ['How would you rather play Lifting Game?', 'Mobile app (App Store / Google Play)', 'In the browser (web game)', 'What would you like the game to have?', 'Create and train your own lifter', 'Women lifters and weight classes', 'New venues and championships', 'Anything else? (optional)'], 'encuesta en inglés');
   igual([ES['encuesta.plataforma'], ES['encuesta.plataforma.app'], ES['encuesta.plataforma.web'], ES['encuesta.features'], ES['encuesta.features.pesista_propio'], ES['encuesta.features.mujeres_categorias'], ES['encuesta.features.sedes_campeonatos'], ES['encuesta.otra']],
-    ['¿Cómo prefieres jugar Tarima?', 'App para el celular (App Store / Google Play)', 'En el navegador (juego web)', '¿Qué te gustaría que tenga el juego?', 'Crear y entrenar a tu propio pesista', 'Pesistas mujeres y categorías de peso', 'Nuevas sedes y campeonatos', '¿Algo más? (opcional)'], 'encuesta en español');
+    ['¿Cómo prefieres jugar Lifting Game?', 'App para el celular (App Store / Google Play)', 'En el navegador (juego web)', '¿Qué te gustaría que tenga el juego?', 'Crear y entrenar a tu propio pesista', 'Pesistas mujeres y categorías de peso', 'Nuevas sedes y campeonatos', '¿Algo más? (opcional)'], 'encuesta en español');
   // LIF-53: el cartel tiene los dos caminos, con los textos que pidió el dueño
   const cx = fs.readFileSync(path.join(ROOT, 'web/js/game/conexion.js'), 'utf8');
   ok(/btn-via-mail/.test(cx) && /btn-via-preguntas/.test(cx), 'el cartel tiene los dos caminos');

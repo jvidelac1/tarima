@@ -13,11 +13,12 @@ Estado al 15 de noviembre de 2026 (ver «Cambio del 15 de noviembre»). Esto es 
 - **Gratis: la primera final entera** (arranque y dos tiempos), una por dispositivo, contada como siempre (dispositivo + HMAC de la IP; la red, 6 finales gratis en 30 días). `/api/envion` responde `via:'ya'`.
 - **Al terminarla, el cartel** (momento `podio`, en lugar de los botones del podio; y antes de la final siguiente, momento `inicio`, al tocar «Jugar» o al cargar). Dos caminos con el mismo peso: «Leave your email» / «Deja tu correo» y «Answer 2 quick questions» / «Responde 2 preguntas rápidas», con «Either one unlocks unlimited play on this device.». Cualquiera da el **juego libre** en ese dispositivo.
   1. **Correo** (lo de siempre: nombre real de LIF-32, correo, el tilde obligatorio «Email me when early access opens» y el de novedades aparte y destildado). Después, el panel «¡Adentro!» con las mismas dos preguntas como paso optativo y «Skip».
-  2. **Las dos preguntas** (las de la encuesta aprobada: «How would you rather play Tarima?» y «What would you like the game to have?», con «Anything else? (optional)»). Hay que contestar las dos (el texto libre sigue opcional); el Worker lo vuelve a exigir. Contestadas: «¡Gracias!», «Desde ahora juegas sin límite en este dispositivo» y «Seguir jugando».
+  2. **Las dos preguntas** (las de la encuesta aprobada: «How would you rather play Lifting Game?» y «What would you like the game to have?», con «Anything else? (optional)»). Hay que contestar las dos (el texto libre sigue opcional); el Worker lo vuelve a exigir. Contestadas: «¡Gracias!», «Desde ahora juegas sin límite en este dispositivo» y «Seguir jugando».
   3. **«Ahora no»** → «Volver al inicio». La próxima final vuelve a pedir el cartel.
 - **La encuesta que desbloquea** (`ENCUESTA_LIBRE "1"`): una vez por dispositivo (tabla `encuestas`, 409 `ya_respondida`) y hasta `ENCUESTAS_POR_IP` (3) por red en 30 días (409 `ip`; el cartel ya no la ofrece: `encuesta_disponible` false, y queda el correo). Sin las dos preguntas, 400 `incompleta`. Las finales de un dispositivo desbloqueado salen con fuente `encuesta` y, como las de los anotados, no cuentan para la red. Después del correo la encuesta no da nada ni gasta la red (`i` NULL). La respuesta de `/api/encuesta` es `{estado:'ok', bono, libre}`; `/api/estado`, `/api/partida` y `/api/envion` traen `libre` y `regla.libre`.
 - **Volver atrás sin tocar código** (y publicar el Worker): correo obligatorio otra vez → `ENCUESTA_LIBRE "0"`; el arranque gratis con el muro en el intervalo (12 al 15 de noviembre) → `GRATIS_ETAPA "arranque"` y `ENCUESTA_LIBRE "0"`; 2 finales enteras → `GRATIS "2"`. La bandera `muro-partidas-gratis`, si PostHog se la asignó a un dispositivo, sigue pisando `GRATIS` con `GRATIS_ETAPA "final"` (sección 6.5): para que valga 1 para todos, la bandera tiene que estar apagada en PostHog.
-- **Privacidad 2026-11-e**: la encuesta es un camino del cartel, desbloquea el juego libre y para eso se guarda que el dispositivo la contestó (con el código de la IP por 30 días). El juego manda `2026-11-e`; el Worker acepta de la a a la e. **Publicar primero el Worker.**
+- **Privacidad 2026-11-e**: la encuesta es un camino del cartel, desbloquea el juego libre y para eso se guarda que el dispositivo la contestó (con el código de la IP por 30 días). El juego mandaba `2026-11-e`.
+- **Privacidad 2026-11-f** (15 de noviembre): el juego pasa a llamarse Lifting Game (antes Tarima) en todo lo que ve el jugador; la página lo aclara una vez y no cambian datos, responsable ni usos. El juego manda `2026-11-f`; el Worker acepta de la a a la f. **Publicar primero el Worker.**
 
 **Eventos (LIF-46).** Un resultado por cartel y si siguió jugando; los toques repetidos no suman.
 
@@ -64,7 +65,7 @@ Para el porcentaje que deja algo: Trends → `muro_resultado` (contar personas �
 
 | Clave | Inglés (por defecto) | Español |
 |---|---|---|
-| `encuesta.plataforma` (una opción) | How would you rather play Tarima? | ¿Cómo prefieres jugar Tarima? |
+| `encuesta.plataforma` (una opción) | How would you rather play Lifting Game? | ¿Cómo prefieres jugar Lifting Game? |
 | `encuesta.plataforma.app` | Mobile app (App Store / Google Play) | App para el celular (App Store / Google Play) |
 | `encuesta.plataforma.web` | In the browser (web game) | En el navegador (juego web) |
 | `encuesta.features` (varias) | What would you like the game to have? | ¿Qué te gustaría que tenga el juego? |
