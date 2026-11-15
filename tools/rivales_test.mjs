@@ -44,7 +44,7 @@ const ESTRATEGIAS = {
 /** Una final: devuelve los kilos de cada intento de cada pesista, los cambios de los rivales y la tabla. */
 export function final({ yo, nivel, estrategia, k, ia, B }) {
   const semilla = mezclar(k, 7310, yo, nivel === 'normal' ? 1 : nivel === 'dificil' ? 2 : 0), E = ESTRATEGIAS[estrategia];
-  const p = new Partida(datos, { semilla, nivel, cal: 0, primera: false, ctl: 'b', tactil: true, ...(ia ? { ia } : {}), atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
+  const p = new Partida(datos, { semilla, nivel, cal: 0, primera: false, ctl: 'b', tactil: true, ...(ia ? { ia, envFijo: true } : {}), atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
   const f = datos.atletas[ATL[yo]];
   for (const lev of ['s', 'c']) { const [lo, hi] = p.rangoApertura(yo, lev); p.abrir(yo, lev, Math.max(lo, Math.min(hi, Math.round(f.techo[lev] * E.abre(mezclar(semilla, lev === 's' ? 1 : 2)))))); }
   const aperturas = p.at.map(a => ({ s: a.decl.s, c: a.decl.c }));
@@ -80,7 +80,7 @@ function dependencia(ia, n) {
   };
   for (const nivel of ['amistoso', 'normal']) for (let k = 0; k < n; k++) {
     const yo = k % 3, semilla = mezclar(k, 999, yo, nivel === 'normal' ? 1 : 0);
-    const p = new Partida(datos, { semilla, nivel, cal: 0, primera: false, ctl: 'b', tactil: true, ...(ia ? { ia } : {}), atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
+    const p = new Partida(datos, { semilla, nivel, cal: 0, primera: false, ctl: 'b', tactil: true, ...(ia ? { ia, envFijo: true } : {}), atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
     for (const lev of ['s', 'c']) p.abrir(yo, lev, Math.round(datos.atletas[ATL[yo]].techo[lev] * .9));
     p.empezar();
     for (let g = 0; p.fase !== 'fin' && g < 90; g++) {

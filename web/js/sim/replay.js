@@ -43,8 +43,10 @@ export function recalcular(reg, datos, o = {}) {
     if (reg.ctl === 'b' && reg.barra !== HUELLAS_B[reg.dif ?? 'facil']) return { ok: false, error: "huella de las reglas de 'b'" };
     // rivales con personalidad (ai.js): su propia huella; sin `ia`, los rivales de siempre (registros anteriores)
     if (reg.ia !== undefined && reg.ia !== HUELLA_IA) return { ok: false, error: 'huella de las reglas de los rivales' };
+    // el estilo de envión fijo toda la competencia (LIF-43): `envFijo: true`; sin él, las reglas de antes
+    if (reg.envFijo !== undefined && reg.envFijo !== true) return { ok: false, error: 'regla del estilo de envión desconocida' };
     if (!Array.isArray(reg.atletas) || !Array.isArray(reg.aperturas) || reg.aperturas.length !== 3 || !Array.isArray(reg.llamados) || reg.llamados.length > 40) return { ok: false, error: 'forma del registro' };
-    const p = new Partida(datos, { semilla: reg.semilla, nivel: reg.nivel, cal: reg.cal, primera: reg.primera, ctl: reg.ctl, tactil: reg.tactil === true, ...(reg.ia !== undefined ? { ia: reg.ia } : {}), ...(reg.dif !== undefined ? { dif: reg.dif } : {}), atletas: reg.atletas });
+    const p = new Partida(datos, { semilla: reg.semilla, nivel: reg.nivel, cal: reg.cal, primera: reg.primera, ctl: reg.ctl, tactil: reg.tactil === true, ...(reg.ia !== undefined ? { ia: reg.ia } : {}), ...(reg.dif !== undefined ? { dif: reg.dif } : {}), ...(reg.envFijo ? { envFijo: true } : {}), atletas: reg.atletas });
     const abrir = lev => { p.at.forEach((a, i) => { if (a.ctrl === 'persona') p.abrir(i, lev, reg.aperturas[i][lev]); else if (reg.aperturas[i][lev] !== a.decl[lev]) throw new Error('la apertura de un rival no coincide'); }); p.empezar(); };
     abrir('s');
     for (const c of reg.llamados) {

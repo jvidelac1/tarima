@@ -6,10 +6,13 @@
 import { chanceUno, chanceBarra, cuerpoDe, cuerpoBarra, KG_MAX, RESTO, multFondo, techoMomento, intensidad } from './rules.js';
 import { idiv } from './fixed.js';
 
-/** Chance (milésimas) de `kg` para el pesista `i` en el levantamiento `lev` (con el envión `env`), la misma del panel. */
+/**
+ * Chance (milésimas) de `kg` para el pesista `i` en el levantamiento `lev` (con el envión `env`), la misma del panel. Si el
+ * estilo de envión ya quedó fijo (LIF-43, match.js → estiloFijo), cuenta ese y no `env`.
+ */
 export function chanceDe(p, i, lev, kg, env, o = {}) {
   const a = p.at[i], b = p.cfg.ctl === 'b', c = b ? cuerpoBarra(a.id) : cuerpoDe(a.id);
-  return (b ? chanceBarra : chanceUno)(p.intensidadDe(i, lev, kg), lev, lev === 'c' ? env || c.casa : undefined, c, { garra: a.garraUno[lev], fatiga: a.fatiga ? a.fatiga[lev] : 0, dif: p.cfg.dif, perfil: o.perfil });
+  return (b ? chanceBarra : chanceUno)(p.intensidadDe(i, lev, kg), lev, lev === 'c' ? p.estiloFijo?.(i) || env || c.casa : undefined, c, { garra: a.garraUno[lev], fatiga: a.fatiga ? a.fatiga[lev] : 0, dif: p.cfg.dif, perfil: o.perfil });
 }
 
 /**
@@ -22,7 +25,7 @@ function chanceDespues(p, i, lev, kg, kg2, env, o = {}) {
   const b = p.cfg.ctl === 'b', resto = Math.max(0, a.resto - Math.max(0, idiv(costo * multFondo(a.f.attrs.fon), 1000))), c = b ? cuerpoBarra(a.id) : cuerpoDe(a.id);
   const I2 = intensidad(kg2, techoMomento(p.techoDia(i, lev), resto));
   // 'b': el intento siguiente arranca por lo menos con el cansancio que ya hay (el de este intento todavía no se sabe)
-  return (b ? chanceBarra : chanceUno)(I2, lev, lev === 'c' ? env || c.casa : undefined, c, { garra: false, fatiga: a.fatiga ? a.fatiga[lev] : 0, dif: p.cfg.dif, perfil: o.perfil });
+  return (b ? chanceBarra : chanceUno)(I2, lev, lev === 'c' ? p.estiloFijo?.(i) || env || c.casa : undefined, c, { garra: false, fatiga: a.fatiga ? a.fatiga[lev] : 0, dif: p.cfg.dif, perfil: o.perfil });
 }
 
 /**

@@ -19,13 +19,17 @@ export class Partida {
    *   siguen recalculando los registros viejos, que no la traen). Va en la cabecera del registro.
    *   `dif`: en 'b', el nivel de dificultad ('facil' si falta; 'medio' o 'dificil', rules.js → NIVELES_B). Va en la cabecera
    *   (solo si no es Fácil, así los registros de Fácil no cambian) con la huella de las reglas de ese nivel.
+   *   `envFijo`: el estilo de envión queda fijo toda la competencia (LIF-43): el que usa cada pesista en su primer intento del
+   *   dos tiempos es el de los tres (la persona no puede cambiarlo y los rivales no lo cambian). Va en la cabecera
+   *   (`envFijo: true`); sin él, las reglas de antes (los registros viejos se siguen recalculando igual).
    */
   constructor(datos, cfg) {
     if (!NIVELES[cfg.nivel]) throw new Error('nivel desconocido');
     if (!Array.isArray(cfg.atletas) || cfg.atletas.length !== 3 || new Set(cfg.atletas.map(x => x.id)).size !== 3) throw new Error('la final es de tres pesistas distintos');
     const ctl = cfg.ctl ?? 'c'; if (!CONTROLES.includes(ctl)) throw new Error('nivel de control desconocido');
     if (cfg.ia !== undefined && cfg.ia !== HUELLA_IA) throw new Error('reglas de los rivales desconocidas');
-    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl, tactil: (ctl === 'f' || ctl === 'u' || ctl === 'b') && !!cfg.tactil, ia: cfg.ia ?? null, dif: ctl === 'b' && NIVELES_B[cfg.dif] ? cfg.dif : 'facil' };
+    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl, tactil: (ctl === 'f' || ctl === 'u' || ctl === 'b') && !!cfg.tactil, ia: cfg.ia ?? null, dif: ctl === 'b' && NIVELES_B[cfg.dif] ? cfg.dif : 'facil', envFijo: cfg.envFijo === true };
+    if (cfg.envFijo !== undefined && typeof cfg.envFijo !== 'boolean') throw new Error('regla del estilo de envión desconocida');
     if (cfg.dif !== undefined && cfg.dif !== 'facil' && this.cfg.dif !== cfg.dif) throw new Error('nivel de dificultad desconocido');
     const r = new Azar(mezclar(this.cfg.semilla, 7)), N = NIVELES[cfg.nivel];
     this.jueces = [0, 1, 2].map(() => r.entre(900, 1100));
@@ -48,7 +52,7 @@ export class Partida {
       a.decl = { ...a.plan.decl };
     }
     this.fase = 'presentacion'; this.lev = 's'; this.seq = 0; this.barra = 0; this.ultimo = -1; this.llamado = null; this.nLlamado = 0;
-    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : ctl === 'b' ? { barra: HUELLAS_B[this.cfg.dif], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}) } : {}), ...(this.cfg.ia ? { ia: this.cfg.ia } : {}),
+    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(this.cfg.envFijo ? { envFijo: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : ctl === 'b' ? { barra: HUELLAS_B[this.cfg.dif], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}) } : {}), ...(this.cfg.ia ? { ia: this.cfg.ia } : {}),
       atletas: cfg.atletas.map(x => ({ id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego' })), aperturas: this.at.map(a => ({ s: a.decl.s, c: a.decl.c })), llamados: [] };
   }
 
@@ -70,6 +74,8 @@ export class Partida {
   }
 
   // ---------- consultas ----------
+  /** Estilo de envión que quedó fijo para el pesista i (el de su primer intento del dos tiempos), o null si todavía se elige (LIF-43). */
+  estiloFijo(i) { return this.cfg.envFijo ? this.at[i].c[0]?.env ?? null : null; }
   techoDia(i, lev) { const a = this.at[i]; return (a.f.techo[lev] + a.forma[lev]) * 1000; }
   /** Intensidad (diezmilésimas) que tendría ahora `kg` para el pesista i: la misma que usa el intento (panel de 'u'). */
   intensidadDe(i, lev, kg) { return intensidad(kg, techoMomento(this.techoDia(i, lev), this.at[i].resto)); }
@@ -183,6 +189,7 @@ export class Partida {
   /** Cierra el llamado de una persona con lo que tocó: {conf, env, ent}. El resultado se recalcula acá, nunca se recibe. */
   resolver(rec) {
     const L = this.llamado; if (!L || this.at[L.a].ctrl !== 'persona') throw new Error('no es el llamado de una persona');
+    const fijo = L.lev === 'c' ? this.estiloFijo(L.a) : null; if (fijo && rec.env !== fijo) throw new Error('el estilo de envión quedó fijo en el primer intento del dos tiempos');
     const ctx = this.contexto(rec.env), m = simular(ctx, rec.conf ?? null, rec.ent);
     if (!m.res) throw new Error('el intento no terminó');
     this.reg.llamados.push({ a: L.a, lev: L.lev, n: L.n, kg: L.kg0, cambios: L.cambios, fin: 'intento', ...(L.lev === 'c' ? { env: rec.env } : {}), conf: rec.conf ?? null, ent: rec.ent, int: 0 });
@@ -191,7 +198,9 @@ export class Partida {
   /** Juega el llamado de un rival: genera sus gestos y los pasa por la misma máquina. Devuelve {ctx, conf, ent, res} para mostrarlo. */
   resolverIA() {
     const L = this.llamado; if (!L || this.at[L.a].ctrl !== 'juego') throw new Error('no es el llamado de un rival');
-    const a = this.at[L.a]; let env; if (L.lev === 'c') env = elegirEnvion(a.f, this.contexto(a.f.enviones[0]).I);
+    // con el estilo fijo (LIF-43) el rival elige el de toda la competencia pensando en su peso más alto (el que usaría por
+    // encima del 95 %), no el de la apertura: si no, quedaba en power para los intentos decisivos
+    const a = this.at[L.a]; let env; if (L.lev === 'c') env = this.cfg.envFijo ? this.estiloFijo(L.a) ?? elegirEnvion(a.f, 10000) : elegirEnvion(a.f, this.contexto(a.f.enviones[0]).I);
     const ctx = this.contexto(env), g = gestos(ctx, this.cfg.nivel, L.sem);
     this.reg.llamados.push({ a: L.a, lev: L.lev, n: L.n });
     const llamado = { ...L }, ap = this._aplicar(ctx, g.res);
