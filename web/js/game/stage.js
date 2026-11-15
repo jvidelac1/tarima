@@ -402,11 +402,15 @@ export class Escena {
     }
     this.sombra = 4; this.cuadro(0, true);      // el último cuadro dibujado es el de verdad
   }
-  /** Carga (una sola vez) el modelo que usa un pesista. Los dos modelos quedan en memoria. */
+  /**
+   * Carga (una sola vez) el modelo que usa un pesista. Los dos modelos quedan en memoria. Si la carga falla, no queda
+   * guardada: el próximo pedido la intenta de nuevo (main.js reintenta con espera y, si no, avisa; LIF-33).
+   */
   cargar(id) {
     const mod = PLANTEL[id].modelo;
     return this.cargas[mod] ||= Athlete.load(mod, this.poses[mod], { aniso: Math.min(this.Q.aniso || 4, this.renderer.capabilities.getMaxAnisotropy()), maxTex: this.Q.tex, progreso: this.alProgreso })
-      .then(a => { a.root.visible = false; a.root.traverse(o => { if (o.isMesh && o.castShadow) o.layers.enable(CAPA_SOMBRA); if (o.isMesh) [].concat(o.material).forEach(conBorde); }); this.scene.add(a.root); this.atletas[mod] = a; return a; });
+      .then(a => { a.root.visible = false; a.root.traverse(o => { if (o.isMesh && o.castShadow) o.layers.enable(CAPA_SOMBRA); if (o.isMesh) [].concat(o.material).forEach(conBorde); }); this.scene.add(a.root); this.atletas[mod] = a; return a; })
+      .catch(e => { delete this.cargas[mod]; throw e; });
   }
   /** Pone en escena a un pesista (o a nadie, con null). Marangi comparte la instancia de Brenner con la tela de color plano. */
   async mostrar(id) {

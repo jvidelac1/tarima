@@ -9,7 +9,7 @@ import { sugerencia } from '../sim/entrenador.js';
 import { PLANTEL, JUGADOR, FICHA, nivelFicha, ENVIONES, LEV, ETIQUETAS, GUIONES, CUERPO, BARRA } from './roster.js';
 import { Registrador, Gobernador, calidadInicial, medirRefresco, decidirCalidad, pasoDe, metaDe, nombreDe, escalones, pisoDe, PRESET, PISO_MP, MARGEN, TECHO_MP } from './perf.js';
 import { sonido } from './audio.js';
-import { detalleError, analitica } from './analitica.js';
+import { detalleError, analitica, appNavegador } from './analitica.js';
 import { Ayudas } from './ui/ayudas.js';
 import { Senal } from './ui/senal.js';
 import { Depura } from './ui/depura.js';
@@ -130,6 +130,9 @@ function tic(pintar, tRaf = null) {
   const dib = pintar && DIBUJA && !E.sinDibujo && !telefono.vertical && (E.modo !== 'panel' || E.forzar || !!escena.rig.mezcla),      // detrás de un panel, también mientras la cámara termina un movimiento suave      // en vertical se ve «Gira el teléfono»: no se dibuja
     seguido = E.seguido; E.seguido = dib && E.modo !== 'panel';
   escena.cuadro(dt, dib); if (!dib) return;
+  // LIF-33: el primer cuadro dibujado con el pesista a la vista (ya sin la pantalla de carga). Sin este evento no se
+  // podía contar a quienes nunca vieron al levantador.
+  if (E.verPesista && !E.escenaVista && escena.activo) { E.escenaVista = true; ev('escena_visible', { ms: Math.round(performance.now()), ms_jugar: E.tJugar ? Math.round(performance.now() - E.tJugar) : null, calidad: C.nombre, pantalla: E.pantalla }); }
   // el intervalo entre cuadros sale de la marca del navegador (el refresco en que cae el cuadro), no de cuándo corrió este código
   const marca = tRaf ?? now, ms = marca - E.ultDibujo; perf.cuadro(ms, seguido && E.seguido, E.intento?.m?.fase || ''); E.ultDibujo = marca; E.forzar = false;
   if (LASTRE) { const fin = performance.now() + LASTRE * escena.megapixeles; while (performance.now() < fin); }
@@ -800,6 +803,8 @@ function ctlInicial() { const q = params.get('ctl'); if (q === 'c' || q === 'f' 
 /**
  * P1 · Bienvenida (docs/MVP.md, secciones 2 y 3): nombre (opcional, con foco en una computadora), las tres contexturas,
  * «Jugar» grande y «Opciones» plegado. Quien vuelve ve «Hola de nuevo» con «No soy yo». El nombre se guarda al salir.
+ * Primera vez (LIF-53, decisión del dueño del 15 de noviembre): se entra directo a jugar con el pesista por defecto
+ * (Compacto), sin elegir: las tarjetas de los pesistas aparecen recién después de la primera final (jugada o cortada).
  */
 async function inicio() {
   visita('inicio'); zocalo(null); relojLibre(); const primera = !guardado.get('tarima.jugadas');
@@ -827,11 +832,12 @@ async function inicio() {
         ${telefono.instalable ? `<div class="fila"><span>${t('opciones.pantalla')}</span><button data-instalar="1">${t('opciones.como_instalar')}</button></div>` : ''}</div>` : '';
     const abrio = S.verOpciones; S.verOpciones = false;
     // la fila de botones (.pie) va fuera de la parte que se desplaza (.bv-cuerpo): nunca tapa las tarjetas
+    const tarjetas = !primera;      // la elección de pesista se ofrece después de la primera final
     const pn = capa.poner(`<div class="bv-cuerpo"><div class="cabeza">${idiomasHTML()}<h1>Tarima</h1><p class="bajada">${t('bienvenida.bajada')}</p></div>
       ${params.has('c') ? `<p class="desafio">${t('bienvenida.desafio')}</p>` : ''}${q ? `<p class="quedan">${q}</p>` : ''}
       ${nombreHTML}
-      <h2 id="pesista-t">${esc(t('pesista.titulo', { nombre: mostrado() }))}</h2>
-      <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b>${cfg.ctl === 'b' ? `<small class="conviene">${t(`pesista.${id}.b`)}</small><small class="rm">${t('rm.tarjeta', { s: datos.atletas[id].techo.s, c: datos.atletas[id].techo.c })}</small>` : `${cuerpoHTML(id, uno)}<small class="conviene">${t(uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small>`}</button>`).join('')}</div>
+      ${tarjetas ? `<h2 id="pesista-t">${esc(t('pesista.titulo', { nombre: mostrado() }))}</h2>
+      <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b>${cfg.ctl === 'b' ? `<small class="conviene">${t(`pesista.${id}.b`)}</small><small class="rm">${t('rm.tarjeta', { s: datos.atletas[id].techo.s, c: datos.atletas[id].techo.c })}</small>` : `${cuerpoHTML(id, uno)}<small class="conviene">${t(uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small>`}</button>`).join('')}</div>` : ''}
       ${opciones}</div><div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button class="link" id="btn-opciones" aria-expanded="${S.opciones}">${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button><button class="link" id="btn-ayuda">${t('boton.ayuda')}</button><a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
       `, 'bienvenida');
     pn.querySelector('a.legal')?.addEventListener('click', () => ev('privacidad_abierta', { pantalla: E.pantalla }));
@@ -839,7 +845,7 @@ async function inicio() {
     const inp = pn.querySelector('#nombre');
     if (inp) {
       // el título de las tarjetas sigue al nombre mientras se escribe (textContent: no hace falta escapar)
-      inp.addEventListener('input', () => { S.nombre = inp.value; pn.querySelector('#pesista-t').textContent = t('pesista.titulo', { nombre: mostrado() }); });
+      inp.addEventListener('input', () => { S.nombre = inp.value; const h = pn.querySelector('#pesista-t'); if (h) h.textContent = t('pesista.titulo', { nombre: mostrado() }); });
       // con teclado, el foco arranca en el nombre; en el teléfono no (abriría el teclado de pantalla sin que lo pida)
       if (S.focoNombre && !T) { inp.focus({ preventScroll: true }); S.focoNombre = false; }
     }
@@ -862,7 +868,8 @@ async function inicio() {
       const principalBtn = b.id === 'btn-empezar'; cfg.calentar = uno ? false : facil ? principalBtn === falta : principalBtn; cfg.primera = primera; if (facil) guardado.set('tarima.tutorial', '1');
       if (S.editar) guardado.set('tarima.nombre', limpiarNombre(S.nombre));
       ev('nombre_puesto', { vacio: !limpiarNombre(guardado.get('tarima.nombre')), vuelve, cambio: S.cambio });
-      ev('pesista_elegido', { pesista: TIPO[cfg.id], por_defecto: !S.tocoPesista });
+      ev('pesista_elegido', { pesista: TIPO[cfg.id], por_defecto: !S.tocoPesista, ofrecido: !primera });
+      E.tJugar = performance.now();
       break;
     }
   }
@@ -1301,7 +1308,9 @@ async function cierre(p) {
   const botones = () => `<div class="fila"><button class="ir grande" id="btn-revancha" data-completa>${otra}</button><button id="btn-cambiar">${t('podio.cambiar')}</button><button id="btn-compartir">${t('podio.compartir')}</button></div><p class="chica" id="compartido" hidden></p><div id="podio-extra"></div>`;
   let pn = capa.poner(arriba() + botones(), 'podio-panel');
   let extra = null; try { extra = await ganchos.podio({ n: E.finalN, puesto, total: yo.total || 0, medalla, lugar: pn.querySelector('#podio-extra'), nombre: nombreJugador(), t }); } catch (e) { console.warn('ganchos.podio:', e); }
-  if (extra === 'muro') { visita('muro'); const sigue = await mostrarMuro('podio'); return sigue ? 'revancha' : 'inicio'; }
+  // el cartel al terminar la final gratis (LIF-53). Desbloquee o no, después va al inicio, que ya ofrece elegir o cambiar
+  // de pesista (las tarjetas aparecen después de la primera final)
+  if (extra === 'muro') { visita('muro'); await mostrarMuro('podio'); return 'inicio'; }
   bloquear(pn); visita('fin');
   for (;;) {
     const b = await Promise.race([clic(pn, '#btn-revancha,#btn-cambiar,#btn-compartir'), new Promise(res => { E.repintar = () => res(null); })]);
@@ -1342,10 +1351,14 @@ async function partida(cfg) {
   // Los dos modelos se terminan de cargar antes de jugar (venían bajando desde el inicio): leer un GLB, compilar sus shaders o
   // subir sus texturas en medio de un levantamiento es un tirón. Todo eso lo hace escena.precalentar() (arrancó en el inicio,
   // detrás del panel) y recién después se calibra la calidad.
-  cargaUI.mostrar('carga.modelos'); await Promise.all(IDS.map(id => escena.cargar(id)));
+  cargaUI.mostrar('carga.modelos'); await cargarModelos();
   await escena.mostrar(cfg.id); escena.posar(poseParado(escena.P, 's'), 's'); escena.camara(camPrincipal());
-  if (DIBUJA) { E.sinDibujo = true; await E.precal; E.sinDibujo = false; await telefono.horizontal(); const c0 = performance.now(), primera = !E.cargaLista; E.cargaLista = true; await calibrar(); if (primera) ev('carga_lista', { ms: Math.round(performance.now()), calibracion_ms: Math.round(performance.now() - c0), calidad: C.nombre }); }
-  cargaUI.ocultar(); E.forzar = true;
+  if (DIBUJA) {
+    if (E.reprecal) { E.reprecal = false; E.precal = escena.precalentar().catch(e => { console.warn('precalentar:', e); }); }      // los modelos llegaron recién con el reintento
+    E.sinDibujo = true; await E.precal; E.sinDibujo = false; await telefono.horizontal(); const c0 = performance.now(), primera = !E.cargaLista; E.cargaLista = true; await calibrar(); if (primera) ev('carga_lista', { ms: Math.round(performance.now()), calibracion_ms: Math.round(performance.now() - c0), calidad: C.nombre });
+    await revisarShaders();
+  }
+  cargaUI.ocultar(); E.forzar = true; E.verPesista = true;
   if (cfg.calentar && !esU(cfg.ctl)) { if (cfg.ctl === 'f') { await tarjeta(); errMedio = await tutorial(cfg); } else { cfg.cal = await metronomo(); errMedio = await practica(cfg); } }
   // P4: el pase se pide después de la práctica, que no gasta nada
   const n = (+guardado.get('tarima.jugadas') || 0) + 1, pase = await pedirPase(cfg, n, 'bienvenida');
@@ -1374,6 +1387,67 @@ function fallar(e, tipo = 'excepcion') {
   cargaUI.error(tipo === 'inicio' ? 'carga.no_inicia' : 'carga.error');
 }
 
+// ---------- LIF-33: lo que no bajó y el 3D que no arranca ----------
+/** Espera de verdad (la carga corre con el reloj real, no con el del juego). */
+const dormir = ms => new Promise(r => setTimeout(r, ms));
+/** `fn` hasta 3 veces, con 1 s y 2,5 s de espera entre una y otra. Tira el último error. */
+async function reintentar(fn, esperas = [1000, 2500]) {
+  for (let k = 0; ; k++) { try { return await fn(k); } catch (e) { if (k >= esperas.length) throw e; console.warn(`reintento ${k + 1}:`, e?.message || e); await dormir(esperas[k]); } }
+}
+/** `carga_fallida` (una vez por etapa y carga): 'datos', 'modelo', 'webgl', 'shader' (y 'modulo', desde arranque.js). */
+const FALLAS = new Set();
+function cargaFallida(etapa, e, extra = {}) {
+  if (FALLAS.has(etapa)) return; FALLAS.add(etapa);
+  const d = detalleError(e); ev('carga_fallida', { etapa, mensaje: d.mensaje, archivo: d.archivo, app: appNavegador(navigator.userAgent), pantalla: E.pantalla, ...extra });
+}
+/** El aviso sobre la pantalla de carga: nada de la interfaz queda a la vista sin el pesista. Resuelve con «Probar de nuevo». */
+async function avisoFalla(tipo) {
+  visita('falla'); capa.quitar(); $('sobre').hidden = true; boton && (boton.activo = false);
+  await cargaUI.aviso(tipo, { app: appNavegador(navigator.userAgent) });
+  if (boton) boton.activo = true;
+}
+/** El 3D no arranca: el aviso, y «Probar de nuevo» recarga la página (no hay forma de rehacer el contexto ahí mismo). */
+async function falloGrafico(etapa, e, extra = {}) {
+  cargaFallida(etapa, e, extra); E.errores.length || console.warn(`3D (${etapa}):`, e?.message || e);
+  await avisoFalla('webgl'); location.reload(); return new Promise(() => {});
+}
+/** Los modelos de los pesistas, con reintentos; si no bajan, el aviso y, con «Probar de nuevo», otra vez. */
+async function cargarModelos() {
+  for (;;) {
+    try { await reintentar(() => Promise.all(IDS.map(id => escena.cargar(id)))); return; }
+    catch (e) { cargaFallida('modelo', e, { intentos: 3 }); E.reprecal = true; await avisoFalla('descarga'); cargaUI.mostrar('carga.modelos'); }
+  }
+}
+/** Un JSON de data/, con reintentos y el aviso si no llega. */
+async function bajarDatos(urls) {
+  for (;;) {
+    try { return await reintentar(() => Promise.all(urls.map(u => fetch(u).then(r => { if (!r.ok) throw new Error(u + ': ' + r.status); return r.json(); })))); }
+    catch (e) { cargaFallida('datos', e, { intentos: 3 }); await avisoFalla('descarga'); cargaUI.mostrar(); }
+  }
+}
+/**
+ * Un programa del 3D que no compila (three avisa por renderer.debug.onShaderError): se prueba una vez con la calidad
+ * Móvil (sin post ni sombras caras); si igual falla, el aviso del 3D (sin el pesista no se juega).
+ */
+async function revisarShaders() {
+  if (!E.shaderMal) return;
+  const primero = E.shaderMal; E.shaderMal = null;
+  if (C.clave !== 'movil') {
+    try { await ponerCalidad('movil'); nombrar(); escena.cuadro(0, true); } catch (e) { E.shaderMal = E.shaderMal || String(e?.message || e); }
+    if (!E.shaderMal) { cargaFallida('shader', { message: primero }, { recuperada: true, calidad: C.nombre }); return; }
+  }
+  await falloGrafico('shader', { message: E.shaderMal || primero });
+}
+/** Contexto 3D perdido que no vuelve en 6 s con la página a la vista: el aviso del 3D. */
+function vigilarContexto(canvas) {
+  let perdido = 0, visto = 0, reloj = null;
+  canvas.addEventListener('webglcontextlost', () => {
+    perdido = performance.now(); visto = 0; clearInterval(reloj);
+    reloj = setInterval(() => { if (!perdido) { clearInterval(reloj); return; } if (document.visibilityState === 'visible' && (visto += 1000) >= 6000) { clearInterval(reloj); falloGrafico('webgl', { message: 'contexto perdido' }, { perdido: true }); } }, 1000);
+  });
+  canvas.addEventListener('webglcontextrestored', () => { perdido = 0; clearInterval(reloj); E.forzar = true; });
+}
+
 async function iniciar() {
   const refresco = medirRefresco();
   pintarFijos(); telefono.instalar({ t }); telefono.avisoInstalar();      // en el iPhone, una vez: cómo jugar a pantalla completa
@@ -1383,12 +1457,20 @@ async function iniciar() {
   // P0: el estado del servidor (y la medición) en paralelo con los datos; el muro al cargar si corresponde
   const origen = params.get('lang') ? 'url' : guardado.get('tarima.idioma') ? 'guardado' : 'defecto';
   const arranque = conexion.arranque({ idioma: idiomaActual(), idioma_origen: origen, version: VERSION_JUEGO, pantalla: () => E.pantalla });
-  const [poses, sim] = await Promise.all(['data/poses.json', 'data/sim.json'].map(u => fetch(u).then(r => { if (!r.ok) throw new Error(u + ': ' + r.status); return r.json(); })));
+  const [poses, sim] = await bajarDatos(['data/poses.json', 'data/sim.json']);
   datos = leerDatos(sim);
   await Promise.all([`800 20px 'Saira Condensed'`, `700 20px 'Saira Condensed'`, `500 20px 'Saira Condensed'`].map(f => document.fonts.load(f).catch(() => null)));
   Object.assign(C, calidadInicial(params.get('q'), tactil())); fijarHz(await refresco);
   if (C.auto) C.Q = { ...C.Q, dpr: 2 };      // en automático el tope de píxeles lo pone la calibración, no la densidad de cada calidad
-  escena = new Escena($('gl'), C.Q, { reduceMotion }); escena.poses = poses; nombrar();
+  // LIF-33: sin WebGL (contexto que no se crea) el aviso del 3D y nunca la interfaz sin el pesista
+  try { escena = new Escena($('gl'), C.Q, { reduceMotion }); } catch (e) { cargaUI.ocultar(); return falloGrafico('webgl', e); }
+  escena.poses = poses; nombrar();
+  // un programa que no compila: se anota (three no lo dice de otra forma) y revisarShaders() decide antes de jugar
+  escena.renderer.debug.onShaderError = (gl, program, vs, fs) => {
+    const log = [gl.getProgramInfoLog(program), gl.getShaderInfoLog(vs), gl.getShaderInfoLog(fs)].map(x => String(x || '').trim()).filter(Boolean).join(' · ').replace(/\s+/g, ' ').slice(0, 160);
+    E.shaderMal = E.shaderMal || log || 'shader'; console.error('THREE: el programa no compila:', log);
+  };
+  vigilarContexto($('gl'));
   // cortes a la vista (stage.js, _vigilar), con la hora del juego y la pantalla: los cuenta tools/cortes.mjs
   escena.alCorte = r => { if (E.cortes.length < 4000) E.cortes.push({ t: Math.round(reloj.ahora()), p: E.pantalla, r: r.join('+') }); };
   escena.alProgreso = cargaUI.progreso; cargaUI.esperar([...new Set(IDS.map(id => PLANTEL[id].modelo))].flatMap(m => [m + ':glb', ...(poses[m]?.mask ? [m + ':mask'] : [])]));      // bytes de los modelos para la pantalla de carga
@@ -1409,7 +1491,7 @@ async function iniciar() {
   cargaUI.ocultar();
   ultimo = reloj.ahora(); requestAnimationFrame(bucle);
   const A = await arranque;
-  ev('juego_abierto', { carga_ms: Math.round(performance.now()), pantalla_inicial: A.muro ? 'muro' : 'bienvenida' });
+  ev('juego_abierto', { carga_ms: Math.round(performance.now()), pantalla_inicial: A.muro ? 'muro' : 'bienvenida', reintentos_modulo: window.__tarimaReintentos || 0 });
   (async () => {
     if (A.muro) { visita('muro'); await mostrarMuro('carga', A); }
     let cfg = null; for (;;) { if (!cfg) cfg = await inicio(); const r = await partida(cfg); cfg = r === 'revancha' ? { ...cfg, calentar: false, primera: false } : null; }

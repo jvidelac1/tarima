@@ -133,22 +133,37 @@ function keepSource(tex, blob, max) {
   tex.onUpdate = () => { const im = tex.image; if (!im?.close) return; tex.userData.w = im.width; tex.userData.h = im.height; im.close(); tex.userData.closed = true; };
 }
 
-/** Baja un archivo como Blob avisando los bytes que van llegando (fetch no da progreso por sí solo). */
-async function bajar(url, avisa) {
-  const res = await fetch(url); if (!res.ok) throw new Error(url + ': ' + res.status);
-  const total = +res.headers.get('content-length') || 0, tipo = res.headers.get('content-type') || '';
-  if (!avisa || !res.body?.getReader) { const b = await res.blob(); avisa?.({ loaded: b.size, total: b.size, lengthComputable: true }); return b; }
-  const rd = res.body.getReader(), partes = []; let n = 0;
-  for (;;) { const { done, value } = await rd.read(); if (done) break; partes.push(value); n += value.length; avisa({ loaded: n, total, lengthComputable: total > 0 }); }
-  avisa({ loaded: n, total: n, lengthComputable: true });
-  return new Blob(partes, { type: tipo });
+/**
+ * Baja un archivo como Blob avisando los bytes que van llegando (fetch no da progreso por sí solo). Si pasan `estancado`
+ * ms sin que llegue nada (la conexión se quedó colgada), corta y falla: así la carga se reintenta en lugar de quedar
+ * esperando para siempre en «Armando la tarima…» (LIF-33).
+ */
+async function bajar(url, avisa, { estancado = 20000 } = {}) {
+  const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+  let reloj = null; const vivo = () => { if (!ctl) return; clearTimeout(reloj); reloj = setTimeout(() => ctl.abort(), estancado); };
+  vivo();
+  try {
+    const res = await fetch(url, ctl ? { signal: ctl.signal } : undefined); if (!res.ok) throw new Error(url + ': ' + res.status);
+    vivo();
+    const total = +res.headers.get('content-length') || 0, tipo = res.headers.get('content-type') || '';
+    if (!avisa || !res.body?.getReader) { const b = await res.blob(); avisa?.({ loaded: b.size, total: b.size, lengthComputable: true }); return b; }
+    const rd = res.body.getReader(), partes = []; let n = 0;
+    for (;;) { const { done, value } = await rd.read(); if (done) break; vivo(); partes.push(value); n += value.length; avisa({ loaded: n, total, lengthComputable: total > 0 }); }
+    avisa({ loaded: n, total: n, lengthComputable: true });
+    return new Blob(partes, { type: tipo });
+  } catch (e) {
+    if (ctl?.signal.aborted) throw new Error(`${url}: sin datos en ${Math.round(estancado / 1000)} s`);
+    throw e;
+  } finally { clearTimeout(reloj); }
 }
 
 /** Normales de detalle compartidas por todos los personajes (las escribe tools/export_web.py). */
 let detailPromise = null;
 function loadDetail(aniso) {
   const one = url => new THREE.TextureLoader().loadAsync(url).then(t => { t.flipY = false; t.colorSpace = THREE.NoColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = aniso; t.needsUpdate = true; return t; });
-  return detailPromise ??= Promise.all([one('models/detail_skin.png'), one('models/detail_cloth.png')]).then(([skin, cloth]) => ({ skin, cloth }));
+  // si no bajan, la próxima carga los vuelve a pedir (sin esto, un fallo quedaba guardado para siempre)
+  return detailPromise ??= Promise.all([one('models/detail_skin.png'), one('models/detail_cloth.png')]).then(([skin, cloth]) => ({ skin, cloth }))
+    .catch(e => { detailPromise = null; throw e instanceof Error ? e : new Error(`detail: ${e?.type || 'error'} ${String(e?.target?.src || '').split('/').pop()}`); });
 }
 /** Metros de superficie por unidad de UV (mediana sobre triángulos de la malla en reposo): fija la escala real del mosaico. */
 function metersPerUv(geo) {
@@ -240,7 +255,9 @@ export class Athlete {
     const bajado = {}, avisa = clave => progreso ? e => { bajado[clave] = e.loaded; try { progreso(clave, e.loaded, e.lengthComputable ? e.total : 0); } catch { /* el aviso no frena la carga */ } } : undefined;
     // la máscara es opcional; solo se pide si el build avisa que existe (evita un 404 en consola). Baja a la par del GLB.
     const maskBlob = data.mask ? bajar(typeof data.mask === 'string' ? data.mask : `models/${name}_mask.png`, avisa(name + ':mask')).catch(() => null) : null;
-    const [gltf, detail] = await Promise.all([loader.loadAsync(url, avisa(name + ':glb')), loadDetail(aniso), MeshoptSimplifier.ready.catch(() => null)]);
+    // el GLB se baja con bajar() (con progreso y con corte si la conexión se cuelga) y después se lee
+    const glb = bajar(url, avisa(name + ':glb') || null).then(b => b.arrayBuffer()).then(buf => loader.parseAsync(buf, url.slice(0, url.lastIndexOf('/') + 1)));
+    const [gltf, detail] = await Promise.all([glb, loadDetail(aniso), MeshoptSimplifier.ready.catch(() => null)]);
     // sin Content-Length (servidor que comprime o manda por partes) el total no se sabe hasta el final: se avisa que terminó
     if (progreso) { const n = bajado[name + ':glb'] || 1; avisa(name + ':glb')({ loaded: n, total: n, lengthComputable: true }); }
     let mask = null;
