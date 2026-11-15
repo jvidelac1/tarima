@@ -643,8 +643,8 @@ html[data-pantalla=intento] #tablero,body:has(#margen:not([hidden])) #tablero{to
 :where(html.horiz.bajo) .panel.compacto :is(#kg-menos5,#kg-mas5){display:none}      /* ↑ ↓ siguen sumando de a 5 con teclado */
 :where(html.horiz.bajo) .panel.compacto .kgsel{margin:3px 0;gap:6px;flex-wrap:nowrap}
 :where(html.horiz.bajo) .panel.compacto .kgsel>span{display:none}      /* «kg» ya lo dice el botón de levantar */
-:where(html.horiz.bajo) .panel.compacto .kgsel .kg{min-width:42px;padding:.4em .6em}
-:where(html.horiz.bajo) .panel.compacto .kgsel .ir{margin-left:auto;padding:.45em .8em;white-space:nowrap}
+:where(html.horiz.bajo) .panel.compacto .kgsel .kg{min-width:42px;min-height:38px;padding:.2em .6em}
+:where(html.horiz.bajo) .panel.compacto .kgsel .ir{margin-left:auto;min-height:38px;padding:.2em .8em;white-space:nowrap}
 :where(html.horiz.bajo) .panel.compacto .kgsel output{font-size:clamp(24px,7.5cqh,32px);line-height:1;min-width:2.6ch}
 :where(html.horiz.bajo) .panel.compacto .pn-esencial{margin:2px 0;font-size:13px;gap:.3em .55em}
 :where(html.horiz.bajo) .panel.compacto .pn-estilo button{min-height:30px;font-size:13px;padding:.15em .6em}
