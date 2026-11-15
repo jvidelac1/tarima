@@ -125,7 +125,7 @@ async function fotos(B, { escena, cargas, params, msg, decir }) {
 
 /**
  * `?fotos=2` (Gráficos fase 1): la misma escena quieta en cada calidad (`?niveles=movil,baja,media,alta,ultra`), con las
- * cámaras del juego y la vista del jurado con las luces de arbitraje prendidas. tools/banco.mjs --fotos=dir --niveles.
+ * cámaras del juego, la vista del jurado con las luces de arbitraje prendidas y los tres árbitros de frente con sus paletas. tools/banco.mjs --fotos=dir --niveles.
  * Por software sirven para mirar el aspecto de cada nivel, no el costo.
  */
 async function fotosNiveles(B, { escena, cargas, params, msg, decir }) {
@@ -137,6 +137,7 @@ async function fotosNiveles(B, { escena, cargas, params, msg, decir }) {
   const tomas = [
     { n: '3-4', c: '3/4', t: 1.3, luces: null }, { n: 'frontal', c: 'baja', t: 1.3, luces: null }, { n: 'lado', c: 'lado', t: fin, luces: null },
     { n: 'jurado-vale', c: 'jurado', t: fin, luces: [true, true, true] }, { n: 'jurado-nulo', c: 'jurado', t: fin, luces: [false, true, false] }, { n: 'reversa-vale', c: 'rev', t: fin, luces: [true, true, true] },
+    { n: 'jueces-vale', c: 'jueces', t: fin, luces: [true, true, true] }, { n: 'jueces-nulo', c: 'jueces', t: fin, luces: [false, true, false] },
   ];
   const lista = niveles.flatMap(q => tomas.map(x => ({ ...x, q, nombre: `${q}_${x.n}` }))); let puesta = null;
   window.BANCO_FOTOS = {
@@ -272,6 +273,7 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
   // (`defecto: false`): se piden con ?variantes=publico,velos o ?variantes=todas.
   const MENOS = [
     { id: 'ambiente', nombre: 'sin el ambiente nuevo (polvo de magnesio y halos de las luces)', poner: () => ocultar([escena.ambiente?.group]) },
+    { id: 'jueces', nombre: 'sin los jueces y oficiales sentados (jueces.js)', defecto: false, poner: () => ocultar([escena.jueces?.group]) },
     { id: 'sombras', nombre: 'sin sombras', poner: () => { escena.setSombras(false); return () => escena.setSombras(true); } },
     { id: 'haces', nombre: 'sin haces de luz', poner: () => ocultar(A.beamMeshes) },
     { id: 'aniso', nombre: 'anisotropía 1 en todas las texturas', poner: v => anisotropia(1, v) },

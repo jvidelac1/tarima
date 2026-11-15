@@ -25,6 +25,7 @@ import { aplicarEsfuerzo } from './effort.js';
 import { tramo } from './sequence.js';
 import { CamaraViva } from './camara_viva.js';
 import { Ambiente } from './ambiente.js';
+import { Jueces } from './jueces.js';
 import { Reflejo } from './reflejo.js';
 
 /**
@@ -192,9 +193,12 @@ export const PLANOS = {
   medio: { key: 'medio', at: ['Neck', 'Hips'], up: -.05, d: 2.05, az: .5, el: .05, fov: 22 },
   caida: { key: 'caida', at: [], up: 0, dAbs: 4.6, az: .72, el: .14, fov: 30, punto: 'caida' },
   manga: { key: 'manga', at: [], up: 0, dAbs: 1.45, az: 1.05, el: .2, fov: 30, punto: 'manga' },
-  // desde la mesa del árbitro central (LIF-38): lo que ve el árbitro, el pesista de frente y, arriba de la pantalla, las
-  // tres luces de arbitraje. La cámara queda en (0; 0,5; 7,0), sobre la mesa, mirando a (0; 1,11; 0): entran de los pies a las luces
-  jurado: { key: 'jurado', at: [], up: 0, dAbs: 7.03, az: 0, el: -.0869, fov: 26, punto: 'jurado' },
+  // el jurado (LIF-38): desde atrás de la mesa de los tres árbitros, por encima de sus hombros. Abajo, sus cabezas y las
+  // paletas que levantan; en el medio, el pesista de frente; arriba de la pantalla, las tres luces. La cámara queda en
+  // (0; 0,7; 10,6), delante de la primera fila de la tribuna, mirando a (0; 0,41; 0)
+  jurado: { key: 'jurado', at: [], up: 0, dAbs: 10.604, az: 0, el: .02735, fov: 30, punto: 'jurado' },
+  // los tres árbitros de frente, desde el borde del escenario (para las fotos de control de banco.js)
+  jueces: { key: 'jueces', at: [], up: 0, dAbs: 3.7, az: Math.PI, el: .12, fov: 34, punto: 'jueces' },
 };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
@@ -215,11 +219,13 @@ export class Escena {
     this.rig = new CameraRig(canvas, { reduceMotion, interactive: false }); this.viva = new CamaraViva({ reduceMotion });
     this.trace = new BarTrace(); this.scene.add(this.trace.group);
     const coarse = matchMedia('(pointer:coarse)').matches, aniso = Math.min(Q.aniso || 4, r.capabilities.getMaxAnisotropy());
-    this.arena = new Arena({ tex: coarse || Q.tex <= 1024 ? 1024 : 2048, aniso, reduceMotion }); this.scene.add(this.arena.group);
+    this.arena = new Arena({ tex: coarse || Q.tex <= 1024 ? 1024 : 2048, aniso, reduceMotion, oficiales: false }); this.scene.add(this.arena.group);
+    // jueces y oficiales sentados (jueces.js): los árbitros levantan la paleta con cada luz
+    const jueces = this.jueces = new Jueces({ reduceMotion }); this.scene.add(jueces.group);
     // ambiente del juego (ambiente.js): retoca texturas y sombreadores de la arena antes de que se dibuje nada, y recibe lo
     // mismo que el tablero y las luces de la arena (main.js no cambia: sigue llamando a arena.setBoard y arena.setDecision)
     const amb = this.ambiente = new Ambiente(this.arena, { tex: coarse || Q.tex <= 1024 ? 1024 : 2048, aniso, reduceMotion }); this.scene.add(amb.group);
-    { const A = this.arena, tablero = A.setBoard.bind(A), decision = A.setDecision.bind(A); A.setBoard = b => { tablero(b); amb.setCartel(b); }; A.setDecision = d => { decision(d); amb.setDecision(d); }; }
+    { const A = this.arena, tablero = A.setBoard.bind(A), decision = A.setDecision.bind(A); A.setBoard = b => { tablero(b); amb.setCartel(b); }; A.setDecision = d => { decision(d); amb.setDecision(d); jueces.setDecision(d); }; }
     this.reflejo = new Reflejo(0); this.reflejo.parchar(this.arena.madera);
     this.lighting = new Lighting(this.scene); amb.setLuces(this.lighting);
     this.barbell = new Barbell({ aniso, texSize: coarse ? 512 : 1024 }); this.scene.add(this.barbell.group);
@@ -568,7 +574,8 @@ export class Escena {
   _apuntar() {
     const a = this.activo, sh = this.plano; if (!sh) return;
     if (sh.punto === 'manga') v2.copy(this.barbell.group.position).add(v.set(.92, .02, 0));
-    else if (sh.punto === 'jurado') v2.set(0, 1.11, 0);
+    else if (sh.punto === 'jurado') v2.set(0, .41, 0);
+    else if (sh.punto === 'jueces') v2.set(0, -.02, 7.3);
     else if (sh.punto === 'caida') { if (a) a.boneWorld('Hips', v2); else v2.set(0, 1, 0); v2.lerp(this.barbell.group.position, .5); v2.x = 0; v2.y = Math.max(.85, v2.y); }
     else { if (!a) return; const huesos = sh.at.filter(k => k !== 'Bar'), nb = sh.at.length - huesos.length; a.midWorld(huesos, v2).multiplyScalar(huesos.length); if (nb) v2.add(this.barbell.group.position); v2.multiplyScalar(1 / sh.at.length); v2.y += sh.up * this.P.h; }
     const e = this.encuadre;
@@ -614,7 +621,7 @@ export class Escena {
   }
   /** Avanza cámara y entorno; dibuja si `pintar`. */
   cuadro(dt, pintar = true) {
-    this._apuntar(); this.rig.update(dt); this._vigilar(dt); this.viva.aplicar(this.rig.camera, dt, this.rig.focusDistance); this.trace.face(this.rig.camera); this.post.focus = this.rig.focusDistance; this.arena.update(dt, this.rig.camera); this.ambiente.update(dt); this._detalle();
+    this._apuntar(); this.rig.update(dt); this._vigilar(dt); this.viva.aplicar(this.rig.camera, dt, this.rig.focusDistance); this.trace.face(this.rig.camera); this.post.focus = this.rig.focusDistance; this.arena.update(dt, this.rig.camera); this.ambiente.update(dt); this.jueces.update(dt); this._detalle();
     if (!pintar) return;
     const r = this.renderer; r.shadowMap.needsUpdate = this.sombra > 0; if (this.sombra > 0) this.sombra--;
     this._dibujar(dt);
