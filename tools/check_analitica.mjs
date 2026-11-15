@@ -304,7 +304,7 @@ const pedidos1 = [];
     const es = await page.locator('article[lang=es] [data-grabacion]').innerText(), en = await page.locator('article[lang=en] [data-grabacion]').textContent();
     ok(/una de cada tres/.test(es) && /3D/.test(es) && /tapados/.test(es) && /correo/.test(es) && /one in three/.test(en) && /3D/.test(en) && /blanked out/.test(en),
       'la privacidad explica la grabación en los dos idiomas: proporción, sin 3D y campos tapados');
-    ok(/2026-11-e/.test(await page.locator('article[lang=es] .version').innerText()), 'la privacidad está en la versión 2026-11-e');
+    ok(/2026-11-f/.test(await page.locator('article[lang=es] .version').innerText()), 'la privacidad está en la versión 2026-11-f');
     const txt = await page.locator('article[lang=es]').innerText();
     ok(/dos preguntas/.test(txt) && /jugar sin límite/.test(txt) && !/una por mes|al mes/.test(txt) && !/encuesta[^.]*finales/i.test(txt), 'en español: la encuesta de dos preguntas, que desbloquea el juego libre (LIF-53), sin finales de premio, y las novedades sin frecuencia');
   }
