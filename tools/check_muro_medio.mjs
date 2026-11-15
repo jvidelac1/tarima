@@ -1,4 +1,5 @@
-// Prueba de punta a punta del muro en el medio de la final (regla de producción GRATIS_ETAPA='arranque', docs/MVP.md 5.5),
+// Prueba de punta a punta del muro en el medio de la final (GRATIS_ETAPA='arranque' con ENCUESTA_LIBRE='0': la regla del 12
+// al 15 de noviembre, que se recupera por variables; la de producción, LIF-53, la prueba tools/check_muro.mjs) (docs/MVP.md 5.5),
 // con el Worker de verdad sobre una D1 falsa (tools/servidor_local.mjs: sin cuenta de Cloudflare, sin red, sin PostHog) y
 // las variables de worker/wrangler.jsonc. Correo obligatorio (decisión del dueño del 13 de noviembre): el muro solo pide el
 // correo, la encuesta no desbloquea nada y es opcional, en el panel de «anotado». Los dos jugadores tienen el navegador en
@@ -40,7 +41,7 @@ const CORREO = 'jugador.intervalo@pruebas-tarima.com';      // example.com está
 
 async function escenario(L) {
   const tactil = L === 'es', D = EN, tag = `[${L}]`, dir = path.join(OUT, L); fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
-  const srv = await iniciarServidorLocal({ silencio: true });
+  const srv = await iniciarServidorLocal({ silencio: true, vars: { GRATIS_ETAPA: 'arranque', ENCUESTA_LIBRE: '0' } });
   if (srv.env.GRATIS_ETAPA !== 'arranque') problemas.push(`${tag} el servidor local no tiene la regla del arranque gratis (GRATIS_ETAPA=${srv.env.GRATIS_ETAPA})`);
   const base = srv.url.replace(/\/$/, '');
   const ctx = await browser.newContext(tactil
@@ -175,7 +176,8 @@ async function escenario(L) {
     await esperar(() => !!document.getElementById('btn-saltar'), 'el panel de anotado con la encuesta');
     await foto('anotado_encuesta');
     await revisarEncuesta(EN, true);
-    { const a = await ultimo('anotar_ok'); if (!a || a.momento !== 'tras_arranque' || a.pantalla !== 'muro') mal(`anotar_ok: ${JSON.stringify(a)}`); }
+    { const a = await ultimo('anotar_respuesta'); if (!a || a.momento !== 'tras_arranque' || a.pantalla !== 'muro') mal(`anotar_respuesta: ${JSON.stringify(a)}`); }
+    { const r = await ultimo('muro_resultado'); if (!r || r.via !== 'mail' || r.momento !== 'tras_arranque' || r.caminos !== 'mail') mal(`muro_resultado: ${JSON.stringify(r)}`); }
     { const v = await ultimo('encuesta_vista'); if (!v || v.momento !== 'tras_arranque') mal(`encuesta_vista: ${JSON.stringify(v)}`); }
     // con teclado: marca una opción y la desmarca (queda vacía), y saltea
     await marca('.op[data-q="plataforma"][data-o="web"]');
@@ -187,6 +189,7 @@ async function escenario(L) {
     await esperar(() => JUEGO.estado().pantalla === 'intervalo' && !!document.getElementById('btn-confirmar'), 'el primer peso del dos tiempos');
     await av(200); await foto('dos_tiempos');
     { const e = await ultimo('envion_ok'); if (!e || e.via !== 'lista') mal(`envion_ok: ${JSON.stringify(e)}`); }
+    { const g = (await eventos()).filter(e => e.ev === 'siguio_jugando'); if (g.length !== 1 || g[0].props.siguio !== true || g[0].props.motivo !== 'envion') mal(`siguio_jugando: ${JSON.stringify(g)}`); }
     { const p = await partidas(); if (p.join() !== 'gratis/completa/lista') mal(`en la base, después de anotarse: ${p.join(' ')}`); }
     s = await jugar(x => x.pantalla === 'fin', 'el dos tiempos después de anotarse');
     await av(400); await foto('podio');
@@ -207,6 +210,7 @@ async function escenario(L) {
     { const ev = await eventos(); const c = ev.filter(e => e.ev === 'muro_cerrado').at(-1)?.props, k = ev.filter(e => e.ev === 'final_cortada').at(-1)?.props;
       if (c?.momento !== 'tras_arranque') mal(`muro_cerrado: ${JSON.stringify(c)}`);
       if (k?.momento !== 'tras_arranque') mal(`final_cortada: ${JSON.stringify(k)}`);
+      const res = ev.filter(e => e.ev === 'muro_resultado'); if (res.length !== 1 || res[0].props.via !== 'cerro') mal(`muro_resultado al cortar: ${JSON.stringify(res)}`);
       if (ev.some(e => e.ev === 'final_fin')) mal('la final cortada mandó final_fin'); }
 
     // ---------- 4 (es). «Jugar» otra vez: muro antes del primer intento ----------

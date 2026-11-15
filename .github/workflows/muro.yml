@@ -11,7 +11,7 @@ name: Muro y lista (punta a punta)
 
 on:
   push:
-    branches: [main, mvp, muro-medio, gameplay]
+    branches: [main, mvp, muro-medio, gameplay, primera-vez]
     paths:
       - 'web/js/game/conexion.js'
       - 'web/js/game/servidor.js'
@@ -30,6 +30,7 @@ on:
       - 'tools/servidor_local.mjs'
       - 'tools/check_muro.mjs'
       - 'tools/check_muro_medio.mjs'
+      - 'web/js/game/arranque.js'
       - '.github/workflows/muro.yml'
   pull_request:
     branches: [main]
@@ -51,6 +52,7 @@ on:
       - 'tools/servidor_local.mjs'
       - 'tools/check_muro.mjs'
       - 'tools/check_muro_medio.mjs'
+      - 'web/js/game/arranque.js'
       - '.github/workflows/muro.yml'
   workflow_dispatch:
 
@@ -63,7 +65,7 @@ defaults:
 
 jobs:
   medio:
-    name: Arranque gratis, muro en el intervalo, correo y dos tiempos; Ahora no y fin
+    name: Regla alternativa (GRATIS_ETAPA=arranque, ENCUESTA_LIBRE=0) — arranque gratis, muro en el intervalo
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -99,7 +101,7 @@ jobs:
         if: ${{ always() }}
         run: |
           {
-            echo "### Muro en el medio de la final (Worker local con la regla de producción, dibujo por software)"
+            echo "### Muro en el medio de la final (regla alternativa por variables; Worker local, dibujo por software)"
             for f in check_muro_medio_en check_muro_medio_es; do
               echo; echo "**$f**"; echo '```'
               if [ -f "out/logs/$f.log" ]; then tail -n 30 "out/logs/$f.log"; else echo "(no corrió)"; fi
@@ -116,7 +118,7 @@ jobs:
           retention-days: 14
 
   vieja:
-    name: Regla vieja por variables (2 finales, muro en el podio, encuesta, correo)
+    name: Regla de producción (LIF-53) — final entera gratis y el cartel con correo o 2 preguntas
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -152,7 +154,7 @@ jobs:
         if: ${{ always() }}
         run: |
           {
-            echo "### Muro con la regla vieja (GRATIS_ETAPA=final; Worker local, dibujo por software)"
+            echo "### Cartel con la regla de producción (LIF-53; Worker local, dibujo por software)"
             for f in check_muro_en check_muro_es; do
               echo; echo "**$f**"; echo '```'
               if [ -f "out/logs/$f.log" ]; then tail -n 30 "out/logs/$f.log"; else echo "(no corrió)"; fi

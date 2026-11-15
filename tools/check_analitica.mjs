@@ -142,7 +142,7 @@ window.__activa = await a.iniciar({ estado: e, idioma: 'es', idioma_origen: 'url
 a.visita('muro');
 a.ev('muro_visto', { motivo: 'dispositivo', caminos: 'mail', origen: 'podio', variante_texto: a.bandera('muro-texto') });
 a.identificar('${LISTA_ID}');
-a.ev('anotar_ok', { estado: 'nuevo', pantalla: 'muro', finales_previas: 2 });
+a.ev('anotar_respuesta', { estado: 'nuevo', pantalla: 'muro', finales_previas: 2 });
 a.encuestaVista({ momento: 'tras_arranque' });
 a.ev('encuesta_enviada', { momento: 'tras_arranque', plataforma: 'app', features: 2, otra: true });
 window.__sesion = a.idSesion();
@@ -246,7 +246,7 @@ const pedidos1 = [];
   const eventos = llegadas.flatMap(l => l.eventos);
   const nombres = eventos.map(e => e.event);
   ok(llegadas.length > 0, `llegaron pedidos a /qx (${llegadas.map(l => l.ruta).join(' ')})`);
-  for (const ev of ['juego_abierto', 'muro_visto', 'anotar_ok', 'encuesta_vista', 'encuesta_enviada']) ok(nombres.includes(ev), `llegó ${ev} por /qx`);
+  for (const ev of ['juego_abierto', 'muro_visto', 'anotar_respuesta', 'encuesta_vista', 'encuesta_enviada']) ok(nombres.includes(ev), `llegó ${ev} por /qx`);
   ok(!nombres.some(n => /^survey /.test(n)), 'sin eventos de la API de Surveys de PostHog');
   ok(nombres.includes('$identify') || eventos.some(e => e.props.distinct_id === LISTA_ID || e.props.$user_id === LISTA_ID), 'identify con lista_id');
   const todo = JSON.stringify(eventos);
@@ -304,9 +304,9 @@ const pedidos1 = [];
     const es = await page.locator('article[lang=es] [data-grabacion]').innerText(), en = await page.locator('article[lang=en] [data-grabacion]').textContent();
     ok(/una de cada tres/.test(es) && /3D/.test(es) && /tapados/.test(es) && /correo/.test(es) && /one in three/.test(en) && /3D/.test(en) && /blanked out/.test(en),
       'la privacidad explica la grabación en los dos idiomas: proporción, sin 3D y campos tapados');
-    ok(/2026-11-d/.test(await page.locator('article[lang=es] .version').innerText()), 'la privacidad está en la versión 2026-11-d');
+    ok(/2026-11-e/.test(await page.locator('article[lang=es] .version').innerText()), 'la privacidad está en la versión 2026-11-e');
     const txt = await page.locator('article[lang=es]').innerText();
-    ok(/dos preguntas/.test(txt) && /opcional/.test(txt) && !/una por mes|al mes/.test(txt) && !/encuesta[^.]*finales/i.test(txt), 'en español: la encuesta opcional de dos preguntas, sin finales de premio, y las novedades sin frecuencia');
+    ok(/dos preguntas/.test(txt) && /jugar sin límite/.test(txt) && !/una por mes|al mes/.test(txt) && !/encuesta[^.]*finales/i.test(txt), 'en español: la encuesta de dos preguntas, que desbloquea el juego libre (LIF-53), sin finales de premio, y las novedades sin frecuencia');
   }
   await page.click('article[lang=es] [data-medicion-boton]');
   ok(await page.evaluate(() => localStorage.getItem('tarima.medicion')) === '0', 'el interruptor apaga la medición');

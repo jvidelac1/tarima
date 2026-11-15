@@ -86,6 +86,9 @@ async function corrida(via) {
     return true;
   };
 
+  // Primera vez (LIF-53): la bienvenida no ofrece elegir pesista; el que juega con el dedo y el lento usan a Brenner
+  // (Largo), como siempre, guardado como si lo hubiera elegido en otra visita (sin jugadas: sigue siendo la primera vez)
+  if (tactil || lento) await ctx.addInitScript(() => { try { if (!sessionStorage.getItem('__p')) { localStorage.setItem('tarima.pesista', 'brenner'); sessionStorage.setItem('__p', '1'); } } catch { /* sin almacenamiento */ } });
   await page.goto(`${base}juego.html?lang=es&semilla=${SEMILLA}&q=${tactil ? 'movil&ritmo=completa' : 'baja'}${clasico ? '&ctl=c' : ''}${DIBUJO ? '' : '&dibujo=0'}`, { waitUntil: 'load' });
   if (!await J(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
   const gl = await J(() => { const g = JUEGO.escena.renderer.getContext(), e = g.getExtension('WEBGL_debug_renderer_info'); return e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : '?'; });
@@ -195,14 +198,15 @@ async function corrida(via) {
   const s0 = await J(() => JUEGO.estado());
   // la bienvenida: con teclado el foco arranca en el nombre; con el dedo, en «Jugar» (no abre el teclado de pantalla sin pedirlo)
   if (s0.foco !== (tactil ? '#btn-empezar' : '#nombre')) mal(`la bienvenida no abre con el foco en ${tactil ? '«Jugar»' : 'el nombre'} (foco: ${s0.foco})`);
-  const ini = await J(() => { const pn = document.querySelector('#capa .panel'); return { jugar: pn.querySelector('#btn-empezar')?.textContent.trim(), nombre: !!pn.querySelector('input#nombre'), idiomas: pn.querySelectorAll('.idi').length, ayuda: !!pn.querySelector('#btn-ayuda'), tarjetas: pn.querySelectorAll('.pesista').length, opciones: !!pn.querySelector('.nivel'), lang: document.documentElement.lang }; });
-  if (ini.jugar !== ES['bienvenida.jugar'] || !ini.nombre || ini.idiomas !== 2 || !ini.ayuda || ini.tarjetas !== 3 || ini.opciones || ini.lang !== 'es') mal(`la bienvenida no tiene nombre, tres tarjetas, «Jugar», ES · EN y ayuda con «Opciones» plegado: ${JSON.stringify(ini)}`);
+  // primera vez (LIF-53): nombre opcional y «Jugar», sin elegir pesista (las tarjetas salen después de la primera final)
+  const ini = await J(() => { const pn = document.querySelector('#capa .panel'); return { jugar: pn.querySelector('#btn-empezar')?.textContent.trim(), nombre: !!pn.querySelector('input#nombre'), idiomas: pn.querySelectorAll('.idi').length, ayuda: !!pn.querySelector('#btn-ayuda'), tarjetas: pn.querySelectorAll('.pesista').length, titulo: !!pn.querySelector('#pesista-t'), opciones: !!pn.querySelector('.nivel'), lang: document.documentElement.lang }; });
+  if (ini.jugar !== ES['bienvenida.jugar'] || !ini.nombre || ini.idiomas !== 2 || !ini.ayuda || ini.tarjetas !== 0 || ini.titulo || ini.opciones || ini.lang !== 'es') mal(`la primera bienvenida no es nombre, «Jugar», ES · EN y ayuda con «Opciones» plegado, sin tarjetas: ${JSON.stringify(ini)}`);
   // el nombre se escribe sin que el juego se coma las teclas: la H no abre la ayuda y Espacio no es un toque
   const NOMBRE = "Hugo O'Neil";
   if (!tactil) {
     const k0 = await J(() => JUEGO.toques.total); await page.keyboard.type(NOMBRE);
-    const k1 = await J(() => ({ toques: JUEGO.toques.total, sobre: JUEGO.estado().sobre, valor: document.getElementById('nombre')?.value, titulo: document.getElementById('pesista-t')?.textContent }));
-    if (k1.toques !== k0 || k1.sobre || k1.valor !== NOMBRE || !k1.titulo.includes(NOMBRE)) mal(`escribir el nombre: ${JSON.stringify(k1)} (toques antes ${k0})`);
+    const k1 = await J(() => ({ toques: JUEGO.toques.total, sobre: JUEGO.estado().sobre, valor: document.getElementById('nombre')?.value }));
+    if (k1.toques !== k0 || k1.sobre || k1.valor !== NOMBRE) mal(`escribir el nombre: ${JSON.stringify(k1)} (toques antes ${k0})`);
   }
 
   if (clasico) {
@@ -220,7 +224,6 @@ async function corrida(via) {
 
   if (lento) {
     // ---- 'u': el panel del llamado no tiene reloj, y sin tocar nada el levantamiento sale solo y vale
-    if (!await pulsa('.pesista[data-id="brenner"]')) mal('no se pudo elegir a Brenner');
     await jugar(s => s.pantalla === 'llamado' && s.panel, true);
     await J(() => JUEGO.test.avanzar(450));
     const a1 = await J(() => ({ reloj: document.getElementById('reloj').textContent, txt: document.querySelector('#capa .panel').textContent }));
@@ -252,7 +255,7 @@ async function corrida(via) {
 
   // ---- 1. Fácil: partida completa con el reloj inyectado, sin mouse
   const t0 = Date.now();
-  if (!await pulsa(`.pesista[data-id="${tactil ? 'brenner' : 'ventura'}"]`) || !await pulsa('#btn-opciones') || !await pulsa('.nivel[data-n="normal"]')) mal('no se pudo elegir pesista y nivel (en «Opciones»)');
+  if (!await pulsa('#btn-opciones') || !await pulsa('.nivel[data-n="normal"]')) mal('no se pudo elegir el nivel (en «Opciones»)');
   const envion = tactil ? () => 'split' : clave => (/intento 1/.test(clave) ? 'split' : /intento 2/.test(clave) ? 'squat' : 'power');
   // en 'u' un fallo no sale de tocar mal: sale de pedir mucho. El tercer arranque pide 25 kg de más (se cae, con su línea),
   // y el primer dos tiempos se juega sin tocar nada (sale solo y vale: no tocar nunca tira la barra)
@@ -316,6 +319,9 @@ async function corrida(via) {
   // ---- 2. con el reloj verdadero: pausa, ayuda y el primer intento de otra final a velocidad real
   await J(() => JUEGO.test.real()); await page.waitForTimeout(700);
   await pulsa('#btn-cambiar'); await page.waitForFunction(() => JUEGO.estado().pantalla === 'inicio'); await page.waitForTimeout(500);
+  // después de la primera final, el inicio ofrece elegir o cambiar de pesista (LIF-53)
+  { const x = await J(() => ({ tarjetas: document.querySelectorAll('#capa .pesista').length, elegido: document.querySelector('#capa .pesista[aria-pressed=true]')?.dataset.id, titulo: document.getElementById('pesista-t')?.textContent || '' }));
+    if (x.tarjetas !== 3 || x.elegido !== (tactil ? 'brenner' : 'ventura') || (!tactil && !x.titulo.includes(NOMBRE))) mal(`después de la primera final el inicio no ofrece cambiar de pesista: ${JSON.stringify(x)}`); }
   await J(() => { JUEGO.E.visitados.length = 0; JUEGO.E.propios = []; }); const tr0 = Date.now();
   if (!tactil) {
     await page.keyboard.press('Escape');
@@ -352,7 +358,7 @@ async function idiomas() {
   // sin ?lang= y con el navegador en inglés: inglés
   await page.goto(`${base}juego.html?dibujo=0&q=baja`, { waitUntil: 'load' }); if (!await J(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
   let x = await leer();
-  if (x.lang !== 'en' || x.jugar !== EN['bienvenida.jugar'] || x.titulo !== EN['app.titulo'] || x.ev !== EN['app.evento'] || !x.h2.includes(EN['bienvenida.nombre_defecto'])) mal(`con el navegador en inglés la bienvenida no salió en inglés: ${JSON.stringify(x)}`);
+  if (x.lang !== 'en' || x.jugar !== EN['bienvenida.jugar'] || x.titulo !== EN['app.titulo'] || x.ev !== EN['app.evento'] || x.h2 !== undefined) mal(`con el navegador en inglés la bienvenida (primera vez, sin elegir pesista) no salió en inglés: ${JSON.stringify(x)}`);
   await page.screenshot({ path: path.join(OUT, 'idioma_en.png') }).catch(() => null);
   // el selector la pasa a español sin recargar, y queda guardado
   await page.locator('#capa .idi[data-lang="es"]').click(); await page.waitForTimeout(150); x = await leer();
