@@ -3,7 +3,7 @@
 // La partida se maneja igual en vivo y al recalcular: abrir() → empezar() → [cambio()] → resolver() o resolverIA() → …
 import { idiv, rdiv, clampi, mezclar, Azar } from './fixed.js';
 import { simular } from './attempt.js';
-import { gestos, decidir, elegirEnvion, planRival, decidirPlan, estiloRival, HUELLA_IA } from './ai.js';
+import { gestos, decidir, elegirEnvion, envionRival, planRival, decidirPlan, estiloRival, HUELLA_IA } from './ai.js';
 import { sugerencia } from './entrenador.js';
 import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad, cuerpoDe, cuerpoBarra, HUELLA_U, HUELLAS_B, NIVELES_B, fatigaDe, sumarFatiga } from './rules.js';
 
@@ -198,9 +198,8 @@ export class Partida {
   /** Juega el llamado de un rival: genera sus gestos y los pasa por la misma máquina. Devuelve {ctx, conf, ent, res} para mostrarlo. */
   resolverIA() {
     const L = this.llamado; if (!L || this.at[L.a].ctrl !== 'juego') throw new Error('no es el llamado de un rival');
-    // con el estilo fijo (LIF-43) el rival elige el de toda la competencia pensando en su peso más alto (el que usaría por
-    // encima del 95 %), no el de la apertura: si no, quedaba en power para los intentos decisivos
-    const a = this.at[L.a]; let env; if (L.lev === 'c') env = this.cfg.envFijo ? this.estiloFijo(L.a) ?? elegirEnvion(a.f, 10000) : elegirEnvion(a.f, this.contexto(a.f.enviones[0]).I);
+    // con el estilo fijo (LIF-43) el rival usa toda la competencia el de su personalidad (ai.js → envionRival)
+    const a = this.at[L.a]; let env; if (L.lev === 'c') env = this.cfg.envFijo ? this.estiloFijo(L.a) ?? envionRival(a.id, a.f) : elegirEnvion(a.f, this.contexto(a.f.enviones[0]).I);
     const ctx = this.contexto(env), g = gestos(ctx, this.cfg.nivel, L.sem);
     this.reg.llamados.push({ a: L.a, lev: L.lev, n: L.n });
     const llamado = { ...L }, ap = this._aplicar(ctx, g.res);

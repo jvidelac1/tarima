@@ -612,8 +612,8 @@ html[data-pantalla=intento] #tablero,body:has(#margen:not([hidden])) #tablero{to
 
 /* ---------- panel del llamado compacto ('b' y 'u', LIF-31) y estilo de envión fijo (LIF-43) ----------
    A la vista: título corto con «Detalles», kilos ± con levantar, la dificultad y la chance, y en el dos tiempos el estilo de
-   envión en un solo botón. El resto se despliega en .pn-detalle. En el teléfono acostado el panel no pasa del 35 % del alto
-   (check_telefono). */
+   envión en un solo botón. El resto se despliega en .pn-detalle. En el teléfono acostado el panel no pasa del 38 % del alto
+   y todo lo que se toca mide 40 px de alto o más (check_telefono). */
 .panel.compacto .pn-cab{display:flex;align-items:center;gap:.6em}
 .panel.compacto .pn-cab h2{margin:0;flex:1;min-width:0}
 .panel.compacto .pn-mas{flex:none;min-height:34px;padding:.2em .7em;font-size:clamp(11px,1.6cqh,13px);background:transparent}
@@ -637,16 +637,16 @@ html[data-pantalla=intento] #tablero,body:has(#margen:not([hidden])) #tablero{to
 .pn-detalle{border-top:1px solid var(--line);margin-top:.35em;padding-top:.15em}
 .pn-detalle[hidden]{display:none}
 .pn-detalle .rm-linea{margin-top:.3em}
-:where(html.horiz.bajo) .panel.compacto{padding:6px 10px}
+:where(html.horiz.bajo) .panel.compacto{padding:4px 10px}
 :where(html.horiz.bajo) .panel.compacto h2{font-size:clamp(12px,3.6cqh,15px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-:where(html.horiz.bajo) .panel.compacto .pn-mas{min-height:28px;font-size:12px;padding:.15em .6em}
+:where(html.horiz.bajo) .panel.compacto .pn-mas{min-height:40px;font-size:12px;padding:.15em .7em}
 :where(html.horiz.bajo) .panel.compacto :is(#kg-menos5,#kg-mas5){display:none}      /* ↑ ↓ siguen sumando de a 5 con teclado */
-:where(html.horiz.bajo) .panel.compacto .kgsel{margin:3px 0;gap:6px;flex-wrap:nowrap}
+:where(html.horiz.bajo) .panel.compacto .kgsel{margin:2px 0;gap:6px;flex-wrap:nowrap}
 :where(html.horiz.bajo) .panel.compacto .kgsel>span{display:none}      /* «kg» ya lo dice el botón de levantar */
-:where(html.horiz.bajo) .panel.compacto .kgsel .kg{min-width:42px;min-height:38px;padding:.2em .6em}
-:where(html.horiz.bajo) .panel.compacto .kgsel .ir{margin-left:auto;min-height:38px;padding:.2em .8em;white-space:nowrap}
+:where(html.horiz.bajo) .panel.compacto .kgsel .kg{min-width:44px;min-height:40px;padding:.2em .6em}
+:where(html.horiz.bajo) .panel.compacto .kgsel .ir{margin-left:auto;min-height:40px;padding:.2em .8em;white-space:nowrap}
 :where(html.horiz.bajo) .panel.compacto .kgsel output{font-size:clamp(24px,7.5cqh,32px);line-height:1;min-width:2.6ch}
-:where(html.horiz.bajo) .panel.compacto .pn-esencial{margin:2px 0;font-size:13px;gap:.3em .55em}
-:where(html.horiz.bajo) .panel.compacto .pn-estilo button{min-height:30px;font-size:13px;padding:.15em .6em}
+:where(html.horiz.bajo) .panel.compacto .pn-esencial{margin:1px 0;font-size:13px;gap:.3em .55em}
+:where(html.horiz.bajo) .panel.compacto .pn-estilo button{min-height:40px;font-size:13px;padding:.15em .7em}
 :where(html.horiz.bajo) .panel.compacto .pn-estilo:not(.abierto) .pn-dif{display:none}      /* la dificultad, en la lista de los tres */
 :where(html.horiz.bajo) .panel.compacto .pn-estilo.fijo .pn-et{display:none}

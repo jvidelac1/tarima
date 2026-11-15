@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { leerDatos } from '../web/js/sim/data.js';
 import { Partida } from '../web/js/sim/match.js';
 import { Intento, simular } from '../web/js/sim/attempt.js';
-import { gestos, HUELLA_IA, PERSONALIDADES } from '../web/js/sim/ai.js';
+import { gestos, HUELLA_IA, PERSONALIDADES, envionRival } from '../web/js/sim/ai.js';
 import { recalcular, resumen } from '../web/js/sim/replay.js';
 import { chanceDe } from '../web/js/sim/entrenador.js';
 import { Azar, mezclar } from '../web/js/sim/fixed.js';
@@ -669,7 +669,7 @@ function lineaNombraToques(res, lev, I) {
     const reg = JSON.parse(JSON.stringify(p.reg)), rc = recalcular(reg, datos), t = resumen(p.tabla());
     ok(reg.envFijo === true, 'el registro no dice envFijo');
     ok(rc.ok && resumen(rc.tabla) === t, `estilo fijo, semilla ${semilla}: recalcular da ${rc.ok ? resumen(rc.tabla) : rc.error} y en vivo ${t}`);
-    for (const a of p.at) { const es = new Set(a.c.map(x => x.env)); ok(es.size <= 1, `semilla ${semilla}: ${a.id} cambió de estilo: ${[...es].join(', ')}`); if (a.c[0]) estilos[a.c[0].env]++; ok(p.estiloFijo(a.i) === (a.c[0]?.env ?? null), 'estiloFijo no es el del primer intento'); }
+    for (const a of p.at) { const es = new Set(a.c.map(x => x.env)); ok(es.size <= 1, `semilla ${semilla}: ${a.id} cambió de estilo: ${[...es].join(', ')}`); if (a.c[0]) estilos[a.c[0].env]++; if (a.ctrl === 'juego' && a.c[0]) ok(a.c[0].env === envionRival(a.id, a.f), `${a.id} no usa el estilo de su personalidad: ${a.c[0].env}`); ok(p.estiloFijo(a.i) === (a.c[0]?.env ?? null), 'estiloFijo no es el del primer intento'); }
     // el mismo registro con otro estilo en un intento que no es el primero no recalcula
     const propios = reg.llamados.filter(c => c.a === persona && c.lev === 'c' && c.fin === 'intento');
     if (propios.length > 1) { const g = JSON.parse(JSON.stringify(reg)), c = g.llamados.filter(x => x.a === persona && x.lev === 'c' && x.fin === 'intento')[1]; c.env = c.env === 'split' ? 'power' : 'split'; const r2 = recalcular(g, datos); falsos++; ok(!r2.ok && /estilo/.test(r2.error), `cambiar el estilo a mitad del dos tiempos recalculó: ${JSON.stringify(r2.ok ? 'ok' : r2.error)}`);

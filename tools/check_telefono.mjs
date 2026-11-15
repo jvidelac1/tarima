@@ -44,9 +44,10 @@ await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/`;
 fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT, { recursive: true });
 const problemas = [], notas = [], TAPA = [], PANEL = [], INFORMA = process.env.TAPA_INFORMA === '1';      // TAPA_INFORMA=1: solo informa (para medir un antes)
-// LIF-31: alto del panel del llamado con el detalle plegado (teléfono acostado, 'b'): ≤ 35 % del alto de la pantalla.
+// LIF-31: alto del panel del llamado con el detalle plegado (teléfono acostado, 'b'): ≤ 38 % del alto de la pantalla, y cada
+// botón a la vista del panel con 40 px de alto o más (el toque en el teléfono).
 // PANEL_INFORMA=1: solo informa (para medir un antes)
-const PANEL_TOPE = .35, PANEL_INFORMA = process.env.PANEL_INFORMA === '1';
+const PANEL_TOPE = .38, BOTON_MIN = 40, PANEL_INFORMA = process.env.PANEL_INFORMA === '1';
 const browser = await chromium.launch(launchOptions({ headed: HEADED }));
 
 const CASOS = [
@@ -209,7 +210,10 @@ async function correr(C) {
       if (s.panel) await av(450);
       const R = await revisar(clave.replace(/\|+/g, ' ').trim()); revisadas++;
       if (s.panel && s.pantalla === 'llamado' && R.panel && !C.vertical) {
-        const d = await J(() => { const pn = document.querySelector('#capa .panel'); return { detalle: !!pn?.querySelector('.pn-detalle:not([hidden])'), estilo: (pn?.querySelector('.pn-estilo')?.textContent || '').replace(/\s+/g, ' ').trim() }; });
+        const d = await J(() => { const pn = document.querySelector('#capa .panel'); return { detalle: !!pn?.querySelector('.pn-detalle:not([hidden])'), estilo: (pn?.querySelector('.pn-estilo')?.textContent || '').replace(/\s+/g, ' ').trim(),
+          botones: [...(pn?.querySelectorAll('button') || [])].filter(b => b.offsetParent && b.getBoundingClientRect().height > 0).map(b => ({ id: b.id || b.className || b.textContent.trim().slice(0, 12), alto: Math.round(b.getBoundingClientRect().height) })) }; });
+        const chicos = d.botones.filter(b => b.alto < BOTON_MIN); d.botonMin = Math.min(...d.botones.map(b => b.alto)); delete d.botones;
+        if (chicos.length && !PANEL_INFORMA) mal(`en el panel del llamado «${R.panel.titulo}» hay botones de menos de ${BOTON_MIN} px: ${chicos.map(b => `${b.id} ${b.alto}`).join(', ')}`);
         const pct = R.panel.alto / C.h; PANEL.push({ p: C.nombre, titulo: R.panel.titulo, alto: R.panel.alto, pct, ...d });
         if (!d.detalle && pct > PANEL_TOPE && ['iphone_844x390', 'android_667x375'].includes(C.nombre) && !PANEL_INFORMA) mal(`el panel del llamado «${R.panel.titulo}» ocupa ${Math.round(pct * 100)} % del alto con el detalle plegado (tope ${PANEL_TOPE * 100} %)`);
       }
@@ -226,6 +230,8 @@ async function correr(C) {
           else {
             probado.estilo = true; await av(50); const Re = await revisar('llamado eligiendo el estilo de envión'); await foto('llamado_estilo');
             PANEL.push({ p: C.nombre, titulo: (Re.panel?.titulo || '') + ' (eligiendo estilo)', alto: Re.panel?.alto, pct: (Re.panel?.alto || 0) / C.h, detalle: false });
+            const altos = await J(() => [...document.querySelectorAll('#capa .envion')].map(b => Math.round(b.getBoundingClientRect().height)));
+            if (altos.length !== 3 || altos.some(h => h < BOTON_MIN)) mal(`los tres estilos de envión: alturas ${altos.join(', ')} px (mínimo ${BOTON_MIN})`);
             if (!await pulsa('#capa .envion[data-env="split"]')) mal('no se pudo elegir el split con el dedo'); await av(50);
           }
         }
@@ -305,7 +311,7 @@ try { for (const C of CASOS.filter(c => !SOLO || c.nombre === SOLO)) await corre
 catch (e) { problemas.push('excepción de la prueba: ' + (e.stack || e.message)); }
 await browser.close(); server.close();
 if (TAPA.length) { console.log('\nCuánto tapa la interfaz al pesista (caja proyectada desde three; tools/tapa.mjs):'); for (const id of [...new Set(TAPA.map(x => x.p))]) { console.log(`  [${id}]`); for (const x of TAPA.filter(y => y.p === id)) console.log('    ' + fila(x.momento, x.x)); } fs.writeFileSync(path.join(OUT, 'tapa.json'), JSON.stringify(TAPA, null, 1)); }
-if (PANEL.length) { console.log('\nAlto del panel del llamado (con el detalle plegado salvo que diga «detalle»):'); for (const x of PANEL) console.log(`  [${x.p}] ${x.titulo}: ${x.alto} px · ${Math.round(x.pct * 100)} % del alto${x.detalle ? ' · detalle' : ''}${x.estilo ? ` · «${x.estilo}»` : ''}`); fs.writeFileSync(path.join(OUT, 'panel.json'), JSON.stringify(PANEL, null, 1)); }
+if (PANEL.length) { console.log('\nAlto del panel del llamado (con el detalle plegado salvo que diga «detalle»):'); for (const x of PANEL) console.log(`  [${x.p}] ${x.titulo}: ${x.alto} px · ${Math.round(x.pct * 100)} % del alto${x.botonMin ? ` · botón más bajo ${x.botonMin} px` : ''}${x.detalle ? ' · detalle' : ''}${x.estilo ? ` · «${x.estilo}»` : ''}`); fs.writeFileSync(path.join(OUT, 'panel.json'), JSON.stringify(PANEL, null, 1)); }
 for (const n of notas) console.log('nota: ' + n);
 if (problemas.length) { console.log(`\nFALLÓ (${problemas.length}):`); for (const p of problemas.slice(0, 40)) console.log('  ' + p); process.exit(1); }
 console.log('\nOK: teléfono de costado (dos tamaños y mano izquierda) y en vertical con el contenido girado, jugado con toques, campos de texto con el editor de arriba y dos dedos, sin cortes ni superposiciones');
