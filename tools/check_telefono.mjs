@@ -46,7 +46,7 @@ fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT, { recursive:
 const problemas = [], notas = [], TAPA = [], PANEL = [], INFORMA = process.env.TAPA_INFORMA === '1';      // TAPA_INFORMA=1: solo informa (para medir un antes)
 // LIF-31: alto del panel del llamado con el detalle plegado (teléfono acostado, 'b'): ≤ 35 % del alto de la pantalla.
 // PANEL_INFORMA=1: solo informa (para medir un antes)
-const PANEL_TOPE = .35, PANEL_INFORMA = process.env.PANEL_INFORMA !== '0';      // por ahora solo informa: el tope se exige con el panel nuevo
+const PANEL_TOPE = .35, PANEL_INFORMA = process.env.PANEL_INFORMA === '1';
 const browser = await chromium.launch(launchOptions({ headed: HEADED }));
 
 const CASOS = [
@@ -194,6 +194,7 @@ async function correr(C) {
     const x = await J(medirEnPagina).catch(e => ({ error: String(e) })); if (!x) return; if (x.error) { notas.push(`${tag} tapa ${momento}: ${x.error}`); return; }
     TAPA.push({ p: C.nombre, momento, x }); const r = revisarTapa(momento, x); if (r && !INFORMA) mal(r);
   };
+  const probado = { detalle: false, estilo: false };
   const vistas = new Set(), pantallas = new Set(); let firma = '', dedosProbados = false, bordesProbados = false, campoSolo = false, nIntentos = 0, ultToque = 0, hecho = '', revisadas = 0;
   const hasta = s => s.pantalla === 'fin' || (C.hastaIntentos && nIntentos >= C.hastaIntentos);
   for (let n = 0; n < 60000; n++) {
@@ -211,6 +212,24 @@ async function correr(C) {
         const d = await J(() => { const pn = document.querySelector('#capa .panel'); return { detalle: !!pn?.querySelector('.pn-detalle:not([hidden])'), estilo: (pn?.querySelector('.pn-estilo')?.textContent || '').replace(/\s+/g, ' ').trim() }; });
         const pct = R.panel.alto / C.h; PANEL.push({ p: C.nombre, titulo: R.panel.titulo, alto: R.panel.alto, pct, ...d });
         if (!d.detalle && pct > PANEL_TOPE && ['iphone_844x390', 'android_667x375'].includes(C.nombre) && !PANEL_INFORMA) mal(`el panel del llamado «${R.panel.titulo}» ocupa ${Math.round(pct * 100)} % del alto con el detalle plegado (tope ${PANEL_TOPE * 100} %)`);
+      }
+      // con el dedo: «Detalles» se abre y se cierra, y el estilo de envión se elige sin salir del panel; todo entra en la pantalla
+      if (s.panel && s.pantalla === 'llamado' && C.partida && R.panel) {
+        if (!probado.detalle && await pulsa('#btn-detalle')) {
+          probado.detalle = true; await av(50); const Rd = await revisar('llamado con el detalle abierto'); await foto('llamado_detalle');
+          PANEL.push({ p: C.nombre, titulo: Rd.panel?.titulo, alto: Rd.panel?.alto, pct: (Rd.panel?.alto || 0) / C.h, detalle: true });
+          await pulsa('#btn-detalle'); await av(50);
+          if (await J(() => !document.querySelector('#capa .pn-detalle')?.hidden)) mal('«Detalles» no se volvió a plegar');
+        }
+        if (!probado.estilo && /Dos tiempos · intento 1/.test(R.panel.titulo)) {
+          if (!await pulsa('#btn-estilo')) mal('en el primer dos tiempos no hay botón del estilo de envión');
+          else {
+            probado.estilo = true; await av(50); const Re = await revisar('llamado eligiendo el estilo de envión'); await foto('llamado_estilo');
+            PANEL.push({ p: C.nombre, titulo: (Re.panel?.titulo || '') + ' (eligiendo estilo)', alto: Re.panel?.alto, pct: (Re.panel?.alto || 0) / C.h, detalle: false });
+            if (!await pulsa('#capa .envion[data-env="split"]')) mal('no se pudo elegir el split con el dedo'); await av(50);
+          }
+        }
+        if (/Dos tiempos · intento [23]/.test(R.panel.titulo) && !await J(() => !!document.querySelector('#capa .pn-estilo.fijo') && !document.querySelector('#capa #btn-estilo'))) mal(`«${R.panel.titulo}»: el estilo de envión no se ve fijo`);
       }
       const sg = I && I.propio ? I.senal : null;
       if (s.panel && ['inicio', 'presentacion', 'apertura', 'intervalo'].includes(s.pantalla)) await tapa(s.pantalla);
@@ -270,6 +289,7 @@ async function correr(C) {
   if (C.dedos && !dedosProbados) mal('no se llegó a probar dos dedos a la vez');
   if (C.partida && !bordesProbados) mal('no se llegó a probar un toque en el borde');
   if (C.campos && !campoSolo) mal('no se llegó a probar un campo sin panel');
+  if (C.partida && (!probado.detalle || !probado.estilo)) mal(`no se llegó a probar ${!probado.detalle ? '«Detalles»' : 'el estilo de envión'} en el panel del llamado`);
   // la última pantalla (el podio con sus botones) también se revisa
   if (fin.s.pantalla === 'fin') { await av(3000); await revisar('fin (podio con botones)'); }
   if (C.vertical) {      // el teléfono gira de verdad: orientación real, sin girar el contenido

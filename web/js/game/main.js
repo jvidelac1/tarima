@@ -266,6 +266,8 @@ const kilosHTML = (kg, lo, hi, fijo = false, extra = '') => {
   const b = (id, d, txt, clave, dis) => `<button id="${id}" class="kg" data-d="${d}" ${dis ? 'disabled' : ''} aria-label="${esc(t(clave))}">${txt}</button>`;
   return `<div class="fila kgsel">${b('kg-menos5', -5, '−5', 'kilos.menos5', fijo || kg <= lo)}${b('kg-menos', -1, '−1', 'kilos.menos1', fijo || kg <= lo)}<output id="kg-val">${kg}</output><span>kg</span>${b('kg-mas', 1, '+1', 'kilos.mas1', fijo || kg >= hi)}${b('kg-mas5', 5, '+5', 'kilos.mas5', fijo || kg >= hi)}${extra}</div>`;
 };
+/** Candado del estilo de envión fijo (LIF-43): dibujo chico, sin emoji (el texto «fijo» va al lado). */
+const CANDADO = '<svg class="candado" viewBox="0 0 16 16" width="1em" height="1em" aria-hidden="true"><rect x="3" y="7" width="10" height="8" rx="1.5" fill="currentColor"/><path d="M5 7V5a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
 const masKilos = (kg, d, lo, hi) => Math.max(lo, Math.min(hi, kg + d));
 /** Selector ES · EN (bienvenida y pausa). Cambia sin recargar: la pantalla actual se vuelve a pintar. */
 const idiomasHTML = (flota = false) => `<div class="idiomas${flota ? ' flota' : ''}" role="group" aria-label="${esc(t('app.idioma'))}">${IDIOMAS.map(l => `<button class="idi" data-lang="${l}" lang="${l}" aria-pressed="${l === idiomaActual()}">${l.toUpperCase()}</button>`).join('')}</div>`;
@@ -1016,7 +1018,9 @@ function encuadreLibre() {
 
 /** Panel único del llamado propio: kilos (fichas y ajuste fino), envión, qué hace falta, frase del entrenador y Confirmar. */
 function panelLlamado(p, L, t0, alConfirmar, corre = true) {
-  const a = p.at[L.a], min = p.minimo(L.a), tv = p.techoVisible(L.a, L.lev, false), facil = p.cfg.ctl !== 'c', uno = esU(p.cfg.ctl), barra = p.cfg.ctl === 'b', S = { kg: L.kg, env: guardado.get(`tarima.env.${p.cfg.ctl}.${a.id}`) || (uno ? cuerpoDe(a.id).casa : facil ? 'split' : a.f.enviones[0]), mas: false, dt: p.cfg.ctl === 'f' && L.lev === 'c' && !guardado.get('tarima.dostiempos'), seguro: false };
+  const a = p.at[L.a], min = p.minimo(L.a), tv = p.techoVisible(L.a, L.lev, false), facil = p.cfg.ctl !== 'c', uno = esU(p.cfg.ctl), barra = p.cfg.ctl === 'b', envFijo = L.lev === 'c' ? p.estiloFijo(L.a) : null, envGuardado = guardado.get(`tarima.env.${p.cfg.ctl}.${a.id}`),
+    // LIF-43: el estilo de envión queda fijo desde el primer dos tiempos; antes, el último que eligió o el que propone el entrenador (split)
+    S = { kg: L.kg, env: envFijo || (['split', 'power', 'squat'].includes(envGuardado) ? envGuardado : null) || (uno ? cuerpoDe(a.id).casa : facil ? 'split' : a.f.enviones[0]), mas: false, elige: false, detalle: guardado.get('tarima.panel.detalle') === '1', dt: p.cfg.ctl === 'f' && L.lev === 'c' && !guardado.get('tarima.dostiempos'), seguro: false };
   // 'u': el panel trae puesto el peso del entrenador (entrenador.js: la chance de cada peso y La cuenta), no el plan fijo
   // si ya cambió los kilos en este intento (y quedó desplazado), el panel respeta su peso y no lo pisa el del entrenador
   const sug = uno && a.cambios === 0 ? sugerencia(p, L.a, L.lev, S.env) : null; if (sug !== null && sug >= min) S.kg = sug;
@@ -1058,11 +1062,28 @@ function panelLlamado(p, L, t0, alConfirmar, corre = true) {
     const garra = barra ? '' : `<p class="chica garra">${t(a.garraUno[L.lev] ? 'llamado.u_garra_si' : 'llamado.u_garra_no')}</p>`;
     // después de una caída: la línea de por qué y lo que da el mismo peso (la barra no baja)
     const mismo = E.antes ? `<p class="chica antes">${esc(E.antes)} ${esc(t(llega ? 'llamado.u_mismo' : 'llamado.u_mismo_no', { kg: S.kg, discos: discos(Math.abs(pr.fin)) }))}</p>` : '';
-    const envion = L.lev === 'c' ? `<div class="fila"><span>${t('envion.titulo')}</span>${Object.keys(ENVIONES).map(e => { const q = llegas(S.kg, e); return `<button class="envion" data-env="${e}" aria-pressed="${e === S.env}">${ENVIONES[e]}${barra ? ` · ${t('envion.dif.' + e)}` : ''} ${discosHTML(q)}</button>`; }).join('')}</div>` : '';
-    return `${kilos}${linea}${verdeHTML(S.kg)}${mismo}${garra}${cuentaU ? `<p class="cuenta">${cuentaU}</p>` : ''}${explica ? `<p class="que">${explica}</p>` : ''}
-      ${barra ? (T || !E.primeraFinal || L.n > 1 ? '' : `<p class="chica">${t('llamado.u_teclas')}</p>`) : `<p class="que reloj"><b>${t('llamado.u_sin_apuro')}</b>${T ? '' : ` <span class="chica">(${t('llamado.u_teclas')})</span>`}</p>`}
+    // LIF-31: a la vista solo lo esencial (kilos ±, levantar, la dificultad y «X de 10», y en el dos tiempos el estilo de envión
+    // en un control compacto); el resto (el % del RM, el verde de cada barrita, el cansancio, cómo ganar, avisos) se despliega
+    // con «Detalles». Lo esencial de 'b' es la dificultad y la chance; en 'u', la línea de lo que sobra o falta
+    const esencial = barra ? `<b class="dif">${esc(t('rm.dif.' + dif))}</b><b class="chance">${esc(t('llamado.u_chance', { n: n10 }))}</b>` : linea;
+    const rmPct = barra ? `<p class="rm-linea dif-${dif}" title="${esc(t('rm.nota'))}"><span>${esc(t('rm.linea', { pct: Math.round(S.kg * 100 / rm), kg: rm }))}</span></p>` : '';
+    const detalle = `${rmPct}${verdeHTML(S.kg)}${mismo}${garra}${cuentaU ? `<p class="cuenta">${cuentaU}</p>` : ''}${explica ? `<p class="que">${explica}</p>` : ''}
+      ${barra ? '' : `<p class="que reloj"><b>${t('llamado.u_sin_apuro')}</b></p>`}
       ${S.kg !== L.kg ? `<p class="chica${S.kg === sug ? ' sugiere' : ''}">${t(S.kg === sug ? 'llamado.u_sugiere' : 'llamado.cambio', { kg: L.kg })}</p>` : ''}${fijo ? `<p class="chica">${t('llamado.fijo')}</p>` : ''}
-      ${S.mas ? `${envion}<p class="chica">${t('llamado.pedido', { kg: L.kg, min, c: a.cambios })}</p>` : ''}${L.lev === 'c' ? `<div class="fila"><button id="btn-mas" aria-expanded="${!!S.mas}">${t(S.mas ? 'llamado.menos_opciones' : 'llamado.mas_opciones')}</button></div>` : ''}`;
+      ${L.lev === 'c' && !envFijo ? `<p class="chica">${esc(t('jerk.regla'))}</p>` : ''}<p class="chica">${t('llamado.pedido', { kg: L.kg, min, c: a.cambios })}</p>`;
+    const teclas = T || !E.primeraFinal || L.n > 1 ? '' : `<p class="chica teclas">${t('llamado.u_teclas')}</p>`;
+    return `${kilos}<div class="pn-esencial dif-${barra ? dif : 'u'}">${esencial}${estiloHTML(e => barra ? '' : ` ${discosHTML(llegas(S.kg, e))}`)}</div>${teclas}
+      <div class="pn-detalle"${S.detalle ? '' : ' hidden'}>${detalle}</div>`;
+  };
+  // LIF-31 y LIF-43: el estilo de envión en un control compacto («Estilo de envión: Split · fácil ▾») que se abre en una fila
+  // de tres; desde el primer dos tiempos queda fijo, con candado
+  const nomEstilo = e => `${ENVIONES[e]} · ${t('jerk.dif.' + e)}`;
+  const estiloHTML = (extra = () => '') => {
+    if (L.lev !== 'c') return '';
+    const partes = e => `<span class="pn-et">${esc(t('jerk.titulo'))}</span> <b>${esc(ENVIONES[e])}</b><span class="pn-dif"> · ${esc(t('jerk.dif.' + e))}</span>`;
+    if (envFijo) return `<span class="pn-estilo fijo" title="${esc(t('jerk.fijo_nota'))}">${CANDADO}${partes(envFijo)} <em>${esc(t('jerk.fijo'))}</em></span>`;
+    if (S.elige) return `<span class="pn-estilo abierto" role="group" aria-label="${esc(t('jerk.titulo'))}"><span class="pn-et">${esc(t('jerk.titulo'))}</span>${Object.keys(ENVIONES).map(e => `<button class="envion" data-env="${e}" aria-pressed="${e === S.env}">${esc(nomEstilo(e))}${extra(e)}</button>`).join('')}<em class="pn-regla">${esc(t('jerk.regla'))}</em></span>`;
+    return `<span class="pn-estilo"><button id="btn-estilo" aria-expanded="false" title="${esc(t('jerk.regla'))}">${partes(S.env)} <i aria-hidden="true">▾</i></button></span>`;
   };
   const pinta = () => {
     const ms = corre ? reloj.ahora() - t0 : 0, fijo = a.cambios >= 2 || ms > L.reloj - RELOJ.cambiosHasta, T = tactil();
@@ -1072,7 +1093,7 @@ function panelLlamado(p, L, t0, alConfirmar, corre = true) {
     const noLlega = uno && chance(S.kg) < 5, txtConf = !uno ? t('llamado.confirmar') : S.seguro && noLlega ? t('llamado.u_seguro', { kg: S.kg, n: chance(S.kg) }) : t(T ? 'llamado.u_confirmar' : 'llamado.u_confirmar_tecla', { kg: S.kg });
     const kilos = kilosHTML(S.kg, min, KG_MAX, fijo, `<button class="ir" id="btn-confirmar">${esc(txtConf)}</button>`).replace('id="kg-menos"', `id="kg-menos"${menosTit}`);
     const atajos = `<div class="fila">${facil ? `<span>${t('ficha.titulo')}</span>` : ''}${Object.entries(fichas).map(([k, v]) => `<button class="ficha" data-kg="${v}" ${fijo ? 'disabled' : ''} aria-pressed="${v === S.kg}">${t('ficha.' + k)} ${v}</button>`).join('')}</div>`;
-    const envion = L.lev === 'c' ? `<div class="fila"><span>${t('envion.titulo')}</span>${Object.keys(ENVIONES).map(e => `<button class="envion" data-env="${e}" aria-pressed="${e === S.env}">${ENVIONES[e]}${a.f.enviones.includes(e) ? '' : ' *'}</button>`).join('')}</div>` : '';
+    const envion = L.lev === 'c' ? `<div class="fila"><span>${t('envion.titulo')}</span>${Object.keys(ENVIONES).map(e => `<button class="envion" data-env="${e}" aria-pressed="${e === S.env}"${envFijo && e !== envFijo ? ' disabled' : ''}>${ENVIONES[e]}${a.f.enviones.includes(e) ? '' : ' *'}</button>`).join('')}${envFijo ? `<span class="pn-estilo fijo" title="${esc(t('jerk.fijo_nota'))}">${CANDADO}<em>${esc(t('jerk.fijo'))}</em></span>` : ''}</div>` : '';
     const noDomina = L.lev === 'c' && !a.f.enviones.includes(S.env) ? ` · ${t('envion.no_domina')}` : '';
     const reloj0 = corre ? `<b>${t('llamado.corre')}</b>` : `<b>${t('llamado.sin_apuro', { tactil: T })}</b>`;
     const pedido = t('llamado.pedido', { kg: L.kg, min, c: a.cambios });
@@ -1087,16 +1108,22 @@ function panelLlamado(p, L, t0, alConfirmar, corre = true) {
       : `${kilos}${antes}${atajos}${envion}<p class="frase">${frase(S.kg)}</p><p class="cuenta">${cuenta}</p><p class="que">${reloj0}${T ? '' : ` <span class="chica">(${t('llamado.teclas')})</span>`}</p>
         <p class="chica">${pedido}${fijo ? ' ' + t('llamado.cerrados') : ''}${S.kg !== L.kg ? ` · <b>${t('llamado.cambio_pro')}</b>` : ''}${noDomina}</p>`;
     // 'u' y 'b': sin el selector de idioma (está en la pausa y en la bienvenida): un panel, una decisión
-    const pn = capa.poner(`${uno ? '' : idiomasHTML(true)}<h2>${esc(t('llamado.titulo', { quien: quien(a), lev: t('lev.' + L.lev), n: L.n }))}</h2>${cuerpo}`, 'chico abajo lado');      // al costado: no tapa al pesista
+    // en el panel compacto el título va sin el nombre (el tablero ya dice quién levanta): entra en una línea con «Detalles»
+    const titulo = `<h2>${esc(t(uno ? 'panel.titulo' : 'llamado.titulo', { quien: quien(a), lev: t('lev.' + L.lev), n: L.n }))}</h2>`;
+    const cab = uno ? `<div class="pn-cab">${titulo}<button id="btn-detalle" class="pn-mas" aria-expanded="${S.detalle}">${esc(t(S.detalle ? 'panel.menos' : 'panel.mas'))} <i aria-hidden="true">${S.detalle ? '▴' : '▾'}</i></button></div>` : titulo;
+    const pn = capa.poner(`${uno ? '' : idiomasHTML(true)}${cab}${cuerpo}`, `chico abajo lado llamado${uno ? ' compacto' : ''}`);      // al costado: no tapa al pesista
     const al = (b, fn) => { b.onclick = () => { if (activa(pn)) fn(); }; };
     pn.querySelectorAll('.kg').forEach(b => al(b, () => { S.kg = masKilos(S.kg, +b.dataset.d, min, KG_MAX); S.seguro = false; pinta(); }));
     pn.querySelectorAll('.ficha').forEach(b => al(b, () => { S.kg = +b.dataset.kg; pinta(); }));
-    pn.querySelectorAll('.envion').forEach(b => al(b, () => { S.env = b.dataset.env; pinta(); }));
+    // al elegir un estilo, el foco vuelve a «levantar» (Espacio levanta)
+    pn.querySelectorAll('.envion').forEach(b => al(b, () => { if (envFijo) return; S.env = b.dataset.env; const cerro = S.elige; S.elige = false; const q = pinta(); if (cerro) q.querySelector('#btn-confirmar')?.focus({ preventScroll: true }); }));
+    const est = pn.querySelector('#btn-estilo'); if (est) al(est, () => { S.elige = true; pinta().querySelector('.envion[aria-pressed=true]')?.focus({ preventScroll: true }); });
+    const det = pn.querySelector('#btn-detalle'); if (det) al(det, () => { S.detalle = !S.detalle; guardado.set('tarima.panel.detalle', S.detalle ? '1' : '0'); pinta(); });
     const mas = pn.querySelector('#btn-mas'); if (mas) al(mas, () => { S.mas = !S.mas; pinta(); });
     al(pn.querySelector('#btn-confirmar'), () => {
       sonido.activar();
       if (uno && E.primeraFinal && !S.seguro && chance(S.kg) < 5) { S.seguro = true; bloquear(pinta(), true); return; }      // el segundo «¿Seguro?» también espera 400 ms
-      guardado.set(`tarima.env.${p.cfg.ctl}.${a.id}`, S.env); E.repintar = null; alConfirmar(S);
+      if (L.lev === 'c' && !envFijo) guardado.set(`tarima.env.${p.cfg.ctl}.${a.id}`, S.env); E.repintar = null; alConfirmar(S);
     });
     E.repintar = () => pinta();
     return pn;
@@ -1149,7 +1176,7 @@ async function llamadoPropio(p, L) {
     E.todavias = 0; E.guardados = 0; E.fotoToques = toques.foto();
     corrida = await correrIntento(ctx, { a, lev: L.lev, env, conf0: ms, t0, guia: primerDT ? EN_HOMBROS : null });
     if (primerDT && corrida.m.movs.length > 1) guardado.set('tarima.dostiempos', '1');
-  } else { env = L.lev === 'c' ? a.f.enviones[0] : undefined; ctx = p.contexto(env); corrida = { conf: null, ent: [], res: simular(ctx, null, []).res, grab: [], m: { movs: [] } }; }
+  } else { env = L.lev === 'c' ? p.estiloFijo(L.a) ?? a.f.enviones[0] : undefined; ctx = p.contexto(env); corrida = { conf: null, ent: [], res: simular(ctx, null, []).res, grab: [], m: { movs: [] } }; }
   TB.congelado = true; const et = p.llamado.et, x = p.resolver({ conf: corrida.conf, env, ent: corrida.ent });
   if (JSON.stringify(x.res) !== JSON.stringify(corrida.res)) E.errores.push('el resultado mostrado no coincide con el recalculado');
   const pal = k => (uno ? null : (x.res.gestos || []).filter(g => g.pal === k).length), U = x.res.uno;
@@ -1351,7 +1378,7 @@ async function partida(cfg) {
   const n = (+guardado.get('tarima.jugadas') || 0) + 1, pase = await pedirPase(cfg, n, 'bienvenida');
   if (!pase) return 'inicio';
   E.turnoDe = null; E.pase = pase; E.finalN = pase.n ?? n; E.finalIniciada = false; E.tFinal0 = performance.now(); E.antes = null; E.primeraFinal = n === 1; E.rivalesSeguidos = 0; E.casi = null;
-  const p = E.p = new Partida(datos, { semilla, ia: HUELLA_IA, nivel: cfg.nivel, cal: cfg.cal, primera: cfg.primera, ctl: cfg.ctl, ...(cfg.ctl === 'b' && cfg.dif !== 'facil' ? { dif: cfg.dif } : {}), tactil: (cfg.ctl === 'f' || esU(cfg.ctl)) && tactil(), atletas: IDS.map((id, i) => ({ id, ctrl: i === E.yo ? 'persona' : 'juego' })) });
+  const p = E.p = new Partida(datos, { semilla, ia: HUELLA_IA, envFijo: true, nivel: cfg.nivel, cal: cfg.cal, primera: cfg.primera, ctl: cfg.ctl, ...(cfg.ctl === 'b' && cfg.dif !== 'facil' ? { dif: cfg.dif } : {}), tactil: (cfg.ctl === 'f' || esU(cfg.ctl)) && tactil(), atletas: IDS.map((id, i) => ({ id, ctrl: i === E.yo ? 'persona' : 'juego' })) });
   await presentacion(p, cfg, errMedio, n === 1); p.empezar();
   while (p.fase !== 'fin') {
     if (p.fase === 'intervalo') {

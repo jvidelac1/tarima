@@ -660,4 +660,12 @@ export default {
   'rm.nota': 'Fácil: sube 9 o 10 de cada 10 veces · Medio: 7 u 8 · Difícil: 4 a 6 · Muy difícil: 3 o menos.',
   'rm.tarjeta': 'RM: arranque {s} · dos tiempos {c}',
   'glosario.rm.t': 'RM', 'glosario.rm.d': 'El máximo de tu pesista en cada levantamiento. Al elegir los kilos, el panel dice qué porcentaje de tu RM es y si es fácil, medio, difícil o muy difícil.',
+  // LIF-31 y LIF-43: panel del llamado plegable y estilo de envión fijo toda la competencia
+  'panel.titulo': '{lev} · intento {n} de 3',
+  'panel.mas': 'Detalles', 'panel.menos': 'Ocultar',
+  'jerk.titulo': 'Estilo de envión:',
+  'jerk.dif.split': 'fácil', 'jerk.dif.power': 'medio', 'jerk.dif.squat': 'difícil',
+  'jerk.fijo': 'fijo',
+  'jerk.regla': 'Queda fijo para los 3 intentos.',
+  'jerk.fijo_nota': 'Lo elegiste en tu primer dos tiempos: queda para los 3 intentos.',
 };
