@@ -24,6 +24,8 @@ import { sugerencia, chanceDe } from '../web/js/sim/entrenador.js';
 import { jugarUno, datos, ATL, BOTS_U } from './uno_bots.mjs';
 
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
+// orden de los turnos (match.js → TURNOS): por defecto 'rondas', como el juego; --orden=oficial o --orden=viejo (sin turnos)
+const ORDEN = arg('orden') || 'rondas', TURNOS_CFG = ORDEN === 'viejo' ? {} : { turnos: ORDEN };
 const N = +(arg('n') || 200);
 const NOVATO = { ...BOTS_U.reactivo, lag: 60 };
 const TIPO = { ventura: 'Compacto', brenner: 'Largo', marangi: 'Potente' };
@@ -38,7 +40,7 @@ const ESTRATEGIAS = {
 
 function final(id, nivel, estrategia, k) {
   const yo = ATL.indexOf(id), semilla = mezclar(k, 5150, yo, nivel === 'normal' ? 1 : 0);
-  const p = new Partida(datos, { semilla, nivel, cal: 0, primera: false, ctl: 'u', tactil: true, ia: HUELLA_IA, atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
+  const p = new Partida(datos, { semilla, nivel, cal: 0, primera: false, ctl: 'u', tactil: true, ia: HUELLA_IA, ...TURNOS_CFG, atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
   const f = datos.atletas[id], elegir = ESTRATEGIAS[estrategia], cuerpo = cuerpoDe(id), out = { barras: 0, caidas: 0, tramo: {} };
   for (const lev of ['s', 'c']) { const [lo, hi] = p.rangoApertura(yo, lev); p.abrir(yo, lev, Math.max(lo, Math.min(hi, Math.round(f.techo[lev] * .9)))); }
   p.empezar();
@@ -66,7 +68,7 @@ for (const nivel of ['amistoso', 'normal']) for (const id of ATL) for (const e o
   ((R[nivel] ||= {})[id] ||= {})[e] = A;
 }
 const pc = (a, b) => (b ? a * 100 / b : 0), f0 = x => x.toFixed(0).padStart(3);
-console.log(`Pesistas y decisiones en 'u' · ${N} finales por pesista, estrategia y nivel de rivales (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
+console.log(`Pesistas y decisiones en 'u' · orden ${ORDEN} · ${N} finales por pesista, estrategia y nivel de rivales (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
 for (const nivel of ['amistoso', 'normal']) {
   console.log(`Rivales ${nivel}: oro % · barras caídas % · sin total % · total medio (kg)`);
   for (const id of ATL) console.log(`   ${TIPO[id].padEnd(8)} ${Object.entries(R[nivel][id]).map(([e, A]) => `${e} ${f0(pc(A.oro, A.n))} · ${f0(pc(A.caidas, A.barras))} · ${f0(pc(A.sinTotal, A.n))} · ${(A.total / Math.max(1, A.n - A.sinTotal)).toFixed(0)}`).join('  |  ')}`);

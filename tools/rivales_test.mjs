@@ -30,6 +30,8 @@ import * as AI from '../web/js/sim/ai.js';
 import { jugarBarra, PERFILES, datos, ATL, NOMBRE } from './barra_bots.mjs';
 
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
+// orden de los turnos (match.js → TURNOS): por defecto 'rondas', como el juego; --orden=oficial o --orden=viejo (sin turnos)
+const ORDEN = arg('orden') || 'rondas', TURNOS_CFG = ORDEN === 'viejo' ? {} : { turnos: ORDEN };
 const N = +(arg('n') || 500), IA = arg('ia') || (AI.HUELLA_IA ? 'nuevo' : 'viejo'), QUIEN = arg('jugador') || 'novato';
 const SLOTS = ['s1', 's2', 's3', 'c1', 'c2', 'c3'], SOLO = arg('estrategias') ? arg('estrategias').split(',') : null;
 
@@ -44,7 +46,7 @@ const ESTRATEGIAS = {
 /** Una final: devuelve los kilos de cada intento de cada pesista, los cambios de los rivales y la tabla. */
 export function final({ yo, nivel, estrategia, k, ia, B }) {
   const semilla = mezclar(k, 7310, yo, nivel === 'normal' ? 1 : nivel === 'dificil' ? 2 : 0), E = ESTRATEGIAS[estrategia];
-  const p = new Partida(datos, { semilla, nivel, cal: 0, primera: false, ctl: 'b', tactil: true, ...(ia ? { ia } : {}), atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
+  const p = new Partida(datos, { semilla, nivel, cal: 0, primera: false, ctl: 'b', tactil: true, ...(ia ? { ia } : {}), ...TURNOS_CFG, atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
   const f = datos.atletas[ATL[yo]];
   for (const lev of ['s', 'c']) { const [lo, hi] = p.rangoApertura(yo, lev); p.abrir(yo, lev, Math.max(lo, Math.min(hi, Math.round(f.techo[lev] * E.abre(mezclar(semilla, lev === 's' ? 1 : 2)))))); }
   const aperturas = p.at.map(a => ({ s: a.decl.s, c: a.decl.c }));
@@ -80,7 +82,7 @@ function dependencia(ia, n) {
   };
   for (const nivel of ['amistoso', 'normal']) for (let k = 0; k < n; k++) {
     const yo = k % 3, semilla = mezclar(k, 999, yo, nivel === 'normal' ? 1 : 0);
-    const p = new Partida(datos, { semilla, nivel, cal: 0, primera: false, ctl: 'b', tactil: true, ...(ia ? { ia } : {}), atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
+    const p = new Partida(datos, { semilla, nivel, cal: 0, primera: false, ctl: 'b', tactil: true, ...(ia ? { ia } : {}), ...TURNOS_CFG, atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
     for (const lev of ['s', 'c']) p.abrir(yo, lev, Math.round(datos.atletas[ATL[yo]].techo[lev] * .9));
     p.empezar();
     for (let g = 0; p.fase !== 'fin' && g < 90; g++) {
@@ -156,7 +158,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const t0 = Date.now(), ia = IA === 'nuevo' ? AI.HUELLA_IA : undefined;
   if (IA === 'nuevo' && !ia) { console.log('ai.js no tiene HUELLA_IA: no hay rivales nuevos'); process.exit(1); }
   const R = medir(ia), dep = dependencia(ia, Math.max(30, Math.round(N / 5))), f2 = x => x.toFixed(2).padStart(5), pc = x => (x * 100).toFixed(0).padStart(3) + ' %';
-  console.log(`Rivales ${IA}${ia ? ` (huella ${ia})` : ''} · ${N} finales por estrategia y nivel (el jugador maneja a los tres por turno) · jugador ${QUIEN} (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
+  console.log(`Rivales ${IA}${ia ? ` (huella ${ia})` : ''} · orden ${ORDEN} · ${N} finales por estrategia y nivel (el jugador maneja a los tres por turno) · jugador ${QUIEN} (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
   console.log('Correlación de kilos jugador → rival (centrada por intento) · intentos a ±1 kg (por azar) y distancia media en kg · cambios del rival a lo del jugador o +1 · oro del jugador · rivales sin marca');
   for (const K of Object.keys(R.corr)) {
     console.log(`  ${K.padEnd(19)} r ${ATL.map(id => `${NOMBRE[id]} ${f2(R.corr[K][id])}`).join(' ')}  · ±1 ${ATL.map(id => `${pc(R.coincide[K][id].si)} (${pc(R.coincide[K][id].base)}) ${R.coincide[K][id].dif.toFixed(1)} kg`).join(' ')}  · espejo ${pc(R.espejo[K].pct)} de ${R.espejo[K].n} (${R.espejo[K].porFinal.toFixed(2)} por final)  · oro ${pc(R.oro[K])}  · sin marca ${pc(R.sinMarca[K])}`);

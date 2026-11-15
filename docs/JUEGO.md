@@ -799,10 +799,12 @@ Las reglas siguen las del deporte real, adaptadas de memoria y sin cotejar contr
 | Regla | Decisión |
 |---|---|
 | Intentos | Tres de arranque, intervalo, tres de dos tiempos |
-| Orden de salida | Sale primero quien pidió menos kilos. A igual peso, quien tiene menor número de intento. Después, quien hizo antes su intento anterior. Después, el dorsal más bajo |
+| Orden de salida (por rondas, por defecto desde el 15-nov, LIF-3) | En cada ronda los tres levantan una vez. Dentro de la ronda abre quien pidió menos kilos; a igual peso, quien lo pidió primero, y después el dorsal (número de sorteo). La barra nunca baja dentro de la ronda: todo pedido o cambio de quien todavía no levantó en esa ronda tiene como mínimo lo cargado, y como se sale de menor a mayor nadie queda por debajo. Entre una ronda y otra sí puede bajar. Con 3 pesistas, el jugador nunca espera más de 4 turnos ajenos seguidos |
+| Orden de salida (oficial: opción «Oficial» en Opciones) | Sale primero quien pidió menos kilos. A igual peso, quien tiene menor número de intento. Después, quien hizo antes su intento anterior. Después, el dorsal más bajo |
 | La barra nunca baja | No se puede pedir menos de lo que ya está cargado |
 | Progresión | Tras un válido, al menos 1 kg más. Tras un nulo, el mismo peso o más |
 | Declaración | Automática al terminar cada intento: el plan del entrenador (sección 6.3) |
+| Cambios antes del turno (15-nov, LIF-4) | Mientras levanta otro, el jugador puede cambiar su pedido con «Cambiar» (debajo del tablero; tecla C): solo hacia arriba, hasta dos veces por intento contando los del panel de su llamado. Los rivales cambian al cierre de cada intento ajeno, según su personalidad, también solo hacia arriba; el tablero lo dice («Brenner cambia a 167») |
 | Cambios | Dos por intento, hacia arriba o hacia abajo, nunca por debajo de la barra ni del mínimo propio. El jugador los hace en el panel de su llamado, hasta que su reloj baja de 0:15. Los rivales los hacen al cierre de cada intento ajeno. Si un cambio altera el orden, sale el otro; cuando vuelven a llamar al primero, su reloj arranca de nuevo |
 | Reloj | 0:30 desde el llamado; 0:45 si el pesista se sigue a sí mismo. Aviso a 0:10. Se detiene cuando la barra pasa la rodilla. Si llega a cero antes, intento nulo |
 | Jueces | Tres luces, mayoría simple. Sin revisión por video |
@@ -1225,6 +1227,8 @@ No se tocan en la etapa 1: `blender/`, `web/models/`, `web/data/poses.json`, `we
   "cal": 40,               // corrección de atraso en ms (0 a 100), fija para toda la partida
   "nivel": "normal",
   "ctl": "f",              // nivel de control de la persona: "f" Fácil, "c" Clásico; si falta, Clásico (CONTROLES.md, sección 4)
+  "orden": "rondas",        // 15-nov (LIF-3): "rondas" u "oficial", con "turnos" = huella de sus reglas (match.js → TURNOS);
+  "turnos": "3b08cd58",     //   sin los dos, el orden oficial de siempre y sin pedidos antes del turno
   "atletas": [ { "id": "ventura", "ctrl": "persona", "jugador": "u_123" },
                { "id": "brenner", "ctrl": "juego" },
                { "id": "marangi", "ctrl": "juego" } ],
@@ -1244,6 +1248,7 @@ No se tocan en la etapa 1: `blender/`, `web/models/`, `web/data/poses.json`, `we
 - Resultado, luces, causa del fallo y tabla **nunca viajan**: se recalculan.
 - Los llamados de los rivales figuran solo con pesista, levantamiento y número. Sus kilos, sus cambios y sus gestos los genera el núcleo, y el recálculo verifica que el orden coincida.
 - La declaración automática no se registra: sale del reglamento.
+- Con `orden`, un cambio de pedido de la persona antes de su turno (LIF-4) va entre los llamados como `{ "a": 0, "lev": "s", "pide": 167 }`: solo hacia arriba, nunca por debajo de su mínimo, y con los cambios de su llamado, dos por intento.
 - En Fácil, `ent` es la **salida de la capa de traducción** (lo que recibió el núcleo, incluida la bajada automática), no las teclas. `ctl` entra solo en el contexto de la persona: los rivales juegan siempre con las reglas de Clásico. No se subió la versión de reglas; con servidor hay que subirla y separar la tabla por `ctl`.
 
 **Semillas.** De la semilla salen la forma del día, los umbrales de los jueces, el instante de la chicharra y los gestos de los rivales.

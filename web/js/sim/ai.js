@@ -171,14 +171,10 @@ export function decidirPlan(p, i, propio) {
       else if (pl.estilo === 'arriesga') { let k = null; for (let x = min; x <= al(P.oro) && k === null; x++) if (p.puestoSi(i, 'c', x) === 1) k = x; if (k !== null && k > kg) { kg = k; por = 'tabla'; momento = 'todo'; } }
     }
   }
-  // 3. con orden de turnos (match.js → TURNOS, LIF-4): en el tercer arranque, el que hace cuentas (si no se guarda) y el que
-  // arriesga responden a la tabla del arranque al cierre de un intento ajeno: si no van primeros, cambian a lo justo para
-  // subir un puesto (el calculador, hasta su umbral) o para quedar primeros (el que arriesga, hasta su meta + 1,5 %). Lee
-  // marcas, no lo que pidió otro; Ventura no cambia nunca en el arranque.
-  if (p.cfg.turnos && !propio && lev === 's' && n === 3 && tiene && ((pl.estilo === 'calcula' && !pl.guarda) || pl.estilo === 'arriesga')) {
-    const ahora = p.puestoSi(i, 's', 0), meta = pl.estilo === 'calcula' ? ahora - 1 : 1, hasta = al(pl.estilo === 'calcula' ? pl.umbral : pl.meta3 + 15);
-    if (ahora > 1) for (let k = min; k <= hasta; k++) if (p.puestoSi(i, 's', k) <= meta) { if (k > a.decl[lev]) { kg = k; por = 'tabla'; momento = pl.estilo === 'calcula' ? 'pasar' : 'todo'; } break; }
-  }
+  // Con orden de turnos (match.js → TURNOS, LIF-4) los cambios al cierre de un intento ajeno son los mismos de la tabla del
+  // dos tiempos, pero solo hacia arriba (el «asegura» de Brenner, que baja, no se hace). Se probó que el calculador y el que
+  // arriesga cambiaran también en el tercer arranque al ir atrás: con «lo justo para pasar» o con su propio número, sus
+  // cambios caían en la marca o el pedido del jugador ±1 entre 0,16 y 0,29 veces por final (meta ≤ 0,15): se descartó.
   kg = Math.max(kg, min);
   if (!propio && (por !== 'tabla' || kg === a.decl[lev] || (p.cfg.turnos && kg < a.decl[lev]))) return null;      // con turnos, los cambios solo suben
   pl.momento[clave] = momento;
