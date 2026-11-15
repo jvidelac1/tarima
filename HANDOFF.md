@@ -1339,6 +1339,46 @@ suben (llamado 32–39, veredicto 10–30) por el tablero.
 datos (`rival_salteado`) cuántos miran a los rivales enteros. El RM es el de la ficha: la «forma del día» y el cansancio no lo
 cambian (sí la chance y la dificultad). Clásico también usa el tablero y el botón (no tiene el «Toca: seguir» de los rivales).
 
+### Primera vez, el cartel con dos caminos y la carga que no se cuelga (15-nov, rama `primera-vez`; LIF-53, LIF-46, LIF-33)
+
+Detalle completo (regla, textos, eventos y el embudo de PostHog) en `docs/MVP.md`, «Cambio del 15 de noviembre».
+
+**Decisiones del 15-nov.** Del dueño (LIF-53): entrar directo a jugar con el pesista por defecto; elegir o cambiar pesista
+recién después de la primera final; el cartel al terminar la primera final completa, obligatorio para seguir, que se
+desbloquea con el correo O con las 2 preguntas (cualquiera alcanza); con el correo, las preguntas como paso optativo con
+«Skip»; novedades en un tilde aparte, destildado. Del orquestador (el dueño pidió que se resuelva sin él): **las 2 preguntas
+desbloquean el juego libre igual que el correo, una vez por dispositivo**, y **el nombre al anotarse pide 4 letras como
+mínimo** (antes 5; «Mila», «Erin», «Joon» pasan, «Joe» no; sigue rechazando «AAAA», símbolos, números, tecleo al azar y
+relleno). El tilde «Email me when early access opens» sigue obligatorio en el camino del correo.
+
+**Qué cambió.**
+- Worker: `GRATIS_ETAPA "final"`, `GRATIS "1"`, `ENCUESTA_LIBRE "1"` (variable nueva). La encuesta con premio exige las dos
+  preguntas, una por dispositivo y 3 por red en 30 días (409 `ip`); los dispositivos desbloqueados juegan con fuente
+  `encuesta` y no pesan sobre la red. `anotar_ok` (solo altas nuevas) y `anotar_repetido` los manda el Worker con la persona
+  de la lista. Privacidad y consentimiento `2026-11-e` (publicar primero el Worker).
+- Juego: bienvenida de primera vez sin tarjetas de pesista (Compacto); después de la primera final, las tarjetas en el
+  inicio. El cartel con «Leave your email» / «Answer 2 quick questions». Eventos `muro_resultado` (una vez por cartel) y
+  `siguio_jugando`, `anotar_respuesta` en el navegador, `encuesta_enviada` con `paso` y `desbloquea`.
+- LIF-33: `arranque.js` trae `main.js` y recarga sola 2 veces si el módulo no baja; datos y modelos con 3 intentos y corte
+  si la descarga se cuelga; aviso de descarga y aviso del 3D (sin WebGL, shader que no compila aunque se pruebe la calidad
+  Móvil, contexto perdido) que tapan todo; `escena_visible` y `carga_fallida`. «Script error.» sin archivo viene de scripts
+  de otro origen (apps de Facebook/Instagram, extensiones): todos los módulos del juego son del mismo origen; `error_juego`
+  lo marca `ajeno: true`, y las promesas rechazadas con un evento (imagen que no bajó) ya traen mensaje.
+- Pruebas: `worker_test`, `servidor_test`, vitest, `check_muro` reescrita a la regla de producción, `check_muro_medio` con
+  la regla del arranque por variables, `check_game` (primera bienvenida), `check_analitica` (2026-11-e) y
+  `check_carga_fallas` nueva (grupo «telefono» de pruebas.yml).
+
+**Volver atrás por variable.** Correo obligatorio: `ENCUESTA_LIBRE "0"`. Arranque gratis con el muro en el intervalo:
+`GRATIS_ETAPA "arranque"` y `ENCUESTA_LIBRE "0"`. Dos finales enteras: `GRATIS "2"`.
+
+**Pendiente / estimación.** La práctica no cambió: con la barrita no hay tutorial ni tarjeta; la primera final sigue con
+«Cómo se gana» y el primer peso (dos paneles). Juntar esos dos en uno en el teléfono acostado necesita revisar el alto: queda
+para otra vuelta si los datos muestran caída ahí. Si PostHog todavía tiene la bandera `muro-partidas-gratis` asignando «2»,
+esos dispositivos tienen 2 finales gratis: apagarla. Medir 48 h después de publicar con el embudo de MVP.md
+(`muro_visto` → `muro_resultado` por `via` → `siguio_jugando`). Ramas en paralelo que tocan los mismos archivos:
+`analitica.js` (rama `utm`: acá se agregó `app_navegador` junto a `fuente_trafico`) y `stage.js` (rama `graficos`: acá solo
+`cargar()` deja de guardar la carga que falló).
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.

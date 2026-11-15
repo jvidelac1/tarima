@@ -1,6 +1,58 @@
 # MVP de Tarima
 
-Estado al 13 de noviembre de 2026. Esto es lo que se construye para la primera versión pública. Quien implemente toma de acá las reglas, los textos y el contrato del servidor. Las tres propuestas de partida (conversión, jugador nuevo y producto) quedaron resueltas en este documento. Donde chocaban, la elección está explicada en una línea en la sección 0.
+Estado al 15 de noviembre de 2026 (ver «Cambio del 15 de noviembre»). Esto es lo que se construye para la primera versión pública. Quien implemente toma de acá las reglas, los textos y el contrato del servidor. Las tres propuestas de partida (conversión, jugador nuevo y producto) quedaron resueltas en este documento. Donde chocaban, la elección está explicada en una línea en la sección 0.
+
+## Cambio del 15 de noviembre: primera vez, el cartel con dos caminos y la carga que no se cuelga (LIF-53, LIF-46, LIF-33)
+
+**Decisión del dueño** (LIF-53, textual en lo importante): «Se entra directo a jugar, sin onboarding de elegir pesista. Se asigna un pesista por defecto. Recién después de la primera final se ofrece elegir o cambiar pesista. El cartel de la lista de espera aparece solo al terminar la primera final completa (arranque + enviones). Sigue siendo obligatorio para seguir jugando, pero se desbloquea de dos formas: responder 2 o 3 preguntas cortas, o dejar el mail. Cualquiera de las dos alcanza. Si deja el mail, las preguntas aparecen como un segundo paso optativo, con «saltear». Recibir novedades es un tilde aparte, destildado por defecto». Esto pisa lo que las secciones de abajo dicen del arranque gratis, del correo obligatorio y de la encuesta sin premio; donde chocan, manda esta sección.
+
+**Primera vez.** La bienvenida de quien nunca terminó (ni cortó) una final es el nombre (opcional, no frena: vacío vale «Rookie») y «Jugar»: sin tarjetas de pesista; juega con Compacto (`ventura`), el de siempre por defecto. Desde la primera final (jugada o cortada, `tarima.jugadas`), la bienvenida trae las tres tarjetas de siempre (Compacto, Largo, Potente; nada de mujeres) con el pesista actual marcado. Después del cartel del podio el juego va al inicio, que es donde se ofrece elegir o cambiar. La práctica no cambia: en la barrita (`'b'`) no hay tutorial ni tarjeta aparte; la primera final explica «Cómo se gana» y el primer peso (presentación y apertura), y la barrita se explica sobre la marcha.
+
+**La regla del servidor** (`worker/wrangler.jsonc`): `GRATIS_ETAPA "final"`, `GRATIS "1"`, `TOPE_IP "6"`, `BONO_ENCUESTA "0"`, `ENCUESTA_LIBRE "1"`, `ENCUESTAS_POR_IP "3"`.
+
+- **Gratis: la primera final entera** (arranque y dos tiempos), una por dispositivo, contada como siempre (dispositivo + HMAC de la IP; la red, 6 finales gratis en 30 días). `/api/envion` responde `via:'ya'`.
+- **Al terminarla, el cartel** (momento `podio`, en lugar de los botones del podio; y antes de la final siguiente, momento `inicio`, al tocar «Jugar» o al cargar). Dos caminos con el mismo peso: «Leave your email» / «Deja tu correo» y «Answer 2 quick questions» / «Responde 2 preguntas rápidas», con «Either one unlocks unlimited play on this device.». Cualquiera da el **juego libre** en ese dispositivo.
+  1. **Correo** (lo de siempre: nombre real de LIF-32, correo, el tilde obligatorio «Email me when early access opens» y el de novedades aparte y destildado). Después, el panel «¡Adentro!» con las mismas dos preguntas como paso optativo y «Skip».
+  2. **Las dos preguntas** (las de la encuesta aprobada: «How would you rather play Tarima?» y «What would you like the game to have?», con «Anything else? (optional)»). Hay que contestar las dos (el texto libre sigue opcional); el Worker lo vuelve a exigir. Contestadas: «¡Gracias!», «Desde ahora juegas sin límite en este dispositivo» y «Seguir jugando».
+  3. **«Ahora no»** → «Volver al inicio». La próxima final vuelve a pedir el cartel.
+- **La encuesta que desbloquea** (`ENCUESTA_LIBRE "1"`): una vez por dispositivo (tabla `encuestas`, 409 `ya_respondida`) y hasta `ENCUESTAS_POR_IP` (3) por red en 30 días (409 `ip`; el cartel ya no la ofrece: `encuesta_disponible` false, y queda el correo). Sin las dos preguntas, 400 `incompleta`. Las finales de un dispositivo desbloqueado salen con fuente `encuesta` y, como las de los anotados, no cuentan para la red. Después del correo la encuesta no da nada ni gasta la red (`i` NULL). La respuesta de `/api/encuesta` es `{estado:'ok', bono, libre}`; `/api/estado`, `/api/partida` y `/api/envion` traen `libre` y `regla.libre`.
+- **Volver atrás sin tocar código** (y publicar el Worker): correo obligatorio otra vez → `ENCUESTA_LIBRE "0"`; el arranque gratis con el muro en el intervalo (12 al 15 de noviembre) → `GRATIS_ETAPA "arranque"` y `ENCUESTA_LIBRE "0"`; 2 finales enteras → `GRATIS "2"`. La bandera `muro-partidas-gratis`, si PostHog se la asignó a un dispositivo, sigue pisando `GRATIS` con `GRATIS_ETAPA "final"` (sección 6.5): para que valga 1 para todos, la bandera tiene que estar apagada en PostHog.
+- **Privacidad 2026-11-e**: la encuesta es un camino del cartel, desbloquea el juego libre y para eso se guarda que el dispositivo la contestó (con el código de la IP por 30 días). El juego manda `2026-11-e`; el Worker acepta de la a a la e. **Publicar primero el Worker.**
+
+**Eventos (LIF-46).** Un resultado por cartel y si siguió jugando; los toques repetidos no suman.
+
+| Evento | Quién | Cuándo | Propiedades |
+|---|---|---|---|
+| `muro_visto` | juego | cada vez que sale el cartel | `momento` (`podio`, `inicio`, `tras_arranque`), `caminos` (`mail+preguntas`, `mail`), `origen`, `vez` (1, 2… en esta carga) |
+| `muro_camino` | juego | elige un camino (una vez por camino y cartel) | `via` (`mail`, `preguntas`), `momento`, `vez` |
+| `muro_resultado` | juego | **una vez por cartel** | `via` (`mail`, `preguntas`, `cerro`), `momento`, `caminos`, `s` (segundos con el cartel), `vez`; con `mail`, `novedades`; con `cerro`, `salida` (`volver`, `ahora_no`, `pagina`: cerró la pestaña con el cartel abierto, sale por sendBeacon) |
+| `siguio_jugando` | juego | **una vez por resultado** | `siguio` (true al empezar otra final o seguir al dos tiempos; false al irse de la página o si vuelve a ver el cartel sin jugar), `motivo` (`final`, `envion`, `salio`, `muro`), `via`, `momento`, `s` |
+| `muro_ahora_no`, `muro_cerrado` | juego | una vez por cartel (antes, por toque) | `momento`, `vez` |
+| `anotar_envio` | juego | envía el formulario | `novedades`, `sugerencia_usada`, `pantalla`, `momento` |
+| `anotar_respuesta` | juego | 200 de `/api/anotar` (reemplaza al `anotar_ok` del navegador) | `estado` como lo ve el navegador (`nuevo` también para un correo que ya estaba desde otro dispositivo), `pantalla`, `momento`, `novedades` |
+| `anotar_ok` | **Worker** | **solo altas nuevas** (fila nueva en `lista`), persona = `lista_id` | `novedades`, `momento`, `pantalla`, `idioma`, `pais` |
+| `anotar_repetido` | **Worker** | el correo ya estaba | `mismo_dispositivo`, `momento`, `pantalla`, `idioma`, `pais` |
+| `encuesta_vista` / `encuesta_salteada` | juego | | `momento`, `paso` (`cartel`, `anotado`) |
+| `encuesta_enviada` | juego | | `momento`, `paso`, `desbloquea` (true solo en el cartel con 200 del Worker), `plataforma`, `features` (cuántas), `otra` |
+| `encuesta_error` | juego | las preguntas del cartel no desbloquearon | `motivo` (`incompleta`, `ip`, `ya_respondida`, `limite`, `red`), `momento` |
+| `encuesta_respuesta` | Worker | | además: `desbloquea`, `momento` |
+| `escena_visible` | juego | primer cuadro dibujado con el pesista (LIF-33) | `ms` (desde la carga), `ms_jugar` (desde «Jugar»), `calidad`, `pantalla` |
+| `carga_fallida` | juego | algo de la carga falló (una vez por etapa y carga) | `etapa` (`modulo`, `datos`, `modelo`, `webgl`, `shader`), `mensaje` (recortado, sin URL ni correo), `archivo`, `intentos`, `app`; `modulo` lleva `tipo` (`descarga`, `navegador`); `shader`, `recuperada` si la calidad Móvil lo arregló |
+| `juego_abierto` | juego | | además `reintentos_modulo` (recargas solas antes de abrir) |
+| (súper propiedad) | juego | | `app_navegador` (`facebook`, `instagram`, `tiktok`, `line`, `snapchat` o null) |
+
+Los eventos que el Worker manda solo salen si el juego mide (`metricas: true` en el alta: no con la medición desactivada) y nunca llevan el correo.
+
+**Embudo en PostHog: «vio el cartel → mail / preguntas / se fue → siguió jugando».** Insights → Funnel, por persona, ventana 48 h (o 1 día):
+1. `muro_visto` con `vez = 1` (el primer cartel de la carga; filtrar `momento = podio` para los que terminaron la final gratis).
+2. `muro_resultado`, **desglosado por `via`** (Breakdown → Event property → `via`): da las tres ramas mail / preguntas / cerro.
+3. `siguio_jugando` con `siguio = true`.
+
+Para el porcentaje que deja algo: Trends → `muro_resultado` (contar personas únicas) desglosado por `via`, dividido por personas únicas de `muro_visto`. Para las novedades: `muro_resultado` (`via = mail`) desglosado por `novedades`; las altas nuevas de verdad son `anotar_ok` (Worker) y los correos repetidos `anotar_repetido`. Para LIF-33: `escena_visible` / `juego_abierto` (personas únicas) por `$os`, `$browser` y `app_navegador`, y `carga_fallida` por `etapa`.
+
+**Carga (LIF-33).** `juego.html` carga `js/game/arranque.js`, que trae `main.js`: si el módulo no llega (three que no baja: «Failed to fetch», «Load failed»), la página se recarga sola hasta 2 veces (1,5 s y 3 s) y después sale el aviso «We couldn’t download the game» con «Try again». Los datos (`data/*.json`) y los modelos se piden 3 veces (1 s y 2,5 s de espera; una descarga sin datos en 20 s se corta y cuenta como falla) y, si no llegan, el mismo aviso, que reintenta ahí mismo. Si WebGL no arranca (contexto que no se crea, programa que no compila aunque se pruebe la calidad Móvil, o contexto perdido 6 s con la página a la vista), el aviso «This browser can’t show the 3D lifter» con qué probar (otro navegador, actualizar, salir de Facebook o Instagram, la aceleración por hardware) y «Try again», que recarga: nunca la interfaz sin el levantador. «Script error.» sin archivo viene de scripts de otro origen (lo que inyectan las apps de Facebook o Instagram y las extensiones): todos los módulos del juego son del mismo origen y se piden con CORS, así que sus errores llegan con el mensaje; `error_juego` lo marca `ajeno: true`. Las promesas rechazadas con un evento (una imagen o textura que no bajó) ya no llegan «sin mensaje»: `error IMG detail_skin.png`.
+
+**Pruebas.** `worker_test` (2d), `servidor_test` (1c, el Worker de verdad con PostHog falso), `cd worker && npx vitest run` («primera vez»), y con navegador en Actions: `check_muro` (la regla de producción: en inglés con teclado, correo, preguntas optativas, inicio con pesistas; en español en el teléfono, «Ahora no», cartel al empezar y al recargar, preguntas que desbloquean), `check_muro_medio` (la regla del arranque por variables), `check_game` (primera bienvenida sin tarjetas; después de la final, con tarjetas), `check_analitica` (privacidad 2026-11-e) y `check_carga_fallas` (módulo, modelos, sin WebGL, shader y `escena_visible`, en computadora y teléfono).
 
 ## Cambio del 13 de noviembre: correo obligatorio, encuesta opcional después de anotarse e inglés por defecto
 
