@@ -32,6 +32,12 @@ export const EVENTOS = new Set([
   'medicion_desactivada', 'error_juego',
   // Gameplay 2 (docs/JUEGO.md G2.7): un toque saltea el turno de un rival o el veredicto propio
   'rival_salteado', 'veredicto_salteado',
+  // muro en el medio de la final (12-nov)
+  'muro_cerrado', 'final_cortada', 'envion_ok', 'envion_negado',
+  // LIF-46 y LIF-53: el cartel con dos caminos y lo que pasó después
+  'muro_camino', 'muro_resultado', 'siguio_jugando', 'anotar_respuesta', 'encuesta_error',
+  // LIF-33: si se vio el pesista y por qué no
+  'escena_visible', 'carga_fallida',
 ]);
 
 export const BANDERAS = { 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio' };
@@ -148,11 +154,26 @@ export function fuenteTrafico(buscar, referente = '', origen = '') {
   return 'directo';
 }
 
+/** Navegador dentro de una app (por el agente de usuario): ahí el 3D y las descargas fallan más. null si no es ninguna. */
+export function appNavegador(ua = '') {
+  ua = String(ua || '');
+  return /Instagram/i.test(ua) ? 'instagram' : /\bFBA[NV]\/|FB_IAB|FBIOS|\bFB4A\b/.test(ua) ? 'facebook' : /\bTikTok|musical_ly|BytedanceWebview/i.test(ua) ? 'tiktok' : /\bLine\//.test(ua) ? 'line' : /Snapchat/i.test(ua) ? 'snapchat' : null;
+}
+
 /**
  * Lo mínimo para encontrar un error sin mandar texto libre largo: mensaje recortado (sin direcciones de mail ni
  * parámetros de URL), archivo (solo el nombre), línea y columna.
+ * - Una promesa rechazada con un Event (una imagen o textura que no bajó: three rechaza con el evento de error de la
+ *   imagen) no tiene `message`: se describe con el tipo de evento, la etiqueta y el archivo (`error IMG detail_skin.png`).
+ * - «Script error.» sin archivo es un error de un script de OTRO origen (los navegadores ocultan el detalle): con todos los
+ *   módulos del juego en el mismo origen, sale de lo que inyectan las apps (Facebook, Instagram) o las extensiones.
+ *   Se marca con `ajeno: true`.
  */
 export function detalleError(e, ev = null) {
+  if (e && typeof e === 'object' && !(e instanceof Error) && typeof e.type === 'string' && 'target' in e && e.message === undefined) {
+    const tg = e.target, src = String(tg?.src || tg?.currentSrc || tg?.href || '').split(/[?#]/)[0].split('/').pop().slice(0, 60);
+    return { mensaje: [e.type, tg?.tagName || tg?.constructor?.name || '', src].filter(Boolean).join(' ').slice(0, 160), archivo: src || null, linea: null, col: null, evento: true };
+  }
   const msgCrudo = String((e && (e.message ?? (typeof e === 'string' ? e : ''))) || ev?.message || '');
   const mensaje = msgCrudo.replace(/[^\s@]+@[^\s@]+/g, '[mail]').replace(/(https?:\/\/[^\s?#]+)[?#]\S*/g, '$1').replace(/\s+/g, ' ').trim().slice(0, 160);
   let archivo = ev?.filename || '', linea = ev?.lineno || null, col = ev?.colno || null;
@@ -162,6 +183,9 @@ export function detalleError(e, ev = null) {
   }
   archivo = String(archivo).split(/[?#]/)[0].split('/').pop().slice(0, 60);
   const out = { mensaje: mensaje || null, archivo: archivo || null, linea: Number.isFinite(linea) ? linea : null, col: Number.isFinite(col) ? col : null };
+  if (/^Script error\.?$/i.test(mensaje) && !archivo) out.ajeno = true;
+  if (!mensaje && e !== null && e !== undefined && typeof e !== 'object') out.mensaje = String(e).slice(0, 160) || null;
+  if (!out.mensaje && e && typeof e === 'object' && !(e instanceof Error)) out.mensaje = (Object.prototype.toString.call(e) + ' ' + (e.constructor?.name || '')).trim().slice(0, 160);
   return out;
 }
 
@@ -197,7 +221,8 @@ export function crearAnalitica(o = {}) {
 
   const apagadaPorUsuario = () => local.get('tarima.medicion') === '0' || new URLSearchParams(buscar).get('metricas') === '0';
 
-  function ev(nombre, props = {}) {
+  /** `o.beacon`: al irse de la página (pagehide), sale ya por sendBeacon (si no, se perdería con la página). */
+  function ev(nombre, props = {}, o = {}) {
     if (typeof nombre !== 'string' || !nombre) return;
     if (!EVENTOS.has(nombre) && !avisados.has(nombre)) { avisados.add(nombre); g.console?.warn?.(`analitica: evento fuera de la lista de docs/MVP.md 6.3: ${nombre}`); }
     const p = { ...fijas, ...limpiarProps(props) };
@@ -206,7 +231,7 @@ export function crearAnalitica(o = {}) {
     if (reg) reg.push({ ev: nombre, props: p, t });
     if (estado === 'apagada') return;
     if (estado === 'esperando') { if (cola.length < MAX_COLA) cola.push(['ev', nombre, p, t]); return; }
-    try { ph.capture(nombre, p); } catch { /* la medición nunca rompe el juego */ }
+    try { if (o && o.beacon) ph.capture(nombre, p, { send_instantly: true, transport: 'sendBeacon' }); else ph.capture(nombre, p); } catch { /* la medición nunca rompe el juego */ }
   }
 
   /** Liga la sesión al número interno de la lista (nunca el correo). Llamar antes de `anotar_ok`. */
@@ -272,6 +297,7 @@ export function crearAnalitica(o = {}) {
         pais: est?.contexto?.pais ?? null, previas: est?.contexto?.previas ?? null, dias: est?.contexto?.dias ?? null,
         jugador: /^d_[0-9a-f]{16}$/.test(est?.contexto?.jugador ?? '') ? est.contexto.jugador : null,
         fuente_trafico: fuenteTrafico(buscar, referente, origen), referente: dominioReferente(referente, origen) || null,
+        app_navegador: appNavegador(ventana.navigator?.userAgent),
         pantalla, grabada: grabar, gratis_etapa: est?.regla?.etapa ?? null, ...banderasProps,
         // Sin IP del jugador (el proxy no la manda), PostHog ubicaría a todos en el país del servidor de Cloudflare: el país real va en `pais`.
         $geoip_disable: true,
@@ -322,9 +348,10 @@ export function crearAnalitica(o = {}) {
     return anonimo;
   }
 
-  // La encuesta opcional después de anotarse (5.4): las respuestas no van por acá (las manda el Worker).
-  const encuestaVista = ({ momento = null } = {}) => ev('encuesta_vista', { momento });
-  const encuestaCerrada = ({ momento = null } = {}) => ev('encuesta_salteada', { momento });
+  // La encuesta (5.4): en el cartel (paso 'cartel', desbloquea) o después del correo (paso 'anotado', optativa). Las
+  // respuestas no van por acá (las manda el Worker).
+  const encuestaVista = ({ momento = null, paso = null } = {}) => ev('encuesta_vista', { momento, paso });
+  const encuestaCerrada = ({ momento = null, paso = null } = {}) => ev('encuesta_salteada', { momento, paso });
 
   /** El día que haya un aviso de consentimiento: con un sí, PostHog puede guardar su id y unir visitas. */
   function consentir() {
