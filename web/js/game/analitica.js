@@ -4,6 +4,7 @@
 // Reglas:
 // - Sin cookies ni almacenamiento de medición: persistence 'memory'. El id de PostHog cambia en cada carga de página.
 //   `consentir()` existe para el día que haya un aviso de consentimiento; hoy nadie lo llama.
+// - UTM (utm_source, utm_medium, utm_campaign, utm_content) limpios como súper propiedades, y al identificar, `$initial_*` con `$set_once`.
 // - person_profiles 'identified_only': solo los anotados tienen perfil (identify con su lista_id, nunca el correo).
 // - No-op sin clave, con `?metricas=0` o con la medición desactivada en la página de privacidad (`tarima.medicion` = 0).
 //   Igual, cada evento queda en `window.JUEGO.eventos` para que las pruebas puedan afirmar el embudo.
@@ -145,7 +146,7 @@ export function dominioReferente(referente, origen = '') {
  */
 export function fuenteTrafico(buscar, referente = '', origen = '') {
   const p = new URLSearchParams(buscar || '');
-  const utm = (p.get('utm_source') || '').trim().toLowerCase().replace(/[^a-z0-9_.-]/g, '').slice(0, 40);
+  const utm = campania(buscar).utm_source;   // la misma limpieza que la propiedad utm_source
   if (utm) return utm;
   if (p.has('c')) return 'compartido';
   for (const [k, f] of CLICK_IDS) if (p.has(k)) return f;
@@ -159,6 +160,30 @@ export function appNavegador(ua = '') {
   ua = String(ua || '');
   return /Instagram/i.test(ua) ? 'instagram' : /\bFBA[NV]\/|FB_IAB|FBIOS|\bFB4A\b/.test(ua) ? 'facebook' : /\bTikTok|musical_ly|BytedanceWebview/i.test(ua) ? 'tiktok' : /\bLine\//.test(ua) ? 'line' : /Snapchat/i.test(ua) ? 'snapchat' : null;
 }
+
+/** Parámetros de campaña que se registran (docs/MVP.md 6.1 y docs/DIFUSION.md). `utm_term` no: no hay avisos pagos. */
+export const UTM = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content'];
+
+/**
+ * Los UTM del link, limpios: minúscula, solo letras, números, «_», «.» y «-» (los espacios y «+» pasan a «_»), hasta 60
+ * caracteres; null si falta. Un valor con «@» o con 7 dígitos seguidos, sin contar espacios, «+» ni paréntesis (un correo o
+ * un teléfono pegado en el link), se descarta entero: nunca llega a PostHog. Una fecha con guiones (2026-11-15) pasa.
+ */
+export function campania(buscar) {
+  const p = new URLSearchParams(buscar || '');
+  return Object.fromEntries(UTM.map(k => {
+    const crudo = String(p.get(k) ?? '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+    if (!crudo || crudo.includes('@') || /\d{7}/.test(crudo.replace(/[\s()+]/g, ''))) return [k, null];
+    const v = crudo.replace(/[\s+]+/g, '_').replace(/[^a-z0-9_.-]/g, '').slice(0, 60);
+    return [k, v || null];
+  }));
+}
+
+/** Atribución inicial de la persona (`$set_once` en identify): la de la primera carga en la que se identifica. */
+export const campaniaInicial = (buscar, referente = '', origen = '') => Object.fromEntries([
+  ['$initial_fuente_trafico', fuenteTrafico(buscar, referente, origen)],
+  ...Object.entries(campania(buscar)).map(([k, v]) => [`$initial_${k}`, v]),
+]);
 
 /**
  * Lo mínimo para encontrar un error sin mandar texto libre largo: mensaje recortado (sin direcciones de mail ni
@@ -234,11 +259,14 @@ export function crearAnalitica(o = {}) {
     try { if (o && o.beacon) ph.capture(nombre, p, { send_instantly: true, transport: 'sendBeacon' }); else ph.capture(nombre, p); } catch { /* la medición nunca rompe el juego */ }
   }
 
-  /** Liga la sesión al número interno de la lista (nunca el correo). Llamar antes de `anotar_ok`. */
+  /**
+   * Liga la sesión al número interno de la lista (nunca el correo). Llamar antes de `anotar_ok`. Con `$set_once` deja en la
+   * persona `$initial_fuente_trafico` y `$initial_utm_*` de esta carga; PostHog no los pisa en las visitas siguientes.
+   */
   function identificar(lista_id) {
     if (typeof lista_id !== 'string' || !/^[0-9a-f]{8,64}$/i.test(lista_id)) return;
     if (estado === 'esperando') { cola.push(['id', lista_id]); return; }
-    if (estado === 'activa') { try { ph.identify(lista_id); } catch { /* nada */ } }
+    if (estado === 'activa') { try { ph.identify(lista_id, undefined, campaniaInicial(buscar, referente, origen)); } catch { /* nada */ } }
   }
 
   /** Súper propiedades del juego (por ejemplo `{ dificultad: 'medio' }`): van en cada evento y en PostHog con register. */
@@ -288,6 +316,10 @@ export function crearAnalitica(o = {}) {
         advanced_disable_flags: true, advanced_disable_decide: true, advanced_disable_feature_flags: true,
         bootstrap: { featureFlags: flags },
         mask_all_text: true, mask_all_element_attributes: true, save_referrer: false,
+        // Los UTM los registra este archivo, limpios (campania): posthog-js mandaría el valor crudo y los click-ids (fbclid…).
+        save_campaign_params: false,
+        // Y en $current_url, los click-ids (fbclid, gclid, ttclid…) van como «<masked>».
+        mask_personal_data_properties: true,
         enable_recording_console_log: false,
         session_recording: opcionesGrabacion(() => nombresDelJugador()),
       });
@@ -298,6 +330,7 @@ export function crearAnalitica(o = {}) {
         jugador: /^d_[0-9a-f]{16}$/.test(est?.contexto?.jugador ?? '') ? est.contexto.jugador : null,
         fuente_trafico: fuenteTrafico(buscar, referente, origen), referente: dominioReferente(referente, origen) || null,
         app_navegador: appNavegador(ventana.navigator?.userAgent),
+        ...campania(buscar),
         pantalla, grabada: grabar, gratis_etapa: est?.regla?.etapa ?? null, ...banderasProps,
         // Sin IP del jugador (el proxy no la manda), PostHog ubicaría a todos en el país del servidor de Cloudflare: el país real va en `pais`.
         $geoip_disable: true,
