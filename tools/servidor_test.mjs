@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearServidor, expDelPase, etapaDelPase, pareceCorreo, sugerirCorreo, CONSENTIMIENTO } from '../web/js/game/servidor.js';
-import { crearAnalitica, nombreVisible, limpiarProps, fuenteTrafico, dominioReferente, detalleError, proporcionGrabacion, taparTexto, taparAtributo, BLOQUEO_GRABACION, BANDERAS } from '../web/js/game/analitica.js';
+import { crearAnalitica, nombreVisible, limpiarProps, fuenteTrafico, dominioReferente, campania, campaniaInicial, UTM, detalleError, proporcionGrabacion, taparTexto, taparAtributo, BLOQUEO_GRABACION, BANDERAS } from '../web/js/game/analitica.js';
 import { reenviar } from '../functions/_reenviar.js';
 import { onRequest as raiz } from '../functions/index.js';
 import { VERSIONES_CONSENTIMIENTO } from '../worker/src/reglas.js';
@@ -538,7 +538,7 @@ igual(expDelPase('basura'), null, 'pase inválido');
 
 function posthogFalso() {
   const ph = { llamadas: [], init(k, c) { this.llamadas.push(['init', k, c]); }, register(p) { this.llamadas.push(['register', p]); },
-    capture(e, p, o) { this.llamadas.push(['capture', e, p, o]); }, identify(id) { this.llamadas.push(['identify', id]); },
+    capture(e, p, o) { this.llamadas.push(['capture', e, p, o]); }, identify(id, set, setOnce) { this.llamadas.push(['identify', id, set, setOnce]); },
     get_distinct_id() { return 'ph_distinto'; }, set_config(c) { this.llamadas.push(['set_config', c]); },
     stopSessionRecording() { this.llamadas.push(['stopSessionRecording']); } };
   return ph;
@@ -552,6 +552,16 @@ igual([fuenteTrafico('?fbclid=PAZ'), fuenteTrafico('?ttclid=1'), fuenteTrafico('
   fuenteTrafico('', 'https://www.google.com/'), fuenteTrafico('', 'https://foro.ejemplo.org/hilo/3'), fuenteTrafico('', 'https://liftinggame.pages.dev/x', 'https://liftinggame.pages.dev'),
   fuenteTrafico('?utm_source=ig&fbclid=1', 'https://l.facebook.com/')],
   ['facebook', 'tiktok', 'instagram', 'x', 'google', 'otro_sitio', 'directo', 'ig'], 'fuente_trafico con click-id y referente');
+// UTM (LIF-55): limpios, nunca un correo ni un teléfono; fuente_trafico usa la misma limpieza.
+igual(UTM, ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content'], 'los cuatro UTM');
+igual(campania('?utm_source=Reddit&utm_medium=social&utm_campaign=lanzamiento-2026-11&utm_content=Clip Arranque+1&utm_term=x'),
+  { utm_source: 'reddit', utm_medium: 'social', utm_campaign: 'lanzamiento-2026-11', utm_content: 'clip_arranque_1' }, 'campania: minúscula, espacios a _');
+igual(campania(''), { utm_source: null, utm_medium: null, utm_campaign: null, utm_content: null }, 'campania sin UTM: todo null');
+igual(campania('?utm_source=juan%40mail.com&utm_medium=%2B54%209%2011%204567-8901&utm_campaign=Ñandú%20Rápido&utm_content=%3Cscript%3E' + 'x'.repeat(80)),
+  { utm_source: null, utm_medium: null, utm_campaign: 'nandu_rapido', utm_content: ('scriptx' + 'x'.repeat(79)).slice(0, 60) }, 'campania: sin correo ni teléfono, sin acentos ni signos, 60 caracteres');
+igual([fuenteTrafico('?utm_source=a%40b.com&c=1'), fuenteTrafico('?utm_source=Grupo WhatsApp')], ['compartido', 'grupo_whatsapp'], 'fuente_trafico descarta un utm_source con correo');
+igual(campaniaInicial('?utm_source=x&utm_medium=social', 'https://t.co/a', 'https://liftinggame.pages.dev'),
+  { $initial_fuente_trafico: 'x', $initial_utm_source: 'x', $initial_utm_medium: 'social', $initial_utm_campaign: null, $initial_utm_content: null }, 'campaniaInicial');
 igual([dominioReferente('https://l.instagram.com/?u=secreto'), dominioReferente(''), dominioReferente('android-app://com.x'), dominioReferente('https://a.dev/p', 'https://a.dev')],
   ['l.instagram.com', '', '', ''], 'referente: solo el sitio, nunca el propio juego');
 {
@@ -588,6 +598,7 @@ igual([dominioReferente('https://l.instagram.com/?u=secreto'), dominioReferente(
   igual(cfg.bootstrap.featureFlags['muro-texto'], 'b', 'banderas del Worker como bootstrap');
   const reg = ph.llamadas.find(l => l[0] === 'register')[1];
   igual([reg.idioma, reg.tactil, reg.pais, reg.previas, reg.fuente_trafico, reg['$feature/muro-texto'], reg['$feature/muro-partidas-gratis']], ['es', true, 'AR', 1, 'compartido', 'b', '2'], 'súper propiedades');
+  igual([reg.utm_source, reg.utm_medium, reg.utm_campaign, reg.utm_content], [null, null, null, null], 'sin UTM en la URL: null');
   const orden = ph.llamadas.filter(l => l[0] !== 'init' && l[0] !== 'register' || l[1]?.pantalla).map(l => l[0] === 'capture' ? l[1] : l[0] === 'register' ? 'pantalla' : l[0]);
   igual(orden, ['identify', 'juego_abierto', 'pantalla'], 'la cola sale en orden, con identify primero');
   ok(ph.llamadas.find(l => l[1] === 'juego_abierto')[3]?.timestamp instanceof Date, 'los eventos de la cola llevan su hora');
@@ -601,6 +612,22 @@ igual([dominioReferente('https://l.instagram.com/?u=secreto'), dominioReferente(
   igual(sesion.getItem('tarima.clave_publica'), 'phc_PRUEBA123', 'la clave pública queda en la pestaña para la privacidad');
   a.consentir();
   igual(ph.llamadas.at(-1), ['set_config', { persistence: 'localStorage+cookie' }], 'consentir cambia la persistencia');
+}
+{
+  // UTM en la URL: súper propiedades limpias, PostHog no guarda los crudos, y $initial_* con $set_once al identificar.
+  const ph = posthogFalso();
+  const v = ventanaFalsa({ search: '?utm_source=Reddit&utm_medium=social&utm_campaign=lanzamiento&utm_content=r_weightlifting&fbclid=ABC' });
+  const a = crearAnalitica({ ventana: v, local: new Mem(), sesion: new Mem(), cargar: async () => ph, azar: () => 0.99 });
+  await a.iniciar({ estado: { ...ESTADO, lista_id: 'b'.repeat(32) } });
+  const cfg = ph.llamadas.find(l => l[0] === 'init')[2];
+  igual([cfg.save_campaign_params, cfg.save_referrer, cfg.mask_personal_data_properties], [false, false, true], 'posthog-js no guarda UTM ni referente crudos y tapa los click-ids de la URL');
+  const reg = ph.llamadas.find(l => l[0] === 'register')[1];
+  igual([reg.fuente_trafico, reg.utm_source, reg.utm_medium, reg.utm_campaign, reg.utm_content, 'fbclid' in reg],
+    ['reddit', 'reddit', 'social', 'lanzamiento', 'r_weightlifting', false], 'UTM como súper propiedades');
+  igual(ph.llamadas.find(l => l[0] === 'identify'), ['identify', 'b'.repeat(32), undefined,
+    { $initial_fuente_trafico: 'reddit', $initial_utm_source: 'reddit', $initial_utm_medium: 'social', $initial_utm_campaign: 'lanzamiento', $initial_utm_content: 'r_weightlifting' }],
+    'identify con $set_once de la atribución inicial');
+  ok(!JSON.stringify(ph.llamadas).includes('ABC'), 'el click-id no viaja');
 }
 {
   // ?metricas=0 y la medición desactivada: no se carga PostHog.

@@ -932,8 +932,13 @@ posthog.init(m.clave, {
   bootstrap: { featureFlags: estado.flags },
   mask_all_text: true, mask_all_element_attributes: true,
 });
-posthog.register({ idioma, idioma_origen, tactil, version, pais, previas, dias, fuente_trafico, ...propsDeBanderas });
+posthog.register({ idioma, idioma_origen, tactil, version, pais, previas, dias, fuente_trafico,
+  utm_source, utm_medium, utm_campaign, utm_content, ...propsDeBanderas });
 ```
+
+- **UTM (LIF-55, 15 de noviembre).** `utm_source`, `utm_medium`, `utm_campaign` y `utm_content` van como súper propiedades en todos los eventos, con los mismos nombres que usa PostHog (así Web analytics los toma para la entrada de cada sesión). Van limpios (`campania()` en `analitica.js`): minúscula, solo `a-z 0-9 _ . -`, espacios y `+` pasan a `_`, hasta 60 caracteres, `null` si faltan. Un valor con `@` o con 7 dígitos seguidos (un correo o un teléfono pegado en el link) se descarta entero. `utm_term` no se registra (no hay avisos pagos). posthog-js va con `save_campaign_params: false`, para que no mande los valores crudos ni los click-ids como propiedades, y con `mask_personal_data_properties: true`, que tapa los click-ids (`fbclid`, `gclid`, `ttclid`…) en `$current_url`.
+- **Atribución inicial.** Al identificar a un anotado (`identify(lista_id)`, en la carga en que se anota y en cada visita siguiente) se mandan con `$set_once` `$initial_fuente_trafico` y `$initial_utm_source`, `$initial_utm_medium`, `$initial_utm_campaign`, `$initial_utm_content` (null si no había). `$set_once` no pisa, así que queda la de la primera carga en la que se identificó; como el muro sale al terminar el arranque de la primera final, quien se anota en su primera visita queda con el link de esa visita. Con `persistence: 'memory'` no hay forma de recordar en el navegador el primer link de alguien que se anota en otra visita, y no se agrega almacenamiento para eso. Los anotados antes de este cambio reciben como inicial la de su primera visita después del cambio. Los anónimos no tienen persona (`identified_only`): para ellos la atribución es la de cada evento.
+- **Links por canal.** La tabla de links listos para copiar está en `docs/DIFUSION.md`.
 
 - **Banderas como propiedades.** `propsDeBanderas` es `{'$feature/muro-partidas-gratis': '2', …}`, para separar por variante en cualquier gráfico.
 - **Pantalla actual.** `visita()` actualiza la súper propiedad `pantalla`, así `$pageleave` dice dónde se fue la gente.
@@ -997,7 +1002,7 @@ Todos van en minúscula y en español. Ninguno lleva nombre, mail, IP ni disposi
 | `baja` | Lo manda el Worker (sin persona) | `via` (`mail`, `formulario`) |
 | `$pageleave` | Automático | `pantalla` (súper propiedad) |
 
-`fuente_trafico` vale `utm_source` si viene en la URL, `compartido` si llega con `?c=` y `directo` en otro caso. El código `c` es al azar por cada vez que se comparte y no identifica a nadie.
+`fuente_trafico` vale `utm_source` (limpio, igual que la propiedad) si viene en la URL; si no, `compartido` si llega con `?c=`; si no, la red según el click-id del link (`fbclid` → `facebook`) o según el sitio del referente (solo el dominio, en `referente`), `otro_sitio` si es un sitio desconocido, y `directo` si no hay nada. `utm_medium`, `utm_campaign` y `utm_content` van aparte (6.1). El código `c` es al azar por cada vez que se comparte y no identifica a nadie.
 
 ### 6.4 Embudos, cohortes y paneles
 
