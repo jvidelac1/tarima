@@ -348,6 +348,7 @@ function alTeclado(e) {
   // «Saltar» del turno de un rival: la tecla S (Espacio no saltea nada de los rivales)
   if ((k === TECLA_SALTAR || k === TECLA_SALTAR.toUpperCase()) && E.saltarRival && !E.sobre && !e.repeat) { e.preventDefault(); E.saltarRival('tecla'); return; }
   if (k === 'Escape') { e.preventDefault(); if (E.saltar) E.saltar(); else if (E.sobre) cerrarSobre(); else abrirSobre('pausa'); return; }      // en el tutorial, Esc lo saltea
+  if ((k === 'c' || k === 'C') && !E.sobre && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); cambiarCamara(); return; }
   if (k === 'h' || k === 'H' || k === '?') { if (!E.sobre) { if (abrirSobre('ayuda')) e.preventDefault(); } else { e.preventDefault(); if (E.sobre.tipo === 'ayuda') cerrarSobre(); else pintarSobre('ayuda'); } return; }
   const raiz = E.sobre ? $('sobre').firstElementChild : $('capa').firstElementChild;
   if (!raiz) { if (k === 'Tab') e.preventDefault(); return; }      // sin panel, Espacio es del levantamiento, y Tab no saca el foco de la página
@@ -381,7 +382,18 @@ const cartel = (txt, clase = '') => { const k = (txt || '') + '|' + clase; if (k
 const veredicto = (txt, sub, mal) => { $('veredicto').hidden = !txt; $('veredicto').innerHTML = txt ? `${esc(txt)}${sub ? `<small>${esc(sub)}</small>` : ''}` : ''; $('veredicto').className = 'veredicto' + (mal ? ' mal' : ''); };
 const guiaTxt = txt => { const g = $('guia'); if (g.textContent !== txt) g.textContent = txt; g.hidden = !txt; };
 const etiqueta = et => { $('etiqueta').hidden = !et?.length; $('etiqueta').textContent = (et || []).map(e => ETIQUETAS[e]).join(' · '); };
-const camPrincipal = () => (escena.vertical ? 'lado' : '3/4');
+/**
+ * Cámara del levantamiento (LIF-38): la general de siempre, o la elegida con la tecla C o `?camara=` (jurado: desde la mesa
+ * del árbitro central; baja: frontal; lado: lateral). Se recuerda en este navegador. El teléfono en vertical usa la lateral.
+ */
+const CAMARAS_ELEGIBLES = ['3/4', 'jurado', 'baja', 'lado'];
+const camElegida = () => { const q = params.get('camara'), g = guardado.get('tarima.camara'); return CAMARAS_ELEGIBLES.includes(q) ? q : CAMARAS_ELEGIBLES.includes(g) ? g : '3/4'; };
+const camPrincipal = () => (escena.vertical ? 'lado' : (E.camara ||= camElegida()));
+function cambiarCamara() {
+  const de = camPrincipal(), a = CAMARAS_ELEGIBLES[(CAMARAS_ELEGIBLES.indexOf(de) + 1) % CAMARAS_ELEGIBLES.length]; E.camara = a; guardado.set('tarima.camara', a);
+  // si se está viendo la cámara del levantamiento, cambia ya (con un movimiento suave); en un primer plano, la próxima vez
+  if (escena && !escena.vertical && (!escena.plano || escena.plano.key === 'jurado') && (E.modo === 'intento' || E.intento)) { escena.camara(a, .8); E.forzar = true; }
+}
 /** Recuadro fijo «ESPACIO: seguir» / «Toca: seguir» de las pantallas pasivas (turno de un rival, veredicto, repetición). */
 function seguir(on) {
   let el = $('seguir'); if (!el) { el = document.createElement('div'); el.id = 'seguir'; el.className = 'seguir'; el.hidden = true; el.setAttribute('aria-hidden', 'true'); $('tv').appendChild(el); }
@@ -730,6 +742,8 @@ async function decision(a, lev, res, et, propio, o = {}) {
   // sin cortes: la cámara sigue a la barra que cae y gira hacia el público con movimientos suaves; un rival que no decide nada
   // (`o.fija`) queda en la cámara general
   if (fin && !ok && !o.fija) escena.primerPlano('caida', null, .45);
+  // un válido propio: mientras se prenden las luces, la vista desde la mesa del jurado (el pesista de frente y las tres luces arriba)
+  else if (fin && ok && propio && !o.fija && !R0 && !escena.vertical) escena.camara('jurado', 1.3);
   const t0 = reloj.ahora(), d = [null, null, null], hito = { luz: 0, ver: false, caida: !fin || !ok || !!o.fija, rev: !!o.fija };
   const avanzar = (t, dt, vivo, conFinal = true) => {
     if (fin && conFinal) dibujarFinal(fin, t, dt, vivo);

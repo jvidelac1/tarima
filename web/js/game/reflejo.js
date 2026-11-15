@@ -14,7 +14,7 @@ export class Reflejo {
     this.y = y; this.escala = .5; this.activo = false; this.cam = new THREE.PerspectiveCamera();
     this.rt = new THREE.WebGLRenderTarget(8, 8, { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true });
     this.rt.texture.name = 'reflejo de la tarima';
-    this.u = { tReflejo: { value: this.rt.texture }, uReflejoMat: { value: new THREE.Matrix4() }, uReflejo: { value: 1 } };
+    this.u = { tReflejo: { value: this.rt.texture }, uReflejoMat: { value: new THREE.Matrix4() }, uReflejo: { value: 2 } };
     this.mats = new Set();
   }
   /** Tamaño del lienzo en píxeles reales; el reflejo usa `escala` de cada lado. */

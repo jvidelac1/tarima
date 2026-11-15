@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { rng, makeCanvas, canvasTexture, normalFromHeight, noiseCanvas } from '../util.js';
 import { EVENT } from '../config.js';
+import { BOKEH, BOKEH_LAYER } from '../post.js';
 
 const DISPLAY = "'Saira Condensed','Arial Narrow',sans-serif";
 /** Partículas del soplo de polvo (las primeras del búfer: están en todas las calidades). */
@@ -47,7 +48,7 @@ function goma(aniso) {
   const S = 512, r = rng(808);
   const color = makeCanvas(S, S, g => {
     g.fillStyle = '#1d1e23'; g.fillRect(0, 0, S, S);
-    g.globalCompositeOperation = 'soft-light'; g.globalAlpha = .55; g.drawImage(noiseCanvas(S, 6, 33, 4), 0, 0); g.globalCompositeOperation = 'source-over';
+    g.globalCompositeOperation = 'soft-light'; g.globalAlpha = .22; g.drawImage(noiseCanvas(S, 6, 33, 4), 0, 0); g.globalCompositeOperation = 'source-over';
     const motas = ['#5d6f8c', '#8a8f98', '#3f5f8f', '#b9bcc2', '#4a4d55'];
     for (let k = 0; k < 5200; k++) { g.globalAlpha = .25 + r() * .5; g.fillStyle = motas[Math.floor(r() * motas.length)]; const x = r() * S, y = r() * S, s = .8 + r() * 1.8; g.fillRect(x, y, s, s * (.6 + r() * .8)); }
     g.globalAlpha = 1; g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(0, 0, S, 4); g.fillRect(0, 0, 4, S); g.fillStyle = 'rgba(160,165,180,.1)'; g.fillRect(0, 4, S, 2); g.fillRect(4, 0, 2, S);
@@ -67,7 +68,7 @@ const POLVO_VS = /* glsl */`
 attribute vec4 aSemilla; attribute float aTipo;
 uniform float uTiempo; uniform float uTam; uniform float uMov; uniform vec3 uCaja0; uniform vec3 uCajaT; uniform vec4 uGolpe;
 uniform vec3 uLuzPos[ 4 ]; uniform vec3 uLuzDir[ 4 ]; uniform vec3 uLuzCol[ 4 ]; uniform vec2 uLuzCono[ 4 ];
-varying vec3 vCol; varying vec2 vUv;
+varying vec3 vCol; varying vec2 vUv; varying float vZ;
 void main(){
   vec3 s = aSemilla.xyz; float f = aSemilla.w; float t = uTiempo * uMov;
   vec3 p; float peso; float tam = uTam * ( 0.55 + fract( f * 13.7 ) );
@@ -86,19 +87,24 @@ void main(){
     p = uCaja0 + q * uCajaT;
     peso = smoothstep( 0.0, 0.1, q.y ) * smoothstep( 1.0, 0.8, q.y ) * ( 0.55 + 0.45 * sin( t * ( 1.5 + 3.0 * f ) + f * 40.0 ) );
   }
-  vec3 luz = vec3( 0.012, 0.013, 0.016 );
+  vec3 luz = vec3( 0.006, 0.0065, 0.008 );
   for ( int i = 0; i < 4; i ++ ) {
     float c = dot( normalize( uLuzPos[ i ] - p ), uLuzDir[ i ] );
     luz += uLuzCol[ i ] * smoothstep( uLuzCono[ i ].x, uLuzCono[ i ].y, c );
   }
-  vCol = luz * peso; vUv = position.xy * 2.0;
-  vec4 mv = viewMatrix * vec4( p, 1.0 ); mv.xy += position.xy * tam;
-  gl_Position = projectionMatrix * mv;
+  vec4 mv = viewMatrix * vec4( p, 1.0 );
+  vCol = luz * peso * smoothstep( 1.2, 3.2, - mv.z ); vUv = position.xy * 2.0;      // pegado a la cámara no se dibuja: sería un disco enorme
+  mv.xy += position.xy * tam;
+  gl_Position = projectionMatrix * mv; vZ = gl_Position.z / gl_Position.w * 0.5 + 0.5;
 }`;
 const POLVO_FS = /* glsl */`
-varying vec3 vCol; varying vec2 vUv;
+uniform sampler2D tDepth; uniform vec2 uRes; uniform float uUseDepth;
+varying vec3 vCol; varying vec2 vUv; varying float vZ;
 void main(){
   float r = dot( vUv, vUv ); if ( r > 1.0 ) discard;
+  // con profundidad de campo el polvo se dibuja después del desenfoque (si no, cada mota sería un disco): ahí la
+  // profundidad de la escena se prueba a mano, como los discos de luz de la arena
+  if ( uUseDepth > 0.5 ) { if ( texture2D( tDepth, gl_FragCoord.xy / uRes ).x < vZ - 2e-5 ) discard; }
   float a = 1.0 - r;
   gl_FragColor = vec4( vCol * a * a, 1.0 );
   #include <tonemapping_fragment>
@@ -166,7 +172,7 @@ export class Ambiente {
     g.setAttribute('aSemilla', new THREE.InstancedBufferAttribute(sem, 4)); g.setAttribute('aTipo', new THREE.InstancedBufferAttribute(tipo, 1)); g.instanceCount = 0;
     const v3 = k => Array.from({ length: k }, () => new THREE.Vector3()), v2 = k => Array.from({ length: k }, () => new THREE.Vector2(2, 3));
     this.uPolvo = {
-      uTiempo: this.T, uTam: { value: .011 }, uMov: { value: this.reduce ? 0 : 1 }, uCaja0: { value: new THREE.Vector3(-2.7, .05, -2.3) }, uCajaT: { value: new THREE.Vector3(5.4, 3.7, 4.6) }, uGolpe: { value: new THREE.Vector4(0, 0, -100, 0) },
+      tDepth: BOKEH.tDepth, uRes: BOKEH.uRes, uUseDepth: BOKEH.uUseDepth, uTiempo: this.T, uTam: { value: .007 }, uMov: { value: this.reduce ? 0 : 1 }, uCaja0: { value: new THREE.Vector3(-2.7, .05, -2.3) }, uCajaT: { value: new THREE.Vector3(5.4, 3.7, 4.6) }, uGolpe: { value: new THREE.Vector4(0, 0, -100, 0) },
       uLuzPos: { value: v3(4) }, uLuzDir: { value: v3(4) }, uLuzCol: { value: v3(4) }, uLuzCono: { value: v2(4) },
     };
     const m = new THREE.ShaderMaterial({ name: 'polvo de magnesio', vertexShader: POLVO_VS, fragmentShader: POLVO_FS, uniforms: this.uPolvo, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
@@ -174,15 +180,15 @@ export class Ambiente {
   }
   /** Las luces que iluminan el polvo (clave y los tres contraluces de lighting.js): posición, eje, color y cono. */
   setLuces(L) {
-    const u = this.uPolvo, ls = [L.key, L.rimA, L.rimB, L.hair], k = [.2, .16, .16, .14];
+    const u = this.uPolvo, ls = [L.key, L.rimA, L.rimB, L.hair], k = [.13, .12, .12, .1];
     ls.forEach((l, i) => {
       u.uLuzPos.value[i].copy(l.position); u.uLuzDir.value[i].copy(l.position).sub(l.target.position).normalize();
       u.uLuzCol.value[i].set(l.color.r, l.color.g, l.color.b).multiplyScalar(l.intensity * k[i]); u.uLuzCono.value[i].set(Math.cos(l.angle * 1.25), Math.cos(l.angle * .55));
     });
   }
   /** Lo que entra con esta calidad: `A` = {polvo: partículas, conos: fuerza de los conos (0 = como estaban), publico: se mueve}. */
-  setNivel(A = {}) {
-    this.nivel = A; const n = Math.max(0, Math.min(POLVO_MAX, Math.round(A.polvo || 0)));
+  setNivel(A = {}, dof = false) {
+    this.nivel = A; this.polvo.layers.set(dof ? BOKEH_LAYER : 0);      // con profundidad de campo va con los discos de luz, después del desenfoque const n = Math.max(0, Math.min(POLVO_MAX, Math.round(A.polvo || 0)));
     this.polvo.geometry.instanceCount = n ? Math.max(n, N_SOPLO) : 0; this.polvo.visible = n > 0;
     for (const b of this.arena.beams || []) b.base = b.base0 * (A.conos || 1);
     this.publicoVivo = !!A.publico && !this.reduce;
@@ -193,7 +199,7 @@ export class Ambiente {
       const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, '#22367e'); gr.addColorStop(.32, '#1d2a5c'); gr.addColorStop(.5, '#23264e'); gr.addColorStop(.68, '#43285a'); gr.addColorStop(1, '#84361f'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
       for (let i = -1; i < 11; i++) { const x = i * w / 10, calido = i >= 5, a = .1 + .07 * (i & 1); g.fillStyle = calido ? `rgba(255,${150 + (i & 1) * 40},70,${a})` : `rgba(${90 + (i & 1) * 50},${170 + (i & 1) * 30},255,${a})`; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + w * .04, 0); g.lineTo(x + w * .09, h / 2); g.lineTo(x + w * .04, h); g.lineTo(x, h); g.lineTo(x + w * .05, h / 2); g.closePath(); g.fill(); }
       // centro oscuro: el pesista se despega del fondo
-      const cg = g.createRadialGradient(w / 2, h * .62, h * .1, w / 2, h * .62, w * .3); cg.addColorStop(0, 'rgba(6,8,18,.62)'); cg.addColorStop(1, 'rgba(6,7,14,0)'); g.fillStyle = cg; g.fillRect(0, 0, w, h);
+      const cg = g.createRadialGradient(w / 2, h * .62, h * .1, w / 2, h * .62, w * .3); cg.addColorStop(0, 'rgba(6,8,18,.4)'); cg.addColorStop(1, 'rgba(6,7,14,0)'); g.fillStyle = cg; g.fillRect(0, 0, w, h);
       g.fillStyle = 'rgba(255,210,63,.9)'; g.fillRect(0, h * .93, w, h * .012); g.fillStyle = 'rgba(246,243,234,.7)'; g.fillRect(0, h * .955, w, h * .006);
     });
   }

@@ -192,9 +192,9 @@ export const PLANOS = {
   medio: { key: 'medio', at: ['Neck', 'Hips'], up: -.05, d: 2.05, az: .5, el: .05, fov: 22 },
   caida: { key: 'caida', at: [], up: 0, dAbs: 4.6, az: .72, el: .14, fov: 30, punto: 'caida' },
   manga: { key: 'manga', at: [], up: 0, dAbs: 1.45, az: 1.05, el: .2, fov: 30, punto: 'manga' },
-  // desde la mesa del árbitro central (LIF-38): por encima de su hombro, el pesista de frente y, arriba de la pantalla,
-  // las tres luces de arbitraje. La cámara queda en (0; 0,55; 8,6) mirando a (0; 0,96; 0): entran de la cabeza del árbitro a las luces
-  jurado: { key: 'jurado', at: [], up: 0, dAbs: 8.61, az: 0, el: -.0476, fov: 30, punto: 'jurado' },
+  // desde la mesa del árbitro central (LIF-38): lo que ve el árbitro, el pesista de frente y, arriba de la pantalla, las
+  // tres luces de arbitraje. La cámara queda en (0; 0,5; 7,0), sobre la mesa, mirando a (0; 1,11; 0): entran de los pies a las luces
+  jurado: { key: 'jurado', at: [], up: 0, dAbs: 7.03, az: 0, el: -.0869, fov: 26, punto: 'jurado' },
 };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
@@ -322,11 +322,13 @@ export class Escena {
   }
   /** Ambiente de la calidad (Q.amb): polvo, conos, público y reflejo de la tarima (solo con post: necesita color lineal). */
   _ambiente(Q) {
-    const A = Q.amb || {}; this.ambiente.setNivel(A);
+    const A = Q.amb || {}; this.ambiente.setNivel(A, !!Q.dof);
     const esc = !Q.directo && A.reflejo > 0 ? A.reflejo : 0; if (esc) this.reflejo.escala = esc; this.reflejo.setActivo(esc > 0);
   }
   _post(Q) {
-    const p = this.post = new Post(this.renderer, this.scene, this.rig.camera, Q); p.reduceMotion = this.reduceMotion; p.motionObject = this.barbell.group; p.bokehObject = this.arena.bokeh;
+    const p = this.post = new Post(this.renderer, this.scene, this.rig.camera, Q); p.reduceMotion = this.reduceMotion; p.motionObject = this.barbell.group;
+    // después del desenfoque van los discos de luz de la arena y el polvo de magnesio (un contenedor suelto: no cambia de quién son hijos)
+    const tras = this._tras ||= Object.assign(new THREE.Object3D(), { matrixAutoUpdate: false }); tras.children = [this.arena.bokeh, this.ambiente.polvo]; p.bokehObject = tras;
     // Sin oclusión ni profundidad de campo ningún pase lee la profundidad de la escena: no se resuelve (una pasada de pantalla
     // completa menos por cuadro) ni se guarda la del MSAA (cuatro muestras por píxel que no salen de la memoria de la placa).
     const lee = !!(Q.ao || Q.dof || Q.mblur); p.sceneRT.resolveDepthBuffer = lee; p.sceneRT.storeMultisampledDepthBuffer = lee;
@@ -562,7 +564,7 @@ export class Escena {
   _apuntar() {
     const a = this.activo, sh = this.plano; if (!sh) return;
     if (sh.punto === 'manga') v2.copy(this.barbell.group.position).add(v.set(.92, .02, 0));
-    else if (sh.punto === 'jurado') v2.set(0, .96, 0);
+    else if (sh.punto === 'jurado') v2.set(0, 1.11, 0);
     else if (sh.punto === 'caida') { if (a) a.boneWorld('Hips', v2); else v2.set(0, 1, 0); v2.lerp(this.barbell.group.position, .5); v2.x = 0; v2.y = Math.max(.85, v2.y); }
     else { if (!a) return; const huesos = sh.at.filter(k => k !== 'Bar'), nb = sh.at.length - huesos.length; a.midWorld(huesos, v2).multiplyScalar(huesos.length); if (nb) v2.add(this.barbell.group.position); v2.multiplyScalar(1 / sh.at.length); v2.y += sh.up * this.P.h; }
     const e = this.encuadre;
