@@ -43,7 +43,10 @@ const server = http.createServer((req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/`;
 fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT, { recursive: true });
-const problemas = [], notas = [], TAPA = [], INFORMA = process.env.TAPA_INFORMA === '1';      // TAPA_INFORMA=1: solo informa (para medir un antes)
+const problemas = [], notas = [], TAPA = [], PANEL = [], INFORMA = process.env.TAPA_INFORMA === '1';      // TAPA_INFORMA=1: solo informa (para medir un antes)
+// LIF-31: alto del panel del llamado con el detalle plegado (teléfono acostado, 'b'): ≤ 35 % del alto de la pantalla.
+// PANEL_INFORMA=1: solo informa (para medir un antes)
+const PANEL_TOPE = .35, PANEL_INFORMA = process.env.PANEL_INFORMA !== '0';      // por ahora solo informa: el tope se exige con el panel nuevo
 const browser = await chromium.launch(launchOptions({ headed: HEADED }));
 
 const CASOS = [
@@ -204,6 +207,11 @@ async function correr(C) {
       firma = clave; pantallas.add(s.pantalla);
       if (s.panel) await av(450);
       const R = await revisar(clave.replace(/\|+/g, ' ').trim()); revisadas++;
+      if (s.panel && s.pantalla === 'llamado' && R.panel && !C.vertical) {
+        const d = await J(() => { const pn = document.querySelector('#capa .panel'); return { detalle: !!pn?.querySelector('.pn-detalle:not([hidden])'), estilo: (pn?.querySelector('.pn-estilo')?.textContent || '').replace(/\s+/g, ' ').trim() }; });
+        const pct = R.panel.alto / C.h; PANEL.push({ p: C.nombre, titulo: R.panel.titulo, alto: R.panel.alto, pct, ...d });
+        if (!d.detalle && pct > PANEL_TOPE && ['iphone_844x390', 'android_667x375'].includes(C.nombre) && !PANEL_INFORMA) mal(`el panel del llamado «${R.panel.titulo}» ocupa ${Math.round(pct * 100)} % del alto con el detalle plegado (tope ${PANEL_TOPE * 100} %)`);
+      }
       const sg = I && I.propio ? I.senal : null;
       if (s.panel && ['inicio', 'presentacion', 'apertura', 'intervalo'].includes(s.pantalla)) await tapa(s.pantalla);
       if (s.panel && s.pantalla === 'llamado') await tapa('llamado'); else if (sg && sg.tipo === 'barra') { await av(500); await tapa('corre'); } else if (sg && sg.tipo === 'espera' && sg.barra) await tapa('quieta');
@@ -277,6 +285,7 @@ try { for (const C of CASOS.filter(c => !SOLO || c.nombre === SOLO)) await corre
 catch (e) { problemas.push('excepción de la prueba: ' + (e.stack || e.message)); }
 await browser.close(); server.close();
 if (TAPA.length) { console.log('\nCuánto tapa la interfaz al pesista (caja proyectada desde three; tools/tapa.mjs):'); for (const id of [...new Set(TAPA.map(x => x.p))]) { console.log(`  [${id}]`); for (const x of TAPA.filter(y => y.p === id)) console.log('    ' + fila(x.momento, x.x)); } fs.writeFileSync(path.join(OUT, 'tapa.json'), JSON.stringify(TAPA, null, 1)); }
+if (PANEL.length) { console.log('\nAlto del panel del llamado (con el detalle plegado salvo que diga «detalle»):'); for (const x of PANEL) console.log(`  [${x.p}] ${x.titulo}: ${x.alto} px · ${Math.round(x.pct * 100)} % del alto${x.detalle ? ' · detalle' : ''}${x.estilo ? ` · «${x.estilo}»` : ''}`); fs.writeFileSync(path.join(OUT, 'panel.json'), JSON.stringify(PANEL, null, 1)); }
 for (const n of notas) console.log('nota: ' + n);
 if (problemas.length) { console.log(`\nFALLÓ (${problemas.length}):`); for (const p of problemas.slice(0, 40)) console.log('  ' + p); process.exit(1); }
 console.log('\nOK: teléfono de costado (dos tamaños y mano izquierda) y en vertical con el contenido girado, jugado con toques, campos de texto con el editor de arriba y dos dedos, sin cortes ni superposiciones');
