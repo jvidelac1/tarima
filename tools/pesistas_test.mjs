@@ -15,7 +15,7 @@
 //      por más o por el oro: riesgo elegido, no falta de coordinación);
 //   distintos: en las caídas, lo que más le costó a Largo es pararse y a Potente, arriba de la cabeza (lo que dice su tarjeta);
 //   parejos: con rivales normales, ningún pesista gana con el panel más de 25 puntos que otro.
-// Uso: node tools/pesistas_test.mjs [--n=200]
+// Uso: node tools/pesistas_test.mjs [--n=600] [--orden=rondas|oficial|viejo]
 import { Partida } from '../web/js/sim/match.js';
 import { HUELLA_IA } from '../web/js/sim/ai.js';      // los rivales del juego (con personalidad)
 import { mezclar } from '../web/js/sim/fixed.js';
@@ -26,7 +26,9 @@ import { jugarUno, datos, ATL, BOTS_U } from './uno_bots.mjs';
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 // orden de los turnos (match.js → TURNOS): por defecto 'rondas', como el juego; --orden=oficial o --orden=viejo (sin turnos)
 const ORDEN = arg('orden') || 'rondas', TURNOS_CFG = ORDEN === 'viejo' ? {} : { turnos: ORDEN };
-const N = +(arg('n') || 200);
+// 600 finales (antes 200): con 200, el oro de cada pesista se mueve ±4 puntos entre corridas y el criterio E de Compacto caía
+// por debajo de 15 según cómo salieran los llamados (15-nov, orden por rondas); ~2,5 min en una Mac.
+const N = +(arg('n') || 600);
 const NOVATO = { ...BOTS_U.reactivo, lag: 60 };
 const TIPO = { ventura: 'Compacto', brenner: 'Largo', marangi: 'Potente' };
 

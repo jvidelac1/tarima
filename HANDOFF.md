@@ -1339,6 +1339,81 @@ suben (llamado 32–39, veredicto 10–30) por el tablero.
 datos (`rival_salteado`) cuántos miran a los rivales enteros. El RM es el de la ficha: la «forma del día» y el cansancio no lo
 cambian (sí la chance y la dificultad). Clásico también usa el tablero y el botón (no tiene el «Toca: seguir» de los rivales).
 
+### Orden por rondas y «Cambiar» el pedido (15-nov, rama `rondas`, LIF-3 y LIF-4)
+
+Pedidos del dueño: LIF-3 «ordenar por rondas los intentos de los 3 pesistas» (con el orden oficial el jugador espera muchos
+turnos seguidos y se entiende mal) y LIF-4 «permitir 1 o 2 cambios de kilos por intento» para responder a los rivales.
+Nada fusionado ni publicado.
+
+- **Núcleo** (`match.js → TURNOS`, `HUELLA_TURNOS`). `new Partida(..., { turnos: 'rondas' | 'oficial' })`; el registro lleva
+  `orden` y `turnos` (la huella) y `replay.js` rechaza otra huella u otro orden. Sin `turnos` (registros viejos) todo es como
+  antes: orden oficial y sin pedidos antes del turno. Por rondas: en cada ronda los tres levantan una vez; dentro de la ronda
+  abre quien pidió menos, a igual peso quien lo pidió primero (`a.pidio`) y después el dorsal. `ordenSalida()` y `ronda()`
+  son de la partida (el tablero ya no copia la regla).
+- **Decisión: la barra nunca baja dentro de la ronda** porque el mínimo de quien todavía no levantó en esa ronda incluye lo
+  cargado (`minimo`, con `rondaBarra`) y se sale de menor a mayor: nadie puede quedar por debajo, así que no hace falta «subir
+  el pedido» ni reordenar a nadie. Entre rondas sí baja (la ronda 2 la abre el pedido más bajo): lo que pide quien ya levantó
+  es para la ronda siguiente y no lo limita la barra de esta. En 600 finales de `sim_test` 17 pasó 827 veces.
+- **Pedidos antes del turno** (`Partida.pedidoValido`/`pedir`): con `turnos`, mientras levanta otro, la persona sube su pedido;
+  solo hacia arriba, nunca bajo su mínimo, y dos por intento contando los cambios del panel de su llamado. En el registro va
+  entre los llamados como `{a, lev, pide}` (límite de llamados 40 → 52 con turnos).
+- **Decisión: el panel del llamado propio sigue como estaba** (puede bajar hasta el mínimo; es la declaración final y es zona
+  del agente de `panel`). Lo nuevo es lo de antes del turno, que solo sube como pide el ticket.
+- **Rivales.** Con `turnos` sus cambios al cierre de un intento ajeno son los mismos de antes (la tabla del dos tiempos, por
+  personalidad) pero solo hacia arriba y como mucho dos. Se probó que Brenner y Marangi cambiaran también en el tercer arranque
+  al ir atrás (con «lo justo para pasar» y con su propio número): sus cambios caían en la marca o el pedido del jugador ±1 entre
+  0,16 y 0,29 veces por final (meta de `rivales_test` ≤ 0,15) y **se descartó**. `ai.js` no cambió de huella.
+- **Juego.** Opciones → «Orden»: «Por rondas» (por defecto) u «Oficial», con una nota de una línea (`tarima.orden`). El tablero
+  dice «Arranque · Ronda 2» (computadora), el cambio de un rival al pie («Brenner cambia a 167», en dorado; en el teléfono esa
+  línea reemplaza a la de la estrategia) y, en el turno de un rival, un botón chico **«Cambiar»** debajo del tablero (tecla C).
+  Abierto: «− 167 +» con «X de 10» (en 'b' y 'u'), «Pedir 167», ✕ y «Te quedan 2 cambios»; flechas, Enter y Esc con teclado.
+  Con el tablero quieto (el resultado del rival ya está calculado) solo se pone al día la fila propia («antes 165»). Si en la
+  partida ya le toca a la persona (el rival que se ve ya se resolvió), el pedido queda pendiente y entra como cambio de su
+  llamado al abrirlo (`E.pedidoPend`; si la desplaza, sale otro). Evento `pedido_cambiado` (docs/MVP.md). `ui/pedido.js` es
+  lo puro (qué se puede pedir) y lo prueba `sim_test` 17.
+- **Compatibilidad.** `tools/sim_ref*.json` existentes sin cambios y en verde; `tools/sim_ref_turnos.json` es nuevo (12
+  partidas, rondas y oficial, con pedidos). `ritmo_test`, `rivales_test` y `pesistas_test` aceptan `--orden=rondas|oficial|viejo`
+  y por defecto miden lo que juega el juego (rondas). El muro (conexion.js, servidor.js, worker/) no se tocó; el servidor no
+  recalcula registros.
+
+**Medido** (sin navegador, en la Mac, de a una prueba; antes = `--orden=viejo`, idéntico a `main`):
+
+| ritmo_test, 360 finales por fila | antes | por rondas |
+|---|---|---|
+| turnos de rivales seguidos entre dos propios: mediana · p90 · máximo | 1 · 4 · 6 | 2 · 3 · **4** |
+| Fácil, mirando cada rival: espera mediana · p90 · máxima | 12,2 · 35,8 · 61,3 s | 17,4 · 27,2 · **40,5 s** |
+| Fácil, saltando cada rival: espera mediana · p90 · máxima | 5,5 · 12,2 · 17,1 s | 7,7 · 10,0 · **12,2 s** |
+| Medio / Difícil saltando: espera máxima | 17,1 / 17,1 s | 12,2 / 12,2 s |
+| final mediana, Fácil mirando / saltando | 194,5 / 126,0 s | 195,8 / 126,9 s |
+| final mediana saltando, Medio / Difícil | 136,0 / 137,5 s | 136,1 / 137,6 s |
+
+La mediana de la espera sube porque ya no hay dos levantamientos propios seguidos (antes, muchos «0 rivales en el medio»);
+lo que baja es la espera larga, que era la queja. El orden «Oficial» nuevo da lo mismo que antes (máxima 61,4 s).
+`ritmo_test` ahora juzga las barras caídas con 250 semillas: con 60, Medio daba 19,3 % por rondas y 16,4 % antes según en qué
+orden salían los llamados (la semilla de cada intento depende de su número); con 250, 17,3 % y 16,7 % (meta ≤ 18 %).
+
+| oro del novato con el panel (rivales_test, 'b', 500 finales) | antes | por rondas |
+|---|---|---|
+| rivales amistosos | 88 % | 87 % |
+| rivales normales | 15 % | 19 % |
+
+| pesistas_test ('u', 600 finales, rivales normales, panel) | antes | por rondas |
+|---|---|---|
+| Compacto / Largo / Potente | 51 / 48 / 69 % | 44 / 50 / 62 % |
+| diferencia entre pesistas (meta ≤ 25) | 20 | 18 |
+| panel contra prudente, peor pesista (meta ≥ 15) | 18 | 31 |
+| panel contra codicioso, peor pesista (meta ≥ 15) | 28 | 18 |
+
+El «prudente» (+2 kg siempre) se hunde por rondas (Compacto 31 → 3 %): antes la barra lo obligaba a subir; ahora puede
+pedir poco entre rondas y lo hace. `pesistas_test` pasa a 600 finales por defecto: con 200 el criterio E de Compacto caía a 13
+puntos por ruido (con 600, 18). Rivales: cambios espejo 0,01 a 0,10 por final (antes 0,01 a 0,14), contrafáctica 0 %
+(declarar ±3 kg no cambia ninguna decisión de un rival), variedad igual. Cambios de rivales que ve el jugador tras sus
+intentos: 0,6 por final en amistoso (antes 0,4).
+
+**Pendiente / para el dueño.** Mirarlo jugando: si «Cambiar» se usa (evento `pedido_cambiado`) y si el «Ronda 2» del tablero
+alcanza para entender el orden. Decidir si el panel del llamado propio también debe ser «solo hacia arriba» (hoy deja bajar
+hasta el mínimo). Los rivales siguen sin cambiar en el arranque (con ellos cambiando, espejaban al jugador).
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.
