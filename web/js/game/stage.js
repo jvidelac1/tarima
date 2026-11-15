@@ -23,6 +23,9 @@ import { PLATE_R, PLATES, loadout, COLLAR_KG } from '../config.js';
 import { PLANTEL, JUGADOR } from './roster.js';
 import { aplicarEsfuerzo } from './effort.js';
 import { tramo } from './sequence.js';
+import { CamaraViva } from './camara_viva.js';
+import { Ambiente } from './ambiente.js';
+import { Reflejo } from './reflejo.js';
 
 /**
  * Lo que el pase final de post.js hace después del AgX (saturación, contraste, gamma de sombras y tinte frío/cálido), como
@@ -189,7 +192,12 @@ export const PLANOS = {
   medio: { key: 'medio', at: ['Neck', 'Hips'], up: -.05, d: 2.05, az: .5, el: .05, fov: 22 },
   caida: { key: 'caida', at: [], up: 0, dAbs: 4.6, az: .72, el: .14, fov: 30, punto: 'caida' },
   manga: { key: 'manga', at: [], up: 0, dAbs: 1.45, az: 1.05, el: .2, fov: 30, punto: 'manga' },
+  // desde la mesa del árbitro central (LIF-38): por encima de su hombro, el pesista de frente y, arriba de la pantalla,
+  // las tres luces de arbitraje. La cámara queda en (0; 0,55; 8,6) mirando a (0; 0,96; 0): entran de la cabeza del árbitro a las luces
+  jurado: { key: 'jurado', at: [], up: 0, dAbs: 8.61, az: 0, el: -.0476, fov: 30, punto: 'jurado' },
 };
+/** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
+const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
 
 export class Escena {
   constructor(canvas, Q, { reduceMotion = false } = {}) {
@@ -204,13 +212,18 @@ export class Escena {
     this.scene = new THREE.Scene(); this.scene.background = new THREE.Color('#070b16'); this.scene.fog = new THREE.FogExp2('#0b1226', .015);
     this._niebla = { hdr: this.scene.fog.color.clone(), directo: tonoJS(this.scene.fog.color) };      // en el camino directo la niebla se mezcla ya en colores de pantalla
     if (canvas.parentElement && typeof document !== 'undefined') { const d = this.velo = document.createElement('div'); d.setAttribute('aria-hidden', 'true'); d.style.cssText = `position:absolute;inset:0;pointer-events:none;background:${vineta()}`; canvas.after(d); }
-    this.rig = new CameraRig(canvas, { reduceMotion, interactive: false });
+    this.rig = new CameraRig(canvas, { reduceMotion, interactive: false }); this.viva = new CamaraViva({ reduceMotion });
     this.trace = new BarTrace(); this.scene.add(this.trace.group);
     const coarse = matchMedia('(pointer:coarse)').matches, aniso = Math.min(Q.aniso || 4, r.capabilities.getMaxAnisotropy());
     this.arena = new Arena({ tex: coarse || Q.tex <= 1024 ? 1024 : 2048, aniso, reduceMotion }); this.scene.add(this.arena.group);
-    this.lighting = new Lighting(this.scene);
+    // ambiente del juego (ambiente.js): retoca texturas y sombreadores de la arena antes de que se dibuje nada, y recibe lo
+    // mismo que el tablero y las luces de la arena (main.js no cambia: sigue llamando a arena.setBoard y arena.setDecision)
+    const amb = this.ambiente = new Ambiente(this.arena, { tex: coarse || Q.tex <= 1024 ? 1024 : 2048, aniso, reduceMotion }); this.scene.add(amb.group);
+    { const A = this.arena, tablero = A.setBoard.bind(A), decision = A.setDecision.bind(A); A.setBoard = b => { tablero(b); amb.setCartel(b); }; A.setDecision = d => { decision(d); amb.setDecision(d); }; }
+    this.reflejo = new Reflejo(0); this.reflejo.parchar(this.arena.madera);
+    this.lighting = new Lighting(this.scene); amb.setLuces(this.lighting);
     this.barbell = new Barbell({ aniso, texSize: coarse ? 512 : 1024 }); this.scene.add(this.barbell.group);
-    this.arena.setQuality(Q); this.lighting.setQuality(Q);
+    this.arena.setQuality(Q); this.lighting.setQuality(Q); this._ambiente(Q);
     this.arena.group.traverse(o => { o.castShadow = false; if (o.material) [].concat(o.material).forEach(conTono); });      // en la sombra, solo el pesista y la barra
     this._capaSombra();
     this._post(Q); this._modo();
@@ -221,7 +234,7 @@ export class Escena {
     this.vigia = { p: new THREE.Vector3(), d: new THREE.Vector3(), q: new THREE.Vector3(), cad: new THREE.Vector3(), fov: 0, bar: [0, 0], listo: false, id: null };
     this.alCorte = null; this.velado = false;
     this.barbell.setLoad(100); this._sombraBarra(); this.barbell.setPosition(v.set(0, PLATE_R, 0)); this.barbell.settle(PLATE_R);
-    this.resize(); this.lighting.bake(r, [this.barbell.group, this.trace.group]);
+    this.resize(); this.lighting.bake(r, [this.barbell.group, this.trace.group, this.ambiente.group]);
     // después de hornear el entorno (que la ve igual): la arena fija en pocas mallas
     const A = this.arena; this.fijos = juntarFijos(A.group, new Set([A.impostors, A.crowd, A.bokeh, A.flashMesh, ...A.beamMeshes, ...(A.lamps || [])].filter(Boolean)));
     this.barato = null; this.setBarato(Q.barato);
@@ -307,6 +320,11 @@ export class Escena {
     }
     return res;
   }
+  /** Ambiente de la calidad (Q.amb): polvo, conos, público y reflejo de la tarima (solo con post: necesita color lineal). */
+  _ambiente(Q) {
+    const A = Q.amb || {}; this.ambiente.setNivel(A);
+    const esc = !Q.directo && A.reflejo > 0 ? A.reflejo : 0; if (esc) this.reflejo.escala = esc; this.reflejo.setActivo(esc > 0);
+  }
   _post(Q) {
     const p = this.post = new Post(this.renderer, this.scene, this.rig.camera, Q); p.reduceMotion = this.reduceMotion; p.motionObject = this.barbell.group; p.bokehObject = this.arena.bokeh;
     // Sin oclusión ni profundidad de campo ningún pase lee la profundidad de la escena: no se resuelve (una pasada de pantalla
@@ -343,7 +361,7 @@ export class Escena {
   resize() {
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight, Q = this.Q; if (!w || !h) return;
     const porTope = Math.sqrt(this.tope / (w * h)), pr = this.libre ? porTope : Math.min(window.devicePixelRatio || 1, Q.dpr, porTope);
-    this.renderer.setPixelRatio(pr); this.renderer.setSize(w, h, false); this.rig.setAspect(w / h); this.post.setSize(w, h, pr); this.vertical = h > w; this.sombra = 4;
+    this.renderer.setPixelRatio(pr); this.renderer.setSize(w, h, false); this.rig.setAspect(w / h); this.post.setSize(w, h, pr); this.reflejo.setSize(w * pr, h * pr); this.vertical = h > w; this.sombra = 4;
   }
   /**
    * Presupuesto de píxeles por cuadro. Solo cambia el tamaño de los destinos: no compila nada. `libre`: dibuja esos píxeles
@@ -359,7 +377,7 @@ export class Escena {
    * Rehace los pases y puede cambiar los programas de todos los materiales: solo durante la carga, seguido de precalentar().
    */
   setCalidad(Q) {
-    if (Q !== this.Q) { this.Q = Q; this.arena.setQuality(Q); this.lighting.setQuality(Q); this.post.dispose(); this._post(Q); this._sombras(); this.directo = !!Q.directo; this._modo(); this.setBarato(Q.barato); }
+    if (Q !== this.Q) { this.Q = Q; this.arena.setQuality(Q); this.lighting.setQuality(Q); this._ambiente(Q); this.post.dispose(); this._post(Q); this._sombras(); this.directo = !!Q.directo; this._modo(); this.setBarato(Q.barato); }
     this.tope = Q.maxPixels; this.libre = false; this.resize();
   }
   _sombras() { const L = this.lighting, Q = this.Q; L.key.castShadow = this.sombras && Q.shadow > 0; L.key2.castShadow = this.sombras && Q.shadow2 > 0; }
@@ -450,6 +468,9 @@ export class Escena {
     const a = this.activo; if (!a) return;
     aplicarEsfuerzo(a, temblor, t, this.reduceMotion);
     const g = pose.base + pose.s, i = Math.floor(g); a.setPair(i, i + 1, g - i);
+    // el pesista recibe la barra (la muestra cruza la fase de recepción en reproducción continua): dip de la cámara
+    if (dt > 0 && dt < .1 && this._rec?.seg === pose.seg && this._rec.s < pose.s && pose.s - this._rec.s < 8) { const r = this._recepcion(pose.seg); if (r >= 0 && this._rec.s < r && pose.s >= r) this.viva.dip(1); }
+    (this._rec ||= {}).seg = pose.seg; this._rec.s = pose.s;
     a.barWorld(v); if (pose.primero) this._tl(lev).barFix(pose.tau, v);
     if (v.y < PLATE_R) v.y = PLATE_R;
     if (this.barbell.group.rotation.x) this.barbell.group.rotation.x = 0;      // venía rodando (barra suelta)
@@ -471,6 +492,8 @@ export class Escena {
    * del centro (en el aire, los extremos se enderezan; contra la tarima, el golpe la hace vibrar); sin `dt`, quieta.
    */
   barraSuelta(b, dt = 0) {
+    // la barra contra la tarima (venía bajando y frenó de golpe cerca del piso): temblor según la velocidad del golpe
+    if (dt > 0 && dt < .1) { const v0 = (this._py[0] - this._py[1]) / dt, v1 = (b.y - this._py[0]) / dt; if (v0 < -1.2 && v1 - v0 > 1.2 && b.y < this.pisoBarra + .08) { const k = Math.min(.85, .18 - v0 * .11); this.viva.golpe(k); this.ambiente.golpe(b.z, k); } }
     v.set(0, b.y, b.z); this.barbell.setPosition(v); this.barbell.group.rotation.x = b.ang || 0;
     this.barY = b.y; this.barZ = b.z; this.rig.barY = b.y; this.rig.barAhead = b.y;
     if (dt > 0 && dt < .1) { const acc = (b.y - 2 * this._py[0] + this._py[1]) / (dt * dt); this.barbell.step(dt, b.y, acc); } else this.barbell.settle(b.y);
@@ -510,6 +533,12 @@ export class Escena {
     };
     en(0); return { dur: T1 + entra * DE + .05, en, sale, entra };
   }
+  /** Muestra local de la fase de recepción de un segmento (−1 si no tiene). */
+  _recepcion(seg) {
+    const c = this._recs ||= new WeakMap(); let m = c.get(this.P); if (!m) c.set(this.P, m = {});
+    if (m[seg] === undefined) { m[seg] = -1; const G = tramo(this.P, seg); for (const n of RECEPCIONES) { try { m[seg] = G.i(n); break; } catch { /* este segmento no tiene esa fase */ } } }
+    return m[seg];
+  }
   /** Altura del centro de la barra apoyada en la tarima con la carga de ahora. */
   get pisoBarra() { return Math.max(.05, this.barbell.plateR); }
   /** Distancia (m) entre el centro de la barra dibujada y el punto medio de las manos: para la prueba automática. */
@@ -519,7 +548,7 @@ export class Escena {
   /** Acercamiento sutil de la cámara (1 = el plano tal cual; 0,92 = un poco más cerca), amortiguado por el rig. */
   acercar(z = 1) { if (this.rig) this.rig.zoomT = z; }
   /** Cámara fija por clave. `suave` (s): en lugar de cortar, va desde la cámara de ahora (cameras.js, suave). */
-  camara(clave, suave = 0) { if (suave) this.rig.suave(suave); else this.rig.mezcla = null; this.plano = null; this.encuadre = null; this.rig.setShot(null); this.rig.cut(CAM[clave] ?? 0); }
+  camara(clave, suave = 0) { if (PLANOS[clave]) { this.primerPlano(clave, null, suave); return; } if (suave) this.rig.suave(suave); else this.rig.mezcla = null; this.plano = null; this.encuadre = null; this.rig.setShot(null); this.rig.cut(CAM[clave] ?? 0); }
   /**
    * Primer plano por clave (SHOTS del visor o PLANOS del juego). `encuadre`: {x, y} fracción del lienzo (desde arriba a la
    * izquierda) donde tiene que quedar el sujeto, para dejarlo en la parte libre cuando un panel tapa un costado o el pie.
@@ -533,6 +562,7 @@ export class Escena {
   _apuntar() {
     const a = this.activo, sh = this.plano; if (!sh) return;
     if (sh.punto === 'manga') v2.copy(this.barbell.group.position).add(v.set(.92, .02, 0));
+    else if (sh.punto === 'jurado') v2.set(0, .96, 0);
     else if (sh.punto === 'caida') { if (a) a.boneWorld('Hips', v2); else v2.set(0, 1, 0); v2.lerp(this.barbell.group.position, .5); v2.x = 0; v2.y = Math.max(.85, v2.y); }
     else { if (!a) return; const huesos = sh.at.filter(k => k !== 'Bar'), nb = sh.at.length - huesos.length; a.midWorld(huesos, v2).multiplyScalar(huesos.length); if (nb) v2.add(this.barbell.group.position); v2.multiplyScalar(1 / sh.at.length); v2.y += sh.up * this.P.h; }
     const e = this.encuadre;
@@ -578,7 +608,7 @@ export class Escena {
   }
   /** Avanza cámara y entorno; dibuja si `pintar`. */
   cuadro(dt, pintar = true) {
-    this._apuntar(); this.rig.update(dt); this._vigilar(dt); this.trace.face(this.rig.camera); this.post.focus = this.rig.focusDistance; this.arena.update(dt, this.rig.camera); this._detalle();
+    this._apuntar(); this.rig.update(dt); this._vigilar(dt); this.viva.aplicar(this.rig.camera, dt, this.rig.focusDistance); this.trace.face(this.rig.camera); this.post.focus = this.rig.focusDistance; this.arena.update(dt, this.rig.camera); this.ambiente.update(dt); this._detalle();
     if (!pintar) return;
     const r = this.renderer; r.shadowMap.needsUpdate = this.sombra > 0; if (this.sombra > 0) this.sombra--;
     this._dibujar(dt);
@@ -602,6 +632,8 @@ export class Escena {
   }
   _dibujar(dt) {
     if (this.directo) { const r = this.renderer; r.setRenderTarget(null); r.render(this.scene, this.rig.camera); return; }
+    // reflejo de la tarima (calidades altas): la escena desde la cámara espejada, sin la tarima, el escenario ni lo que no se refleja
+    if (this.reflejo.activo) { const A = this.arena; this.reflejo.render(this.renderer, this.scene, this.rig.camera, [A.tarima, A.escenario, this.trace.group, this.ambiente.polvo, A.bokeh, A.flashMesh].filter(Boolean)); }
     this.post.motion.set(0, 0); this.post.render(dt);
   }
 }
