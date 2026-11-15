@@ -1,13 +1,28 @@
 // Máquina de la partida (docs/JUEGO.md, secciones 6, 7 y 9.2): orden de salida, llamados, declaraciones, cambios, Resto,
 // clasificación, La cuenta y etiquetas. Carga, reacción y ceremonia no tienen lógica: las muestra la presentación.
 // La partida se maneja igual en vivo y al recalcular: abrir() → empezar() → [cambio()] → resolver() o resolverIA() → …
-import { idiv, rdiv, clampi, mezclar, Azar } from './fixed.js';
+import { idiv, rdiv, clampi, mezclar, Azar, huella, canonico } from './fixed.js';
 import { simular } from './attempt.js';
 import { gestos, decidir, elegirEnvion, planRival, decidirPlan, estiloRival, HUELLA_IA } from './ai.js';
 import { sugerencia } from './entrenador.js';
 import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad, cuerpoDe, cuerpoBarra, HUELLA_U, HUELLAS_B, NIVELES_B, fatigaDe, sumarFatiga } from './rules.js';
 
 const LEVS = ['s', 'c'];
+
+/**
+ * Orden de los turnos y pedidos antes del turno (LIF-3 y LIF-4, 15-nov). Con `turnos` en la configuración de la partida:
+ *   'rondas'  (por defecto en el juego) en cada ronda los tres levantan una vez; dentro de la ronda abre quien pidió menos
+ *             kilos (a igual peso, quien lo pidió primero, y después el número de sorteo: el dorsal). La barra nunca baja
+ *             dentro de la ronda: todo pedido o cambio de quien todavía no levantó en esa ronda tiene como mínimo lo que ya
+ *             está cargado, y como el orden es de menor a mayor, nadie queda con menos que la barra. Entre rondas sí puede
+ *             bajar (la ronda 2 la abre el pedido más bajo, aunque sea menos que lo último de la ronda 1).
+ *   'oficial' el reglamento: el orden por peso a lo largo de todo el levantamiento (como siempre).
+ * En los dos, la persona puede cambiar su pedido hasta `previos` veces antes de su turno (`pedir`), y esos cambios (y los de
+ * los rivales al cierre de un intento ajeno) solo suben. Sin `turnos` (registros viejos) todo queda como antes: orden
+ * oficial, sin pedidos antes del turno. La lógica no entra en la huella: si cambia, subir `version`.
+ */
+export const TURNOS = { version: '1.0', modos: ['rondas', 'oficial'], previos: 2, soloSube: true };
+export const HUELLA_TURNOS = huella(canonico(TURNOS));
 
 export class Partida {
   /**
@@ -25,7 +40,8 @@ export class Partida {
     if (!Array.isArray(cfg.atletas) || cfg.atletas.length !== 3 || new Set(cfg.atletas.map(x => x.id)).size !== 3) throw new Error('la final es de tres pesistas distintos');
     const ctl = cfg.ctl ?? 'c'; if (!CONTROLES.includes(ctl)) throw new Error('nivel de control desconocido');
     if (cfg.ia !== undefined && cfg.ia !== HUELLA_IA) throw new Error('reglas de los rivales desconocidas');
-    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl, tactil: (ctl === 'f' || ctl === 'u' || ctl === 'b') && !!cfg.tactil, ia: cfg.ia ?? null, dif: ctl === 'b' && NIVELES_B[cfg.dif] ? cfg.dif : 'facil' };
+    if (cfg.turnos !== undefined && !TURNOS.modos.includes(cfg.turnos)) throw new Error('orden de turnos desconocido');
+    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl, tactil: (ctl === 'f' || ctl === 'u' || ctl === 'b') && !!cfg.tactil, ia: cfg.ia ?? null, turnos: cfg.turnos ?? null, dif: ctl === 'b' && NIVELES_B[cfg.dif] ? cfg.dif : 'facil' };
     if (cfg.dif !== undefined && cfg.dif !== 'facil' && this.cfg.dif !== cfg.dif) throw new Error('nivel de dificultad desconocido');
     const r = new Azar(mezclar(this.cfg.semilla, 7)), N = NIVELES[cfg.nivel];
     this.jueces = [0, 1, 2].map(() => r.entre(900, 1100));
@@ -35,7 +51,7 @@ export class Partida {
       const f = datos.atletas[x.id]; if (!f) throw new Error('pesista desconocido: ' + x.id);
       const forma = { s: r.entre(-2, 2), c: r.entre(-2, 2) }, pct = clampi(f.ia.apertura + r.entre(-25, 25), 910, 960) + N.abre;
       const saltos = { s: f.ia.saltos.s.map(k => k + r.entre(-1, 1)), c: f.ia.saltos.c.map(k => k + r.entre(-1, 1)) }, sube1 = [r.ent(3) === 0, r.ent(3) === 0, r.ent(3) === 0, r.ent(3) === 0];
-      const a = { i, id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego', f, modelo: datos.modelos[f.modelo], resto: RESTO.ini, forma, saltos, sube1, s: [], c: [], decl: { s: 0, c: 0 }, mejor: { s: 0, c: 0 }, seqMejor: { s: -1, c: -1 }, ult: { s: -1, c: -1 }, cambios: 0, bono: '', garraUno: { s: true, c: true }, fatiga: { s: 0, c: 0 } };
+      const a = { i, id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego', f, modelo: datos.modelos[f.modelo], resto: RESTO.ini, forma, saltos, sube1, s: [], c: [], decl: { s: 0, c: 0 }, mejor: { s: 0, c: 0 }, seqMejor: { s: -1, c: -1 }, ult: { s: -1, c: -1 }, cambios: 0, pidio: 0, bono: '', garraUno: { s: true, c: true }, fatiga: { s: 0, c: 0 } };
       if (a.ctrl === 'juego') { if (N.forma) { forma.s += N.forma; forma.c += N.forma; } a.decl.s = rdiv(f.techo.s * pct, 1000); a.decl.c = rdiv(f.techo.c * pct, 1000); }
       return a;
     });
@@ -47,8 +63,8 @@ export class Partida {
       a.plan = planRival(a.id, { s: this.techoVisible(a.i, 's'), c: this.techoVisible(a.i, 'c') }, a.f.techo, cfg.nivel, mezclar(this.cfg.semilla, 31, a.i));
       a.decl = { ...a.plan.decl };
     }
-    this.fase = 'presentacion'; this.lev = 's'; this.seq = 0; this.barra = 0; this.ultimo = -1; this.llamado = null; this.nLlamado = 0;
-    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : ctl === 'b' ? { barra: HUELLAS_B[this.cfg.dif], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}) } : {}), ...(this.cfg.ia ? { ia: this.cfg.ia } : {}),
+    this.fase = 'presentacion'; this.lev = 's'; this.seq = 0; this.barra = 0; this.rondaBarra = -1; this.nPedido = 0; this.ultimo = -1; this.llamado = null; this.nLlamado = 0;
+    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : ctl === 'b' ? { barra: HUELLAS_B[this.cfg.dif], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}) } : {}), ...(this.cfg.ia ? { ia: this.cfg.ia } : {}), ...(this.cfg.turnos ? { orden: this.cfg.turnos, turnos: HUELLA_TURNOS } : {}),
       atletas: cfg.atletas.map(x => ({ id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego' })), aperturas: this.at.map(a => ({ s: a.decl.s, c: a.decl.c })), llamados: [] };
   }
 
@@ -66,7 +82,7 @@ export class Partida {
   empezar() {
     const lev = this.fase === 'presentacion' ? 's' : this.fase === 'intervalo' ? 'c' : null; if (!lev) throw new Error('no hay sesión por empezar');
     if (this.at.some(a => !a.decl[lev])) throw new Error('falta una apertura');
-    this.fase = this.lev = lev; this.barra = 0; this.ultimo = -1; this._siguiente();
+    this.fase = this.lev = lev; this.barra = 0; this.rondaBarra = -1; this.ultimo = -1; for (const a of this.at) a.pidio = 0; this._siguiente();
   }
 
   // ---------- consultas ----------
@@ -75,11 +91,36 @@ export class Partida {
   intensidadDe(i, lev, kg) { return intensidad(kg, techoMomento(this.techoDia(i, lev), this.at[i].resto)); }
   /** Techo visible (g): el de ficha corregido por el Resto. Con `signo`, suma 1 kg por el signo de la forma del día (lo que usan los rivales). */
   techoVisible(i, lev, signo = true) { const a = this.at[i], s = a.forma[lev]; return techoMomento(a.f.techo[lev] * 1000, a.resto) + (signo ? (s > 0 ? 1000 : s < 0 ? -1000 : 0) : 0); }
-  /** Mínimo que puede pedir: 1 kg más tras un válido, lo mismo tras un nulo, y nunca menos de lo que ya está en la barra. */
+  /**
+   * Mínimo que puede pedir: 1 kg más tras un válido, lo mismo tras un nulo, y nunca menos de lo que ya está en la barra. Por
+   * rondas, la barra cuenta solo para quien todavía no levantó en la ronda en la que se cargó (lo que pide quien ya levantó
+   * es para la ronda siguiente, que puede abrir más abajo).
+   */
   minimo(i, lev = this.lev) {
     const a = this.at[i], u = a[lev][a[lev].length - 1], m = u ? (u.res === 'valido' ? u.kg + 1 : u.kg) : this.rangoApertura(i, lev)[0];
-    return Math.max(m, lev === this.lev ? this.barra : 0);
+    return Math.max(m, lev !== this.lev ? 0 : this.cfg.turnos === 'rondas' ? (a[lev].length === this.rondaBarra ? this.barra : 0) : this.barra);
   }
+  /** Ronda en curso (1 a 3) del levantamiento que se compite, por rondas; 0 en el orden oficial o fuera de una sesión. */
+  ronda() {
+    if (this.cfg.turnos !== 'rondas' || (this.fase !== 's' && this.fase !== 'c')) return 0;
+    const L = this.llamado; if (L) return L.n;
+    const n = this.at.filter(a => a[this.lev].length < 3).map(a => a[this.lev].length); return n.length ? Math.min(...n) + 1 : 0;
+  }
+  /** Comparación del orden de salida entre dos pesistas con intentos pendientes en `lev` (la regla de cada modo). */
+  _antes(x, y, lev) {
+    if (this.cfg.turnos === 'rondas') return (x[lev].length - y[lev].length) || (x.decl[lev] - y.decl[lev]) || (x.pidio - y.pidio) || (x.f.dorsal - y.f.dorsal);
+    return (x.decl[lev] - y.decl[lev]) || (x[lev].length - y[lev].length) || (x.ult[lev] - y.ult[lev]) || (x.f.dorsal - y.f.dorsal);
+  }
+  /**
+   * Orden en que van a levantar si nadie cambia nada: el llamado en curso (`L`) primero, después los que tienen intentos (por
+   * rondas, los que faltan en esta ronda y después los de la siguiente) y al final los que terminaron. Índices de pesista.
+   */
+  ordenSalida(L = this.llamado) {
+    const lev = this.lev, pend = this.at.filter(a => a[lev].length < 3 && (!L || a.i !== L.a)).sort((x, y) => this._antes(x, y, lev));
+    return [...(L ? [this.at[L.a]] : []), ...pend, ...this.at.filter(a => a[lev].length >= 3 && (!L || a.i !== L.a))].map(a => a.i);
+  }
+  /** Anota cuándo pidió un pesista lo que tiene pedido (desempate por rondas: quien pidió primero). */
+  _pide(a, kg) { a.decl[this.lev] = kg; a.pidio = ++this.nPedido; }
   _filas(i = -1, lev = 's', kg = 0) {
     return this.at.map(a => {
       let s = a.mejor.s, c = a.mejor.c, qs = a.seqMejor.s, qc = a.seqMejor.c;
@@ -144,7 +185,7 @@ export class Partida {
       if (lev === 's') { this.fase = 'intervalo'; for (const a of this.at) a.resto = Math.min(RESTO.ini, a.resto + RESTO.intervalo); } else this.fase = 'fin';
       return;
     }
-    cand.sort((x, y) => (x.decl[lev] - y.decl[lev]) || (x[lev].length - y[lev].length) || (x.ult[lev] - y.ult[lev]) || (x.f.dorsal - y.f.dorsal));
+    cand.sort((x, y) => this._antes(x, y, lev));
     const a = cand[0], n = a[lev].length + 1, seguido = this.ultimo === a.i, clave = lev + n;
     if (seguido && a.bono !== clave) { a.bono = clave; a.resto = Math.min(RESTO.ini, a.resto + RESTO.seguido); }
     const idx = this.nLlamado++;
@@ -174,11 +215,35 @@ export class Partida {
   cambio(ms, kg) {
     const mal = this.cambioValido(ms, kg); if (mal) throw new Error('cambio inválido: ' + mal);
     const L = this.llamado, a = this.at[L.a];
-    a.decl[L.lev] = kg; a.cambios++; L.cambios.push([ms, kg]);
+    if (this.cfg.turnos) this._pide(a, kg); else a.decl[L.lev] = kg;
+    a.cambios++; L.cambios.push([ms, kg]);
     const idx = L.idx; this.nLlamado = idx; this._siguiente();
     if (this.llamado.a !== L.a) { this.reg.llamados.push({ a: L.a, lev: L.lev, n: L.n, kg: L.kg0, cambios: L.cambios, fin: 'desplazado', int: 0 }); this.nLlamado = idx + 2; this.llamado.idx = idx + 1; this.llamado.sem = mezclar(this.cfg.semilla, 100 + idx + 1); return { desplazado: true }; }
     this.llamado.kg0 = L.kg0; this.llamado.cambios = L.cambios; this.llamado.reloj = L.reloj;
     return { desplazado: false };
+  }
+  /**
+   * ¿Puede la persona `i` cambiar su pedido a `kg` ahora, antes de su turno (LIF-4)? Devuelve el motivo si no. Solo con
+   * `turnos`, mientras levanta otro (o entre dos turnos), hasta TURNOS.previos veces por intento (cuentan junto con los
+   * cambios del panel de su llamado), siempre hacia arriba y nunca por debajo de su mínimo.
+   */
+  pedidoValido(i, kg) {
+    const a = this.at[i], lev = this.lev;
+    if (!this.cfg.turnos) return 'sin pedidos antes del turno';
+    if (this.fase !== 's' && this.fase !== 'c') return 'no hay sesión';
+    if (!a || a.ctrl !== 'persona') return 'no es una persona';
+    if (a[lev].length >= 3) return 'ya terminó';
+    if (this.llamado && this.llamado.a === i) return 'es su turno';
+    if (a.cambios >= TURNOS.previos) return 'ya hizo sus dos cambios';
+    if (!Number.isInteger(kg) || kg <= a.decl[lev]) return 'solo hacia arriba';
+    if (kg < this.minimo(i) || kg > KG_MAX) return 'peso fuera de rango';
+    return null;
+  }
+  /** Cambio de pedido de la persona antes de su turno: queda en el registro como `{a, lev, pide}` entre los llamados. */
+  pedir(i, kg) {
+    const mal = this.pedidoValido(i, kg); if (mal) throw new Error('pedido inválido: ' + mal);
+    const a = this.at[i]; this._pide(a, kg); a.cambios++;
+    this.reg.llamados.push({ a: i, lev: this.lev, pide: kg });
   }
   /** Cierra el llamado de una persona con lo que tocó: {conf, env, ent}. El resultado se recalcula acá, nunca se recibe. */
   resolver(rec) {
@@ -208,7 +273,7 @@ export class Partida {
     if (res.uno && res.uno.garra === 'usada') a.garraUno[lev] = false;      // 'u': una garra por levantamiento
     if (ctx.ctl === 'b' && res.uno) sumarFatiga(a.fatiga, lev, fatigaDe(res.uno));      // 'b': lo que exigió este intento cansa a los siguientes
     for (const b of this.at) if (b !== a) b.resto = Math.min(RESTO.ini, b.resto + RESTO.ajeno);
-    a.ult[lev] = seq; a.cambios = 0; this.ultimo = a.i; this.barra = L.kg;
+    a.ult[lev] = seq; a.cambios = 0; this.ultimo = a.i; this.barra = L.kg; this.rondaBarra = L.n - 1;
     // declaración automática: el plan del entrenador
     const n = a[lev].length;
     if (n < 3) {
@@ -219,11 +284,13 @@ export class Partida {
       // 'u' (Gameplay 2.1): la persona declara lo que propone el entrenador (entrenador.js), no el plan fijo. Así el orden de
       // los llamados ya cuenta con ese peso y el panel no la desplaza al proponerlo
       else if (this.cfg.ctl === 'u' || this.cfg.ctl === 'b') { const k = sugerencia(this, a.i, lev, ctx.env); if (k !== null) a.decl[lev] = k; }
+      if (this.cfg.turnos) this._pide(a, a.decl[lev]);      // pidió ahora (desempate por rondas)
     }
     // cambios de los rivales, al cierre de cada intento ajeno
     const avisos = [];
     for (const b of this.at) if (b !== a && b.ctrl === 'juego' && b[lev].length < 3 && b.cambios < 2) {
-      const k = this.cfg.ia ? decidirPlan(this, b.i, false) : decidir(this, b.i); if (k !== null && k >= this.minimo(b.i)) { avisos.push({ a: b.i, de: b.decl[lev], a_kg: k }); b.decl[lev] = k; b.cambios++; }
+      const k = this.cfg.ia ? decidirPlan(this, b.i, false) : decidir(this, b.i);
+      if (k !== null && k >= this.minimo(b.i) && (!this.cfg.turnos || (k > b.decl[lev] && b.cambios < TURNOS.previos))) { avisos.push({ a: b.i, de: b.decl[lev], a_kg: k }); if (this.cfg.turnos) this._pide(b, k); else b.decl[lev] = k; b.cambios++; }
     }
     this._siguiente();
     return { res, gasto, avisos, intento: a[lev][n - 1] };

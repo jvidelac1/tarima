@@ -1,6 +1,6 @@
 // Recalcula una partida entera desde su registro (docs/JUEGO.md, sección 9.6). Lo usan las pruebas y, en la etapa 5, el
 // servidor: el cliente manda lo que el jugador tocó, nunca un resultado. Cualquier registro que no cierre se rechaza.
-import { Partida } from './match.js';
+import { Partida, TURNOS, HUELLA_TURNOS } from './match.js';
 import { HUELLA_IA } from './ai.js';
 import { VERSION, NIVELES, RELOJ, CONTROLES, HUELLA_U, HUELLAS_B, NIVELES_B } from './rules.js';
 
@@ -43,12 +43,21 @@ export function recalcular(reg, datos, o = {}) {
     if (reg.ctl === 'b' && reg.barra !== HUELLAS_B[reg.dif ?? 'facil']) return { ok: false, error: "huella de las reglas de 'b'" };
     // rivales con personalidad (ai.js): su propia huella; sin `ia`, los rivales de siempre (registros anteriores)
     if (reg.ia !== undefined && reg.ia !== HUELLA_IA) return { ok: false, error: 'huella de las reglas de los rivales' };
-    if (!Array.isArray(reg.atletas) || !Array.isArray(reg.aperturas) || reg.aperturas.length !== 3 || !Array.isArray(reg.llamados) || reg.llamados.length > 40) return { ok: false, error: 'forma del registro' };
-    const p = new Partida(datos, { semilla: reg.semilla, nivel: reg.nivel, cal: reg.cal, primera: reg.primera, ctl: reg.ctl, tactil: reg.tactil === true, ...(reg.ia !== undefined ? { ia: reg.ia } : {}), ...(reg.dif !== undefined ? { dif: reg.dif } : {}), atletas: reg.atletas });
+    // orden de turnos (LIF-3 y LIF-4): `orden` ('rondas' u 'oficial') con la huella de sus reglas; sin los dos, el de siempre
+    if ((reg.orden !== undefined || reg.turnos !== undefined) && (reg.turnos !== HUELLA_TURNOS || !TURNOS.modos.includes(reg.orden))) return { ok: false, error: 'huella u orden de los turnos' };
+    const turnos = reg.orden !== undefined, maxLl = turnos ? 40 + 6 * TURNOS.previos : 40;
+    if (!Array.isArray(reg.atletas) || !Array.isArray(reg.aperturas) || reg.aperturas.length !== 3 || !Array.isArray(reg.llamados) || reg.llamados.length > maxLl) return { ok: false, error: 'forma del registro' };
+    const p = new Partida(datos, { semilla: reg.semilla, nivel: reg.nivel, cal: reg.cal, primera: reg.primera, ctl: reg.ctl, tactil: reg.tactil === true, ...(reg.ia !== undefined ? { ia: reg.ia } : {}), ...(turnos ? { turnos: reg.orden } : {}), ...(reg.dif !== undefined ? { dif: reg.dif } : {}), atletas: reg.atletas });
     const abrir = lev => { p.at.forEach((a, i) => { if (a.ctrl === 'persona') p.abrir(i, lev, reg.aperturas[i][lev]); else if (reg.aperturas[i][lev] !== a.decl[lev]) throw new Error('la apertura de un rival no coincide'); }); p.empezar(); };
     abrir('s');
     for (const c of reg.llamados) {
       if (p.fase === 'intervalo') abrir('c');
+      // un cambio de pedido de la persona antes de su turno: {a, lev, pide}
+      if (c && c.pide !== undefined) {
+        if (!turnos || Object.keys(c).length !== 3 || c.lev !== p.lev || !entero(c.a) || !entero(c.pide)) return { ok: false, error: 'pedido mal formado' };
+        const v = p.pedidoValido(c.a, c.pide); if (v) return { ok: false, error: 'pedido inválido: ' + v };
+        p.pedir(c.a, c.pide); continue;
+      }
       const L = p.llamado; if (!L) return { ok: false, error: 'sobran llamados' };
       if (c.a !== L.a || c.lev !== L.lev || c.n !== L.n) return { ok: false, error: `el llamado ${L.idx} no es el que toca` };
       if (p.at[L.a].ctrl === 'juego') { if (Object.keys(c).length !== 3) return { ok: false, error: 'el llamado de un rival trae datos de más' }; p.resolverIA(); continue; }

@@ -1,0 +1,103 @@
+{
+ "datos": "09c9b907",
+ "ia": "d280707a",
+ "turnos": "3b08cd58",
+ "casos": [
+  {
+   "semilla": 11000027,
+   "nivel": "amistoso",
+   "persona": 0,
+   "ctl": "b",
+   "turnos": "rondas",
+   "tabla": "ventura:160+201=361#1 brenner:165+191=356#2 marangi:167+188=355#3"
+  },
+  {
+   "semilla": 22000054,
+   "nivel": "normal",
+   "persona": 1,
+   "ctl": "c",
+   "turnos": "oficial",
+   "tabla": "marangi:166+207=373#1 brenner:161+205=366#2 ventura:156+196=352#3"
+  },
+  {
+   "semilla": 33000081,
+   "nivel": "dificil",
+   "persona": 2,
+   "ctl": "u",
+   "turnos": "rondas",
+   "tabla": "ventura:169+212=381#1 brenner:176+204=380#2 marangi:167+195=362#3"
+  },
+  {
+   "semilla": 44000108,
+   "nivel": "amistoso",
+   "persona": 0,
+   "ctl": "b",
+   "turnos": "oficial",
+   "tabla": "ventura:162+201=363#1 marangi:168+193=361#2 brenner:157+193=350#3"
+  },
+  {
+   "semilla": 55000135,
+   "nivel": "normal",
+   "persona": 1,
+   "ctl": "c",
+   "turnos": "rondas",
+   "tabla": "marangi:165+210=375#1 ventura:165+202=367#2 brenner:166+190=356#3"
+  },
+  {
+   "semilla": 66000162,
+   "nivel": "dificil",
+   "persona": 2,
+   "ctl": "u",
+   "turnos": "oficial",
+   "tabla": "ventura:168+211=379#1 brenner:173+205=378#2 marangi:0+198=0#-"
+  },
+  {
+   "semilla": 77000189,
+   "nivel": "amistoso",
+   "persona": 0,
+   "ctl": "b",
+   "turnos": "rondas",
+   "tabla": "ventura:166+203=369#1 brenner:154+186=340#2 marangi:0+199=0#-"
+  },
+  {
+   "semilla": 88000216,
+   "nivel": "normal",
+   "persona": 1,
+   "ctl": "c",
+   "turnos": "oficial",
+   "tabla": "marangi:176+215=391#1 ventura:167+209=376#2 brenner:171+197=368#3"
+  },
+  {
+   "semilla": 99000243,
+   "nivel": "dificil",
+   "persona": 2,
+   "ctl": "u",
+   "turnos": "rondas",
+   "tabla": "ventura:167+213=380#1 brenner:178+201=379#2 marangi:164+205=369#3"
+  },
+  {
+   "semilla": 110000270,
+   "nivel": "amistoso",
+   "persona": 0,
+   "ctl": "b",
+   "turnos": "oficial",
+   "tabla": "brenner:163+198=361#1 ventura:152+206=358#2 marangi:161+194=355#3"
+  },
+  {
+   "semilla": 121000297,
+   "nivel": "normal",
+   "persona": 1,
+   "ctl": "c",
+   "turnos": "rondas",
+   "tabla": "ventura:163+211=374#1 brenner:173+200=373#2 marangi:166+198=364#3"
+  },
+  {
+   "semilla": 132000324,
+   "nivel": "dificil",
+   "persona": 2,
+   "ctl": "u",
+   "turnos": "oficial",
+   "tabla": "ventura:168+211=379#1 brenner:177+201=378#2 marangi:170+202=372#3"
+  }
+ ]
+}
