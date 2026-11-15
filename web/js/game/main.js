@@ -5,7 +5,7 @@ import { reloj, Boton, toques, principal, claveDe, enfocar, navegar, enCampo } f
 import { Escena } from './stage.js';
 import { poseDe, poseParado, marcas, tramo } from './sequence.js';
 import { armarCaida, poseCaida } from './caida.js';
-import { sugerencia } from '../sim/entrenador.js';
+import { sugerencia, chanceDe } from '../sim/entrenador.js';
 import { PLANTEL, JUGADOR, FICHA, nivelFicha, ENVIONES, LEV, ETIQUETAS, GUIONES, CUERPO, BARRA } from './roster.js';
 import { Registrador, Gobernador, calidadInicial, medirRefresco, decidirCalidad, pasoDe, metaDe, nombreDe, escalones, pisoDe, PRESET, PISO_MP, MARGEN, TECHO_MP } from './perf.js';
 import { sonido } from './audio.js';
@@ -18,6 +18,7 @@ import { Barrita } from './ui/barrita.js';
 import { explicar, pasos, PALABRAS, GUIA, discos, puntos, tramoTxt, deDiez, fuerteDebil, nivelTramo, cuartos, dificultadDe } from './ui/mensajes.js';
 import { alDia, tocar, senal as senalDe, GUIADO, EN_HOMBROS, QUE_U, QUE_B, proximoCentro } from './controles.js';
 import { tableroHTML, datosTablero, tableroVivoHTML } from './ui/tablero.js';
+import { opcionesPedido, pedidoHTML, TECLA_PEDIDO } from './ui/pedido.js';
 import { etiquetasRival } from './ui/marcador.js';
 import { leerDatos } from '../sim/data.js';
 import { Partida } from '../sim/match.js';
@@ -347,6 +348,11 @@ function alTeclado(e) {
   }
   // «Saltar» del turno de un rival: la tecla S (Espacio no saltea nada de los rivales)
   if ((k === TECLA_SALTAR || k === TECLA_SALTAR.toUpperCase()) && E.saltarRival && !E.sobre && !e.repeat) { e.preventDefault(); E.saltarRival('tecla'); return; }
+  // «Cambiar» el pedido en el turno de un rival (LIF-4): C abre y cierra; abierto, las flechas cambian los kilos, Enter pide y Esc cierra
+  if (!E.sobre && opPedido()) {
+    const q = k === TECLA_PEDIDO || k === TECLA_PEDIDO.toUpperCase() ? (PD.abierto ? 'no' : 'abrir') : !PD.abierto ? '' : k === 'ArrowLeft' || k === 'ArrowDown' ? 'menos' : k === 'ArrowRight' || k === 'ArrowUp' ? 'mas' : k === 'Enter' ? 'ok' : k === 'Escape' ? 'no' : '';
+    if (q) { e.preventDefault(); if (!e.repeat || q === 'menos' || q === 'mas') pedidoAccion(q, 'tecla'); return; }
+  }
   if (k === 'Escape') { e.preventDefault(); if (E.saltar) E.saltar(); else if (E.sobre) cerrarSobre(); else abrirSobre('pausa'); return; }      // en el tutorial, Esc lo saltea
   if (k === 'h' || k === 'H' || k === '?') { if (!E.sobre) { if (abrirSobre('ayuda')) e.preventDefault(); } else { e.preventDefault(); if (E.sobre.tipo === 'ayuda') cerrarSobre(); else pintarSobre('ayuda'); } return; }
   const raiz = E.sobre ? $('sobre').firstElementChild : $('capa').firstElementChild;
@@ -419,16 +425,64 @@ async function pasarA(id, preparar, sinFundido = false) {
  * curso (undefined: el último que se pintó; null: entre dos turnos). Durante un turno queda quieto (`congelar`): el
  * resultado de un rival ya está calculado antes de mostrarlo y el tablero no lo puede adelantar.
  */
-const TB = { el: null, p: null, L: null, cambios: {}, html: '', congelado: false };
+const TB = { el: null, cuerpo: null, ped: null, p: null, L: null, cambios: {}, avisos: [], html: '', congelado: false };
 function tablero(p, L = undefined) {
-  if (!TB.el) { const el = TB.el = document.createElement('div'); el.id = 'tablero'; el.className = 'tablero'; el.hidden = true; el.setAttribute('aria-live', 'polite'); $('tv').appendChild(el); }
+  if (!TB.el) {
+    const el = TB.el = document.createElement('div'); el.id = 'tablero'; el.className = 'tablero'; el.hidden = true; el.setAttribute('aria-live', 'polite');
+    TB.cuerpo = document.createElement('div'); TB.ped = document.createElement('div'); TB.ped.className = 'tb-pedido'; TB.ped.hidden = true; TB.ped.setAttribute('aria-live', 'off');
+    TB.ped.addEventListener('click', e => { const b = e.target.closest('[data-pedido]'); if (b && !b.disabled) { e.preventDefault(); pedidoAccion(b.dataset.pedido, 'boton'); } });
+    el.append(TB.cuerpo, TB.ped); $('tv').appendChild(el);
+  }
   const el = TB.el; el.setAttribute('aria-label', t('tablero.aria'));
-  if (!p) { el.hidden = true; TB.p = null; TB.cambios = {}; TB.html = ''; return; }
-  if (TB.p !== p || TB.lev !== p.lev) { TB.cambios = {}; TB.lev = p.lev; } TB.p = p; if (L !== undefined) TB.L = L;
-  const d = datosTablero(p, E.yo, TB.L, TB.cambios); if (!d) { el.hidden = true; return; }
+  if (!p) { el.hidden = true; TB.p = null; TB.cambios = {}; TB.avisos = []; TB.html = ''; pintarPedido(); return; }
+  if (TB.p !== p || TB.lev !== p.lev) { TB.cambios = {}; TB.avisos = []; TB.lev = p.lev; } TB.p = p; if (L !== undefined) TB.L = L;
+  const d = datosTablero(p, E.yo, TB.L, TB.cambios, TB.avisos); if (!d) { el.hidden = true; pintarPedido(); return; }
+  // un pedido propio que todavía no entró en la partida (le toca a la persona y en pantalla sigue el rival): se ve igual
+  const yoF = E.pedidoPend != null && d.filas.find(f => f.yo && f.estado !== 'ahora'); if (yoF) { yoF.pide = E.pedidoPend; yoF.cambio = TB.cambios[E.yo] ?? null; }
   const html = tableroVivoHTML(d, { nombre: i => quien(p.at[i]), corto: i => corto(p.at[i]), ident: i => ident(p.at[i]), rm: p.at[E.yo].f.techo[d.lev], compacto: document.documentElement.classList.contains('bajo') });
-  if (html !== TB.html) { el.innerHTML = html; TB.html = html; }
-  el.classList.toggle('dt', d.lev === 'c'); el.hidden = false;
+  if (html !== TB.html) { TB.cuerpo.innerHTML = html; TB.html = html; }
+  el.classList.toggle('dt', d.lev === 'c'); el.hidden = false; pintarPedido();
+}
+
+// ---------- «Cambiar» el pedido mientras no le toca (LIF-4; ui/pedido.js) ----------
+const PD = { abierto: false, kg: 0, html: '' };
+/** Lo que se puede pedir ahora (null: sin botón). Solo en el turno de un rival, con el tablero a la vista. */
+function opPedido() {
+  const p = TB.p; if (!p || !TB.el || TB.el.hidden) return null;
+  const rival = TB.L ? TB.L.a !== E.yo : E.turnoDe != null && E.turnoDe !== E.yo; if (!rival) return null;
+  return opcionesPedido(p, E.yo, E.pedidoPend ?? null);
+}
+function pintarPedido() {
+  if (!TB.ped) return; const op = opPedido();
+  if (!op) PD.abierto = false; else PD.kg = Math.max(op.min, Math.min(op.max, PD.kg || op.min));
+  const html = pedidoHTML(op, PD, { tecla: !tactil(), chance: op && TB.p && esU(TB.p.cfg.ctl) ? kg => deDiez(chanceDe(TB.p, E.yo, op.lev, kg)) : null });
+  if (html !== PD.html) { const foco = TB.ped.contains(document.activeElement) ? document.activeElement.dataset.pedido : null; TB.ped.innerHTML = html; PD.html = html; if (foco) TB.ped.querySelector(`[data-pedido="${foco}"]`)?.focus({ preventScroll: true }); }
+  TB.ped.hidden = !op; TB.el?.classList.toggle('pidiendo', !!op && PD.abierto);
+}
+/** Botones y teclas del control: abrir, menos, mas, ok, no. `via`: 'boton' o 'tecla'. */
+function pedidoAccion(q, via) {
+  const op = opPedido(); if (!op) return;
+  if (q === 'abrir') { PD.abierto = true; PD.kg = op.min; }
+  else if (q === 'menos') PD.kg = Math.max(op.min, PD.kg - 1);
+  else if (q === 'mas') PD.kg = Math.min(op.max, PD.kg + 1);
+  else if (q === 'no') PD.abierto = false;
+  else if (q === 'ok') pedirYa(op, PD.kg, via);
+  pintarPedido();
+}
+/**
+ * Pide `kg`. Si en la partida ya le toca a la persona (el rival que se ve ya está resuelto), queda pendiente y entra como un
+ * cambio de su llamado al abrirlo (`E.pedidoPend`, en jugarFinal); si no, entra ya (Partida.pedir). Con el tablero quieto
+ * (turno de un rival en curso) solo se pone al día la fila propia: lo demás adelantaría el resultado del rival.
+ */
+function pedirYa(op, kg, via) {
+  const p = TB.p, L = p.llamado, de = op.decl;
+  if (L && L.a === E.yo) { if (p.cambioValido(0, kg)) return; E.pedidoPend = kg; }
+  else { if (p.pedidoValido(E.yo, kg)) return; p.pedir(E.yo, kg); }
+  if (TB.cambios[E.yo] === undefined) TB.cambios[E.yo] = de;
+  PD.abierto = false; sonido.aviso();
+  ev('pedido_cambiado', { lev: op.lev, intento: op.n, de, kg, via, pendiente: E.pedidoPend != null, orden: p.cfg.turnos });
+  if (TB.congelado) { const c = TB.cuerpo.querySelector('tr.yo .tb-pide'); if (c) { c.innerHTML = `<b>${kg}</b><small class="tb-cambio">${esc(t('tablero.antes', { kg: TB.cambios[E.yo] }))}</small>`; c.parentElement.classList.add('cambio'); } TB.html = ''; pintarPedido(); }
+  else tablero(p);
 }
 /**
  * Al aparecer el veredicto de un intento: el tablero se pone al día (su marca) y los rivales que cambiaron de kilos quedan
@@ -436,6 +490,7 @@ function tablero(p, L = undefined) {
  */
 function alVeredicto(p, L, avisos = []) {
   delete TB.cambios[L.a]; for (const c of avisos) if (TB.cambios[c.a] === undefined) TB.cambios[c.a] = c.de;
+  TB.avisos = avisos.map(c => ({ a: c.a, a_kg: c.a_kg }));      // «Brenner cambia a 167» al pie, hasta el próximo cierre
   TB.congelado = false; tablero(p, null); if (avisos.length) sonido.aviso();
 }
 
@@ -803,7 +858,7 @@ function ctlInicial() { const q = params.get('ctl'); if (q === 'c' || q === 'f' 
  */
 async function inicio() {
   visita('inicio'); zocalo(null); relojLibre(); const primera = !guardado.get('tarima.jugadas');
-  const cfg = { id: guardado.get('tarima.pesista') || 'ventura', nivel: guardado.get('tarima.nivel') || 'amistoso', ritmo: params.get('ritmo') === 'completa' ? 'completa' : 'expres', ctl: ctlInicial(), dif: difInicial() };
+  const cfg = { id: guardado.get('tarima.pesista') || 'ventura', nivel: guardado.get('tarima.nivel') || 'amistoso', ritmo: params.get('ritmo') === 'completa' ? 'completa' : 'expres', ctl: ctlInicial(), dif: difInicial(), orden: guardado.get('tarima.orden') === 'oficial' ? 'oficial' : 'rondas' };
   if (!IDS.includes(cfg.id)) cfg.id = 'ventura';
   // Difícil juega con rivales parejos, salvo que la persona haya elegido los rivales a mano
   if (cfg.ctl === 'b' && cfg.dif === 'dificil' && cfg.nivel === 'amistoso' && !guardado.get('tarima.nivel_elegido')) cfg.nivel = 'normal';
@@ -822,6 +877,7 @@ async function inicio() {
     const opciones = S.opciones ? `<div class="opciones">
         <div class="fila"><span>${t('opciones.dificultad')}</span>${DIFICULTADES.map(d => opt('dif', 'd', d, cfg.ctl === 'c' ? null : cfg.dif, 'opciones.dif.' + d)).join('')}${opt('ctl', 'c', 'c', cfg.ctl, 'opciones.pro')}<small class="nota">${t('opciones.dif_nota.' + (cfg.ctl === 'c' ? 'clasico' : cfg.dif))}</small></div>
         <div class="fila"><span>${t('opciones.rivales')}</span>${opt('nivel', 'n', 'amistoso', cfg.nivel, 'opciones.tranquilos')}${opt('nivel', 'n', 'normal', cfg.nivel, 'opciones.parejos')}${opt('nivel', 'n', 'dificil', cfg.nivel, 'opciones.duros')}</div>
+        <div class="fila"><span>${t('opciones.orden')}</span>${opt('orden', 'o', 'rondas', cfg.orden, 'opciones.orden_rondas')}${opt('orden', 'o', 'oficial', cfg.orden, 'opciones.orden_oficial')}<small class="nota">${t('opciones.orden_nota.' + cfg.orden)}</small></div>
         <div class="fila"><span>${t('opciones.final')}</span>${opt('ritmo', 'r', 'expres', cfg.ritmo, 'opciones.rapida')}${opt('ritmo', 'r', 'completa', cfg.ritmo, 'opciones.completa')}</div>
         <div class="fila"><span>${t('opciones.sonido')}</span>${['si', 'no'].map(v => `<button data-sonido="${v}" aria-pressed="${(v === 'si') === sonido.encendido}">${sonido.icono(v === 'si')}${t('opciones.sonido_' + v)}</button>`).join('')}</div>
         ${telefono.instalable ? `<div class="fila"><span>${t('opciones.pantalla')}</span><button data-instalar="1">${t('opciones.como_instalar')}</button></div>` : ''}</div>` : '';
@@ -849,7 +905,7 @@ async function inicio() {
     if (!b) continue;      // cambió el idioma desde la pausa: se vuelve a pintar
     if (b.dataset.lang) { cambiarIdioma(b.dataset.lang); continue; }
     if (b.dataset.id) { cfg.id = b.dataset.id; S.tocoPesista = true; }
-    else if (b.dataset.n) { cfg.nivel = b.dataset.n; guardado.set('tarima.nivel_elegido', '1'); } else if (b.dataset.r) cfg.ritmo = b.dataset.r; else if (b.dataset.c) cfg.ctl = b.dataset.c;
+    else if (b.dataset.n) { cfg.nivel = b.dataset.n; guardado.set('tarima.nivel_elegido', '1'); } else if (b.dataset.r) cfg.ritmo = b.dataset.r; else if (b.dataset.c) cfg.ctl = b.dataset.c; else if (b.dataset.o) cfg.orden = b.dataset.o;
     // dificultad: Fácil, Medio y Difícil son la barrita; Difícil trae rivales parejos si estaban los tranquilos
     else if (b.dataset.d) { cfg.dif = b.dataset.d; if (cfg.ctl === 'c') cfg.ctl = 'b'; if (cfg.dif === 'dificil' && cfg.nivel === 'amistoso') cfg.nivel = 'normal'; fijarDificultad(cfg); }
     else if (b.id === 'btn-opciones') { S.opciones = !S.opciones; S.verOpciones = S.opciones; if (S.opciones) ev('opciones_abiertas'); }
@@ -866,7 +922,7 @@ async function inicio() {
       break;
     }
   }
-  guardado.set('tarima.pesista', cfg.id); guardado.set('tarima.nivel', cfg.nivel); guardado.set('tarima.ctl', cfg.ctl); guardado.set('tarima.dificultad', cfg.dif); fijarDificultad(cfg); capa.quitar(); return cfg;
+  guardado.set('tarima.pesista', cfg.id); guardado.set('tarima.nivel', cfg.nivel); guardado.set('tarima.ctl', cfg.ctl); guardado.set('tarima.dificultad', cfg.dif); guardado.set('tarima.orden', cfg.orden); fijarDificultad(cfg); capa.quitar(); return cfg;
 }
 
 /**
@@ -1125,7 +1181,7 @@ function soltarFoco() { document.activeElement?.blur?.(); $('escena')?.focus?.({
  */
 async function llamadoPropio(p, L) {
   visita('llamado'); const a = p.at[L.a];
-  if (!E.finalIniciada) { E.finalIniciada = true; ev('final_inicio', { n: E.finalN, fuente: E.pase?.fuente ?? null, pesista: TIPO[a.id], nivel: p.cfg.nivel, ritmo: E.cfg?.ritmo, ctl: p.cfg.ctl, dificultad: E.dificultad }); }
+  if (!E.finalIniciada) { E.finalIniciada = true; ev('final_inicio', { n: E.finalN, fuente: E.pase?.fuente ?? null, pesista: TIPO[a.id], nivel: p.cfg.nivel, ritmo: E.cfg?.ritmo, ctl: p.cfg.ctl, dificultad: E.dificultad, orden: p.cfg.turnos }); }
   // del rival al jugador, fundido corto; si el jugador repite, sin fundido (su pesista ya está en la tarima)
   tablero(p, L); const repite = escena.id === a.id && E.turnoDe === E.yo; E.turnoDe = E.yo;
   await pasarA(a.id, () => { escena.setCarga(L.kg, L.lev); escena.posar(poseParado(escena.P, L.lev), L.lev); setLuces(null); zocalo(a, L); }, repite);
@@ -1350,8 +1406,8 @@ async function partida(cfg) {
   // P4: el pase se pide después de la práctica, que no gasta nada
   const n = (+guardado.get('tarima.jugadas') || 0) + 1, pase = await pedirPase(cfg, n, 'bienvenida');
   if (!pase) return 'inicio';
-  E.turnoDe = null; E.pase = pase; E.finalN = pase.n ?? n; E.finalIniciada = false; E.tFinal0 = performance.now(); E.antes = null; E.primeraFinal = n === 1; E.rivalesSeguidos = 0; E.casi = null;
-  const p = E.p = new Partida(datos, { semilla, ia: HUELLA_IA, nivel: cfg.nivel, cal: cfg.cal, primera: cfg.primera, ctl: cfg.ctl, ...(cfg.ctl === 'b' && cfg.dif !== 'facil' ? { dif: cfg.dif } : {}), tactil: (cfg.ctl === 'f' || esU(cfg.ctl)) && tactil(), atletas: IDS.map((id, i) => ({ id, ctrl: i === E.yo ? 'persona' : 'juego' })) });
+  E.turnoDe = null; E.pedidoPend = null; PD.abierto = false; E.pase = pase; E.finalN = pase.n ?? n; E.finalIniciada = false; E.tFinal0 = performance.now(); E.antes = null; E.primeraFinal = n === 1; E.rivalesSeguidos = 0; E.casi = null;
+  const p = E.p = new Partida(datos, { semilla, ia: HUELLA_IA, turnos: cfg.orden === 'oficial' ? 'oficial' : 'rondas', nivel: cfg.nivel, cal: cfg.cal, primera: cfg.primera, ctl: cfg.ctl, ...(cfg.ctl === 'b' && cfg.dif !== 'facil' ? { dif: cfg.dif } : {}), tactil: (cfg.ctl === 'f' || esU(cfg.ctl)) && tactil(), atletas: IDS.map((id, i) => ({ id, ctrl: i === E.yo ? 'persona' : 'juego' })) });
   await presentacion(p, cfg, errMedio, n === 1); p.empezar();
   while (p.fase !== 'fin') {
     if (p.fase === 'intervalo') {
@@ -1359,6 +1415,9 @@ async function partida(cfg) {
       if (!await trasArranque(p)) { cortarFinal(p); return 'inicio'; }      // sin correo: la final termina con el arranque
       await intervalo(p); continue;
     }
+    // un pedido hecho con «Cambiar» cuando en la partida ya le tocaba a la persona: entra como cambio de su llamado (si la
+    // desplaza, sale otro y el tablero lo muestra)
+    if (E.pedidoPend != null) { const kg = E.pedidoPend; E.pedidoPend = null; if (p.at[p.llamado.a].ctrl === 'persona' && !p.cambioValido(0, kg) && p.cambio(0, kg).desplazado) continue; }
     const L = { ...p.llamado }, a = p.at[L.a];
     // en 'u' la carga de la barra no es una espera aparte: el panel ya muestra el peso final (G2.7)
     if (a.ctrl === 'persona') { if (!esU(cfg.ctl)) await carga(L.kg, L.lev); await llamadoPropio(p, L); } else await llamadoRival(p, L, cfg);
@@ -1378,7 +1437,7 @@ async function iniciar() {
   const refresco = medirRefresco();
   pintarFijos(); telefono.instalar({ t }); telefono.avisoInstalar();      // en el iPhone, una vez: cómo jugar a pantalla completa
   cargaUI.titulo('carga.msg');
-  alCambiarIdioma(() => { pintarFijos(); senalUI?.repintar(); barritaUI?.repintar(); if (E.sobre) pintarSobre(E.sobre.tipo); E.repintar?.(); if (TB.p && !TB.congelado) tablero(TB.p); if ($('saltar-rival') && !$('saltar-rival').hidden) botonSaltar(true); });
+  alCambiarIdioma(() => { pintarFijos(); senalUI?.repintar(); barritaUI?.repintar(); if (E.sobre) pintarSobre(E.sobre.tipo); E.repintar?.(); if (TB.p && !TB.congelado) tablero(TB.p); else { PD.html = ''; pintarPedido(); } if ($('saltar-rival') && !$('saltar-rival').hidden) botonSaltar(true); });
   addEventListener('resize', () => { if (TB.p && !TB.congelado) tablero(TB.p); });      // teléfono acostado: el tablero compacto
   // P0: el estado del servidor (y la medición) en paralelo con los datos; el muro al cargar si corresponde
   const origen = params.get('lang') ? 'url' : guardado.get('tarima.idioma') ? 'guardado' : 'defecto';

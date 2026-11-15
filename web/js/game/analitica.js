@@ -32,6 +32,8 @@ export const EVENTOS = new Set([
   'medicion_desactivada', 'error_juego',
   // Gameplay 2 (docs/JUEGO.md G2.7): un toque saltea el turno de un rival o el veredicto propio
   'rival_salteado', 'veredicto_salteado',
+  // orden de turnos (LIF-4): «Cambiar» el pedido en el turno de un rival
+  'pedido_cambiado',
 ]);
 
 export const BANDERAS = { 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio' };
