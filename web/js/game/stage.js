@@ -221,7 +221,7 @@ export class Escena {
     this.rig = new CameraRig(canvas, { reduceMotion, interactive: false }); this.viva = new CamaraViva({ reduceMotion });
     this.trace = new BarTrace(); this.scene.add(this.trace.group);
     const coarse = matchMedia('(pointer:coarse)').matches, aniso = Math.min(Q.aniso || 4, r.capabilities.getMaxAnisotropy());
-    this.arena = new Arena({ tex: 64, aniso, reduceMotion, oficiales: false });      // la madera de la tarima la pone look.js (acá, una de relleno) this.scene.add(this.arena.group);
+    this.arena = new Arena({ tex: 64, aniso, reduceMotion, oficiales: false }); this.scene.add(this.arena.group);      // tex 64: la madera de la tarima la pone look.js (acá, una de relleno)
     // jueces y oficiales sentados (jueces.js): los árbitros levantan la paleta con cada luz
     const jueces = this.jueces = new Jueces({ reduceMotion }); this.scene.add(jueces.group);
     // ambiente del juego (ambiente.js): retoca texturas y sombreadores de la arena antes de que se dibuje nada, y recibe lo
@@ -453,7 +453,7 @@ export class Escena {
     for (const b of Object.values(this.atletas)) b.root.visible = b === a;
     // el pesista del jugador (this.yo, lo fija main.js) lleva siempre su malla lisa, nunca la del modelo con otro nombre
     const tela = id === this.yo ? JUGADOR.tela : f.tela;
-    a.setClothFlat(tela ? new THREE.Color(tela) : null);
+    { const asp = (id === this.yo ? JUGADOR.aspecto : null) || f.aspecto || {}; a.setAspecto({ ...asp, tela: { ...(asp.tela || {}), plano: tela || null } }); }      // aspecto por parámetros (athlete.js, ASPECTO)
     this.activo = a; this.id = id; this.P = this.poses[f.modelo]; this.rig.setAthleteHeight(this.P.h); this.sombra = 4;
   }
   setCarga(kg, lev) { if (kg !== this.kg) { this.kg = this.barbell.setLoad(kg); this._sombraBarra(); this.sombra = 4; } if (lev && this.P) this.barbell.setGrip(lev === 's' ? this.P.grip?.snatch : this.P.grip?.clean); }

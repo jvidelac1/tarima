@@ -13,7 +13,7 @@
 // Nada de esto decide nada del juego. Costo por cuadro: los materiales son los de siempre con más mapas; la utilería fija se
 // junta por material (stage.js, juntarFijos) y los discos de los cajones son un solo dibujo instanciado.
 import * as THREE from 'three';
-import { rng, makeCanvas, canvasTexture, normalFromHeight } from '../util.js';
+import { rng, makeCanvas, canvasTexture } from '../util.js';
 import { EVENT } from '../config.js';
 
 /** Gradación del juego: exposición, saturación, contraste, gamma de sombras, tinte de sombras y de altas, viñeta y negro. */
@@ -29,22 +29,36 @@ const cl = x => Math.min(1, Math.max(0, x));
 // ---------- ruido ----------
 /** Ruido de valor periódico (período n): devuelve f(x, y) en 0..1. */
 function ruido(seed, n = 64) {
-  const r = rng(seed), g = new Float32Array(n * n); for (let i = 0; i < g.length; i++) g[i] = r();
+  const r = rng(seed), g = new Float32Array(n * n), M = n - 1; for (let i = 0; i < g.length; i++) g[i] = r();
   return (x, y) => {
     const x0 = Math.floor(x), y0 = Math.floor(y), tx = x - x0, ty = y - y0, sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
-    const i0 = ((x0 % n) + n) % n, i1 = (i0 + 1) % n, j0 = ((y0 % n) + n) % n * n, j1 = ((y0 + 1) % n + n) % n * n;
+    const i0 = x0 & M, i1 = (i0 + 1) & M, j0 = (y0 & M) * n, j1 = ((y0 + 1) & M) * n;      // n es potencia de dos
     const a = g[j0 + i0], b = g[j0 + i1], c = g[j1 + i0], d = g[j1 + i1];
     return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
   };
 }
 const fbm = (f, x, y, oct = 4) => { let v = 0, a = .5, t = 0; for (let o = 0; o < oct; o++) { v += a * f(x, y); t += a; x *= 2; y *= 2; a *= .5; } return v / t; };
-/** Campo de baja frecuencia calculado en una grilla de N×N y leído con interpolación (para no pagar octavas por píxel). */
-function grilla(N, f) {
-  const d = new Float32Array(N * N); for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) d[y * N + x] = f((x + .5) / N, (y + .5) / N);
-  return (u, v) => {
-    const fx = Math.min(N - 1.001, Math.max(0, u * N - .5)), fy = Math.min(N - 1.001, Math.max(0, v * N - .5)), x0 = fx | 0, y0 = fy | 0, tx = fx - x0, ty = fy - y0, i = y0 * N + x0;
-    return (d[i] * (1 - tx) + d[i + 1] * tx) * (1 - ty) + (d[i + N] * (1 - tx) + d[i + N + 1] * tx) * ty;
+/** K campos de baja frecuencia calculados juntos en una grilla de N×N: f(u, v, o) los escribe; leer(u, v, out) los interpola (para no pagar octavas por píxel). */
+function grillas(N, K, f) {
+  const d = new Float32Array(N * N * K), o = new Float32Array(K); for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { f((x + .5) / N, (y + .5) / N, o); d.set(o, (y * N + x) * K); }
+  return (u, v, out) => {
+    let fx = u * N - .5, fy = v * N - .5; if (fx < 0) fx = 0; else if (fx > N - 1.001) fx = N - 1.001; if (fy < 0) fy = 0; else if (fy > N - 1.001) fy = N - 1.001;
+    const x0 = fx | 0, y0 = fy | 0, tx = fx - x0, ty = fy - y0, a = (y0 * N + x0) * K, b = a + K, c = a + N * K, e = c + K, w00 = (1 - tx) * (1 - ty), w10 = tx * (1 - ty), w01 = (1 - tx) * ty, w11 = tx * ty;
+    for (let k = 0; k < K; k++) out[k] = d[a + k] * w00 + d[b + k] * w10 + d[c + k] * w01 + d[e + k] * w11;
   };
+}
+/** Normales tangentes desde un lienzo de alturas (canal rojo), con acceso directo a los píxeles. */
+function normales(alt, fuerza, wrap, aniso) {
+  const w = alt.width, h = alt.height, src = alt.getContext('2d').getImageData(0, 0, w, h).data, out = makeCanvas(w, h), g = out.getContext('2d'), img = g.createImageData(w, h), d = img.data, k = fuerza / 255;
+  for (let y = 0, i = 0; y < h; y++) {
+    const ya = (y ? y - 1 : wrap ? h - 1 : 0) * w, yb = (y < h - 1 ? y + 1 : wrap ? 0 : y) * w, yy = y * w;
+    for (let x = 0; x < w; x++, i += 4) {
+      const xa = x ? x - 1 : wrap ? w - 1 : 0, xb = x < w - 1 ? x + 1 : wrap ? 0 : x;
+      const dx = (src[(yy + xb) * 4] - src[(yy + xa) * 4]) * k, dy = (src[(yb + x) * 4] - src[(ya + x) * 4]) * k, l = 127.5 / Math.sqrt(dx * dx + dy * dy + 1);
+      d[i] = 127.5 - dx * l; d[i + 1] = 127.5 + dy * l; d[i + 2] = 127.5 + l; d[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0); return canvasTexture(out, { srgb: false, repeat: wrap, aniso });
 }
 const hash2 = (x, y) => { let h = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) | 0; h = Math.imul(h ^ h >>> 13, 1274126177); return ((h ^ h >>> 16) >>> 0) / 4294967296; };
 
@@ -65,67 +79,85 @@ function generar(S, fn, H = S) {
 }
 /** Los tres lienzos como mapas de un material físico. La rugosidad del material tiene que ser 1 (el mapa la multiplica). */
 function mapas(c, { fuerza = 2, wrap = true, aniso = 4, repeat = null } = {}) {
-  const normalMap = normalFromHeight(c.alt, fuerza, { wrap, aniso }), map = canvasTexture(c.col, { aniso, repeat: wrap }), roughnessMap = canvasTexture(c.rug, { srgb: false, repeat: wrap, aniso: Math.min(aniso, 4) });
+  const normalMap = normales(c.alt, fuerza, wrap, aniso), map = canvasTexture(c.col, { aniso, repeat: wrap }), roughnessMap = canvasTexture(c.rug, { srgb: false, repeat: wrap, aniso: Math.min(aniso, 4) });
   if (repeat) for (const t of [map, normalMap, roughnessMap]) t.repeat.set(repeat[0], repeat[1]);
   return { map, normalMap, roughnessMap };
 }
 
 // ---------- tarima ----------
-/** Madera de la tarima (4 × 4 m en un lienzo de S px): tablas a lo largo de z con veta, juntas, barniz gastado, golpes de discos y magnesio. */
+/** Veta fina enlosable (grises alrededor de 0,5): hilos a lo largo de y y poros en rayitas. Se superpone a la madera a resolución final. */
+function vetaFina(W, H) {
+  const n = ruido(71);
+  return generar(W, (u, v, o, px, py) => {
+    const hilos = fbm(n, u * 64, v * 4, 2), poro = hash2(px, py >> 3) > .86 ? .22 : 0, k = cl(.5 + (hilos - .5) * 1.1 - poro);
+    o[0] = o[1] = o[2] = k; o[3] = k; o[4] = cl(.5 + (hilos - .5) * .5 + poro);
+  }, H);
+}
+/**
+ * Madera de la tarima (4 × 4 m en lienzos de S px): tablas a lo largo de z con veta, barniz gastado, golpes de discos,
+ * magnesio y pintura. Lo que cambia despacio se calcula por píxel a media resolución; la veta fina, las juntas, los rayones
+ * y el salpicado se agregan a resolución final con el lienzo 2D (que compone en la placa): un lienzo de 2048 por píxel
+ * tardaba varios segundos de JavaScript.
+ */
 function madera(S, aniso) {
-  const r = rng(77), nA = ruido(1), nB = ruido(2), nC = ruido(3), nD = ruido(4), NP = 26, pw = 4 / NP, tablas = [];
+  const Sb = S >> 1, r = rng(77), nA = ruido(1), nB = ruido(2), nC = ruido(3), nD = ruido(4), NP = 26, pw = 4 / NP, tablas = [];
   for (let i = 0; i < NP; i++) { const cortes = []; let z = -r() * 1.6; while (z < 4.2) { z += 1.1 + r() * 1.5; cortes.push([z, r(), r(), r() * 50]); } tablas.push(cortes); }
   // pintura: línea perimetral gastada y la marca estarcida al frente (se lee desde el jurado)
-  const mask = makeCanvas(S, S, g => {
-    g.fillStyle = '#000'; g.fillRect(0, 0, S, S); g.strokeStyle = '#fff'; g.lineWidth = S * .012; const b = S * .03; g.strokeRect(b, b, S - 2 * b, S - 2 * b);
-    g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `800 ${S * .06}px ${DISPLAY}`; g.fillText(EVENT.marca, S / 2, S * .9);
-    g.font = `700 ${S * .026}px ${DISPLAY}`; g.fillText('PLATAFORMA 1 · PLATFORM 1', S / 2, S * .1);
+  const mask = makeCanvas(Sb, Sb, g => {
+    g.fillStyle = '#000'; g.fillRect(0, 0, Sb, Sb); g.strokeStyle = '#fff'; g.lineWidth = Sb * .012; const b = Sb * .03; g.strokeRect(b, b, Sb - 2 * b, Sb - 2 * b);
+    g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `800 ${Sb * .06}px ${DISPLAY}`; g.fillText(EVENT.marca, Sb / 2, Sb * .9);
+    g.font = `700 ${Sb * .026}px ${DISPLAY}`; g.fillText('PLATAFORMA 1 · PLATFORM 1', Sb / 2, Sb * .1);
   });
-  const md = mask.getContext('2d').getImageData(0, 0, S, S).data;
-  const sucio = grilla(256, (u, v) => fbm(nD, u * 3.6, v * 3.6, 4)), gasto = grilla(256, (u, v) => fbm(nA, u * 12 + 9, v * 12, 3)), tiza = grilla(384, (u, v) => fbm(nC, u * 10.4 + 3, v * 10.4 + 7, 4));
-  const marcas = grilla(512, (u, v) => fbm(nB, u * 56, v * 20, 3)), pint = grilla(256, (u, v) => fbm(nB, u * 36 + 5, v * 36, 3));
-  const c = generar(S, (u, v, o, px, py) => {
-    const x = u * 4, z = v * 4, cx = x - 2, cz = z - 2, fi = x / pw, i = Math.min(NP - 1, fi | 0), fx = fi - i, cortes = tablas[i];
+  const md = mask.getContext('2d').getImageData(0, 0, Sb, Sb).data, M = new Float32Array(5);
+  // lo lento: mugre, barniz gastado, nubes de magnesio, marcas de goma y desgaste de la pintura
+  const macro = grillas(256, 5, (u, v, o) => { o[0] = fbm(nD, u * 3.6, v * 3.6, 4); o[1] = fbm(nA, u * 12 + 9, v * 12, 3); o[2] = fbm(nC, u * 10.4 + 3, v * 10.4 + 7, 4); o[3] = fbm(nB, u * 56, v * 20, 3); o[4] = fbm(nB, u * 36 + 5, v * 36, 3); });
+  const c = generar(Sb, (u, v, o, px, py) => {
+    const x = u * 4, z = v * 4, cx = x - 2, cz = z - 2, fi = x / pw, i = Math.min(NP - 1, fi | 0), gx = (fi - i) * pw, cortes = tablas[i];
     let j = 0; while (cortes[j][0] < z) j++;
-    const B = cortes[j], z0 = j ? cortes[j - 1][0] : -9, dz = Math.min(z - z0, B[0] - z), dx = Math.min(fx, 1 - fx) * pw, gx = fx * pw, off = B[3];
-    // veta: hilos finos a lo largo de la tabla, deformados, más bandas anchas («catedral»)
+    const B = cortes[j], off = B[3]; macro(u, v, M);
+    // veta: hilos a lo largo de la tabla, deformados, más bandas anchas («catedral»)
     const warp = nA(gx * 7 + off, z * .8 + off) * .65 + nA(gx * 14 + off, z * 1.6 + off) * .35;
-    const hilos = fbm(nB, gx * 250 + off * 3, z * 2.4 + warp * 3, 3), banda = .5 + .5 * Math.sin((gx * 48 + warp * 8 + z * .3) * 6.2832);
-    const t = cl((.6 * hilos + .4 * banda * (.35 + .65 * nD(gx * 26 + off, z * 1.3))) * 1.15 - .08 + (B[1] - .5) * .42), tono = .8 + .3 * B[2];
-    let R = (.80 - .31 * t) * tono, G = (.60 - .29 * t) * tono, Bc = (.37 - .22 * t) * tono, h = .62 + (hilos - .5) * .16, rg = .3 + .16 * hilos;
-    if (nC(gx * 1300 + off, z * 50) > .8) { R *= .85; G *= .84; Bc *= .82; h -= .08; }      // poros
-    const m = sucio(u, v), k = .78 + .36 * m; R *= k; G *= k; Bc *= k;
+    const hilos = fbm(nB, gx * 120 + off * 3, z * 2.4 + warp * 3, 3), banda = .5 + .5 * Math.sin((gx * 48 + warp * 8 + z * .3) * 6.2832);
+    const t = cl((.6 * hilos + .4 * banda * (.35 + .65 * nD(gx * 26 + off, z * 1.3))) * 1.15 - .08 + (B[1] - .5) * .42), tono = (.8 + .3 * B[2]) * (.78 + .36 * M[0]);
+    let R = (.80 - .31 * t) * tono, G = (.60 - .29 * t) * tono, Bc = (.37 - .22 * t) * tono, h = .62 + (hilos - .5) * .12, rg = .3 + .14 * hilos;
     // barniz comido donde se paran: más claro, más parejo y mate
-    const st = Math.exp(-((cx / 1.05) ** 2 + ((cz - .12) / .75) ** 2)), w = cl(st * 1.35 * (.3 + .95 * gasto(u, v)));
+    const st = Math.exp(-((cx / 1.05) * (cx / 1.05) + ((cz - .12) / .75) * ((cz - .12) / .75))), w = cl(st * 1.35 * (.3 + .95 * M[1]));
     R += (R * 1.1 + .06 - R) * w * .55; G += (G * 1.1 + .055 - G) * w * .55; Bc += (Bc * 1.12 + .05 - Bc) * w * .55; rg += w * .36;
     // donde caen los discos: marcas de goma, abolladuras
-    const gl = Math.exp(-(((Math.abs(cx) - .97) / .19) ** 2)) * sm(-.8, -.35, cz) * (1 - sm(.6, .98, cz)), mk = gl * (.35 + .9 * marcas(u, v)), kk = 1 - .5 * cl(mk);
-    R *= kk; G *= kk; Bc *= kk; rg += mk * .25; h -= gl * sm(.64, .82, nC(x * 36, z * 36)) * .3;
-    // magnesio: nubes, y salpicado fino donde se para y donde golpea la barra
-    let ch = sm(.5, .74, tiza(u, v) * (.42 + .95 * st + .5 * gl)) * .5; if (nA(x * 310, z * 310) > .84) ch += (st * .5 + gl * .35) * nB(x * 90, z * 90);
-    ch = cl(ch); R += (.93 - R) * ch; G += (.92 - G) * ch; Bc += (.88 - Bc) * ch; rg += (.97 - rg) * cl(ch * 1.7);
+    const ax = (Math.abs(cx) - .97) / .19, gl = ax * ax < 9 ? Math.exp(-ax * ax) * sm(-.8, -.35, cz) * (1 - sm(.6, .98, cz)) : 0;
+    if (gl > .01) { const mk = gl * (.35 + .9 * M[3]), kk = 1 - .5 * cl(mk); R *= kk; G *= kk; Bc *= kk; rg += mk * .25; h -= gl * sm(.64, .82, nC(x * 36, z * 36)) * .3; }
+    // magnesio en nubes
+    const ch = cl(sm(.5, .74, M[2] * (.42 + .95 * st + .5 * gl)) * .5);
+    if (ch > 0) { R += (.93 - R) * ch; G += (.92 - G) * ch; Bc += (.88 - Bc) * ch; rg += (.97 - rg) * cl(ch * 1.7); }
     // pintura gastada
-    const p = md[(py * S + px) * 4] / 255 * sm(.34, .52, pint(u, v) + .2 - w * .25) * .8;
-    if (p > 0) { R += (.84 - R) * p; G += (.82 - G) * p; Bc += (.76 - Bc) * p; rg += (.52 - rg) * p; h += p * .04; }
-    // juntas entre tablas y bisel
-    const gap = 1 - sm(.0008, .003, dx) * sm(.0008, .003, dz), kg = 1 - .82 * gap; R *= kg; G *= kg; Bc *= kg;
-    h -= gap * .5 + .1 * (1 - sm(0, .012, Math.min(dx, dz)));
-    o[0] = R; o[1] = G; o[2] = Bc; o[3] = cl(h); o[4] = cl(rg + gap * .6);
+    const pm = md[(py * Sb + px) * 4];
+    if (pm > 0) { const p = pm / 255 * sm(.34, .52, M[4] + .2 - w * .25) * .8; R += (.84 - R) * p; G += (.82 - G) * p; Bc += (.76 - Bc) * p; rg += (.52 - rg) * p; h += p * .04; }
+    o[0] = R; o[1] = G; o[2] = Bc; o[3] = cl(h); o[4] = cl(rg);
   });
-  // rayones sueltos (en los tres lienzos: claro, hundido y mate)
-  const rr = rng(505), gs = [c.col.getContext('2d'), c.alt.getContext('2d'), c.rug.getContext('2d')], est = ['rgba(238,226,204,A)', 'rgba(0,0,0,A)', 'rgba(255,255,255,A)'];
-  for (let k = 0; k < 150; k++) {
-    const x = S * (.08 + rr() * .84), y = S * (.2 + rr() * .7), a = (rr() - .5) * 1.2 + Math.PI / 2, L = S * (.01 + rr() * rr() * .09), al = .1 + rr() * .3, lw = .6 + rr() * 1.2;
-    gs.forEach((g, i) => { g.strokeStyle = est[i].replace('A', (al * (i ? 1.4 : 1)).toFixed(2)); g.lineWidth = lw; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); g.stroke(); });
-  }
-  return mapas(c, { fuerza: 2.6, wrap: false, aniso });
+  // a resolución final: veta fina superpuesta, juntas entre tablas, rayones y salpicado de magnesio
+  const fino = vetaFina(256, 512), rr = rng(505), px = S / 4, lw = Math.max(1, S / 1024 * 1.25);
+  const juntas = g => { g.beginPath(); for (let i = 0; i < NP; i++) { const x0 = i * pw * px; if (i) { g.moveTo(x0, 0); g.lineTo(x0, S); } for (const [z] of tablas[i]) if (z < 4) { g.moveTo(x0, z * px); g.lineTo(x0 + pw * px, z * px); } } g.stroke(); };
+  const rayas = []; for (let k = 0; k < 170; k++) rayas.push([S * (.08 + rr() * .84), S * (.2 + rr() * .7), (rr() - .5) * 1.2 + Math.PI / 2, S * (.01 + rr() * rr() * .09), .1 + rr() * .3, .6 + rr() * 1.2]);
+  const motas = []; for (let k = 0; k < 4200; k++) { const lado = rr() < .3 ? (rr() < .5 ? -1 : 1) * (.97 + (rr() - .5) * .3) : (rr() + rr() - 1) * 1.1; motas.push([S * (lado / 4 + .5), S * ((.12 + (rr() + rr() + rr() - 1.5) * .55) / 4 + .5), 1 + rr() * 1.7, .12 + rr() * .45]); }
+  const subir = (base, tile, modo, alfa, extra) => makeCanvas(S, S, g => {
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(base, 0, 0, S, S);
+    g.globalCompositeOperation = modo; g.globalAlpha = alfa; g.fillStyle = g.createPattern(tile, 'repeat'); g.fillRect(0, 0, S, S); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.lineCap = 'round';
+    extra(g);
+  });
+  const trazos = (g, tinta, ka) => { for (const [x, y, a, L, al, w] of rayas) { g.strokeStyle = tinta.replace('A', Math.min(1, al * ka).toFixed(2)); g.lineWidth = w * lw; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); g.stroke(); } };
+  const salpicar = (g, tinta, ka) => { g.fillStyle = tinta; for (const [x, y, s, a] of motas) { g.globalAlpha = Math.min(1, a * ka); g.fillRect(x, y, s * lw, s * lw); } g.globalAlpha = 1; };
+  const col = subir(c.col, fino.col, 'overlay', .6, g => { g.strokeStyle = 'rgba(22,13,6,.82)'; g.lineWidth = lw * 1.2; juntas(g); trazos(g, 'rgba(238,226,204,A)', 1); salpicar(g, 'rgb(250,249,243)', 1); });
+  const alt = subir(c.alt, fino.alt, 'overlay', .75, g => { g.strokeStyle = 'rgba(0,0,0,.4)'; g.lineWidth = lw * 4; juntas(g); g.strokeStyle = 'rgba(0,0,0,.9)'; g.lineWidth = lw * 1.5; juntas(g); trazos(g, 'rgba(0,0,0,A)', 1.4); });
+  const rug = subir(c.rug, fino.rug, 'soft-light', .5, g => { g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = lw * 1.5; juntas(g); trazos(g, 'rgba(255,255,255,A)', 1.4); salpicar(g, 'rgb(255,255,255)', 1.5); });
+  return mapas({ col, alt, rug }, { fuerza: 3.4, wrap: false, aniso });
 }
 
 /** Goma del escenario: baldosa de 1 m con motas, junta, polvo y roces. El lienzo cubre 2 × 2 m (cuatro baldosas distintas). */
 function gomaPiso(S, aniso) {
   const nA = ruido(11), nB = ruido(12), pal = [[.34, .37, .44], [.46, .47, .49], [.22, .3, .42], [.6, .6, .6], [.3, .31, .33]];
+  const lento = grillas(256, 2, (u, v, o) => { o[0] = fbm(nA, u * 8, v * 8, 4); o[1] = fbm(nB, u * 4 + 3, v * 4, 3); }), M = new Float32Array(2);
   const c = generar(S, (u, v, o, px, py) => {
-    const polvo = fbm(nA, u * 8, v * 8, 4), mancha = fbm(nB, u * 4 + 3, v * 4, 3), fino = hash2(px, py), fu = (u * 2) % 1, fv = (v * 2) % 1, dj = Math.min(fu, 1 - fu, fv, 1 - fv);
+    lento(u, v, M); const polvo = M[0], mancha = M[1], fino = hash2(px, py), fu = (u * 2) % 1, fv = (v * 2) % 1, du = fu < .5 ? fu : 1 - fu, dv = fv < .5 ? fv : 1 - fv, dj = du < dv ? du : dv;
     let k = .05 + .028 * sm(.4, .8, polvo) + (fino - .5) * .012, R = k, G = k * 1.02, B = k * 1.08, h = .5 + (fino - .5) * .3, rg = .5 + .32 * sm(.35, .75, polvo) - .16 * sm(.55, .8, mancha);
     const mx = px >> 1, my = py >> 1, hm = hash2(mx + 91, my + 17);
     if (hm < .085) { const P = pal[(hash2(mx, my) * pal.length) | 0], a = .35 + hm * 5; R += (P[0] - R) * a * .5; G += (P[1] - G) * a * .5; B += (P[2] - B) * a * .5; h += .1; rg += .08; }
@@ -328,7 +360,7 @@ export class Look {
       antes.call(this, sh, r);
       sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
 	{ vec2 ledP = vMapUv * vec2( 500.0, 175.0 ); vec2 ledF = abs( fract( ledP ) - 0.5 );
-	  float ledM = smoothstep( 0.48, 0.3, max( ledF.x, ledF.y ) ) * smoothstep( 0.62, 0.2, length( ledF ) );
+	  float ledM = ( 1.0 - smoothstep( 0.3, 0.48, max( ledF.x, ledF.y ) ) ) * ( 1.0 - smoothstep( 0.2, 0.62, length( ledF ) ) );
 	  float ledW = clamp( max( fwidth( ledP.x ), fwidth( ledP.y ) ) * 1.6, 0.0, 1.0 );
 	  diffuseColor.rgb *= mix( ledM * 1.75, 0.82, ledW ); }`);
     };
@@ -403,7 +435,7 @@ export class Look {
 
     // discos de los cajones y las pilas: un dibujo instanciado, color por instancia
     { const geo = new THREE.CylinderGeometry(1, 1, 1, 30); const G = this.goma || {};
-      const mat = new THREE.MeshStandardMaterial({ name: 'discos de utilería', color: new THREE.Color(1, 1, 1), roughness: 1, roughnessMap: G.roughnessMap || null, bumpMap: G.bumpMap || null, bumpScale: 1.5, envMapIntensity: .5 });
+      const mat = new THREE.MeshStandardMaterial({ name: 'discos de utilería', color: new THREE.Color(1, 1, 1), roughness: 1, roughnessMap: G.roughnessMap || null, bumpMap: G.bumpMap || null, bumpScale: .35, envMapIntensity: .5 });
       const im = new THREE.InstancedMesh(geo, mat, discos.length), c = new THREE.Color(); discos.forEach(([m, col], i) => { im.setMatrixAt(i, m); im.setColorAt(i, c.set(col)); });
       im.instanceColor.needsUpdate = true; im.frustumCulled = false; im.receiveShadow = true; im.name = 'discos de utilería'; this.arena.group.add(im); this.discos = im; }
 
