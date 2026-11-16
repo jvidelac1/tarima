@@ -413,13 +413,13 @@ export class Athlete {
   setMix(i, j, u, k, w) { const n = this.snap.length - 1, c = x => Math.min(n, Math.max(0, x | 0)); this._blend(this.snap[c(i)], this.snap[c(j)], Math.min(1, Math.max(0, u)), this.snap[c(k)], Math.min(1, Math.max(0, w))); }
   /**
    * Como setMix, por partes (el juego: el final del intento, game/caida.js): los huesos de los brazos (clavícula, brazo,
-   * antebrazo, mano y dedos) salen de `br` y el resto del cuerpo de `cu`; cada uno es {i, u, k, w}: la muestra fraccionaria
-   * i + u mezclada en `w` con la muestra `k`. Así los brazos pueden desandar el clip mientras las piernas lo siguen.
+   * antebrazo, mano y dedos) salen de `br` y el resto del cuerpo de `cu`; cada uno es {i, j, u, k, w}: la mezcla en `u` de las
+   * muestras `i` y `j` (sin `j`, la siguiente), mezclada en `w` con la muestra `k`. Así los brazos pueden desandar el clip mientras las piernas lo siguen.
    */
   setParts(cu, br) {
     const n = this.snap.length - 1, c = x => Math.min(n, Math.max(0, x | 0)), S = this.snap, u01 = x => Math.min(1, Math.max(0, x));
     this._arm ||= this.bones.map(b => /^(Left|Right)(Shoulder|Arm|ForeArm|Hand)/.test(boneKey(b.name)));
-    this._blend(S[c(cu.i)], S[c(cu.i + 1)], u01(cu.u), S[c(cu.k)], u01(cu.w), { A: S[c(br.i)], B: S[c(br.i + 1)], u: u01(br.u), C: S[c(br.k)], uc: u01(br.w) });
+    this._blend(S[c(cu.i)], S[c(cu.j ?? cu.i + 1)], u01(cu.u), S[c(cu.k)], u01(cu.w), { A: S[c(br.i)], B: S[c(br.j ?? br.i + 1)], u: u01(br.u), C: S[c(br.k)], uc: u01(br.w) });
   }
   _blend(A0, B0, u0, C0 = null, uc0 = 0, arm = null) {
     for (let i = 0; i < this.bones.length; i++) {
