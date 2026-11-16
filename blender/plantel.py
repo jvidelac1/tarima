@@ -97,6 +97,15 @@ PESISTAS = {
    pelo=dict(color='#3b2a1c', peinado='rapado', barba=.85),
    uniforme=dict(malla='#17171c', panel='#a81d2f', vivo='#efece4', rodillera='#d7263d', rodillera2='#17171c', cinturon='#1a1a1e', zapatillas=('#eeede8','#d6d2c6','#d7263d','#7a5a3a')),
    juego=dict(color='#e5565f', bandera='linear-gradient(180deg,#17171c 0 40%,#d7263d 40% 60%,#f1efe9 60%)', dorsal=45, kg=dict(s=196, c=240))),
+ # compacto atlético de categoría media: hombros y trapecio anchos, cintura firme, pelo más largo arriba y costados cortos, barba corta
+ 'kordan': dict(nombre='Stevan Kordan', pais='Dravenia', codigo='DRV', genero='M', categoria='94', estatura=1.71,
+   musculo=1.0, grasa=.14, prop=dict(femur=.228),
+   rasgos=(.0, .1, .9), piel='media', ojos='#3f3324',
+   # cara cuadrada de mandíbula marcada, mentón ancho, nariz recta, cejas bajas
+   cara=[('head/head-square',.5),('chin/chin-width-incr',.45),('chin/chin-bones-incr',.4),('chin/chin-jaw-drop-incr',.2),('cheek/l-cheek-bones-incr',.35),('cheek/r-cheek-bones-incr',.35),('nose/nose-greek-incr',.3),('eyebrows/eyebrows-trans-down',.45)],
+   pelo=dict(color='#1c1511', peinado='corto', largo=.021, barba=.5),
+   uniforme=dict(malla='#ece8dd', panel='#0f5a66', vivo='#12181c', rodillera='#14171a', rodillera2='#0f5a66', cinturon='#2a1d15', zapatillas=('#efeee9','#d9d5ca','#0f5a66','#8a5f36')),
+   juego=dict(color='#2fb3c4', bandera='linear-gradient(90deg,#0f5a66 0 30%,#ece8dd 30% 70%,#12181c 70%)', dorsal=9, kg=dict(s=178, c=216))),
 }
 NUEVOS = [k for k, v in PESISTAS.items() if not v.get('legado')]
 
