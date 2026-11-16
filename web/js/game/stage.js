@@ -29,6 +29,7 @@ import { Jueces } from './jueces.js';
 import { Reflejo } from './reflejo.js';
 import { Look, GRADO_LOOK, SALA } from './look.js';
 import { Publico } from './publico.js';
+import { GESTO } from './caida.js';
 
 /**
  * Lo que el pase final de post.js hace después del AgX (saturación, contraste, gamma de sombras y tinte frío/cálido), como
@@ -187,6 +188,8 @@ function conBorde(m) {
 
 const v = new THREE.Vector3(), v2 = new THREE.Vector3();
 const _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _pc = new THREE.Vector3(), _pd = new THREE.Vector3(), _pe = new THREE.Vector3(), _pf = new THREE.Vector3(), _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion();
+/** Interpolación esférica entre dos direcciones unitarias (devuelve un vector nuevo). */
+function slerpDir(a, b, t) { const c = Math.min(1, Math.max(-1, a.dot(b))), th = Math.acos(c); if (th < 1e-4) return a.clone(); const s = Math.sin(th); return a.clone().multiplyScalar(Math.sin((1 - t) * th) / s).addScaledVector(b, Math.sin(t * th) / s); }
 /** Respiración del pesista de pie después del intento (posarMezcla): grados de cabeceo por hueso del tronco y ciclos por segundo. */
 export const RESPIRA = { grados: .9, hz: .55 };
 /** Escala del hueso del cuello con la cabeza propia oculta: cuello, cabeza, pelo y ojos quedan en un punto entre las clavículas. */
@@ -214,12 +217,14 @@ export const PLANOS = {
  * Primera persona (pedido del dueño: «hacer el levantamiento como si lo estuviera haciendo yo»; su referencia: una foto en
  * primera persona con las dos manos grandes abajo, lo que se mira al frente y al centro, horizonte derecho). La mirada es
  * sintética: siempre al frente, sin guiñada ni balanceo, sin picados al piso. Reglas, iguales para cualquier biotipo y fase:
- * - CON LA BARRA EN LAS MANOS Y HASTA LOS HOMBROS, LA CÁMARA ACOMPAÑA A LA BARRA (como el arma de un juego en primera
- *   persona): va `barra[0]` m detrás de la barra (o lo que haga falta para que entren las dos manos: medio agarre /
- *   (`agarre` × tangente de medio lente a lo ancho), hasta `barra[3]`) y `barra[1]` m más arriba por cada metro de esa
- *   distancia, mirando al frente con `barra[2]` rad de inclinación. La barra cruza la imagen en el tercio de abajo con las
- *   manos y los antebrazos; al frente, los jueces y el público. Sube con la barra: del piso a la altura de los ojos.
- *   Mientras tanto del cuerpo propio solo se dibujan antebrazos y manos (la cámara queda dentro del cuerpo: athlete.js, aTorso).
+ * - LA CÁMARA ESTÁ SIEMPRE EN LOS OJOS (sube y baja con el cuerpo: agachado en la salida, de pie al final) y mira al frente
+ *   (`barra[2]` rad): adelante, los jueces y el público.
+ * - CON LAS MANOS POR DEBAJO DE LOS OJOS, BRAZOS DE PRIMERA PERSONA (`vm`, como el arma de un juego en primera persona): el
+ *   cuerpo propio y la barra se dibujan girados alrededor de la línea de los hombros hasta que el brazo apunta al frente
+ *   (`vm.at` rad con la barra tomada, `vm.libre` con las manos sueltas) y corridos al frente (`vm.dz`: con la barra en los
+ *   hombros y con los brazos estirados) y `vm.dy` m. Los
+ *   brazos entran por el borde de abajo y las manos con la barra quedan en el tercio inferior. Es solo dibujo (_vm): huesos,
+ *   barra, sombras y reflejo no cambian. Del cuerpo propio se dibujan solo los brazos (athlete.js, aTorso).
  * - CON LA BARRA POR ENCIMA DE LOS OJOS (más de `alto[1]` m: recepción del arranque, envión arriba) la cámara vuelve a los
  *   ojos (cabeza + `arriba` m a lo largo del cuello + `adelante` m al frente), retrocede `atras[0] + atras[1]` (o lo que pida
  *   el agarre, hasta `atrasMax`) y mira a la barra dejándola `encima` rad por encima del centro: arriba la barra con las
@@ -238,7 +243,7 @@ export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .
   barra: [.3, .45, -.16, .5], alto: [-.05, .3], atras: [.12, .26], agarre: .72, atrasMax: .75, suelta: [1, -.45, 9], sinCabeza: .6, foco: 1.6,
   resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003 }, temblor: .006,
   // «brazos de primera persona» (como el arma de un juego en primera persona): ver _povCam y _vm
-  vm: { at: -.17, libre: -.5, dy: -.1, dz: .3, largo: [.15, .4], toma: [.08, .25], max: 2.1, sigue: 12 } };
+  vm: { at: -.08, libre: -.3, alto: .6, dy: -.02, dz: [.2, .12], sobre: [0, .25], largo: [.15, .4], toma: [.08, .25], max: 2.1, sigue: 12 } };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
 
@@ -528,7 +533,7 @@ export class Escena {
     const a = this.activo; if (!a) return;
     aplicarEsfuerzo(a, temblor, t, this.reduceMotion);
     this._temblor = temblor;
-    const g = pose.base + pose.s, i = Math.floor(g); a.setPair(i, i + 1, g - i); this._suelta = false;
+    const g = pose.base + pose.s, i = Math.floor(g); a.setPair(i, i + 1, g - i); this._suelta = false; this.rig.fijo = false;
     // el pesista recibe la barra (la muestra cruza la fase de recepción en reproducción continua): dip de la cámara
     if (dt > 0 && dt < .1 && this._rec?.seg === pose.seg && this._rec.s < pose.s && pose.s - this._rec.s < 8) { const r = this._recepcion(pose.seg); if (r >= 0 && this._rec.s < r && pose.s >= r) { this.viva.dip(1); if (this.pov) this.viva.golpe(.55); } }
     (this._rec ||= {}).seg = pose.seg; this._rec.s = pose.s;
@@ -555,7 +560,51 @@ export class Escena {
       for (const k of ['Spine1', 'Spine2']) { const h = a._byName.get(k); if (!h) continue; h.parent.getWorldQuaternion(_qa); h.quaternion.premultiply(_qb.setFromAxisAngle(_pa.set(1, 0, 0), ang).premultiply(_qc.copy(_qa).invert()).multiply(_qa)); }
       a.root.updateMatrixWorld(true);
     }
+    if (p.barrido?.w > 0 || p.gesto?.w > 0) this._gesto(a, p);
     this.rig.headY = a.boneWorld('Head', v2).y + .14; this.sombra = 3;
+  }
+  /** Gira el hueso `h` (en el mundo, con peso `w`) para que apunte de él a su hijo `hijo` en la dirección `dir` (unitaria, mundo). */
+  _apuntarHueso(a, h, hijo, dir, w) {
+    const b = a._byName.get(h), c = a._byName.get(hijo); if (!b || !c || w <= 0) return;
+    b.updateWorldMatrix(true, true); const p0 = b.getWorldPosition(_pa), d = c.getWorldPosition(_pb).sub(p0).normalize();
+    _qa.setFromUnitVectors(d, dir); if (w < 1) _qa.slerp(_qb.identity(), 1 - w);
+    b.parent.getWorldQuaternion(_qb); b.quaternion.premultiply(_qc.copy(_qb).invert().multiply(_qa).multiply(_qb));
+  }
+  /** Gira el hueso `h` `ang` rad alrededor del eje `eje` del mundo. */
+  _girarHueso(a, h, eje, ang) {
+    const b = a._byName.get(h); if (!b || !ang) return; b.parent.updateWorldMatrix(true, false); b.parent.getWorldQuaternion(_qb);
+    b.quaternion.premultiply(_qc.copy(_qb).invert().multiply(_qa.setFromAxisAngle(eje, ang)).multiply(_qb));
+  }
+  /**
+   * Barrido de los brazos y gesto después de soltar la barra (reglas en caida.js: BARRIDO y GESTO). Direcciones en el mundo
+   * (+x la izquierda del pesista, +y arriba, +z su frente): valen para cualquier biotipo, no hay nada por personaje.
+   */
+  _gesto(a, p) {
+    const B = p.barrido, g = p.gesto, quieto = this.reduceMotion;
+    for (const [L, sx] of [['Left', 1], ['Right', -1]]) {
+      if (B?.w > 0) {
+        // del brazo como está (arriba) al frente y de ahí a colgar; el antebrazo va un poco atrasado (el codo guía)
+        a._byName.get(L + 'Arm')?.updateWorldMatrix(true, true);
+        const d0 = a.boneWorld(L + 'ForeArm', _pc).sub(a.boneWorld(L + 'Arm', _pd)).normalize().clone(), fr = _pe.set(sx * .22, .0, .975).normalize().clone(), ab = _pf.set(sx * .13, -.985, .1).normalize().clone();
+        const en = x => { const y = Math.min(1, Math.max(0, x)); return y < .5 ? slerpDir(d0, fr, y * 2) : slerpDir(fr, ab, y * 2 - 1); };
+        this._apuntarHueso(a, L + 'Arm', L + 'ForeArm', en(B.x), B.w); this._apuntarHueso(a, L + 'ForeArm', L + 'Hand', en(B.x - .1), B.w);
+      }
+      if (g?.tipo === 'festejo' && g.w > 0) {
+        // dos puños al frente, a la altura de los hombros, que marcan dos veces
+        const golpe = quieto ? 0 : Math.max(0, Math.sin((g.t - GESTO.festejo.sube) * Math.PI * 2 * 2.2)) * (g.t > GESTO.festejo.sube && g.t < GESTO.festejo.sube + .95 ? 1 : 0);
+        this._apuntarHueso(a, L + 'Arm', L + 'ForeArm', _pe.set(sx * .3, -.72 + .1 * golpe, .5).normalize(), g.w);
+        this._apuntarHueso(a, L + 'ForeArm', L + 'Hand', _pf.set(-sx * .12, .82 - .5 * golpe, .42 + .3 * golpe).normalize(), g.w);
+        a.dedosDe?.(L, g.dedos, g.w);
+      }
+    }
+    if (g?.tipo === 'festejo' && g.w > 0) { for (const k of ['Spine1', 'Spine2']) this._girarHueso(a, k, _pa.set(1, 0, 0), -.035 * g.w); this._girarHueso(a, 'Head', _pa.set(1, 0, 0), -.1 * g.w); }
+    if (g?.tipo === 'bronca' && g.w > 0) {
+      // la cabeza cae, los hombros se vencen y niega con la cabeza (dos veces, cada vez menos)
+      for (const k of ['Spine1', 'Spine2']) this._girarHueso(a, k, _pa.set(1, 0, 0), .07 * g.w);
+      this._girarHueso(a, 'Neck', _pa.set(1, 0, 0), .2 * g.w); this._girarHueso(a, 'Head', _pa.set(1, 0, 0), .24 * g.w);
+      if (!quieto) this._girarHueso(a, 'Head', _pa.set(0, 1, 0), .2 * g.w * Math.sin((g.t - .5) * Math.PI * 2 * .9) * Math.max(0, Math.min(1, (g.t - .5) / .2)) * Math.max(0, 1 - (g.t - .5) / 2.2));
+    }
+    a.root.updateMatrixWorld(true);
   }
   /**
    * Barra suelta en {y, z, ang} (m y radianes: rueda sobre su eje). Con `dt` la flexión de la barra sigue la aceleración
@@ -564,7 +613,7 @@ export class Escena {
   barraSuelta(b, dt = 0) {
     // la barra contra la tarima (venía bajando y frenó de golpe cerca del piso): temblor según la velocidad del golpe
     if (dt > 0 && dt < .1) { const v0 = (this._py[0] - this._py[1]) / dt, v1 = (b.y - this._py[0]) / dt; if (v0 < -1.2 && v1 - v0 > 1.2 && b.y < this.pisoBarra + .08) { const k = Math.min(.85, .18 - v0 * .11); this.viva.golpe(k); this.ambiente.golpe(b.z, k); } }
-    v.set(0, b.y, b.z); this.barbell.setPosition(v); this.barbell.group.rotation.x = b.ang || 0; this._suelta = true;
+    v.set(0, b.y, b.z); this.barbell.setPosition(v); this.barbell.group.rotation.x = b.ang || 0; this._suelta = true; this.rig.fijo = true;      // pedido del dueño: al terminar el intento la cámara no se mueve (ni el reencuadre que seguía a la barra que cae)
     this.barY = b.y; this.barZ = b.z; this.rig.barY = b.y; this.rig.barAhead = b.y;
     if (dt > 0 && dt < .1) { const acc = (b.y - 2 * this._py[0] + this._py[1]) / (dt * dt); this.barbell.step(dt, b.y, acc); } else this.barbell.settle(b.y);
     this._py[1] = dt > 0 ? this._py[0] : b.y; this._py[0] = b.y; this.sombra = 3;
@@ -656,10 +705,7 @@ export class Escena {
     const S = this.pov, R = this.rig, o = this.ojos(_pd), quieto = this.reduceMotion, a = this.activo; S.t += dt;
     const b = this.barbell.group.position, paso = (x, a, c) => { const t = Math.min(1, Math.max(0, (x - a) / (c - a))); return t * t * (3 - 2 * t); };
     const sigue = (x, y, k) => (S.nueva || quieto ? y : x + (y - x) * (1 - Math.exp(-k * dt)));
-    // cuánto está la barra por encima de los ojos (0 a 1) y la distancia a la que entran las dos manos en la imagen
-    const dy0 = b.y - o.y, arriba = paso(dy0, POV.alto[0], POV.alto[1]), tH = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * cam.aspect;
     const hm = a ? a.midWorld(['LeftHand', 'RightHand'], _pe) : _pe.copy(b), sh = a ? a.midWorld(['LeftArm', 'RightArm'], _pf) : _pf.copy(o);
-    const medio = a ? Math.abs(a.boneWorld('LeftHand', _pa).x - a.boneWorld('RightHand', _pb).x) / 2 : .3, D = medio / (POV.agarre * Math.max(.3, tH));
     // BRAZOS DE PRIMERA PERSONA. Con las manos por debajo de los ojos, mirando al frente no se verían ni las manos ni la barra
     // (cuelgan debajo de la cara). Como el arma de un juego en primera persona, el cuerpo propio y la barra se DIBUJAN girados
     // alrededor de la línea de los hombros hasta que el brazo (hombro → manos) apunta al frente (`vm.at` rad con la barra
@@ -667,22 +713,20 @@ export class Escena {
     // abajo, las manos y la barra quedan en el tercio inferior y al frente se ven los jueces. Es solo dibujo (_vm): los
     // huesos, la barra, las sombras y el reflejo siguen donde están. `kB`: cuánto de eso (0 con las manos sobre los ojos);
     // `kA`: cuánto acompaña la barra (1 tomada, 0 suelta o todavía en el piso sin tomar).
-    const kB = a ? 1 - paso(hm.y - o.y, POV.alto[0], POV.alto[1]) : 0; S.kB = sigue(S.kB, kB, 7);
-    const toma = this._suelta || !a ? 0 : 1 - paso(Math.hypot(hm.y - b.y, hm.z - b.z), POV.vm.toma[0], POV.vm.toma[1]); S.kA = sigue(S.kA || 0, toma, this._suelta ? 30 : 9);
+    // Con las manos por ENCIMA de `vm.alto` rad (barra arriba), lo mismo al revés: el brazo baja hasta `vm.alto` y la barra queda en
+    // el cuarto de arriba de la imagen, sin inclinar la mirada (los jueces siguen en cuadro; antes la cámara subía 35° y mostraba el techo).
+    S.kB = a ? 1 : 0;
+    const toma = this._suelta || !a ? 0 : 1 - paso(Math.hypot(hm.y - b.y, hm.z - b.z), POV.vm.toma[0], POV.vm.toma[1]); S.kA = sigue(S.kA || 0, toma, this._suelta ? 4 : 9);
     const ang = Math.atan2(hm.y - sh.y, hm.z - sh.z), largo = Math.hypot(hm.y - sh.y, hm.z - sh.z), at = POV.vm.libre + (POV.vm.at - POV.vm.libre) * S.kA;
-    const rot = Math.min(POV.vm.max, Math.max(0, at - ang)) * paso(largo, POV.vm.largo[0], POV.vm.largo[1]); S.rot = sigue(S.rot || 0, rot, POV.vm.sigue);
-    const kE = (this.P?.h || 1.7) / 1.7; (S.vm ||= { piv: new THREE.Vector3(), rot: 0, dy: 0, dz: 0, kA: 0 }); S.vm.piv.copy(sh); S.vm.rot = S.rot * S.kB; S.vm.dy = POV.vm.dy * kE * S.kB; S.vm.dz = POV.vm.dz * kE * S.kB; S.vm.kA = S.kA;
-    // ojos: retroceso con la barra arriba
-    const retro = this._suelta ? 0 : Math.min(POV.atrasMax, Math.max(POV.atras[0] + POV.atras[1] * arriba, Math.sqrt(Math.max(0, D * D - dy0 * dy0)) - (b.z - o.z))) * arriba;
-    S.retro = S.nueva ? retro : S.retro + (retro - S.retro) * (1 - Math.exp(-(this._suelta ? 3 : 12) * dt)); o.z -= S.retro;
+    const rot = (ang < at ? Math.min(POV.vm.max, at - ang) : ang > POV.vm.alto ? POV.vm.alto - ang : 0) * paso(largo, POV.vm.largo[0], POV.vm.largo[1]); S.rot = sigue(S.rot || 0, rot, POV.vm.sigue);
+    // corrimiento al frente: `vm.dz[1]` m con los brazos estirados (los hombros quedan fuera de la imagen, abajo) y `vm.dz[0]` con la
+    // barra en los hombros (ahí girar no alcanza: la barra está pegada a los hombros); se va cuando las manos pasan `vm.sobre` m por encima de los hombros
+    const ext = paso(largo, POV.vm.largo[0], POV.vm.largo[1]), dzT = (POV.vm.dz[0] + (POV.vm.dz[1] - POV.vm.dz[0]) * ext) * (1 - (1 - ext) * paso(hm.y - sh.y, POV.vm.sobre[0], POV.vm.sobre[1])); S.dz = sigue(S.dz ?? dzT, dzT, POV.vm.sigue); S.ext = sigue(S.ext ?? ext, ext, POV.vm.sigue);
+    const kE = (this.P?.h || 1.7) / 1.7; (S.vm ||= { piv: new THREE.Vector3(), rot: 0, dy: 0, dz: 0, kA: 0 }); S.vm.piv.copy(sh); S.vm.rot = S.rot * S.kB; S.vm.dy = POV.vm.dy * S.ext * kE * S.kB; S.vm.dz = S.dz * kE * S.kB; S.vm.kA = S.kA;
     if (S.nueva) S.p.copy(o); else S.p.lerp(o, 1 - Math.exp(-POV.sigue * dt));
-    // inclinación de la mirada (reglas de POV): al frente con las manos abajo; hacia la barra cuando está sobre los ojos
-    const dy = b.y - S.p.y, dz = b.z - S.p.z, hacia = Math.atan2(dy, dz), incOjos = Math.max(POV.abajo, Math.min(POV.tope, hacia - POV.encima));
-    const incSuelta = b.z < S.p.z - .1 ? POV.frente : Math.max(POV.suelta[1], Math.min(POV.frente, hacia * POV.suelta[0]));
-    const kM = this._suelta ? S.kB : 1 - arriba, incT = this._suelta ? incSuelta + (POV.barra[2] - incSuelta) * kM : incOjos + (POV.barra[2] - incOjos) * kM;
-    // con retardo y con tope de velocidad (`giroMax` rad/s: cuando la barra pasa junto a la cámara el ángulo hacia ella cambia de golpe)
-    const dInc = (incT - S.inc) * (1 - Math.exp(-(quieto ? 60 : this._suelta ? POV.suelta[2] : POV.giro) * dt)), topeG = POV.giroMax * dt;
-    S.inc = S.nueva ? incT : S.inc + (quieto ? dInc : Math.max(-topeG, Math.min(topeG, dInc))); S.nueva = false;
+    // la mirada no se inclina nunca: al frente (`barra[2]` rad), también con la barra arriba y después de soltarla (la barra que
+    // cae se oye y se siente en el temblor; no se la sigue al piso)
+    S.inc = POV.barra[2]; S.nueva = false;
     let inc = S.inc, bal = 0, y = 0;
     if (!quieto) {
       const w = S.t * Math.PI * 2 * POV.resp.hz, T = Math.min(1, Math.max(0, this._temblor)) * POV.temblor;
@@ -691,8 +735,9 @@ export class Escena {
     }
     cam.position.copy(S.p); cam.position.y += y; cam.rotation.set(inc, Math.PI, bal, 'YXZ');
     // del cuerpo propio, solo los brazos mientras se dibujan girados (el tronco y las piernas quedarían acostados delante de la cámara)
-    S.torso = Math.min(1, Math.max(0, S.kB / .12)); this._torso(a, S.torso);
-    if (a?.skin?.uCorte) a.skin.uCorte.value = .8;
+    // (y tampoco con la barra arriba: el dueño no quiere ver el torso propio; los brazos entran por el borde de abajo)
+    S.torso = 1; this._torso(a, S.torso);
+    if (a?.skin?.uCorte) a.skin.uCorte.value = .8;      // los brazos enteros: el corte del hombro queda fuera de la imagen, abajo
     const fov = Math.min(POV.fov, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(POV.fovAncho / 2)) / Math.max(.5, cam.aspect)))) * (1 - (1 - R.zoom) * .5);
     cam.fov = fov; cam.near = POV.cerca; cam.updateProjectionMatrix(); cam.updateMatrixWorld();
     R.focusDistance = POV.foco; R.target.set(S.p.x, S.p.y, S.p.z + POV.foco); R.subject.copy(R.target);

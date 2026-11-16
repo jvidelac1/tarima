@@ -51,12 +51,12 @@ export class CameraRig {
    * El arrastre orbita alrededor del blanco y la rueda acerca o aleja.
    */
   setShot(shot) {
-    this.shot = shot || null; this._shotNew = true; this.manual = false; this.zoom = this.zoomT = 1;
+    this.shot = shot || null; this.fijo = false; this._shotNew = true; this.manual = false; this.zoom = this.zoomT = 1;
     if (shot) { this.az = this.azT = shot.az; this.el = this.elT = shot.el; } else this.cut(this.index);
   }
   /** Corte a una cámara fija. */
   cut(i) {
-    this.shot = null;
+    this.shot = null; this.fijo = false;
     this.index = clamp(i | 0, 0, CAMERAS.length - 1); const c = CAMERAS[this.index]; this.top = 99;
     this.az = this.azT = c.az; this.el = this.elT = c.el; this.zoom = this.zoomT = 1; this.manual = false; this.camera.fov = c.fov; this.time = 0; Object.assign(this._in, this.inset);
   }
@@ -101,7 +101,7 @@ export class CameraRig {
   setAspect(a) { this.camera.aspect = a; this.camera.updateProjectionMatrix(); }
 
   update(dt) {
-    const c = CAMERAS[this.index], cam = this.camera; this.time += dt;
+    const c = CAMERAS[this.index], cam = this.camera; if (!this.fijo) this.time += dt;      // `fijo` (el juego, al terminar el intento): ni deriva, ni reencuadre, ni márgenes nuevos
     this.az = damp(this.az, this.azT, 7, dt); this.el = damp(this.el, this.elT, 7, dt); this.zoom = damp(this.zoom, this.zoomT, 7, dt);
     // cámara propia (el juego: primera persona): `propia(cam, dt)` la arma entera; acá solo se le suma la transición suave
     if (this.propia) { this.propia(cam, dt); this.top = 99; this._mezclar(dt); return; }
@@ -117,12 +117,12 @@ export class CameraRig {
     }
     const drift = (this.reduceMotion || this.manual) ? 0 : Math.sin(this.time * .16) * c.drift;
     const az = this.az + drift, el = this.el, I = this._in, snap = this.top > 50;
-    for (const k of ['t', 'b', 'l', 'r']) I[k] = snap ? this.inset[k] : damp(I[k], this.inset[k], 5, dt);
+    if (!this.fijo || snap) for (const k of ['t', 'b', 'l', 'r']) I[k] = snap ? this.inset[k] : damp(I[k], this.inset[k], 5, dt);
     // encuadre: atleta y barra completos dentro del rectángulo libre de gráfica. El borde superior se anticipa a la barra
     // (barAhead = altura máxima en el próximo segundo y medio), como un operador que conoce el levantamiento:
     // radio de disco + flecha del whip + aire.
     const topT = Math.max(this.height * 1.09, this.headY + .2, Math.max(this.barY, this.barAhead) + .225 + .06 + .09);
-    this.top = snap || Math.abs(topT - this.top) > 1.5 ? topT : damp(this.top, topT, this.reduceMotion ? 50 : (topT > this.top ? 4.2 : 1.6), dt);
+    if (!this.fijo || snap) this.top = snap || Math.abs(topT - this.top) > 1.5 ? topT : damp(this.top, topT, this.reduceMotion ? 50 : (topT > this.top ? 4.2 : 1.6), dt);
     const top = this.top, bottom = -.16, H = top - bottom, jib = c.key === 'jib';
     const W = 2.5 * Math.abs(Math.cos(az)) + 1.5 * Math.abs(Math.sin(az)) + .45;
     const fh = Math.max(.4, 1 - I.t - I.b), fw = Math.max(.4, 1 - I.l - I.r);

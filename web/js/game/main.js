@@ -797,6 +797,7 @@ function dibujarFinal(c, t, dt, vivo) {
   escena.posarMezcla(poseCaida(c.pl, c.g0, c.destino, t, c.R)); const b = c.barra.en(tb); escena.barraSuelta(b, dt);
   if (vivo) for (; c.golpes < b.golpes.length; c.golpes++) { const v = b.golpes[c.golpes].v; sonido.golpe(v); if (c.golpes === 0 && c.tipo !== 'bajada') sonido.lamento(); }
 }
+const textoDe = k => t(k);
 /** El final quieto, en su último cuadro (cuando se saltea). */
 const terminarFinal = c => { if (c) { c.golpes = 1e9; dibujarFinal(c, c.dur + 5, 0, false); } };
 
@@ -1757,7 +1758,7 @@ window.JUEGO = {
       const P = escena.P, G = tramo(P, seg), k = G.i(fase), pose = { seg: G.nombre, s: k, tau: G.tt[k], base: G.base, primero: seg === (lev === 's' ? 'snatch' : 'clean') };
       escena.posar(pose, lev); escena.posar(pose, lev);
       const c = E.prueba = armarFinal({ res, grab: [{ t: 0, pose, y: escena.barY, z: escena.barZ }], m: { movs: [{ mov }] } }, lev);
-      E.camPrueba = null; if (!c) return null; if (camara === 'caida') escena.primerPlano('caida'); else escena.camara(camara);
+      E.camPrueba = null; if (!c) return null; c.resP = res; if (camara === 'caida') escena.primerPlano('caida'); else escena.camara(camara);
       return { tipo: c.tipo, dur: c.dur, suelta: c.pl.suelta, y: escena.barY, z: escena.barZ };
     },
     /**
@@ -1781,7 +1782,9 @@ window.JUEGO = {
       return { ...o, giro: r(giro), cual, bar: [r(b.y), r(b.z)], cam: { p: [r(cam.position.x), r(cam.position.y), r(cam.position.z)], inc: r(Math.asin(d.y)), fov: r(cam.fov) }, pov: !!escena.pov, sinCabeza: !!escena._sinCabeza };
     },
     /** Lleva la escena de final() al instante t (s), la dibuja si `dibujar`, y mide holguras entre la barra y el cuerpo. */
-    finalEn(t, dibujar = false, dt = 1 / 60, dtCam = .5) { const c = E.prueba; dibujarFinal(c, t, dt, false); escena.cuadro(dtCam, dibujar); return holgura(t - c.pl.suelta); },
+    finalEn(t, dibujar = false, dt = 1 / 60, dtCam = .5) { const c = E.prueba; dibujarFinal(c, t, dt, false);
+      // las luces y el veredicto como en el juego (decision): de a una desde 0,2 s y el cartel a 1,05 s
+      if (c.resP) { const ok = c.resP.res === 'valido', L = ok ? [true, true, true] : c.resP.res === 'nulo' ? [false, true, false] : [false, false, false], n = Math.max(0, Math.min(3, Math.floor((t - .2) / .3) + 1)); setLuces(t < .2 ? null : L.map((x, i) => (i < n ? x : null))); veredicto(t >= 1.05 ? textoDe(ok ? 'veredicto.vale' : c.resP.res === 'nulo' ? 'veredicto.no_vale' : 'veredicto.cayo') : '', '', !ok); } escena.cuadro(dtCam, dibujar); return holgura(t - c.pl.suelta); },
     /** Cambio de carga a mano: de `kg0` a `kg1`, con la manga en primer plano. Devuelve la duración (s). */
     async carga(kg0, kg1, id = 'ventura') { await escena.cargar(id); await escena.mostrar(id); escena.setCarga(kg0, 's'); escena.posar(poseParado(escena.P, 's'), 's'); await escena.mostrar(null); escena.barraSuelta({ y: escena.pisoBarra, z: escena.barZ, ang: 0 }); const A = E.pruebaCarga = escena.cambioDeCarga(kg1); escena.primerPlano('manga'); return A ? { dur: A.dur, sale: A.sale, entra: A.entra } : null; },
     cargaEn(t, dibujar = false) { const A = E.pruebaCarga, x = A.en(t); escena.barraSuelta({ y: escena.pisoBarra, z: escena.barZ, ang: 0 }); escena.cuadro(.5, dibujar); return x; },

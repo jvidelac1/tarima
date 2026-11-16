@@ -43,6 +43,10 @@ on:
         description: 'Iteración rápida: solo estas tomas del plantel (ej.: 3-4,medio,cara). Saltea las fotos viejas y el laboratorio'
         type: string
         default: ''
+      solo_claves:
+        description: 'Trabajo pov: solo las fases clave en primera persona con calidad alta (iteración rápida)'
+        type: boolean
+        default: false
       solo:
         description: 'Correr solo un trabajo: fotos o pov (vacío: los dos)'
         type: string
@@ -156,11 +160,30 @@ jobs:
           fi
           echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
           mkdir -p out/logs
+      - name: Modelos del plantel desde una corrida de pesistas.yml (sin subirlos al repo)
+        if: ${{ inputs.pesistas_run || env.PESISTAS_RUN }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ inputs.pesistas_run || env.PESISTAS_RUN }}
+        run: |
+          for r in $RUN; do gh run download "$r" -R "$GITHUB_REPOSITORY" -D "$RUNNER_TEMP/pes_$r" || true; python3 tools/sumar_pesista.py "$RUNNER_TEMP/pes_$r" || true; rm -rf "$RUNNER_TEMP/pes_$r"; done
+          python3 tools/plantel_web.py; ls -la web/models
+      - name: Fases clave en primera persona con la calidad alta y el plantel nuevo (check_pov --solo=claves --q=alta)
+        if: ${{ !cancelled() && hashFiles('web/models/ilarraz.glb') != '' }}
+        timeout-minutes: 20
+        run: node tools/check_pov.mjs --solo=claves --q=alta --plantel=$TERNA --out=out/pov_alta 2>&1 | tee out/logs/check_pov_alta.log
       - name: Final cuadro a cuadro y primera persona (check_pov)
+        if: ${{ !cancelled() && inputs.solo_claves != true }}
         timeout-minutes: 25
         run: node tools/check_pov.mjs 2>&1 | tee out/logs/check_pov.log
+      - name: Teléfono acostado en primera persona, con la interfaz y la barrita (check_barra --solo=tel_en --camara=pov)
+        if: ${{ !cancelled() && inputs.solo_claves != true }}
+        timeout-minutes: 10
+        env:
+          TAPA_INFORMA: 1
+        run: node tools/check_barra.mjs --solo=tel_en --camara=pov --out=out/barra_pov_tel 2>&1 | tee out/logs/check_barra_pov_tel.log
       - name: Tres arranques jugados en primera persona, con el final denso (check_barra --camara=pov --final)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && inputs.solo_claves != true }}
         timeout-minutes: 12
         env:
           TAPA_INFORMA: 1
@@ -168,7 +191,7 @@ jobs:
           node tools/check_barra.mjs --solo=pc_es --camara=pov --final --out=out/barra_pov 2>&1 | tee out/logs/check_barra_pov.log
           node tools/hojas.mjs out/barra_pov --cols=6 --ancho=400
       - name: Tres arranques jugados con la cámara general, con el final denso (check_barra --final)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && inputs.solo_claves != true }}
         timeout-minutes: 12
         env:
           TAPA_INFORMA: 1

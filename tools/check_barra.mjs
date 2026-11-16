@@ -75,7 +75,7 @@ for (const P of PANTALLAS) try {
   // dónde se veía el puntero cuando llegó cada Espacio (antes que el juego: este oyente se registra primero)
   await page.addInitScript(() => { window.__P = []; addEventListener('keydown', e => { if (e.code !== 'Space' || e.repeat) return; const p = document.querySelector('#barrita .b-punt'); window.__P.push({ ts: e.timeStamp, izq: p ? parseFloat(p.style.left) : null, visible: !document.getElementById('barrita')?.hidden }); }, true); });
   // sin dibujo continuo (?dibujo=0, como check_game): por software cada cuadro tarda; antes de cada captura se fuerza uno
-  await page.goto(`${base}juego.html?lang=${P.lang}&q=baja&dibujo=0&semilla=${SEMILLA}${CAMARA ? '&camara=' + CAMARA : ''}`, { waitUntil: 'load' });
+  await page.goto(`${base}juego.html?lang=${P.lang}&q=baja&dibujo=0&semilla=${SEMILLA}${CAMARA ? '&camara=' + CAMARA : ''}${process.env.TARIMA_PLANTEL ? '&plantel=' + process.env.TARIMA_PLANTEL : ''}${process.env.TARIMA_Q ? '&q=' + process.env.TARIMA_Q : ''}`.replace('&q=baja&dibujo=0', process.env.TARIMA_Q ? '&dibujo=0' : '&q=baja&dibujo=0'), { waitUntil: 'load' });
   if (!await J(() => window.JUEGO.listo)) { mal('el juego no inició'); await ctx.close(); continue; }
   await J(() => JUEGO.test.manual());
   const av = ms => J(ms => JUEGO.test.avanzar(ms), ms), ir = t => J(t => JUEGO.test.hasta(t, 8), t);

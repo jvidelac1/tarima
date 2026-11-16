@@ -17,8 +17,9 @@ import { sinApi } from './sin_api.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web'), OUT = path.join(ROOT, 'out', 'pov');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
+const OUT = path.resolve(ROOT, arg('out') || path.join('out', 'pov')), Q = arg('q') || 'baja', PLANTEL = arg('plantel') || process.env.TARIMA_PLANTEL || '';      // --q=alta: fotos con la calidad alta (lento por software); --plantel=id,id,id: vestuario
 const HEADED = process.argv.includes('--headed'), SOLO = arg('solo');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
 const server = http.createServer((req, res) => {
@@ -36,9 +37,10 @@ const ctx = await browser.newContext({ viewport: { width: 960, height: 540 }, de
 const page = await ctx.newPage(), hojas = await ctx.newPage();
 page.on('console', m => { if (m.type() === 'error') problemas.push(`console.error: ${m.text()}`); });
 page.on('pageerror', e => problemas.push(`pageerror: ${e.message}`));
-await page.goto(`${base}juego.html?q=baja&dibujo=0`, { waitUntil: 'load' });
+await page.goto(`${base}juego.html?q=${Q}&dibujo=0${PLANTEL ? '&plantel=' + PLANTEL : ''}`, { waitUntil: 'load' });
+await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 240000 }).catch(() => {});
 if (!await page.evaluate(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
-await page.evaluate(() => { for (const id of ['capa', 'zocalo', 'senal', 'acuse', 'marcador', 'tablero']) { const e = document.getElementById(id); if (e) e.style.visibility = 'hidden'; } });
+await page.evaluate(() => { for (const id of ['capa', 'zocalo', 'senal', 'acuse', 'tablero']) { const e = document.getElementById(id); if (e) e.style.visibility = 'hidden'; } });
 const slug = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/gi, '_').toLowerCase();
 const toma = () => page.screenshot({ type: 'jpeg', quality: 70 });
 /** Hoja de contactos: las fotos (búferes JPEG) con su rótulo, en `cols` columnas. */
@@ -73,7 +75,7 @@ async function recorrer(id, [nombre, lev, seg, fase, mov, res], camara, fotos, c
   await J(() => window.JUEGO.test.medir());
   // la cámara se asienta en la pose del final antes de la primera foto (venía de la escena anterior)
   await J(() => { window.JUEGO.test.finalEn(0, false, 1 / 60, .5); window.JUEGO.test.finalEn(0, false, 1 / 60, .5); });
-  let piso = 9; const M = { resbala: 0, vPie: 0, tPie: 0, giro: 0, cual: '', tGiro: 0, manoTronco: 9, tMano: 0, vMano: 0, tVMano: 0, holgura: 9, sube: 0 }, lista = []; let ant = null, prox = 0;
+  let camRef = null, piso = 9; const M = { resbala: 0, vPie: 0, tPie: 0, giro: 0, cual: '', tGiro: 0, manoTronco: 9, tMano: 0, vMano: 0, tVMano: 0, holgura: 9, sube: 0 }, lista = []; let ant = null, prox = 0;
   for (let t = 0; t <= info.dur + .3; t += 1 / 60) {
     const sacar = fotos && t >= prox - 1e-9;
     const m = await J(([t, d]) => { const h = window.JUEGO.test.finalEn(t, d, 1 / 60, 1 / 60); return { ...window.JUEGO.test.medir(), h: h ? h.h : null }; }, [t, sacar]);
@@ -95,6 +97,8 @@ async function recorrer(id, [nombre, lev, seg, fase, mov, res], camara, fotos, c
       if (d < M.manoTronco) { M.manoTronco = d; M.tMano = t; }
     }
     if (m.h !== null && m.h < M.holgura) M.holgura = m.h;
+    // la cámara queda quieta desde que se suelta la barra (pedido del dueño): cuánto se corre y cuánto gira desde ese cuadro
+    if (t >= info.suelta + 1 / 60 && m.cam) { camRef ||= m.cam; M.camMov = Math.max(M.camMov || 0, Math.hypot(...m.cam.p.map((x, i) => x - camRef.p[i]))); M.camGiro = Math.max(M.camGiro || 0, Math.abs(m.cam.inc - camRef.inc), Math.abs(m.cam.fov - camRef.fov) * Math.PI / 180); }
     ant = m;
   }
   return { info, M, lista };
@@ -104,6 +108,8 @@ if (!SOLO || SOLO === 'finales') {
   for (const id of ['ventura', 'brenner']) for (const caso of FINALES) {
     const r = await recorrer(id, caso, '3/4', true); if (!r) continue; const { M, info } = r;
     console.log(`${id.padEnd(8)} ${caso[0].padEnd(26)} ${info.tipo.padEnd(8)} ${info.dur.toFixed(2)} s · pies resbalan ${(M.resbala * 100).toFixed(1)} cm (máx ${(M.vPie * 100).toFixed(0)} cm/s a ${M.tPie.toFixed(2)} s; punta hasta ${(M.sube * 100).toFixed(0)} cm) · giro máx ${G(M.giro).toFixed(0)} °/s (${M.cual}, a ${M.tGiro.toFixed(2)} s) · mano hasta ${M.vMano.toFixed(1)} m/s (a ${M.tVMano.toFixed(2)} s) · mano–tronco mín ${(M.manoTronco * 100).toFixed(1)} cm a ${M.tMano.toFixed(2)} s · holgura barra ${(M.holgura * 100).toFixed(1)} cm`);
+    if (M.camMov > .02 || M.camGiro > .004) problemas.push(`${id} · ${caso[0]}: la cámara general se mueve después de soltar la barra (${(M.camMov * 100).toFixed(1)} cm, ${G(M.camGiro).toFixed(2)}°)`);
+    console.log(`${''.padEnd(36)}cámara tras soltar: ${(M.camMov * 100).toFixed(1)} cm, ${G(M.camGiro).toFixed(2)}°`);
     await hoja(`final_${id}_${slug(caso[0])}_general`, r.lista);
     if (id === 'ventura') { const l = await recorrer(id, caso, 'lado', true); if (l) await hoja(`final_${id}_${slug(caso[0])}_lado`, l.lista); }
   }
@@ -137,6 +143,7 @@ if (!SOLO || SOLO === 'pov' || SOLO === 'claves') {
       await J(() => window.JUEGO.test.real());
       console.log(`${id.padEnd(8)} ${seg.padEnd(7)} cámara: hasta ${vMax.toFixed(2)} m/s y ${aMax.toFixed(0)} m/s² · mirada entre ${G(incMin).toFixed(0)}° y ${G(incMax).toFixed(0)}°, gira hasta ${G(wMax).toFixed(0)} °/s · a lo sumo a ${(lejos * 100).toFixed(0)} cm del hueso de la cabeza`);
       // reglas: la mirada no gira más de 160 °/s (sigue a la barra, con tope de 150) y la cámara no se aleja más de 1,4 m de la cabeza (acompaña a la barra: con la barra en el piso queda a la altura de las rodillas)
+      if (G(incMax - incMin) > 3) problemas.push(`${id} ${seg}: la mirada se inclina ${G(incMax - incMin).toFixed(0)}° (tiene que quedar al frente)`);
       if (G(wMax) > 160) problemas.push(`${id} ${seg}: la mirada gira a ${G(wMax).toFixed(0)} °/s`);
       if (lejos > 1.4) problemas.push(`${id} ${seg}: la cámara queda a ${(lejos * 100).toFixed(0)} cm de la cabeza`);
     }

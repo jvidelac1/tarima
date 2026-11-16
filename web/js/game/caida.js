@@ -77,7 +77,7 @@ export function planCaida(tipo, causa, valido = false) {
     bajada: { suelta: valido ? .7 : .35, vy: .25, vz: .6, quieto: (valido ? .7 : .35) + .5, mezcla: .9 },
   }[tipo];
   if (!P) return null;
-  const pl = { tipo, causa, ...P, salto: null };
+  const pl = { tipo, causa, ...P, salto: null, valido };
   if (tipo === 'arriba' && causa === 'adelante') Object.assign(pl, { vz: 1.15, salto: { dz: -.14, desde: .05, dur: .32 } });
   if (tipo === 'arriba' && causa === 'atras') Object.assign(pl, { vz: -1.25, vy: .2, salto: { dz: .2, desde: .05, dur: .4 } });
   return pl;
@@ -98,6 +98,15 @@ export function planCaida(tipo, causa, valido = false) {
  *   a «Parado», y lo que les falta a los pies lo hacen en un saltito (`SALTITO`: la raíz sube y la mezcla ocurre en el aire).
  */
 export const PARARSE = .8, DESANDAR = .24, MANOS = .2, SALTITO = { dur: .3, alto: .04 };
+/**
+ * Con la barra soltada desde arriba de la cabeza (`bajada` y `arriba`) los brazos NO desandan el clip (pasaban por codos
+ * altos, «doble bíceps», y por la cruz): BARREN por delante, de arriba hacia abajo, detrás de la barra que cae, en
+ * `BARRIDO.dur` s (stage.js los apunta por regla: brazo y antebrazo siguen un arco en el plano del frente).
+ * Después, el GESTO (también por regla, sobre los huesos, igual para cualquier biotipo): válido = dos puños que suben y
+ * marcan dos veces («¡vamos!»), y los brazos vuelven a colgar; nulo o fallo = la cabeza cae, los hombros se vencen y niega
+ * con la cabeza. Tiempos en s desde que terminan de bajar los brazos.
+ */
+export const BARRIDO = { dur: .55 }, GESTO = { festejo: { sube: .28, dura: 1.0, baja: .45 }, bronca: { sube: .5 } };
 /** Lo que tarda en pasar a «Parado» (s): con saltito, medio segundo como mucho (el saltito va en el medio). */
 const mezclaDe = (pl, g0, R) => (R && g0 >= R.rec ? Math.min(pl.mezcla, SALTITO.dur + .2) : pl.mezcla);
 /** Poses (muestras globales) por las que pasan los brazos: la del final y la de cada fase anterior, hasta `R.brazosA`. */
@@ -127,6 +136,13 @@ export function poseCaida(pl, g0, destino, t, R = null) {
   // brazos: desandan el clip desde que se suelta la barra y después bajan a «Parado» mientras el cuerpo llega
   const K = clavesBrazos(g0, R), n = K.length - 1, tD = n * DESANDAR, tb = t - pl.suelta - MANOS, x = tb <= 0 || !n ? 0 : suave(tb / tD) * n, kB = Math.min(Math.max(0, n - 1), Math.floor(x));
   const tBajar = pl.suelta + MANOS + tD, wB = suave((t - tBajar) / Math.min(.8, Math.max(.3, tM + mz - tBajar)));
+  if (pl.tipo === 'bajada' || pl.tipo === 'arriba') {
+    // barrido: los brazos quedan en la pose del final (stage.js los apunta) y al llegar abajo pasan a «Parado»
+    const x = suave(tb / BARRIDO.dur), wP = suave((tb - BARRIDO.dur * .7) / (BARRIDO.dur * .45)), tG = t - (pl.suelta + MANOS + BARRIDO.dur * 1.1), i = Math.floor(gC), f0 = Math.floor(g0);
+    let gesto = null;
+    if (tG > 0) { if (pl.valido) { const F = GESTO.festejo; gesto = { tipo: 'festejo', w: suave(tG / F.sube) * (1 - suave((tG - F.sube - F.dura) / F.baja)), t: tG, dedos: f0 }; } else gesto = { tipo: 'bronca', w: suave(tG / GESTO.bronca.sube), t: tG }; }
+    return { i, j: i + 1, u: gC - i, k: destino, w, dz, dy, t, brazos: { i: f0, j: f0 + 1, u: g0 - f0, k: destino, w: wP }, barrido: tb > 0 ? { x, w: suave(tb / .1) * (1 - wP) } : null, gesto };
+  }
   const i = Math.floor(gC), a0 = K[kB], a1 = K[Math.min(n, kB + 1)], f0 = Math.floor(a0);
   // la primera pose puede ser fraccionaria (g0): se aproxima a su muestra más cercana solo si no es entera
   return { i, j: i + 1, u: gC - i, k: destino, w, dz, dy, t, brazos: { i: n ? Math.round(a0) : f0, j: n ? Math.round(a1) : f0 + 1, u: n ? x - kB : g0 - f0, k: destino, w: wB } };
