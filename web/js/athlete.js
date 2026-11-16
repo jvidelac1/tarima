@@ -343,9 +343,9 @@ function hairColor(tex, out) {
 function capMaterial(src, mask, uv1) {
   const U = { tCuero: { value: mask || null }, uCuero: { value: mask && uv1 ? 1 : 0 } }; if (U.uCuero.value) src.alphaTest = .5;      // el borde del casco lo corta el nacimiento pintado (máscara, canal B)
   src.roughness = Math.max(src.roughness ?? .8, .78); src.metalness = 0; src.envMapIntensity = .1; src.side = THREE.FrontSide;
-  if (src.normalMap) src.normalScale.set(.8, .8);
+  src.normalMap = null;      // sin mapa de normales: en el borde fino del casco el UV de las hebras degenera y las normales salían disparadas (púas gris claro en el nacimiento); la forma la dan los gajos de la malla
   src.onBeforeCompile = sh => { conCuero(sh, U, '0.2', '0.44'); sh.fragmentShader = sh.fragmentShader.replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.45; material.specularColorBlended *= 0.45; material.specularF90 *= 0.5;'); };
-  src.customProgramCacheKey = () => 'tarima-pelo-3';
+  src.customProgramCacheKey = () => 'tarima-pelo-4';
   return src;
 }
 function hairDepthMaterial(src) {

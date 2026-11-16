@@ -426,7 +426,7 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     col=np.clip(col,0,1); col[~cov]=SKIN; nrm[~cov]=(.5,.5,1); rough[~cov]=.5; ao[~cov]=1
     save(col[::-1],OUT+'body_color.png',compress_level=3); save(nrm[::-1],OUT+'body_normal.png',compress_level=3)
     save(np.stack([ao,rough,np.zeros_like(rough)],2)[::-1],OUT+'body_orm.png',compress_level=3)
-    MR=min(R,2048); mk=np.stack([skinm*cov,cloth*cov,hairm*cov],2)[::-1]
+    MR=min(R,2048); mk=np.stack([skinm*cov,cloth*cov,np.maximum(hairm,np.clip(brow*.9,0,1))*cov],2)[::-1]     # las cejas van en el canal de pelo de la máscara (el visor las sombrea como pelo: como piel salían grises)
     # segunda máscara, para separar del resto de la tela lo que no es la malla: R rodilleras, G medias, B vendas de muñeca (mismo UV)
     Image.fromarray((np.clip(np.stack([slv*cov,sock*cov,wrapm*cov],2)[::-1],0,1)*255+.5).astype(np.uint8)).resize((MR,MR),Image.BILINEAR).save(OUT+'body_mask2.png',optimize=True)
     Image.fromarray((np.clip(mk,0,1)*255+.5).astype(np.uint8)).resize((MR,MR),Image.BILINEAR).save(OUT+'body_mask.png',optimize=True)
