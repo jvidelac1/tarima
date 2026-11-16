@@ -233,7 +233,7 @@ export class Arena {
 
     // fondo de escenario: pantalla LED con marco, telón con pliegues, torres de luz a los costados y línea de piso
     const wallTex = canvasTexture(ledWallCanvas(2048, 720), { aniso });
-    const wall = add(new THREE.Mesh(new THREE.PlaneGeometry(7.4, 2.6), new THREE.MeshBasicMaterial({ map: wallTex, color: hdr('#ffffff', .36) })), ''); wall.position.set(0, STAGE_Y + .35 + 1.3, -5.2);      // 7,4 × 2,6 m: deja ver la sala a los lados y arriba (con 10 × 3,5 el fondo de la toma frontal era solo pantalla) this.pantalla = wall;
+    const wall = add(new THREE.Mesh(new THREE.PlaneGeometry(7.4, 2.6), new THREE.MeshBasicMaterial({ map: wallTex, color: hdr('#ffffff', .36) })), ''); wall.position.set(0, STAGE_Y + .35 + 1.3, -5.2); /* 7,4 × 2,6 m: deja ver la sala a los lados y arriba (con 10 × 3,5 el fondo de la toma frontal era solo pantalla) */ this.pantalla = wall;
     const frameMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#15161b'), roughness: .5, metalness: .4 });
     const frame = add(new THREE.Mesh(new THREE.BoxGeometry(7.7, 2.9, .25), frameMat), 'r'); frame.position.set(0, wall.position.y, -5.34);
     const drapeTex = canvasTexture(drapeCanvas(), { aniso: 4 }); drapeTex.wrapS = THREE.RepeatWrapping; drapeTex.repeat.set(3, 1);
@@ -267,7 +267,7 @@ export class Arena {
     // (las torres de luz junto a la pantalla tapaban el tablero y el reloj: sus focos van en las torres de las esquinas)
 
     // puente de luces sobre la pantalla, colgado del truss del fondo: una parrilla de focos a la vista en las tomas generales
-    truss([-4.7, 4.25, -4.9], [4.7, 4.25, -4.9], .13); for (const s of [-1, 1]) truss([s * 4.7, 4.25, -4.9], [s * 4.7, TB, -4.6], .07);
+    truss([-4.7, 3.82, -4.9], [4.7, 3.82, -4.9], .13); for (const s of [-1, 1]) truss([s * 4.7, 3.82, -4.9], [s * 4.7, TB, -4.6], .07);
     const canGeo = new THREE.CylinderGeometry(.13, .16, .36, 14), lensGeo = new THREE.CircleGeometry(.12, 16), canMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#16171b'), roughness: .5, metalness: .5 });
     const beamGeo = new THREE.CylinderGeometry(.09, 1, 1, 28, 1, true); beamGeo.translate(0, -.5, 0);   // vértice en el foco, se abre hacia abajo
     this.beams = []; this.beamMeshes = [];
@@ -289,7 +289,7 @@ export class Arena {
     };
     const cols = ['#8fdcff', '#ffb08a', '#f2ecff', '#8fdcff', '#ff8a9c', '#f2ecff', '#ffd9a0', '#ff8a9c'];
     cols.forEach((c, i) => { const x = -6.3 + i * 1.8; fixture([x, TB - .3, -4.6], [x * .25, .4, -.2], c, 14, .05); });
-    for (let i = 0; i < 8; i++) { const x = -4.2 + i * 1.2; fixture([x, 4.0, -4.86], [x * .45, 1.3, 2.5], i % 2 ? '#ffd9a0' : '#f2ecff', 9, 0, .7); }
+    for (let i = 0; i < 8; i++) { const x = -4.2 + i * 1.2; fixture([x, 3.56, -4.86], [x * .45, 1.3, 2.5], i % 2 ? '#ffd9a0' : '#f2ecff', 9, 0, .7); }
     for (let i = 0; i < 6; i++) { const x = -5 + i * 2; fixture([x, TY - .3, 6.8], [x * .2, 1, 0], '#ffe6c4', 18, 0); }
     for (const s of [-1, 1]) for (let i = 0; i < 3; i++) fixture([s * 7.4, TY - .35 - i * .05, 3.6 - i * 2.8], [0, 1, 0], i === 1 ? '#fff0d8' : (s < 0 ? '#8fdcff' : '#ffb08a'), 12, i === 1 ? 0 : .035);
     for (const s of [-1, 1]) for (let i = 0; i < 3; i++) fixture([s * 7.22, 3.7 + i * .9, -4.4], [s * 1.2, 1.2, 0], i === 1 ? '#ffd9a0' : '#f4f0ff', i === 1 ? 7 : 4.5, 0, .62);

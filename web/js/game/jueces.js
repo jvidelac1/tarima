@@ -117,8 +117,8 @@ export class Jueces {
     this.fijos.push(malla(tec, 'mesa técnica'));
     // gente de pie en penumbra a los costados del escenario (entrenadores, cargadores, un camarógrafo): siluetas oscuras, sin detalle; la sala está habitada
     const pie = [];
-    [[-5.55, -2.9, 'cruzados', 'buzo', 'corto', '#3a1d22'], [-6.1, -2.1, 'atras', 'buzo', 'rapado', '#1d2f38'], [-5.95, 4.55, 'abajo', 'remera', 'corto', '#22304f'], [-5.3, 4.95, 'cruzados', 'remera', 'cola', '#22304f'], [5.95, -1.3, 'atras', 'buzo', 'melena', '#30281f'], [5.65, 4.7, 'abajo', 'remera', 'entradas', '#26282e']].forEach(([x, z, gesto, ropa, pelo, tono], i) => {
-      const C0 = gente(i + 13, tono, '#15171c'), C = {}; for (const k in C0) C[k] = C0[k].clone().multiplyScalar(.5);
+    [[-6.05, -3.5, 'cruzados', 'buzo', 'corto', '#3a1d22'], [-5.95, 4.55, 'atras', 'remera', 'corto', '#22304f'], [-5.3, 4.95, 'cruzados', 'remera', 'cola', '#22304f'], [5.65, 4.7, 'abajo', 'remera', 'entradas', '#26282e']].forEach(([x, z, gesto, ropa, pelo, tono], i) => {
+      const C0 = gente(i + 13, tono, '#15171c'), C = {}; for (const k in C0) C[k] = C0[k].clone().multiplyScalar(.42);
       pie.push(...en(persona(C, { det: 1, pelo, k: i + 13, gesto, ropa, dePie: true }), asiento(x, STAGE_Y, z, Math.atan2(-x, .4 - z))));
     });
     this.fijos.push(malla(pie, 'gente de pie'));
