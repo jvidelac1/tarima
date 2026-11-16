@@ -1657,7 +1657,36 @@ Rama `graficos2`, desde `prueba` (primera-vez + utm + graficos). Nada fusionado 
 
 **Pendiente / estimación.** Falta medir en un teléfono real y, con los jueces, otra vez en la Mac. Las caras son un maniquí con nariz y ojos (sin boca ni cejas). El
 selector no muestra la vista elegida detrás del panel hasta que empieza el levantamiento. En una ventana más alta que ancha
-la cámara es siempre la lateral, se elija lo que se elija. Falta una prueba de navegador que fuerce un nulo propio.
+la cámara es siempre la lateral, se elija lo que se elija. (La prueba de navegador que fuerza un nulo propio está desde la
+fusión en `prueba`: `check_game`, corrida «clasico».)
+
+### graficos2 y lienzo juntos en `prueba` (15-nov; LIF-38, LIF-45)
+
+`prueba` = main + primera-vez + utm + graficos + nombre + panel + rondas + **graficos2** + **lienzo**. Nada fusionado a main
+ni publicado.
+
+**Conflictos y cómo quedaron.**
+- `main.js`: C abre «Cambiar» (rondas, LIF-4) y V cambia la cámara (graficos2); en Opciones van las filas «Orden» y
+  «Cámara». Solo chocaba el comentario de la cámara (quedó el de graficos2).
+- `analitica.js`: los eventos `pedido_cambiado` y `camara_elegida`; lienzo entró sin conflicto (bandera
+  `grabacion_lienzo`, súper propiedad `grabada_lienzo`). i18n sin conflicto: 751 claves en es y en, las mismas.
+- Privacidad: la versión final es `2026-11-g` (el juego la manda; el Worker acepta de la a a la g).
+- `check_game`: la fila «Cámara» de Opciones (graficos2) con el estilo de envión fijo de rondas (el de graficos2 cambiaba de
+  estilo en cada dos tiempos, que ahora no se puede).
+- Workflows: unión de las ramas de cada lado.
+
+**LIF-45, el nombre en el 3D grabado (decisión del orquestador).** En las visitas que graban el lienzo
+(`analitica.grabandoLienzo()`), cuando levanta el jugador la pantalla LED (`ambiente.js`, `_led`) y el tablero del costado
+(`arena.js`, `_drawBoard`) dicen «LIFTING GAME» (`EVENT.marca`) en vez de su nombre (`main.js`, `zocalo`: el cartel lleva
+`entero` y `jugador`). Con eso `regionesLienzo` no tapa nada (los rectángulos negros tapaban al pesista cuando pasaba por
+delante del cartel, por ejemplo desde el jurado) y queda **solo como respaldo**: tapa la línea del nombre si el cartel puede
+estar mostrando el nombre del jugador (cartel sin datos, o dibujado con el nombre antes de que se prendiera la grabación).
+Los rivales son ficticios: con un rival en el cartel tampoco se tapa. Sigue la falla cerrada (sin escena o cuadro sin dibujar:
+el grabador saltea el cuadro). Pruebas: `servidor_test` (cinco casos nuevos de `regionesLienzo`) y `check_analitica`
+(sección 7: con lienzo los carteles del jugador dicen LIFTING GAME y no se tapa nada; sin lienzo, su nombre).
+
+**Nulo propio y jurado.** `check_game`, corrida «clasico»: en la segunda práctica suelta la barra arriba antes de la señal de
+bajar (NULO «antes») y verifica que la cámara va al jurado al empezar el veredicto y sigue ahí 1,8 s después, con luces rojas.
 
 ## Contratos entre Blender y el visor
 

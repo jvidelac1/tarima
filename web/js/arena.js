@@ -474,7 +474,7 @@ export class Arena {
     g.fillStyle = '#0b0d16'; g.fillRect(0, 0, w, h); g.fillStyle = '#1c2a5c'; g.fillRect(0, 0, w, 96);
     g.textBaseline = 'middle'; g.textAlign = 'center'; g.fillStyle = '#fff'; g.font = `800 58px ${DISPLAY}`; g.fillText(EVENT.marca, w / 2, 50);
     g.textAlign = 'left'; g.font = `700 44px ${DISPLAY}`; g.fillStyle = '#35e6d6'; g.fillText(b.country || '', 34, 160);
-    g.fillStyle = '#fff'; g.font = `800 64px ${DISPLAY}`; g.fillText((b.name || '').toUpperCase().split(' ').pop(), 34, 228);
+    g.fillStyle = '#fff'; g.font = `800 64px ${DISPLAY}`; g.fillText(b.entero ? String(b.name || '').toUpperCase() : (b.name || '').toUpperCase().split(' ').pop(), 34, 228, w - 68);      // b.entero: «LIFTING GAME» entero (LIF-45)
     g.font = `500 34px ${DISPLAY}`; g.fillStyle = '#c3c9dc'; g.fillText(`${b.lift || ''} · ${b.intento || 'INTENTO ' + (b.attempt || 1)}`.toUpperCase(), 34, 296);      // b.intento: el juego lo pasa en el idioma elegido
     g.textAlign = 'center'; g.fillStyle = '#ffd23f'; g.font = `800 230px ${DISPLAY}`; g.fillText(b.kg ? String(b.kg) : '', w / 2, 452); g.font = `700 54px ${DISPLAY}`; g.fillText('KG', w / 2, 590);
     this.boardTex.needsUpdate = true;

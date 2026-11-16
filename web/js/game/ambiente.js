@@ -216,7 +216,7 @@ export class Ambiente {
     g.font = `600 ${h * .058}px ${DISPLAY}`; g.fillStyle = '#c3c9dc'; g.fillText((b.intento || '').toUpperCase(), w * .022, h * .45, w * .25);
     // derecha: quién levanta y cuánto
     caja(w * .71, w * .29, 'rgba(20,10,8,.6)'); g.textAlign = 'right';
-    const nombre = (b.name || '').toUpperCase().split(' ').pop();
+    const nombre = b.entero ? String(b.name || '').toUpperCase() : (b.name || '').toUpperCase().split(' ').pop();      // b.entero: «LIFTING GAME» (LIF-45)
     g.font = `800 ${h * .15}px ${DISPLAY}`; g.fillStyle = '#f6f3ea'; g.fillText(nombre || EVENT.session.toUpperCase(), w * .978, h * .18, w * .25);
     if (b.kg) { g.font = `800 ${h * .3}px ${DISPLAY}`; g.fillStyle = '#ffd23f'; g.fillText(String(b.kg), w * .93, h * .43, w * .2); g.font = `700 ${h * .07}px ${DISPLAY}`; g.fillText('KG', w * .978, h * .49); }
     if (b.country) { g.font = `700 ${h * .06}px ${DISPLAY}`; g.fillStyle = '#35e6d6'; g.textAlign = 'left'; g.fillText(String(b.country).toUpperCase(), w * .725, h * .56, w * .1); }

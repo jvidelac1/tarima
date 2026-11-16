@@ -888,6 +888,13 @@ igual([dominioReferente('https://l.instagram.com/?u=secreto'), dominioReferente(
     tira(() => regionesLienzo(lienzo, escena(), () => false), 'sin preserveDrawingBuffer y sin dibujar en este cuadro: tira (se leería negro)');
     preservar = true;
     igual(regionesLienzo(lienzo, escena(), () => false).length, 2, 'con preserveDrawingBuffer el cuadro sirve aunque no se haya dibujado');
+    // LIF-45: con «LIFTING GAME» en los carteles (entero) o un rival levantando, nada que tapar; con el nombre del jugador, sí
+    const conCartel = b => escena({ arena: { pantalla, boardTex, board: b, group: { traverse: fn => [pantalla, tablero].forEach(fn) } } });
+    igual(regionesLienzo(lienzo, conCartel({ name: 'LIFTING GAME', entero: true, jugador: true })), [], 'carteles con LIFTING GAME: no se tapa nada (el pesista queda a la vista)');
+    igual(regionesLienzo(lienzo, conCartel({ name: 'Ventura', jugador: false })), [], 'levanta un rival (nombre ficticio): no se tapa nada');
+    igual(regionesLienzo(lienzo, conCartel({ name: 'Ana Pérez', jugador: true })).length, 2, 'el nombre del jugador ya dibujado: se tapa (respaldo)');
+    igual(regionesLienzo(lienzo, conCartel({})).length, 2, 'cartel sin datos: se tapa');
+    preservar = false; tira(() => regionesLienzo(lienzo, conCartel({ entero: true }), () => false), 'con LIFTING GAME igual se saltea un cuadro sin dibujar');
   }
   {
     // vigiaCuadros: fresco solo en el cuadro en que three dibujó (renderer.info.render.frame cambió).

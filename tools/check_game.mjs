@@ -9,7 +9,8 @@
 //    (Esc), ayuda (H) y el primer intento de otra final.
 //  - tactil (Fácil): lo mismo en un teléfono de costado (844 × 390: en vertical solo se ve «Gira el teléfono»), con toques
 //    sobre el escenario y sobre los botones.
-//  - clasico: metrónomo y un intento de práctica con el esquema de mantener y soltar.
+//  - clasico: metrónomo y un intento de práctica con el esquema de mantener y soltar; en el segundo, un NULO propio (suelta
+//    antes de la señal de bajar) y la cámara tiene que ir al jurado (LIF-38).
 //  - lento (Fácil, con Brenner): en la final, 40 s con el panel del llamado abierto no gastan reloj (no hay reloj); y
 //    después de confirmar, sin tocar nada, el levantamiento sale solo y vale (en 'u' no hay nulo por reloj).
 //  - idioma: con ?lang=en la bienvenida sale en inglés; el selector ES · EN la pasa a español sin recargar, lo recuerda y
@@ -118,7 +119,8 @@ async function corrida(via) {
           if (I.fase === 'pelea' || I.fase === 'traba') {
             const p = I.pelea, quiere = p.modo === 'traba' ? p.E < p.exiTraba + 150 : (p.P < 1e6 && p.aguja < p.exi + 55) || (!p.trabado && p.E < p.exiTraba + 150);
             if (quiere && s.ahora - ultToque >= 150) { await baja(); await av(40); await sube(); ultToque = s.ahora; } else await av(manual ? 16 : 10);
-          } else if (I.fase === 'fijacion' && !I.apretado) { await baja(); await av(30); }
+          } else if (o.nulo && I.fase === 'fijacion' && I.fij?.firme) { await sube(); await av(300); }      // suelta antes de la señal de bajar: NULO («antes»)
+          else if (I.fase === 'fijacion' && !I.apretado) { await baja(); await av(30); }
           else if (I.objetivo !== null) { await ir(I.objetivo); if (I.accion === 'baja') { await baja(); if (I.fase === 'vuelo' || I.fase === 'empuje') { await av(40); await sube(); } } else await sube(); await av(16); }
           else await av(manual ? 30 : 15);
           continue;
@@ -243,7 +245,18 @@ async function corrida(via) {
     if (r.propios[0]?.res !== 'valido' || r.propios[0].ctl !== 'c') mal(`la práctica en Clásico no salió válida: ${JSON.stringify(r.propios[0])}`);
     if (!(r.alto.practica > 1.5)) mal(`en el calentamiento la barra no subió (máximo ${r.alto.practica?.toFixed(2)} m)`);
     for (const v of ['senal.aprieta', 'senal.suelta', 'senal.recibe_pro', 'senal.deja'].map(k => ES[k])) if (!vistas.has(v)) mal(`en Clásico no apareció la señal «${v}»`);
-    await foto('practica'); await cerrar(); return;
+    await foto('practica');
+    // LIF-38: un NULO propio (en la segunda práctica suelta la barra arriba antes de la señal de bajar) va a la vista del
+    // jurado mientras se prenden las luces y se queda ahí hasta el fundido
+    await jugar(s => s.pantalla === 'decision', true, { nulo: true });
+    const n0 = await J(() => ({ plano: JUEGO.escena.plano?.key || null, ultimo: (JUEGO.E.propios || []).at(-1) || null, n: (JUEGO.E.propios || []).length }));
+    await J(() => JUEGO.test.avanzar(1800)); await foto('nulo_jurado');
+    const n1 = await J(() => ({ plano: JUEGO.escena.plano?.key || null, luces: [...document.getElementById('luces').children].map(el => el.className).join(',') }));
+    console.log(`${tag} nulo propio: ${n0.ultimo?.res}:${n0.ultimo?.causa} · cámara al empezar el veredicto «${n0.plano}», 1,8 s después «${n1.plano}» · luces ${n1.luces}`);
+    if (n0.n !== 2 || n0.ultimo?.res !== 'nulo') mal(`no se pudo forzar un NULO propio en la práctica: ${JSON.stringify(n0.ultimo)}`);
+    else if (n0.plano !== 'jurado' || n1.plano !== 'jurado') mal(`con un NULO propio la cámara no fue al jurado (${n0.plano} → ${n1.plano})`);
+    if (!/r/.test(n1.luces)) mal(`en el NULO no se prendió ninguna luz roja (${n1.luces})`);
+    await cerrar(); return;
   }
 
   if (lento) {

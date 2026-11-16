@@ -24,6 +24,8 @@
 //     dibujado (por software) hasta el final del primer intento propio, con el lienzo y sin él: cuadros del lienzo que
 //     llegan, KB por segundo, cuadros negros, lo que cuesta cada captura en el hilo principal (createImageBitmap y
 //     regionesLienzo), cuadros y tareas largas. Guarda algunos cuadros en out/analitica/lienzo_*.png para mirarlos.
+//     Grabando el lienzo, los carteles del 3D dicen «LIFTING GAME» cuando levanta el jugador (y entonces no se tapa nada);
+//     sin el lienzo, su nombre.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -315,9 +317,9 @@ const pedidos1 = [];
     ok(/una de cada tres/.test(es) && /tapados/.test(es) && /correo/.test(es) && /one in three/.test(en) && /blanked out/.test(en),
       'la privacidad explica la grabación en los dos idiomas: proporción y campos tapados');
     // LIF-45: el 3D se graba (por defecto en computadoras) con los carteles del nombre tapados; ya no se promete lo contrario
-    ok(/grabamos la imagen 3D/.test(es) && /solo en computadoras/.test(es) && /carteles[^.]*nombre[^.]*tapados/.test(es) && !/No grabamos la imagen 3D/.test(es)
-      && /record the 3D picture/.test(en) && /only on computers/.test(en) && /name[^.]*blanked out/.test(en) && !/don't record the 3D/i.test(en),
-      'la privacidad dice que se graba el 3D (por defecto en computadoras) con los carteles del nombre tapados');
+    ok(/grabamos la imagen 3D/.test(es) && /solo en computadoras/.test(es) && /carteles[^.]*no muestran tu nombre[^.]*LIFTING GAME/.test(es) && !/No grabamos la imagen 3D/.test(es)
+      && /record the 3D picture/.test(en) && /only on computers/.test(en) && /don't show your name[^.]*LIFTING GAME/.test(en) && !/don't record the 3D/i.test(en),
+      'la privacidad dice que se graba el 3D (por defecto en computadoras) con los carteles diciendo LIFTING GAME en vez del nombre');
     ok(/2026-11-g/.test(await page.locator('article[lang=es] .version').innerText()), 'la privacidad está en la versión 2026-11-g');
     const txt = await page.locator('article[lang=es]').innerText();
     ok(/dos preguntas/.test(txt) && /jugar sin límite/.test(txt) && !/una por mes|al mes/.test(txt) && !/encuesta[^.]*finales/i.test(txt), 'en español: la encuesta de dos preguntas, que desbloquea el juego libre (LIF-53), sin finales de premio, y las novedades sin frecuencia');
@@ -498,6 +500,8 @@ async function partida(flag, { lienzo = 'off', dibujo = false } = {}) {
     const f = t => { window.__raf.push(performance.timeOrigin + t); requestAnimationFrame(f); }; requestAnimationFrame(f);
     try { new PerformanceObserver(l => { for (const e of l.getEntries()) window.__lt.push([performance.timeOrigin + e.startTime, e.duration]); }).observe({ type: 'longtask', buffered: true }); } catch { /* sin longtask */ }
     // lo que cuesta en el hilo principal pedir cada captura del lienzo (la parte síncrona de createImageBitmap)
+    // LIF-45: lo que muestran los carteles del 3D cuando levanta el jugador («LIFTING GAME» si se graba el lienzo)
+    setInterval(() => { const b = window.JUEGO?.escena?.arena?.board; if (b?.jugador) { window.__cartelYo = { name: b.name, entero: !!b.entero }; if (!b.entero) window.__cartelYoNombre = b.name; } }, 150);
     window.__cib = [];
     const cib = window.createImageBitmap;
     window.createImageBitmap = function (...a) { const t = performance.now(); try { return cib.apply(this, a); } finally { window.__cib.push([Date.now(), performance.now() - t, a[0]?.id || a[0]?.constructor?.name || '?']); } };
@@ -523,13 +527,17 @@ async function partida(flag, { lienzo = 'off', dibujo = false } = {}) {
     lt: window.__lt.filter(x => x[0] >= a && x[0] <= b).map(x => x[1]),
     cib: window.__cib.filter(x => x[0] >= a && x[0] <= b).map(x => [x[1], x[2]]),
     preservar: window.JUEGO?.escena?.renderer?.getContext?.()?.getContextAttributes?.()?.preserveDrawingBuffer ?? null,
+    cartelYo: window.__cartelYo || null, cartelYoNombre: window.__cartelYoNombre || null,
   }), [tA ?? 0, tB ?? 0]);
   // lo que tarda regionesLienzo (los carteles proyectados) con la escena de este momento
   const reg = !dibujo ? null : await page.evaluate(async () => {
     const A = await import('/js/game/analitica.js'), c = document.getElementById('gl'), e = window.JUEGO.escena;
+    // con el cartel como si mostrara el nombre del jugador (el respaldo): se mide y se ubican los carteles
+    const b = e.arena.board; e.arena.board = { ...b, jugador: true, entero: false };
     let r = null; const t = performance.now();
-    for (let i = 0; i < 200; i++) r = A.regionesLienzo(c, e);
-    return { ms: (performance.now() - t) / 200, n: r.length, r, ancho: c.clientWidth, alto: c.clientHeight };
+    try { for (let i = 0; i < 200; i++) r = A.regionesLienzo(c, e); } finally { e.arena.board = b; }
+    const ahora = A.regionesLienzo(c, e);
+    return { ms: (performance.now() - t) / 200, n: r.length, r, ancho: c.clientWidth, alto: c.clientHeight, ahora: ahora.length, cartel: { name: b?.name, jugador: b?.jugador, entero: b?.entero } };
   }).catch(e => ({ error: String(e) }));
   const ev = rrwebDe(desde);
   const seg = Math.max(0.001, ((tB ?? 0) - (tA ?? 0)) / 1000);
@@ -541,7 +549,7 @@ async function partida(flag, { lienzo = 'off', dibujo = false } = {}) {
     mutGrab: ev.filter(e => esMutacion(e) && e.timestamp >= tA && e.timestamp <= tB).length,
     topGrab: quienGrabo(ev, ev.filter(e => esMutacion(e) && e.timestamp >= tA && e.timestamp <= tB)),
     cuadros: m.raf.length, p50: pct(dt, 0.5), p95: pct(dt, 0.95), lentos: dt.filter(x => x > 33).length, lt: m.lt.length, ltMs: Math.round(m.lt.reduce((a, b) => a + b, 0)),
-    cib: m.cib, preservar: m.preservar, reg, dibujo, lienzo, page,
+    cib: m.cib, preservar: m.preservar, reg, cartelYo: m.cartelYo, cartelYoNombre: m.cartelYoNombre, dibujo, lienzo, page,
     lienzoCuadros: ev.filter(esCuadroLienzo), lienzoIntento: ev.filter(e => esCuadroLienzo(e) && e.timestamp >= tA && e.timestamp <= tB),
   };
   r.lienzoBytes = r.lienzoCuadros.reduce((a, e) => a + (base64DeCuadro(e)?.b64.length || 0) * 0.75, 0);
@@ -606,7 +614,11 @@ async function partida(flag, { lienzo = 'off', dibujo = false } = {}) {
   ok(con.lienzoIntento.length >= 1, `grabacion_lienzo=compu en computadora: llegan cuadros del 3D durante el intento (${con.lienzoIntento.length})`);
   ok(fps <= 3.5, `pocos cuadros del lienzo por segundo: ${fps.toFixed(2)}`);
   ok(negros <= Math.max(1, vistos.length * 0.1), `cuadros negros (el lienzo leído sin dibujar): ${negros} de ${vistos.length}`);
-  ok(con.reg && con.reg.n >= 1 && !con.reg.error, `los carteles con el nombre se ubican en la pantalla (${JSON.stringify(con.reg)})`);
+  ok(con.reg && con.reg.n >= 1 && !con.reg.error, `los carteles con el nombre se ubican en la pantalla (respaldo; ${JSON.stringify(con.reg)})`);
+  // LIF-45: grabando el lienzo, los carteles dicen LIFTING GAME cuando levanta el jugador y entonces no se tapa nada
+  ok(con.cartelYo?.name === 'LIFTING GAME' && con.cartelYo.entero && !con.cartelYoNombre, `con el lienzo, los carteles del jugador dicen LIFTING GAME (${JSON.stringify(con.cartelYo)}, con nombre: ${con.cartelYoNombre})`);
+  ok(!con.reg?.cartel?.entero || con.reg.ahora === 0, `con LIFTING GAME en los carteles no se tapa nada (${con.reg?.ahora} rectángulos)`);
+  ok(sin.cartelYoNombre && sin.cartelYoNombre !== 'LIFTING GAME', `sin el lienzo, los carteles muestran el nombre del jugador (${sin.cartelYoNombre})`);
   ok(!todo.includes(NOMBRE), 'con el lienzo: el nombre del jugador no aparece como texto en la grabación');
   ok(!/rr_dataURL|data:image\//.test(todo), 'con el lienzo: ninguna instantánea completa con la imagen del lienzo sin tapar (rr_dataURL)');
   notas.push(`lienzo: ${con.lienzoIntento.length} cuadros en ${seg.toFixed(1)} s de intento, ${(con.lienzoBytes / 1024).toFixed(0)} KB en la carga, createImageBitmap p50 ${pct(cibGl, 0.5).toFixed(2)} ms`);

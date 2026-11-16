@@ -127,6 +127,9 @@ export function rectanguloDeZona({ mundo, vista, proyeccion, w, h, zona: [u0, u1
   return { x: a, y: c, width: b - a, height: d - c };
 }
 
+/** Si el cartel (arena.board, lo que main.js pasa a setBoard) puede estar mostrando el nombre del jugador. Ante la duda, sí. */
+export const muestraNombreJugador = b => !b || typeof b !== 'object' || (b.jugador !== false && !b.entero);
+
 /**
  * canvasCapture.maskRegionsFn: lo que se tapa en cada cuadro del lienzo. Para #gl, los carteles con el nombre (y su
  * reflejo en la tarima cuando está prendido), proyectados con la cámara del último cuadro dibujado; los otros lienzos
@@ -141,6 +144,11 @@ export function regionesLienzo(canvas, escena, fresco = () => true) {
   const attrs = escena.renderer?.getContext?.()?.getContextAttributes?.();
   if (attrs && attrs.preserveDrawingBuffer === false && !fresco()) throw new Error('cuadro sin dibujar');
   const ancho = canvas.clientWidth || canvas.width, alto = canvas.clientHeight || canvas.height;
+  // LIF-45: si los carteles no muestran el nombre del jugador (dicen «LIFTING GAME» porque esta visita graba el lienzo, o
+  // levanta un rival, que es ficticio), no se tapa nada: el rectángulo negro taparía al pesista cuando pasa por delante. Sin
+  // datos del cartel (o con el nombre del jugador ya dibujado, por ejemplo si la grabación se prendió con el cartel puesto)
+  // se tapa como antes: es el respaldo.
+  if (!muestraNombreJugador(escena.arena?.board)) return [];
   const espejos = [null];
   if (escena.reflejo?.activo) espejos.push(Number.isFinite(escena.reflejo.y) ? escena.reflejo.y : 0);
   const out = [];

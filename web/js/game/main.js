@@ -82,6 +82,8 @@ function limpiarNombre(s) {
 const nombreJugador = () => limpiarNombre(guardado.get('tarima.nombre')) || t('bienvenida.nombre_defecto');
 /** Quién es un pesista para el jugador: su propio nombre si es el suyo; los rivales conservan el de siempre. */
 const quien = a => (a && a.i === E.yo ? nombreJugador() : a?.f?.nombre || '');
+/** Si esta visita graba el lienzo 3D (LIF-45, bandera `grabacion_lienzo`). */
+const grabaLienzo = () => { try { return !!analitica?.grabandoLienzo?.(); } catch { return false; } };
 const corto = a => (a && a.i === E.yo ? nombreJugador() : PLANTEL[a.id].corto);
 /** Color y bandera de un pesista: los del jugador son siempre los suyos (JUGADOR), nunca los del modelo que eligió. */
 const ident = a => (a && a.i === E.yo ? JUGADOR : PLANTEL[a.id]);
@@ -384,7 +386,10 @@ function zocalo(a, L) {
   // modelo; sin dorsal, que es jerga
   $('zocalo').hidden = false; $('z-bandera').style.background = P.bandera; $('z-codigo').textContent = pais; $('z-codigo').hidden = !pais; $('z-dorsal').textContent = ''; $('z-nombre').textContent = quien(a);
   $('z-lev').textContent = t('lev.' + L.lev); $('z-intento').textContent = L.n ? t('zocalo.intento', { n: L.n }) : t('zocalo.practica'); $('z-kg').textContent = L.kg;
-  escena.arena.setBoard({ name: quien(a), country: pais, kg: L.kg, attempt: L.n || 1, lift: t('lev.' + L.lev), intento: t('tablero.intento', { n: L.n || 1 }) });
+  // LIF-45: en las visitas que graban el lienzo, los carteles del 3D (pantalla LED y tablero del costado) dicen «LIFTING GAME»
+  // en vez del nombre del jugador; `jugador` y `entero` le dicen a regionesLienzo (analitica.js) que ya no hay nada que tapar
+  const yo = a.i === E.yo, sinNombre = yo && grabaLienzo();
+  escena.arena.setBoard({ name: sinNombre ? EVENT.marca : quien(a), entero: sinNombre, jugador: yo, country: pais, kg: L.kg, attempt: L.n || 1, lift: t('lev.' + L.lev), intento: t('tablero.intento', { n: L.n || 1 }) });
 }
 let cartelAhora = '';
 /** El pisotón de ¡PÁRATE!: la imagen se sacude 4 px durante 120 ms (nada con movimiento reducido). */
