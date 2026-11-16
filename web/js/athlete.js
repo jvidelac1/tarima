@@ -18,7 +18,7 @@ const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const _v = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
 
 const SKIN_PARS = /* glsl */`
-uniform sampler2D tMask; uniform sampler2D tDetailSkin; uniform sampler2D tDetailCloth; uniform vec2 uTile; uniform float uMaskMode; uniform vec3 uScatter; uniform float uSweat; uniform float uDetail; uniform float uSkinSat; uniform float uSkinRough; uniform vec3 uHairColor; uniform vec4 uClothFlat; uniform vec3 uSkinTint; uniform vec3 uClothTint; uniform float uTone; uniform float uWrinkle; uniform float uGloss;
+uniform sampler2D tMask; uniform sampler2D tDetailSkin; uniform sampler2D tDetailCloth; uniform vec2 uTile; uniform float uMaskMode; uniform vec3 uScatter; uniform float uSweat; uniform float uDetail; uniform float uSkinSat; uniform float uSkinRough; uniform vec3 uHairColor; uniform vec4 uClothFlat; uniform vec3 uSkinTint; uniform vec3 uClothTint; uniform float uTone; uniform float uWrinkle; uniform float uGloss; uniform float uFino;
 vec3 gMask = vec3( 0.0 ); float gGrain = 0.0; float gPatch = 0.5;
 // Subsuperficie barata: difuso envuelto teñido de rojo en el terminador (la luz "dobla" la esquina dentro de la piel),
 // transmisión en contraluz por los bordes finos (orejas, dedos) y nada de eso sobre la tela.
@@ -31,8 +31,10 @@ void RE_Direct_Skin( const in IncidentLight directLight, const in vec3 geometryP
   float back = pow( saturate( dot( geometryViewDir, - normalize( directLight.direction + geometryNormal * 0.4 ) ) ), 3.0 ) * rim;
   reflectedLight.directDiffuse += gMask.r * directLight.color * uScatter * ( extra + back * 0.8 ) * BRDF_Lambert( material.diffuseContribution );
   // transpiración: una película fina y lisa encima de la piel, en parches (segundo lóbulo angosto; uGloss lo gradúa)
+  if ( uFino > 0.5 ) {
   float nh = saturate( dot( geometryNormal, normalize( directLight.direction + geometryViewDir ) ) );
   reflectedLight.directSpecular += gMask.r * uGloss * uSweat * gPatch * directLight.color * saturate( ndl ) * ( pow( nh, 120.0 ) * 0.5 + pow( nh, 24.0 ) * 0.035 );
+  }
 }
 #undef RE_Direct
 #define RE_Direct RE_Direct_Skin
@@ -50,9 +52,10 @@ const SKIN_MASK = /* glsl */`
   // el albedo de piel llega saturado del horneado: se baja un poco para que la luz cálida no lo vuelva naranja
   diffuseColor.rgb = mix( diffuseColor.rgb, mix( vec3( dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) ) ), diffuseColor.rgb, uSkinSat ), gMask.r );
   // tono de piel (parámetro del personaje) y su variación: parches grandes más rojizos o más pálidos (uTone), como la piel de verdad
-  { vec2 tv = texture2D( tDetailSkin, vMapUv * 2.3 + 0.13 ).xy + texture2D( tDetailSkin, vMapUv * 0.9 + 0.41 ).xy - 1.0; float tono = clamp( ( tv.x + tv.y ) * 2.5, -1.0, 1.0 );
+  if ( uFino > 0.5 ) { vec2 tv = texture2D( tDetailSkin, vMapUv * 2.3 + 0.13 ).xy + texture2D( tDetailSkin, vMapUv * 0.9 + 0.41 ).xy - 1.0; float tono = clamp( ( tv.x + tv.y ) * 2.5, -1.0, 1.0 );
     vec3 piel = diffuseColor.rgb * uSkinTint * ( 1.0 + uTone * tono * vec3( 0.10, -0.03, -0.08 ) ) * ( 1.0 - 0.12 * uTone * abs( tono ) );
     diffuseColor.rgb = mix( diffuseColor.rgb, piel, gMask.r ); }
+  else diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * uSkinTint, gMask.r );
   diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * uClothTint, gMask.g * step( 0.5, uMaskMode ) );      // tinte de la tela (conserva el diseño horneado)
   // tela de color plano (el juego la usa para un pesista que comparte modelo): tapa lo que la textura trae horneado
   diffuseColor.rgb = mix( diffuseColor.rgb, uClothFlat.rgb, uClothFlat.a * smoothstep( 0.5, 0.9, gMask.g ) * step( 0.5, uMaskMode ) );
@@ -69,7 +72,7 @@ const SKIN_DETAIL = /* glsl */`
   // Se apagan cuando un mosaico ocupa pocos píxeles, para no centellear en plano general.
   gPatch = smoothstep( -0.35, 0.45, dot( texture2D( tDetailSkin, vMapUv * 7.0 ).xy * 2.0 - 1.0, vec2( 1.0 ) ) * 3.0 );
   // arrugas de la tela: pliegues alargados de baja frecuencia (el mosaico de piel estirado), se ven desde el plano general
-  vec2 d = ( texture2D( tDetailSkin, vMapUv * vec2( 3.1, 10.0 ) + 0.27 ).xy * 2.0 - 1.0 ) * uWrinkle * gMask.g;
+  vec2 d = vec2( 0.0 ); if ( uFino > 0.5 ) d = ( texture2D( tDetailSkin, vMapUv * vec2( 3.1, 10.0 ) + 0.27 ).xy * 2.0 - 1.0 ) * uWrinkle * gMask.g;
   if ( uDetail > 0.0 ) {      // en plano general ningún mosaico se resuelve (athlete.js lo apaga): se ahorran las cuatro lecturas
   vec2 uvS = vMapUv * uTile.x, uvC = vMapUv * uTile.y;
   float fS = max( fwidth( uvS.x ), fwidth( uvS.y ) ), fC = max( fwidth( uvC.x ), fwidth( uvC.y ) );   // mosaicos por píxel
@@ -81,7 +84,7 @@ const SKIN_DETAIL = /* glsl */`
   d += ( pores * 0.5 * gMask.r + weave * 0.8 * gMask.g ) * uDetail;
   }
   d.y = - d.y;   // textura +Y con UV de glTF (v hacia abajo)
-  {
+  if ( uDetail > 0.0 || uFino > 0.5 ) {
   vec3 q0 = dFdx( - vViewPosition ), q1 = dFdy( - vViewPosition ); vec2 st0 = dFdx( vMapUv ), st1 = dFdy( vMapUv );
   vec3 q1p = cross( q1, normal ), q0p = cross( normal, q0 ); vec3 T = q1p * st0.x + q0p * st1.x, B = q1p * st0.y + q0p * st1.y;
   float det = max( dot( T, T ), dot( B, B ) ); float sc = det == 0.0 ? 0.0 : inversesqrt( det );
@@ -202,6 +205,8 @@ function metersPerUv(geo) {
  * - tela.tinte: multiplica la tela conservando el diseño; tela.plano: color que reemplaza la tela entera (null = textura);
  *   arrugas: pliegues en las normales; brillo: reflejo satinado de la lycra (sheen).
  */
+/** Detalle fino de los materiales del pesista (variación de tono, arrugas de tela, brillo de transpiración): 1 con post, 0 en el camino directo («Baja» y «Móvil»: ahí cada lectura de textura cuenta). Compartido por todos los personajes. */
+export const FINO = { value: 1 };
 export const ASPECTO = Object.freeze({
   piel: Object.freeze({ tono: '#efe6dc', saturacion: .8, variacion: .9, rugosidad: .64, sudor: .55, brillo: .4, dispersion: [.62, .2, .11] }),
   pelo: Object.freeze({ color: null }),
@@ -218,7 +223,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
   for (const t of [m.map, m.normalMap, m.roughnessMap, m.aoMap]) if (t) t.anisotropy = aniso;
   const uniforms = { tDetailSkin: { value: detail.skin }, tDetailCloth: { value: detail.cloth }, uTile: { value: new THREE.Vector2(mpu / .012, mpu / .008) }, uDetail: { value: 1 }, tMask: { value: mask }, uMaskMode: { value: mask ? 1 : 0 },
     uScatter: { value: new THREE.Color(...ASPECTO.piel.dispersion) }, uSweat: { value: ASPECTO.piel.sudor }, uSkinSat: { value: ASPECTO.piel.saturacion }, uSkinRough: { value: ASPECTO.piel.rugosidad }, uHairColor: { value: new THREE.Color(.03, .025, .02) }, uClothFlat: { value: new THREE.Vector4(0, 0, 0, 0) },
-    uSkinTint: { value: new THREE.Color(ASPECTO.piel.tono) }, uClothTint: { value: new THREE.Color(1, 1, 1) }, uTone: { value: ASPECTO.piel.variacion }, uWrinkle: { value: ASPECTO.tela.arrugas }, uGloss: { value: ASPECTO.piel.brillo } };
+    uSkinTint: { value: new THREE.Color(ASPECTO.piel.tono) }, uClothTint: { value: new THREE.Color(1, 1, 1) }, uTone: { value: ASPECTO.piel.variacion }, uWrinkle: { value: ASPECTO.tela.arrugas }, uGloss: { value: ASPECTO.piel.brillo }, uFino: FINO };
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, uniforms);
     sh.fragmentShader = sh.fragmentShader
@@ -227,7 +232,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' + SKIN_DETAIL)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + SKIN_MATERIAL);
   };
-  m.customProgramCacheKey = () => 'tarima-skin-8';
+  m.customProgramCacheKey = () => 'tarima-skin-9';
   m.userData.skin = uniforms;
   return m;
 }

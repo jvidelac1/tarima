@@ -16,6 +16,7 @@ import * as THREE from 'three';
 import { rng, makeCanvas, canvasTexture } from '../util.js';
 import { EVENT } from '../config.js';
 import { BOKEH } from '../post.js';
+import { FINO } from '../athlete.js';
 import { conSuperficie, setSuperficies, chapa, USO } from './materiales.js';
 
 /** Gradación del juego: exposición, saturación, contraste, gamma de sombras, tinte de sombras y de altas, viñeta y negro. */
@@ -483,7 +484,9 @@ export class Look {
 
   /** Lo que depende de la calidad: los rayos solo con post y haces; `A.rayos` escala su fuerza. */
   setNivel(Q) {
-    setSuperficies(!Q.directo);
+    setSuperficies(!Q.directo); FINO.value = Q.directo ? 0 : 1;
+    // en el camino directo la pared de chapa (material físico en mucha pantalla) no se dibuja: queda el telón, como antes
+    this.arena.group.traverse(o => { if (o.material === this.chapaMat) o.visible = !Q.directo; });
     BOKEH.uScale.value = Q.directo ? .3 : .45;      // luces de fondo: puntos con halo en el camino directo (eran discos grises), bokeh moderado con post      // superficies por función solo con post
     const A = Q.amb || {}, k = A.rayos ?? 1; this.group.visible = !Q.directo && !!Q.beams && k > 0;
     for (const r of this.rayos || []) r.mat.uniforms.uFuerza.value = r.base * k;
