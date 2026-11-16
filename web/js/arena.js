@@ -166,8 +166,8 @@ varying vec3 vCol; varying float vDisc; varying float vZ; varying float vD;
 void main(){
   vec4 mv = modelViewMatrix * vec4( position, 1.0 ); float d = max( - mv.z, 0.01 );
   float coc = clamp( ( abs( d - uFocus ) - uRange ) * ( d < uFocus ? uNearScale : uScale ) / d, 0.0, 1.0 ) * uMaxBlur;
-  float base = max( aSize * uPx / d, 1.6 ), size = max( base, 2.0 * coc );
-  vCol = aColor * pow( base / size, 1.5 ); vDisc = smoothstep( 1.5, 5.0, coc );
+  float base = max( aSize * uPx / d, 3.4 ), size = max( base, 2.0 * coc );      // nunca un punto duro de un píxel: un brillo blando
+  vCol = aColor * 0.5 * pow( base / size, 1.5 ); vDisc = smoothstep( 1.5, 5.0, coc );
   vD = d; gl_PointSize = size + 1.0; gl_Position = projectionMatrix * mv; vZ = gl_Position.z / gl_Position.w * 0.5 + 0.5;
 }`;
 const BOKEH_FS = /* glsl */`
@@ -233,13 +233,13 @@ export class Arena {
 
     // fondo de escenario: pantalla LED con marco, telón con pliegues, torres de luz a los costados y línea de piso
     const wallTex = canvasTexture(ledWallCanvas(2048, 720), { aniso });
-    const wall = add(new THREE.Mesh(new THREE.PlaneGeometry(10, 3.5), new THREE.MeshBasicMaterial({ map: wallTex, color: hdr('#ffffff', .36) })), ''); wall.position.set(0, STAGE_Y + .35 + 1.75, -5.2); this.pantalla = wall;
+    const wall = add(new THREE.Mesh(new THREE.PlaneGeometry(7.4, 2.6), new THREE.MeshBasicMaterial({ map: wallTex, color: hdr('#ffffff', .36) })), ''); wall.position.set(0, STAGE_Y + .35 + 1.3, -5.2);      // 7,4 × 2,6 m: deja ver la sala a los lados y arriba (con 10 × 3,5 el fondo de la toma frontal era solo pantalla) this.pantalla = wall;
     const frameMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#15161b'), roughness: .5, metalness: .4 });
-    const frame = add(new THREE.Mesh(new THREE.BoxGeometry(10.3, 3.8, .25), frameMat), 'r'); frame.position.set(0, wall.position.y, -5.34);
+    const frame = add(new THREE.Mesh(new THREE.BoxGeometry(7.7, 2.9, .25), frameMat), 'r'); frame.position.set(0, wall.position.y, -5.34);
     const drapeTex = canvasTexture(drapeCanvas(), { aniso: 4 }); drapeTex.wrapS = THREE.RepeatWrapping; drapeTex.repeat.set(3, 1);
     const drape = add(new THREE.Mesh(new THREE.PlaneGeometry(17, 6.4), new THREE.MeshBasicMaterial({ map: drapeTex, color: hdr('#ffffff', .5) })), ''); drape.position.set(0, 2.3, -5.9);
-    const wallBase = add(new THREE.Mesh(new THREE.BoxGeometry(10.3, .35, .5), new THREE.MeshStandardMaterial({ color: new THREE.Color('#3a3d48'), roughness: .7 })), 'rc'); wallBase.position.set(0, STAGE_Y + .175, -5.25);
-    for (let i = 0; i < 8; i++) { const x = -4.55 + i * 1.3; if (Math.abs(x) > 2) glint(x, STAGE_Y + .42, -4.92, '#ffcf9a', .9, .05); }
+    const wallBase = add(new THREE.Mesh(new THREE.BoxGeometry(7.7, .35, .5), new THREE.MeshStandardMaterial({ color: new THREE.Color('#3a3d48'), roughness: .7 })), 'rc'); wallBase.position.set(0, STAGE_Y + .175, -5.25);
+    for (let i = 0; i < 8; i++) { const x = -4.55 + i * 1.3; if (Math.abs(x) > 2 && Math.abs(x) < 3.7) glint(x, STAGE_Y + .42, -4.92, '#ffcf9a', .9, .05); }
 
     // tablero y reloj a los costados de la pantalla (texturas dinámicas)
     this.boardCanvas = makeCanvas(512, 640); this.boardTex = canvasTexture(this.boardCanvas, { aniso: 4, keep: true });
@@ -266,6 +266,8 @@ export class Arena {
     for (const [x, z, y] of [[-7.4, 6.8, TY], [7.4, 6.8, TY], [-7.4, -4.6, TB], [7.4, -4.6, TB]]) truss([x, FLOOR_Y, z], [x, y, z]);
     // (las torres de luz junto a la pantalla tapaban el tablero y el reloj: sus focos van en las torres de las esquinas)
 
+    // puente de luces sobre la pantalla, colgado del truss del fondo: una parrilla de focos a la vista en las tomas generales
+    truss([-4.7, 4.25, -4.9], [4.7, 4.25, -4.9], .13); for (const s of [-1, 1]) truss([s * 4.7, 4.25, -4.9], [s * 4.7, TB, -4.6], .07);
     const canGeo = new THREE.CylinderGeometry(.13, .16, .36, 14), lensGeo = new THREE.CircleGeometry(.12, 16), canMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#16171b'), roughness: .5, metalness: .5 });
     const beamGeo = new THREE.CylinderGeometry(.09, 1, 1, 28, 1, true); beamGeo.translate(0, -.5, 0);   // vértice en el foco, se abre hacia abajo
     this.beams = []; this.beamMeshes = [];
@@ -287,12 +289,13 @@ export class Arena {
     };
     const cols = ['#8fdcff', '#ffb08a', '#f2ecff', '#8fdcff', '#ff8a9c', '#f2ecff', '#ffd9a0', '#ff8a9c'];
     cols.forEach((c, i) => { const x = -6.3 + i * 1.8; fixture([x, TB - .3, -4.6], [x * .25, .4, -.2], c, 14, .05); });
+    for (let i = 0; i < 8; i++) { const x = -4.2 + i * 1.2; fixture([x, 4.0, -4.86], [x * .45, 1.3, 2.5], i % 2 ? '#ffd9a0' : '#f2ecff', 9, 0, .7); }
     for (let i = 0; i < 6; i++) { const x = -5 + i * 2; fixture([x, TY - .3, 6.8], [x * .2, 1, 0], '#ffe6c4', 18, 0); }
     for (const s of [-1, 1]) for (let i = 0; i < 3; i++) fixture([s * 7.4, TY - .35 - i * .05, 3.6 - i * 2.8], [0, 1, 0], i === 1 ? '#fff0d8' : (s < 0 ? '#8fdcff' : '#ffb08a'), 12, i === 1 ? 0 : .035);
-    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) fixture([s * 7.22, 2.9 + i * .95, -4.4], [s * 1.2, 1.2, 0], i === 1 ? '#ffd9a0' : '#f4f0ff', i === 1 ? 7 : 4.5, 0, .62);
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) fixture([s * 7.22, 3.7 + i * .9, -4.4], [s * 1.2, 1.2, 0], i === 1 ? '#ffd9a0' : '#f4f0ff', i === 1 ? 7 : 4.5, 0, .62);
 
     // luces de arbitraje físicas sobre la pantalla
-    const lampBox = add(new THREE.Mesh(new THREE.BoxGeometry(1.5, .46, .16), frameMat), 'r'); lampBox.position.set(0, wall.position.y + 2.18, -5.1);
+    const lampBox = add(new THREE.Mesh(new THREE.BoxGeometry(1.5, .46, .16), frameMat), 'r'); lampBox.position.set(0, wall.position.y + 1.72, -5.1);
     this.lamps = [-1, 0, 1].map(i => { const m = new THREE.Mesh(new THREE.CircleGeometry(.15, 24), new THREE.MeshBasicMaterial({ color: new THREE.Color('#15171c') })); m.position.set(i * .46, lampBox.position.y, -5.015); this.group.add(m); return m; });
 
     // mesas con oficiales sentados (árbitros al frente, jurado al costado, mesa técnica sobre el escenario) y cargadores de pie
@@ -410,9 +413,11 @@ export class Arena {
     railMesh.frustumCulled = false; this.group.add(railMesh);
     // cinta LED en el frente de cada tribuna (da estructura al fondo desenfocado)
     const fasciaTex = banner.clone(); fasciaTex.repeat.set(3, 1); fasciaTex.needsUpdate = true;
-    const fasciaMat = new THREE.MeshBasicMaterial({ map: fasciaTex, color: hdr('#ffffff', .25) });
+    const fasciaMat = new THREE.MeshBasicMaterial({ map: fasciaTex, color: hdr('#ffffff', .25) }), cierreMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#0b0d13') });
     for (const st of stands) {
-      const f = new THREE.Mesh(new THREE.PlaneGeometry(st.w, .5), fasciaMat); f.position.set(st.o[0] - st.back[0] * .62, st.o[1] - .12, st.o[2] - st.back[1] * .62); f.rotation.y = Math.atan2(-st.back[0], -st.back[1]); this.group.add(f);
+      // cerramiento del frente de la tribuna (1,3 m, oscuro): tapa el busto de la primera fila, que de cerca delata al público
+      const cz = new THREE.Mesh(new THREE.PlaneGeometry(st.w + .6, 1.3), cierreMat); cz.position.set(st.o[0] - st.back[0] * .6, st.o[1] + .2, st.o[2] - st.back[1] * .6); cz.rotation.y = Math.atan2(-st.back[0], -st.back[1]); this.group.add(cz);
+      const f = new THREE.Mesh(new THREE.PlaneGeometry(st.w, .5), fasciaMat); f.position.set(st.o[0] - st.back[0] * .62, st.o[1] + .5, st.o[2] - st.back[1] * .62); f.rotation.y = Math.atan2(-st.back[0], -st.back[1]); this.group.add(f);
     }
     // flashes de cámaras: salen de la mano de un espectador, no del aire
     this.flashes = []; const fm = new THREE.MeshBasicMaterial({ map: this.discTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
