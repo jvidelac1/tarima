@@ -201,7 +201,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' + SKIN_DETAIL)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + SKIN_MATERIAL);
   };
-  m.customProgramCacheKey = () => 'tarima-skin-12';
+  m.customProgramCacheKey = () => 'tarima-skin-13';
   m.userData.skin = uniforms;
   return m;
 }
@@ -236,9 +236,9 @@ function pesoCabeza(mesh, skin) {
   const g = mesh.geometry, si = g.attributes.skinIndex, sw = g.attributes.skinWeight, uv = g.attributes.uv; if (!si || !sw || g.attributes.aCabeza) return;
   const es = mesh.skeleton.bones.map(b => { for (let x = b; x; x = x.parent) if (x.isBone && boneKey(x.name) === 'Neck') return true; return false; });
   // `aTorso`: lo mismo para el tronco entero (columna, clavículas, cuello y cabeza; no la cadera ni los brazos)
-  // y los brazos hasta el codo (antebrazos, manos, cadera y piernas quedan enteros y opacos; el corte del codo y de la cintura se ve por dentro del color de la malla:
+  // (brazos, cadera y piernas quedan enteros y opacos; el corte del hombro queda fuera de cuadro y el de la cintura se ve por dentro del color de la malla:
   // el juego dibuja las dos caras mientras el tronco está oculto)
-  const tr = mesh.skeleton.bones.map((b, i) => (es[i] || /^(Spine\d?|LeftShoulder|RightShoulder|LeftArm|RightArm)$/.test(boneKey(b.name)) ? 1 : 0));
+  const tr = mesh.skeleton.bones.map((b, i) => (es[i] || /^(Spine\d?|LeftShoulder|RightShoulder)$/.test(boneKey(b.name)) ? 1 : 0));
   const w = new Float32Array(si.count), wt = new Float32Array(si.count);
   for (let i = 0; i < si.count; i++) { let t = 0, c = 0, d = 0; for (let k = 0; k < 4; k++) { const p = sw.getComponent(i, k), h = si.getComponent(i, k); t += p; if (es[h]) c += p; d += p * tr[h]; } w[i] = t > 0 ? c / t : 0; wt[i] = t > 0 ? d / t : 0; }
   g.setAttribute('aCabeza', new THREE.BufferAttribute(w, 1)); g.setAttribute('aTorso', new THREE.BufferAttribute(wt, 1));
