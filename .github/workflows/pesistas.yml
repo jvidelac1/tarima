@@ -45,6 +45,8 @@ env:
   # Lo que corre un push que toca este archivo (sirve para dispararlo sin `gh workflow run`)
   MODO_PUSH: sonda
   PESISTAS_PUSH: ""
+  TARIMA_CHESTU: "0"      # EXPERIMENTO de esta rama: cápsula vieja y desvío de la barra por regla
+  TARIMA_ALTPUSH: "1"
   MPFB_COMMIT: 6ff1eb358f6c1959ced77e79e6dd2406d9a71f49   # el MPFB con el que se hicieron ventura y brenner (24-oct-2026)
 
 jobs:

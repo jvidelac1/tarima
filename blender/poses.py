@@ -53,6 +53,7 @@ R=dict(thigh=brad(['LeftUpLeg'],hd('LeftUpLeg'),hd('LeftLeg'),75,tr=(.25,1)),thi
 # Pecho alto (bajo las clavículas), medido aparte: con busto o panza el radio único del pecho (chestF) sale varios centímetros más gordo que el cuerpo
 # a la altura por donde la barra entra al rack. La cápsula del pecho va de chestF abajo a este radio arriba, y nunca más gorda que chestF.
 R['chestU']=min(R['chestF'],brad(['Spine1','Spine2'],hd('Spine1'),hd('Neck'),75,True,(.5,.75)))
+if os.environ.get('TARIMA_CHESTU')=='0': R['chestU']=R['chestF']     # EXPERIMENTO (rama plantel-alt-capsula): cápsula de pecho de radio único, como antes de 5cf10f8
 print('RADII',NAME,{k:round(v,3) for k,v in R.items()})
 print(f'SKEL {NAME}: TH={TH:.3f} SHN={SHN:.3f} UA={UA:.3f} FA={FA:.3f} hipZ={C0.z:.3f} shZ={SHZ0:.3f} shX={SHX:.3f} ankle=({ANK.x:.3f},{ANK.y:.3f},{ANK.z:.3f})')
 
@@ -1176,6 +1177,17 @@ for seg in SEGS:
                 T=lerp_task(tasks[i],tasks[i+1],j/SUB,ms[i],ms[i+1]); y_=T['bar'].y
                 if os.environ.get('TARIMA_CAPR') and 'rack' in (tasks[i]['mode'],tasks[i+1]['mode']): print(f"NEAR {NAME} {seg} {seq[i][0]} {j}: {near_part(apply(wrist_fix(T)))}")
                 declip(T); bp_=settle(T)
+                if os.environ.get('TARIMA_ALTPUSH') and mix[i] and T['mode']=='rack':
+                    # EXPERIMENTO: alternativa que no toca check(). En la entrada y la salida del rack la barra se corre hacia adelante hasta que la cápsula de torso (con el
+                    # mismo descuento cerca del estante que usa frame_check) deja de marcar; después se aplica la envolvente suave, como en los demás tramos.
+                    capEnd_,rel_=shelf[i]
+                    for _ in range(10):
+                        S_=PB('LeftArm').matrix.translation; dsh_=math.hypot(bp_.y-S_.y-rel_.y,bp_.z-S_.z-rel_.z); al_=min(0.0,capEnd_)*max(0.0,1-dsh_/(CAPR*K))
+                        c_=bar_clear(bp_.y,bp_.z,leg_geo(T['feet'],T['ko']))-THR['bar']-al_-.002
+                        if c_>=0: break
+                        T['bar'].y+=c_
+                        for h_ in T['hands']: h_['W'].y+=c_
+                        bp_=settle(T)
                 for _ in range(3):
                     # con el brazo recto la barra real queda donde llega la mano, no exactamente donde se la pidió: las cápsulas se miden sobre la posición real
                     if T['mode'] not in ('floor','hang','rel'): break
