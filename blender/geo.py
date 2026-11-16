@@ -261,12 +261,13 @@ def hair_shells(b,OUT,mat,layers=None,size=.024):
         A=np.zeros(N); np.add.at(A,E[:,0],ln[E[:,1]]); np.add.at(A,E[:,1],ln[E[:,0]]); ln=np.minimum(ln,.5*ln+.5*A/deg)
     sel=[p for p in me.polygons if min(ln[v] for v in p.vertices)>.0004]; ln=np.maximum(ln,.0009)   # sin caras apoyadas sobre la piel (el borde ralo lo da la textura)
     used=sorted({v for p in sel for v in p.vertices}); ix={v:i for i,v in enumerate(used)}
-    comb=np.array([0,.3,-1.]); comb/=np.linalg.norm(comb); bm=bmesh.new(); uv=bm.loops.layers.uv.new('UVMap'); U=np.array(used)
+    comb=np.array([0,.3,-1.]); comb/=np.linalg.norm(comb); bm=bmesh.new(); uv=bm.loops.layers.uv.new('UVMap'); uv2=bm.loops.layers.uv.new('UVCuero'); U=np.array(used)
+    LU=np.empty(len(me.loops)*2); me.uv_layers.active.data.foreach_get('uv',LU); LU=LU.reshape(-1,2)     # UV del cuerpo por esquina: va como segundo UV de cada capa
     for k in range(1,layers+1):
         f=k/layers; pos=co[U]+no[U]*(ln[U]*f)[:,None]+comb[None,:]*(ln[U]*f*f*.45)[:,None]; vs=[bm.verts.new(q) for q in pos]
         for p in sel:
             fc=bm.faces.new([vs[ix[v]] for v in p.vertices]); fc.smooth=True; ax=int(np.argmax(np.abs(p.normal))); a,c=[i for i in range(3) if i!=ax]
-            for lp,v in zip(fc.loops,p.vertices): lp[uv].uv=(co[v][a]/size,co[v][c]/size)
+            for lp,v,li in zip(fc.loops,p.vertices,p.loop_indices): lp[uv].uv=(co[v][a]/size,co[v][c]/size); lp[uv2].uv=(float(LU[li][0]),float(LU[li][1]))
     m=bpy.data.meshes.new('Hair'); bm.to_mesh(m); bm.free(); o=bpy.data.objects.new('Hair',m); bpy.context.scene.collection.objects.link(o); m.materials.append(mat)
     names,W=wget(b); nu=len(used)
     for j,n in enumerate(names):

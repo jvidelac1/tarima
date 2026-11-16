@@ -39,6 +39,10 @@ on:
         description: 'Corrida de pesistas.yml de la que tomar los modelos del plantel (vacío: la de PESISTAS_RUN)'
         type: string
         default: ''
+      terna:
+        description: 'Terna del plantel a fotografiar (vacío: la de TERNA). Ej.: solanet,jastrev,kordan'
+        type: string
+        default: ''
       tomas:
         description: 'Iteración rápida: solo estas tomas del plantel (ej.: 3-4,medio,cara). Saltea las fotos viejas y el laboratorio'
         type: string
@@ -54,9 +58,9 @@ permissions:
 
 env:
   # corrida de pesistas.yml con los modelos del plantel que se fotografían (no están en el repo mientras se iteran)
-  PESISTAS_RUN: '43918976509'
+  PESISTAS_RUN: '43934023488 43939929117'
   # plaza del juego y terna que se fotografía: el pesista en escena es el primero de la terna (plaza ventura)
-  TERNA: 'ilarraz,jastrev,solanet'
+  TERNA: 'ilarraz,jastrev,kordan'
 
 defaults:
   run:
@@ -109,10 +113,12 @@ jobs:
       - name: Fotos del plantel (el primero de la terna en todas las tomas; los otros en plano medio, torso y cara)
         if: ${{ !cancelled() && hashFiles('web/models/ilarraz.glb') != '' }}
         timeout-minutes: 30
+        env:
+          TERNA: ${{ inputs.terna || env.TERNA }}
         run: |
           node tools/banco.mjs --fotos=out/graficos/plantel/a --niveles=${{ inputs.niveles || 'alta,movil' }} ${{ inputs.tomas && format('--tomas={0}', inputs.tomas) || '' }} --plantel=$TERNA --pesista=ventura --ancho=1280 --alto=620 2>&1 | tee out/logs/fotos_plantel.log || true
-          for plaza in ${{ inputs.tomas && ' ' || 'brenner marangi' }}; do
-            node tools/banco.mjs --fotos=out/graficos/plantel/$plaza --niveles=alta --tomas=medio,torso,cara,3-4,medio-salida --plantel=$TERNA --pesista=$plaza --ancho=1280 --alto=620 2>&1 | tee -a out/logs/fotos_plantel.log || true
+          for plaza in brenner marangi; do
+            node tools/banco.mjs --fotos=out/graficos/plantel/$plaza --niveles=alta --tomas=${{ inputs.tomas && 'torso,cara' || 'medio,torso,cara,3-4,medio-salida' }} --plantel=$TERNA --pesista=$plaza --ancho=1280 --alto=620 2>&1 | tee -a out/logs/fotos_plantel.log || true
           done
       - name: Banco de medición con el ambiente (banco)
         if: ${{ !cancelled() && inputs.banco }}

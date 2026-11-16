@@ -181,7 +181,7 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     # ================= PIEL =================
     lo=T.n3(7,11,3); mid=T.n3(42,12,2); fine=T.n3(380,13,2); blot=np.clip(.5+T.n3(18,14,2)*2.2,0,1)
     tint(np.clip(.5+lo*1.8,0,1)*.20,MEL); tint(np.clip(mid*2.4,0,1)*.13,HEM); tint(np.clip(-mid*2.4,0,1)*.08,MEL); col*=1+fine[:,:,None]*.06
-    pore=T.n2(2.4,4)+T.n3(950,15)*.8; H+=mid*.00012+fine*.00008+T.n2(1,3)*.000015        # relieve medio, grano fino y poro a escala de texel (el poro por zona se suma más abajo)
+    pore=T.n2(2.4,4)+T.n3(950,15)*.8; H+=mid*.00008+fine*.00003+T.n2(1,3)*.00001        # relieve medio, grano fino y poro a escala de texel (el poro por zona se suma más abajo)
     rough+=fine*.12+lo*.08+pore*.05
     head=F('head'); ears=F('ears'); eL,nose,lips,chin,ear=LM['eyeL'],LM['nose'],LM['lips'],LM['chin'],LM['ears']; er=float(LM['eyeR_r'][0]); hs=float(eL[0]/.0288)
     cheek=T.g((.048*hs,eL[1]+.012,(nose[2]+lips[2])/2+.008),.030*hs,True)
@@ -217,10 +217,10 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
             ven=np.maximum(ven,np.exp(-((dth*r)/(.0017*K))**2)*sm(.04,.22,t)*sm(.74,.55,t)*(.6+.4*(k<2)))
         t2,r2,th2,L2=T.seg(s0,a); dth=np.angle(np.exp(1j*(th2-(.35*sgn+.2*np.sin(2*np.pi*(t2*1.2+.3)))))).astype(f32)
         ven2=np.exp(-((dth*r2)/(.0020*K))**2)*sm(.3,.5,t2)*sm(1.02,.9,t2)*ua
-        ven=np.maximum(ven*fl,ven2*.8)*STY.get('veins',.8); H+=ven*.00055; tint(ven*.20,VEIN)
+        ven=np.maximum(ven*fl,ven2*.8)*STY.get('veins',.8); H+=ven*.00055; tint(ven*.08,VEIN)
         strands(fl*sm(.74,.7,t)*sm(.0,.15,t),(th*75,t*38+th*2.5),40+sgn,a=.32)
         # axila
-        pit=T.g((sgn*(sh[0]-.035*K),sh[1]+.005,sh[2]-.085*K),.042*K)*sm(.8,.45,T.ao)*sd_; mix(pit*np.clip(.55+T.n3(900,45,1,(1,1,.15))*2,0,1)*.7*min(1,bh*1.6),hair*.75,.62)
+        pit=T.g((sgn*(sh[0]-.035*K),sh[1]+.005,sh[2]-.085*K),.042*K)*sm(.8,.45,T.ao)*sd_; mix(pit*np.clip(.55+T.n3(900,45,1,(1,1,.15))*2,0,1)*.22*min(1,bh*1.6),hair*.6+SKIN*.4,.62)
         # mano
         hand=fl*sm(1.03,1.05,t); W_=BA[side+'Hand'][0]; i1=BA[side+'HandIndex1'][0]; p1=BA[side+'HandPinky1'][0]; m1=BA[side+'HandMiddle1'][0]
         pn=np.cross(i1-W_,p1-W_); pn/=np.linalg.norm(pn); pn*=(-1 if sgn>0 else 1)          # normal de la palma
@@ -265,7 +265,7 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     Jh={k:v[0] for k,v in BA.items()}; Nn=np.stack([nxo[T.idx],ny[T.idx],nz[T.idx]],1); aB=np.empty(len(T.P),f32); aF=np.empty_like(aB); aS=np.empty_like(aB); C_=1<<21
     for i in range(0,len(T.P),C_): aB[i:i+C_],aF[i:i+C_],aS[i:i+C_]=anatomy(T.P[i:i+C_],Nn[i:i+C_],Jh,K)
     aB,aF,aS=T.img(aB),T.img(aF),T.img(aS); del Nn
-    aF-=aS*(1-np.abs(2*T.nq(((axo*.67-z*.74)*45,(axo*.74+z*.67)*650,y*650),48)))**2*.00016*STY.get('cut',1.)
+    aF-=aS*(1-np.abs(2*T.nq(((axo*.67-z*.74)*45,(axo*.74+z*.67)*650,y*650),48)))**2*.00005*STY.get('cut',1.)
     aZ=sm(chin[2],chin[2]-.02,z); anatH=(aB*ANAT_NORMAL+aF*ANAT_FINE)*aZ*STY.get('cut',1.); anatC=aF*aZ; del aB,aS
     skinH=H; H=np.zeros((R,R),f32)                     # a partir de acá, H es el relieve propio de cada prenda
     # ================= MALLA (lycra) =================
@@ -280,8 +280,13 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     suit=np.maximum(TF*sm(1-E,1+E,scoop)*sm(1-E,1+E,arm)*sm(neck[2]+.03,neck[2]+.02,z),sm(.45,.55,F('thigh'))*sm(hemz-.001,hemz+.001,z))
     SUIT=hexc(STY['suit']); TRIM=hexc(STY['trim']); cl=T.n3(30,70,3)
     mix(suit,SUIT*(1+cl[:,:,None]*.07+T.n2(1,71)[:,:,None]*.03),.74)
+    pan=np.zeros((R,R),f32); pip=np.zeros((R,R),f32)
+    if STY.get('panel'):     # paneles laterales en diagonal (angostos bajo la axila, anchos en el muslo) con vivo en la costura
+        Lt=float(sh[2]-hip[2]); zt=(z-hip[2])/Lt; xb=(.078+.050*np.clip(zt,-.7,.8))*K; dpn=axo-xb; dtop=(.74+.9*(axo-.1)-zt)*Lt     # el borde de arriba sube hacia la axila
+        pan=suit*sm(-.0015,.0015,dpn)*sm(-.0015,.0015,dtop); mix(pan,hexc(STY['panel'])*(1+cl[:,:,None]*.07),.72)
+        pip=suit*np.maximum(np.exp(-(dpn/.0028)**2)*(dtop>-.003),np.exp(-(dtop/.0028)**2)*(dpn>-.003)); mix(pip*.95,TRIM*(1+cl[:,:,None]*.05),.6)
     p=max(3.,5.0*S); vv,uu=np.mgrid[0:R,0:R].astype(f32); knit=np.sin(uu*(2*np.pi/p))*np.sin(vv*(2*np.pi/p)); del uu,vv   # punto de ~2 mm: sobrevive a 2048; el visor puede sumar detail_cloth.png
-    H+=suit*(knit*.00006+T.n2(1,75)*.00002+cl*.00015); rough+=suit*(cl*.30+knit*.04+T.n2(6,76)*.10)
+    H+=suit*(knit*.00006+T.n2(1,75)*.00002+cl*.00015)+pip*.0004; rough+=suit*(cl*.30+knit*.04+T.n2(6,76)*.10)
     # ribete del escote y las sisas, con pespunte
     dash=lambda s_,per=.0032:(((s_/per)%1)>.38).astype(f32)
     sco=x*.55+y*.85+z
@@ -291,7 +296,7 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     cxz=knee[0]+(hip[0]-knee[0])*np.clip((z-knee[2])/(hip[2]-knee[2]),0,1); tht=np.arctan2(y-knee[1],axo-cxz).astype(f32)
     for o in (.005,.0135): st_=np.exp(-((z-hemz-o)/.00045)**2)*dash(tht*.085)*hem; H-=st_*.0003; tint(st_*.35,(.8,.8,.8))
     H+=hem*.0004
-    side=suit*sm(.125,.13,axo)*sm(sh[2]-.2,sh[2]-.21,z); stripe=side*sm(.022,.018,np.abs(y-.005)); mix(stripe,TRIM,.55)
+    side=suit*sm(.125,.13,axo)*sm(sh[2]-.2,sh[2]-.21,z)*(0. if STY.get('panel') else 1.); stripe=side*sm(.022,.018,np.abs(y-.005)); mix(stripe,TRIM,.55)
     ds=np.abs(np.abs(y-.005)-.02); H-=side*(.0003*np.exp(-(ds/.0009)**2)); st_=side*np.exp(-((ds-.0024)/.00045)**2)*dash(z); H-=st_*.00025; tint(st_*.3,(.75,.75,.75))
     ins=suit*sm(hip[2]-.01,hip[2]-.04,z)*np.exp(-(x/.0009)**2); H-=ins*.0003                         # costura de entrepierna
     # arrugas de tensión: pliegue inguinal, entrepierna y cintura
@@ -308,7 +313,7 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     decal(STY['code'],0,sh[2]-.165*K,.13*K,x,suit*(y<-.04),TRIM); decal(STY['name'],0,sh[2]-.13*K,.21*K,-x,suit*(y>.03),TRIM)
     sweatc=suit*np.maximum(np.exp(-((x/.07)**2+((z-(sh[2]-.17))/.10)**2))*(ny<0),np.exp(-((x/.06)**2+((z-(sh[2]-.22))/.16)**2))*(ny>0))*np.clip(.6+cl*2,0,1)
     col*=1-.16*sweatc[:,:,None]; rough-=.10*sweatc
-    cloth=suit.copy(); thick=suit*.0006
+    cloth=suit.copy(); thick=suit*.0011
     # ================= RODILLERAS (neopreno) =================
     KS=K if 'escote' in STY else 1.; zq=knee[2]+(z-knee[2])/KS; zs=ank[2]+(z-ank[2])/KS     # rodilleras y medias a la escala del pesista (los dos originales, medida fija)
     slv=sm(.45,.55,F('leg'))*sm(knee[2]-.112-.001,knee[2]-.112+.001,zq)*sm(knee[2]+.102+.001,knee[2]+.102-.001,zq)
@@ -366,18 +371,22 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     dnl=max(float(nose[2]-lips[2]),.004)     # con nariz corta o cara llena la franja fija entre labio y nariz quedaba vacía (barba sin bigote): los bordes se achican con esa distancia
     must=sm(lips[2]+min(.005,.2*dnl),lips[2]+min(.009,.4*dnl),z)*sm(nose[2]-min(.003,.1*dnl),nose[2]-min(.008,.3*dnl),z)*sm(.034*max(1.,hs),.024*max(1.,hs),axo)*sm(lips[1]+.03,lips[1]+.02,y)
     burn=sm(ear[1]-.034,ear[1]-.028,y)*sm(ear[1]-.008,ear[1]-.014,y)*sm(eL[2]+.012,eL[2]+.002,z)*sm(lips[2],lips[2]+.01,z)
-    fade=sm(chin[2]-.045+s1*.01,chin[2]-.004+s1*.01,z)*sm(ear[1]-.006,ear[1]-.02,y)
+    fade=sm(chin[2]-.026+s1*.008,chin[2]+.002+s1*.008,z)*sm(ear[1]-.006,ear[1]-.02,y)
     bz=head*np.maximum.reduce([jaw*fade,must,burn])*(1-np.clip(F('lips')*4,0,1))
     tint(bz*(1-STY['beard'])*.5*STY.get('afeitado',1.),(.80,.82,.86))                                            # sombra de barba afeitada
     beard=np.clip(bz*STY['beard']*st,0,1); mix(beard,HAIR*(1+s3[:,:,None]*.5),.68); hairH+=beard*(.0004+s3*.0004); hairm=np.maximum(hairm,beard)
-    zc=eL[2]+.0235*hs-9*(axo-.032*hs)**2; thb=(.0042*sm(.056,.03,axo)+.001)*STY.get('cejas',1.)
+    zc=eL[2]+.0235*hs-9*(axo-.032*hs)**2; thb=(.0050*sm(.056,.03,axo)+.0012)*STY.get('cejas',1.)
     brow=head*sm(thb*1.35,thb*.15,np.abs(z-zc))*sm(.0105*hs,.019*hs,axo)*sm(.058,.046,axo)*(y<eL[1]+.02)
-    brow=np.clip(brow*(.75+T.nq((z*2600+axo*1100,axo*520),95)*1.7+s3*1.1),0,1); mix(brow*.86,HAIR*.9+SKIN*.1,.6); hairH+=brow*.0004; hairm=np.maximum(hairm,brow)
-    lp=sm(*STY.get('labio_borde',(.3,.8)),F('lips')); mix(lp*STY.get('labio_mezcla',.6),(hexc(STY['labio']) if STY.get('labio') else hexc('#a4605a'))*(1+T.nq((x*700,z*90),96)[:,:,None]*.25),.34)
+    bt=np.clip((axo-.0105*hs)/(.048-.0105*hs),0,1)                                    # 0 en el entrecejo, 1 en la cola
+    brow=brow*(.55+.45*sm(.0,.25,bt))*sm(1.02,.7,bt)                                 # nace rala, se afina y se pierde hacia la sien
+    bh_=T.nq(((z-zc)*2300-axo*1500*(1-.6*bt),axo*420+(z-zc)*250),95)                 # pelos peinados hacia afuera y arriba
+    mix(blur(brow,1.6*S)*.62,HAIR*.7+SKIN*.3)                                        # fondo difuso: la ceja tiene cuerpo aunque el pelo sea ralo
+    brow=np.clip(brow*(1.05+bh_*2.2+s3*.9),0,1); mix(brow*.92,HAIR*.9+SKIN*.1,.6); hairH+=brow*.00015; browm=brow*.6
+    lp=sm(*STY.get('labio_borde',(.3,.8)),F('lips')); mix(lp*STY.get('labio_mezcla',.5),(hexc(STY['labio']) if STY.get('labio') else hexc('#a4605a'))*(1+T.nq((x*700,z*90),96)[:,:,None]*.25),.34)
     rough+=lp*.10; lipH=-lp*.00016*(1-np.abs(2*T.nq((x*520,z*60),97)))**2
-    skinm=np.clip(skinm-hairm,0,1)
+    skinm=np.clip(skinm-np.maximum(hairm,browm*.5),0,1)
     # largo del pelo para las capas de volumen de finish.py (geo.hair_shells): 255 = 20 mm
-    hlen=np.maximum.reduce([np.clip(al_,0,1)*sm(.15,.6,hm)*STY.get('hairlen',.010)*dfade(.70)*(1+s1*.5)*(np.clip(1+STY['mechones']*1.6*T.n3(55,98,2),.35,1.9) if STY.get('mechones') else 1.),beard*(.0015+.006*STY['beard'])*(STY['beard']>.35),brow*.0022])
+    hlen=np.maximum.reduce([np.clip(al_,0,1)*sm(.5,.92,hm)*STY.get('hairlen',.010)*dfade(.70)*(1+s1*.5)*(np.clip(1+STY['mechones']*1.6*T.n3(55,98,2),.35,1.9) if STY.get('mechones') else 1.),beard*(.0015+.006*STY['beard'])*(STY['beard']>.35)])
     Image.fromarray((np.clip(hlen/.02,0,1)*cov*255+.5).astype(np.uint8)[::-1]).resize((2048,2048),Image.BILINEAR).save(OUT+'hair_len.png')   # con barba rala (<0,35) la barba queda solo en la textura
     # ================= TIZA (magnesio) =================
     cn=np.clip(.5+T.n3(55,100,3)*2.6,0,1); cf=np.clip(.5+T.n3(700,101,2)*3,0,1); chalk=np.zeros((R,R),f32)
@@ -388,8 +397,10 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     thf=sm(.45,.55,F('thigh'))*sm(.1,-.4,ny)*sm(knee[2]+.11,knee[2]+.17,z)*sm(hip[2]+.02,hip[2]-.06,z)
     thf*=np.exp(-(((axo-knee[0])/.06)**2)); soft=blur(thf*smear,7*S)*(.45+.55*cf)*.42
     smh=sm(.0,.36,T.n3(30,103,3,(.25,.25,1))+.06)*cn
-    soft=np.maximum(soft,blur(sm(sh[2]-.035,sh[2]+.0,z)*sm(sh[2]+.085,sh[2]+.05,z)*sm(.2,-.3,ny)*sm(.22,.17,axo)*(1-head)*(1-farm)*smh,7*S)*(.45+.55*cf)*.42*skinm)
+    soft=np.maximum(soft,blur(sm(sh[2]-.035,sh[2]+.0,z)*sm(sh[2]+.085,sh[2]+.05,z)*sm(.2,-.3,ny)*sm(.22,.17,axo)*(1-head)*(1-farm)*smh,7*S)*(.45+.55*cf)*.22*skinm)
     chalk=np.maximum(chalk,soft*cov)
+    pch=suit*(ny<-.2)*np.exp(-((x/.085)**2+((z-(sh[2]-.12))/.06)**2))*smh
+    chalk=np.maximum(chalk,(blur(pch,6*S)*.34+blur(slv*sm(.1,-.4,ny)*smear,6*S)*.26)*(.45+.55*cf)*cov)
     chalk=np.clip(chalk*STY.get('chalk',1.),0,.93)*cov
     mix(chalk,np.array([.93,.93,.91],f32)*(1+cf[:,:,None]*.05-.03),.93)
     chalkH=chalk*(.00012+cf*.00018)
@@ -402,14 +413,16 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     dp=sm(.25,.8,dp)*skinm*(1-.7*head); rough+=(.07-rough)*dp      # gotas: solo brillo y relieve, sin oscurecer
     # ================= COMPOSICIÓN =================
     rough=np.where(cloth>.5,np.clip(rough,.3,.95),np.clip(rough,.16,.92))
+    cont=np.clip(blur(cloth,4.5*S)-cloth,0,1)*2.*(1-cloth)*(1-hairm); col*=1-.42*np.clip(cont,0,1)[:,:,None]      # sombra de contacto: la prenda tiene espesor
     edge=blur(cloth,1.2*S)                                                            # borde de prenda apenas biselado
-    am=np.clip((1-cloth)+suit*.75+slv*.30+sock*.5-wrapm,0,1)*(1-hairm)                  # cuánto del relieve muscular deja ver cada prenda
+    am=np.clip((1-cloth)+suit*STY.get('ceñido',.5)+slv*.25+sock*.4-wrapm,0,1)*(1-hairm)                  # cuánto del relieve muscular deja ver cada prenda
     H=skinH*(1-cloth)+lipH+(thick+H)*edge+hairH+chalkH+dp*.00013+anatH*am
     del skinH,lipH,hairH,chalkH
     nrm=normal_from_height(H,T.su,T.sv,T.ok)
     cavA=np.clip(1+anatC*am*(115/K),.70,1.05); del anatC                              # los surcos entre grupos musculares oscurecen (son anchos: el pasa-altos de 3 px no los ve)
-    cav=np.clip(1+(H-blur(H,3*S))*900,0.55,1.1); ao=np.clip((.12+.88*T.ao)*cav*cavA,0,1)
-    tn=np.array([.50,.34,.31],f32); aoc=.45+.55*T.ao*np.clip(cav,0,1)*cavA; col=col*(tn[None,None,:]+(1-tn[None,None,:])*aoc[:,:,None])
+    aoS=T.ao*(1-suit)+blur(T.ao,22*S)*suit
+    cav=np.clip(1+(H-blur(H,3*S))*900,0.55,1.1); ao=np.clip((.12+.88*aoS)*cav*cavA,0,1)
+    tn=np.array([.47,.36,.33],f32); aoc=.45+.55*aoS*np.clip(cav,0,1)*cavA; col=col*(tn[None,None,:]+(1-tn[None,None,:])*aoc[:,:,None])
     col=np.clip(col,0,1); col[~cov]=SKIN; nrm[~cov]=(.5,.5,1); rough[~cov]=.5; ao[~cov]=1
     save(col[::-1],OUT+'body_color.png',compress_level=3); save(nrm[::-1],OUT+'body_normal.png',compress_level=3)
     save(np.stack([ao,rough,np.zeros_like(rough)],2)[::-1],OUT+'body_orm.png',compress_level=3)

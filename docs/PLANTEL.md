@@ -23,7 +23,7 @@ Blender **no se corre en la Mac del dueño**: los personajes se construyen en Gi
 | `piel` | Tono: un nombre de `PIEL` (`muy_clara` … `muy_oscura`) o `'#rrggbb'`. |
 | `pelo` | `color`, `peinado` (`corto`, `rapado`, `rodete`, `rodete_alto`), `largo`, `barba`, `entradas`, `degrade`. |
 | `ojos` | Color del iris. |
-| `uniforme` | `malla`, `vivo`, `rodillera`, `rodillera2`, `cinturon` (o `None`), `zapatillas` (capellada, suela, acento, taco). |
+| `uniforme` | `malla`, `panel` (color de los paneles laterales en diagonal, con el `vivo` en la costura; `None` = malla lisa), `vivo`, `rodillera`, `rodillera2`, `cinturon` (o `None`), `zapatillas` (capellada, suela, acento, taco). |
 | `tatuaje` | Bandas geométricas inventadas en el brazo izquierdo. |
 | `juego` | Lo que usa la interfaz: `color`, `bandera` (degradé CSS de un país inventado), `dorsal`, `kg` (intentos de referencia del visor). |
 
@@ -133,3 +133,16 @@ juego, el canal R de la máscara dice dónde hay piel y `plantel.json` cuál es 
 | `tools/sumar_pesista.py` | Suma al juego lo que baja de Actions. |
 | `tools/plantel_web.py` | Escribe `web/data/plantel.json`. |
 | `web/js/game/roster.js` | `vestir()` y `ternaDe()`: el vestuario del juego. |
+
+## Dirección de arte (16-nov): semirrealista heroico
+
+La vara es la imagen de referencia del dueño (tres pesistas macizos, piel mate con magnesio, equipo completo). Reglas que
+salen de ahí, todas en `plantel.cfg()`/`sty()` y `tex.py` (nada por personaje):
+- **Físico heroico**: cuello, brazo y muslo más gruesos por regla (`measure-neck/upperarm/thigh-circ-incr`); la masa de la
+  categoría sigue mandando, así que el volumen sale de la cintura.
+- **Mirada**: párpados pesados (`eye-*-slit`) y ceño (`eyebrows-*-down`); las cejas son pelos pintados (sin capas).
+- **Pelo y barba**: las capas llevan un segundo UV (`UVCuero`, el UV del cuerpo) y el visor las recorta con el canal B de la
+  máscara: el nacimiento es el pintado (curvo y ralo), no el borde de los polígonos.
+- **Equipo**: cinturón en todos, malla con paneles, magnesio en manos, muslos, pecho de la malla y rodilleras.
+- **Piel**: mate. El visor no suma relieve de poro; lee el mapa de normales de la piel un nivel más borroso (`uNormBias`).
+- Terna de las fotos (`TERNA` en `graficos.yml`): ilarraz (71, compacto definido), jastrev (+110), kordan (94, compacto atlético).
