@@ -232,7 +232,7 @@ export const PLANOS = {
  * - la cabeza propia no se dibuja en esta vista ni mientras la cámara esté a menos de `sinCabeza` m de los ojos (el hueso del cuello se
  *   achica a un punto entre las clavículas: cuello, cara, pelo, ojos y pestañas van pesados a él o a la cabeza, su hijo). La sombra sale sin cabeza: cae detrás del pesista.
  */
-export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 3.3, giroMax: 2.6, margen: .4, hombros: .5, encima: .38, abajo: -1.02, frente: -.21, tope: .6, bajo: [.12, .42], alto: [-.05, .3], atras: [.12, .26], atrasAgachado: 0, pecho: .07, vuelta: 2.9, abajoAgachado: -1.4, agarre: .72, atrasMax: .75, fovBajo: 88, fovAnchoBajo: 122, suelta: [1, -.8, 9, .45], jueces: -.13, sinCabeza: .6, foco: 1.6,
+export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 3.3, giroMax: 2.6, margen: .4, hombros: .38, encima: .38, abajo: -1.02, frente: -.21, tope: .6, bajo: [.12, .42], alto: [-.05, .3], atras: [.12, .26], atrasAgachado: 0, pecho: .07, vuelta: 0, abajoAgachado: -1.4, agarre: .72, atrasMax: .75, fovBajo: 88, fovAnchoBajo: 122, suelta: [1, -.8, 9, .45], jueces: -.13, sinCabeza: .6, foco: 1.6,
   resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003 }, temblor: .006 };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
@@ -665,12 +665,13 @@ export class Escena {
     // barra suelta: la mirada la sigue mientras cae y, `suelta[3]` s después de soltarla, sube a los jueces (`jueces` rad): ahí se prenden las luces
     S.tSuelta = this._suelta ? (S.tSuelta || 0) + dt : 0;
     // «quieta»: la barra suelta lleva `suelta[3]` s casi sin moverse (o cayó detrás, donde no se la ve): recién ahí la mirada sube
-    // Si cayó detrás, la cabeza gira a buscarla por encima del hombro (`vuelta` rad de guiñada) y vuelve al frente cuando queda quieta.
+    // Si cayó detrás no se la ve: la mirada queda al frente y sube a los jueces. (`vuelta`, rad de guiñada para girar la cabeza a
+    // buscarla, quedó en 0: con 2,9 el hombro propio tapaba más de media imagen 1,8 s; ronda 5 del director de arte.)
     const atrasB = this._suelta && b.z < S.p.z - .1;
     if (dt > 0) { const v = S.bAnt ? Math.hypot(b.y - S.bAnt[0], b.z - S.bAnt[1]) / dt : 9; S.bAnt = [b.y, b.z]; S.tQuieta = this._suelta && v < .15 ? (S.tQuieta || 0) + dt : 0; }
-    const quietaYa = S.tQuieta > POV.suelta[3] + (atrasB ? .8 : 0), yawT = atrasB && !quietaYa ? POV.vuelta : 0;
+    const quietaYa = S.tQuieta > POV.suelta[3] + (atrasB && POV.vuelta ? .8 : 0), yawT = atrasB && !quietaYa ? POV.vuelta : 0;
     S.yaw = S.nueva || quieto ? 0 : (S.yaw || 0) + (yawT - (S.yaw || 0)) * (1 - Math.exp(-4.5 * dt));
-    const incT = this._suelta ? (quietaYa ? POV.jueces : atrasB ? Math.max(-1, -Math.atan2(Math.abs(dy), Math.max(.3, Math.abs(dz)))) : Math.max(POV.suelta[1], Math.min(POV.frente, hacia * POV.suelta[0]))) : Math.max(POV.abajo + (POV.abajoAgachado - POV.abajo) * (S.kT || 0), Math.min(POV.tope, hacia + corr));
+    const incT = this._suelta ? (quietaYa ? POV.jueces : atrasB ? (POV.vuelta ? Math.max(-1, -Math.atan2(Math.abs(dy), Math.max(.3, Math.abs(dz)))) : POV.frente) : Math.max(POV.suelta[1], Math.min(POV.frente, hacia * POV.suelta[0]))) : Math.max(POV.abajo + (POV.abajoAgachado - POV.abajo) * (S.kT || 0), Math.min(POV.tope, hacia + corr));
     // con retardo y con tope de velocidad (`giroMax` rad/s: cuando la barra pasa junto a la cámara el ángulo hacia ella cambia de golpe)
     const dInc = (incT - S.inc) * (1 - Math.exp(-(quieto ? 60 : this._suelta ? (quietaYa ? 2.2 : POV.suelta[2]) : POV.giro) * dt)), topeG = POV.giroMax * dt;
     S.inc = S.nueva ? incT : S.inc + (quieto ? dInc : Math.max(-topeG, Math.min(topeG, dInc))); S.nueva = false;
