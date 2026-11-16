@@ -1696,6 +1696,59 @@ y jurado con nulo (paletas rojas y blanca), tablero con «Change C», panel con 
 grabados del lienzo con «LIFTING GAME» en el tablero del costado y el pesista sin tapar. La primera corrida de servidor
 (43787765416) falló porque `main.js` no importaba `EVENT`; arreglado en `dee23df`.
 
+### Aprender jugando: explicaciones de una línea en su momento (16-nov, rama `aprender`; LIF-52)
+
+Pedido del dueño: que un jugador nuevo aprenda halterofilia jugando, sin pantallas extra ni tutorial: una línea, una vez, en el
+momento justo, que se pueda cerrar. Rama `aprender` desde `prueba`. Nada fusionado ni publicado.
+
+- **`web/js/game/ui/aprende.js`** (nuevo): `APRENDE` (claves, momentos y condición), `elegir()` (puro, lo prueba sim_test 20) y
+  la clase `Aprende` (el cartelito `#aprende` dentro de `#tv`). **Cada explicación es la línea del glosario** de «Cómo se
+  juega» (`glosario.<clave>.t` y `.d`): un solo texto para las dos cosas. Solo en 'b' y 'u'.
+- **Cuándo sale cada una** (en orden de prioridad; una por momento; si hay otra a la vista hace menos de 3,5 s, espera):
+
+  | clave | momento | condición |
+  |---|---|---|
+  | `estilo` | panel del llamado | primer dos tiempos (estilo sin fijar) |
+  | `dificultad` | panel del llamado | 'b'; el título es el del panel («Fácil · 10 de 10») |
+  | `kilos` | panel del llamado | ya hizo un intento en ese levantamiento |
+  | `cambiar` | turno de un rival | hay botón «Cambiar» |
+  | `nulo` | veredicto de un rival | no vale |
+  | `luces` | veredicto de un rival | — |
+  | `total` | panel del llamado o turno de un rival | dos tiempos |
+
+- **Dónde**: con el panel del llamado, encima del panel, de su mismo ancho (el pesista está del otro lado; si con «Detalles»
+  abierto no entra, se oculta mientras tanto); en lo demás, abajo a la izquierda (en 'b' y 'u' ahí no hay zócalo); con mano
+  izquierda, encima del botón redondo. La del panel se va al cerrarse el panel; la de la esquina sigue en el turno y el veredicto
+  de los rivales y en la carga, y se va al llegar el llamado propio. Tope 15 s. Nunca durante el levantamiento propio.
+- **Una vez**: `tarima.visto.a_<clave>` si la persona la cerró (✕), si estuvo 3,5 s a la vista o si es la segunda vez que sale
+  (la primera la cortó un momento corto, por ejemplo un rival salteado). `tarima.aprende.n_<clave>` cuenta las veces.
+- **No frena nada**: no hay esperas nuevas ni toques que la cierren; la ✕ es un botón (input.js no lo cuenta como toque) sin
+  foco (Espacio sigue siendo del juego).
+- **Eventos** (docs/MVP.md 6.3): `explicacion_vista` (`clave`, `momento`, `pantalla`, `vez`) y `explicacion_cerrada` (`clave`,
+  `via` `boton`/`sola`, `ms`, `leida`). Embudo para medir: vista → cerrada con `boton` o `leida`.
+- **Decisiones del agente**: en 'b' y 'u' la presentación de la primera final ya no lleva las tres reglas de «Cómo se gana» (las
+  luces y el total se explican en su momento; quedan los rivales); el aviso «la barra nunca baja» que iba dentro del detalle
+  plegado del panel (se gastaba sin verse) pasa a ser la explicación `kilos`; el glosario de 'b' y 'u' suma las luces, el no vale,
+  la dificultad, «Cambiar» y el estilo de envión (16 palabras en 'b'), y corrige kilos («dentro de la ronda») y total («necesitas
+  un válido en cada uno»).
+- **Textos que coinciden con el juego** (sim_test 20, contra el núcleo): 2 o 3 blancas = vale (1740 veredictos de rivales, 2 no
+  vale); sin un válido en cada levantamiento, total 0; «Cambiar» = 2 cambios por intento y solo hacia arriba (`TURNOS`); la barra
+  que no baja dentro de la ronda y la progresión (+1 tras un válido, lo mismo tras un fallo) ya las verifica `jugar()`. En 'b' y
+  'u' el jugador no puede hacer un no vale (la fijación siempre vale): la explicación `nulo` sale con el de un rival, y son raros.
+
+**Medido.** Ritmo: las explicaciones no agregan esperas; `check_recorrido` (computadora, es y en, mirando y saltando rivales)
+da las mismas esperas que `prueba` (27,6 s máx. mirando; 9,1 s saltando; 3,5 s tras el fallo); `ritmo_test` en verde (no
+cambia: es del núcleo). Tapado (`check_telefono`, `tools/tapa.mjs` cuenta solo el cartelito; tope 5 % del cuerpo): **0 %
+del pesista en todas las explicaciones y todos los tamaños** (844×390, 667×375, zurdo 740×360, Safari 844×340, 932×430 en
+inglés; en vertical no se mide el pesista); el panel del llamado sigue en 31 % del alto. Con mano izquierda la primera versión
+tapaba 17 % del rival y en vertical se encimaba con el panel: corregido. Toque en la ✕: cierra, `leida: true`, 0 toques del
+juego. Corridas en verde sobre `61a373d`: pruebas 43796645404 (los 4 grupos) y teléfono 43796645436. Capturas miradas:
+computadora es y en (llamado, rival, veredicto), teléfono 667×375 y 844×390 (es), 932×430 (en), zurdo y vertical.
+
+**Pendiente / estimación.** Verlo en un teléfono de verdad. Medir en PostHog cuántas se cierran con la ✕ y cuántas se cortan
+(`leida: false`): si muchas se cortan, subir la prioridad de la de la esquina o alargarla. La del nulo depende de que un rival
+haga un no vale (≈ 1 de cada 900 intentos de rivales): casi nadie la va a ver; si se quiere enseñar, hace falta otro momento.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.
