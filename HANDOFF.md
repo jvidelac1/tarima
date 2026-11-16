@@ -1971,6 +1971,37 @@ línea del pelo, cejas, deformación en flexión (codo, rodilla), manos, postura
 
 **Límite conocido.** Con el antebrazo más largo que el brazo (más de 0,51) el codo no llega al rack y `check()` lo marca.
 
+### Gráficos fase 4: personas, no muñecos (16-nov, rama `visual`, desde `prueba` + `plantel`)
+
+Meta del dueño: nivel Saltline («detalle fino») y su sensación de respuesta. Meta medible: director de arte a ciegas (solo
+capturas, junto a las de Saltline) con 7/10 o más en el conjunto de Alta y en el pesista, ninguna parte bajo 6 y Móvil 6 o
+más. No se acepta una tanda que puntúe peor que la anterior. Nada fusionado a `main` ni publicado.
+
+**Plan (escrito antes de tocar código).** Diagnóstico mirando las capturas de `prueba` (Alta y Móvil), los retratos del
+plantel (corrida 43875357534) y las de Saltline: la sala, la tarima, la barra y los discos ya tienen material y luz; lo que
+delata «juego de muñecos» son **las personas**, todas:
+
+| Qué se ve hoy | Por qué se lee a muñeco o plástico | Qué cambia |
+|---|---|---|
+| Pesista: cara | línea del pelo recta como un casco pintado, sin patillas ni entradas redondeadas; cejas de bloque; labios pintados y saturados; piel pareja; ojos chicos y fijos | `tex.py`: nacimiento del pelo como curva (pico, entradas, sien, patilla) con borde por densidad; cejas por pelos; labios del tono de la piel con borde difuso; zonas de color (frente, nariz, mejillas, orejas, nudillos, codos, rodillas), lunares y poro por zona |
+| Pesista: pelo | capas con alfa pegadas al cráneo: no hay volumen ni silueta | más largo y capas arriba que a los costados, mechones con largo desparejo; brillo anisótropo en el visor |
+| Pesista: piel en el juego | normales de detalle en ronchas (se lee arcilla mojada), sombra roja saturada bajo el mentón, costura dura en el cuello | sombreador: detalle fino solo como rugosidad y poro, dispersión acotada (sin rojo en sombra propia), especular de dos lóbulos más bajo |
+| Pesista: cuerpo | brazos que se inflan al flexionar, glúteos de globo (corregido en `b05f1af`, sin mirar) | mirar la corrida 43875357534 y corregir por regla lo que quede |
+| Público | bolos: una elipse de cabeza sobre un trapecio, todos iguales y nítidos | personas modeladas por código (hombros, brazos, regazo, pelo, cabeza con cuello), dibujadas una vez a un atlas con luz de sala y contraluz del escenario; variantes y gestos; más oscuras y fuera de foco |
+| Jueces y mesas | maniquíes de cápsulas y esferas | el mismo constructor de personas con más detalle (nuca, orejas, pelo con volumen, cuello de camisa, hombros de saco, manos) |
+| Cargadores | cápsulas azules | personas de pie del mismo constructor |
+| Móvil | fondo negro con manchas (tribuna horneada de elipses), sin atmósfera | tribuna horneada desde el atlas de personas, degradé de bruma y luz de sala horneados en lo que ya se dibuja (sin capas nuevas por píxel) |
+| Movimiento | (a medir) saltos entre fases, pies que deslizan, barra rígida | medir con las hojas cuadro a cuadro y `check_fluidez`; después interpolación, anclaje de pies y flexión de barra |
+
+Orden: (1) personas por código en three.js (público, jueces, cargadores, Móvil) mientras corren los builds de Blender;
+(2) cara, pelo y piel del pesista en Blender (builds en Actions: `pesistas.yml`) y su sombreador en el visor; (3) plantel
+nuevo dentro del juego; (4) fluidez. Después de cada tanda, ronda del director a ciegas con las mismas tomas.
+
+**Iterar texturas del pesista sin Blender.** `pesistas.yml` sube `maps_1024.npz` (los mapas de horneado a un cuarto) en el
+artefacto de cada pesista. Con eso `blender/tex.py` corre con numpy en segundos:
+`TARIMA_OUT=<carpeta>/ python3 blender/tex.py <nombre> 1024` (la carpeta tiene `<nombre>/maps.npz`, `lm.json`, `bones.json`,
+`bones_all.json`). Sirve para la línea del pelo, cejas, labios y zonas de color; el detalle fino se mira en el build.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.
