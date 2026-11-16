@@ -40,7 +40,8 @@ page.on('pageerror', e => problemas.push(`pageerror: ${e.message}`));
 await page.goto(`${base}juego.html?q=${Q}&dibujo=0${PLANTEL ? '&plantel=' + PLANTEL : ''}`, { waitUntil: 'load' });
 await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 240000 }).catch(() => {});
 if (!await page.evaluate(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
-await page.evaluate(() => { for (const id of ['capa', 'zocalo', 'senal', 'acuse', 'tablero']) { const e = document.getElementById(id); if (e) e.style.visibility = 'hidden'; } });
+await page.evaluate(() => { document.documentElement.classList.add('juego-u');      // el veredicto a la izquierda, como en el juego (no encima del pesista)
+  for (const id of ['capa', 'zocalo', 'senal', 'acuse', 'tablero']) { const e = document.getElementById(id); if (e) e.style.visibility = 'hidden'; } });
 const slug = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/gi, '_').toLowerCase();
 const toma = () => page.screenshot({ type: 'jpeg', quality: 70 });
 /** Hoja de contactos: las fotos (búferes JPEG) con su rótulo, en `cols` columnas. */

@@ -238,7 +238,7 @@ export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .
   barra: [.3, .45, -.16, .5], alto: [-.05, .3], atras: [.12, .26], agarre: .72, atrasMax: .75, suelta: [1, -.45, 9], sinCabeza: .6, foco: 1.6,
   resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003 }, temblor: .006,
   // «brazos de primera persona» (como el arma de un juego en primera persona): ver _povCam y _vm
-  vm: { bajo: [-.31, -.22], lejos: .6, rack: .42, alto: [.12, .5], cruce: [-.3, .2], codo: [-.55, .05], agarre: .7, toma: [.08, .25], sigue: 14 } };
+  vm: { bajo: [-.31, -.22], lejos: .6, rack: .42, alto: [.12, .5], cruce: [-.3, .2], codo: [-.55, .05], fuera: -.98, agarre: [.7, .82], toma: [.14, .3], sigue: 14 } };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
 
@@ -719,9 +719,16 @@ export class Escena {
       const ext = paso(sh.distanceTo(hm) / Math.max(.2, sh.distanceTo(el) + el.distanceTo(hm)), .6, .95), hy = (hm.y - o.y) / kE, sube = paso(hy, V.cruce[0], V.cruce[1]);
       const tH = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * cam.aspect, medio = Math.abs(a.boneWorld('LeftHand', _pb).x - a.boneWorld('RightHand', _pc).x) / 2;
       const yBajo = V.bajo[0] + (V.bajo[1] - V.bajo[0]) * Math.min(1, Math.max(0, (hy + 1.2) / .9)), zBajo = V.rack + (V.lejos - V.rack) * ext;
-      const Ty = (yBajo + (V.alto[0] - yBajo) * sube) * kE, Tz = Math.max((zBajo + (V.alto[1] - zBajo) * sube) * kE, medio / (V.agarre * Math.max(.3, tH)));
+      // arriba solo con los brazos estirados: con el codo doblado (giro de codos, barra en los hombros, empuje) las manos se quedan
+      // abajo, donde el codo cae fuera de la imagen; la barra pasa al cuarto de arriba cuando el brazo se estira
+      const k = sube * ext, Ty = (yBajo + (V.alto[0] - yBajo) * k) * kE, Tz = Math.max((zBajo + (V.alto[1] - zBajo) * k) * kE, medio / ((V.agarre[0] + (V.agarre[1] - V.agarre[0]) * k) * Math.max(.3, tH)));
       S.Ty = sigue(S.Ty ?? Ty, Ty, V.sigue); S.Tz = sigue(S.Tz ?? Tz, Tz, V.sigue); S.ext = sigue(S.ext ?? ext, ext, V.sigue);
       let rot = Math.atan2(V.codo[0] * kE - S.Ty, V.codo[1] * kE - S.Tz) - Math.atan2(el.y - hm.y, el.z - hm.z); rot -= Math.round(rot / (2 * Math.PI)) * 2 * Math.PI;
+      // el corte del cuerpo propio (el hombro con el brazo estirado; el codo si no) tiene que quedar fuera de la imagen, por debajo de
+      // `vm.fuera` rad desde los ojos: si con el codo apuntando a `vm.codo` no alcanza, el giro se corrige lo mínimo para que quede
+      { const c = S.ext > .8 ? sh : el, ry = c.y - hm.y, rz = c.z - hm.z, elev = d => Math.atan2(S.Ty + rz * Math.sin(d) + ry * Math.cos(d), S.Tz + rz * Math.cos(d) - ry * Math.sin(d));
+        if (elev(rot) > V.fuera) { let mejor = rot, eM = elev(rot); for (let n = 1; n <= 45; n++) { let listo = false; for (const sg of [1, -1]) { const d = rot + sg * n * .035, e = elev(d); if (e < eM) { eM = e; mejor = d; } if (e <= V.fuera) { listo = true; break; } } if (listo) break; } rot = mejor; } }
+      S.rot = S.nueva || quieto ? rot : S.rot + (rot - S.rot - Math.round((rot - S.rot) / (2 * Math.PI)) * 2 * Math.PI) * (1 - Math.exp(-40 * dt)); rot = S.rot;
       vm.piv.copy(hm); vm.rot = rot; vm.dy = S.p.y + S.Ty - hm.y; vm.dz = S.p.z + S.Tz - hm.z; vm.kA = S.kA; vm.on = true;
     } else vm.on = false;
     // la mirada no se inclina nunca: al frente (`barra[2]` rad), también con la barra arriba y después de soltarla (la barra que
