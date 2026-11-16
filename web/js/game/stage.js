@@ -570,7 +570,9 @@ export class Escena {
     const base = PLANOS[clave] || SHOTS.find(s => s.key === clave) || null, h = this.P?.h || 1.75;
     // LIF-50, teléfono parado: con márgenes de la gráfica arriba y abajo (main.js, margenVertical), el sujeto del primer plano
     // va al centro de lo que queda libre y no detrás de la barrita y el botón
-    const I = this.rig.inset; if (!encuadre && base && !['jurado', 'jueces'].includes(base.punto) && (I.t || I.b)) encuadre = { x: .5, y: (I.t + 1 - I.b) / 2 };
+    // Los planos cerrados del visor (torso, cara, brazos y barra) se piensan apaisados: parado, con un tercio del ancho, cortaban
+    // la cara; van 1,7 veces más lejos (del pecho a la cabeza entera en la ceremonia)
+    const I = this.rig.inset; if (!encuadre && base && !['jurado', 'jueces'].includes(base.punto) && (I.t || I.b)) encuadre = { x: .5, y: (I.t + 1 - I.b) / 2, ...(!base.dAbs && this.vertical ? { dAbs: base.d * h * 1.7 } : {}) };
     const dAbs = encuadre?.dAbs || base?.dAbs, sh = base && dAbs ? { ...base, d: dAbs / h } : base;
     this.plano = sh; this.encuadre = encuadre; this.rig.setShot(sh); if (sh) this._apuntar();      // setShot primero: el corrimiento usa el ángulo del plano
   }

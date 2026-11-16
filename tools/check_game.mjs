@@ -7,7 +7,7 @@
 //    señal que expone JUEGO.estado(). Sin tutorial aparte. El primer dos tiempos se juega SIN TOCAR (sale solo y vale) y el
 //    tercer arranque pide 25 kg de más (se cae, con la línea que nombra el tramo). Después, con el reloj verdadero: pausa
 //    (Esc), ayuda (H) y el primer intento de otra final.
-//  - tactil (Fácil): lo mismo en un teléfono de costado (844 × 390: en vertical solo se ve «Gira el teléfono»), con toques
+//  - tactil (Fácil): lo mismo en un teléfono de costado (844 × 390; parado lo prueba check_telefono), con toques
 //    sobre el escenario y sobre los botones.
 //  - clasico: metrónomo y un intento de práctica con el esquema de mantener y soltar; en el segundo, un NULO propio (suelta
 //    antes de la señal de bajar) y la cámara tiene que ir al jurado (LIF-38).
