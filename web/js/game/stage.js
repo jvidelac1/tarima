@@ -555,6 +555,7 @@ export class Escena {
       for (const k of ['Spine1', 'Spine2']) { const h = a._byName.get(k); if (!h) continue; h.parent.getWorldQuaternion(_qa); h.quaternion.premultiply(_qb.setFromAxisAngle(_pa.set(1, 0, 0), ang).premultiply(_qc.copy(_qa).invert()).multiply(_qa)); }
       a.root.updateMatrixWorld(true);
     }
+    if (p.mano?.w > 0) this._manosEnBarra(a, p.mano);
     if (p.barrido?.w > 0 || p.gesto?.w > 0) this._gesto(a, p);
     this.rig.headY = a.boneWorld('Head', v2).y + .14; this.sombra = 3;
   }
@@ -564,6 +565,24 @@ export class Escena {
     b.updateWorldMatrix(true, true); const p0 = b.getWorldPosition(_pa), d = c.getWorldPosition(_pb).sub(p0).normalize();
     _qa.setFromUnitVectors(d, dir); if (w < 1) _qa.slerp(_qb.identity(), 1 - w);
     b.parent.getWorldQuaternion(_qb); b.quaternion.premultiply(_qc.copy(_qb).invert().multiply(_qa).multiply(_qb));
+  }
+  /**
+   * Las manos acompañan la barra que baja (caida.js, GUIA): cada brazo se resuelve con dos huesos para que la muñeca quede
+   * junto a la barra en {y, z} (a un puño de distancia, del lado del hombro), con el codo hacia afuera y abajo; `m.w` lo mezcla
+   * con la pose de abajo y `m.dedos` abre la mano al soltar. Regla sobre los huesos: vale para cualquier biotipo.
+   */
+  _manosEnBarra(a, m) {
+    for (const [L, sx] of [['Left', 1], ['Right', -1]]) {
+      const hA = a._byName.get(L + 'Arm'), hF = a._byName.get(L + 'ForeArm'), hM = a._byName.get(L + 'Hand'); if (!hA || !hF || !hM) continue;
+      hA.updateWorldMatrix(true, true);
+      const S = hA.getWorldPosition(new THREE.Vector3()), E0 = hF.getWorldPosition(new THREE.Vector3()), M0 = hM.getWorldPosition(new THREE.Vector3()), L1 = S.distanceTo(E0), L2 = E0.distanceTo(M0);
+      // la muñeca, a 7 cm del eje de la barra hacia el hombro, en el ancho de agarre que traía
+      const T = new THREE.Vector3(M0.x, m.y, m.z), haciaS = new THREE.Vector3(0, S.y - m.y, S.z - m.z).normalize(); T.addScaledVector(haciaS, .07);
+      const dv = T.clone().sub(S), d = Math.min(dv.length(), (L1 + L2) * .999), dir = dv.normalize(), x = (L1 * L1 - L2 * L2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, L1 * L1 - x * x));
+      const polo = new THREE.Vector3(sx * .75, -.45, -.5), perp = polo.addScaledVector(dir, -polo.dot(dir)).normalize(), E = S.clone().addScaledVector(dir, x).addScaledVector(perp, h);
+      this._apuntarHueso(a, L + 'Arm', L + 'ForeArm', E.clone().sub(S).normalize(), m.w); this._apuntarHueso(a, L + 'ForeArm', L + 'Hand', S.clone().addScaledVector(dir, d).sub(E).normalize(), m.w);
+    }
+    a.root.updateMatrixWorld(true);
   }
   /** Gira el hueso `h` `ang` rad alrededor del eje `eje` del mundo. */
   _girarHueso(a, h, eje, ang) {
@@ -608,7 +627,7 @@ export class Escena {
   barraSuelta(b, dt = 0) {
     // la barra contra la tarima (venía bajando y frenó de golpe cerca del piso): temblor según la velocidad del golpe
     if (dt > 0 && dt < .1) { const v0 = (this._py[0] - this._py[1]) / dt, v1 = (b.y - this._py[0]) / dt; if (v0 < -1.2 && v1 - v0 > 1.2 && b.y < this.pisoBarra + .08) { const k = Math.min(.85, .18 - v0 * .11); this.viva.golpe(k); this.ambiente.golpe(b.z, k); } }
-    v.set(0, b.y, b.z); this.barbell.setPosition(v); this.barbell.group.rotation.x = b.ang || 0; this._suelta = true; this.rig.fijo = true;      // pedido del dueño: al terminar el intento la cámara no se mueve (ni el reencuadre que seguía a la barra que cae)
+    v.set(0, b.y, b.z); this.barbell.setPosition(v); this.barbell.group.rotation.x = b.ang || 0; this._suelta = !b.guiada;      // `guiada`: todavía va en las manos (bajada controlada) this.rig.fijo = true;      // pedido del dueño: al terminar el intento la cámara no se mueve (ni el reencuadre que seguía a la barra que cae)
     this.barY = b.y; this.barZ = b.z; this.rig.barY = b.y; this.rig.barAhead = b.y;
     if (dt > 0 && dt < .1) { const acc = (b.y - 2 * this._py[0] + this._py[1]) / (dt * dt); this.barbell.step(dt, b.y, acc); } else this.barbell.settle(b.y);
     this._py[1] = dt > 0 ? this._py[0] : b.y; this._py[0] = b.y; this.sombra = 3;

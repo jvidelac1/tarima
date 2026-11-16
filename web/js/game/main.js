@@ -784,7 +784,7 @@ function reglasFinal(P, seg) {
 function armarFinal(r, lev) {
   if (!r || !r.grab || !r.grab.length || !escena.P) return null;
   const M = r.m?.movs?.[r.m.movs.length - 1], g = r.grab[r.grab.length - 1];
-  const g0 = g.pose.base + g.pose.s, c = armarCaida(r.res, M?.mov, { y: g.y, z: g.z }, escena.pisoBarra, g0, reglasFinal(escena.P, g.pose.seg)); if (!c) return null;
+  const g0 = g.pose.base + g.pose.s, sh = escena.activo?.midWorld(['LeftArm', 'RightArm'], new escena.barbell.group.position.constructor()), c = armarCaida(r.res, M?.mov, { y: g.y, z: g.z }, escena.pisoBarra, g0, reglasFinal(escena.P, g.pose.seg), sh ? { y: sh.y, z: sh.z } : null); if (!c) return null;
   return Object.assign(c, { g0, pose: g.pose, destino: PARADO(escena.P), lev, golpes: 0 });
 }
 /**
@@ -1700,12 +1700,12 @@ const MIEMBROS = [['Hips', 'Spine2', .13], ['Spine2', 'Neck', .11], ['Neck', 'He
  * cada segmento, menos los radios. Negativa: la barra atraviesa el cuerpo. Los brazos se miden desde 0,25 s después de
  * soltar (antes la barra recién sale de las manos).
  */
-function holgura(tb) {
+function holgura(tb, enManos = 0) {
   const a = escena.activo; if (!a || tb < 0) return null;
   const V = escena.barbell.group.position.constructor, b = escena.barbell.group.position, R = escena.pisoBarra;
   const e0 = new V(-.62, b.y, b.z), e1 = new V(.62, b.y, b.z), todos = {}; let min = { h: 9, que: '' };
   for (const [x, y, r, brazo] of MIEMBROS) {
-    if (brazo && tb < .25) continue;
+    if (brazo && tb < enManos + .25) continue;      // `enManos`: lo que la barra baja acompañada por las manos antes de soltarla (caida.js, GUIA)
     const p = a.boneWorld(x, new V()), q = a.boneWorld(y, new V()), que = x + (x === y ? '' : '-' + y);
     let h = distSeg(e0, e1, p, q) - r - .014;
     for (const P of [p, q]) if (Math.abs(P.x) > .66 && Math.abs(P.x) < 1) h = Math.min(h, Math.hypot(P.y - b.y, P.z - b.z) - R - r);      // contra los discos
@@ -1784,7 +1784,7 @@ window.JUEGO = {
     /** Lleva la escena de final() al instante t (s), la dibuja si `dibujar`, y mide holguras entre la barra y el cuerpo. */
     finalEn(t, dibujar = false, dt = 1 / 60, dtCam = .5) { const c = E.prueba; dibujarFinal(c, t, dt, false);
       // las luces y el veredicto como en el juego (decision): de a una desde 0,2 s y el cartel a 1,05 s
-      if (c.resP) { const ok = c.resP.res === 'valido', L = ok ? [true, true, true] : c.resP.res === 'nulo' ? [false, true, false] : [false, false, false], n = Math.max(0, Math.min(3, Math.floor((t - .2) / .3) + 1)); setLuces(t < .2 ? null : L.map((x, i) => (i < n ? x : null))); veredicto(t >= 1.05 ? textoDe(ok ? 'veredicto.vale' : c.resP.res === 'nulo' ? 'veredicto.no_vale' : 'veredicto.cayo') : '', '', !ok); } escena.cuadro(dtCam, dibujar); return holgura(t - c.pl.suelta); },
+      if (c.resP) { const ok = c.resP.res === 'valido', L = ok ? [true, true, true] : c.resP.res === 'nulo' ? [false, true, false] : [false, false, false], n = Math.max(0, Math.min(3, Math.floor((t - .2) / .3) + 1)); setLuces(t < .2 ? null : L.map((x, i) => (i < n ? x : null))); veredicto(t >= 1.05 ? textoDe(ok ? 'veredicto.vale' : c.resP.res === 'nulo' ? 'veredicto.no_vale' : 'veredicto.cayo') : '', '', !ok); } escena.cuadro(dtCam, dibujar); return holgura(t - c.pl.suelta, c.pl.guia ? c.pl.guia.dur : 0); },
     /** Cambio de carga a mano: de `kg0` a `kg1`, con la manga en primer plano. Devuelve la duración (s). */
     async carga(kg0, kg1, id = 'ventura') { await escena.cargar(id); await escena.mostrar(id); escena.setCarga(kg0, 's'); escena.posar(poseParado(escena.P, 's'), 's'); await escena.mostrar(null); escena.barraSuelta({ y: escena.pisoBarra, z: escena.barZ, ang: 0 }); const A = E.pruebaCarga = escena.cambioDeCarga(kg1); escena.primerPlano('manga'); return A ? { dur: A.dur, sale: A.sale, entra: A.entra } : null; },
     cargaEn(t, dibujar = false) { const A = E.pruebaCarga, x = A.en(t); escena.barraSuelta({ y: escena.pisoBarra, z: escena.barZ, ang: 0 }); escena.cuadro(.5, dibujar); return x; },
