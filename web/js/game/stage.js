@@ -627,6 +627,8 @@ export class Escena {
     const ad = a.boneWorld('LeftArm', _pb).sub(a.boneWorld('RightArm', _pc)).cross(arr).normalize();
     return c.addScaledVector(arr, POV.arriba * k).addScaledVector(ad, POV.adelante * k);
   }
+  /** En primera persona: la barra está suelta y quedó detrás de los ojos (más de 10 cm): desde ahí no se la ve. */
+  barraAtras() { return !!this.pov && !!this._suelta && this.barbell.group.position.z < this.pov.p.z - .1; }
   /** La cámara en primera persona de este cuadro (la llama el rig en lugar de su encuadre). */
   _povCam(cam, dt) {
     const S = this.pov, R = this.rig, o = this.ojos(_pd), quieto = this.reduceMotion; S.t += dt;
@@ -657,7 +659,10 @@ export class Escena {
   _cabeza() {
     const a = this.activo, cerca = !!a && a.root.visible && (!!this.pov || this.rig.camera.position.distanceTo(this.ojos(_pd)) < POV.sinCabeza), quien = cerca ? a : null;
     if (quien === this._sinCabeza) return;
-    for (const [x, e] of [[this._sinCabeza, 1], [quien, SIN_CABEZA]]) { const h = x?._byName.get('Neck'); if (h) { h.scale.setScalar(e); h.updateMatrixWorld(true); } }
+    for (const [x, e] of [[this._sinCabeza, 1], [quien, SIN_CABEZA]]) { const h = x?._byName.get('Neck'); if (h) { h.scale.setScalar(e); h.updateMatrixWorld(true); }
+      // pelo, barba, ojos y pestañas no se dibujan: achicados al punto del cuello quedaban como un pozo oscuro entre las clavículas al mirar hacia abajo
+      if (x) for (const m of [...x.meshes, x.hairDepth]) if (m && (m === x.hairDepth || /^(Hair|Eyes|Lashes)$/.test(m.material?.name))) m.visible = e === 1;
+      if (x?.skin?.uSinCabeza) x.skin.uSinCabeza.value = e === 1 ? 0 : 1; }      // y lo que queda del cuello se pinta de piel lisa (athlete.js: pesoCabeza)
     this._sinCabeza = quien; this.sombra = Math.max(this.sombra, 2);
   }
   /**

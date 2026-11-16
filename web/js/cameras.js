@@ -81,7 +81,15 @@ export class CameraRig {
       const g = (this._mg ||= new THREE.Quaternion()).setFromUnitVectors(a.multiplyScalar(1 / la), b.multiplyScalar(1 / lb)), h = (this._mh ||= new THREE.Quaternion()).identity().slerp(g, k);
       cam.position.copy(M.T).lerp(this.target, k).addScaledVector(a.applyQuaternion(h), la + (lb - la) * k); if (cam.position.y < .08) cam.position.y = .08;
     } else cam.position.copy(M.p).lerp(p, k);
-    cam.quaternion.copy(M.q).slerp(q, k); cam.fov = M.fov + (cam.fov - M.fov) * k;
+    // Hacia una cámara propia (primera persona) el giro va por rumbo e inclinación, con el horizonte nivelado: el camino más
+    // corto entre dos orientaciones tan distintas (de afuera a los ojos, que miran casi a plomo) ladeaba la imagen a mitad de camino.
+    if (this.propia) {
+      const e0 = (this._me0 ||= new THREE.Euler()).setFromQuaternion(M.q, 'YXZ'), e1 = (this._me1 ||= new THREE.Euler()).setFromQuaternion(q, 'YXZ');
+      let dy = e1.y - e0.y; dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI;
+      const kr = 1 - (1 - u) ** 3;      // el giro llega antes que la posición: la mirada ya está en la barra mientras la cámara termina de entrar
+      cam.rotation.set(e0.x + (e1.x - e0.x) * kr, e0.y + dy * kr, e0.z + (e1.z - e0.z) * kr, 'YXZ');
+    } else cam.quaternion.copy(M.q).slerp(q, k);
+    cam.fov = M.fov + (cam.fov - M.fov) * k;
     cam.updateProjectionMatrix(); cam.updateMatrixWorld();
     if (u >= 1) this.mezcla = null;
   }

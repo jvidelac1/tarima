@@ -18,7 +18,7 @@ const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const _v = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
 
 const SKIN_PARS = /* glsl */`
-uniform sampler2D tMask; uniform sampler2D tDetailSkin; uniform sampler2D tDetailCloth; uniform vec2 uTile; uniform float uMaskMode; uniform vec3 uScatter; uniform float uSweat; uniform float uDetail; uniform float uSkinSat; uniform float uSkinRough; uniform vec3 uHairColor; uniform vec4 uClothFlat;
+uniform sampler2D tMask; uniform sampler2D tDetailSkin; uniform sampler2D tDetailCloth; uniform vec2 uTile; uniform float uMaskMode; uniform vec3 uScatter; uniform float uSweat; uniform float uDetail; uniform float uSkinSat; uniform float uSkinRough; uniform vec3 uHairColor; uniform float uHairMix; uniform vec3 uPiel; uniform float uSinCabeza; varying float vCab; uniform vec4 uClothFlat;
 vec3 gMask = vec3( 0.0 ); float gGrain = 0.0; float gPatch = 0.5;
 // Subsuperficie barata: difuso envuelto teñido de rojo en el terminador (la luz "dobla" la esquina dentro de la piel),
 // transmisión en contraluz por los bordes finos (orejas, dedos) y nada de eso sobre la tela.
@@ -49,8 +49,10 @@ const SKIN_MASK = /* glsl */`
   // tela de color plano (el juego la usa para un pesista que comparte modelo): tapa lo que la textura trae horneado
   diffuseColor.rgb = mix( diffuseColor.rgb, uClothFlat.rgb, uClothFlat.a * smoothstep( 0.5, 0.9, gMask.g ) * step( 0.5, uMaskMode ) );
   // bajo el pelo en capas (canal B) la piel toma el color del pelo: entre hebra y hebra no se ve cuero cabelludo claro
-  diffuseColor.rgb = mix( diffuseColor.rgb, uHairColor, 0.7 * smoothstep( 0.25, 0.8, gMask.b ) * step( 0.5, uMaskMode ) );
+  diffuseColor.rgb = mix( diffuseColor.rgb, uHairColor, uHairMix * smoothstep( 0.25, 0.8, gMask.b ) * step( 0.5, uMaskMode ) );
 #endif
+  // cabeza propia oculta (primera persona): lo que queda del cuello y la cabeza, achicado a un punto, se pinta de piel lisa
+  diffuseColor.rgb = mix( diffuseColor.rgb, uPiel, uSinCabeza * smoothstep( 0.55, 0.85, vCab ) );
 `;
 const SKIN_DETAIL = /* glsl */`
 #ifdef USE_MAP
@@ -187,16 +189,17 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
   if (src.normalMap) m.normalScale.copy(src.normalScale);
   for (const t of [m.map, m.normalMap, m.roughnessMap, m.aoMap]) if (t) t.anisotropy = aniso;
   const uniforms = { tDetailSkin: { value: detail.skin }, tDetailCloth: { value: detail.cloth }, uTile: { value: new THREE.Vector2(mpu / .012, mpu / .008) }, uDetail: { value: 1 }, tMask: { value: mask }, uMaskMode: { value: mask ? 1 : 0 },
-    uScatter: { value: new THREE.Color(.5, .17, .1) }, uSweat: { value: .55 }, uSkinSat: { value: .78 }, uSkinRough: { value: .56 }, uHairColor: { value: new THREE.Color(.03, .025, .02) }, uClothFlat: { value: new THREE.Vector4(0, 0, 0, 0) } };
+    uScatter: { value: new THREE.Color(.5, .17, .1) }, uSweat: { value: .55 }, uSkinSat: { value: .78 }, uSkinRough: { value: .56 }, uHairColor: { value: new THREE.Color(.03, .025, .02) }, uHairMix: { value: .7 }, uPiel: { value: new THREE.Color(.6, .42, .33) }, uSinCabeza: { value: 0 }, uClothFlat: { value: new THREE.Vector4(0, 0, 0, 0) } };
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, uniforms);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aCabeza; varying float vCab;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvCab = aCabeza;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <lights_physical_pars_fragment>', '#include <lights_physical_pars_fragment>\n' + SKIN_PARS)
       .replace('#include <map_fragment>', '#include <map_fragment>\n' + SKIN_MASK)
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' + SKIN_DETAIL)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + SKIN_MATERIAL);
   };
-  m.customProgramCacheKey = () => 'tarima-skin-7';
+  m.customProgramCacheKey = () => 'tarima-skin-8';
   m.userData.skin = uniforms;
   return m;
 }
@@ -221,6 +224,26 @@ function hairMaterial(src) {
   return src;
 }
 /** Color medio (lineal) de las hebras opacas de la textura de pelo. */
+/**
+ * Atributo `aCabeza` de la malla del cuerpo: cuánto pesa en cada vértice el cuello y lo que cuelga de él (cabeza, ojos). El
+ * juego oculta la cabeza propia en primera persona achicando el cuello a un punto; con esto el sombreador pinta ese resto
+ * de piel lisa (`uPiel`: el promedio del albedo en la base del cuello, donde el peso va de 0,3 a 0,6) en vez de dejar la
+ * cara y la barba estiradas.
+ */
+function pesoCabeza(mesh, skin) {
+  const g = mesh.geometry, si = g.attributes.skinIndex, sw = g.attributes.skinWeight, uv = g.attributes.uv; if (!si || !sw || g.attributes.aCabeza) return;
+  const es = mesh.skeleton.bones.map(b => { for (let x = b; x; x = x.parent) if (x.isBone && boneKey(x.name) === 'Neck') return true; return false; });
+  const w = new Float32Array(si.count);
+  for (let i = 0; i < si.count; i++) { let t = 0, c = 0; for (let k = 0; k < 4; k++) { const p = sw.getComponent(i, k); t += p; if (es[si.getComponent(i, k)]) c += p; } w[i] = t > 0 ? c / t : 0; }
+  g.setAttribute('aCabeza', new THREE.BufferAttribute(w, 1));
+  try {
+    const im = mesh.material.map?.image; if (!im || !uv || !skin?.uPiel) return;
+    const N = 256, cv = document.createElement('canvas'); cv.width = cv.height = N; const c2 = cv.getContext('2d', { willReadFrequently: true }); c2.drawImage(im, 0, 0, N, N);
+    const d = c2.getImageData(0, 0, N, N).data; let r = 0, gr = 0, b = 0, n = 0;
+    for (let i = 0; i < si.count; i++) if (w[i] > .3 && w[i] < .6) { const x = Math.min(N - 1, Math.max(0, Math.floor((uv.getX(i) % 1 + 1) % 1 * N))), y = Math.min(N - 1, Math.max(0, Math.floor((uv.getY(i) % 1 + 1) % 1 * N))), j = (y * N + x) * 4; r += d[j]; gr += d[j + 1]; b += d[j + 2]; n++; }
+    if (n > 8) skin.uPiel.value.setRGB(r / n / 255, gr / n / 255, b / n / 255, THREE.SRGBColorSpace);
+  } catch { /* se queda el color por defecto */ }
+}
 function hairColor(tex, out) {
   try {
     const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(tex.image, 0, 0, 64, 64);
@@ -319,6 +342,7 @@ export class Athlete {
     const body = [...done.values()].find(m => m.name === 'Body'), hair = [...done.values()].find(m => m.name === 'Hair');
     if (body && hair?.map) hairColor(hair.map, body.userData.skin.uHairColor.value);
     this.skin = body?.userData.skin || null;
+    for (const o of this.meshes) if (o.material?.name === 'Body') pesoCabeza(o, this.skin);
     this.hasMask = !!mask; this.hasNormalMap = [...done.values()].some(m => m.name === 'Body' && m.normalMap);
     this.materialNames = [...done.values()].map(m => m.name);
     this.barBone = this.bones.find(b => boneKey(b.name) === 'Bar');
