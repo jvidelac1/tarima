@@ -4,7 +4,7 @@
 //   El color de ropa, piel y pelo sigue saliendo de cada instancia, así no hay dos espectadores iguales.
 // - Con el ánimo del público (ovación) una parte creciente levanta los brazos: cambia de variante en el sombreador.
 // - Sin profundidad de campo («Baja», «Móvil») no se dibujan miles de siluetas: cada tribuna se hornea una vez, con las
-//   mismas personas, a una textura sobre el plano de la grada (proyección paralela desde el escenario).
+//   mismas personas, a una textura con una banda por fila, y se dibuja como una tira vertical por fila.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { VARIANTES, QUIETAS, armar } from './publico_gente.js';
@@ -38,6 +38,7 @@ varying vec2 vUv; varying vec3 vCloth; varying vec3 vSkin; varying vec3 vHair;
 void main(){
   vec4 t = texture2D( map, vUv ); if ( t.a < 0.4 ) discard;
   vec3 col = mix( vCloth, vSkin, smoothstep( 0.2, 0.42, t.b ) ); col = mix( col, vHair, smoothstep( 0.68, 0.9, t.b ) );
+  col = mix( vec3( dot( col, vec3( 0.3, 0.6, 0.1 ) ) ), col, 0.62 );      // ropa apagada: el público no compite con la tarima
   gl_FragColor = vec4( col * ( uSala * ( t.r * uGain ) + uRebote * t.g ), 1.0 );
   #include <fog_fragment>
   if ( uHorneo > 0.0 ) gl_FragColor.rgb = pow( clamp( gl_FragColor.rgb * uHorneo, 0.0, 1.0 ), vec3( 1.0 / 2.2 ) );
@@ -63,7 +64,7 @@ export class Publico {
   vUv = vec2( ( uv.x + mod( var, ${COLS}.0 ) ) / ${COLS}.0, ( uv.y + floor( var / ${COLS}.0 ) ) / ${FILAS}.0 );`);
     m.fragmentShader = CROWD_FS; m.userData.conTono = false;
     Object.assign(m.uniforms, { uFiesta: animo, uSala: { value: new THREE.Color(.62, .7, .92) }, uHorneo: { value: 0 } });
-    m.uniforms.map.value = this.atlas.texture; m.uniforms.uGain.value = .16; m.uniforms.uRebote.value.set(.5, .36, .22); m.needsUpdate = true;
+    m.uniforms.map.value = this.atlas.texture; m.uniforms.uGain.value = .075; m.uniforms.uRebote.value.set(.2, .15, .1); m.needsUpdate = true;
     arena.crowdTex?.dispose(); arena.crowdTex = this.atlas.texture;
     // --- tribunas horneadas: se arman la primera vez que una calidad sin profundidad de campo las pide
     if (arena.impostors) { arena.impostors.removeFromParent(); arena.impostors.traverse(o => { o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose(); }); arena.impostors = null; }
@@ -87,31 +88,38 @@ export class Publico {
     r.shadowMap.autoUpdate = false; r.shadowMap.needsUpdate = false; r.setRenderTarget(rt); r.setClearColor(fondo, alfa); r.autoClear = true; r.clear(); r.render(sc, cam);
     r.setRenderTarget(prev); r.setClearColor(col, a); r.autoClear = auto; r.shadowMap.autoUpdate = sm; r.shadowMap.needsUpdate = need;
   }
-  /** Una textura por tribuna con sus espectadores, vista en paralelo desde el escenario, puesta sobre el plano de la grada. */
+  /**
+   * Tribunas horneadas: una textura por tribuna con una banda por fila (cada fila se dibuja sola, recortada en profundidad)
+   * y una tira vertical por fila en su lugar. Se ve como el público de verdad desde cualquier cámara (las filas se tapan
+   * entre sí) con cuatro llamadas de dibujo en total.
+   */
   _hornear() {
     const A = this.arena, crowd = A.crowd, mat = crowd.material, g0 = crowd.geometry, grupo = new THREE.Group(); grupo.name = 'tribunas horneadas';
-    const L = Math.hypot(A._rise, A._depth), ancho = this.chico ? 1024 : 2048, M = new THREE.Matrix4(); mat.uniforms.uHorneo.value = HORNEO;
+    const BH = 1.5, M = new THREE.Matrix4(), r = this.renderer, fondo = new THREE.Color(.03, .032, .04); mat.uniforms.uHorneo.value = HORNEO;
     A.stands.forEach((st, si) => {
       const ids = []; A.seats.forEach((s, i) => { if (s.si === si) ids.push(i); });
       const g = new THREE.InstancedBufferGeometry(); g.index = g0.index; for (const k of ['position', 'uv']) g.setAttribute(k, g0.attributes[k]);
       for (const k of ['aCloth', 'aSkin', 'aHair', 'aVar']) { const src = g0.attributes[k], n = src.itemSize, a = new Float32Array(ids.length * n); ids.forEach((id, j) => { for (let c = 0; c < n; c++) a[j * n + c] = src.array[id * n + c]; }); g.setAttribute(k, new THREE.InstancedBufferAttribute(a, n)); }
       const im = new THREE.InstancedMesh(g, mat, ids.length); ids.forEach((id, j) => { crowd.getMatrixAt(id, M); im.setMatrixAt(j, M); }); im.frustumCulled = false;
       const sc = new THREE.Scene(); sc.add(im);
-      // plano de la grada: X a lo ancho, Y sube por la pendiente; dos filas de más arriba (las cabezas de la última) y media abajo
-      const bx = st.back[0], bz = st.back[1], X = new THREE.Vector3(-bz, 0, bx), Y = new THREE.Vector3(bx * A._depth, A._rise, bz * A._depth).normalize(), Z = new THREE.Vector3().crossVectors(X, Y);
-      const len = (st.rows + 2.5) * L, base = new THREE.Vector3(st.o[0], st.o[1] + .3, st.o[2]).addScaledVector(Y, -.5 * L), centro = base.clone().addScaledVector(Y, len / 2);
-      // cámara paralela: mira desde el escenario hacia la tribuna, apenas hacia arriba (como la ven las cámaras del juego)
-      const dir = new THREE.Vector3(bx, .12, bz).normalize(), up = new THREE.Vector3(0, 1, 0).addScaledVector(dir, -dir.y).normalize(), alto = len * Math.abs(Y.dot(up));
-      const cam = new THREE.OrthographicCamera(-st.w / 2 - .3, st.w / 2 + .3, alto / 2, -alto / 2, 1, 80); cam.position.copy(centro).addScaledVector(dir, -40); cam.up.copy(up); cam.lookAt(centro); cam.updateMatrixWorld();
-      const rt = new THREE.WebGLRenderTarget(ancho, Math.max(64, Math.round(ancho * alto / (st.w + .6) / 4) * 4), { samples: 4, depthBuffer: true, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, colorSpace: THREE.SRGBColorSpace });
-      rt.texture.anisotropy = 4; rt.texture.name = 'tribuna horneada ' + si;
-      this._dibujar(sc, cam, rt, new THREE.Color(.012, .013, .017).multiplyScalar(HORNEO).convertLinearToSRGB(), 1);
-      g.dispose(); im.dispose();
-      // el plano toma la textura con la misma proyección (paralela: las cuatro esquinas alcanzan)
-      const pg = new THREE.PlaneGeometry(st.w + .6, len), P = pg.attributes.position, uv = pg.attributes.uv, m4 = new THREE.Matrix4().makeBasis(X, Y, Z).setPosition(centro), v = new THREE.Vector3();
-      for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i).applyMatrix4(m4).project(cam); uv.setXY(i, v.x * .5 + .5, v.y * .5 + .5); }
-      const q = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ map: rt.texture, side: THREE.DoubleSide, color: new THREE.Color(1 / HORNEO, 1 / HORNEO, 1 / HORNEO) }));
-      q.matrixAutoUpdate = false; q.matrix.copy(m4); q.frustumCulled = false; q.userData.rt = rt; grupo.add(q);
+      const W = (this.chico ? 1024 : 2048) >> (st.w < 30 ? 1 : 0), ancho = st.w + .6, banda = Math.max(16, Math.round(W * BH / ancho)), rt = new THREE.WebGLRenderTarget(W, banda * st.rows, { depthBuffer: true, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, colorSpace: THREE.SRGBColorSpace });
+      rt.texture.anisotropy = 4; rt.texture.name = 'tribuna horneada ' + si; rt.scissorTest = true;
+      const bx = st.back[0], bz = st.back[1], atras = new THREE.Vector3(bx, 0, bz), cam = new THREE.OrthographicCamera(-ancho / 2, ancho / 2, BH / 2, -BH / 2, 9.6, 10.4), pos = [], uv = [], idx = [], der = new THREE.Vector3(), c = new THREE.Vector3();
+      const prev = r.getRenderTarget(), col = r.getClearColor(new THREE.Color()), al = r.getClearAlpha(), auto = r.autoClear, sm = r.shadowMap.autoUpdate, need = r.shadowMap.needsUpdate;
+      r.shadowMap.autoUpdate = false; r.shadowMap.needsUpdate = false; r.autoClear = false; r.setClearColor(fondo, 0);
+      for (let k = 0; k < st.rows; k++) {
+        c.set(st.o[0] + bx * k * A._depth, st.o[1] + k * A._rise, st.o[2] + bz * k * A._depth);      // centro del escalón de la fila k
+        cam.position.copy(c).addScaledVector(atras, -10); cam.position.y += BH / 2; cam.up.set(0, 1, 0); cam.lookAt(c.x, c.y + BH / 2, c.z); cam.updateMatrixWorld();
+        rt.viewport.set(0, k * banda, W, banda); rt.scissor.set(0, k * banda, W, banda); r.setRenderTarget(rt); r.clear(); r.render(sc, cam);
+        der.setFromMatrixColumn(cam.matrixWorld, 0); const o = pos.length / 3;
+        for (const [sx, sy] of [[-1, 0], [1, 0], [-1, 1], [1, 1]]) { pos.push(c.x + der.x * sx * ancho / 2, c.y + sy * BH, c.z + der.z * sx * ancho / 2); uv.push((sx + 1) / 2, (k + sy) / st.rows); }
+        idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2);
+      }
+      r.setRenderTarget(prev); r.setClearColor(col, al); r.autoClear = auto; r.shadowMap.autoUpdate = sm; r.shadowMap.needsUpdate = need;
+      rt.viewport.set(0, 0, W, banda * st.rows); rt.scissorTest = false; g.dispose(); im.dispose();
+      const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); pg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); pg.setIndex(idx);
+      const q = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ map: rt.texture, alphaTest: .5, side: THREE.DoubleSide, color: new THREE.Color(1 / HORNEO, 1 / HORNEO, 1 / HORNEO) }));
+      q.matrixAutoUpdate = false; q.frustumCulled = false; q.userData.rt = rt; grupo.add(q);
     });
     mat.uniforms.uHorneo.value = 0;
     A.impostors = grupo; A.group.add(grupo); this.horneado = grupo;

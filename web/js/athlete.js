@@ -25,15 +25,15 @@ vec3 gMask = vec3( 0.0 ); float gGrain = 0.0; float gPatch = 0.5;
 void RE_Direct_Skin( const in IncidentLight directLight, const in vec3 geometryPosition, const in vec3 geometryNormal, const in vec3 geometryViewDir, const in vec3 geometryClearcoatNormal, const in PhysicalMaterial material, inout ReflectedLight reflectedLight ) {
   RE_Direct_Physical( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );
   float ndl = dot( geometryNormal, directLight.direction );
-  float wrap = saturate( ( ndl + 0.5 ) / 1.5 );
-  float extra = max( 0.0, wrap * wrap - saturate( ndl ) );
+  float wrap = saturate( ( ndl + 0.3 ) / 1.3 );
+  float extra = max( 0.0, wrap - saturate( ndl ) ) * 0.55;      // solo la franja del terminador: sin rojo en la sombra propia
   float rim = pow( 1.0 - saturate( dot( geometryNormal, geometryViewDir ) ), 2.0 );
   float back = pow( saturate( dot( geometryViewDir, - normalize( directLight.direction + geometryNormal * 0.4 ) ) ), 3.0 ) * rim;
-  reflectedLight.directDiffuse += gMask.r * directLight.color * uScatter * ( extra + back * 0.3 ) * BRDF_Lambert( material.diffuseContribution );
+  reflectedLight.directDiffuse += gMask.r * directLight.color * uScatter * ( extra + back * 0.04 ) * BRDF_Lambert( material.diffuseContribution );
   // transpiración: una película fina y lisa encima de la piel, en parches (segundo lóbulo angosto; uGloss lo gradúa)
   if ( uFino > 0.5 ) {
   float nh = saturate( dot( geometryNormal, normalize( directLight.direction + geometryViewDir ) ) );
-  reflectedLight.directSpecular += gMask.r * uGloss * uSweat * gPatch * directLight.color * saturate( ndl ) * ( pow( nh, 120.0 ) * 0.5 + pow( nh, 24.0 ) * 0.035 );
+  reflectedLight.directSpecular += gMask.r * uGloss * uSweat * gPatch * directLight.color * saturate( ndl ) * ( pow( nh, 90.0 ) * 0.2 + pow( nh, 18.0 ) * 0.03 );
   }
 }
 #undef RE_Direct
@@ -70,7 +70,7 @@ const SKIN_DETAIL = /* glsl */`
   // con la máscara (R piel, G tela). uTile = mosaicos por unidad de UV, medido sobre la malla al cargar. Cada una va en dos
   // escalas: la real (poros, trama de punto: solo se ve en primer plano) y una más gruesa que sobrevive a distancia de torso.
   // Se apagan cuando un mosaico ocupa pocos píxeles, para no centellear en plano general.
-  gPatch = smoothstep( -0.35, 0.45, dot( texture2D( tDetailSkin, vMapUv * 7.0 ).xy * 2.0 - 1.0, vec2( 1.0 ) ) * 3.0 );
+  gPatch = mix( 0.5, smoothstep( -0.35, 0.45, dot( texture2D( tDetailSkin, vMapUv * 7.0 ).xy * 2.0 - 1.0, vec2( 1.0 ) ) * 3.0 ), 0.3 );      // zonas más y menos húmedas, apenas (con contraste se leía arcilla mojada)
   // arrugas de la tela: pliegues alargados de baja frecuencia (el mosaico de piel estirado), se ven desde el plano general
   vec2 d = vec2( 0.0 ); if ( uFino > 0.5 ) d = ( texture2D( tDetailSkin, vMapUv * vec2( 3.1, 10.0 ) + 0.27 ).xy * 2.0 - 1.0 ) * uWrinkle * gMask.g;
   if ( uDetail > 0.0 ) {      // en plano general ningún mosaico se resuelve (athlete.js lo apaga): se ahorran las cuatro lecturas
@@ -78,10 +78,10 @@ const SKIN_DETAIL = /* glsl */`
   float fS = max( fwidth( uvS.x ), fwidth( uvS.y ) ), fC = max( fwidth( uvC.x ), fwidth( uvC.y ) );   // mosaicos por píxel
   vec3 s1 = texture2D( tDetailSkin, uvS ).xyz * 2.0 - 1.0, s2 = texture2D( tDetailSkin, uvS * 0.21 + 0.37 ).xyz * 2.0 - 1.0;
   vec3 c1 = texture2D( tDetailCloth, uvC ).xyz * 2.0 - 1.0, c2 = texture2D( tDetailCloth, uvC * 0.3 ).xyz * 2.0 - 1.0;
-  vec2 pores = s1.xy * ( 1.0 - smoothstep( 0.02, 0.07, fS ) ) + s2.xy * 0.35 * ( 1.0 - smoothstep( 0.1, 0.4, fS ) );
+  vec2 pores = s1.xy * ( 1.0 - smoothstep( 0.02, 0.07, fS ) ) + s2.xy * 0.06 * ( 1.0 - smoothstep( 0.1, 0.4, fS ) );
   vec2 weave = c1.xy * ( 1.0 - smoothstep( 0.03, 0.09, fC ) ) + c2.xy * 0.6 * ( 1.0 - smoothstep( 0.1, 0.32, fC ) );
   gGrain = s1.x + s1.y;
-  d += ( pores * 0.5 * gMask.r + weave * 0.8 * gMask.g ) * uDetail;
+  d += ( pores * 0.38 * gMask.r + weave * 0.8 * gMask.g ) * uDetail;
   }
   d.y = - d.y;   // textura +Y con UV de glTF (v hacia abajo)
   if ( uDetail > 0.0 || uFino > 0.5 ) {
@@ -96,7 +96,7 @@ const SKIN_DETAIL = /* glsl */`
 // Piel mate con brillo roto: rugosidad base alta, grano de alta frecuencia y sudor en parches (no un lóbulo liso de plástico).
 const SKIN_MATERIAL = /* glsl */`
 {
-  float skinRough = clamp( max( material.roughness, uSkinRough ) + gGrain * 0.08 + ( 0.5 - gPatch ) * 0.3 - uSweat * 0.12 * gPatch, 0.4, 1.0 );      // zonas mates y zonas húmedas, no un brillo parejo
+  float skinRough = clamp( max( material.roughness, uSkinRough ) + gGrain * 0.05 + ( 0.5 - gPatch ) * 0.3 - uSweat * 0.1 * gPatch, 0.42, 1.0 );      // zonas mates y zonas húmedas, no un brillo parejo
   material.roughness = mix( material.roughness, skinRough, gMask.r );
   float f0k = mix( 1.0, 0.5, gMask.r ); material.specularColor *= f0k; material.specularColorBlended *= f0k;     // F0 de piel (~0,028) por debajo del 0,04 genérico
 }
@@ -208,7 +208,7 @@ function metersPerUv(geo) {
 /** Detalle fino de los materiales del pesista (variación de tono, arrugas de tela, brillo de transpiración): 1 con post, 0 en el camino directo («Baja» y «Móvil»: ahí cada lectura de textura cuenta). Compartido por todos los personajes. */
 export const FINO = { value: 1 };
 export const ASPECTO = Object.freeze({
-  piel: Object.freeze({ tono: '#e6d3c2', saturacion: .74, variacion: 1, rugosidad: .68, sudor: .55, brillo: .3, dispersion: [.5, .15, .08] }),
+  piel: Object.freeze({ tono: '#f0dfd2', saturacion: .9, variacion: 1, rugosidad: .68, sudor: .55, brillo: .3, dispersion: [.5, .15, .08] }),
   pelo: Object.freeze({ color: null }),
   tela: Object.freeze({ tinte: '#ffffff', plano: null, arrugas: .5, brillo: .5 }),
 });
@@ -232,7 +232,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' + SKIN_DETAIL)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + SKIN_MATERIAL);
   };
-  m.customProgramCacheKey = () => 'tarima-skin-10';
+  m.customProgramCacheKey = () => 'tarima-skin-11';
   m.userData.skin = uniforms;
   return m;
 }

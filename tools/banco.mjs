@@ -45,7 +45,7 @@ const guardar = o => { fs.mkdirSync(path.dirname(path.resolve(SALIDA)), { recurs
 const problemas = [];
 try {
   if (FOTOS) {
-    await page.goto(`${base}juego.html?banco=1&fotos=${tiene('niveles') || arg('niveles') ? 2 : 1}${arg('niveles') ? '&niveles=' + arg('niveles') : ''}${arg('pesista') ? '&pesista=' + arg('pesista') : ''}${arg('plantel') ? '&plantel=' + arg('plantel') : ''}${arg('lab') ? '&lab=' + arg('lab') : ''}`, { waitUntil: 'load' });      // --lab=materiales: fotos del laboratorio de materiales (lab.js)
+    await page.goto(`${base}juego.html?banco=1&fotos=${tiene('niveles') || arg('niveles') ? 2 : 1}${arg('niveles') ? '&niveles=' + arg('niveles') : ''}${arg('pesista') ? '&pesista=' + arg('pesista') : ''}${arg('plantel') ? '&plantel=' + arg('plantel') : ''}${arg('tomas') ? '&tomas=' + arg('tomas') : ''}${arg('lab') ? '&lab=' + arg('lab') : ''}`, { waitUntil: 'load' });      // --lab=materiales: fotos del laboratorio de materiales (lab.js)
     await page.waitForFunction(() => (window.BANCO_FOTOS && window.BANCO_FOTOS.listo) || (window.BANCO && window.BANCO.listo), null, { timeout: 300000 });
     const info = await page.evaluate(() => ({ lista: window.BANCO_FOTOS ? window.BANCO_FOTOS.lista.map(f => f.nombre) : [], errores: window.BANCO.errores, sombra: window.BANCO_FOTOS?.opacidadSombra, cruda: window.BANCO_FOTOS?.opacidadCruda, gl: (() => { const g = window.JUEGO?.escena?.renderer.getContext(), x = g && g.getExtension('WEBGL_debug_renderer_info'); return x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : '?'; })() }));
     for (const e of info.errores) problemas.push('fotos: ' + e.split('\n')[0]);

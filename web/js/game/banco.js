@@ -133,7 +133,7 @@ async function fotosNiveles(B, { escena, cargas, params, msg, decir }) {
   decir('cargando los modelos'); await Promise.all(cargas);
   const id = PLANTEL[params.get('pesista')] ? params.get('pesista') : 'brenner';
   await escena.mostrar(id); escena.setCarga(140, 's'); msg.hidden = true;
-  escena.arena.setBoard({ name: id, country: 'NVK', kg: 140, attempt: 2, lift: 'Arranque', intento: 'Intento 2' });
+  escena.arena.setBoard({ name: PLANTEL[id].corto || id, country: PLANTEL[id].codigo || 'NVK', kg: 140, attempt: 2, lift: 'Arranque', intento: 'Intento 2' });
   const niveles = (params.get('niveles') || 'movil,baja,media,alta,ultra').split(',').map(x => x.trim()).filter(k => PRESET[k]), fin = tramo(escena.P, 'snatch').fin - .05;
   const tomas = [
     { n: '3-4', c: '3/4', t: 1.3, luces: null }, { n: 'frontal', c: 'baja', t: 1.3, luces: null }, { n: 'lado', c: 'lado', t: fin, luces: null },
@@ -141,7 +141,8 @@ async function fotosNiveles(B, { escena, cargas, params, msg, decir }) {
     { n: 'medio', c: 'medio', t: fin, luces: null }, { n: 'torso', c: 'torso', t: fin, luces: null }, { n: 'cara', c: 'cara', t: fin, luces: null }, { n: 'medio-salida', c: 'medio', t: 1.3, luces: null },
     { n: 'jueces-vale', c: 'jueces', t: fin, luces: [true, true, true] }, { n: 'jueces-nulo', c: 'jueces', t: fin, luces: [false, true, false] },
   ];
-  const lista = niveles.flatMap(q => tomas.map(x => ({ ...x, q, nombre: `${q}_${x.n}` }))); let puesta = null;
+  const cuales = (params.get('tomas') || '').split(',').filter(Boolean), elegidas = cuales.length ? tomas.filter(x => cuales.includes(x.n)) : tomas;      // ?tomas=medio,cara: solo esas
+  const lista = niveles.flatMap(q => elegidas.map(x => ({ ...x, q, nombre: `${q}_${x.n}` }))); let puesta = null;
   window.BANCO_FOTOS = {
     lista, listo: true, opacidadSombra: null, opacidadCruda: null,
     async poner(i) {
