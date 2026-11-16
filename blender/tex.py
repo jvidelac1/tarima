@@ -408,7 +408,7 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     rough=np.where(cloth>.5,np.clip(rough,.3,.95),np.clip(rough,.16,.92))
     cont=np.clip(blur(cloth,4.5*S)-cloth,0,1)*2.*(1-cloth)*(1-hairm); col*=1-.42*np.clip(cont,0,1)[:,:,None]      # sombra de contacto: la prenda tiene espesor
     edge=blur(cloth,1.2*S)                                                            # borde de prenda apenas biselado
-    am=np.clip((1-cloth)+suit*.75+slv*.30+sock*.5-wrapm,0,1)*(1-hairm)                  # cuánto del relieve muscular deja ver cada prenda
+    am=np.clip((1-cloth)+suit*STY.get('ceñido',.5)+slv*.25+sock*.4-wrapm,0,1)*(1-hairm)                  # cuánto del relieve muscular deja ver cada prenda
     H=skinH*(1-cloth)+lipH+(thick+H)*edge+hairH+chalkH+dp*.00013+anatH*am
     del skinH,lipH,hairH,chalkH
     nrm=normal_from_height(H,T.su,T.sv,T.ok)

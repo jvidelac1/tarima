@@ -20,6 +20,11 @@ const _v = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3
 const SKIN_PARS = /* glsl */`
 uniform sampler2D tMask; uniform sampler2D tDetailSkin; uniform sampler2D tDetailCloth; uniform vec2 uTile; uniform float uMaskMode; uniform vec3 uScatter; uniform float uSweat; uniform float uDetail; uniform float uSkinSat; uniform float uSkinRough; uniform vec3 uHairColor; uniform vec4 uClothFlat; uniform vec3 uSkinTint; uniform vec3 uClothTint; uniform float uTone; uniform float uWrinkle; uniform float uGloss; uniform float uFino; uniform float uClothGain; uniform float uNormBias; uniform float uHairMix; uniform vec3 uPiel; uniform float uSinCabeza; varying float vCab; uniform float uSinTorso; uniform float uCorte; varying float vTor; varying float vNdcY;
 vec3 gMask = vec3( 0.0 ); float gGrain = 0.0; float gPatch = 0.5;
+// ruido de valor suave (manchas redondeadas, sin textura): antes la variación de tono y los parches húmedos salían del mosaico de
+// poros y se leían como una red de vetas claras sobre la piel
+float pielHash( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }
+float pielRuido( vec2 p ) { vec2 i = floor( p ), f = fract( p ); f = f * f * ( 3.0 - 2.0 * f );
+  return mix( mix( pielHash( i ), pielHash( i + vec2( 1.0, 0.0 ) ), f.x ), mix( pielHash( i + vec2( 0.0, 1.0 ) ), pielHash( i + vec2( 1.0, 1.0 ) ), f.x ), f.y ); }
 // Subsuperficie barata: difuso envuelto teñido de rojo en el terminador (la luz "dobla" la esquina dentro de la piel),
 // transmisión en contraluz por los bordes finos (orejas, dedos) y nada de eso sobre la tela.
 void RE_Direct_Skin( const in IncidentLight directLight, const in vec3 geometryPosition, const in vec3 geometryNormal, const in vec3 geometryViewDir, const in vec3 geometryClearcoatNormal, const in PhysicalMaterial material, inout ReflectedLight reflectedLight ) {
@@ -52,7 +57,7 @@ const SKIN_MASK = /* glsl */`
   // el albedo de piel llega saturado del horneado: se baja un poco para que la luz cálida no lo vuelva naranja
   diffuseColor.rgb = mix( diffuseColor.rgb, mix( vec3( dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) ) ), diffuseColor.rgb, uSkinSat ), gMask.r );
   // tono de piel (parámetro del personaje) y su variación: parches grandes más rojizos o más pálidos (uTone), como la piel de verdad
-  if ( uFino > 0.5 ) { vec2 tv = texture2D( tDetailSkin, vMapUv * 2.3 + 0.13 ).xy + texture2D( tDetailSkin, vMapUv * 0.9 + 0.41 ).xy - 1.0; float tono = clamp( ( tv.x + tv.y ) * 2.5, -1.0, 1.0 );
+  if ( uFino > 0.5 ) { float tono = clamp( ( pielRuido( vMapUv * 31.0 + 3.7 ) * 0.65 + pielRuido( vMapUv * 73.0 + 9.1 ) * 0.35 - 0.5 ) * 2.6, -1.0, 1.0 );
     vec3 piel = diffuseColor.rgb * uSkinTint * ( 1.0 + uTone * tono * vec3( 0.10, -0.03, -0.08 ) ) * ( 1.0 - 0.12 * uTone * abs( tono ) );
     diffuseColor.rgb = mix( diffuseColor.rgb, piel, gMask.r ); }
   else diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * uSkinTint, gMask.r );
@@ -78,7 +83,7 @@ const SKIN_DETAIL = /* glsl */`
   // con la máscara (R piel, G tela). uTile = mosaicos por unidad de UV, medido sobre la malla al cargar. Cada una va en dos
   // escalas: la real (poros, trama de punto: solo se ve en primer plano) y una más gruesa que sobrevive a distancia de torso.
   // Se apagan cuando un mosaico ocupa pocos píxeles, para no centellear en plano general.
-  gPatch = mix( 0.5, smoothstep( -0.35, 0.45, dot( texture2D( tDetailSkin, vMapUv * 7.0 ).xy * 2.0 - 1.0, vec2( 1.0 ) ) * 3.0 ), 0.3 );      // zonas más y menos húmedas, apenas (con contraste se leía arcilla mojada)
+  gPatch = mix( 0.5, smoothstep( 0.3, 0.7, pielRuido( vMapUv * 47.0 + 1.3 ) * 0.7 + pielRuido( vMapUv * 113.0 ) * 0.3 ), 0.3 );      // zonas más y menos húmedas, apenas (con contraste se leía arcilla mojada)
   // arrugas de la tela: pliegues alargados de baja frecuencia (el mosaico de piel estirado), se ven desde el plano general
   vec2 d = vec2( 0.0 ); if ( uFino > 0.5 ) d = ( texture2D( tDetailSkin, vMapUv * vec2( 3.1, 10.0 ) + 0.27 ).xy * 2.0 - 1.0 ) * uWrinkle * gMask.g;
   if ( uDetail > 0.0 ) {      // en plano general ningún mosaico se resuelve (athlete.js lo apaga): se ahorran las cuatro lecturas
@@ -243,11 +248,28 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
       .replace('#include <normal_fragment_maps>', THREE.ShaderChunk.normal_fragment_maps.replaceAll('texture2D( normalMap, vNormalMapUv )', 'texture2D( normalMap, vNormalMapUv, uNormBias * gMask.r )') + '\n' + SKIN_DETAIL)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + SKIN_MATERIAL);
   };
-  m.customProgramCacheKey = () => 'tarima-skin-20';
+  m.customProgramCacheKey = () => 'tarima-skin-21';
   m.userData.skin = uniforms;
   return m;
 }
 
+// Brillo del pelo (Kajiya-Kay): la hebra refleja en una banda perpendicular a su dirección, no en un punto. La dirección de
+// la hebra se toma como «hacia abajo sobre la cabeza» (tangente a la superficie en el plano vertical), corrida un poco hacia la
+// normal; dos bandas, una angosta del color de la luz y otra ancha teñida. Bajo y suave: pelo corto, no una peluca de vinilo.
+const HAIR_PARS = /* glsl */`
+void RE_Direct_Hair( const in IncidentLight directLight, const in vec3 geometryPosition, const in vec3 geometryNormal, const in vec3 geometryViewDir, const in vec3 geometryClearcoatNormal, const in PhysicalMaterial material, inout ReflectedLight reflectedLight ) {
+  RE_Direct_Physical( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );
+  vec3 arriba = normalize( ( viewMatrix * vec4( 0.0, 1.0, 0.0, 0.0 ) ).xyz );
+  vec3 t = cross( geometryNormal, cross( arriba, geometryNormal ) ); float lt = length( t ); if ( lt < 1e-3 ) return; t /= lt;
+  vec3 h = normalize( directLight.direction + geometryViewDir );
+  float ndl = saturate( dot( geometryNormal, directLight.direction ) * 0.6 + 0.4 );
+  float a1 = dot( normalize( t + geometryNormal * 0.12 ), h ), a2 = dot( normalize( t - geometryNormal * 0.2 ), h );
+  float banda = pow( sqrt( max( 0.0, 1.0 - a1 * a1 ) ), 90.0 ) * 0.05 + pow( sqrt( max( 0.0, 1.0 - a2 * a2 ) ), 22.0 ) * 0.035;
+  reflectedLight.directSpecular += directLight.color * ndl * banda * ( 0.35 + material.diffuseContribution * 6.0 );
+}
+#undef RE_Direct
+#define RE_Direct RE_Direct_Hair
+`;
 /**
  * Pelo, barba y cejas en capas concéntricas con alfa (una sola primitiva; el índice va de la capa de adentro a la de afuera
  * y no se reordena). Se dibuja con mezcla y sin escribir profundidad; `hairDepth` es una pasada previa del mismo mallado que
@@ -262,9 +284,10 @@ function hairMaterial(src) {
   // especular se lee como un halo a 1–2 cm de la cabeza. Se desvanece con el ángulo de vista y el pelo queda casi sin brillo.
   src.onBeforeCompile = sh => {
     sh.fragmentShader = sh.fragmentShader.replace('#include <alphatest_fragment>', 'diffuseColor.a *= smoothstep( 0.2, 0.62, abs( dot( normalize( vNormal ), normalize( vViewPosition ) ) ) );\n#include <alphatest_fragment>')
-      .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.35; material.specularColorBlended *= 0.35;');
+      .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.2; material.specularColorBlended *= 0.2;')
+      .replace('#include <lights_physical_pars_fragment>', '#include <lights_physical_pars_fragment>\n' + HAIR_PARS);
   };
-  src.customProgramCacheKey = () => 'tarima-hair-2';
+  src.customProgramCacheKey = () => 'tarima-hair-3';
   return src;
 }
 /** Color medio (lineal) de las hebras opacas de la textura de pelo. */
