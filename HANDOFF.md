@@ -2118,6 +2118,16 @@ luces ni veredicto, brazos en T y «soldado» igual en válido y nulo. Lo que ca
   fallo = cabeza que cae, hombros vencidos y negación.
 - Hojas: `finalEn` prende las luces y el veredicto como el juego; `check_pov --solo=claves --q=alta --plantel=…` saca las
   fases clave con calidad alta y el plantel nuevo (`out/pov_alta`); `check_barra --solo=tel_en --camara=pov` el teléfono.
+Medido en la última corrida (43949153444, `check_pov` en verde): mirada fija en −9° en los cinco segmentos y los dos modelos
+(giro ≤ 1 °/s), cámara a ≤ 19 cm del hueso de la cabeza, cámara general tras soltar ≤ 3,7 cm (el temblor del golpe) y 0,00°.
+Hojas en `~/tarima-datos/ver_visual/pov/` (`claves_alta/`: fases clave con calidad alta y el plantel nuevo; `hojas/`; `final/`;
+`jugado/`: arranques jugados con la barrita, en computadora y en teléfono acostado; `antes/`: lo que miró la ronda 1).
+**Sin nota de director a ciegas todavía** (la pone el coordinador sobre `visual`). Lo que queda a la vista:
+- manos en los hombros con los dedos abiertos (es la pose del clip: se arregla en `poses.py`, no acá);
+- en el giro de codos y el empuje (una o dos décimas) asoma el corte del brazo contra el borde de abajo;
+- en el arranque el agarre es ancho y las manos quedan contra los bordes de la imagen;
+- la barra dibujada con las manos no proyecta sombra propia (la sombra se congela mientras el cuerpo se dibuja movido);
+- en una ventana más alta que ancha la cámara sigue siendo la lateral; sin probar en una placa real ni en un teléfono.
 Lo de abajo («no tocar» y «sigue mal») es de las cinco rondas anteriores, con la cámara vieja.
 
 Lo que las cinco rondas dejaron bien («no tocar»): barra arriba (recepción y recuperación del arranque, empuje, tijera y
