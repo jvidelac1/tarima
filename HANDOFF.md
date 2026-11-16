@@ -1457,12 +1457,63 @@ nombre y kilos, las tres luces en la pantalla y las tres físicas arriba.
 **Pendiente / sin medir.**
 - **Nada se midió en una placa real.** Falta correr `juego.html?banco=1` en la Mac del dueño y en un teléfono, antes y después.
   Si el polvo de «Móvil»/«Baja» costara algo medible, se apaga con `AMBIENTE.movil.polvo = 0` (una línea).
-- La cámara no tiene opción en pantalla (solo tecla C y `?camara=`): en el teléfono no se puede elegir. La fila iría en
-  Opciones (bienvenida), que estaba tocando otra rama.
+- (Resuelto en `graficos2`: fila «Cámara» en Opciones, tecla V y evento `camara_elegida`.)
 - El cambio de cámara no deja evento de analítica (la lista de eventos es de otra rama).
 - Conos y reflejo solo se ven de Media/Alta para arriba; en el celular no hay conos (en el camino directo cada capa aditiva
   paga el tono por píxel). Postproceso: no se agregó nada (brillo, viñeta, grano y gradación ya estaban en Media y Alta).
 - Los árbitros siguen siendo muñecos de cápsulas: por eso el jurado es lo que ve el árbitro y no un plano de ellos.
+
+### Gráficos fase 2: jueces de verdad, jurado en los nulos y selector de cámara (15-nov, rama `graficos2`; LIF-38, LIF-36)
+
+Rama `graficos2`, desde `prueba` (primera-vez + utm + graficos). Nada fusionado ni publicado.
+
+**Qué cambió.**
+- `web/js/game/jueces.js` (nuevo) — `Jueces`: personas ficticias modeladas por código (sin imágenes ni caras de nadie):
+  silla, piernas, saco por secciones (superelipses), camisa en V, corbata, cuello, cabeza con pelo (corto, melena o calvo),
+  brazos apoyados en la mesa. Los tres árbitros además tienen nariz, ojos y orejas, una consola con dos botones y **una
+  paleta**: cuando se prende su luz la levantan (blanca o roja, 0,35 s) y la bajan cuando las luces se apagan (0,55 s; con
+  movimiento reducido, sin animación). Reciben lo mismo que `arena.setDecision` (stage.js lo envuelve). También son personas
+  el jurado lateral (cinco, mesa larga: es lo que se ve desde la cámara general) y los dos de la mesa técnica, con menos detalle.
+  - *Costo*: cada grupo es una malla con color por vértice (13 600 triángulos en total; se descartan por grupo fuera de
+    cuadro) y un solo material Lambert sin texturas; la luz va pintada en el color (lo que mira abajo más oscuro, lo que mira a
+    la tarima más claro) más un relleno fijo en el sombreador (`RELLENO`: las luces del escenario apuntan a la tarima y las
+    mesas quedaban en negro). Los tres brazos de las paletas son una malla cuyas posiciones se recalculan en JavaScript solo
+    mientras se mueven (594 vértices); las tres paletas, un dibujo instanciado sin luces. Nada por cuadro en reposo.
+  - `arena.js` acepta `oficiales: false` (el juego): no arma los muñecos de cápsulas sentados ni sus mesas. El visor no cambia.
+    Los dos cargadores de pie siguen siendo cápsulas.
+- **Decisiones de diseño (del agente).** Los tres árbitros comparten **una mesa** al frente (x = −0,95; 0; 0,95; antes el
+  central estaba solo y los otros dos a 3,6 m: no entraban en ningún plano juntos). La **vista del jurado** dejó de ser «lo
+  que ve el árbitro»: ahora es por encima de los hombros de los tres (cámara en (0; 0,7; 10,6), lente de 30°): abajo sus
+  cabezas y las paletas, en el medio el pesista de frente, arriba las tres luces. El pesista ocupa un 36 % del alto (antes
+  62 %). Con profundidad de campo, lo cercano se desenfoca menos en ese plano (`post.cerca` 0,1 en lugar de 0,35). Uniforme:
+  saco azul grisáceo, camisa clara, corbata gris, azul o bordó. Plano `jueces` (los tres de frente) solo para las fotos de control.
+- **Jurado en los nulos propios** (`decision()` en main.js): igual que en el válido, movimiento suave de 1,3 s; el nulo se
+  queda ahí hasta el fundido que sigue. Rivales, resúmenes y la barra que se cae (fallo) siguen como antes.
+- **Selector de cámara**: fila «Camera / Cámara» en Opciones (Main · Judges · Side · Low / General · Jurado · Lateral · Baja),
+  recordada en `tarima.camara`; evento `camara_elegida` (`vista`, `via`: `opciones` o `tecla`, `pantalla`; docs/MVP.md 6.3).
+  **La tecla pasó de C a V** (C es «Cambiar» el pedido de kilos, LIF-4); `?camara=` sigue. El orden de la tecla es el de la fila.
+- Banco: tomas `jueces-vale` y `jueces-nulo`, variante `jueces` (los oculta). `graficos.yml`: `comparar` acepta `base` (rama).
+
+**Medido** (Actions, por software: vale la relación, no los ms).
+- Costo contra `prueba` en la misma máquina (run 43776898919, alternado, 960×540, ms de un cuadro a 1 MP):
+
+  | | prueba (3 corridas) | graficos2 (3 corridas) |
+  |---|---|---|
+  | Baja | 1159 · 1157 · 1188 (media 1168) | 1167 · 1165 · 1171 (media 1168) |
+  | Móvil | 503* · 843 · 838 | 829 · 842 · 841 |
+
+  (*una sola vuelta: no vale.) Lo mismo dentro del ruido. La variante «sin los jueces» dice que ahorra 141 a 159 ms, pero «sin
+  el ambiente» en `prueba` dice 149 a 176 con el mismo rango (−16 a 300): es el sesgo de la medición de variantes, no un costo.
+- Cortes (`check_recorrido`, run 43776253714): 0 cortes bruscos y 20 fundidos mirando todo, 0 y 32 saltando rivales: igual
+  que la base. **En ese recorrido no salió ningún nulo propio**: la vista del jurado en el nulo usa la misma llamada que el
+  válido (que sí se midió), pero no quedó ejercitada en el navegador.
+- `check_game` controla la fila de cámara (4 botones, guardado, evento) por teclado y por toques.
+- Capturas miradas (artefacto `graficos-out`): jueces de frente, jurado con válido y con nulo, general (jurado lateral) y
+  reversa (los tres árbitros con las paletas arriba), en Móvil, Baja, Media y Alta.
+
+**Pendiente / estimación.** Nada medido en una placa real. Las caras son un maniquí con nariz y ojos (sin boca ni cejas). El
+selector no muestra la vista elegida detrás del panel hasta que empieza el levantamiento. En una ventana más alta que ancha
+la cámara es siempre la lateral, se elija lo que se elija. Falta una prueba de navegador que fuerce un nulo propio.
 
 ## Contratos entre Blender y el visor
 
