@@ -6,7 +6,7 @@
 //     grandes de las fases clave y, reproduciendo cada segmento seguido, cuánto se mueve y gira la cámara (m/s, °/s) y que
 //     la cabeza propia no se dibuje. También el final de un válido visto desde los ojos.
 // Hojas y fotos en out/pov/. Falla con errores de consola o si la primera persona no cumple sus reglas (ver abajo).
-// Uso: node tools/check_pov.mjs [--headed] [--solo=finales|pov]
+// Uso: node tools/check_pov.mjs [--headed] [--solo=finales|pov|claves]   (claves: solo las fotos grandes de las fases clave en primera persona)
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -110,10 +110,10 @@ if (!SOLO || SOLO === 'finales') {
 }
 
 // ---------- B. primera persona ----------
-if (!SOLO || SOLO === 'pov') {
+if (!SOLO || SOLO === 'pov' || SOLO === 'claves') {
   console.log('\nB. PRIMERA PERSONA');
   const SEGS = [['snatch', 's', 100], ['clean', 'c', 120], ['split', 'c', 60], ['power', 'c', 50], ['squat', 'c', 70]];
-  for (const id of ['ventura', 'brenner']) {
+  for (const id of SOLO === 'claves' ? [] : ['ventura', 'brenner']) {
     for (const [seg, lev, n] of SEGS) {
       // hoja: una foto cada 5 muestras (medio segundo de clip), con la cámara asentada en cada una
       const lista = [];
@@ -155,7 +155,7 @@ if (!SOLO || SOLO === 'pov') {
   }
   await page.setViewportSize({ width: 960, height: 540 }); await page.waitForTimeout(200);
   // el final desde los ojos: válido de arranque y de envión, y una caída
-  for (const caso of [FINALES[0], FINALES[1], FINALES[4], FINALES[7]]) { const r = await recorrer('ventura', caso, 'pov', true); if (r) await hoja(`pov_final_${slug(caso[0])}`, r.lista); }
+  for (const caso of SOLO === 'claves' ? [] : [FINALES[0], FINALES[1], FINALES[4], FINALES[7], FINALES[8]]) { const r = await recorrer('ventura', caso, 'pov', true); if (r) await hoja(`pov_final_${slug(caso[0])}`, r.lista); }
 }
 
 await browser.close(); server.close();

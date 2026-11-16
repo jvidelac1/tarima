@@ -63,8 +63,8 @@ const SKIN_MASK = /* glsl */`
   diffuseColor.rgb = mix( diffuseColor.rgb, uHairColor, uHairMix * smoothstep( 0.25, 0.8, gMask.b ) * step( 0.5, uMaskMode ) );
 #endif
   // cuerpo propio sin dibujar salvo antebrazos y manos (primera persona con la cámara de la barra), con trama para que entre y salga de a poco
-  // y lo que queda (los brazos) se deshace hacia el borde de arriba de la imagen: el corte del hombro nunca queda a la vista
-  if ( uSinTorso > 0.0 && fract( sin( dot( floor( gl_FragCoord.xy ), vec2( 39.3468, 11.135 ) ) ) * 24634.6345 ) < uSinTorso * smoothstep( 0.55, 0.92, vNdcY ) ) discard;
+  // y lo que queda (los brazos, que entran por abajo) se deshace contra el borde de abajo de la imagen: el corte del hombro nunca queda a la vista
+  if ( uSinTorso > 0.0 && fract( sin( dot( floor( gl_FragCoord.xy ), vec2( 39.3468, 11.135 ) ) ) * 24634.6345 ) < uSinTorso * smoothstep( 0.84, 0.99, - vNdcY ) ) discard;
   if ( uSinTorso > 0.0 && vTor > uCorte && fract( sin( dot( floor( gl_FragCoord.xy ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) < uSinTorso ) discard;
   // cabeza propia oculta (primera persona): lo que queda del cuello y la cabeza, achicado a un punto, se pinta de piel lisa
   diffuseColor.rgb = mix( diffuseColor.rgb, uPiel, uSinCabeza * smoothstep( 0.55, 0.85, vCab ) );
@@ -240,7 +240,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' + SKIN_DETAIL)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + SKIN_MATERIAL);
   };
-  m.customProgramCacheKey = () => 'tarima-skin-18';
+  m.customProgramCacheKey = () => 'tarima-skin-19';
   m.userData.skin = uniforms;
   return m;
 }
