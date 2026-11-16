@@ -712,7 +712,9 @@ html.vert .relojbox{top:calc(var(--st) + 54px);right:calc(var(--sr) + 8px)}
 html.vert #tv .bug{max-width:calc(100% - 170px - var(--sl) - var(--sr))}
 html.vert #tv .bug span{display:none}
 /* el tablero, chico arriba a la izquierda (sin tocar los botones de la derecha); en el levantamiento propio no va */
-html.vert #tv #tablero{--u:10px;top:calc(var(--st) + 8px);left:calc(var(--sl) + 8px);max-width:calc(100% - 172px - var(--sl) - var(--sr));padding:3px 5px}
+html.vert #tv #tablero{--u:10px;top:calc(var(--st) + 8px);left:calc(var(--sl) + 8px);max-width:calc(100% - 172px - var(--sl) - var(--sr));padding:3px 5px;overflow:hidden}
+/* sin la columna de «AHORA / SIGUE» (la fila resaltada ya dice quién sale) ni la personalidad del rival (va en su cartel) */
+html.vert #tablero :is(.tb-est,.tb-n small.tb-estilo){display:none}
 html.vert #tablero .tb td{font-size:12px}
 html.vert #tablero .tb-n span{max-width:6.5em}
 html.vert #tablero .tb-pie p{font-size:11px}
@@ -736,8 +738,13 @@ html.vert body:has(#veredicto:not([hidden])) #zona{display:none}
 /* «Toca: seguir»: a la derecha del botón (o de «Saltar»); con el veredicto, abajo al centro, donde estaba el botón */
 html.vert #tv #seguir{left:auto;right:calc(var(--sr) + 10px);transform:none;bottom:calc(var(--sb) + var(--bm) + var(--boton)/2 - .9em);white-space:nowrap}
 html.vert body:has(#veredicto:not([hidden])) #tv #seguir{right:auto;left:50%;transform:translateX(-50%);bottom:calc(var(--sb) + var(--bm))}
-/* el acuse (la tecla que se hunde), a la izquierda del botón */
-html.vert #tv #acuse{right:auto;left:calc(var(--sl) + 14px);top:auto;bottom:calc(var(--sb) + var(--bm) + var(--boton)/2 - 1em);flex-direction:row}
+/* el acuse: sin la tecla dibujada (el botón mismo se hunde); solo el motivo de un toque que no sirvió, a la izquierda del
+   botón (o de «Saltar»), sin llegar a ellos */
+html.vert #tv #acuse{right:auto;left:calc(var(--sl) + 10px);top:auto;bottom:calc(var(--sb) + var(--bm) + var(--boton)/2 - .8em);flex-direction:row;max-width:calc(50% - 96px)}
+html.vert #acuse kbd{display:none}
+html.vert #acuse b{min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* con la barrita a la vista, la señal no (en 'b' quedaba su caja vacía detrás de la barrita) */
+html.vert body:has(#barrita:not([hidden])) #tv #senal{display:none}
 /* la guía de la práctica y la presentación: arriba, debajo de los botones, a lo ancho */
 html.vert #tv #guia{left:calc(var(--sl) + 12px);right:calc(var(--sr) + 12px);top:calc(var(--st) + 56px);bottom:auto;transform:none;max-width:none;width:auto;text-align:center;font-size:max(14px,calc(var(--u)*1.05))}
 /* «Saltar práctica» arriba a la izquierda (a la derecha están los botones chicos) */
@@ -771,3 +778,19 @@ html.vert .verde-b{gap:.2em .6em;margin:.2em 0}
 html.vert .panel.lado :is(p.frase,p.reloj,p.garra,p.sugiere){display:none}
 /* el podio con sus botones: la tabla completa ya se vio un momento antes */
 html.vert .panel.podio-panel:has(button) .tabla{display:none}
+/* paneles parados: títulos más chicos (el alto sobra y el ancho no) y el selector ES · EN arriba a la derecha sin comerse el título */
+html.vert .panel h1{font-size:clamp(22px,7vw,30px)}
+html.vert .panel h2{font-size:clamp(16px,4.6vw,19px)}
+html.vert .panel:has(>.idiomas.flota)>:is(h1,h2):first-of-type,html.vert .panel .cabeza{padding-right:100px}
+html.vert .panel.muro:has(>.idiomas.flota)>h1:first-of-type+.bajada{padding-right:0}
+/* la tabla de la final a lo ancho: sin la columna de la energía (se ve en el intento) y más junta */
+html.vert table.tabla{font-size:13px}
+html.vert .tabla :is(th,td){padding:.25em .14em}
+html.vert .tabla :is(th,td):last-child{display:none}
+html.vert .tabla td.n{max-width:6.5em;overflow:hidden;text-overflow:ellipsis}
+html.vert .tabla td.n i{width:1.1em;margin-right:.3em}
+/* elegir kilos: −5 −1 kilos +1 +5 en una fila */
+html.vert .kgsel{gap:6px;flex-wrap:nowrap;justify-content:center}
+html.vert .kgsel>span{display:none}
+html.vert .kgsel button.kg{min-width:46px;padding:.5em .55em}
+html.vert .kgsel output{font-size:clamp(30px,10vw,44px);min-width:2.6ch}

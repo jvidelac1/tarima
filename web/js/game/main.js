@@ -1132,6 +1132,16 @@ function encuadreLibre() {
   // el tablero de la final (arriba a la izquierda): el pesista se encuadra debajo, no detrás
   const tb = $('tablero'); if (tb && !tb.hidden && tb.offsetHeight) { const b = (tb.offsetTop + tb.offsetHeight) / c.height + .015; if (b < .45 && tb.offsetLeft / c.width < (x0 + x1) / 2) y0 = Math.max(y0, b); }
   const fov = 22, tg = 2 * Math.tan(fov / 2 * Math.PI / 180), asp = c.width / c.height;
+  if (document.documentElement.classList.contains('vert')) {
+    // LIF-50, teléfono parado: el panel va abajo a lo ancho y la explicación de primera vez justo encima. Ahí el plano
+    // americano quedaba cortado por las rodillas: va el pesista entero (de los pies a la cabeza, con aire) en lo que queda
+    // libre entre el tablero y la explicación (o el panel). El sujeto del plano (entre el cuello y la cadera) va más arriba
+    // del centro de esa parte, para que entren los pies.
+    const ap = $('aprende'); if (ap && !ap.hidden && ap.dataset.donde === 'panel' && !ap.classList.contains('sin-lugar') && ap.offsetHeight) { const t = ap.offsetTop / c.height; if (t > .25) y1 = Math.min(y1, t - .01); }
+    y0 = Math.max(y0, (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--techo-v')) || 0) / c.height);
+    const h = escena.P?.h || 1.75, arriba = 1.12 * h, abajo = -.06 * h, sujeto = .66 * h, alto = arriba - abajo;
+    return { x: .5, y: y0 + (y1 - y0) * (arriba - sujeto) / alto, dAbs: Math.max(alto / (tg * (y1 - y0)), .9 / (tg * asp)) };
+  }
   return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, dAbs: Math.max(1.6 / (tg * (y1 - y0)), 1 / (tg * asp * (x1 - x0))) };
 }
 
