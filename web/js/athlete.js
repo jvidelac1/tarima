@@ -29,7 +29,7 @@ void RE_Direct_Skin( const in IncidentLight directLight, const in vec3 geometryP
   float extra = max( 0.0, wrap * wrap - saturate( ndl ) );
   float rim = pow( 1.0 - saturate( dot( geometryNormal, geometryViewDir ) ), 2.0 );
   float back = pow( saturate( dot( geometryViewDir, - normalize( directLight.direction + geometryNormal * 0.4 ) ) ), 3.0 ) * rim;
-  reflectedLight.directDiffuse += gMask.r * directLight.color * uScatter * ( extra + back * 0.8 ) * BRDF_Lambert( material.diffuseContribution );
+  reflectedLight.directDiffuse += gMask.r * directLight.color * uScatter * ( extra + back * 0.3 ) * BRDF_Lambert( material.diffuseContribution );
   // transpiración: una película fina y lisa encima de la piel, en parches (segundo lóbulo angosto; uGloss lo gradúa)
   if ( uFino > 0.5 ) {
   float nh = saturate( dot( geometryNormal, normalize( directLight.direction + geometryViewDir ) ) );
@@ -96,7 +96,7 @@ const SKIN_DETAIL = /* glsl */`
 // Piel mate con brillo roto: rugosidad base alta, grano de alta frecuencia y sudor en parches (no un lóbulo liso de plástico).
 const SKIN_MATERIAL = /* glsl */`
 {
-  float skinRough = clamp( max( material.roughness, uSkinRough ) + gGrain * 0.08 - uSweat * 0.2 * gPatch, 0.36, 1.0 );
+  float skinRough = clamp( max( material.roughness, uSkinRough ) + gGrain * 0.08 + ( 0.5 - gPatch ) * 0.3 - uSweat * 0.12 * gPatch, 0.4, 1.0 );      // zonas mates y zonas húmedas, no un brillo parejo
   material.roughness = mix( material.roughness, skinRough, gMask.r );
   float f0k = mix( 1.0, 0.5, gMask.r ); material.specularColor *= f0k; material.specularColorBlended *= f0k;     // F0 de piel (~0,028) por debajo del 0,04 genérico
 }
@@ -208,7 +208,7 @@ function metersPerUv(geo) {
 /** Detalle fino de los materiales del pesista (variación de tono, arrugas de tela, brillo de transpiración): 1 con post, 0 en el camino directo («Baja» y «Móvil»: ahí cada lectura de textura cuenta). Compartido por todos los personajes. */
 export const FINO = { value: 1 };
 export const ASPECTO = Object.freeze({
-  piel: Object.freeze({ tono: '#efe6dc', saturacion: .8, variacion: .9, rugosidad: .64, sudor: .55, brillo: .4, dispersion: [.62, .2, .11] }),
+  piel: Object.freeze({ tono: '#e6d3c2', saturacion: .74, variacion: 1, rugosidad: .68, sudor: .55, brillo: .3, dispersion: [.5, .15, .08] }),
   pelo: Object.freeze({ color: null }),
   tela: Object.freeze({ tinte: '#ffffff', plano: null, arrugas: .5, brillo: .5 }),
 });
@@ -217,7 +217,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
   const m = new THREE.MeshPhysicalMaterial({
     name: src.name, map: src.map, normalMap: src.normalMap, roughnessMap: src.roughnessMap, metalnessMap: src.metalnessMap, aoMap: src.aoMap,
     color: src.color, roughness: src.roughness, metalness: src.metalness, side: src.side,
-    sheen: .5, sheenRoughness: .5, sheenColor: new THREE.Color(.5, .5, .56), envMapIntensity: .5, specularIntensity: 1,
+    sheen: .5, sheenRoughness: .5, sheenColor: new THREE.Color(.5, .5, .56), envMapIntensity: .35, specularIntensity: 1,
   });
   if (src.normalMap) m.normalScale.copy(src.normalScale);
   for (const t of [m.map, m.normalMap, m.roughnessMap, m.aoMap]) if (t) t.anisotropy = aniso;
@@ -232,7 +232,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' + SKIN_DETAIL)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + SKIN_MATERIAL);
   };
-  m.customProgramCacheKey = () => 'tarima-skin-9';
+  m.customProgramCacheKey = () => 'tarima-skin-10';
   m.userData.skin = uniforms;
   return m;
 }

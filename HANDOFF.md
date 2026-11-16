@@ -1688,6 +1688,88 @@ el grabador saltea el cuadro). Pruebas: `servidor_test` (cinco casos nuevos de `
 **Nulo propio y jurado.** `check_game`, corrida «clasico»: en la segunda práctica suelta la barra arriba antes de la señal de
 bajar (NULO «antes») y verifica que la cámara va al jurado al empezar el veredicto y sigue ahí 1,8 s después, con luces rojas.
 
+### Gráficos fase 3: el look (16-nov, rama `look`, desde `prueba`)
+
+Pedido del dueño: «temas gráficos, sigue igual… me refiero a las TEXTURAS»; quiere el nivel de Saltline y pesistas «semi
+humanos reales». Nada fusionado ni publicado. La cámara en primera persona y lo de después del levantamiento van en otra rama.
+
+**Qué cambió (archivos).**
+- `web/js/game/look.js` (nuevo) — `Look`, se arma en `stage.js` después de la arena, el ambiente y las luces:
+  - *Luz de competencia* (`_luces`): sala a oscuras; clave alta y lateral (4,4; 9,3; 3,9), contraluz **cálido** ancho desde
+    atrás a la izquierda (`rimA`, el que mira a la cámara general) y frío del otro lado; relleno y luz de sala mínimos.
+    `GRADO_LOOK`: una sola gradación (saturación 0,88, sombras frías, altas cálidas, viñeta 0,36, negros firmes) para el pase
+    final de `post.js` (uniforms nuevos `uFrio`, `uCalido`, `uNegro`), el tono del camino directo y `tonoJS` de `stage.js`.
+    Menos desenfoque de fondo (`uScale` 0,45: el marcador y la sala se leen), bloom con umbral alto, bruma de sala a un tercio.
+  - *Texturas por campo* (color + altura→normales + rugosidad de la misma cuenta, ruido de valor en octavas): madera de la
+    tarima (tablas, veta, barniz gastado donde se paran, marcas y abolladuras donde caen los discos, magnesio, línea y marca
+    estarcidas y gastadas; 2048 px en computadora aunque arranque en «Baja», 1024 en teléfono), goma del escenario (motas,
+    juntas, polvo, roces brillantes), metal pintado con saltaduras y óxido, fenólico de baúl, terciado, goma de disco.
+    La madera se calcula a media resolución y la veta fina, las juntas y los rayones se componen a resolución final con el
+    lienzo 2D (por píxel a 2048 eran varios segundos de JavaScript; quedó en ~1,2 s con la Mac ocupada, 0,3 s a 1024).
+  - *Pantalla LED* con fondo oscuro y grano de píxel en el sombreador (un punto por LED, se funde con la distancia).
+  - *Utilería* (fija, se junta por material en `juntarFijos`; los discos son un dibujo instanciado): dos cajones de discos,
+    tres pilas, portabarras con tres barras, tres bancos con toalla y botella, cuatro baúles de gira, dos monitores de piso,
+    cámara de TV con trípode, caja de magnesio de madera, cuatro tendidos de cable y canaleta, calcomanías de cinta y de
+    magnesio derramado, ocho banderines ficticios, y dos paños de **pared de chapa** con columnas, caño y tablero.
+  - *Rayos de luz*: conos de bruma de la clave y de los contraluces (solo con post). Público en penumbra con luz de rebote
+    en cabeza y hombros (`uRebote` en `arena.js`).
+- `web/js/game/materiales.js` (nuevo) — **materiales como funciones GLSL por píxel** (método de Saltline): `conSuperficie(m, tipo)`
+  inyecta `superficie(P, col, rug, met)` en un material físico; de la altura que devuelve sale la normal. Tipos: `madera` y
+  `goma` (encima de sus mapas: veta fina, gránulo, magnesio y polvo por capas), `disco`, y `chapa` (toda por función: costillas
+  con un coseno, pintura en capas → base anticorrosiva → acero → óxido y chorreaduras, vetas lavadas, mugre abajo, tornillos,
+  bañadores de pared). **`USO`** (0 a 1) es el valor compartido: gradúa magnesio, polvo y óxido en todas; sube 0,03 con cada
+  barra que cae. Solo con post (`setSuperficies`); en el camino directo quedan los mapas.
+- `web/js/game/lab.js` (nuevo) — **laboratorio de materiales**: `juego.html?banco=1&lab=materiales` (esferas y paneles de
+  madera, goma, moleteado, cromo, disco, chapa, chapa roja y metal pintado bajo la luz del juego, deslizador de uso, teclas
+  1 a 5 para las vistas; piel y tela sobre el pesista). Fotos: `node tools/banco.mjs --fotos=dir --lab=materiales` (paso nuevo de `graficos.yml`).
+- **Pesistas por parámetros** (`athlete.js`): `ASPECTO` y `Athlete.setAspecto({ piel: {tono, saturacion, variacion, rugosidad,
+  sudor, brillo, dispersion}, pelo: {color}, tela: {tinte, plano, arrugas, brillo} })`: son uniforms, no compila nada, y lo que
+  no se pasa vuelve al valor por defecto (un modelo compartido no arrastra el aspecto del anterior). En el sombreador: tono de
+  piel con parches rojizos y pálidos, segundo lóbulo de transpiración en parches, menos especular de base (F0 a la mitad),
+  más dispersión en el borde de sombra, arrugas de tela en las normales visibles desde el plano general, tinte de tela y de
+  pelo. `PLANTEL[id].aspecto` en `roster.js` (Ventura y Marangi ya tienen el suyo; `JUGADOR.aspecto` si se quiere). `FINO`
+  apaga el detalle fino en «Baja» y «Móvil».
+- `barbell.js`: goma de los discos con mapa de rugosidad y relieve, y caras con roces en arco, golpes y magnesio.
+- `graficos.yml`: rama `look`, entradas `niveles` y `con_alta`, fotos del laboratorio.
+
+**Calidades.** Móvil y Baja: luz, gradación, texturas (1024/512 en teléfono), utilería, LED con grano; sin superficies por
+función, sin rayos, sin pared de chapa y sin el detalle fino del pesista. Media, Alta y Ultra: todo.
+
+**Rondas del director de arte** (un agente que solo ve capturas y las referencias de Saltline; puntaje contra Saltline = 10):
+
+| ronda | capturas | Alta | Móvil | lo peor que marcó |
+|---|---|---|---|---|
+| 1 | `scratchpad/look/r2` | 5 | 3,5 | velo lechoso y halo, desenfoque excesivo, discos grises flotando, piel plástica, luz sin dirección, polvo como nieve |
+| 2 | `scratchpad/look/r3` | 5 | 3,5 | piel de cera, cara y pelo de muñeco, marcador ilegible, fondo vacío, jueces y público maniquíes, tela lisa |
+| 3 | `scratchpad/look/r4` | 5 | 3,5 | cara de muñeco (ojos fijos, pelo casquete), público de bolos, jueces sin cara, halo en el contorno, tiza al 100 % lava todo, Móvil sin ambiente |
+
+En las tres dijo que **mejoró claramente contra el antes** («de juego de celular caricaturesco a casi realista con muñeco
+adentro») y que lo mejor es la tarima, los discos y la barra, y la composición del jurado y de la reversa. **El puntaje no
+subió de 5**: lo que lo frena ya no es la sala sino el pesista, los jueces y el público. Después de la ronda 3 se bajó otra
+vez el desenfoque y el bloom, la saturación de la piel y se aclaró la sala de «Móvil» (sin ronda nueva).
+
+**Antes y después** (rutas en el scratchpad de la sesión, `/private/tmp/claude-501/-Users-juancavidela-Desktop-tarima/65496069-74a9-4729-8e58-e719d10cf3c8/scratchpad/`):
+antes `saltline_ref/tarima_hoy.jpg`; después `look/r4/graficos-out/graficos/fotos/alta_3-4.png`, `alta_frontal.png`,
+`alta_jurado-vale.png`, `movil_3-4.png`; laboratorio `look/r4/graficos-out/graficos/lab/lab_chapa-usado.png`. Las mismas
+fotos salen de cada corrida de `graficos.yml` (artefacto `graficos-out`).
+
+**Costo.** COSTO_PENDIENTE
+
+**Límites del modelo actual que solo se resuelven en Blender** (no se tocaron mallas, poses ni esqueleto):
+- *Cara*: ojos muy abiertos y fijos, sin párpados que cierren ni ceño de esfuerzo (no hay morphs de expresión); cejas pintadas.
+- *Pelo*: capas concéntricas con alfa que se leen como casquete; hace falta pelo en tarjetas o mechones con su normal.
+- *Máscara*: `*_mask.webp` trae piel, tela y pelo (RGB, sin alfa). Zapatillas y muñequeras caen en «tela»: no se les puede
+  dar cuero, suela o toalla por separado sin un cuarto canal o un ID de material. Tampoco hay zonas (codos, rodillas, manos)
+  para enrojecer donde corresponde: la variación de tono es por ruido.
+- *Malla*: brazos y torso finos para la categoría, mancha oscura en la axila (deformación), manos con poco detalle; costuras
+  y pliegues reales de la malla van en el mapa de normales horneado, no en un mosaico.
+- Jueces y público siguen siendo modelos por código sin cara (`jueces.js`) y siluetas; los dos cargadores son cápsulas.
+
+**Pendiente / sin medir.** Cuadros por segundo reales en una placa (Mac del dueño y un teléfono): `juego.html?banco=1` antes
+y después. El tiempo de generación de texturas en un teléfono real. `USO` todavía no se guarda entre finales ni lo usa el
+juego para nada más que el aspecto. Los discos de la barra no llevan superficie por función (se mueven: haría falta espacio
+de objeto). La chapa elige su eje por derivadas: en una esfera se estira (en la pared no).
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.

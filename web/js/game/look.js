@@ -223,9 +223,9 @@ function gomaDisco(S) {
 /** Fondo de la pantalla LED: casi negro, con líneas finas y dos paneles apagados; lo brillante son los textos y las luces. */
 function ledFondo(w, h) {
   return makeCanvas(w, h, g => {
-    const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, '#0b1a22'); gr.addColorStop(.35, '#070c12'); gr.addColorStop(.65, '#0b0a0d'); gr.addColorStop(1, '#22140b'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
-    for (let i = -2; i < 26; i++) { const x = i * w / 24, calido = i >= 12; g.fillStyle = calido ? `rgba(255,150,60,${.035 + .03 * (i & 1)})` : `rgba(70,190,210,${.03 + .028 * (i & 1)})`; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + w * .012, 0); g.lineTo(x + w * .05, h); g.lineTo(x + w * .038, h); g.closePath(); g.fill(); }
-    const cg = g.createRadialGradient(w / 2, h * .62, h * .1, w / 2, h * .62, w * .32); cg.addColorStop(0, 'rgba(0,0,0,.75)'); cg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = cg; g.fillRect(0, 0, w, h);
+    const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, '#143642'); gr.addColorStop(.35, '#0c1a24'); gr.addColorStop(.65, '#1a1416'); gr.addColorStop(1, '#4a2a14'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    for (let i = -2; i < 26; i++) { const x = i * w / 24, calido = i >= 12; g.fillStyle = calido ? `rgba(255,150,60,${.08 + .06 * (i & 1)})` : `rgba(70,190,210,${.07 + .05 * (i & 1)})`; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + w * .012, 0); g.lineTo(x + w * .05, h); g.lineTo(x + w * .038, h); g.closePath(); g.fill(); }
+    const cg = g.createRadialGradient(w / 2, h * .62, h * .1, w / 2, h * .62, w * .32); cg.addColorStop(0, 'rgba(0,0,0,.55)'); cg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = cg; g.fillRect(0, 0, w, h);
     g.fillStyle = 'rgba(255,170,70,.85)'; g.fillRect(0, h * .93, w, h * .01); g.fillStyle = 'rgba(210,225,230,.5)'; g.fillRect(0, h * .952, w, h * .005);
   });
 }
@@ -320,11 +320,11 @@ export class Look {
   _luces(L) {
     L.key.position.set(4.4, 9.3, 3.9); L.key.color.set('#fff0dc'); L.key.intensity = 4.7; L.key.angle = .3; L.key.penumbra = .7;
     L.key2.color.set('#c6d6ff'); L.key2.intensity = .32;
-    L.stage.color.set('#b9c6e0'); L.stage.intensity = .75;
+    L.stage.color.set('#b9c6e0'); L.stage.intensity = 1.1;
     L.hemi.color.set('#56688a'); L.hemi.groundColor.set('#2c2016'); L.hemi.intensity = .15;
     L.wash.color.set('#8fa0c4'); L.wash.intensity = .07;
     // rimA mira a la cámara general (atrás a la izquierda): es EL contraluz, cálido y ancho (también rasa el piso)
-    L.rimA.color.set('#ffa85c'); L.rimA.intensity = 9.5; L.rimA.angle = .46; L.rimA.penumbra = .85; L.rimA.position.set(-6.3, 5.6, -4.6);
+    L.rimA.color.set('#ffa85c'); L.rimA.intensity = 6.5; L.rimA.angle = .46; L.rimA.penumbra = .85; L.rimA.position.set(-6.3, 5.6, -4.6);
     L.rimB.color.set('#9fd0ff'); L.rimB.intensity = 5.5; L.rimB.angle = .4;
     L.hair.color.set('#ffe2bc'); L.hair.intensity = 3.4;
   }
@@ -342,10 +342,10 @@ export class Look {
   /** Lo que no está bajo los focos queda en penumbra: tribunas, pabellón, cintas y telón. */
   _sala() {
     const A = this.arena, k = (m, f) => { if (m && m.color) m.color.multiplyScalar(f); };
-    if (A.crowd) { const u = A.crowd.material.uniforms; u.uGain.value = .065; if (u.uRebote) u.uRebote.value.set(.11, .075, .045); }
+    if (A.crowd) { const u = A.crowd.material.uniforms; u.uGain.value = .095; if (u.uRebote) u.uRebote.value.set(.16, .11, .065); }
     A.group.traverse(o => {
       const m = o.material; if (!m || Array.isArray(m) || !m.isMeshBasicMaterial) return;
-      if (o.geometry?.type === 'CylinderGeometry' && o.geometry.parameters.radiusTop > 30) k(m, o.geometry.parameters.height > 5 ? .75 : .5);      // pabellón y cinta de luz
+      if (o.geometry?.type === 'CylinderGeometry' && o.geometry.parameters.radiusTop > 30) k(m, o.geometry.parameters.height > 5 ? 1.25 : .6);      // pabellón y cinta de luz
       else if (o.geometry?.type === 'PlaneGeometry' && o.geometry.parameters.width === 90) m.color.set('#090a0d');                                 // piso de sala
       else if (o.geometry?.type === 'PlaneGeometry' && o.geometry.parameters.width === 17) m.color.multiply(new THREE.Color(.75, .85, 1.1));                                               // telón
     });
@@ -353,7 +353,7 @@ export class Look {
     for (const o of A.group.children) if (o.isInstancedMesh && o.material.isMeshBasicMaterial && o.geometry.type === 'BoxGeometry' && !o.material.map) k(o.material, .6);      // escalones y barandas
     // los focos del fondo: ámbar a la izquierda (acompañan al contraluz), blanco frío a la derecha; nada de rosa y celeste
     (A.beams || []).forEach((b, i) => b.mat.uniforms.uColor.value.set(i < 5 ? (i % 2 ? '#ffb469' : '#ffc890') : (i % 2 ? '#cfe0ff' : '#e9eeff')));
-    this.salaImpostor = .8;
+    this.salaImpostor = 1.7;
     // la bruma de sala (velos aditivos) lavaba los negros: a un tercio
     { const hechos = new Set(); A.group.traverse(o => { const m = o.material; if (m?.map === A.hazeTex && m.color && !hechos.has(m)) { hechos.add(m); m.color.multiplyScalar(.3); } }); }
     if (this.ambiente?.uPolvo) this.ambiente.uPolvo.uTam.value = .0045;
@@ -487,7 +487,7 @@ export class Look {
     setSuperficies(!Q.directo); FINO.value = Q.directo ? 0 : 1;
     // en el camino directo la pared de chapa (material físico en mucha pantalla) no se dibuja: queda el telón, como antes
     this.arena.group.traverse(o => { if (o.material === this.chapaMat) o.visible = !Q.directo; });
-    BOKEH.uScale.value = Q.directo ? .3 : .45;      // luces de fondo: puntos con halo en el camino directo (eran discos grises), bokeh moderado con post      // superficies por función solo con post
+    BOKEH.uScale.value = Q.directo ? .12 : .18;      // luces de fondo: puntos con halo en el camino directo (eran discos grises), bokeh moderado con post      // superficies por función solo con post
     const A = Q.amb || {}, k = A.rayos ?? 1; this.group.visible = !Q.directo && !!Q.beams && k > 0;
     for (const r of this.rayos || []) r.mat.uniforms.uFuerza.value = r.base * k;
     const imp = this.arena.impostors; if (imp && !imp.userData.look) { imp.userData.look = true; imp.traverse(o => { if (o.material?.color) o.material.color.multiplyScalar(this.salaImpostor || 1); }); }
@@ -497,9 +497,9 @@ export class Look {
     const u = p.finalMat.uniforms, G = GRADO_LOOK;
     u.toneMappingExposure.value = G.exp; u.uSat.value = G.sat; u.uContrast.value = G.con; u.uShadowGamma.value = G.gam; u.uVignette.value = G.vin;
     u.uFrio.value.set(...G.frio); u.uCalido.value.set(...G.calido); u.uNegro.value = G.negro; u.uGrain.value = .028;
-    if (p.bloom) { p.bloom.strength = .1; p.bloom.radius = .35; p.bloom.threshold = 2.4; }
+    if (p.bloom) { p.bloom.strength = .08; p.bloom.radius = .3; p.bloom.threshold = 2.6; }
     // menos desenfoque de fondo que la transmisión de antes: la sala (utilería, chapa, público) tiene que leerse
-    for (const m of [p.dofPre, p.dofBlur, p.mixMat]) if (m?.uniforms.uScale) m.uniforms.uScale.value = .45;
+    for (const m of [p.dofPre, p.dofBlur, p.mixMat]) if (m?.uniforms.uScale) m.uniforms.uScale.value = .18;
     if (p.mixMat) p.mixMat.uniforms.uBloomClamp.value = 7;
   }
   update(dt) { if (!this.reduce) this.T.value += dt; }
