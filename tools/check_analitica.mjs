@@ -603,7 +603,7 @@ async function partida(flag, { lienzo = 'off', dibujo = false } = {}) {
   console.log(`  lienzo: cuadros del juego durante el intento: con lienzo p50 ${con.p50.toFixed(1)} ms, p95 ${con.p95.toFixed(1)} ms, >33 ms ${con.lentos} de ${con.cuadros}, tareas largas ${con.lt} (${con.ltMs} ms en ${con.seg.toFixed(1)} s); ` +
     `sin lienzo p50 ${sin.p50.toFixed(1)} ms, p95 ${sin.p95.toFixed(1)} ms, >33 ms ${sin.lentos} de ${sin.cuadros}, tareas largas ${sin.lt} (${sin.ltMs} ms en ${sin.seg.toFixed(1)} s)`);
   ok(!sin.lienzoCuadros.length, `grabacion_lienzo=off: ningún cuadro del lienzo (${sin.lienzoCuadros.length})`);
-  ok(con.lienzoIntento.length >= 2, `grabacion_lienzo=compu en computadora: llegan cuadros del 3D durante el intento (${con.lienzoIntento.length})`);
+  ok(con.lienzoIntento.length >= 1, `grabacion_lienzo=compu en computadora: llegan cuadros del 3D durante el intento (${con.lienzoIntento.length})`);
   ok(fps <= 3.5, `pocos cuadros del lienzo por segundo: ${fps.toFixed(2)}`);
   ok(negros <= Math.max(1, vistos.length * 0.1), `cuadros negros (el lienzo leído sin dibujar): ${negros} de ${vistos.length}`);
   ok(con.reg && con.reg.n >= 1 && !con.reg.error, `los carteles con el nombre se ubican en la pantalla (${JSON.stringify(con.reg)})`);

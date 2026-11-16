@@ -877,8 +877,8 @@ igual([dominioReferente('https://l.instagram.com/?u=secreto'), dominioReferente(
     const r = regionesLienzo(lienzo, escena());
     const [u0, u1, v0, v1] = ZONAS_NOMBRE.led;
     ok(r.length === 2 && r[0].x < 500 + 100 * (u0 * 2 - 1) && r[0].x + r[0].width >= 500 + 100 * (u1 * 2 - 1) && r[0].y < 400 + 200 * v0 + 1 && r[0].y + r[0].height > 400 + 200 * v1,
-      `LED: la caja derecha (quién levanta) tapada (${JSON.stringify(r[0])})`);
-    ok(r[1].x <= 300 && r[1].x + r[1].width >= 400, `tablero del costado tapado entero (${JSON.stringify(r[1])})`);
+      `LED: la línea del nombre de la caja derecha tapada (${JSON.stringify(r[0])})`);
+    ok(r[1].x <= 300 && r[1].x + r[1].width >= 400, `tablero del costado: la línea del nombre tapada de lado a lado (${JSON.stringify(r[1])})`);
     igual(regionesLienzo(lienzo, escena({ reflejo: { activo: true, y: 0 } })).length, 4, 'con el reflejo de la tarima prendido: también los carteles reflejados');
     igual(regionesLienzo({ id: 'ayudas', clientWidth: 10, clientHeight: 10 }, null), [], 'las ayudas no tienen nombres');
     const tira = (fn, m) => { let t = false; try { fn(); } catch { t = true; } ok(t, m); };

@@ -74,11 +74,14 @@ export const LIENZO = { fps: 3, calidad: 0.4, ancho: 640 };
 export const escalaLienzo = anchoCss => (Number.isFinite(anchoCss) && anchoCss > 0 ? Math.max(0.1, Math.min(1, LIENZO.ancho / anchoCss)) : 0.5);
 
 /**
- * Carteles del 3D que pueden mostrar el nombre del jugador, como rectángulos de su textura (u de izquierda a derecha,
- * v de arriba abajo, con un margen): la caja derecha de la pantalla LED (ambiente.js, _led: quién levanta, kilos, país)
- * y el tablero del costado entero (arena.js, _drawBoard). Si cambian esos dibujos, cambia esto.
+ * Dónde se escribe el nombre de quien levanta en los carteles del 3D, como rectángulos de su textura (u de izquierda a
+ * derecha, v de arriba abajo, con un margen): en la pantalla LED, la línea del nombre de la caja derecha (ambiente.js,
+ * _led: centro en 0,18 del alto, letra de 0,15, alineado a la derecha desde 0,978 del ancho y hasta 0,25 de ancho) y en
+ * el tablero del costado, la línea del nombre (arena.js, _drawBoard: centro en 228 de 640 px, letra de 64, desde x 34).
+ * Solo la línea: los kilos, el país y el pesista quedan a la vista (un rectángulo grande taparía al levantador). Si
+ * cambian esos dibujos, cambia esto.
  */
-export const ZONAS_NOMBRE = { led: [0.68, 1, 0.02, 0.68], tablero: [0, 1, 0, 1] };
+export const ZONAS_NOMBRE = { led: [0.70, 1, 0.07, 0.29], tablero: [0, 1, 0.28, 0.44] };
 const tableros = new WeakMap();
 function mallasConNombre(A) {
   if (!A?.pantalla?.geometry) throw new Error('sin pantalla LED');
