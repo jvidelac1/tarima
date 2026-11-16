@@ -1752,8 +1752,11 @@ línea del pelo, cejas, deformación en flexión (codo, rodilla), manos, postura
   reconstruyeron con este commit, y si su `chestU` sale menor, su `check()` también cambia.
 - Alternativa que no toca `check()`: rama `plantel-alt-capsula` (commit «EXPERIMENTO», no fusionar): cápsula vieja
   (`TARIMA_CHESTU=0`) y la barra desviada hacia adelante por regla en la entrada y la salida del rack (`TARIMA_ALTPUSH=1`).
-  Corrida **43874816087** (halvard, completo): quedó en curso al cerrar, **sin resultado y sin comparar**. Para comparar:
-  líneas `CHK`, `BAD`, `PUSH` y `TRAJ` de su log contra las de 43827465589.
+  Corrida **43874816087** (halvard, completo), leída del log después del cierre: **no sirve tal como está, 9 BAD** (contra 10
+  sin nada y 0 con `chestU`). Para esquivar la cápsula vieja la barra tiene que irse adelante hasta 8,6 cm al entrar al rack
+  (Giro de codos→Recepción) y 6,1 a 8,2 cm al salir (Impulso→Empuje), y aun así quedan 8 cuadros barra-cuerpo (en ellos la
+  malla real está a 3,2 a 8,3 cm) y aparece un zigzag de barra de 1,09 m/s en el squat jerk. No se miraron sus hojas. Es un
+  solo intento de alternativa, no prueba que no exista otra.
 
 **Límite conocido.** Con el antebrazo más largo que el brazo (más de 0,51) el codo no llega al rack y `check()` lo marca.
 
