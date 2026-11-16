@@ -287,7 +287,7 @@ function conCuero(sh, U) {
   Object.assign(sh.uniforms, U);
   sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n#ifndef USE_UV1\nattribute vec2 uv1;\n#endif\nvarying vec2 vCuero;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvCuero = uv1;');
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D tCuero; uniform float uCuero; varying vec2 vCuero;')
-    .replace('#include <alphatest_fragment>', 'if ( uCuero > 0.5 ) diffuseColor.a *= smoothstep( 0.06, 0.3, texture2D( tCuero, vCuero, 1.5 ).b );\n#include <alphatest_fragment>');
+    .replace('#include <alphatest_fragment>', 'if ( uCuero > 0.5 ) diffuseColor.a = min( 1.0, diffuseColor.a * 1.5 ) * smoothstep( 0.5, 0.92, texture2D( tCuero, vCuero, 2.5 ).b );\n#include <alphatest_fragment>');
 }
 function hairMaterial(src, mask, uv1) {
   const U = { tCuero: { value: mask || null }, uCuero: { value: mask && uv1 ? 1 : 0 } }; src.userData.cuero = U;
@@ -301,7 +301,7 @@ function hairMaterial(src, mask, uv1) {
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.2; material.specularColorBlended *= 0.2;')
       .replace('#include <lights_physical_pars_fragment>', '#include <lights_physical_pars_fragment>\n' + HAIR_PARS);
   };
-  src.customProgramCacheKey = () => 'tarima-hair-6';
+  src.customProgramCacheKey = () => 'tarima-hair-7';
   return src;
 }
 /** Color medio (lineal) de las hebras opacas de la textura de pelo. */
@@ -341,7 +341,7 @@ function hairColor(tex, out) {
 }
 function hairDepthMaterial(src) {
   const m = new THREE.MeshBasicMaterial({ name: 'HairDepth', map: src.map, alphaTest: .45, colorWrite: false, depthWrite: true, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
-  if (src.userData.cuero) { m.onBeforeCompile = sh => conCuero(sh, src.userData.cuero); m.customProgramCacheKey = () => 'tarima-hairdepth-3'; }
+  if (src.userData.cuero) { m.onBeforeCompile = sh => conCuero(sh, src.userData.cuero); m.customProgramCacheKey = () => 'tarima-hairdepth-4'; }
   return m;
 }
 function lashMaterial(src) {
