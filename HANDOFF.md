@@ -2116,6 +2116,16 @@ luces ni veredicto, brazos en T y «soldado» igual en válido y nulo. Lo que ca
   2 cm o 0,2°. Brazos: con la barra soltada desde arriba **barren por delante** (`BARRIDO`, `_gesto`), ya no desandan el clip
   (codos altos y cruz). **Gesto por regla** (`GESTO`): válido = dos puños que marcan dos veces y vuelven a colgar; nulo o
   fallo = cabeza que cae, hombros vencidos y negación.
+- **Soltar la barra como en una tarima de verdad** (pedido del dueño, 16-nov a la noche; `caida.js`: `GUIA`, `BarraGuiada`;
+  `stage.js`: `_manosEnBarra`). Levantamiento terminado (válido o nulo de los jueces): la barra **baja en las manos** por
+  delante, de arriba de la cabeza al pecho (0,5 s, cada vez más rápido; 30 cm delante de los hombros y 14 cm debajo), los
+  brazos se resuelven con dos huesos para que la muñeca vaya junto a la barra (codo hacia afuera y abajo); ahí se suelta
+  hacia adelante con la velocidad que traía, las manos quedan abiertas al frente 0,16 s y cuelgan en 0,45 s; **paso corto
+  hacia atrás** (11 cm, con un saltito) mientras cae. La barra rebota (coeficiente 0,32: ~10 % de la altura), rueda y
+  flexiona con el golpe (`barbell.step`, ya estaba), con sonido y temblor. Después, el gesto. Fallo con la barra arriba:
+  como antes, sale lejos y el pesista salta atrás (adelante) o sale adelante (atrás); los brazos esperan 0,42 s y barren por
+  delante con el codo doblado (`BARRIDO`). `check_escenas` (holgura barra-cuerpo) en verde: los brazos se miden desde 0,25 s
+  después de que las manos sueltan.
 - Hojas: `finalEn` prende las luces y el veredicto como el juego; `check_pov --solo=claves --q=alta --plantel=…` saca las
   fases clave con calidad alta y el plantel nuevo (`out/pov_alta`); `check_barra --solo=tel_en --camara=pov` el teléfono.
 Medido en la última corrida (43949153444, `check_pov` en verde): mirada fija en −9° en los cinco segmentos y los dos modelos
