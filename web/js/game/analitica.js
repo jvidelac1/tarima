@@ -14,8 +14,11 @@
 //   `encuesta_salteada`; las respuestas las manda el Worker como `encuesta_respuesta` (sin el correo).
 // - Grabación de sesión (6.6): solo en una parte de las cargas, según la bandera `grabacion` (off · tercio · todas),
 //   decidido una vez por carga, que con la persistencia en memoria es una sesión de PostHog. Graba la página (paneles,
-//   botones, textos, toques), nunca el lienzo 3D; los campos van tapados y el texto que tenga el nombre del jugador o
-//   una «@» también. Los nodos que cambian en cada cuadro (la señal del intento) quedan fuera (BLOQUEO_GRABACION).
+//   botones, textos, toques); los campos van tapados y el texto que tenga el nombre del jugador o una «@» también. Los
+//   nodos que cambian en cada cuadro (la señal del intento) quedan fuera (BLOQUEO_GRABACION).
+//   El lienzo 3D (LIF-45), según la bandera `grabacion_lienzo` (off · compu · todas): a LIENZO.fps cuadros por segundo,
+//   chicos y en WebP de baja calidad, con negro encima de los carteles del 3D que pueden mostrar el nombre del jugador (la
+//   pantalla LED y el tablero del costado, regionesLienzo). Si no se pueden ubicar, el cuadro no se graba.
 //   Sin medición no hay grabación. El grabador (web/vendor/posthog/lazy-recorder.js) se descarga solo si se graba.
 //
 // Uso (lo conecta main.js):
@@ -41,7 +44,7 @@ export const EVENTOS = new Set([
   'escena_visible', 'carga_fallida',
 ]);
 
-export const BANDERAS = { 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio' };
+export const BANDERAS = { 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio', grabacion_lienzo: 'compu' };
 
 /** Qué parte de las cargas se graba según la bandera `grabacion` (worker/src/reglas.js). Un valor desconocido no graba. */
 export const GRABACION = { off: 0, tercio: 1 / 3, todas: 1 };
@@ -53,6 +56,118 @@ export const proporcionGrabacion = v => (typeof v === 'string' && Object.hasOwn(
  * Así el grabador no procesa una mutación por cuadro mientras se levanta.
  */
 export const BLOQUEO_GRABACION = 'canvas, #senal, #acuse, #depura';
+/** Lo mismo cuando se graba el lienzo: el 3D (#gl) y las ayudas que van encima (#ayudas, transparente) se graban. */
+export const BLOQUEO_GRABACION_LIENZO = '#senal, #acuse, #depura';
+
+/**
+ * Bandera `grabacion_lienzo` (solo en las cargas que se graban): `off` nunca, `compu` solo sin pantalla táctil
+ * (`pointer: coarse`, la misma regla que la propiedad `tactil`), `todas` también en teléfonos. Un valor desconocido no graba.
+ */
+export const GRABACION_LIENZO = ['off', 'compu', 'todas'];
+export const grabaLienzo = (v, tactil) => v === 'todas' || (v === 'compu' && !tactil);
+
+/**
+ * Cuadros del lienzo: `fps` por segundo, WebP con `calidad`, y `ancho` px CSS como mucho (escala de la captura sobre el
+ * tamaño del lienzo en la página; el grabador la acota entre 0,1 y 1). Medido en docs/MVP.md 6.6.
+ */
+export const LIENZO = { fps: 3, calidad: 0.4, ancho: 640 };
+export const escalaLienzo = anchoCss => (Number.isFinite(anchoCss) && anchoCss > 0 ? Math.max(0.1, Math.min(1, LIENZO.ancho / anchoCss)) : 0.5);
+
+/**
+ * Carteles del 3D que pueden mostrar el nombre del jugador, como rectángulos de su textura (u de izquierda a derecha,
+ * v de arriba abajo, con un margen): la caja derecha de la pantalla LED (ambiente.js, _led: quién levanta, kilos, país)
+ * y el tablero del costado entero (arena.js, _drawBoard). Si cambian esos dibujos, cambia esto.
+ */
+export const ZONAS_NOMBRE = { led: [0.68, 1, 0.02, 0.68], tablero: [0, 1, 0, 1] };
+const tableros = new WeakMap();
+function mallasConNombre(A) {
+  if (!A?.pantalla?.geometry) throw new Error('sin pantalla LED');
+  const out = [[A.pantalla, ZONAS_NOMBRE.led]];
+  if (A.boardTex) {
+    let t = tableros.get(A);
+    if (!t) { A.group?.traverse?.(o => { if (!t && o.isMesh && o.material?.map === A.boardTex) t = o; }); if (t) tableros.set(A, t); }
+    if (!t) throw new Error('sin tablero');
+    out.push([t, ZONAS_NOMBRE.tablero]);
+  }
+  return out;
+}
+
+/**
+ * Rectángulo de la pantalla (px CSS del lienzo, el sistema de canvasCapture.maskRegionsFn) que cubre una zona de un plano
+ * de three (PlaneGeometry, z = 0 en su espacio). Matrices de three (columnas). `espejoY`: la zona reflejada en el plano
+ * y = espejoY (el reflejo de la tarima). null si queda toda detrás de la cámara; todo el lienzo si queda en parte.
+ */
+export function rectanguloDeZona({ mundo, vista, proyeccion, w, h, zona: [u0, u1, v0, v1], ancho, alto, espejoY = null, margen = 0.08 }) {
+  const M = mundo, V = vista, P = proyeccion;
+  const xs = [], ys = [];
+  let detras = 0;
+  for (const [u, v] of [[u0, v0], [u1, v0], [u0, v1], [u1, v1]]) {
+    const lx = (u - 0.5) * w, ly = (0.5 - v) * h;
+    let x = M[0] * lx + M[4] * ly + M[12], y = M[1] * lx + M[5] * ly + M[13];
+    const z = M[2] * lx + M[6] * ly + M[14];
+    if (espejoY !== null) y = 2 * espejoY - y;
+    const cx = V[0] * x + V[4] * y + V[8] * z + V[12], cy = V[1] * x + V[5] * y + V[9] * z + V[13], cz = V[2] * x + V[6] * y + V[10] * z + V[14], cw = V[3] * x + V[7] * y + V[11] * z + V[15];
+    const px = P[0] * cx + P[4] * cy + P[8] * cz + P[12] * cw, py = P[1] * cx + P[5] * cy + P[9] * cz + P[13] * cw, pw = P[3] * cx + P[7] * cy + P[11] * cz + P[15] * cw;
+    if (!(pw > 1e-6)) { detras++; continue; }
+    xs.push((px / pw + 1) / 2 * ancho); ys.push((1 - py / pw) / 2 * alto);
+  }
+  if (detras === 4) return null;
+  if (detras) return { x: 0, y: 0, width: ancho, height: alto };
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const mx = (x1 - x0) * margen + 2, my = (y1 - y0) * margen + 2;
+  const a = Math.max(0, Math.floor(x0 - mx)), b = Math.min(ancho, Math.ceil(x1 + mx)), c = Math.max(0, Math.floor(y0 - my)), d = Math.min(alto, Math.ceil(y1 + my));
+  if (!(b > a && d > c)) return null;
+  return { x: a, y: c, width: b - a, height: d - c };
+}
+
+/**
+ * canvasCapture.maskRegionsFn: lo que se tapa en cada cuadro del lienzo. Para #gl, los carteles con el nombre (y su
+ * reflejo en la tarima cuando está prendido), proyectados con la cámara del último cuadro dibujado; los otros lienzos
+ * (las ayudas) no tienen nombres. Tira si no encuentra la escena o los carteles: el grabador entonces saltea el cuadro.
+ * `fresco()` (vigiaCuadros) dice si en este cuadro se dibujó: sin preserveDrawingBuffer, un cuadro sin dibujar se
+ * leería negro, así que también se saltea.
+ */
+export function regionesLienzo(canvas, escena, fresco = () => true) {
+  if (!canvas || canvas.id !== 'gl') return [];
+  const cam = escena?.rig?.camera;
+  if (!cam?.projectionMatrix?.elements || !cam.matrixWorldInverse?.elements) throw new Error('sin cámara');
+  const attrs = escena.renderer?.getContext?.()?.getContextAttributes?.();
+  if (attrs && attrs.preserveDrawingBuffer === false && !fresco()) throw new Error('cuadro sin dibujar');
+  const ancho = canvas.clientWidth || canvas.width, alto = canvas.clientHeight || canvas.height;
+  const espejos = [null];
+  if (escena.reflejo?.activo) espejos.push(Number.isFinite(escena.reflejo.y) ? escena.reflejo.y : 0);
+  const out = [];
+  for (const [malla, zona] of mallasConNombre(escena.arena)) {
+    const p = malla.geometry.parameters;
+    if (!p || !(p.width > 0) || !(p.height > 0) || !malla.matrixWorld?.elements) throw new Error('cartel sin medidas');
+    if (malla.visible === false) continue;
+    for (const espejoY of espejos) {
+      const r = rectanguloDeZona({ mundo: malla.matrixWorld.elements, vista: cam.matrixWorldInverse.elements, proyeccion: cam.projectionMatrix.elements, w: p.width, h: p.height, zona, ancho, alto, espejoY });
+      if (r) out.push(r);
+    }
+  }
+  return out;
+}
+
+/**
+ * Si en el cuadro de ahora se dibujó el 3D (three cuenta los render en renderer.info.render.frame). Un requestAnimationFrame
+ * propio, pedido antes de posthog.init: corre después del bucle del juego (pedido antes) y antes del grabador (pedido
+ * después), así que ve el render de este cuadro. Solo importa si el lienzo no conserva su imagen (preserveDrawingBuffer).
+ */
+export function vigiaCuadros(ventana, escena = () => ventana?.JUEGO?.escena) {
+  const raf = ventana?.requestAnimationFrame?.bind(ventana), ahora = () => ventana?.document?.timeline?.currentTime ?? null;
+  if (!raf) return { fresco: () => true, parar() {} };
+  let antes = null, dibujado = null, vivo = true;
+  const mirar = () => {
+    if (!vivo) return;
+    raf(mirar);
+    const n = escena()?.renderer?.info?.render?.frame;
+    dibujado = n !== undefined && n !== antes ? ahora() : dibujado;
+    antes = n;
+  };
+  raf(mirar);
+  return { fresco: () => { const t = ahora(); return t === null || (dibujado !== null && dibujado === t); }, parar() { vivo = false; } };
+}
 
 /** Campos de la página cuyo valor es el nombre del jugador mientras lo escribe (bienvenida y editor del teléfono). */
 const CAMPOS_NOMBRE = ['nombre', 'editor-campo'];
@@ -232,6 +347,7 @@ export function crearAnalitica(o = {}) {
   let flags = { ...BANDERAS };
   let anonimo = null;
   let grabar = false;
+  let lienzo = false, vigia = null;
   const cola = [];
   const avisados = new Set();
   // súper propiedades del juego (hoy, `dificultad`): van en todos los eventos desde que se fijan, también en window.JUEGO.eventos
@@ -297,11 +413,16 @@ export function crearAnalitica(o = {}) {
     // Grabación: se sortea una vez por carga. El grabador va antes de init (si no, posthog-js lo pediría a /static/).
     const p = proporcionGrabacion(flags.grabacion);
     grabar = p > 0 && azar() < p;
+    const tactil = !!(ventana.matchMedia && ventana.matchMedia('(pointer: coarse)').matches);
+    // El lienzo, en una parte de las cargas grabadas. El grabador lo necesita (si no, lo apaga solo): OffscreenCanvas y createImageBitmap.
+    lienzo = grabar && grabaLienzo(flags.grabacion_lienzo, tactil) && typeof ventana.OffscreenCanvas === 'function' && typeof ventana.createImageBitmap === 'function';
     try {
       [ph] = await Promise.all([cargar(), grabar ? cargarGrabador().catch(() => { grabar = false; }) : null]);
       // Si mientras se descargaba se apagó la medición (apagar() o el interruptor en otra pestaña), no se arranca.
-      if (estado !== 'esperando' || apagadaPorUsuario()) { grabar = false; if (estado === 'esperando') apagar(); return false; }
-      if (grabar) configGrabacionRemota(ventana, clave);
+      if (estado !== 'esperando' || apagadaPorUsuario()) { grabar = false; lienzo = false; if (estado === 'esperando') apagar(); return false; }
+      lienzo = lienzo && grabar;
+      if (grabar) configGrabacionRemota(ventana, clave, lienzo);
+      if (lienzo) vigia = vigiaCuadros(ventana);      // antes de init: su cuadro va antes que el del grabador
       const banderasProps = Object.fromEntries(Object.entries(flags).map(([k, v]) => [`$feature/${k}`, String(v)]));
       ph.init(clave, {
         api_host: origen + (m.host || '/qx'),
@@ -321,17 +442,20 @@ export function crearAnalitica(o = {}) {
         // Y en $current_url, los click-ids (fbclid, gclid, ttclid…) van como «<masked>».
         mask_personal_data_properties: true,
         enable_recording_console_log: false,
-        session_recording: opcionesGrabacion(() => nombresDelJugador()),
+        session_recording: opcionesGrabacion(() => nombresDelJugador(), lienzo ? {
+          escala: escalaLienzo(ventana.innerWidth),
+          regiones: c => regionesLienzo(c, ventana.JUEGO?.escena, vigia.fresco),
+        } : null),
       });
       ph.register(limpiarProps({
         idioma, idioma_origen, version,
-        tactil: !!(ventana.matchMedia && ventana.matchMedia('(pointer: coarse)').matches),
+        tactil,
         pais: est?.contexto?.pais ?? null, previas: est?.contexto?.previas ?? null, dias: est?.contexto?.dias ?? null,
         jugador: /^d_[0-9a-f]{16}$/.test(est?.contexto?.jugador ?? '') ? est.contexto.jugador : null,
         fuente_trafico: fuenteTrafico(buscar, referente, origen), referente: dominioReferente(referente, origen) || null,
         app_navegador: appNavegador(ventana.navigator?.userAgent),
         ...campania(buscar),
-        pantalla, grabada: grabar, gratis_etapa: est?.regla?.etapa ?? null, ...banderasProps,
+        pantalla, grabada: grabar, grabada_lienzo: lienzo, gratis_etapa: est?.regla?.etapa ?? null, ...banderasProps,
         // Sin IP del jugador (el proxy no la manda), PostHog ubicaría a todos en el país del servidor de Cloudflare: el país real va en `pais`.
         $geoip_disable: true,
       }));
@@ -340,6 +464,7 @@ export function crearAnalitica(o = {}) {
       try { ventana.addEventListener?.('storage', e => { if (e?.key === 'tarima.medicion' && e.newValue === '0') apagar(); }); } catch { /* nada */ }
     } catch {
       grabar = false;
+      vigia?.parar(); vigia = null; lienzo = false;
       apagar();
       return false;
     }
@@ -358,6 +483,7 @@ export function crearAnalitica(o = {}) {
   function apagar() {
     if (grabar && ph) { try { ph.stopSessionRecording(); } catch { /* nada */ } }
     grabar = false;
+    lienzo = false; vigia?.parar(); vigia = null;
     estado = 'apagada';
     cola.length = 0;
   }
@@ -372,6 +498,8 @@ export function crearAnalitica(o = {}) {
   const activa = () => estado === 'activa';
   /** true si esta carga se graba (sorteada, con medición y con el grabador cargado). */
   const grabando = () => estado === 'activa' && grabar;
+  /** true si además se graba el lienzo 3D (bandera `grabacion_lienzo`). */
+  const grabandoLienzo = () => grabando() && lienzo;
   const bandera = nombre => flags[nombre] ?? BANDERAS[nombre] ?? null;
 
   /** Id para el campo `sesion` del Worker: el de PostHog si hay medición, si no uno al azar de esta carga. */
@@ -437,23 +565,28 @@ export function crearAnalitica(o = {}) {
 
   return {
     get estado() { return estado; },
-    ev, identificar, visita, propiedades, iniciar, apagar, activa, grabando, bandera, idSesion, encuestaVista, encuestaCerrada, consentir,
+    ev, identificar, visita, propiedades, iniciar, apagar, activa, grabando, grabandoLienzo, bandera, idSesion, encuestaVista, encuestaCerrada, consentir,
     desactivarMedicion, activarMedicion, medicionActivada, instalarErrores,
   };
 }
 
 /**
  * Opciones de `session_recording` de posthog-js. Lo del cliente gana sobre lo que diga el proyecto de PostHog, así que
- * aunque alguien prenda ahí el lienzo o afloje el enmascarado, acá sigue apagado y tapado.
+ * aunque alguien prenda ahí el lienzo o afloje el enmascarado, acá manda esto. `lienzo` (null: sin lienzo):
+ * {escala, regiones(canvas)} para grabar el 3D a LIENZO.fps con los carteles del nombre tapados.
  */
-export function opcionesGrabacion(nombres = () => []) {
+export function opcionesGrabacion(nombres = () => [], lienzo = null) {
+  const conLienzo = !!(lienzo && typeof lienzo.regiones === 'function');
   return {
     maskAllInputs: true,                          // mail, nombre, respuesta libre: siempre «***»
     maskTextSelector: '*',                        // todo texto pasa por maskTextFn…
     maskTextFn: texto => taparTexto(texto, nombres()),   // …que tapa solo lo del jugador
     maskAttributeFn: (atributo, valor) => taparAtributo(atributo, valor, nombres()),   // value, data-v del correo sugerido…
-    blockSelector: BLOQUEO_GRABACION,
-    captureCanvas: { recordCanvas: false },       // nunca el 3D: le quitaría fluidez al juego
+    blockSelector: conLienzo ? BLOQUEO_GRABACION_LIENZO : BLOQUEO_GRABACION,
+    // el 3D: pocos cuadros, chicos y en baja calidad (sin él, recordCanvas false: aunque el proyecto lo prenda)
+    captureCanvas: conLienzo ? { recordCanvas: true, canvasFps: LIENZO.fps, canvasQuality: LIENZO.calidad } : { recordCanvas: false },
+    // con maskRegionsFn el grabador tampoco pone la imagen del lienzo sin tapar en las instantáneas completas
+    ...(conLienzo ? { canvasCapture: { resolutionScale: lienzo.escala ?? 0.5, maskRegionsFn: lienzo.regiones } } : {}),
     recordHeaders: false, recordBody: false,      // nada de la red
     recordCrossOriginIframes: false,
     collectFonts: false,
@@ -463,16 +596,17 @@ export function opcionesGrabacion(nombres = () => []) {
 /**
  * Configuración «remota» de la grabación puesta a mano antes de init. Con advanced_disable_flags posthog-js no pide la
  * configuración del proyecto; la toma de window._POSTHOG_REMOTE_CONFIG (como el array.js de cada proyecto). Sin flags
- * ni compresión extra, sin consola, sin red y sin lienzo. Las grabaciones van a /qx/s/.
+ * ni compresión extra, sin consola y sin red; el lienzo solo con `lienzo` (lo mismo que dice opcionesGrabacion, que gana).
+ * Las grabaciones van a /qx/s/.
  */
-export function configGrabacionRemota(ventana, clave) {
+export function configGrabacionRemota(ventana, clave, lienzo = false) {
   if (!ventana) return;
   const previo = ventana._POSTHOG_REMOTE_CONFIG && typeof ventana._POSTHOG_REMOTE_CONFIG === 'object' ? ventana._POSTHOG_REMOTE_CONFIG : {};
   ventana._POSTHOG_REMOTE_CONFIG = {
     ...previo,
     [clave]: { config: {
       hasFeatureFlags: false, capturePerformance: false, autocapture_opt_out: true, heatmaps: false, surveys: false,
-      sessionRecording: { endpoint: '/s/', recordCanvas: false, consoleLogRecordingEnabled: false, networkPayloadCapture: { recordHeaders: false, recordBody: false } },
+      sessionRecording: { endpoint: '/s/', recordCanvas: !!lienzo, ...(lienzo ? { canvasFps: LIENZO.fps, canvasQuality: String(LIENZO.calidad) } : {}), consoleLogRecordingEnabled: false, networkPayloadCapture: { recordHeaders: false, recordBody: false } },
     } },
   };
 }

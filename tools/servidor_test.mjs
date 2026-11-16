@@ -18,7 +18,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crearServidor, expDelPase, etapaDelPase, pareceCorreo, sugerirCorreo, CONSENTIMIENTO } from '../web/js/game/servidor.js';
-import { crearAnalitica, nombreVisible, limpiarProps, fuenteTrafico, dominioReferente, campania, campaniaInicial, UTM, detalleError, proporcionGrabacion, taparTexto, taparAtributo, BLOQUEO_GRABACION, BANDERAS } from '../web/js/game/analitica.js';
+import { crearAnalitica, nombreVisible, limpiarProps, fuenteTrafico, dominioReferente, campania, campaniaInicial, UTM, detalleError, proporcionGrabacion, taparTexto, taparAtributo, BLOQUEO_GRABACION, BANDERAS,
+  BLOQUEO_GRABACION_LIENZO, grabaLienzo, LIENZO, escalaLienzo, rectanguloDeZona, regionesLienzo, vigiaCuadros, opcionesGrabacion, ZONAS_NOMBRE } from '../web/js/game/analitica.js';
 import { reenviar } from '../functions/_reenviar.js';
 import { onRequest as raiz } from '../functions/index.js';
 import { VERSIONES_CONSENTIMIENTO } from '../worker/src/reglas.js';
@@ -68,7 +69,7 @@ const base = o => crearServidor({ host: 'liftinggame.pages.dev', buscar: '', esp
 
 // ---------- 1. servidor.js ----------
 
-igual(CONSENTIMIENTO, '2026-11-f', 'versión del consentimiento');
+igual(CONSENTIMIENTO, '2026-11-g', 'versión del consentimiento');
 ok(VERSIONES_CONSENTIMIENTO.has(CONSENTIMIENTO), 'el Worker acepta la versión que manda el juego');
 ok(['2026-11-a', '2026-11-b', '2026-11-c', '2026-11-d', '2026-11-e'].every(v => VERSIONES_CONSENTIMIENTO.has(v)), 'el Worker sigue aceptando las versiones anteriores');
 {
@@ -782,14 +783,14 @@ igual([dominioReferente('https://l.instagram.com/?u=secreto'), dominioReferente(
   ok(/\bcanvas\b/.test(BLOQUEO_GRABACION) && /#senal\b/.test(BLOQUEO_GRABACION), 'bloqueo: los lienzos y la señal del intento');
 
   // Arma una analítica con PostHog y grabador falsos. `orden` anota qué se cargó y cuándo se llamó init.
-  const armar = ({ grabacion, azar = () => 0, local = new Mem(), falla = false, documento = null, search = '' } = {}) => {
+  const armar = ({ grabacion, lienzo, extra = {}, azar = () => 0, local = new Mem(), falla = false, documento = null, search = '' } = {}) => {
     const ph = posthogFalso(), orden = [];
     const ini = ph.init; ph.init = function (k, c) { orden.push('init'); return ini.call(this, k, c); };
-    const v = { ...ventanaFalsa({ search }), document: documento };
+    const v = { ...ventanaFalsa({ search }), document: documento, ...extra };
     let tiradas = 0;
     const a = crearAnalitica({ ventana: v, local, sesion: new Mem(), cargar: async () => { orden.push('posthog'); return ph; },
       cargarGrabador: async () => { orden.push('grabador'); if (falla) throw new Error('no'); }, azar: () => { tiradas++; return azar(); } });
-    const est = { ...ESTADO, flags: grabacion === undefined ? { 'muro-texto': 'b' } : { 'muro-texto': 'b', grabacion } };
+    const est = { ...ESTADO, flags: { 'muro-texto': 'b', ...(grabacion === undefined ? {} : { grabacion }), ...(lienzo === undefined ? {} : { grabacion_lienzo: lienzo }) } };
     return { a, ph, v, orden, est, tiradas: () => tiradas, cfg: () => ph.llamadas.find(l => l[0] === 'init')?.[2], reg: () => ph.llamadas.find(l => l[0] === 'register')?.[1] };
   };
   {
@@ -807,8 +808,97 @@ igual([dominioReferente('https://l.instagram.com/?u=secreto'), dominioReferente(
       [true, false, BLOQUEO_GRABACION, '*', false, false, false, true, true], 'todas: campos tapados, sin lienzo, sin red ni consola, sin pedidos extra a PostHog');
     const rc = x.v._POSTHOG_REMOTE_CONFIG?.phc_PRUEBA123?.config;
     igual([rc?.sessionRecording?.endpoint, rc?.sessionRecording?.recordCanvas, rc?.hasFeatureFlags], ['/s/', false, false], 'todas: configuración de la grabación puesta a mano (sin pedirla a PostHog)');
+    igual([x.a.grabandoLienzo(), x.reg().grabada_lienzo, sr.canvasCapture], [false, false, undefined], 'todas en un teléfono (pointer: coarse): sin lienzo (grabacion_lienzo = compu)');
     x.a.desactivarMedicion();
     igual([x.ph.llamadas.some(l => l[0] === 'stopSessionRecording'), x.a.grabando()], [true, false], 'desactivar la medición corta la grabación');
+  }
+  // ---- el lienzo 3D (LIF-45): bandera grabacion_lienzo, opciones del grabador y los carteles con el nombre tapados ----
+  {
+    igual(BANDERAS.grabacion_lienzo, 'compu', 'grabacion_lienzo: solo en computadora por defecto');
+    igual([grabaLienzo('off', false), grabaLienzo('compu', false), grabaLienzo('compu', true), grabaLienzo('todas', true), grabaLienzo('movil', false), grabaLienzo(undefined, false)],
+      [false, true, false, true, false, false], 'grabaLienzo: off, compu (sin pantalla táctil), todas; un valor desconocido no graba');
+    ok(!/\bcanvas\b/.test(BLOQUEO_GRABACION_LIENZO) && /#senal\b/.test(BLOQUEO_GRABACION_LIENZO), 'con lienzo: los lienzos se graban, la señal sigue bloqueada');
+    ok(LIENZO.fps > 0 && LIENZO.fps <= 4 && LIENZO.calidad <= 0.5 && LIENZO.ancho <= 800, `pocos cuadros y baja calidad (${LIENZO.fps} por segundo, calidad ${LIENZO.calidad}, ${LIENZO.ancho} px)`);
+    igual([escalaLienzo(1280), escalaLienzo(320), escalaLienzo(20000), escalaLienzo(undefined)], [0.5, 1, 0.1, 0.5], 'escala de la captura: hasta LIENZO.ancho px');
+    const sin = opcionesGrabacion(() => []), con = opcionesGrabacion(() => [], { escala: 0.5, regiones: () => [] });
+    igual([sin.captureCanvas.recordCanvas, sin.canvasCapture, sin.blockSelector], [false, undefined, BLOQUEO_GRABACION], 'opciones sin lienzo');
+    igual([con.captureCanvas, con.canvasCapture.resolutionScale, typeof con.canvasCapture.maskRegionsFn, con.blockSelector, con.maskAllInputs],
+      [{ recordCanvas: true, canvasFps: LIENZO.fps, canvasQuality: LIENZO.calidad }, 0.5, 'function', BLOQUEO_GRABACION_LIENZO, true], 'opciones con lienzo: pocos cuadros, baja calidad, carteles tapados');
+  }
+  {
+    // Una computadora (sin pointer: coarse) con lo que necesita el grabador del lienzo.
+    const compu = { matchMedia: () => ({ matches: false }), OffscreenCanvas: function () {}, createImageBitmap() {}, innerWidth: 1600, requestAnimationFrame() { return 1; } };
+    const correr = async o => { const x = armar({ grabacion: 'todas', ...o }); await x.a.iniciar({ estado: x.est }); return x; };
+    const def = await correr({ extra: compu });
+    const sr = def.cfg().session_recording, rc = def.v._POSTHOG_REMOTE_CONFIG?.phc_PRUEBA123?.config?.sessionRecording;
+    igual([def.a.grabandoLienzo(), def.reg().grabada_lienzo, def.reg()['$feature/grabacion_lienzo'], sr.captureCanvas.recordCanvas, sr.canvasCapture.resolutionScale, sr.blockSelector, rc?.recordCanvas, rc?.canvasFps],
+      [true, true, 'compu', true, 0.4, BLOQUEO_GRABACION_LIENZO, true, LIENZO.fps], 'computadora con la bandera por defecto: se graba el lienzo');
+    const off = await correr({ extra: compu, lienzo: 'off' });
+    igual([off.a.grabando(), off.a.grabandoLienzo(), off.cfg().session_recording.captureCanvas.recordCanvas, off.reg().grabada_lienzo], [true, false, false, false], 'grabacion_lienzo = off: la página sí, el lienzo no');
+    const tel = await correr({ extra: { ...compu, matchMedia: () => ({ matches: true }) }, lienzo: 'todas' });
+    igual([tel.a.grabandoLienzo(), tel.reg().tactil], [true, true], 'grabacion_lienzo = todas: también en un teléfono');
+    const viejo = await correr({ extra: { ...compu, OffscreenCanvas: undefined } });
+    igual(viejo.a.grabandoLienzo(), false, 'sin OffscreenCanvas el grabador no puede: sin lienzo');
+    const nada = armar({ grabacion: 'off', extra: compu, lienzo: 'todas' }); await nada.a.iniciar({ estado: nada.est });
+    igual([nada.a.grabando(), nada.a.grabandoLienzo(), nada.reg().grabada_lienzo], [false, false, false], 'el lienzo solo va en las cargas que se graban');
+    def.a.desactivarMedicion();
+    igual(def.a.grabandoLienzo(), false, 'desactivar la medición corta también el lienzo');
+  }
+  {
+    // Proyección: cámara en (0, 0, 5) mirando a -z, perspectiva de 90° y aspecto 1; plano de 2 × 2 en el origen.
+    const I = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    const vista = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, -5, 1];
+    const n = 0.1, f = 100, proyeccion = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -(f + n) / (f - n), -1, 0, 0, -2 * f * n / (f - n), 0];
+    const base = { mundo: I, vista, proyeccion, w: 2, h: 2, ancho: 1000, alto: 1000, margen: 0 };
+    const cerca = (r, e) => r && ['x', 'y', 'width', 'height'].every(k => Math.abs(r[k] - e[k]) <= 5);
+    const todo = rectanguloDeZona({ ...base, zona: [0, 1, 0, 1] });
+    ok(cerca(todo, { x: 400, y: 400, width: 200, height: 200 }), `el plano entero en el centro de la pantalla (${JSON.stringify(todo)})`);
+    const der = rectanguloDeZona({ ...base, zona: [0.5, 1, 0, 0.5] });
+    ok(cerca(der, { x: 500, y: 400, width: 100, height: 100 }), `la cuarta parte de arriba a la derecha (u a la derecha, v hacia abajo): ${JSON.stringify(der)}`);
+    const esp = rectanguloDeZona({ ...base, zona: [0, 1, 0, 1], mundo: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 2, 0, 1], espejoY: 0 });
+    ok(cerca(esp, { x: 400, y: 600, width: 200, height: 200 }), `reflejado en y = 0 queda abajo (${JSON.stringify(esp)})`);
+    igual(rectanguloDeZona({ ...base, zona: [0, 1, 0, 1], mundo: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 10, 1] }), null, 'detrás de la cámara: nada');
+    igual(rectanguloDeZona({ ...base, zona: [0, 1, 0, 1], mundo: [1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 5, 1], w: 2, h: 40 }), { x: 0, y: 0, width: 1000, height: 1000 }, 'en parte detrás de la cámara: todo el lienzo');
+    igual(rectanguloDeZona({ ...base, zona: [0, 1, 0, 1], mundo: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 50, 0, 0, 1] }), null, 'fuera del cuadro: nada');
+    const conMargen = rectanguloDeZona({ ...base, zona: [0, 1, 0, 1], margen: 0.1 });
+    ok(conMargen.width > todo.width + 30 && conMargen.x < todo.x, 'con margen el rectángulo crece');
+
+    // regionesLienzo con una escena falsa: la pantalla LED, el tablero (hallado por su textura) y el reflejo.
+    const boardTex = {}, tablero = { isMesh: true, visible: true, material: { map: boardTex }, geometry: { parameters: { width: 2, height: 2 } }, matrixWorld: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -2, 0, 0, 1] } };
+    const pantalla = { isMesh: true, visible: true, material: {}, geometry: { parameters: { width: 2, height: 2 } }, matrixWorld: { elements: I } };
+    let preservar = false;
+    const escena = (o = {}) => ({
+      arena: { pantalla, boardTex, group: { traverse: fn => [pantalla, tablero].forEach(fn) } },
+      rig: { camera: { projectionMatrix: { elements: proyeccion }, matrixWorldInverse: { elements: vista } } },
+      renderer: { getContext: () => ({ getContextAttributes: () => ({ preserveDrawingBuffer: preservar }) }) },
+      reflejo: { activo: false, y: 0 }, ...o,
+    });
+    const lienzo = { id: 'gl', clientWidth: 1000, clientHeight: 1000 };
+    const r = regionesLienzo(lienzo, escena());
+    const [u0, u1, v0, v1] = ZONAS_NOMBRE.led;
+    ok(r.length === 2 && r[0].x < 500 + 100 * (u0 * 2 - 1) && r[0].x + r[0].width >= 500 + 100 * (u1 * 2 - 1) && r[0].y < 400 + 200 * v0 + 1 && r[0].y + r[0].height > 400 + 200 * v1,
+      `LED: la caja derecha (quién levanta) tapada (${JSON.stringify(r[0])})`);
+    ok(r[1].x <= 300 && r[1].x + r[1].width >= 400, `tablero del costado tapado entero (${JSON.stringify(r[1])})`);
+    igual(regionesLienzo(lienzo, escena({ reflejo: { activo: true, y: 0 } })).length, 4, 'con el reflejo de la tarima prendido: también los carteles reflejados');
+    igual(regionesLienzo({ id: 'ayudas', clientWidth: 10, clientHeight: 10 }, null), [], 'las ayudas no tienen nombres');
+    const tira = (fn, m) => { let t = false; try { fn(); } catch { t = true; } ok(t, m); };
+    tira(() => regionesLienzo(lienzo, null), 'sin escena: tira (el grabador saltea el cuadro)');
+    tira(() => regionesLienzo(lienzo, escena({ arena: { boardTex: {} } })), 'sin pantalla LED: tira');
+    tira(() => regionesLienzo(lienzo, escena({ arena: { pantalla, boardTex: {}, group: { traverse: fn => [pantalla].forEach(fn) } } })), 'tablero que no se encuentra: tira');
+    tira(() => regionesLienzo(lienzo, escena(), () => false), 'sin preserveDrawingBuffer y sin dibujar en este cuadro: tira (se leería negro)');
+    preservar = true;
+    igual(regionesLienzo(lienzo, escena(), () => false).length, 2, 'con preserveDrawingBuffer el cuadro sirve aunque no se haya dibujado');
+  }
+  {
+    // vigiaCuadros: fresco solo en el cuadro en que three dibujó (renderer.info.render.frame cambió).
+    const cola = []; let t = 0;
+    const info = { render: { frame: 0 } };
+    const v = { requestAnimationFrame: fn => cola.push(fn), document: { timeline: { get currentTime() { return t; } } }, JUEGO: { escena: { renderer: { info } } } };
+    const vg = vigiaCuadros(v);
+    const cuadro = dibuja => { t += 16; if (dibuja) info.render.frame++; const fs = cola.splice(0); fs.forEach(f => f(t)); return vg.fresco(); };
+    igual([cuadro(true), cuadro(true), cuadro(false), cuadro(true)], [true, true, false, true], 'vigía: fresco en los cuadros dibujados');
+    t += 5; igual(vg.fresco(), false, 'vigía: fuera del cuadro mirado, no');
+    vg.parar(); cuadro(true); igual(cola.length, 0, 'vigía: parar() corta su requestAnimationFrame');
   }
   {
     // El nombre: el guardado y el que se está escribiendo en la bienvenida o en el editor del teléfono.

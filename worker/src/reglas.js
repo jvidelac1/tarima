@@ -6,9 +6,10 @@
 // página en una parte de las visitas. 2026-11-d: la encuesta opcional después de anotarse (dos preguntas, sin premio) y
 // las novedades sin frecuencia. 2026-11-e: la encuesta del cartel también desbloquea el juego libre (LIF-53, decisión del
 // dueño del 15 de noviembre). 2026-11-f: el juego pasa a llamarse Lifting Game (antes Tarima); mismos datos y usos.
+// 2026-11-g: la grabación de sesión incluye la imagen 3D (pocos cuadros, carteles con el nombre tapados; LIF-45).
 // Las anteriores se siguen aceptando (páginas del juego viejas en caché).
-export const CONSENTIMIENTO = '2026-11-f';
-export const VERSIONES_CONSENTIMIENTO = new Set(['2026-11-a', '2026-11-b', '2026-11-c', '2026-11-d', '2026-11-e', CONSENTIMIENTO]);
+export const CONSENTIMIENTO = '2026-11-g';
+export const VERSIONES_CONSENTIMIENTO = new Set(['2026-11-a', '2026-11-b', '2026-11-c', '2026-11-d', '2026-11-e', '2026-11-f', CONSENTIMIENTO]);
 export const DIA = 86400;            // segundos
 export const VENTANA_IP = 30 * DIA;  // cuenta por IP y retención del código de IP
 export const RETENCION = 180 * DIA;  // partidas y dispositivos sin lista
@@ -279,6 +280,8 @@ export const BANDERAS = {
   'invitacion-podio1': { valores: ['on', 'off'], defecto: 'on' },
   // Grabación de sesión (docs/MVP.md 6.6): qué parte de las cargas se graba. Se cambia en PostHog sin publicar.
   'grabacion': { valores: ['off', 'tercio', 'todas'], defecto: 'tercio' },
+  // En las cargas grabadas, si también se graba el lienzo 3D (LIF-45): nunca, solo en computadora o también en teléfonos.
+  'grabacion_lienzo': { valores: ['off', 'compu', 'todas'], defecto: 'compu' },
 };
 
 export const banderasPorDefecto = () => Object.fromEntries(Object.entries(BANDERAS).map(([k, b]) => [k, b.defecto]));

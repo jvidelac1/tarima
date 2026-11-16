@@ -357,9 +357,9 @@ for (const [r, e] of [
 const def = R.banderasPorDefecto();
 igual(R.combinarBanderas(null, null), def, 'banderas por defecto');
 igual(R.combinarBanderas(null, { 'muro-partidas-gratis': { enabled: true, variant: '1' }, 'invitacion-podio1': { enabled: false }, grabacion: { enabled: true, variant: 'todas' } }),
-  { 'muro-partidas-gratis': '1', 'muro-texto': 'a', 'invitacion-podio1': 'off', grabacion: 'todas' }, 'banderas de PostHog');
+  { 'muro-partidas-gratis': '1', 'muro-texto': 'a', 'invitacion-podio1': 'off', grabacion: 'todas', grabacion_lienzo: 'compu' }, 'banderas de PostHog');
 igual(R.combinarBanderas({ 'muro-partidas-gratis': '1', 'muro-texto': 'b', grabacion: 'todas' }, { 'muro-partidas-gratis': { variant: '2' }, 'muro-texto': { variant: 'a' }, grabacion: { variant: 'off' } }),
-  { 'muro-partidas-gratis': '1', 'muro-texto': 'b', 'invitacion-podio1': 'on', grabacion: 'off' }, 'pegajosas fijas, las demás se refrescan');
+  { 'muro-partidas-gratis': '1', 'muro-texto': 'b', 'invitacion-podio1': 'on', grabacion: 'off', grabacion_lienzo: 'compu' }, 'pegajosas fijas, las demás se refrescan');
 igual(R.combinarBanderas(null, { 'muro-texto': { variant: 'zzz' } })['muro-texto'], 'a', 'variante desconocida: por defecto');
 igual(R.combinarBanderas({ grabacion: 'todas' }, null).grabacion, 'todas', 'sin respuesta: queda lo guardado');
 // grabacion (docs/MVP.md 6.6): un tercio por defecto; off o todas desde PostHog; una bandera booleana apagada es «off»;
@@ -368,6 +368,10 @@ igual(def.grabacion, 'tercio', 'grabacion: un tercio por defecto');
 igual(['off', 'tercio', 'todas', 'muestra'].map(v => R.combinarBanderas(null, { grabacion: { enabled: true, variant: v } }).grabacion), ['off', 'tercio', 'todas', 'tercio'], 'grabacion: variantes');
 igual(R.combinarBanderas(null, { grabacion: { enabled: false } }).grabacion, 'off', 'grabacion: bandera booleana apagada');
 igual(R.combinarBanderas({ grabacion: 'muestra' }, null).grabacion, 'tercio', 'grabacion: lo guardado con un valor viejo no vale');
+// grabacion_lienzo (LIF-45): solo en computadora por defecto; off o todas desde PostHog.
+igual(def.grabacion_lienzo, 'compu', 'grabacion_lienzo: computadora por defecto');
+igual(['off', 'compu', 'todas', 'movil'].map(v => R.combinarBanderas(null, { grabacion_lienzo: { enabled: true, variant: v } }).grabacion_lienzo), ['off', 'compu', 'todas', 'compu'], 'grabacion_lienzo: variantes');
+igual(R.combinarBanderas(null, { grabacion_lienzo: { enabled: false } }).grabacion_lienzo, 'off', 'grabacion_lienzo: bandera booleana apagada');
 igual(R.banderasAsignadas(null, { 'muro-texto': { variant: 'b' } }), { 'muro-texto': 'b' }, 'solo se guarda lo que asignó PostHog, nunca un valor por defecto');
 igual(R.combinarBanderas({}, null, { 'muro-partidas-gratis': '1' })['muro-partidas-gratis'], '1', 'el por defecto puede salir de GRATIS');
 igual(R.config({ GRATIS: '1' }, R.banderasAsignadas(null, {})).gratis, 1, 'sin bandera asignada, GRATIS manda');

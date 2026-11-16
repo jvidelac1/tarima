@@ -117,7 +117,7 @@ describe('estado y cookie', () => {
     expect(r.res.headers.get('cache-control')).toBe('no-store');
     expect(r.j).toMatchObject({ puede: true, quedan: 2, lista: false, encuesta_disponible: true, metricas: null });
     expect(r.j.contexto).toMatchObject({ previas: 0, dias: '0' });
-    expect(r.j.flags).toEqual({ 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio' });
+    expect(r.j.flags).toEqual({ 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio', grabacion_lienzo: 'compu' });
     expect(r.j.dispositivo).toMatch(/^[0-9a-f-]{36}$/);
     const c = r.res.headers.get('set-cookie');
     expect(c).toContain(`tdv=${r.j.dispositivo}`);
@@ -652,7 +652,7 @@ describe('banderas de PostHog', () => {
     const ip = nuevaIp(), a = uuid();
     flagsRespuesta = { flags: { 'muro-partidas-gratis': { key: 'muro-partidas-gratis', enabled: true, variant: '1' }, 'muro-texto': { enabled: true, variant: 'b' }, 'invitacion-podio1': { enabled: false } }, errorsWhileComputingFlags: false };
     const r = await llamar('/api/estado', { dispositivo: a }, { ip, e });
-    expect(r.j.flags).toEqual({ 'muro-partidas-gratis': '1', 'muro-texto': 'b', 'invitacion-podio1': 'off', grabacion: 'tercio' });
+    expect(r.j.flags).toEqual({ 'muro-partidas-gratis': '1', 'muro-texto': 'b', 'invitacion-podio1': 'off', grabacion: 'tercio', grabacion_lienzo: 'compu' });
     expect(r.j.quedan).toBe(1);
     const pedido = salidas.find(s => s.url.pathname === '/flags');
     expect(pedido.url.search).toBe('?v=2');
