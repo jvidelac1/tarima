@@ -418,8 +418,8 @@ export class Arena {
     const fasciaMat = new THREE.MeshBasicMaterial({ map: fasciaTex, color: hdr('#ffffff', .25) }), cierreMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#0b0d13') });
     for (const st of stands) {
       // cerramiento del frente de la tribuna (1,3 m, oscuro): tapa el busto de la primera fila, que de cerca delata al público
-      const cz = new THREE.Mesh(new THREE.PlaneGeometry(st.w + .6, 1.3), cierreMat); cz.position.set(st.o[0] - st.back[0] * .6, st.o[1] + .2, st.o[2] - st.back[1] * .6); cz.rotation.y = Math.atan2(-st.back[0], -st.back[1]); this.group.add(cz);
-      const f = new THREE.Mesh(new THREE.PlaneGeometry(st.w, .5), fasciaMat); f.position.set(st.o[0] - st.back[0] * .62, st.o[1] + .5, st.o[2] - st.back[1] * .62); f.rotation.y = Math.atan2(-st.back[0], -st.back[1]); this.group.add(f);
+      const frente = st.back[1] > 0, cz = new THREE.Mesh(new THREE.PlaneGeometry(st.w + .6, 1.3), cierreMat); cz.position.set(st.o[0] - st.back[0] * .6, st.o[1] + (frente ? -.42 : .2), st.o[2] - st.back[1] * .6);      /* la tribuna del frente (detrás de los árbitros) lo lleva bajo: alto, llenaba el primer plano de la cámara del jurado */ cz.rotation.y = Math.atan2(-st.back[0], -st.back[1]); this.group.add(cz);
+      const f = new THREE.Mesh(new THREE.PlaneGeometry(st.w, .5), fasciaMat); f.position.set(st.o[0] - st.back[0] * .62, st.o[1] + (frente ? -.12 : .5), st.o[2] - st.back[1] * .62); f.rotation.y = Math.atan2(-st.back[0], -st.back[1]); this.group.add(f);
     }
     // flashes de cámaras: salen de la mano de un espectador, no del aire
     this.flashes = []; const fm = new THREE.MeshBasicMaterial({ map: this.discTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });

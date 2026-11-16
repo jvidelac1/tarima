@@ -417,7 +417,7 @@ export class Look {
 
   /** Luz de competencia: sala a oscuras, clave casi cenital, contraluz cálido marcado desde atrás a la izquierda. */
   _luces(L) {
-    L.key.position.set(4.4, 9.3, 3.9); L.key.color.set('#fff0dc'); L.key.intensity = 5.6; L.key.angle = .3; L.key.penumbra = .7;
+    L.key.position.set(4.4, 9.3, 3.9); L.key.color.set('#fff0dc'); L.key.intensity = 5.1; L.key.angle = .3; L.key.penumbra = .7;
     L.key2.color.set('#ffe9d2'); L.key2.intensity = .5; L.key2.position.set(-3.6, 4.6, 7.2);      // relleno bajo y de frente: abre las cuencas de los ojos que la cenital deja apagadas
     L.stage.color.set('#b9c6e0'); L.stage.intensity = 2.8;
     L.hemi.color.set('#56688a'); L.hemi.groundColor.set('#2c2016'); L.hemi.intensity = .15;
@@ -665,12 +665,12 @@ export class Look {
       const g = new THREE.Group(); g.position.copy(l.position); g.lookAt(hasta); g.rotateX(-Math.PI / 2);
       const m = new THREE.Mesh(geo, mat); m.scale.set(rad, len, rad); m.renderOrder = 5; m.frustumCulled = false; g.add(m); this.group.add(g); this.rayos.push({ mat, base: fuerza });
     };
-    rayo(L.rimA, .03, .5); rayo(L.rimB, .024, .5); rayo(L.key, .014, .6);
+    rayo(L.rimA, .02, .5); rayo(L.rimB, .016, .5); rayo(L.key, .01, .6);
     // conos anchos y suaves desde el puente de focos y las torres hasta la tarima (focos de mentira: solo el volumen de bruma)
     const foco = (p, t, color, ang) => ({ position: new THREE.Vector3(...p), target: { position: new THREE.Vector3(...t) }, color: new THREE.Color(color), angle: ang });
-    for (const x of [-3.0, -1.0, 1.0, 3.0]) rayo(foco([x, 3.56, -4.86], [x * .35, 0, .6], x < 0 ? '#ffd0a0' : '#dfe8ff', .2), .022, 1);
-    for (const s2 of [-1, 1]) rayo(foco([s2 * 7.22, 4.6, -4.4], [s2 * .6, 0, 0], s2 < 0 ? '#ffb877' : '#cfe0ff', .17), .02, 1);
-    for (const x of [-3, 3]) rayo(foco([x, 6.8, 6.8], [x * .3, 0, .4], '#ffe6c4', .15), .012, 1);      // haces angostos y definidos: anchos eran un banco de niebla beige sobre la tribuna      // solo los dos contraluces: los conos de la clave y del pelo casi no se veían y eran pantalla entera de mezcla
+    for (const x of [-3.0, -1.0, 1.0, 3.0]) rayo(foco([x, 3.56, -4.86], [x * .35, 0, .6], x < 0 ? '#ffd0a0' : '#dfe8ff', .2), .014, 1);
+    for (const s2 of [-1, 1]) rayo(foco([s2 * 7.22, 4.6, -4.4], [s2 * .6, 0, 0], s2 < 0 ? '#ffb877' : '#cfe0ff', .17), .013, 1);
+    for (const x of [-3, 3]) rayo(foco([x, 6.8, 6.8], [x * .3, 0, .4], '#ffe6c4', .15), .008, 1);      // haces angostos y definidos: anchos eran un banco de niebla beige sobre la tribuna      // solo los dos contraluces: los conos de la clave y del pelo casi no se veían y eran pantalla entera de mezcla
     this.group.visible = false;
   }
 
