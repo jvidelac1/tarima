@@ -241,7 +241,7 @@ export const PLANOS = {
  * - RECUADRO («doble visión», `RECUADRO`): mientras tanto, una pantalla chica muestra el levantamiento desde afuera (ver _recuadro).
  */
 export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, frente: -.03, alto: .07, abajo: -1.35,
-  baja: [.5, .32], toma: [.14, .3], ajusta: .55, levanta: .6, suelta: [-.2, .9, .35], muelle: 7, vMax: .9, sinCabeza: .6, cercaOjo: .24, foco: 6,
+  baja: [.5, .32], toma: [.14, .3], ajusta: .55, levanta: .6, suelta: [-.2, .9, .35], muelle: 7, vMax: 1, sinCabeza: .6, cercaOjo: .24, foco: 6,
   resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003, tension: 2.4 }, temblor: .006, latido: { hz: 1.15, fov: .22 } };
 /**
  * Recuadro de la primera persona: `ancho` del lienzo (`angosto` si mide menos de 900 px), alto = ancho × `alto`, pegado al
@@ -618,7 +618,7 @@ export class Escena {
       const hF = a._byName.get(L + 'Foot'); if (!hF) return; hF.updateWorldMatrix(true, false);
       const F0 = hF.getWorldPosition(new THREE.Vector3()), qF = hF.getWorldQuaternion(new THREE.Quaternion()), v = Math.min(1, Math.max(0, m.u * 2 - i)), T = F0.clone();
       T.z += -raiz + m.dz * su(v); T.y += -(m.dy || 0) + .05 * Math.sin(Math.PI * v) * (m.dz ? 1 : 0);
-      this._dosHuesos(a, L + 'UpLeg', L + 'Leg', L + 'Foot', T, null, 1, .995);
+      this._dosHuesos(a, L + 'UpLeg', L + 'Leg', L + 'Foot', T, new THREE.Vector3(i ? -.12 : .12, 0, 1), 1, .995);      // la rodilla, siempre hacia adelante (con la pierna casi recta, tomarla de la pose la hacía saltar de lado)
       hF.parent.updateWorldMatrix(true, false); hF.quaternion.copy(hF.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(qF));      // el pie no cambia de orientación
     });
     a.root.updateMatrixWorld(true);
@@ -789,7 +789,8 @@ export class Escena {
         // tomada: las manos están en la barra, o llegaron cerca y dejaron de moverse (el gancho deja la muñeca a unos centímetros del eje)
         const vel = dt > 0 ? Math.abs(dist - (S.dist ?? dist)) / dt : 0; S.dist = dist; S.tQ = vel < .08 && dist < POV.baja[0] ? (S.tQ || 0) + dt : 0;
         if (toma < .6 && S.tQ < .3) { S.tAg = 0; S.bajo = paso(dist, POV.baja[0], POV.baja[1]); }      // las manos van a la barra: la mira
-        else { S.tAg = (S.tAg ?? 9) + dt; S.bajo = (S.bajo || 0) > 0 ? Math.max(1e-3, 1 - paso(S.tAg, POV.ajusta, POV.ajusta + POV.levanta)) : 0; if (S.tAg > POV.ajusta + POV.levanta) S.bajo = 0; }
+        else { if ((S.bajo || 0) > 0 && !S.llego) { if (Math.abs((S.inc || 0) - aBarra) < .1) S.llego = true; else S.tAg = -dt; }      // primero llega a mirar la barra; recién ahí cuenta el ajuste
+          S.tAg = (S.tAg ?? 9) + dt; S.bajo = (S.bajo || 0) > 0 ? Math.max(1e-3, 1 - paso(S.tAg, POV.ajusta, POV.ajusta + POV.levanta)) : 0; if (S.tAg > POV.ajusta + POV.levanta) { S.bajo = 0; S.llego = false; } }
         const arriba = paso(b.y - S.p.y, -.05, .3);
         incT = POV.frente + POV.alto * arriba; incT += (aBarra - incT) * Math.min(1, S.bajo);
       }
