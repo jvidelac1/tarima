@@ -3,7 +3,10 @@ sys.path.insert(0,os.path.dirname(os.path.abspath(__file__))); from common impor
 from mathutils import Vector
 R=int(os.environ.get('TARIMA_TEX','4096'))   # resolución de horneado (posición, máscaras, AO, normal de objeto)
 import body
+from style import STYLES
 NAME=sys.argv[1]; OUT=out_dir(NAME)
+# corte de la malla (escote y sisa): los pesistas del plantel paramétrico lo traen en su estilo, en m para 1,69 m; los dos originales usan el de siempre
+STY=STYLES[NAME]; KM=STY['H']/1.687 if 'escote' in STY else 1.; ESC=STY.get('escote',(.085,.19)); SIS=STY.get('sisa',(.118,.2))
 boot()
 b,rig=body.build(NAME)
 me=b.data
@@ -46,11 +49,12 @@ hemz=knee.z+.42*(hip.z-knee.z)
 def masks(x,y,z,F,soft):
     axo=np.abs(x); E=soft
     front=y<neck.y
-    scoop=np.where(front,np.sqrt((x/.085)**2+((z-(neck.z+.03))/.19)**2),np.sqrt((x/.075)**2+((z-(neck.z+.03))/.1)**2))
-    arm=np.sqrt(((axo-(sh.x+.03))/(sh.x+.03-.118))**2+((z-(sh.z+.04))/.2)**2)
+    scoop=np.where(front,np.sqrt((x/(ESC[0]*KM))**2+((z-(neck.z+.03*KM))/(ESC[1]*KM))**2),np.sqrt((x/(.075*KM))**2+((z-(neck.z+.03*KM))/(.1*KM))**2))
+    arm=np.sqrt(((axo-(sh.x+.03*KM))/(sh.x+.03*KM-SIS[0]*KM))**2+((z-(sh.z+.04*KM))/(SIS[1]*KM))**2)
     suit=np.maximum(F['torso']*sm(1-E,1+E,scoop)*sm(1-E,1+E,arm)*sm(neck.z+.03,neck.z+.02,z),F['thigh']*sm(hemz-E*.1,hemz+E*.1,z))
-    slv=F['leg']*sm(knee.z-.112-E*.1,knee.z-.112+E*.1,z)*sm(knee.z+.102+E*.1,knee.z+.102-E*.1,z)
-    sock=F['low']*sm(ank.z+.132+E*.1,ank.z+.132-E*.1,z)
+    zq=knee.z+(z-knee.z)/KM; zs=ank.z+(z-ank.z)/KM     # rodilleras y medias a la escala del pesista
+    slv=F['leg']*sm(knee.z-.112-E*.1,knee.z-.112+E*.1,zq)*sm(knee.z+.102+E*.1,knee.z+.102-E*.1,zq)
+    sock=F['low']*sm(ank.z+.132+E*.1,ank.z+.132-E*.1,zs)
     wrap=np.zeros_like(x)
     for side,fl in (('Left',F['farmL']),('Right',F['farmR'])):
         a=np.array(P(side+'ForeArm')); w=np.array(P(side+'Hand')); d=w-a; L=np.linalg.norm(d); d/=L
@@ -58,6 +62,15 @@ def masks(x,y,z,F,soft):
         wrap=np.maximum(wrap,fl*sm(.75-E*.3,.75+E*.3,t)*sm(1.1,1.08,t))
     return suit,slv,sock,wrap
 suit,slv,sock,wrap=masks(x,y,z,F,.06)
+if True:
+    FEM=STY.get('genero')=='F'; LEG=not STY.get('genero') or 'esclera' not in STY     # los dos originales (estilo legado) no se tocan
+    # Busto bajo la malla: el top deportivo lo contiene y lo alisa. Suavizado laplaciano del frente del pecho cubierto por la tela (quita la punta, baja algo el volumen).
+    E_=np.empty(len(me.edges)*2,dtype=np.int64); me.edges.foreach_get('vertices',E_); E_=E_.reshape(-1,2); dg_=np.maximum(np.bincount(E_.ravel(),minlength=N),1)[:,None]
+    # Ronda 1 del director de arte: seguían las puntas. La zona baja más (el busto de la pesada queda bajo), más pasadas; en el hombre, pocas pasadas (solo la punta del pectoral).
+    wb=(suit*sm(sh.z-(.44 if FEM else .30)*KM,sh.z-(.34 if FEM else .24)*KM,z)*sm(sh.z-.03*KM,sh.z-.09*KM,z)*(y<neck.y)*(0 if LEG else 1))[:,None]; c2=co.copy()
+    for _ in range(45 if FEM else 8):
+        A_=np.zeros_like(c2); np.add.at(A_,E_[:,0],c2[E_[:,1]]); np.add.at(A_,E_[:,1],c2[E_[:,0]]); c2=c2*(1-.65*wb)+A_/dg_*(.65*wb)
+    print(f'BUSTO {NAME}: alisado bajo la malla, {int((wb[:,0]>.05).sum())} vértices, desplazamiento máx {np.linalg.norm(c2-co,axis=1).max()*1000:.1f} mm'); co=c2; x,y,z=co.T; axo=np.abs(x)
 disp=np.maximum.reduce([suit*.0015,slv*.0045,sock*.003,wrap*.0025,F['scalp']*.003])
 me.vertices.foreach_set('co',(co+no*disp[:,None]).ravel()); me.update()
 for p in me.polygons: p.use_smooth=True

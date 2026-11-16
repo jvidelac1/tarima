@@ -1,0 +1,153 @@
+# Pesistas: construye los personajes con Blender (módulo bpy, sin pantalla ni placa) en Ubuntu. En la Mac del dueño NO se
+# corre Blender: todo build de personajes pasa por acá. Un trabajo por pesista (matriz): sin GPU cada uno tarda 35 a 50 min.
+#
+#   gh workflow run pesistas.yml -R jvidelac1/tarima --ref plantel -f modo=completo -f pesistas="quiroga salvatierra"
+#   gh run watch <id> -R jvidelac1/tarima --exit-status
+#   gh run download <id> -R jvidelac1/tarima -D <carpeta>
+#
+# Modos:
+#   sonda     solo cuerpos (blender/sonda.py): medidas, masa estimada y una lámina de frente, costado y tres cuartos de cada
+#             uno, todos en un solo trabajo de pocos minutos. Para ajustar parámetros del plantel antes de un build.
+#   poses     build con FAST=1 y texturas a 2048 (para iterar reglas de poses: check() no depende de la textura).
+#   rapido    build con FAST=1 (sin hojas de poses), texturas completas y retratos.
+#   completo  build con hojas de control de costado y de frente (sheet_<seg>_side/front.png) y retratos.
+# El trabajo queda en rojo si check() da cuadros BAD (igual se suben los artefactos, para mirarlos).
+# Artefacto por pesista (`pesista-<nombre>`): out/<nombre>/ (GLB, poses.json, logs, lineas.txt con POSE/CHK/BAD/TRAJ, hojas,
+# renders de control, retratos en ctl/) y web/ (modelos comprimidos listos para el juego y el fragmento de poses.json).
+# Cómo se suma al juego lo que baja de acá: docs/PLANTEL.md.
+name: Pesistas (Blender en Ubuntu)
+
+on:
+  push:
+    branches: [plantel]
+    paths:
+      - '.github/workflows/pesistas.yml'
+  workflow_dispatch:
+    inputs:
+      pesistas:
+        description: 'Pesistas separados por espacio (vacío = el plantel nuevo completo)'
+        type: string
+        default: ''
+      modo:
+        description: 'sonda (solo cuerpos), poses (FAST y texturas chicas), rapido (FAST) o completo (con hojas)'
+        type: choice
+        options: [sonda, poses, rapido, completo]
+        default: rapido
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # Lo que corre un push que toca este archivo (sirve para dispararlo sin `gh workflow run`)
+  MODO_PUSH: sonda
+  PESISTAS_PUSH: ""
+  MPFB_COMMIT: 6ff1eb358f6c1959ced77e79e6dd2406d9a71f49   # el MPFB con el que se hicieron ventura y brenner (24-oct-2026)
+
+jobs:
+  lista:
+    name: Lista de pesistas
+    runs-on: ubuntu-latest
+    outputs:
+      matriz: ${{ steps.l.outputs.matriz }}
+      modo: ${{ steps.l.outputs.modo }}
+      nombres: ${{ steps.l.outputs.nombres }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: l
+        env:
+          IN_PESISTAS: ${{ inputs.pesistas }}
+          IN_MODO: ${{ inputs.modo }}
+        run: |
+          MODO="${IN_MODO:-$MODO_PUSH}"; NOMBRES="${IN_PESISTAS:-}"
+          [ "$GITHUB_EVENT_NAME" = push ] && NOMBRES="$PESISTAS_PUSH"
+          if [ -z "$NOMBRES" ]; then NOMBRES="$(python3 -c "import sys; sys.path.insert(0,'blender'); import plantel; print(' '.join(plantel.NUEVOS))")"; fi
+          echo "modo=$MODO" >> "$GITHUB_OUTPUT"; echo "nombres=$NOMBRES" >> "$GITHUB_OUTPUT"
+          echo "matriz=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1].split()))" "$NOMBRES")" >> "$GITHUB_OUTPUT"
+          echo "modo $MODO · pesistas $NOMBRES"
+
+  sonda:
+    name: Sonda de cuerpos (medidas, masa y láminas)
+    needs: lista
+    if: ${{ needs.lista.outputs.modo == 'sonda' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Bibliotecas, tipografías, bpy y MPFB
+        run: tools/ci_blender.sh
+      - name: Sonda
+        run: |
+          mkdir -p out/sonda
+          set -o pipefail
+          .venv/bin/python blender/sonda.py ${{ needs.lista.outputs.nombres }} 2>&1 | tee out/sonda/sonda.log | grep --line-buffered -E 'MEASURE|MASA|PROP|SONDA|Error|ERROR|Traceback|^ +File "|Exception'
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: sonda
+          path: out/sonda/
+          retention-days: 14
+
+  build:
+    name: ${{ matrix.nombre }} (${{ needs.lista.outputs.modo }})
+    needs: lista
+    if: ${{ needs.lista.outputs.modo != 'sonda' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        nombre: ${{ fromJSON(needs.lista.outputs.matriz) }}
+    env:
+      N: ${{ matrix.nombre }}
+      MODO: ${{ needs.lista.outputs.modo }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Bibliotecas, tipografías, bpy y MPFB
+        run: tools/ci_blender.sh
+      - name: Build
+        run: |
+          mkdir -p "out/$N"
+          case "$MODO" in
+            poses)  export FAST=1 TARIMA_TEX=2048 TARIMA_AO=16 ;;
+            rapido) export FAST=1 ;;
+          esac
+          # web/ arranca sin los datos de otros pesistas: lo que queda es solo lo de este build (fragmento para sumar al juego)
+          mkdir -p web_ci/models web_ci/data
+          set +e -o pipefail     # con cuadros BAD build.sh sale con error: igual hay que juntar las líneas y subir todo
+          EXPORT_BAD=1 TARIMA_WEB="$PWD/web_ci" TARIMA_THREADS="$(nproc)" ./build.sh "$N" 2>&1 | tee "out/$N/build.txt"; RC=${PIPESTATUS[0]}
+          grep -ahE '^(POSE|CHK|CHKX|TRAJ|TRAJV|TIMING|PROP|MEASURE|MASA|RADII|SKEL|GRIP|GRIPFIT|UNION|PUSH|HAIR|BUN|GLB|TEX) |^ +(BAD|rack) ' "out/$N/make.log" "out/$N/finish.log" > "out/$N/lineas.txt" || true
+          echo "== CHK y BAD =="; grep -aE '^CHK|^ +BAD' "out/$N/lineas.txt" || true
+          exit "$RC"
+      - name: Retratos (blender/ctl3.py sobre el build)
+        if: ${{ always() && needs.lista.outputs.modo != 'poses' }}
+        run: |
+          [ -s "out/$N/s4.blend" ] || { echo "sin s4.blend: no hay retratos"; exit 0; }
+          .venv/bin/python blender/ctl3.py dump "$N" > "out/$N/ctl_dump.log" 2>&1 || { tail -20 "out/$N/ctl_dump.log"; exit 0; }
+          CTL_SAMPLES=32 .venv/bin/python blender/ctl3.py "$N" ret "stand:full,face,faceS,back;over:full,upF;rack:torso,upQ;rsq:full,sqB;start:side" > "out/$N/ctl.log" 2>&1 || tail -30 "out/$N/ctl.log"
+          ls "out/$N/ctl" || true
+      - name: Artefacto liviano (sin .blend ni mapas de horneado)
+        if: ${{ always() }}
+        run: |
+          mkdir -p "art/out/$N" art/web
+          cd "out/$N" && for f in *.glb poses.json *.log *.txt *.json sheet_*.png d_*.png diag.png traj_*.png tex_preview.png uv_*.png body_mask.png hair.png hair_len.png ctl; do [ -e "$f" ] && cp -r "$f" "$GITHUB_WORKSPACE/art/out/$N/"; done; cd "$GITHUB_WORKSPACE"
+          cp -r web_ci/models web_ci/data art/web/ 2>/dev/null || true
+          du -sh art/out/"$N" art/web || true
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: pesista-${{ matrix.nombre }}
+          path: art/
+          retention-days: 14

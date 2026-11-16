@@ -64,14 +64,14 @@ def subdivide(b,levels=1):
     bpy.ops.object.modifier_move_to_index(modifier='sub',index=0); bpy.ops.object.modifier_apply(modifier='sub')
     for p in b.data.polygons: p.use_smooth=True
 ANAT_GEO=(1.15,.5)   # fracción del relieve muscular de tex.anatomy que va a la malla: (masas anchas, surcos). El resto del surco lo pone el normal map
-def anatomy(b,rig,K):
+def anatomy(b,rig,K,cut=1.):
     """Desplaza la malla subdividida sobre la normal con el relieve muscular por reglas (deltoides, bíceps, tríceps, antebrazo, pectoral, trapecio, dorsal, cuádriceps, gemelos).
-    Misma definición que el normal map (tex.anatomy). No toca cabeza, manos ni pies."""
+    Misma definición que el normal map (tex.anatomy). No toca cabeza, manos ni pies. cut: definición del pesista (apaga los surcos con la grasa)."""
     import tex
     co=coords(b); N=len(co); me=b.data; no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3)
     J={x.name[len(PRE):]:np.array(x.head_local) for x in rig.data.bones if x.name.startswith(PRE)}
     B,F,_=tex.anatomy(co,no,J,K); names,W=wget(b); keep=1-sum(W[:,j] for j,n in enumerate(names) if any(k in n for k in ('Head','Hand','Foot','Toe')))
-    d=(B*ANAT_GEO[0]+F*ANAT_GEO[1])*np.clip(keep,0,1); me.vertices.foreach_set('co',(co+no*d[:,None]).ravel()); me.update()
+    d=(B*ANAT_GEO[0]+F*ANAT_GEO[1]*cut)*np.clip(keep,0,1); me.vertices.foreach_set('co',(co+no*d[:,None]).ravel()); me.update()
     print(f'ANAT desplazamiento de malla: máx +{d.max()*1000:.1f} / {d.min()*1000:.1f} mm, {int((np.abs(d)>5e-4).sum())} vértices')
 SIMPLIFY=1.0   # fracción de caras que se conserva en las zonas simplificables. 1 = no simplificar (por defecto; TARIMA_SIMP=0.32 lo activa).
 # Queda apagado: esas zonas son solo el 9 % de las caras del cuerpo (la cabeza es el 37 % y las manos el 28 %), se ahorran ~6 mil triángulos,
@@ -109,14 +109,15 @@ def simplify(b,rig,BJ,K,OUT,keep=None):
     vg=b.vertex_groups['_simp']; gi=vg.index; out=sum(1 for v in b.data.vertices if not any(g.group==gi and g.weight>.5 for g in v.groups)); b.vertex_groups.remove(vg)
     for p in b.data.polygons: p.use_smooth=True
     print(f'SIMP zonas simplificadas: {inr} de {nf} caras; triángulos {t0} -> {sum(len(p.vertices)-2 for p in b.data.polygons)}; vértices fuera de zona {N-int(ok.sum())} -> {out}')
-def garments(b,rig,BJ,K):
+def garments(b,rig,BJ,K,ks=1.):
     """Volumen de prendas sobre la malla ya subdividida. Mismos límites que la textura de finish.py."""
     names,W=wget(b); dom=np.array([n[len(PRE):] for n in names])[W.argmax(1)]; co=coords(b); me=b.data; N=len(co)
     no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3); z=co[:,2]; knee=BJ['knee'][2]; ank=BJ['ank'][2]; E=.0035
     leg=np.isin(dom,['LeftUpLeg','RightUpLeg','LeftLeg','RightLeg']); low=np.isin(dom,['LeftLeg','RightLeg','LeftFoot','RightFoot','LeftToeBase','RightToeBase'])
-    slv=leg*sm(knee-.112-E,knee-.112+E,z)*sm(knee+.102+E,knee+.102-E,z)
-    slv=slv*(1+.35*sm(knee-.10,knee-.112,z)+.35*sm(knee+.09,knee+.102,z))      # ribete más grueso en los bordes
-    sock=low*sm(ank+.132+E,ank+.132-E,z)*(1+.6*sm(ank+.115,ank+.13,z))
+    zq=knee+(z-knee)/ks; zs=ank+(z-ank)/ks     # ks: rodilleras y medias a la escala del pesista (1 = medida fija de los dos originales)
+    slv=leg*sm(knee-.112-E,knee-.112+E,zq)*sm(knee+.102+E,knee+.102-E,zq)
+    slv=slv*(1+.35*sm(knee-.10,knee-.112,zq)+.35*sm(knee+.09,knee+.102,zq))      # ribete más grueso en los bordes
+    sock=low*sm(ank+.132+E,ank+.132-E,zs)*(1+.6*sm(ank+.115,ank+.13,zs))
     wrap=np.zeros(N)
     for side in ('Left','Right'):
         a,w,_=[np.array(p) for p in BJ['arms'][side]]; d=w-a; L=np.linalg.norm(d); d/=L; t=((co-a)@d)/L
@@ -276,6 +277,34 @@ def hair_shells(b,OUT,mat,layers=None,size=.024):
             for k in range(layers): vg.add([int(k*nu+i)],float(w[i]),'REPLACE')
     print(f'HAIR capas {layers}, caras por capa {len(sel)}, largo máx {ln[U].max()*1000:.1f} mm'); return o
 def rig_of(b): return next(m.object for m in b.modifiers if m.type=='ARMATURE')
+def bun(b,K,STY,LM,mat):
+    """Moño del pelo atado: un ovillo achatado apoyado en el cráneo, en la dirección STY['bun']['dir'] desde el centro de la cabeza.
+    Las hebras de la textura (tex.bun) dan vueltas alrededor de su eje. Va pegado al hueso Head; material opaco 'Bun'."""
+    from mathutils.bvhtree import BVHTree
+    B=STY['bun']; d=np.array(B['dir'],float); d/=np.linalg.norm(d); r=B['r']*K; ear=np.asarray(LM['ears'],float); hc=np.array([0,ear[1]+.005,ear[2]+.03])
+    co=coords(b); bvh=BVHTree.FromPolygons([Vector(c) for c in co],[tuple(p.vertices) for p in b.data.polygons]); dist=0.; o=Vector(hc)
+    for _ in range(8):     # la última cara que cruza el rayo desde adentro es el cuero cabelludo
+        h=bvh.ray_cast(o,Vector(d))
+        if h[0] is None: break
+        dist=float((h[0]-Vector(hc)).length); o=h[0]+Vector(d)*.0005
+    if dist<=0 or dist>.2*K: dist=.095*K
+    c=hc+d*(dist+r*.42); e1=np.array([1.,0,0]); e2=np.cross(d,e1); NU,NV=40,20; bm=bmesh.new(); uv=bm.loops.layers.uv.new('UVMap'); V=[]
+    for j in range(NV+1):
+        ph=math.pi*j/NV; row=[]
+        for i in range(NU):
+            th=2*math.pi*i/NU; rr=r*(1+.045*math.sin(3*th+7*ph)+.03*math.sin(5*th-4*ph))     # vueltas del ovillo
+            p=c+(e1*math.cos(th)+e2*math.sin(th))*(rr*math.sin(ph))+d*(rr*.80*math.cos(ph)); row.append(bm.verts.new(p))
+        V.append(row)
+    for j in range(NV):
+        for i in range(NU):
+            i2=(i+1)%NU; f=bm.faces.new((V[j][i],V[j][i2],V[j+1][i2],V[j+1][i])); f.smooth=True
+            for lp,(a,k) in zip(f.loops,((i,j),(i+1,j),(i+1,j+1),(i,j+1))): lp[uv].uv=(a/NU*3+k/NV*.3,k/NV)
+    bmesh.ops.remove_doubles(bm,verts=bm.verts,dist=1e-6); bm.normal_update()
+    cc=Vector(c)
+    if sum(f.normal.dot(f.calc_center_median()-cc) for f in bm.faces)<0:
+        for f in bm.faces: f.normal_flip()
+    m=bpy.data.meshes.new('Bun'); bm.to_mesh(m); bm.free(); o=bpy.data.objects.new('Bun',m); bpy.context.scene.collection.objects.link(o); m.materials.append(mat)
+    o.vertex_groups.new(name=PRE+'Head').add(list(range(len(m.vertices))),1.0,'REPLACE'); print(f'BUN centro ({c[0]:.3f},{c[1]:.3f},{c[2]:.3f}) radio {r*1000:.0f} mm, cráneo a {dist*1000:.0f} mm del centro de la cabeza, {len(m.polygons)} caras'); return o
 def lashes(b,mat):
     """Convierte las tiras 'helper-*-eyelashes-*' del mallado base en un objeto aparte con UV propio (u a lo largo del párpado, v raíz→punta)."""
     from mathutils.kdtree import KDTree

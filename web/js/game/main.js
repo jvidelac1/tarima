@@ -6,7 +6,7 @@ import { Escena } from './stage.js';
 import { poseDe, poseParado, marcas, tramo } from './sequence.js';
 import { armarCaida, poseCaida } from './caida.js';
 import { sugerencia, chanceDe } from '../sim/entrenador.js';
-import { PLANTEL, JUGADOR, FICHA, nivelFicha, ENVIONES, LEV, ETIQUETAS, GUIONES, CUERPO, BARRA } from './roster.js';
+import { PLANTEL, JUGADOR, FICHA, nivelFicha, ENVIONES, LEV, ETIQUETAS, GUIONES, CUERPO, BARRA, vestir, ternaDe } from './roster.js';
 import { Registrador, Gobernador, calidadInicial, medirRefresco, decidirCalidad, pasoDe, metaDe, nombreDe, escalones, pisoDe, PRESET, PISO_MP, MARGEN, TECHO_MP } from './perf.js';
 import { sonido } from './audio.js';
 import { detalleError, analitica, appNavegador } from './analitica.js';
@@ -84,7 +84,7 @@ function limpiarNombre(s) {
 /** El nombre del jugador, o el de siempre («Debutante», «Rookie») si no puso ninguno. Va siempre escapado o con textContent. */
 const nombreJugador = () => limpiarNombre(guardado.get('tarima.nombre')) || t('bienvenida.nombre_defecto');
 /** Quién es un pesista para el jugador: su propio nombre si es el suyo; los rivales conservan el de siempre. */
-const quien = a => (a && a.i === E.yo ? nombreJugador() : a?.f?.nombre || '');
+const quien = a => (a && a.i === E.yo ? nombreJugador() : PLANTEL[a?.id]?.nombre || a?.f?.nombre || '');      // con vestuario (?plantel=), el rival lleva el nombre del modelo que lo dibuja
 /** Si esta visita graba el lienzo 3D (LIF-45, bandera `grabacion_lienzo`). */
 const grabaLienzo = () => { try { return !!analitica?.grabandoLienzo?.(); } catch { return false; } };
 const corto = a => (a && a.i === E.yo ? nombreJugador() : PLANTEL[a.id].corto);
@@ -995,7 +995,7 @@ async function inicio() {
  */
 function cuerpoHTML(id, uno = false, barra = false) {
   const C = CUERPO[id], fr = (k, v) => { const r = BARRA[k]; return r ? Math.max(.08, Math.min(1, (v - r[0]) / (r[1] - r[0]))) : v === 'alta' ? .9 : .55; };
-  const largo = (k, v) => (k === 'estatura' ? t(`pesista.${id}.alto`) : k === 'movilidad' ? t('cuerpo.' + v) : t(fr(k, v) > .5 ? (k === 'brazos' ? 'cuerpo.largos' : 'cuerpo.largo') : (k === 'brazos' ? 'cuerpo.cortos' : 'cuerpo.corto')));
+  const largo = (k, v) => (k === 'estatura' ? (PLANTEL[id].vestido ? v.toFixed(2).replace('.', idiomaActual() === 'es' ? ',' : '.') + ' m' : t(`pesista.${id}.alto`)) : k === 'movilidad' ? t('cuerpo.' + v) : t(fr(k, v) > .5 ? (k === 'brazos' ? 'cuerpo.largos' : 'cuerpo.largo') : (k === 'brazos' ? 'cuerpo.cortos' : 'cuerpo.corto')));
   const med = (k, v, txt) => `<span class="med"><i>${t('cuerpo.' + k)}</i><span class="barra" style="--v:${Math.round(v * 100)}%"></span><em>${txt}</em></span>`;
   // energía y margen (de la ficha de juego): lo que distingue a Largo de Potente mientras comparten cuerpo
   const at = datos?.atletas?.[id]?.attrs, cj = datos?.atletas?.[id] ? cuerpoDe(id) : null;
@@ -1105,7 +1105,7 @@ async function presentacion(p, cfg, errMedio, primera) {
   const forma = s => t(s > 0 ? 'forma.liviano' : s < 0 ? 'forma.pesado' : 'forma.normal');
   const rivales = p.at.filter(a => a.i !== E.yo);
   const html = () => `${idiomasHTML(true)}${primera && !esU(cfg.ctl) ? `<h2>${t('gana.titulo')}</h2><ol class="reglas"><li>${t('gana.l1')}</li><li>${t('gana.l2')}</li><li>${t('gana.l3')}</li></ol>` : ''}
-    <h2>${t('gana.rivales')}</h2><div class="pesistas rivales">${rivales.map(a => `<div class="pesista"><div class="b" style="background:${PLANTEL[a.id].bandera}"></div><b>${esc(a.f.nombre)}</b><small>${t('gana.abre', { s: a.decl.s, c: a.decl.c })}${a.plan ? `<span class="estilo"> · ${t('rival.estilo.' + a.plan.estilo)}</span>` : ''}</small></div>`).join('')}</div>
+    <h2>${t('gana.rivales')}</h2><div class="pesistas rivales">${rivales.map(a => `<div class="pesista"><div class="b" style="background:${PLANTEL[a.id].bandera}"></div><b>${esc(quien(a))}</b><small>${t('gana.abre', { s: a.decl.s, c: a.decl.c })}${a.plan ? `<span class="estilo"> · ${t('rival.estilo.' + a.plan.estilo)}</span>` : ''}</small></div>`).join('')}</div>
     ${G.tipo !== 'nada' ? `<p>${esc(G.tipo === 'tocado' && esU(cfg.ctl) ? t('guion.tocado_u', { rival: quien(p.at[G.a]) }) : GUIONES[G.tipo](G.a >= 0 ? quien(p.at[G.a]) : ''))}</p>` : ''}<p>${t('gana.forma', { s: forma(yo.forma.s), c: forma(yo.forma.c) })}</p>`;
   let pn = capa.poner(`${html()}<div class="fila"><button class="ir grande" id="btn-gana">${t('gana.seguir')}</button></div>`, 'gana');
   bloquear(pn);
@@ -1616,6 +1616,9 @@ async function iniciar() {
   const arranque = conexion.arranque({ idioma: idiomaActual(), idioma_origen: origen, version: VERSION_JUEGO, pantalla: () => E.pantalla });
   const [poses, sim] = await bajarDatos(['data/poses.json', 'data/sim.json']);
   datos = leerDatos(sim);
+  // Vestuario (rama plantel): `?plantel=mujeres` (una terna de data/plantel.json) o `?plantel=solanet,halvard,jastrev` cambia qué
+  // modelo dibuja a cada pesista del juego (el jugador y los rivales). Sin el parámetro no se baja nada ni cambia nada.
+  if (params.get('plantel')) { try { const pl = await fetch('data/plantel.json').then(r => r.json()); const v = vestir(ternaDe(params.get('plantel'), pl), pl.pesistas, poses); console.info('plantel:', v.map(id => `${id} → ${PLANTEL[id].modelo}`).join(', ') || 'sin cambios'); } catch (e) { console.warn('plantel:', e); } }
   await Promise.all([`800 20px 'Saira Condensed'`, `700 20px 'Saira Condensed'`, `500 20px 'Saira Condensed'`].map(f => document.fonts.load(f).catch(() => null)));
   Object.assign(C, calidadInicial(params.get('calidad') || params.get('q'), tactil())); fijarHz(await refresco);
   if (C.auto) C.Q = { ...C.Q, dpr: 2 };      // en automático el tope de píxeles lo pone la calibración, no la densidad de cada calidad

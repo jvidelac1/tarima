@@ -6,7 +6,7 @@ name: Pruebas del juego
 
 on:
   push:
-    branches: [main, mvp, demo, gameplay, tablero, primera-vez, graficos, nombre, panel, rondas, graficos2, aprender, look, vertical]
+    branches: [main, mvp, demo, gameplay, tablero, primera-vez, graficos, nombre, panel, rondas, graficos2, aprender, look, vertical, plantel, visual]
   pull_request:
     branches: [main]
   workflow_dispatch:

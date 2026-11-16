@@ -42,6 +42,34 @@ export const CUERPO = {
  * (cuánto aguanta entre intentos: `fon` de web/data/sim.json) y margen (cuánto perdona un toque a destiempo: `tec`). Se
  * leen de las fichas al pintar la tarjeta; acá, solo cómo se dicen. Escala de 1 a 10.
  */
+/**
+ * Vestuario (rama `plantel`): qué modelo del plantel dibuja a cada uno de los tres pesistas del juego. Las fichas deportivas
+ * (web/data/sim.json: kilos, atributos, plan del rival) NO cambian, así que la partida, su huella y el servidor siguen
+ * igual; cambia a quién se ve: el modelo (web/models/<id>.glb), el nombre y el país del rival, la bandera, el color de la
+ * interfaz y las medidas de la tarjeta. La presentación ya acomoda el clip de cualquier modelo a los tiempos del núcleo
+ * (sequence.js busca las fases por nombre en las poses del modelo dibujado).
+ * @param {string[]} lista   hasta tres ids del plantel, en el orden Compacto, Largo, Potente (los huecos no se tocan)
+ * @param {object} fichas    `pesistas` de web/data/plantel.json (tools/plantel_web.py, desde blender/plantel.py)
+ * @param {object} poses     web/data/poses.json: solo se viste con modelos que ya están construidos
+ * @returns {string[]} los ids del juego que cambiaron de modelo
+ */
+export function vestir(lista, fichas, poses) {
+  const hechos = [], usados = new Set(), TELAS = ['#a3262a', '#3b4a8c', '#b8900f'];
+  Object.keys(PLANTEL).forEach((id, k) => {
+    const m = lista[k], f = fichas?.[m], P = poses?.[m]; if (!m || !f || !P) return;
+    const repetido = usados.has(m); usados.add(m);
+    // un modelo repetido comparte la cara: el segundo lleva la tela de otro color y no tiene primer plano (como Marangi con Brenner)
+    Object.assign(PLANTEL[id], { modelo: m, corto: f.corto, nombre: f.nombre, pais: f.pais, codigo: f.codigo, genero: f.genero, categoria: f.categoria, vestido: true,
+      // `aspecto` (rama look: Athlete.setAspecto): el del modelo nuevo si su ficha lo trae (`juego.aspecto` en blender/plantel.py); nunca el del modelo anterior
+      aspecto: f.aspecto || undefined,
+      cara: !repetido, tela: repetido ? TELAS[k] : undefined, color: (!repetido && f.color) || PLANTEL[id].color, bandera: (!repetido && f.bandera) || PLANTEL[id].bandera });
+    CUERPO[id] = { estatura: P.h, femur: P.seg.femur / P.h, brazos: P.seg.arm / P.h, movilidad: CUERPO[id].movilidad };
+    hechos.push(id);
+  });
+  return hechos;
+}
+/** De `?plantel=` a la lista de tres: el nombre de una terna de plantel.json (`mujeres`, `hombres`...) o ids separados por coma. */
+export const ternaDe = (q, plantel) => (!q ? [] : plantel?.ternas?.[q] || q.split(',').map(x => x.trim()));
 export const FICHA = { energia: 'fon', margen: 'tec' };
 export const nivelFicha = v => (v >= 8 ? 'alto' : v >= 6 ? 'medio' : 'bajo');
 /** Fracción 0..1 de cada medida dentro del rango que se dibuja (barras de la tarjeta). */
