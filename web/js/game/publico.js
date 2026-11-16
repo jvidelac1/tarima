@@ -104,7 +104,7 @@ export class Publico {
    */
   _hornear() {
     const A = this.arena, crowd = A.crowd, mat = crowd.material, g0 = crowd.geometry, grupo = new THREE.Group(); grupo.name = 'tribunas horneadas';
-    const BH = 1.5, M = new THREE.Matrix4(), r = this.renderer, fondo = new THREE.Color(.05, .06, .085); mat.uniforms.uHorneo.value = HORNEO;      // fondo opaco del tono de la sombra de la tribuna: la masa es continua, sin recortes dentados ni huecos negros
+    const BH = 1.5, M = new THREE.Matrix4(), r = this.renderer, fondo = new THREE.Color(.27, .3, .36); mat.uniforms.uHorneo.value = HORNEO;      // fondo opaco del tono de la sombra de la tribuna: la masa es continua, sin recortes dentados ni huecos negros
     A.stands.forEach((st, si) => {
       const ids = []; A.seats.forEach((s, i) => { if (s.si === si) ids.push(i); });
       const g = new THREE.InstancedBufferGeometry(); g.index = g0.index; for (const k of ['position', 'uv']) g.setAttribute(k, g0.attributes[k]);
