@@ -16,6 +16,7 @@ import { Senal } from './ui/senal.js';
 import { Depura } from './ui/depura.js';
 import { Margen } from './ui/margen.js';
 import { Barrita } from './ui/barrita.js';
+import { Aprende, varsGlosario } from './ui/aprende.js';
 import { explicar, pasos, PALABRAS, GUIA, discos, puntos, tramoTxt, deDiez, fuerteDebil, nivelTramo, cuartos, dificultadDe } from './ui/mensajes.js';
 import { alDia, tocar, senal as senalDe, GUIADO, EN_HOMBROS, QUE_U, QUE_B, proximoCentro } from './controles.js';
 import { tableroHTML, datosTablero, tableroVivoHTML } from './ui/tablero.js';
@@ -49,9 +50,10 @@ const IDS = ['ventura', 'brenner', 'marangi'];
 const TIPO = { ventura: 'compacto', brenner: 'largo', marangi: 'potente' };
 const GLOSARIO = ['arranque', 'dos_tiempos', 'intento', 'vale', 'total', 'energia', 'kilos'];
 /** En 'u' la energía es la del levantamiento (no la de toda la final), y se suman la garra y la suerte. */
-const GLOSARIO_U = ['arranque', 'dos_tiempos', 'intento', 'vale', 'total', 'u_energia', 'garra', 'suerte', 'kilos'];
-/** En 'b' (la barrita), lo mismo más la barrita. */
-const GLOSARIO_B = ['barrita', 'cansancio', 'rm', ...GLOSARIO_U];
+/** LIF-52: las luces, el nulo, «Cambiar» y el estilo de envión son también las explicaciones de primera vez (ui/aprende.js). */
+const GLOSARIO_U = ['arranque', 'dos_tiempos', 'intento', 'luces', 'nulo', 'total', 'u_energia', 'garra', 'suerte', 'kilos', 'cambiar', 'estilo'];
+/** En 'b' (la barrita), lo mismo más la barrita, el RM y la dificultad. */
+const GLOSARIO_B = ['barrita', 'cansancio', 'rm', 'dificultad', ...GLOSARIO_U];
 /** 'u' y 'b' comparten la energía, los cuerpos, el entrenador, el panel y el ritmo; 'b' suma la barrita (Gameplay 3). */
 const esU = c => c === 'u' || c === 'b';
 /**
@@ -90,6 +92,11 @@ const corto = a => (a && a.i === E.yo ? nombreJugador() : PLANTEL[a.id].corto);
 const ident = a => (a && a.i === E.yo ? JUGADOR : PLANTEL[a.id]);
 /** Cada concepto se explica una sola vez, la primera vez que aparece (tarima.visto.<clave>). Devuelve true esa primera vez. */
 function primeraVez(clave) { if (guardado.get('tarima.visto.' + clave)) return false; guardado.set('tarima.visto.' + clave, '1'); return true; }
+/**
+ * LIF-52: la explicación de primera vez que toca en este momento ('llamado', 'rival', 'decision'; ui/aprende.js). Solo en
+ * 'b' y 'u' (en Clásico el zócalo ocupa la esquina y quien juega ya sabe). No frena nada: el juego sigue igual.
+ */
+function aprender(momento, c = {}) { if (!aprendeUI || !esU(E.cfg?.ctl)) return null; try { return aprendeUI.momento(momento, c); } catch (e) { console.warn('aprende:', e); return null; } }
 /** Un campo donde se escribe: ahí las teclas son del campo, no del juego. */
 const campo = el => !!el && el.nodeType === 1 && (el.isContentEditable || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || (el.tagName === 'INPUT' && !/^(button|submit|reset|checkbox|radio|range|color|file|image)$/i.test(el.type || 'text')));
 
@@ -102,8 +109,8 @@ const perf = new Registrador();
  */
 const C = { auto: false, clave: '', Q: null, sombras: true, nombre: '', hz: 60, paso: 1, pasoMin: 1, piso: 0, cambios: [], calibrado: false, medido: null, calibracion: null };
 let gov = null, nRaf = 0;
-let escena = null, datos = null, ayudas = null, boton = null, enCuadro = null, senalUI = null, depura = null, margenUI = null, barritaUI = null;
-const visita = n => { if (n !== E.pantalla) E.previa = E.pantalla; E.pantalla = n; document.documentElement.dataset.pantalla = n; if (!E.visitados.includes(n)) E.visitados.push(n); perf.marcar(n); try { ganchos.visita?.(n); } catch { /* métricas */ } };
+let escena = null, datos = null, ayudas = null, boton = null, enCuadro = null, senalUI = null, depura = null, margenUI = null, barritaUI = null, aprendeUI = null;
+const visita = n => { if (n !== E.pantalla) E.previa = E.pantalla; E.pantalla = n; document.documentElement.dataset.pantalla = n; if (!E.visitados.includes(n)) E.visitados.push(n); perf.marcar(n); aprendeUI?.alVisitar(n); try { ganchos.visita?.(n); } catch { /* métricas */ } };
 
 // ---------- tiempo del juego: esperas sobre el reloj inyectable ----------
 const pend = [];
@@ -126,6 +133,7 @@ let ultimo = 0;
 function tic(pintar, tRaf = null) {
   const c0 = performance.now(), now = reloj.ahora(), dt = Math.min(.25, Math.max(0, (now - ultimo) / 1000)); ultimo = now;
   for (let i = pend.length - 1; i >= 0; i--) if (pend[i].t <= now) pend.splice(i, 1)[0].res();
+  aprendeUI?.tic(now);
   // el botón de pausa (para el dedo; con teclado es Esc) no se muestra encima de un panel grande: taparía su título
   { const ver = puedePausar() && !E.sobre && !$('capa').querySelector('.panel:not(.abajo)'); for (const b of [$('pausa'), $('ayudab'), $('sonidob')]) if (b && b.hidden === ver) b.hidden = !ver; }
   try { enCuadro?.(now, dt); } catch (e) { E.errores.push(String(e.stack || e)); console.error(e); enCuadro = null; }
@@ -321,7 +329,7 @@ function ponerAcuse() {
 function puedePausar() { return E.pantalla !== 'carga' && !(E.intento && E.intento.propio); }
 function pintarSobre(tipo) {
   const el = $('sobre'), T = tactil(), ctl = E.cfg?.ctl || E.ctl; E.sobre.tipo = tipo;
-  const glosario = `<h2>${t('glosario.titulo')}</h2><dl class="glosario">${(ctl === 'b' ? GLOSARIO_B : ctl === 'u' ? GLOSARIO_U : GLOSARIO).map(k => `<div><dt>${t(`glosario.${k}.t`)}</dt><dd>${t(`glosario.${k}.d`)}</dd></div>`).join('')}</dl>`;
+  const glosario = `<h2>${t('glosario.titulo')}</h2><dl class="glosario">${(ctl === 'b' ? GLOSARIO_B : ctl === 'u' ? GLOSARIO_U : GLOSARIO).map(k => `<div><dt>${t(`glosario.${k}.t`)}</dt><dd>${t(`glosario.${k}.d`, varsGlosario())}</dd></div>`).join('')}</dl>`;
   el.innerHTML = `<div class="panel chico sobre-${tipo}">${tipo === 'ayuda'
     ? `${idiomasHTML()}<h2>${t('ayuda.titulo', { controles: t(ctl !== 'c' ? 'opciones.un_toque' : 'opciones.pro') })}</h2>${pasosHTML(ctl, T)}<p>${t(ctl === 'b' ? 'ayuda.barra' : ctl === 'u' ? 'ayuda.uno' : ctl === 'f' ? 'ayuda.un_toque' : 'ayuda.pro')}</p>${glosario}${T ? '' : menus()}<div class="fila"><button class="ir" id="so-seguir">${t('pausa.seguir')}</button></div>`
     : `${idiomasHTML()}<h1>${t('pausa.titulo')}</h1><p>${t('pausa.texto')}</p><div class="fila"><button class="ir" id="so-seguir">${t('pausa.seguir')}</button><button id="so-ayuda">${t('pausa.ayuda')}</button><button id="so-salir">${t('pausa.salir')}</button></div>`}</div>`;
@@ -819,7 +827,7 @@ async function decision(a, lev, res, et, propio, o = {}) {
     while (hito.luz < 3 && t >= tLuz + hito.luz * paso) { const i = hito.luz++; d[i] = res.luces[i]; setLuces(d); if (vivo) { sonido.luz(d[i]); if (limite && i < 2) sonido.latido(); if (ok && i === 1) sonido.festejo(lento || limite ? 1 : .6); } }
     if (!hito.caida && t >= tCaida) { hito.caida = true; escena.primerPlano('caida', null, .6); }
     if (!hito.rev && t >= tRev) { hito.rev = true; escena.camara('rev', 1.1); }
-    if (!hito.ver && t >= tVer) { hito.ver = true; veredicto(titulo, sub, !ok); try { o.alVer?.(); } catch (e) { console.warn('alVer:', e); } if (vivo && !ok && (!fin || fin.tipo === 'bajada')) sonido.ovacion(false); }
+    if (!hito.ver && t >= tVer) { hito.ver = true; veredicto(titulo, sub, !ok); try { o.alVer?.(); } catch (e) { console.warn('alVer:', e); } if (!propio && vivo) aprender('decision', { nulo: res.res === 'nulo', lev }); if (vivo && !ok && (!fin || fin.tipo === 'bajada')) sonido.ovacion(false); }
   };
   enCuadro = (ahora, dt) => { avanzar((ahora - t0) / 1000, dt, true); if (uno) margenUI.cuadro(ahora); };
   // un intento propio: el veredicto (y su línea) queda al menos 1 s a la vista antes de poder saltearlo, y una ráfaga que
@@ -1063,7 +1071,8 @@ async function elegirApertura(p, lev, sugerida, html) {
 }
 
 /**
- * P5 · Cómo se gana (en la primera final, tres líneas numeradas; desde la segunda, solo los rivales) y después P6.
+ * P5 · Cómo se gana (en la primera final, tres líneas numeradas; desde la segunda, solo los rivales) y después P6. En 'b' y
+ * 'u' sin las tres líneas (LIF-52): las luces y el total se explican en su momento, una vez (ui/aprende.js).
  * `primera`: es la primera final de este dispositivo.
  */
 async function presentacion(p, cfg, errMedio, primera) {
@@ -1073,7 +1082,7 @@ async function presentacion(p, cfg, errMedio, primera) {
   const facil = cfg.ctl !== 'c', pct = facil ? (errMedio === null ? (cfg.ctl === 'b' ? reglasB(cfg.dif).apertura / 1000 : .90) : Math.max(.88, Math.min(.93, .93 - (errMedio - 50) / 150 * .05))) : errMedio === null ? .935 : Math.max(.88, Math.min(.935, .935 - (errMedio - 30) / 60 * .055)), sug = Math.round(f.techo.s * pct);
   const forma = s => t(s > 0 ? 'forma.liviano' : s < 0 ? 'forma.pesado' : 'forma.normal');
   const rivales = p.at.filter(a => a.i !== E.yo);
-  const html = () => `${idiomasHTML(true)}${primera ? `<h2>${t('gana.titulo')}</h2><ol class="reglas"><li>${t('gana.l1')}</li><li>${t('gana.l2')}</li><li>${t('gana.l3')}</li></ol>` : ''}
+  const html = () => `${idiomasHTML(true)}${primera && !esU(cfg.ctl) ? `<h2>${t('gana.titulo')}</h2><ol class="reglas"><li>${t('gana.l1')}</li><li>${t('gana.l2')}</li><li>${t('gana.l3')}</li></ol>` : ''}
     <h2>${t('gana.rivales')}</h2><div class="pesistas rivales">${rivales.map(a => `<div class="pesista"><div class="b" style="background:${PLANTEL[a.id].bandera}"></div><b>${esc(a.f.nombre)}</b><small>${t('gana.abre', { s: a.decl.s, c: a.decl.c })}${a.plan ? `<span class="estilo"> · ${t('rival.estilo.' + a.plan.estilo)}</span>` : ''}</small></div>`).join('')}</div>
     ${G.tipo !== 'nada' ? `<p>${esc(G.tipo === 'tocado' && esU(cfg.ctl) ? t('guion.tocado_u', { rival: quien(p.at[G.a]) }) : GUIONES[G.tipo](G.a >= 0 ? quien(p.at[G.a]) : ''))}</p>` : ''}<p>${t('gana.forma', { s: forma(yo.forma.s), c: forma(yo.forma.c) })}</p>`;
   let pn = capa.poner(`${html()}<div class="fila"><button class="ir grande" id="btn-gana">${t('gana.seguir')}</button></div>`, 'gana');
@@ -1133,7 +1142,8 @@ function panelLlamado(p, L, t0, alConfirmar, corre = true) {
   const C = p.cuenta(L.a), sinArranque = L.lev === 'c' && !a.mejor.s;
   const cuenta = L.lev === 'c' ? [C.oro ? t('cuenta.oro', { kg: C.oro }) : t(sinArranque ? 'cuenta.sin_arranque' : 'cuenta.oro_no'), C.plata ? t('cuenta.plata', { kg: C.plata }) : ''].filter(Boolean).join(' ') : (C.oro ? t('cuenta.liderar', { kg: C.oro }) : '');
   // una sola explicación nueva por pantalla, y una sola vez: el primer dos tiempos o, en el primer llamado, que la barra no baja
-  const explica = S.dt ? t('llamado.dt_primera') : facil && primeraVez('barra_no_baja') ? t('llamado.barra_no_baja') : '';
+  // en 'b' y 'u' lo explica la línea de primera vez de los kilos (ui/aprende.js), encima del panel y no dentro del detalle plegado
+  const explica = S.dt ? t('llamado.dt_primera') : facil && !uno && primeraVez('barra_no_baja') ? t('llamado.barra_no_baja') : '';
   const uPintar = (kilos, antes, fijo, T) => {
     const pr = llegas(S.kg, S.env), llega = pr.fin >= 0;
     // sin llegar con el día normal, todavía puede subir (el día o la garra): lo dice la chance, sin contradecirla
@@ -1213,10 +1223,12 @@ function panelLlamado(p, L, t0, alConfirmar, corre = true) {
       if (uno && E.primeraFinal && !S.seguro && chance(S.kg) < 5) { S.seguro = true; bloquear(pinta(), true); return; }      // el segundo «¿Seguro?» también espera 400 ms
       if (L.lev === 'c' && !envFijo) guardado.set(`tarima.env.${p.cfg.ctl}.${a.id}`, S.env); E.repintar = null; alConfirmar(S);
     });
-    E.repintar = () => pinta();
+    E.repintar = () => pinta(); aprendeUI?.colocar();
     return pn;
   };
   bloquear(pinta());      // el foco queda en Confirmar: Enter o Espacio confirman; ← → cambian los kilos
+  // LIF-52: una explicación de primera vez encima del panel (el estilo de envión, la dificultad, los kilos o el total)
+  if (uno) { const n10 = chance(S.kg); aprender('llamado', { lev: L.lev, envFijo, barra, hechos: a[L.lev].length, titulos: { dificultad: `${t('rm.dif.' + dificultadDe(n10))} · ${t('llamado.u_chance', { n: n10 })}` } }); }
 }
 
 /**
@@ -1311,6 +1323,7 @@ async function llamadoRival(p, L, cfg) {
     escena.posar(pose || poseParado(escena.P, L.lev), L.lev); escena.camara(camPrincipal()); zocalo(a, L);
   });
   turno(a); etiqueta(etiquetasRival(L.et, yoPrimero)); botonSaltar(true);
+  aprender('rival', { lev: L.lev, cambiar: !!opPedido() });
   let via = '', momento = ''; const ts = reloj.ahora();
   // saltar en el levantamiento: fundido corto y el intento al final
   E.saltarRival = v => { if (via || !E.intento || E.intento.propio) return; via = v || 'boton'; momento = 'intento'; fundido(async () => { E.intento?.alFinal(); await espera(40); }); };
@@ -1590,7 +1603,8 @@ async function iniciar() {
   const cargas = IDS.map(id => escena.cargar(id).catch(() => null));
   if (params.get('banco') === '1') { $('msg').textContent = 'Banco de medición…'; const { correrBanco } = await import('./banco.js'); correrBanco({ escena, cargas, hz: C.hz, params, msg: $('msg') }); return; }
   E.precal = DIBUJA ? Promise.all(cargas).then(() => escena.precalentar()).catch(e => { console.warn('precalentar:', e); }) : Promise.resolve();
-  ayudas = new Ayudas($('ayudas')); senalUI = new Senal($('senal'), tactil()); margenUI = new Margen($('margen'), { reduce: reduceMotion }); barritaUI = new Barrita($('barrita'), { reduce: reduceMotion }); boton = new Boton([$('escena'), $('zona')]); $('escena').tabIndex = -1;
+  ayudas = new Ayudas($('ayudas')); senalUI = new Senal($('senal'), tactil()); margenUI = new Margen($('margen'), { reduce: reduceMotion }); barritaUI = new Barrita($('barrita'), { reduce: reduceMotion }); boton = new Boton([$('escena'), $('zona')]);
+  aprendeUI = new Aprende($('tv'), { ahora: () => reloj.ahora(), guardado, ev, pantalla: () => E.pantalla, panel: () => $('capa').querySelector('.panel.llamado') }); $('escena').tabIndex = -1;
   // «?» junto a la pausa: «Cómo se juega» con el dedo (con teclado es H)
   if (!$('ayudab')) { const ay = document.createElement('button'); ay.id = 'ayudab'; ay.hidden = true; ay.textContent = '?'; $('pausa').after(ay); ay.onclick = () => abrirSobre('ayuda'); pintarFijos(); }
   // el selector ES · EN de cualquier panel (bienvenida, cómo se gana, kilos, llamado, intervalo, podio, muro, encuesta)
@@ -1649,7 +1663,7 @@ window.JUEGO = {
   estado() {
     const I = E.intento, pn = $('capa').firstElementChild, act = document.activeElement;
     const o = { pantalla: E.pantalla, visitados: E.visitados, modo: E.modo, errores: E.errores, ahora: reloj.ahora(), fase: E.p?.fase ?? null, metro: E.metro ?? null, intento: null,
-      panel: !!pn, foco: act && act.tagName === 'BUTTON' ? claveDe(act) || 'button' : campo(act) ? '#' + (act.id || 'campo') : null, idioma: idiomaActual(), sobre: E.sobre ? E.sobre.tipo : null, ctl: E.cfg?.ctl || E.ctl };
+      panel: !!pn, foco: act && act.tagName === 'BUTTON' ? claveDe(act) || 'button' : campo(act) ? '#' + (act.id || 'campo') : null, idioma: idiomaActual(), sobre: E.sobre ? E.sobre.tipo : null, ctl: E.cfg?.ctl || E.ctl, aprende: aprendeUI?.estado() ?? null };
     if (I && I.m) {
       const m = I.m, M = m.M, c = I.ctx, abs = t => (I.guiado ? o.ahora + (t - I.now) / (I.vel || 1) : I.t0 + t), x = { fase: m.fase, propio: I.propio, now: I.now, objetivo: null, accion: null, apretado: boton.apretado, ctl: I.ctl, guiado: I.guiado, seDetiene: !!I.seDetiene, entradas: I.ent.length, parado: I.parado, senal: null };
       // la señal visible: lo único que mira un jugador (y la prueba en Fácil). `objetivo` en tiempo del reloj del juego.

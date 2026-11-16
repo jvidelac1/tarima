@@ -400,9 +400,9 @@ export default {
   'glosario.dos_tiempos.t': 'Dos tiempos', 'glosario.dos_tiempos.d': 'Primero a los hombros, después arriba de la cabeza.',
   'glosario.intento.t': 'Intento', 'glosario.intento.d': 'Cada vez que sales a levantar. Tienes 3 de cada uno.',
   'glosario.vale.t': 'Vale / No vale', 'glosario.vale.d': 'Hay 3 jueces: con 2 luces blancas, vale.',
-  'glosario.total.t': 'Total', 'glosario.total.d': 'Tu mejor arranque más tu mejor dos tiempos. Gana el más alto.',
+  'glosario.total.t': 'Total', 'glosario.total.d': 'Mejor arranque + mejor dos tiempos. Gana el total más alto. Necesitas un válido en cada uno.',
   'glosario.energia.t': 'Energía', 'glosario.energia.d': 'Cada intento cansa. Los fallos y los pesos altos cansan más.',
-  'glosario.kilos.t': 'Kilos', 'glosario.kilos.d': 'Más kilos, más difícil. La barra nunca baja: si fallas, repites el peso o subes.',
+  'glosario.kilos.t': 'Kilos', 'glosario.kilos.d': 'La barra nunca baja dentro de la ronda. Tras un válido pides más; tras un fallo, repites o subes. Poco es más seguro; mucho suma más.',
 
   // en español el puesto va con {n}; estas existen para que los dos diccionarios tengan las mismas claves
   'pos.1': '1.º', 'pos.2': '2.º', 'pos.3': '3.º',
@@ -697,4 +697,11 @@ export default {
   'jerk.fijo': 'fijo',
   'jerk.regla': 'Queda fijo para los 3 intentos.',
   'jerk.fijo_nota': 'Lo elegiste en tu primer dos tiempos: queda para los 3 intentos.',
+  // LIF-52: aprender jugando. Cada explicación sale una vez, en su momento (ui/aprende.js), y es la misma línea del glosario
+  'glosario.luces.t': 'Luces de los jueces', 'glosario.luces.d': '3 jueces, una luz cada uno. Con 2 o 3 blancas, vale. Roja: vieron una falta.',
+  'glosario.nulo.t': 'No vale', 'glosario.nulo.d': 'La barra subió, pero al menos 2 jueces vieron una falta: codos que se doblan (empujar), temblar o bajarla antes de la señal.',
+  'glosario.dificultad.t': 'Dificultad · X de 10', 'glosario.dificultad.d': 'Cuántas veces de 10 sube ese peso. Cuanto más cerca de tu RM (tu mejor marca), más difícil.',
+  'glosario.cambiar.t': 'Cambiar', 'glosario.cambiar.d': 'Mientras levanta un rival, puedes subir tu próximo peso (2 cambios por intento). Úsalo para responder si un rival te pasa.',
+  'glosario.estilo.t': 'Estilo de envión', 'glosario.estilo.d': '{split} (el más fácil), {power} o {squat}. Lo eliges en tu primer dos tiempos y queda para los 3.',
+  'aprende.cerrar': 'Entendido',
 };

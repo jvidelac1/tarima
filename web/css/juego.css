@@ -668,3 +668,15 @@ html[data-pantalla=intento] #tablero,body:has(#margen:not([hidden])) #tablero{to
 :where(html.horiz.bajo) .panel.compacto .pn-estilo button{min-height:40px;font-size:13px;padding:.15em .7em}
 :where(html.horiz.bajo) .panel.compacto .pn-estilo:not(.abierto) .pn-dif{display:none}      /* la dificultad, en la lista de los tres */
 :where(html.horiz.bajo) .panel.compacto .pn-estilo.fijo .pn-et{display:none}
+/* LIF-52: explicación de primera vez (ui/aprende.js). Abajo a la izquierda (en 'b' y 'u' ahí no hay nada y el pesista no
+   llega), o encima del panel del llamado, alineada a su derecha (aprende.js le pone right, bottom y width). Una línea, con ✕. */
+.aprende{position:absolute;left:calc(var(--u)*1.4 + var(--sl));bottom:calc(var(--u)*1.2 + var(--sb));max-width:min(30cqw,calc(var(--u)*27));display:flex;align-items:flex-start;gap:calc(var(--u)*.3);background:rgba(6,14,48,.9);border-left:calc(var(--u)*.28) solid var(--gold);padding:calc(var(--u)*.45) 0 calc(var(--u)*.45) calc(var(--u)*.8);font-family:var(--body);font-weight:400;text-transform:none;letter-spacing:0;font-size:calc(var(--u)*1.05);line-height:1.3;color:var(--ink)}
+.aprende p{margin:0;flex:1;min-width:0}
+.aprende b{font-family:var(--display);font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);margin-right:.25em}
+.aprende button{pointer-events:auto;flex:none;align-self:stretch;min-width:max(36px,calc(var(--u)*2.6));min-height:max(36px,calc(var(--u)*2.6));padding:0;background:transparent;border:0;color:var(--mute);font-size:calc(var(--u)*1.25);cursor:pointer;display:flex;align-items:flex-start;justify-content:center;padding-top:calc(var(--u)*.1)}
+.aprende button:hover{color:var(--ink)}
+.aprende[data-donde=panel]{left:auto;max-width:none;box-sizing:border-box}
+.aprende.sin-lugar{visibility:hidden}
+html:where(.horiz).zurdo .aprende[data-donde=esquina]{left:calc(var(--boton) + var(--bm)*2 + var(--sl))}
+:where(html.horiz.bajo) .aprende{font-size:max(11.5px,calc(var(--u)*1.05));max-width:min(32cqw,calc(var(--u)*28))}
+@media (prefers-reduced-motion:no-preference){.aprende{animation:entraL .18s ease-out}}

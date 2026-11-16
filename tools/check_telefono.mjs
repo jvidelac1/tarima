@@ -56,7 +56,7 @@ const CASOS = [
   { nombre: 'zurdo_740x360', w: 740, h: 360, dpr: 3, url: '&mano=izq', hastaIntentos: 2 },
   // iPhone en Safari de costado, con la barra de direcciones a la vista: quedan unos 340 px de alto
   { nombre: 'safari_844x340', w: 844, h: 340, dpr: 3, seguras: { top: 0, right: 47, bottom: 21, left: 47 }, hastaIntentos: 2 },
-  { nombre: 'android_932x430', w: 932, h: 430, dpr: 3, hastaIntentos: 2 },
+  { nombre: 'android_932x430', w: 932, h: 430, dpr: 3, hastaIntentos: 2, lang: 'en' },      // en inglés (LIF-52: las explicaciones de primera vez en los dos idiomas)
   { nombre: 'vertical_390x844', w: 390, h: 844, dpr: 3, vertical: true, hastaIntentos: 2 },
 ];
 
@@ -83,7 +83,7 @@ async function correr(C) {
     await page.screenshot({ path: path.join(dir, f) }).catch(() => null); return f;
   };
 
-  await page.goto(`${base}juego.html?lang=es&semilla=20261112&dibujo=${DIBUJO ? 1 : 0}${C.url || ''}`, { waitUntil: 'load' });
+  await page.goto(`${base}juego.html?lang=${C.lang || 'es'}&semilla=20261112&dibujo=${DIBUJO ? 1 : 0}${C.url || ''}`, { waitUntil: 'load' });
   const S0 = await J(() => { const p = document.createElement('div'); p.style.cssText = 'position:fixed;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)'; document.body.append(p); const c = getComputedStyle(p), r = { top: parseFloat(c.paddingTop), right: parseFloat(c.paddingRight), bottom: parseFloat(c.paddingBottom), left: parseFloat(c.paddingLeft) }; p.remove(); return { seguras: r, tactil: matchMedia('(pointer:coarse)').matches }; });
   if (!S0.tactil) mal('la emulación no da puntero grueso: la prueba no sirve');
   if (C.seguras && S0.seguras.left !== C.seguras.left) { notas.push(`${tag} áreas seguras pedidas ${JSON.stringify(C.seguras)}, la página ve ${JSON.stringify(S0.seguras)}`); seguras = S0.seguras; }
@@ -121,7 +121,7 @@ async function correr(C) {
       const caja = el => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
       const cruza = (a, b) => a.l < b.r - 1 && a.r > b.l + 1 && a.t < b.b - 1 && a.b > b.t + 1;
       const o = { scroll: se.scrollWidth > W + 1 || se.scrollHeight > H + 1 || scrollX !== 0 || scrollY !== 0, fuera: [], seguras: [], cruces: [], panel: null, zona: ve($('zona')) };
-      const ids = ['zona', 'senal', 'barrita', 'margen', 'zocalo', 'acuse', 'guia', 'veredicto', 'cartel', 'rival', 'etiqueta', 'pausa', 'ayudab', 'sonidob', 'saltar', 'turno', 'marcador', 'tablero', 'saltar-rival'], B = {};
+      const ids = ['zona', 'senal', 'barrita', 'margen', 'zocalo', 'acuse', 'guia', 'veredicto', 'cartel', 'rival', 'etiqueta', 'pausa', 'ayudab', 'sonidob', 'saltar', 'turno', 'marcador', 'tablero', 'saltar-rival', 'aprende'], B = {};
       for (const id of ids) if (ve($(id))) B[id] = caja($(id));
       for (const k of ['bug', 'relojbox']) { const el = document.querySelector('.' + k); if (ve(el)) B[k] = caja(el); }
       for (const [id, b] of Object.entries(B)) {
@@ -129,14 +129,16 @@ async function correr(C) {
         // lo que se toca o se lee no va debajo de la muesca ni de la barra de inicio (el veredicto y el cartel van centrados)
         if (!['veredicto', 'cartel'].includes(id) && (b.l < seg.left - 1 || b.r > W - seg.right + 1 || b.b > H - seg.bottom + 1)) o.seguras.push(id);
       }
-      for (const [a, b] of [['zona', 'barrita'], ['barrita', 'zocalo'], ['barrita', 'guia'], ['barrita', 'margen'], ['zona', 'senal'], ['zona', 'zocalo'], ['zona', 'acuse'], ['zona', 'guia'], ['zona', 'rival'], ['zona', 'pausa'], ['zona', 'saltar'], ['zona', 'sonidob'], ['sonidob', 'pausa'], ['sonidob', 'bug'], ['sonidob', 'senal'], ['ayudab', 'relojbox'], ['senal', 'zocalo'], ['senal', 'guia'], ['senal', 'etiqueta'], ['senal', 'bug'], ['zocalo', 'acuse'], ['guia', 'zocalo'], ['acuse', 'guia'], ['turno', 'sonidob'], ['turno', 'pausa'], ['turno', 'ayudab'], ['turno', 'marcador'], ['margen', 'guia'], ['margen', 'senal'], ['veredicto', 'margen'], ['veredicto', 'turno'], ['tablero', 'veredicto'], ['tablero', 'sonidob'], ['tablero', 'pausa'], ['tablero', 'ayudab'], ['tablero', 'relojbox'], ['tablero', 'senal'], ['tablero', 'margen'], ['tablero', 'acuse'], ['saltar-rival', 'acuse'], ['saltar-rival', 'veredicto'], ['saltar-rival', 'zona']])
+      for (const [a, b] of [['zona', 'barrita'], ['barrita', 'zocalo'], ['barrita', 'guia'], ['barrita', 'margen'], ['zona', 'senal'], ['zona', 'zocalo'], ['zona', 'acuse'], ['zona', 'guia'], ['zona', 'rival'], ['zona', 'pausa'], ['zona', 'saltar'], ['zona', 'sonidob'], ['sonidob', 'pausa'], ['sonidob', 'bug'], ['sonidob', 'senal'], ['ayudab', 'relojbox'], ['senal', 'zocalo'], ['senal', 'guia'], ['senal', 'etiqueta'], ['senal', 'bug'], ['zocalo', 'acuse'], ['guia', 'zocalo'], ['acuse', 'guia'], ['turno', 'sonidob'], ['turno', 'pausa'], ['turno', 'ayudab'], ['turno', 'marcador'], ['margen', 'guia'], ['margen', 'senal'], ['veredicto', 'margen'], ['veredicto', 'turno'], ['tablero', 'veredicto'], ['tablero', 'sonidob'], ['tablero', 'pausa'], ['tablero', 'ayudab'], ['tablero', 'relojbox'], ['tablero', 'senal'], ['tablero', 'margen'], ['tablero', 'acuse'], ['saltar-rival', 'acuse'], ['saltar-rival', 'veredicto'], ['saltar-rival', 'zona'],
+        // LIF-52: la explicación de primera vez no se encima con nada
+        ...['tablero', 'veredicto', 'zona', 'saltar-rival', 'pausa', 'sonidob', 'ayudab', 'relojbox', 'acuse', 'margen', 'senal', 'barrita', 'guia', 'saltar', 'bug'].map(x => ['aprende', x])])
         if (B[a] && B[b] && cruza(B[a], B[b])) o.cruces.push(`${a}/${b}`);
       const pn = document.querySelector('#capa .panel') || (ve($('sobre')) ? $('sobre').querySelector('.panel') : null);
       if (pn) {
         const b = caja(pn), cortados = [];
         // texto cortado a lo ancho dentro del panel (una celda o un botón que no entra)
         for (const el of pn.querySelectorAll('h1,h2,p,li,button,td,th,label,b,span,output')) if (ve(el) && el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).overflowX !== 'visible') cortados.push((el.textContent || '').trim().slice(0, 30));
-        o.panel = { titulo: (pn.querySelector('h1,h2')?.textContent || '').trim().slice(0, 50), alto: Math.round(b.b - b.t), sobraAlto: pn.scrollHeight - pn.clientHeight, sobraAncho: pn.scrollWidth - pn.clientWidth, fuera: b.l < seg.left - 1 || b.r > W - seg.right + 1 || b.t < -1 || b.b > H - seg.bottom + 1, cortados, tapa: B.zona && cruza(B.zona, b) };
+        o.panel = { titulo: (pn.querySelector('h1,h2')?.textContent || '').trim().slice(0, 50), alto: Math.round(b.b - b.t), sobraAlto: pn.scrollHeight - pn.clientHeight, sobraAncho: pn.scrollWidth - pn.clientWidth, fuera: b.l < seg.left - 1 || b.r > W - seg.right + 1 || b.t < -1 || b.b > H - seg.bottom + 1, cortados, tapa: B.zona && cruza(B.zona, b), aprende: !!B.aprende && cruza(B.aprende, b) };
       }
       return o;
     }, seguras);
@@ -152,6 +154,7 @@ async function correr(C) {
       if (P.fuera) mal(`${q} se sale de la pantalla o de las áreas seguras`);
       if (P.cortados.length) mal(`${q} corta texto: ${P.cortados.join(' | ')}`);
       if (P.tapa) mal(`${q} queda debajo del botón táctil`);
+      if (P.aprende) mal(`${q} se encima con la explicación de primera vez`);
     }
     return R;
   };
@@ -195,7 +198,7 @@ async function correr(C) {
     const x = await J(medirEnPagina).catch(e => ({ error: String(e) })); if (!x) return; if (x.error) { notas.push(`${tag} tapa ${momento}: ${x.error}`); return; }
     TAPA.push({ p: C.nombre, momento, x }); const r = revisarTapa(momento, x); if (r && !INFORMA) mal(r);
   };
-  const probado = { detalle: false, estilo: false };
+  const probado = { detalle: false, estilo: false }, aprendes = new Set(); let aprendeCerrada = false;
   const vistas = new Set(), pantallas = new Set(); let firma = '', dedosProbados = false, bordesProbados = false, campoSolo = false, nIntentos = 0, ultToque = 0, hecho = '', revisadas = 0;
   const hasta = s => s.pantalla === 'fin' || (C.hastaIntentos && nIntentos >= C.hastaIntentos);
   for (let n = 0; n < 60000; n++) {
@@ -204,7 +207,7 @@ async function correr(C) {
     if (hasta(s)) break;
     const I = s.intento;
     // una captura y una revisión por pantalla nueva, por panel nuevo y por señal nueva
-    const clave = `${s.pantalla}|${s.panel ? 'panel' : ''}|${s.sobre || ''}|${I && I.propio && I.senal ? I.senal.clave : ''}`;
+    const clave = `${s.pantalla}|${s.panel ? 'panel' : ''}|${s.sobre || ''}|${I && I.propio && I.senal ? I.senal.clave : ''}|${s.aprende ? 'aprende_' + s.aprende.clave : ''}`;
     if (clave !== firma && !(I && I.propio && !I.senal)) {
       firma = clave; pantallas.add(s.pantalla);
       if (s.panel) await av(450);
@@ -236,6 +239,17 @@ async function correr(C) {
           }
         }
         if (/Dos tiempos · intento [23]/.test(R.panel.titulo) && !await J(() => !!document.querySelector('#capa .pn-estilo.fijo') && !document.querySelector('#capa #btn-estilo'))) mal(`«${R.panel.titulo}»: el estilo de envión no se ve fijo`);
+      }
+      // LIF-52: cuánto tapa la explicación al pesista (meta: nada; tope 5 % del cuerpo) y, en el iPhone, cerrarla con el dedo
+      if (s.aprende && !aprendes.has(s.aprende.clave)) {
+        aprendes.add(s.aprende.clave); await tapa('aprende_' + s.aprende.clave); await foto('aprende_' + s.aprende.clave);
+        if (C.campos && !aprendeCerrada) {
+          aprendeCerrada = true; const t0 = await J(() => JUEGO.toques.total);
+          if (!await pulsa('#aprende button')) mal('no se pudo tocar la ✕ de la explicación de primera vez');
+          else { await av(50); const x = await J(() => ({ vis: !document.getElementById('aprende').hidden, ev: JUEGO.eventos.filter(e => e.ev === 'explicacion_cerrada').map(e => e.props), toques: JUEGO.toques.total }));
+            if (x.vis || !x.ev.some(e => e.via === 'boton' && e.leida)) mal(`la ✕ no cerró la explicación (${JSON.stringify(x)})`);
+            if (x.toques !== t0) mal(`tocar la ✕ de la explicación contó ${x.toques - t0} toques del juego`); }
+        }
       }
       const sg = I && I.propio ? I.senal : null;
       if (s.panel && ['inicio', 'presentacion', 'apertura', 'intervalo'].includes(s.pantalla)) await tapa(s.pantalla);
@@ -295,6 +309,13 @@ async function correr(C) {
   if (C.dedos && !dedosProbados) mal('no se llegó a probar dos dedos a la vez');
   if (C.partida && !bordesProbados) mal('no se llegó a probar un toque en el borde');
   if (C.campos && !campoSolo) mal('no se llegó a probar un campo sin panel');
+  // LIF-52: cada explicación se da por vista una sola vez, y en la final entera salen varias
+  { const E2 = await J(() => JUEGO.eventos.filter(e => /^explicacion_/.test(e.ev)).map(e => ({ ev: e.ev, ...e.props }))), vistas = E2.filter(e => e.ev === 'explicacion_vista'), leidas = {};
+    for (const e of E2) if (e.ev === 'explicacion_cerrada' && e.leida) leidas[e.clave] = (leidas[e.clave] || 0) + 1;
+    for (const [k, n] of Object.entries(leidas)) if (n > 1) mal(`la explicación «${k}» se dio por vista ${n} veces`);
+    for (const v of vistas) { const i = E2.indexOf(v), antes = E2.slice(0, i).some(e => e.ev === 'explicacion_cerrada' && e.clave === v.clave && e.leida); if (antes) mal(`la explicación «${v.clave}» volvió a salir después de vista`); }
+    console.log(`${tag} explicaciones de primera vez: ${vistas.map(v => `${v.clave}@${v.momento}${v.vez > 1 ? '×' + v.vez : ''}`).join(' ') || 'ninguna'} · cerradas ${E2.filter(e => e.ev === 'explicacion_cerrada').map(e => `${e.clave}:${e.via}:${e.ms}ms${e.leida ? '' : ':sin_leer'}`).join(' ')}`);
+    if (C.partida && new Set(vistas.map(v => v.clave)).size < 4) mal(`en la final entera salieron pocas explicaciones de primera vez: ${vistas.map(v => v.clave).join(', ') || 'ninguna'}`); }
   if (C.partida && (!probado.detalle || !probado.estilo)) mal(`no se llegó a probar ${!probado.detalle ? '«Detalles»' : 'el estilo de envión'} en el panel del llamado`);
   // la última pantalla (el podio con sus botones) también se revisa
   if (fin.s.pantalla === 'fin') { await av(3000); await revisar('fin (podio con botones)'); }

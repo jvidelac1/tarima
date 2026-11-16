@@ -45,6 +45,7 @@ import { tableroHTML, datosTablero, tableroVivoHTML, ordenSalida } from '../web/
 import { opcionesPedido, pedidoHTML } from '../web/js/game/ui/pedido.js';
 import { dificultadDe, deDiez } from '../web/js/game/ui/mensajes.js';
 import { DICCIONARIOS, tr, fijarIdioma, detectarIdioma } from '../web/js/game/i18n/t.js';
+import { APRENDE, CLAVES as CLAVES_APRENDE, elegir as elegirAprende, textoDe as textoAprende } from '../web/js/game/ui/aprende.js';
 import { toques } from '../web/js/game/input.js';
 import { jugarSenal, jugarFijo, BOTS } from './play_human.mjs';
 import { jugarUno, BOTS_U } from './uno_bots.mjs';
@@ -338,7 +339,7 @@ function jugar(semilla, nivel, persona, estilo = {}) {
   for (const [k, v] of Object.entries(es)) { ok(!VOSEO.test(v), `voseo en es.${k}: «${v}»`); ok(!JERGA.test(v), `jerga en es.${k}: «${v}»`); }
   for (const [k, v] of [...Object.entries(es), ...Object.entries(en)]) ok(!/pagar para levantar|pay to lift/i.test(v), `promesa de monetización en ${k}`);
   // con las variables comunes resueltas no queda ninguna llave
-  const vars = { nombre: 'Ana', quien: 'Ana', rival: 'Teo', n: 2, de: 3, kg: 150, lo: 140, hi: 155, min: 150, c: 1, s: 5, b: 2, lev: 'x', pos: '2nd', ms: 30, k: 1, controles: 'x', veredicto: 'x', causa: 'x', a: 'x', medalla: 'x', total: 300, marcas_s: '✅', marcas_c: '❌', link: 'x', envion: 'x', verbo: 'x', cuando: 'x', cuanto: 'x', ajuste: 'x', lado: 'x', grado: 'x', sugerido: 'x', donde: 'x', mayor: 'x', discos: 'x', pct: 97, tramo: 'x', d: '½', tipo: 'x', apuesta: 'x', zona: 'x', toques: 'x', en: 'x' };
+  const vars = { nombre: 'Ana', quien: 'Ana', rival: 'Teo', n: 2, de: 3, kg: 150, lo: 140, hi: 155, min: 150, c: 1, s: 5, b: 2, lev: 'x', pos: '2nd', ms: 30, k: 1, controles: 'x', veredicto: 'x', causa: 'x', a: 'x', medalla: 'x', total: 300, marcas_s: '✅', marcas_c: '❌', link: 'x', envion: 'x', verbo: 'x', cuando: 'x', cuanto: 'x', ajuste: 'x', lado: 'x', grado: 'x', sugerido: 'x', donde: 'x', mayor: 'x', discos: 'x', pct: 97, tramo: 'x', d: '½', tipo: 'x', apuesta: 'x', zona: 'x', toques: 'x', en: 'x', split: 'x', power: 'x', squat: 'x' };
   for (const l of ['es', 'en']) for (const tactil of [false, true]) for (const k of ke) { const v = tr(l, k, { ...vars, tactil }); ok(!/[{}]/.test(v) && v.trim().length > 0, `${l}.${k} queda «${v}»`); }
   // la señal sale en el idioma elegido, y los pasos de «Cómo se juega» también
   { const ctx = { lev: 's', I: 9000, tec: 7, temple: 0, garra: 6, anclas: datos.modelos.ventura, semilla: 5, cal: 0, primera: false, domina: true, jueces: [1000, 1000, 1000], reloj: 30000, ctl: 'f' };
@@ -805,6 +806,41 @@ function lineaNombraToques(res, lev, I) {
   }
   ok(vistos.rondas > 0 && vistos.oficial > 0 && vistos.pedidos > 0 && rech > 50, `19: pocas finales combinadas ${JSON.stringify(vistos)}, ${rech} estilos adulterados`);
   console.log(`19. estilo fijo y turnos juntos: ${n} finales en vivo contra recalculadas ${JSON.stringify(vistos)} · ${rech} registros con el estilo cambiado a mitad rechazados`);
+}
+
+// ---------- 20. aprender jugando (LIF-52): las explicaciones de primera vez dicen lo que hace el juego ----------
+{
+  // cada explicación es una línea del glosario, en los dos idiomas, sin llaves sin resolver y corta (una línea en la computadora, dos o tres en el teléfono)
+  for (const l of ['es', 'en']) {
+    fijarIdioma(l);
+    for (const k of CLAVES_APRENDE) { const x = textoAprende(k), largo = (x.titulo + ' ' + x.linea).length; ok(!/[{}]/.test(x.titulo + x.linea) && x.linea.length > 20, `aprende ${l}.${k}: «${x.titulo}» «${x.linea}»`); ok(largo <= 150, `aprende ${l}.${k}: ${largo} caracteres (tope 150)`); }
+  }
+  fijarIdioma('es');
+  // una por momento, en orden de prioridad, y nada cuando ya se vieron todas
+  const nada = () => false, todo = () => true, el = (m, c, v = nada) => elegirAprende(m, c, v)?.clave ?? null;
+  ok(el('llamado', { lev: 's', barra: true, hechos: 0 }) === 'dificultad' && el('llamado', { lev: 's', barra: true, hechos: 1 }, k => k === 'dificultad') === 'kilos' && el('llamado', { lev: 'c', barra: true, hechos: 0, envFijo: null }) === 'estilo'
+    && el('llamado', { lev: 'c', barra: true, hechos: 1, envFijo: 'split' }, k => k !== 'total') === 'total' && el('llamado', { lev: 's', barra: false, hechos: 0 }) === null
+    && el('rival', { lev: 's', cambiar: true }) === 'cambiar' && el('rival', { lev: 's', cambiar: false }) === null && el('rival', { lev: 'c', cambiar: false }) === 'total'
+    && el('decision', { nulo: true }) === 'nulo' && el('decision', { nulo: false }) === 'luces' && el('decision', { nulo: true }, todo) === null, 'aprende: elegir() no respeta el momento o la prioridad');
+  ok(new Set(CLAVES_APRENDE).size === APRENDE.length, 'aprende: claves repetidas');
+  // lo que dicen las explicaciones, contra el núcleo: «2 o 3 blancas, vale; roja, una falta» y «no vale: al menos 2 jueces»
+  let decididos = 0, nulos = 0, sinTotal = 0;
+  for (let k = 0; k < 120; k++) {
+    const semilla = mezclar(k, 5252), pr = new Partida(datos, { semilla, nivel: NIV[k % 3], ia: HUELLA_IA, envFijo: true, turnos: k % 2 ? 'oficial' : 'rondas', atletas: IDS.map(id => ({ id, ctrl: 'juego' })) });
+    pr.empezar();
+    for (let g = 0; pr.fase !== 'fin' && g < 60; g++) {
+      if (pr.fase === 'intervalo') { pr.empezar(); continue; }
+      const x = pr.resolverIA(), r = x.res; if (r.res === 'fallo') continue;
+      const blancas = r.luces.filter(Boolean).length; decididos++; if (r.res === 'nulo') nulos++;
+      ok((r.res === 'valido') === (blancas >= 2), `semilla ${semilla}: ${r.res} con ${blancas} luces blancas`);
+    }
+    // «Necesitas un válido en cada uno»: sin arranque o sin dos tiempos válido, total 0
+    for (const f of pr.tabla()) { const a = pr.at[f.a]; if (!a.mejor.s || !a.mejor.c) { sinTotal++; ok(f.total === 0, `semilla ${semilla}: ${a.id} sin un válido en cada uno y con total ${f.total}`); } }
+  }
+  ok(decididos > 500 && nulos > 0, `aprende: pocos veredictos de jueces (${decididos}, ${nulos} nulos)`);
+  // «2 cambios por intento» y «solo hacia arriba» (Cambiar); la barra que no baja dentro de la ronda y la progresión ya las verifica jugar()
+  ok(TURNOS.previos === 2 && TURNOS.soloSube === true, `aprende: «Cambiar» dice 2 cambios hacia arriba y TURNOS es ${JSON.stringify(TURNOS)}`);
+  console.log(`20. Aprender jugando: ${APRENDE.length} explicaciones en es y en (≤ 150 caracteres), una por momento · ${decididos} veredictos de jueces (${nulos} no vale) con 2 o 3 blancas = vale · ${sinTotal} sin total por falta de un válido`);
 }
 
 console.log(fallas.length ? `\nFALLÓ: ${fallas.length} problemas` : `\nOK en ${((Date.now() - t0) / 1000).toFixed(1)} s`);

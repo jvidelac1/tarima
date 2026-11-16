@@ -386,9 +386,9 @@ export default {
   'glosario.dos_tiempos.t': 'Clean & jerk', 'glosario.dos_tiempos.d': 'First to the shoulders, then overhead.',
   'glosario.intento.t': 'Attempt', 'glosario.intento.d': 'Each time you go up to lift. You get 3 of each.',
   'glosario.vale.t': 'Good lift / No lift', 'glosario.vale.d': '3 judges; 2 white lights and it counts.',
-  'glosario.total.t': 'Total', 'glosario.total.d': 'Best snatch plus best clean & jerk. Highest wins.',
+  'glosario.total.t': 'Total', 'glosario.total.d': 'Best snatch + best clean & jerk. Highest total wins gold. You need a good lift in each.',
   'glosario.energia.t': 'Energy', 'glosario.energia.d': 'Every attempt tires you. Misses and heavy lifts tire you more.',
-  'glosario.kilos.t': 'Weight', 'glosario.kilos.d': 'More kilos, harder lift. The bar never goes down: miss and you repeat it or go up.',
+  'glosario.kilos.t': 'Weight', 'glosario.kilos.d': 'The bar never goes down within a round. After a good lift ask for more; after a miss, repeat or go up. Low is safer, high scores more.',
 
   'pos.1': '1st', 'pos.2': '2nd', 'pos.3': '3rd',
   // ---- wall (P9), waitlist, survey and podium invitation (docs/MVP.md 4.5)
@@ -680,4 +680,11 @@ export default {
   'jerk.fijo': 'locked',
   'jerk.regla': 'You keep it for all 3 attempts.',
   'jerk.fijo_nota': 'You chose it on your first clean & jerk: it stays for all 3 attempts.',
+  // LIF-52: aprender jugando. Cada explicación sale una vez, en su momento (ui/aprende.js), y es la misma línea del glosario
+  'glosario.luces.t': 'Judges’ lights', 'glosario.luces.d': '3 judges, one light each. 2 or 3 white: good lift. Red means they saw a fault.',
+  'glosario.nulo.t': 'No lift', 'glosario.nulo.d': 'The bar went up, but at least 2 judges saw a fault: bent elbows (press-out), a wobble, or lowering it before the signal.',
+  'glosario.dificultad.t': 'Difficulty · X in 10', 'glosario.dificultad.d': 'How many times out of 10 that weight goes up. The closer to your 1RM (your best lift), the harder.',
+  'glosario.cambiar.t': 'Change', 'glosario.cambiar.d': 'While a rival lifts, raise your next weight (2 changes per attempt). Use it to answer a rival who passes you.',
+  'glosario.estilo.t': 'Jerk style', 'glosario.estilo.d': '{split} (easiest), {power} or {squat}. You pick it on your first clean & jerk and keep it for all 3.',
+  'aprende.cerrar': 'Got it',
 };

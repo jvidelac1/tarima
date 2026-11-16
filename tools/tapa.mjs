@@ -53,6 +53,8 @@ export function revisar(momento, x) {
   if (['quieta', 'corre', 'pega', 'levanta'].includes(momento) && x.cuerpo.pct > 15) return `${momento}: la interfaz tapa el ${x.cuerpo.pct} % del pesista (meta ≤ 15 %): ${x.cuerpo.quien.join(', ')}`;
   // turno de un rival (13-nov): el tablero y el botón «Saltar» no tapan al rival que levanta
   if (momento === 'rival' && x.cuerpo.pct > 15) return `rival: la interfaz tapa el ${x.cuerpo.pct} % del rival (meta ≤ 15 %): ${x.cuerpo.quien.join(', ')}`;
+  // LIF-52: la explicación de primera vez no tapa al pesista (meta: nada; tope 5 % del cuerpo, contando solo ese cartel)
+  if (momento.startsWith('aprende')) { const q = x.cuerpo.quien.find(z => z.startsWith('aprende ')), n = q ? +q.split(' ')[1].replace('%', '') : 0; if (n > 5) return `${momento}: la explicación de primera vez tapa el ${n} % del pesista (tope 5 %)`; }
   if (momento === 'llamado' && x.torso.pct > 20) return `llamado: el panel tapa el ${x.torso.pct} % del torso y la cara del pesista (meta ≤ 20 %): ${x.torso.quien.join(', ')}`;
   return null;
 }

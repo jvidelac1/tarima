@@ -46,6 +46,8 @@ export const EVENTOS = new Set([
   'pedido_cambiado',
   // LIF-38: la cámara elegida en Opciones o con la tecla V
   'camara_elegida',
+  // LIF-52: las explicaciones de primera vez (ui/aprende.js): cuándo salen y cómo se cierran
+  'explicacion_vista', 'explicacion_cerrada',
 ]);
 
 export const BANDERAS = { 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio', grabacion_lienzo: 'compu' };
