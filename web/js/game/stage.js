@@ -186,6 +186,8 @@ const v = new THREE.Vector3(), v2 = new THREE.Vector3();
 const _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _pc = new THREE.Vector3(), _pd = new THREE.Vector3(), _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion();
 /** Respiración del pesista de pie después del intento (posarMezcla): grados de cabeceo por hueso del tronco y ciclos por segundo. */
 export const RESPIRA = { grados: .9, hz: .55 };
+/** Escala del hueso del cuello con la cabeza propia oculta: cuello, cabeza, pelo y ojos quedan en un punto entre las clavículas. */
+const SIN_CABEZA = 1e-3;
 export const CAM = Object.fromEntries(CAMERAS.map((c, i) => [c.key, i]));
 /**
  * Planos propios del juego (el visor no los ve). `medio`: plano americano del pesista que se prepara en el llamado (de las
@@ -221,14 +223,15 @@ export const PLANOS = {
  *   · con la barra cerca de la cabeza la cámara retrocede: `atras[0]` m con la barra en los hombros y `atras[0] + atras[1]`
  *     con la barra arriba. Es la licencia de esta vista: desde los ojos de verdad la barra en los hombros queda bajo el
  *     mentón y la de arriba, detrás de la frente, y no entrarían en ninguna imagen que mire al frente.
- *   · con la barra suelta (después del intento: cae, rebota y rueda), a medias: `suelta[0]` del ángulo hacia la barra, sin
- *     bajar de `suelta[1]` rad: se la ve caer y rebotar en la parte de abajo y arriba quedan los árbitros con sus paletas.
+ *   · con la barra suelta (después del intento: cae, rebota y rueda), la mirada la sigue en la caída (`suelta[0]` del
+ *     ángulo hacia ella, con `suelta[2]` de rapidez, porque cae en medio segundo) sin bajar de `suelta[1]` rad: se la ve
+ *     caer y rebotar en la tarima, y la cámara vuelve a los ojos de a poco.
  * - lente: `fov` grados de alto, o lo que dé `fovAncho` de ancho en pantallas muy anchas; el acercamiento de la barrita lo cierra un poco.
  * - respiración (sube y baja unos milímetros y cabecea unas décimas de grado) y temblor del esfuerzo: nada con movimiento reducido.
- * - la cabeza propia no se dibuja en esta vista ni mientras la cámara esté a menos de `sinCabeza` m de los ojos (el hueso de la cabeza se
- *   achica a un punto: cara, pelo, ojos y pestañas van pesados a él). La sombra sale sin cabeza: cae detrás del pesista.
+ * - la cabeza propia no se dibuja en esta vista ni mientras la cámara esté a menos de `sinCabeza` m de los ojos (el hueso del cuello se
+ *   achica a un punto entre las clavículas: cuello, cara, pelo, ojos y pestañas van pesados a él o a la cabeza, su hijo). La sombra sale sin cabeza: cae detrás del pesista.
  */
-export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 4.5, margen: .17, hombros: .38, encima: .5, abajo: -1.53, frente: -.21, tope: .6, bajo: [.12, .42], alto: [-.05, .3], atras: [.12, .26], suelta: [.6, -.7], sinCabeza: .35, foco: 1.6,
+export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 4.5, margen: .17, hombros: .38, encima: .5, abajo: -1.53, frente: -.21, tope: .6, bajo: [.12, .42], alto: [-.05, .3], atras: [.12, .26], suelta: [1, -.8, 9], sinCabeza: .6, foco: 1.6,
   resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003 }, temblor: .006 };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
@@ -611,13 +614,15 @@ export class Escena {
   /** Prende o apaga la primera persona (ver POV). Al prenderla, la cámara arranca ya en los ojos, sin retardo. */
   _pov(on) {
     if (!!this.pov === on) return; const cam = this.rig.camera;
-    this.pov = on ? { p: new THREE.Vector3(), inc: 0, t: 0, nueva: true } : null; this.rig.propia = on ? this._povFn : null;
+    this.pov = on ? { p: new THREE.Vector3(), inc: 0, retro: 0, t: 0, nueva: true } : null; this.rig.propia = on ? this._povFn : null;
     if (!on) { cam.near = .25; cam.updateProjectionMatrix(); }
   }
   /** Punto de los ojos del pesista (m, mundo), de los huesos: no usa los ejes del hueso de la cabeza. */
   ojos(out) {
     const a = this.activo; if (!a) return out.set(0, 1.6, .1);
-    const k = (this.P?.h || 1.7) / 1.7, c = a.boneWorld('Head', out), arr = a.boneWorld('Neck', _pa).sub(c).negate().normalize();
+    // con la cabeza oculta el cuello está achicado (ver _cabeza) y el hueso de la cabeza cae sobre el del cuello: se deshace la escala
+    const k = (this.P?.h || 1.7) / 1.7, n = a.boneWorld('Neck', _pa), c = a.boneWorld('Head', out); if (a === this._sinCabeza) c.sub(n).multiplyScalar(1 / SIN_CABEZA).add(n);
+    const arr = n.sub(c).negate().normalize();
     const ad = a.boneWorld('LeftArm', _pb).sub(a.boneWorld('RightArm', _pc)).cross(arr).normalize();
     return c.addScaledVector(arr, POV.arriba * k).addScaledVector(ad, POV.adelante * k);
   }
@@ -627,12 +632,13 @@ export class Escena {
     const b = this.barbell.group.position, paso = (x, a, c) => { const t = Math.min(1, Math.max(0, (x - a) / (c - a))); return t * t * (3 - 2 * t); };
     // cuánto está la barra lejos por debajo (1) o cerca de la cara (0), y cuánto por encima de los ojos (0 a 1); con eso, el retroceso
     const dy0 = b.y - o.y, lejos = paso(-dy0, POV.bajo[0], POV.bajo[1]), arriba = paso(dy0, POV.alto[0], POV.alto[1]);
-    if (!this._suelta) o.z -= POV.atras[0] * (1 - lejos) + POV.atras[1] * arriba;
+    // el retroceso llega con su propio retardo: al soltar la barra la cámara vuelve a los ojos de a poco, no de golpe
+    const retro = this._suelta ? 0 : POV.atras[0] * (1 - lejos) + POV.atras[1] * arriba; S.retro = S.nueva ? retro : S.retro + (retro - S.retro) * (1 - Math.exp(-(this._suelta ? 3 : 12) * dt)); o.z -= S.retro;
     if (S.nueva) S.p.copy(o); else S.p.lerp(o, 1 - Math.exp(-POV.sigue * dt));
     // inclinación de la mirada (reglas de POV): a la barra, con el corrimiento que toca según dónde está
     const dy = b.y - S.p.y, dz = b.z - S.p.z, hacia = Math.atan2(dy, dz), corr = POV.margen + (POV.hombros - POV.margen) * (1 - lejos) + (-POV.encima - POV.hombros) * arriba;
     const incT = this._suelta ? Math.max(POV.suelta[1], Math.min(POV.frente, hacia * POV.suelta[0])) : Math.max(POV.abajo, Math.min(POV.tope, hacia + corr));
-    S.inc = S.nueva ? incT : S.inc + (incT - S.inc) * (1 - Math.exp(-(quieto ? 60 : POV.giro) * dt)); S.nueva = false;
+    S.inc = S.nueva ? incT : S.inc + (incT - S.inc) * (1 - Math.exp(-(quieto ? 60 : this._suelta ? POV.suelta[2] : POV.giro) * dt)); S.nueva = false;
     let inc = S.inc, bal = 0, y = 0;
     if (!quieto) {
       const w = S.t * Math.PI * 2 * POV.resp.hz, T = Math.min(1, Math.max(0, this._temblor)) * POV.temblor;
@@ -648,7 +654,7 @@ export class Escena {
   _cabeza() {
     const a = this.activo, cerca = !!a && a.root.visible && (!!this.pov || this.rig.camera.position.distanceTo(this.ojos(_pd)) < POV.sinCabeza), quien = cerca ? a : null;
     if (quien === this._sinCabeza) return;
-    for (const [x, e] of [[this._sinCabeza, 1], [quien, 1e-4]]) { const h = x?._byName.get('Head'); if (h) { h.scale.setScalar(e); h.updateMatrixWorld(true); } }
+    for (const [x, e] of [[this._sinCabeza, 1], [quien, SIN_CABEZA]]) { const h = x?._byName.get('Neck'); if (h) { h.scale.setScalar(e); h.updateMatrixWorld(true); } }
     this._sinCabeza = quien; this.sombra = Math.max(this.sombra, 2);
   }
   /**
