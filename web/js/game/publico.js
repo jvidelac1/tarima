@@ -41,7 +41,7 @@ void main(){
   // ropa: en la penumbra nadie viste de blanco; lo claro se comprime y todo pierde color (la sala la pinta la luz, no la ropa)
   vec3 ropa = vCloth; float lr = dot( ropa, vec3( 0.3, 0.6, 0.1 ) ); ropa *= mix( 1.0, 0.36, smoothstep( 0.1, 0.55, lr ) );
   vec3 col = mix( ropa, vSkin * 0.82, smoothstep( 0.2, 0.42, t.b ) ); col = mix( col, vHair * 0.7, smoothstep( 0.68, 0.9, t.b ) );
-  col = mix( vec3( dot( col, vec3( 0.3, 0.6, 0.1 ) ) ), col, 0.5 );
+  col = mix( vec3( dot( col, vec3( 0.3, 0.6, 0.1 ) ) ), col, uHorneo > 0.0 ? 0.3 : 0.5 );      // horneada (sin gradación encima): menos color todavía
   // luz: la de sala cae pareja y fría; la del escenario llega de frente, cálida, y solo levanta lo que la mira (cara, pecho, rodillas)
   float esc = t.g * t.g * ( 3.0 - 2.0 * t.g );
   gl_FragColor = vec4( col * ( uSala * ( t.r * uGain ) + uRebote * esc ), 1.0 );
@@ -51,7 +51,7 @@ void main(){
 /** Ganancia con la que se guarda la tribuna horneada (8 bits: el público es oscuro y sin esto se escalona). */
 const HORNEO = 6;
 /** En el camino directo (sin gradación ni viñeta del pase final) el mismo público queda más claro: se baja acá. */
-const DIRECTO = .42;
+const DIRECTO = .3;
 
 export class Publico {
   /** `animo`: el uniform {value} del ánimo del público (ambiente.publico.uAnimo). `chico`: texturas a la mitad (teléfono). */
@@ -70,8 +70,8 @@ export class Publico {
   if ( uFiesta * 0.75 > h && var < ${QUIETAS}.0 ) var = 10.0 + floor( fract( h * 7.3 ) * 6.0 );      // con la ovación, más gente aplaude o festeja
   vUv = vec2( ( uv.x + mod( var, ${COLS}.0 ) ) / ${COLS}.0, ( uv.y + floor( var / ${COLS}.0 ) ) / ${FILAS}.0 );`);
     m.fragmentShader = CROWD_FS; m.userData.conTono = false;
-    Object.assign(m.uniforms, { uFiesta: animo, uSala: { value: new THREE.Color(.5, .62, .95) }, uHorneo: { value: 0 }, uSuave: { value: 1.1 } });
-    m.uniforms.map.value = this.atlas.texture; m.uniforms.uGain.value = .05; m.uniforms.uRebote.value.set(.085, .06, .04); m.needsUpdate = true;
+    Object.assign(m.uniforms, { uFiesta: animo, uSala: { value: new THREE.Color(.5, .62, .95) }, uHorneo: { value: 0 }, uSuave: { value: 1.7 } });
+    m.uniforms.map.value = this.atlas.texture; m.uniforms.uGain.value = .075; m.uniforms.uRebote.value.set(.05, .035, .024); m.needsUpdate = true;
     arena.crowdTex?.dispose(); arena.crowdTex = this.atlas.texture;
     // --- tribunas horneadas: se arman la primera vez que una calidad sin profundidad de campo las pide
     if (arena.impostors) { arena.impostors.removeFromParent(); arena.impostors.traverse(o => { o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose(); }); arena.impostors = null; }
@@ -109,7 +109,8 @@ export class Publico {
       for (const k of ['aCloth', 'aSkin', 'aHair', 'aVar']) { const src = g0.attributes[k], n = src.itemSize, a = new Float32Array(ids.length * n); ids.forEach((id, j) => { for (let c = 0; c < n; c++) a[j * n + c] = src.array[id * n + c]; }); g.setAttribute(k, new THREE.InstancedBufferAttribute(a, n)); }
       const im = new THREE.InstancedMesh(g, mat, ids.length); ids.forEach((id, j) => { crowd.getMatrixAt(id, M); im.setMatrixAt(j, M); }); im.frustumCulled = false;
       const sc = new THREE.Scene(); sc.add(im);
-      const W = (this.chico ? 1024 : 2048) >> (st.w < 30 ? 1 : 0), ancho = st.w + .6, banda = Math.max(16, Math.round(W * BH / ancho)), rt = new THREE.WebGLRenderTarget(W, banda * st.rows, { depthBuffer: true, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, colorSpace: THREE.SRGBColorSpace });
+      const W = 1024 >> (st.w < 30 ? 1 : 0),      /* chica a propósito: ampliada queda fuera de foco, como la tribuna de una foto, y pesa un cuarto */
+       ancho = st.w + .6, banda = Math.max(16, Math.round(W * BH / ancho)), rt = new THREE.WebGLRenderTarget(W, banda * st.rows, { depthBuffer: true, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, colorSpace: THREE.SRGBColorSpace });
       rt.texture.anisotropy = 4; rt.texture.name = 'tribuna horneada ' + si; rt.scissorTest = true;
       const bx = st.back[0], bz = st.back[1], atras = new THREE.Vector3(bx, 0, bz), cam = new THREE.OrthographicCamera(-ancho / 2, ancho / 2, BH / 2, -BH / 2, 9.6, 10.4), pos = [], uv = [], idx = [], der = new THREE.Vector3(), c = new THREE.Vector3();
       const prev = r.getRenderTarget(), col = r.getClearColor(new THREE.Color()), al = r.getClearAlpha(), auto = r.autoClear, sm = r.shadowMap.autoUpdate, need = r.shadowMap.needsUpdate;
@@ -125,7 +126,7 @@ export class Publico {
       r.setRenderTarget(prev); r.setClearColor(col, al); r.autoClear = auto; r.shadowMap.autoUpdate = sm; r.shadowMap.needsUpdate = need;
       rt.viewport.set(0, 0, W, banda * st.rows); rt.scissorTest = false; g.dispose(); im.dispose();
       const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); pg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); pg.setIndex(idx);
-      const q = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ map: rt.texture, alphaTest: .5, side: THREE.DoubleSide, color: new THREE.Color(1 / HORNEO, 1 / HORNEO, 1 / HORNEO).multiplyScalar(DIRECTO) }));
+      const q = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ map: rt.texture, alphaTest: .5, side: THREE.DoubleSide, color: new THREE.Color(.82 / HORNEO, .92 / HORNEO, 1.18 / HORNEO).multiplyScalar(DIRECTO) }));
       q.matrixAutoUpdate = false; q.frustumCulled = false; q.userData.rt = rt; grupo.add(q);
     });
     mat.uniforms.uHorneo.value = 0;

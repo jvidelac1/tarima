@@ -22,7 +22,7 @@ import { conSuperficie, setSuperficies, chapa, USO } from './materiales.js';
 /** Gradación del juego: exposición, saturación, contraste, gamma de sombras, tinte de sombras y de altas, viñeta y negro. */
 export const GRADO_LOOK = Object.freeze({ exp: 1.0, sat: .88, con: 1.03, gam: 1.0, frio: [.92, .995, 1.09], calido: [1.07, 1.0, .91], vin: .36, negro: .004 });
 /** Niebla y fondo de la sala (a oscuras, azul petróleo). */
-export const SALA = Object.freeze({ fondo: '#070a11', niebla: '#0a0f18', densidad: .021, nieblaDirecto: '#1b2740' });      // nieblaDirecto: en «Baja» y «Móvil» la bruma es más clara y azul (da fondo y profundidad sin costo: la niebla ya se calculaba)
+export const SALA = Object.freeze({ fondo: '#070a11', niebla: '#0a0f18', densidad: .021, nieblaDirecto: '#111a2a' });      // nieblaDirecto: en «Baja» y «Móvil» la bruma es más clara y azul (da fondo y profundidad sin costo: la niebla ya se calculaba)
 
 const DISPLAY = "'Saira Condensed','Arial Narrow',sans-serif";
 const Y0 = -.1;      // piso del escenario (la tarima tiene su cara de arriba en 0)
@@ -219,6 +219,26 @@ function gomaDisco(S) {
   return { roughnessMap: rough, bumpMap: bump };
 }
 
+/**
+ * Telón de fondo con luz: pliegues verticales y bañadores de piso que lo lavan desde abajo (ámbar a la izquierda, azul frío
+ * a la derecha, como los contraluces), con la caída de la luz hacia arriba. Va horneado en la textura: el telón sigue
+ * siendo un plano sin luces. 17 × 6,4 m.
+ */
+function telon(W = 1024, H = 384) {
+  const n = ruido(91), r = rng(19), pl = []; let x = 0; while (x < 1) { const w = (.012 + r() * .02); pl.push([x, w, r()]); x += w; }
+  const focos = []; for (let i = 0; i < 9; i++) { const u = (i + .5) / 9; if (Math.abs(u - .5) < .27) continue; focos.push([u + (r() - .5) * .01, u < .5 ? [1, .56, .24] : [.42, .62, 1], .8 + r() * .4]); }
+  let k = 0;
+  const c = generar(W, (u, v, o) => {
+    while (k < pl.length - 1 && pl[k + 1][0] <= u) k++; if (u < pl[k][0]) k = 0; while (k < pl.length - 1 && pl[k + 1][0] <= u) k++;
+    const P = pl[k], t = (u - P[0]) / P[1], pliegue = .5 - .5 * Math.cos(t * 6.2832), y = 1 - v;      // y: 0 en el piso, 1 arriba
+    const base = .012 + .03 * pliegue * (.6 + .4 * P[2]) + .01 * fbm(n, u * 40, v * 6, 2);
+    let R = base * .75, G = base * .85, B = base * 1.15;
+    for (const [fu, col, f] of focos) { const dx = (u - fu) * 17, ancho = .35 + y * 6.4 * .42, g = Math.exp(-(dx * dx) / (ancho * ancho)) * Math.exp(-y * 3.1) * f * (.35 + .65 * pliegue) * .5; R += col[0] * g; G += col[1] * g; B += col[2] * g; }
+    const piso = sm(0, .03, y); o[0] = cl(Math.sqrt(R * piso)); o[1] = cl(Math.sqrt(G * piso)); o[2] = cl(Math.sqrt(B * piso)); o[3] = .5; o[4] = .5;
+  }, H);
+  return canvasTexture(c.col, { aniso: 4 });
+}
+
 // ---------- gráficas ----------
 /** Fondo de la pantalla LED: casi negro, con líneas finas y dos paneles apagados; lo brillante son los textos y las luces. */
 function ledFondo(w, h) {
@@ -310,7 +330,7 @@ void main(){
   float raya = exp( - abs( p.y ) * 46.0 ) * exp( - abs( p.x ) * 3.4 ) * 0.5 * vK;                      // destello anamórfico
   float estrella = ( exp( - abs( p.x ) * 70.0 ) * exp( - abs( p.y ) * 6.0 ) + exp( - abs( p.x + p.y ) * 60.0 ) * exp( - r * 7.0 ) * 0.5 + exp( - abs( p.x - p.y ) * 60.0 ) * exp( - r * 7.0 ) * 0.5 ) * 0.16 * vK;
   vec3 c = vCol * ( nucleo + halo + raya + estrella ) * borde;
-  if ( uDirecto > 0.5 ) c = pow( min( c * 0.55, vec3( 1.0 ) ), vec3( 0.4545 ) ) * 0.9;                  // camino directo: va al lienzo sin pase de tono
+  if ( uDirecto > 0.5 ) c = min( vCol * 0.5 * ( exp( - r * r * 60.0 ) * 2.4 + exp( - r * 7.0 ) * 0.3 + raya * 0.8 ) * borde, vec3( 1.0 ) );      // camino directo: va al lienzo sin pase de tono (valores de pantalla, caída más corta)
   gl_FragColor = vec4( c, 1.0 );
 }`;
 
@@ -373,7 +393,7 @@ export class Look {
       const m = o.material; if (!m || Array.isArray(m) || !m.isMeshBasicMaterial) return;
       if (o.geometry?.type === 'CylinderGeometry' && o.geometry.parameters.radiusTop > 30) k(m, o.geometry.parameters.height > 5 ? 1.25 : .6);      // pabellón y cinta de luz
       else if (o.geometry?.type === 'PlaneGeometry' && o.geometry.parameters.width === 90) m.color.set('#090a0d');                                 // piso de sala
-      else if (o.geometry?.type === 'PlaneGeometry' && o.geometry.parameters.width === 17) m.color.multiply(new THREE.Color(.75, .85, 1.1));                                               // telón
+      else if (o.geometry?.type === 'PlaneGeometry' && o.geometry.parameters.width === 17) { const t = telon(); this.texturas.push(t); m.map?.dispose(); m.map = t; m.color.setRGB(1.15, 1.15, 1.15); m.needsUpdate = true; }                                               // telón
     });
     if (A.cinta) { const vistos = new Set(); for (const o of A.group.children) { const m = o.material; if (m?.map?.source === A.cinta.source && !vistos.has(m)) { vistos.add(m); k(m, .55); } } }
     for (const o of A.group.children) if (o.isInstancedMesh && o.material.isMeshBasicMaterial && o.geometry.type === 'BoxGeometry' && !o.material.map) k(o.material, .6);      // escalones y barandas
@@ -509,7 +529,7 @@ export class Look {
     for (let i = 0; i < 8; i++) { const x = -6.3 + i * 1.8; luz([x, TB - .3, -4.6], [x * .25, .4, -.2], i < 4 ? '#ffb877' : '#d6e4ff', 2.3, 1); }
     for (let i = 0; i < 6; i++) { const x = -5 + i * 2; luz([x, TY - .3, 6.8], [x * .2, 1, 0], '#ffe6c4', 2.3, 1); }
     for (const s of [-1, 1]) for (let i = 0; i < 3; i++) luz([s * 7.4, TY - .35 - i * .05, 3.6 - i * 2.8], [0, 1, 0], i === 1 ? '#fff0d8' : (s < 0 ? '#ffc48a' : '#cfe0ff'), 2.0, .9);
-    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) luz([s * 5.75, 1.5 + i * .95, -4.38], [s * 1.2, 1.2, 0], i === 1 ? '#ffd9a0' : '#f4f0ff', 1.25, .55);
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) luz([s * 5.75, 1.5 + i * .95, -4.38], [s * 1.2, 1.2, 0], i === 1 ? '#ffd9a0' : '#f4f0ff', 1.0, .4);
     const n = L.length, P = new Float32Array(n * 3), C = new Float32Array(n * 3), D = new Float32Array(n * 3), T = new Float32Array(n), c = new THREE.Color(), a = new THREE.Vector3(), b = new THREE.Vector3();
     L.forEach((l, i) => { a.set(...l.pos); b.set(...l.hacia).sub(a).normalize(); a.addScaledVector(b, .14); a.toArray(P, i * 3); b.toArray(D, i * 3); c.set(l.color).multiplyScalar(l.k); c.toArray(C, i * 3); T[i] = l.tam; });
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('aColor', new THREE.BufferAttribute(C, 3)); g.setAttribute('aDir', new THREE.BufferAttribute(D, 3)); g.setAttribute('aTam', new THREE.BufferAttribute(T, 1));
@@ -528,7 +548,7 @@ export class Look {
       const g = new THREE.Group(); g.position.copy(l.position); g.lookAt(hasta); g.rotateX(-Math.PI / 2);
       const m = new THREE.Mesh(geo, mat); m.scale.set(rad, len, rad); m.renderOrder = 5; m.frustumCulled = false; g.add(m); this.group.add(g); this.rayos.push({ mat, base: fuerza });
     };
-    rayo(L.rimA, .03, .62); rayo(L.rimB, .014, .6);      // solo los dos contraluces: los conos de la clave y del pelo casi no se veían y eran pantalla entera de mezcla
+    rayo(L.rimA, .017, .62); rayo(L.rimB, .009, .6);      // solo los dos contraluces: los conos de la clave y del pelo casi no se veían y eran pantalla entera de mezcla
     this.group.visible = false;
   }
 

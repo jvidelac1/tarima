@@ -23,7 +23,7 @@ function pintar(g, color) {
   limpiar(g);
   const N = g.attributes.normal, P = g.attributes.position, n = N.count, c = new Float32Array(n * 3), so = g.attributes.sombra, ti = g.attributes.tinte;
   // lo que mira hacia abajo, más oscuro; lo que mira a la tarima (+z), más claro: el rebote de la luz del escenario
-  for (let i = 0; i < n; i++) { const k = (1 + .34 * Math.min(0, N.getY(i)) + .28 * Math.max(0, N.getZ(i))) * (so ? so.getX(i) : 1); c[i * 3] = color.r * k * (ti ? ti.getX(i) : 1); c[i * 3 + 1] = color.g * k * (ti ? ti.getY(i) : 1); c[i * 3 + 2] = color.b * k * (ti ? ti.getZ(i) : 1); }
+  for (let i = 0; i < n; i++) { const nz = N.getZ(i), ny = N.getY(i), k = (.5 + .62 * Math.max(0, nz * .9 + ny * .42) + .16 * Math.max(0, ny) + .2 * Math.min(0, ny)) * (so ? so.getX(i) : 1); c[i * 3] = color.r * k * (ti ? ti.getX(i) : 1); c[i * 3 + 1] = color.g * k * (ti ? ti.getY(i) : 1); c[i * 3 + 2] = color.b * k * (ti ? ti.getZ(i) : 1); }
   g.deleteAttribute('sombra'); g.deleteAttribute('tinte'); g.setAttribute('color', new THREE.BufferAttribute(c, 3));
   return g;
 }
@@ -61,7 +61,7 @@ const correr = (x, z) => new THREE.Matrix4().makeTranslation(x, 0, z);
 
 const PIEL = ['#c99672', '#8d5a3c', '#e2b490', '#b07a54', '#6f4630', '#d6a37c'].map(col), PELO = ['#2a1d14', '#0e0e10', '#77777c', '#4a3020', '#b9b3a8', '#3a2a1c'].map(col);
 const CORBATA = ['#6e1f2a', '#27406e', '#4a4e58'].map(col), ESTILO = ['corto', 'melena', 'calvo', 'corto', 'melena', 'corto'];
-const BASE = { esclera: col('#8f8983'), iris: col('#1b130d'), marco: col('#0c0c0e'), camisa: col('#d9dce2'), zapato: col('#0d0d10'), silla: col('#3a3d49'), ojo: col('#17120f'), mango: col('#3a2c20'), tapa: col('#2b3248'), mantel: col('#222a42'), banda: col('#aab0c2') };
+const BASE = { esclera: col('#8f8983'), iris: col('#1b130d'), marco: col('#0c0c0e'), camisa: col('#d9dce2'), zapato: col('#0d0d10'), silla: col('#3a3d49'), ojo: col('#17120f'), mango: col('#3a2c20'), tapa: col('#232838'), mantel: col('#1b2032'), banda: col('#aab0c2') };
 /** Colores de la persona k de un grupo con su uniforme (saco y pantalón). */
 const gente = (k, traje, pantalon) => ({ ...BASE, traje: col(traje), pantalon: col(pantalon), piel: PIEL[(k * 5 + 1) % PIEL.length], pelo: PELO[(k * 7 + 2) % PELO.length], corbata: CORBATA[k % CORBATA.length] });
 
@@ -83,7 +83,7 @@ export class Jueces {
     const A = MESA_ARBITROS, MA = asiento(A.x, A.y, A.z, A.ry), fijos = en(mesa(A.sep * 2 + 1, BASE), MA), brazos = [];
     this.arb = [];
     for (let i = 0; i < 3; i++) {
-      const C = gente(i, '#313a52', '#2a2e38'), M = MA.clone().multiply(correr(-(i - 1) * A.sep, -.5));
+      const C = gente(i, ['#262a36', '#1d2333', '#2c2c31'][i], '#1f2229'), M = MA.clone().multiply(correr(-(i - 1) * A.sep, -.5));
       fijos.push(...en(persona(C, { det: 1, paleta: true, pelo: ESTILO[i], k: i }), M));
       // consola con sus dos botones delante de cada uno
       fijos.push(...en([pieza(new THREE.BoxGeometry(.2, .04, .12), BASE.silla, [.22, .78, .62]), pieza(new THREE.SphereGeometry(.014, 6, 4), col('#e8e6dc'), [.18, .803, .62]), pieza(new THREE.SphereGeometry(.014, 6, 4), col('#c8261c'), [.26, .803, .62])], M));
@@ -108,7 +108,7 @@ export class Jueces {
 
     // jurado lateral (cinco, mesa larga) y mesa técnica (dos mesas sobre el escenario): de lejos, sin gesto
     const ML = asiento(-8.3, FLOOR_Y, .1, Math.PI / 2), lat = en(mesa(6.2, BASE), ML);
-    for (let i = 0; i < 5; i++) lat.push(...en(persona(gente(i + 3, '#454955', '#2c2f37'), { det: 0, pelo: ESTILO[(i + 3) % ESTILO.length], corbata: i % 2 === 0, k: i + 3 }), ML.clone().multiply(correr((i - 2) * 1.25, -.5))));
+    for (let i = 0; i < 5; i++) lat.push(...en(persona(gente(i + 3, ['#33363f', '#272b38', '#3a3436'][i % 3], '#24262c'), { det: 0, pelo: ESTILO[(i + 3) % ESTILO.length], corbata: i % 2 === 0, k: i + 3 }), ML.clone().multiply(correr((i - 2) * 1.25, -.5))));
     this.fijos.push(malla(lat, 'jurado lateral'));
     const tec = [];
     [[5.0, -4.3, -.86], [5.75, -3.3, -1.05]].forEach(([x, z, ry], i) => { const M = asiento(x, STAGE_Y, z, ry); tec.push(...en(mesa(1.1, BASE), M), ...en(persona(gente(i + 8, '#30384e', '#2a2e38'), { det: 0, pelo: ESTILO[(i + 2) % ESTILO.length], k: i + 8 }), M.clone().multiply(correr(0, -.5)))); });

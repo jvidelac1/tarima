@@ -57,7 +57,9 @@ function plateFace(spec, size, aniso) {
       g.lineCap = 'round';
       for (let i = 0; i < 70; i++) { const a = Math.random() * 7, r = R * (.57 + Math.random() * .42), l = .05 + Math.random() * Math.random() * .9; g.strokeStyle = `rgba(${Math.random() < .45 ? '245,242,232' : '8,8,10'},${.04 + Math.random() * .13})`; g.lineWidth = s * (.001 + Math.random() * .004); g.beginPath(); g.arc(c, c, r, a, a + l); g.stroke(); }
       for (let i = 0; i < 9; i++) { const a = Math.random() * 7, r = R * (.62 + Math.random() * .33), x = c + Math.cos(a) * r, y = c + Math.sin(a) * r, rad = s * (.03 + Math.random() * .07), rg = g.createRadialGradient(x, y, 0, x, y, rad); rg.addColorStop(0, `rgba(244,242,234,${.1 + Math.random() * .16})`); rg.addColorStop(1, 'rgba(244,242,234,0)'); g.fillStyle = rg; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); }
-      { const rg = g.createRadialGradient(c, c, R * .9, c, c, R); rg.addColorStop(0, 'rgba(0,0,0,0)'); rg.addColorStop(1, 'rgba(10,10,12,.28)'); g.fillStyle = rg; g.fillRect(0, 0, s, s); }
+      { const rg = g.createRadialGradient(c, c, R * .9, c, c, R); rg.addColorStop(0, 'rgba(0,0,0,0)'); rg.addColorStop(1, 'rgba(10,10,12,.28)'); g.fillStyle = rg; g.fillRect(0, 0, s, s); }      // uso: el color se apaga hacia el borde (goma sucia), aureola de magnesio de las manos que lo cargan y rayas de apoyo contra el piso
+      { const rg = g.createRadialGradient(c, c, R * .55, c, c, R); rg.addColorStop(0, 'rgba(20,18,18,.06)'); rg.addColorStop(.7, 'rgba(20,18,18,.16)'); rg.addColorStop(1, 'rgba(236,232,222,.2)'); g.fillStyle = rg; g.fillRect(0, 0, s, s); }
+      for (let i = 0; i < 26; i++) { const a = Math.random() * 7, r0 = R * (.6 + Math.random() * .3), l = R * (.04 + Math.random() * .16), w = (Math.random() - .5) * .5; g.strokeStyle = `rgba(${Math.random() < .6 ? '250,246,236' : '14,12,12'},${.06 + Math.random() * .16})`; g.lineWidth = s * (.0015 + Math.random() * .003); g.beginPath(); g.moveTo(c + Math.cos(a) * r0, c + Math.sin(a) * r0); g.lineTo(c + Math.cos(a + w) * (r0 + l), c + Math.sin(a + w) * (r0 + l)); g.stroke(); }
     }
     const ink = relief ? '#fff' : spec.ink;
     g.fillStyle = ink; g.strokeStyle = ink;
@@ -66,6 +68,7 @@ function plateFace(spec, size, aniso) {
     arcText(g, label, c, c, R * .78, Math.PI / 2, s * .2, 800);
     arcText(g, 'LIFTING GAME', c, c, R * .785, Math.PI, s * .088, 700);
     arcText(g, 'KG · LB ' + String(Math.round(spec.kg * 2.2046)), c, c, R * .785, 0, s * .062, 700);
+    if (!relief) { g.fillStyle = spec.color; for (let i = 0; i < 160; i++) { const a = Math.random() * 7, r = R * (.66 + Math.random() * .26); g.globalAlpha = .12 + Math.random() * .4; g.beginPath(); g.ellipse(c + Math.cos(a) * r, c + Math.sin(a) * r, s * (.002 + Math.random() * .012), s * (.001 + Math.random() * .004), a + 1.57, 0, 7); g.fill(); } g.globalAlpha = 1; }      // letras gastadas por el roce
     if (relief) {  // ranuras concéntricas finas del caucho
       g.strokeStyle = 'rgba(255,255,255,.22)'; g.lineWidth = 1.5;
       for (let rr = .58; rr < .98; rr += .022) { g.beginPath(); g.arc(c, c, R * rr, 0, 7); g.stroke(); }
