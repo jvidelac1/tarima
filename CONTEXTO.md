@@ -41,7 +41,7 @@ con las 2 preguntas de la encuesta (las dos dan juego libre en el dispositivo; `
 pide elegir pesista (Compacto) y las tarjetas salen después de la primera final; el nombre al anotarse pide 4 letras;
 eventos `muro_resultado`, `siguio_jugando`, `escena_visible`, `carga_fallida`, y `anotar_ok` (solo altas nuevas) desde el
 Worker; si la carga falla, reintentos y un aviso claro (descarga o 3D) en lugar de la interfaz sin el levantador. Variables
-del Worker: `GRATIS_ETAPA "final"`, `GRATIS "1"`, `ENCUESTA_LIBRE "1"`; consentimiento `2026-11-f`.
+del Worker: `GRATIS_ETAPA "final"`, `GRATIS "1"`, `ENCUESTA_LIBRE "1"`; consentimiento `2026-11-g` (LIF-45: la grabación de sesión puede llevar el 3D, con la línea del nombre tapada; bandera `grabacion_lienzo`).
 
 ## Backlog
 
