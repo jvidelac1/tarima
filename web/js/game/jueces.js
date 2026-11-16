@@ -69,7 +69,7 @@ function brazo(s, C, radial, paleta = false) {
 function persona(C, { det = 1, paleta = false, pelo = 'corto', corbata = true } = {}) {
   const P = [], rs = det ? 8 : 6, add = g => { P.push(g); };
   // silla
-  add(pieza(new THREE.BoxGeometry(.44, .04, .42), C.silla, [0, .45, -.02])); add(pieza(new THREE.BoxGeometry(.42, .46, .035), C.silla, [0, .74, -.235]));
+  add(pieza(new THREE.BoxGeometry(.44, .04, .42), C.silla, [0, .45, -.02])); add(pieza(new THREE.BoxGeometry(.4, .34, .035), C.silla, [0, .7, -.235]));
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) add(pieza(new THREE.BoxGeometry(.03, .45, .03), C.silla, [sx * .19, .225, -.02 + sz * .18]));
   // piernas y zapatos
   for (const s of [-1, 1]) { add(tramo([s * .1, .555, -.04], [s * .1, .555, .36], .08, C.pantalon, rs)); add(tramo([s * .1, .5, .41], [s * .1, .1, .43], .058, C.pantalon, rs)); add(pieza(new THREE.BoxGeometry(.09, .07, .24), C.zapato, [s * .1, .035, .48])); }
@@ -87,7 +87,7 @@ function persona(C, { det = 1, paleta = false, pelo = 'corto', corbata = true } 
   }
   const sp = det ? 14 : 10;
   if (pelo === 'calvo') add(pieza(new THREE.SphereGeometry(.102, sp, 6, 0, Math.PI * 2, 0, Math.PI * .46), C.pelo, [0, cy - .012, cz - .008], rotX(-1.25), [.95, 1.02, 1.1]));
-  else add(pieza(new THREE.SphereGeometry(.103, sp, 7, 0, Math.PI * 2, 0, Math.PI * .52), C.pelo, [0, cy + .01, cz - .006], rotX(-.42), [.95, 1.13, 1.06]));
+  else add(pieza(new THREE.SphereGeometry(.103, sp, 7, 0, Math.PI * 2, 0, Math.PI * .52), C.pelo, [0, cy + .01, cz - .006], rotX(-.62), [.95, 1.13, 1.06]));
   if (pelo === 'melena') add(pieza(new THREE.SphereGeometry(.1, sp, 7), C.pelo, [0, cy - .06, cz - .05], null, [1.02, 1.2, .7]));
   // brazos apoyados en la mesa (el de la paleta, s = -1, va aparte)
   for (const s of paleta ? [1] : [-1, 1]) for (const [g] of brazo(s, C, rs)) add(g);
@@ -106,13 +106,13 @@ const correr = (x, z) => new THREE.Matrix4().makeTranslation(x, 0, z);
 
 const PIEL = ['#c99672', '#8d5a3c', '#e2b490', '#b07a54', '#6f4630', '#d6a37c'].map(col), PELO = ['#2a1d14', '#0e0e10', '#77777c', '#4a3020', '#b9b3a8', '#3a2a1c'].map(col);
 const CORBATA = ['#6e1f2a', '#27406e', '#4a4e58'].map(col), ESTILO = ['corto', 'melena', 'calvo', 'corto', 'melena', 'corto'];
-const BASE = { camisa: col('#d9dce2'), zapato: col('#0d0d10'), silla: col('#2a2c34'), ojo: col('#17120f'), mango: col('#3a2c20'), tapa: col('#2d3654'), mantel: col('#243058'), banda: col('#aab0c2') };
+const BASE = { camisa: col('#d9dce2'), zapato: col('#0d0d10'), silla: col('#3a3d49'), ojo: col('#17120f'), mango: col('#3a2c20'), tapa: col('#2d3654'), mantel: col('#1f2a4c'), banda: col('#aab0c2') };
 /** Colores de la persona k de un grupo con su uniforme (saco y pantalón). */
 const gente = (k, traje, pantalon) => ({ ...BASE, traje: col(traje), pantalon: col(pantalon), piel: PIEL[(k * 5 + 1) % PIEL.length], pelo: PELO[(k * 7 + 2) % PELO.length], corbata: CORBATA[k % CORBATA.length] });
 
-const BLANCA = new THREE.Color(1.12, 1.1, 1.02), ROJA = new THREE.Color(.82, .035, .025), GUARDADA = new THREE.Color(.05, .05, .06);
+const BLANCA = new THREE.Color(1.12, 1.1, 1.02), ROJA = new THREE.Color(.5, .012, .008), GUARDADA = new THREE.Color(.05, .05, .06);
 /** Luz de sala propia de las mesas (fracción del color de cada superficie): las luces del escenario apuntan a la tarima y sin esto quedan en negro. */
-const RELLENO = .34;
+const RELLENO = .26;
 /** Segundos que tarda en subir y en bajar la paleta. */
 const SUBE = .35, BAJA = .55;
 
@@ -128,7 +128,7 @@ export class Jueces {
     const A = MESA_ARBITROS, MA = asiento(A.x, A.y, A.z, A.ry), fijos = en(mesa(A.sep * 2 + 1, BASE), MA), brazos = [];
     this.arb = [];
     for (let i = 0; i < 3; i++) {
-      const C = gente(i, '#3b4c7c', '#2c303a'), M = MA.clone().multiply(correr(-(i - 1) * A.sep, -.5));
+      const C = gente(i, '#2f3c63', '#2a2e38'), M = MA.clone().multiply(correr(-(i - 1) * A.sep, -.5));
       fijos.push(...en(persona(C, { det: 1, paleta: true, pelo: ESTILO[i] }), M));
       // consola con sus dos botones delante de cada uno
       fijos.push(...en([pieza(new THREE.BoxGeometry(.2, .04, .12), BASE.silla, [.22, .78, .62]), pieza(new THREE.SphereGeometry(.014, 6, 4), col('#e8e6dc'), [.18, .803, .62]), pieza(new THREE.SphereGeometry(.014, 6, 4), col('#c8261c'), [.26, .803, .62])], M));
@@ -153,10 +153,10 @@ export class Jueces {
 
     // jurado lateral (cinco, mesa larga) y mesa técnica (dos mesas sobre el escenario): de lejos, sin gesto
     const ML = asiento(-8.3, FLOOR_Y, .1, Math.PI / 2), lat = en(mesa(6.2, BASE), ML);
-    for (let i = 0; i < 5; i++) lat.push(...en(persona(gente(i + 3, '#4b4f5c', '#2c2f37'), { det: 0, pelo: ESTILO[(i + 3) % ESTILO.length], corbata: i % 2 === 0 }), ML.clone().multiply(correr((i - 2) * 1.25, -.5))));
+    for (let i = 0; i < 5; i++) lat.push(...en(persona(gente(i + 3, '#454955', '#2c2f37'), { det: 0, pelo: ESTILO[(i + 3) % ESTILO.length], corbata: i % 2 === 0 }), ML.clone().multiply(correr((i - 2) * 1.25, -.5))));
     this.fijos.push(malla(lat, 'jurado lateral'));
     const tec = [];
-    [[5.0, -4.3, -.86], [5.75, -3.3, -1.05]].forEach(([x, z, ry], i) => { const M = asiento(x, STAGE_Y, z, ry); tec.push(...en(mesa(1.1, BASE), M), ...en(persona(gente(i + 8, '#34406a', '#2c303a'), { det: 0, pelo: ESTILO[(i + 2) % ESTILO.length] }), M.clone().multiply(correr(0, -.5)))); });
+    [[5.0, -4.3, -.86], [5.75, -3.3, -1.05]].forEach(([x, z, ry], i) => { const M = asiento(x, STAGE_Y, z, ry); tec.push(...en(mesa(1.1, BASE), M), ...en(persona(gente(i + 8, '#2e3a5e', '#2a2e38'), { det: 0, pelo: ESTILO[(i + 2) % ESTILO.length] }), M.clone().multiply(correr(0, -.5)))); });
     this.fijos.push(malla(tec, 'mesa técnica'));
     this.group.traverse(o => { o.castShadow = false; o.receiveShadow = false; o.updateMatrix?.(); });
   }
