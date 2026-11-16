@@ -167,7 +167,7 @@ mir=lambda q:(q[0],q[1],-q[2],-q[3])
 HINGE={'knee':(('UpLeg','Leg','Foot'),(60,140)),'elbow':(('Arm','ForeArm','Hand'),(60,140)),'wrist':(('ForeArm','Hand','HandMiddle1'),(35,85))}   # huesos y rango de flexión (grados)
 # Escultura por reglas del hombro con el brazo arriba (se suma al Corrective Smooth en la pose de referencia, en espacio posado).
 # Cada término: (nombre, centro o segmento en el marco del brazo [a lo largo del brazo, lateral, frente] en m para 1,69 m, radio, empuje sobre la normal)
-ARMUP_SCULPT=dict(delt=((.030,-.035,.0),None,.062,.018),deltA=((.050,-.005,.040),None,.040,.007),trap=((-.005,-.085,-.015),None,.058,.017),pit=((-.075,.030,.005),None,.058,-.011),
+ARMUP_SCULPT=dict(delt=((.030,-.035,.0),None,.062,.018),deltA=((.050,-.005,.040),None,.040,.007),trap=((-.005,-.085,-.015),None,.058,.007),pit=((-.075,.030,.005),None,.058,-.011),
                   lat=((-.035,.034,-.050),(-.210,.015,-.050),.027,.018),pec=((-.035,.014,.050),(-.135,-.045,.072),.024,.016),tri=((.085,.040,-.020),(.200,.036,-.022),.028,.006))
 def armup_sculpt(rig,K,co,sin=()):
     pb=rig.pose.bones; J=lambda n:np.array(pb[PRE+n].matrix.translation)

@@ -139,6 +139,7 @@ async function fotosNiveles(B, { escena, cargas, params, msg, decir }) {
     { n: '3-4', c: '3/4', t: 1.3, luces: null }, { n: 'frontal', c: 'baja', t: 1.3, luces: null }, { n: 'lado', c: 'lado', t: fin, luces: null },
     { n: 'jurado-vale', c: 'jurado', t: fin, luces: [true, true, true] }, { n: 'jurado-nulo', c: 'jurado', t: fin, luces: [false, true, false] }, { n: 'reversa-vale', c: 'rev', t: fin, luces: [true, true, true] },
     { n: 'medio', c: 'medio', t: fin, luces: null }, { n: 'torso', c: 'torso', t: fin, luces: null }, { n: 'cara', c: 'cara', t: fin, luces: null }, { n: 'medio-salida', c: 'medio', t: 1.3, luces: null },
+    { n: 'arriba-frente', c: 'baja', t: fin, luces: null }, { n: 'arriba-espalda', c: 'rev', t: fin, luces: null },      // brazos arriba a cuerpo entero (de perfil ya está «lado»): hombros, cuello y axila
     { n: 'jueces-vale', c: 'jueces', t: fin, luces: [true, true, true] }, { n: 'jueces-nulo', c: 'jueces', t: fin, luces: [false, true, false] },
   ];
   const cuales = (params.get('tomas') || '').split(',').filter(Boolean), elegidas = cuales.length ? tomas.filter(x => cuales.includes(x.n)) : tomas;      // ?tomas=medio,cara: solo esas

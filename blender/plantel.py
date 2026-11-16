@@ -90,7 +90,7 @@ PESISTAS = {
    uniforme=dict(malla='#e26a1b', panel='#1b1b21', vivo='#f1ede2', rodillera='#15151a', rodillera2='#e26a1b', cinturon='#2b1d14', zapatillas=('#efeee9','#d9d5ca','#e26a1b','#8a5f36')),
    juego=dict(color='#f29a4a', bandera='linear-gradient(135deg,#15151a 0 50%,#e26a1b 50%)', dorsal=16, kg=dict(s=138, c=170))),
  'jastrev': dict(nombre='Borko Jastrev', pais='Veldania', codigo='VLD', genero='M', categoria='+110', estatura=1.86, masa=146,
-   musculo=1.0, grasa=.72, prop=dict(brazo=.326),     # brazos largos
+   musculo=1.0, grasa=.72,
    rasgos=(.0, .15, .85), piel='#d3a17e', ojos='#4a3a28',
    # cabeza redonda y cuadrada: mandíbula muy ancha, nariz ancha y corta, mejillas llenas, cejas caídas
    cara=[('head/head-round',.45),('head/head-square',.3),('chin/chin-width-incr',.6),('nose/nose-width2-incr',.5),('nose/nose-scale-vert-decr',.2),('cheek/l-cheek-volume-incr',.5),('cheek/r-cheek-volume-incr',.5),('eyebrows/eyebrows-angle-down',.2)],
@@ -137,11 +137,11 @@ def proporciones(genero, H, m):
     (muslo y pierna cerca de 0,245 de la estatura; brazo sin mano 0,33), corrida hacia palancas cortas, que es lo que selecciona
     la halterofilia. Son una estimación, no una medición de ninguna persona."""
     F = genero == 'F'; z = (H - (1.60 if F else 1.72)) / .10; t = _clip((m - (48 if F else 60)) / 60., 0, 1.3)
-    return dict(femur=_clip(.236 + .007 * z, .215, .262), tibia=_clip(.242 + .003 * z, .23, .255), brazo=_clip(.312 + .006 * z, .295, .335),
-                hombros=(.215 if F else .242) + .012 * t,
+    return dict(femur=_clip(.236 + .007 * z, .215, .262), tibia=_clip(.242 + .003 * z, .23, .255), brazo=_clip(.305 + .004 * z, .29, .325),     # hombro a muñeca. Antes .312 + .006 z: con hombros anchos la envergadura pasaba de 1,08 de la estatura («brazos largos», dueño, 16-nov)
+                hombros=(.212 if F else .232) + .012 * t,     # entre articulaciones del hombro (el ancho heroico va en el deltoide, no en separar las articulaciones)
                 # antebrazo: parte del brazo (hombro a muñeca) que es antebrazo. Con antebrazo más largo que el brazo (más de 0,51) el codo no llega
                 # a la altura del rack con el agarre de cargada: es un límite real de esa palanca, y check() lo marca (codo-rack).
-                antebrazo=.495)
+                antebrazo=.47)     # húmero algo más largo que el antebrazo, como en una persona (antes .495)
 
 def cfg(k):
     """Parámetros de cuerpo para body.build()."""
@@ -180,11 +180,11 @@ def cfg(k):
              # gesto de concentración en reposo: boca apretada y nariz tensa (si el target no existe en esta versión de MPFB, body.py lo saltea con aviso)
              ('expression/units/caucasian/mouth-compression', .45), ('expression/units/caucasian/nose-compression', .3), ('expression/units/caucasian/mouth-depression', .2),
              # físico heroico de pesista (dirección de arte del 16-nov): cuello, brazo y muslo gruesos. La masa manda: body.py compensa bajando el macro 'weight', así el volumen se va de la cintura a los grupos musculares
-             ('neck/measure-neck-circ-incr', (.25 if F else .55) * mu * (1 - .5 * g)), ('arms/measure-upperarm-circ-incr', (.15 if F else .45) * mu * (1 - g)), ('legs/measure-thigh-circ-incr', (.3 if F else .45) * mu * (1 - .6 * g)),
+             ('neck/measure-neck-circ-incr', (.25 if F else .5) * mu * (1 - g)), ('arms/measure-upperarm-circ-incr', (.15 if F else .45) * mu * (1 - g)), ('legs/measure-thigh-circ-incr', (.3 if F else .45) * mu * (1 - .6 * g)),
              # antebrazo grueso de pesista
              ('arms/l-lowerarm-scale-horiz-incr', .22 if F else .4), ('arms/r-lowerarm-scale-horiz-incr', .22 if F else .4), ('arms/l-lowerarm-scale-depth-incr', .22 if F else .4), ('arms/r-lowerarm-scale-depth-incr', .22 if F else .4),
              # la panza del pesado: alta, redonda y firme (no caída), y la cara más llena
-             ('stomach/stomach-pregnant-incr', _clip(.45 * g * g, 0, 1)), ('torso/torso-scale-depth-incr', _clip(.5 * g, 0, 1)), ('head/head-fat-incr', _clip(.7 * g, 0, 1)), ('neck/neck-double-incr', _clip(.5 * g * g, 0, 1))]
+             ('stomach/stomach-pregnant-incr', _clip(.45 * g * g, 0, 1)), ('torso/torso-scale-depth-incr', _clip(.5 * g, 0, 1)), ('head/head-fat-incr', _clip(.5 * g, 0, 1)), ('neck/neck-double-incr', _clip(.2 * g * g, 0, 1))]     # el cuello del pesado tiene que existir: con más papada y cabeza llena quedaba hundido entre los hombros
     # Si con el macro 'weight' al máximo la masa no alcanza (categorías abiertas), body.py suma este paquete de volumen de 0 a 1.
     volumen = [('torso/torso-scale-horiz-incr', .7), ('torso/torso-scale-depth-incr', .55), ('stomach/stomach-pregnant-incr', .15), ('hip/hip-scale-depth-incr', .3), ('buttocks/buttocks-volume-incr', .12), ('hip/hip-scale-horiz-incr', .35),
                ('torso/measure-waist-circ-incr', .5), ('neck/measure-neck-circ-incr', .12 if F else .22)] + [(f'{a}/{s_}-{b_}', w) for s_ in 'lr' for a, b_, w in (('legs', 'upperleg-fat-incr', .9), ('legs', 'lowerleg-fat-incr', .5), ('arms', 'upperarm-fat-incr', .2), ('arms', 'lowerarm-fat-incr', .25))]
