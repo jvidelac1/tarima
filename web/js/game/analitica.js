@@ -41,6 +41,8 @@ export const EVENTOS = new Set([
   'escena_visible', 'carga_fallida',
   // orden de turnos (LIF-4): «Cambiar» el pedido en el turno de un rival
   'pedido_cambiado',
+  // LIF-38: la cámara elegida en Opciones o con la tecla V
+  'camara_elegida',
 ]);
 
 export const BANDERAS = { 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio' };

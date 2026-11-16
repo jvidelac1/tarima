@@ -6,7 +6,7 @@ name: Gráficos (fotos por calidad y banco, por software)
 
 on:
   push:
-    branches: [graficos]
+    branches: [graficos, graficos2]
     paths:
       - 'web/js/**'
       - 'tools/banco.mjs'
@@ -18,9 +18,13 @@ on:
         type: boolean
         default: false
       comparar:
-        description: 'Comparar el costo de «Baja» y «Móvil» contra main en la misma máquina (A, B, A, B)'
+        description: 'Comparar el costo de «Baja» y «Móvil» contra la rama base en la misma máquina (A, B, A, B)'
         type: boolean
         default: false
+      base:
+        description: 'Rama base de la comparación'
+        type: string
+        default: main
 
 permissions:
   contents: read
@@ -76,7 +80,7 @@ jobs:
   # El mismo banco con el juego de main y con el de esta rama, alternados en la MISMA máquina (los runners cambian de una
   # corrida a otra hasta al doble: comparar dos corridas distintas no dice nada). Por software: vale la relación, no los ms.
   comparar:
-    name: Costo contra main en la misma máquina (por software)
+    name: Costo contra la rama base en la misma máquina (por software)
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.comparar }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -86,7 +90,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/checkout@v6
         with:
-          ref: main
+          ref: ${{ inputs.base || 'main' }}
           path: base
       - uses: actions/setup-node@v6
         with:
@@ -106,9 +110,11 @@ jobs:
           mkdir -p out/logs out/comparar
       - name: Banco alternado (main, rama, main, rama, main, rama)
         run: |
+          # la variante «ambiente» existe desde la rama graficos; en main se usa «sombras» (solo para que el banco tenga una)
+          VAR_BASE=sombras; grep -q "ambiente" base/tools/banco.mjs base/web/js/game/banco.js 2>/dev/null && VAR_BASE=ambiente
           for k in 1 2 3; do
-            node base/tools/banco.mjs --ancho=960 --alto=540 --limite=110 --solo=baja,movil --variantes=sombras --vueltas=3 --json=out/comparar/main_$k.json > out/logs/comparar_main_$k.log 2>&1 || true
-            node tools/banco.mjs --ancho=960 --alto=540 --limite=110 --solo=baja,movil --variantes=ambiente --vueltas=3 --json=out/comparar/rama_$k.json > out/logs/comparar_rama_$k.log 2>&1 || true
+            node base/tools/banco.mjs --ancho=960 --alto=540 --limite=110 --solo=baja,movil --variantes=$VAR_BASE --vueltas=3 --json=out/comparar/main_$k.json > out/logs/comparar_main_$k.log 2>&1 || true
+            node tools/banco.mjs --ancho=960 --alto=540 --limite=110 --solo=baja,movil --variantes=jueces --vueltas=3 --json=out/comparar/rama_$k.json > out/logs/comparar_rama_$k.log 2>&1 || true
           done
           node -e '
             const fs = require("fs");

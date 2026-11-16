@@ -280,6 +280,14 @@ async function corrida(via) {
   // ---- 1. Fácil: partida completa con el reloj inyectado, sin mouse
   const t0 = Date.now();
   if (!await pulsa('#btn-opciones') || !await pulsa('.nivel[data-n="normal"]')) mal('no se pudo elegir el nivel (en «Opciones»)');
+  // la fila «Cámara» de Opciones (LIF-38): se elige Jurado, queda guardada y deja el evento; después se vuelve a General
+  if (!await pulsa('.cam[data-cam="jurado"]')) mal('Opciones no tiene la fila de cámara');
+  else {
+    const c = await J(() => ({ g: localStorage.getItem('tarima.camara'), ev: (JUEGO.eventos || []).filter(e => e.ev === 'camara_elegida').at(-1)?.props, n: document.querySelectorAll('#capa .cam').length, on: document.querySelector('#capa .cam[aria-pressed=true]')?.dataset.cam }));
+    if (c.g !== 'jurado' || c.ev?.vista !== 'jurado' || c.ev?.via !== 'opciones' || c.n !== 4 || c.on !== 'jurado') mal(`la cámara elegida en Opciones no quedó: ${JSON.stringify(c)}`);
+    await foto('opciones_camara');
+    if (!await pulsa('.cam[data-cam="3/4"]') || await J(() => localStorage.getItem('tarima.camara')) !== '3/4') mal('no se pudo volver a la cámara general');
+  }
   // el estilo se elige en el primer dos tiempos y queda para los tres (LIF-43): con teclado, power (no el que propone el entrenador)
   const envion = () => (tactil ? 'split' : 'power');
   // en 'u' un fallo no sale de tocar mal: sale de pedir mucho. El tercer arranque pide 25 kg de más (se cae, con su línea),

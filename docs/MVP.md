@@ -1028,6 +1028,7 @@ Todos van en minúscula y en español. Ninguno lleva nombre, mail, IP ni disposi
 | `nombre_puesto` | Sale de la bienvenida | `vacio`, `vuelve` (bool), `cambio` (bool, usó «No soy yo») |
 | `pesista_elegido` | Ídem | `pesista` (`compacto`, `largo`, `potente`), `por_defecto` |
 | `opciones_abiertas` | Despliega «Opciones» | — |
+| `camara_elegida` | Elige la cámara en «Opciones» o con la tecla V | `vista` (`general`, `jurado`, `lateral`, `baja`), `via` (`opciones`, `tecla`), `pantalla` |
 | `tutorial_inicio` / `tutorial_fin` / `tutorial_salteado` | Práctica | `valido`, `s`, `paso` |
 | `partida_pedida` | Respuesta de `/api/partida` | `resultado` (`ok`, `muro`, `sin_servidor`), `fuente`, `motivo` |
 | `final_inicio` | Primer llamado propio | `n`, `fuente`, `pesista`, `nivel`, `ritmo`, `ctl`; desde el 15-nov `orden` (`rondas`, `oficial`) |

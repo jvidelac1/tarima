@@ -198,9 +198,10 @@ export class Arena {
   /**
    * Se construye una sola vez: nada de la geometría ni de las texturas depende de la calidad. Lo que sí depende
    * (densidad y tipo de público, haces, modo de los discos de bokeh) se cambia con setQuality() en milisegundos.
-   * @param {{tex:number, aniso:number, reduceMotion:boolean}} opt
+   * `oficiales: false` (el juego): sin los oficiales sentados ni sus mesas, que ahí dibuja web/js/game/jueces.js.
+   * @param {{tex:number, aniso:number, reduceMotion:boolean, oficiales?:boolean}} opt
    */
-  constructor({ tex = 2048, aniso, reduceMotion }) {
+  constructor({ tex = 2048, aniso, reduceMotion, oficiales = true }) {
     this.group = new THREE.Group(); this.group.name = 'Arena';
     this.reduceMotion = reduceMotion; this.time = 0; this._bokeh = [];
     const add = (mesh, shadow = 'r') => { mesh.receiveShadow = shadow.includes('r'); mesh.castShadow = shadow.includes('c'); this.group.add(mesh); return mesh; };
@@ -303,8 +304,8 @@ export class Arena {
     let nSeat = 0;
     const seat = (x, z, ry, y0 = FLOOR_Y, lamp = true) => {
       const g = new THREE.Group(); g.position.set(x, y0, z); g.rotation.y = ry;
-      part(g, desks, deskCol, 0, .37, 0); part(g, torsos, suits[nSeat++ % suits.length], 0, .82, -.5, 1.15, 1, .75); part(g, heads, skin, 0, 1.27, -.48);
-      if (!lamp) return; g.updateMatrixWorld(); const p = new THREE.Vector3(.3, .8, .29).applyMatrix4(g.matrixWorld); glint(p.x, p.y, p.z, '#ffd9a0', 1.1, .035);   // lamparita de mesa: punto chico y cálido
+      if (oficiales) { part(g, desks, deskCol, 0, .37, 0); part(g, torsos, suits[nSeat++ % suits.length], 0, .82, -.5, 1.15, 1, .75); part(g, heads, skin, 0, 1.27, -.48); }
+      if (!lamp || (!oficiales && y0 === FLOOR_Y)) return;      // en el juego los árbitros del frente comparten una mesa (jueces.js): sin lamparitas sueltas g.updateMatrixWorld(); const p = new THREE.Vector3(.3, .8, .29).applyMatrix4(g.matrixWorld); glint(p.x, p.y, p.z, '#ffd9a0', 1.1, .035);   // lamparita de mesa: punto chico y cálido
     };
     const loader = (x, z, ry) => {
       const g = new THREE.Group(); g.position.set(x, STAGE_Y, z); g.rotation.y = ry;

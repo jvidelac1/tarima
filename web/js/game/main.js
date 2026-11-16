@@ -394,17 +394,19 @@ const veredicto = (txt, sub, mal) => { $('veredicto').hidden = !txt; $('veredict
 const guiaTxt = txt => { const g = $('guia'); if (g.textContent !== txt) g.textContent = txt; g.hidden = !txt; };
 const etiqueta = et => { $('etiqueta').hidden = !et?.length; $('etiqueta').textContent = (et || []).map(e => ETIQUETAS[e]).join(' · '); };
 /**
- * Cámara del levantamiento (LIF-38): la general de siempre, o la elegida con la tecla V o `?camara=` (jurado: desde la mesa
- * del árbitro central; baja: frontal; lado: lateral). Se recuerda en este navegador. El teléfono en vertical usa la lateral.
+ * Cámara del levantamiento (LIF-38): la general de siempre, o la elegida en Opciones, con la tecla V o con `?camara=`
+ * (jurado: por encima de los hombros de los tres árbitros; lado: lateral; baja: frontal). Se recuerda en este navegador y
+ * deja el evento `camara_elegida`. Una ventana más alta que ancha usa la lateral.
  */
-const CAMARAS_ELEGIBLES = ['3/4', 'jurado', 'baja', 'lado'];
+const CAMARAS_ELEGIBLES = ['3/4', 'jurado', 'lado', 'baja'], CAMARA_NOMBRE = { '3/4': 'general', jurado: 'jurado', lado: 'lateral', baja: 'baja' };
 const camElegida = () => { const q = params.get('camara'), g = guardado.get('tarima.camara'); return CAMARAS_ELEGIBLES.includes(q) ? q : CAMARAS_ELEGIBLES.includes(g) ? g : '3/4'; };
 const camPrincipal = () => (escena.vertical ? 'lado' : (E.camara ||= camElegida()));
-function cambiarCamara() {
-  const de = camPrincipal(), a = CAMARAS_ELEGIBLES[(CAMARAS_ELEGIBLES.indexOf(de) + 1) % CAMARAS_ELEGIBLES.length]; E.camara = a; guardado.set('tarima.camara', a);
+function elegirCamara(a, via) {
+  if (!CAMARAS_ELEGIBLES.includes(a)) return; E.camara = a; guardado.set('tarima.camara', a); ev('camara_elegida', { vista: CAMARA_NOMBRE[a], via, pantalla: E.pantalla });
   // si se está viendo la cámara del levantamiento, cambia ya (con un movimiento suave); en un primer plano, la próxima vez
   if (escena && !escena.vertical && (!escena.plano || escena.plano.key === 'jurado') && (E.modo === 'intento' || E.intento)) { escena.camara(a, .8); E.forzar = true; }
 }
+const cambiarCamara = () => elegirCamara(CAMARAS_ELEGIBLES[(CAMARAS_ELEGIBLES.indexOf(E.camara || camElegida()) + 1) % CAMARAS_ELEGIBLES.length], 'tecla');
 /** Recuadro fijo «ESPACIO: seguir» / «Toca: seguir» de las pantallas pasivas (turno de un rival, veredicto, repetición). */
 function seguir(on) {
   let el = $('seguir'); if (!el) { el = document.createElement('div'); el.id = 'seguir'; el.className = 'seguir'; el.hidden = true; el.setAttribute('aria-hidden', 'true'); $('tv').appendChild(el); }
@@ -801,9 +803,10 @@ async function decision(a, lev, res, et, propio, o = {}) {
   const total = o.max ? Math.min(total0, Math.max(o.max, tVer + (o.rival && !R0 ? 1.2 : .4))) : total0;      // el decisivo con «Rápida»: la barra que rebota se corta
   // sin cortes: la cámara sigue a la barra que cae y gira hacia el público con movimientos suaves; un rival que no decide nada
   // (`o.fija`) queda en la cámara general
-  if (fin && !ok && !o.fija) escena.primerPlano('caida', null, .45);
-  // un válido propio: mientras se prenden las luces, la vista desde la mesa del jurado (el pesista de frente y las tres luces arriba)
-  else if (fin && ok && propio && !o.fija && !R0 && !escena.vertical) escena.camara('jurado', 1.3);
+  // un válido o un nulo propio: mientras se prenden las luces, la vista del jurado (los árbitros levantan la paleta, el pesista
+  // de frente y las tres luces arriba). El nulo se queda ahí hasta el fundido que sigue; la barra que se cae (fallo) no pasa por acá
+  if (fin && propio && (ok || res.res === 'nulo') && !o.fija && !R0 && !escena.vertical) escena.camara('jurado', 1.3);
+  else if (fin && !ok && !o.fija) escena.primerPlano('caida', null, .45);
   const t0 = reloj.ahora(), d = [null, null, null], hito = { luz: 0, ver: false, caida: !fin || !ok || !!o.fija, rev: !!o.fija };
   const avanzar = (t, dt, vivo, conFinal = true) => {
     if (fin && conFinal) dibujarFinal(fin, t, dt, vivo);
@@ -900,6 +903,7 @@ async function inicio() {
         <div class="fila"><span>${t('opciones.rivales')}</span>${opt('nivel', 'n', 'amistoso', cfg.nivel, 'opciones.tranquilos')}${opt('nivel', 'n', 'normal', cfg.nivel, 'opciones.parejos')}${opt('nivel', 'n', 'dificil', cfg.nivel, 'opciones.duros')}</div>
         <div class="fila"><span>${t('opciones.orden')}</span>${opt('orden', 'o', 'rondas', cfg.orden, 'opciones.orden_rondas')}${opt('orden', 'o', 'oficial', cfg.orden, 'opciones.orden_oficial')}<small class="nota">${t('opciones.orden_nota.' + cfg.orden)}</small></div>
         <div class="fila"><span>${t('opciones.final')}</span>${opt('ritmo', 'r', 'expres', cfg.ritmo, 'opciones.rapida')}${opt('ritmo', 'r', 'completa', cfg.ritmo, 'opciones.completa')}</div>
+        <div class="fila"><span>${t('opciones.camara')}</span>${CAMARAS_ELEGIBLES.map(c => opt('cam', 'cam', c, E.camara || camElegida(), 'opciones.cam.' + CAMARA_NOMBRE[c])).join('')}</div>
         <div class="fila"><span>${t('opciones.sonido')}</span>${['si', 'no'].map(v => `<button data-sonido="${v}" aria-pressed="${(v === 'si') === sonido.encendido}">${sonido.icono(v === 'si')}${t('opciones.sonido_' + v)}</button>`).join('')}</div>
         ${telefono.instalable ? `<div class="fila"><span>${t('opciones.pantalla')}</span><button data-instalar="1">${t('opciones.como_instalar')}</button></div>` : ''}</div>` : '';
     const abrio = S.verOpciones; S.verOpciones = false;
@@ -931,6 +935,7 @@ async function inicio() {
     // dificultad: Fácil, Medio y Difícil son la barrita; Difícil trae rivales parejos si estaban los tranquilos
     else if (b.dataset.d) { cfg.dif = b.dataset.d; if (cfg.ctl === 'c') cfg.ctl = 'b'; if (cfg.dif === 'dificil' && cfg.nivel === 'amistoso') cfg.nivel = 'normal'; fijarDificultad(cfg); }
     else if (b.id === 'btn-opciones') { S.opciones = !S.opciones; S.verOpciones = S.opciones; if (S.opciones) ev('opciones_abiertas'); }
+    else if (b.dataset.cam) elegirCamara(b.dataset.cam, 'opciones');
     else if (b.dataset.sonido) sonido.encender(b.dataset.sonido === 'si');      // dentro del toque: en el iPhone así se desbloquea
     else if (b.dataset.instalar) telefono.avisoInstalar(true);
     else if (b.id === 'btn-ayuda') abrirSobre('ayuda');
