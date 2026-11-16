@@ -1906,6 +1906,57 @@ las luces quedan arriba a la derecha, chicos: en el veredicto las luces quedan c
 ceremonia y los planos cerrados se alejaron a ojo (×1,7): revisar con el arte nuevo de `look`. Medir en PostHog la retención por
 `orientacion` antes de decidir si vale una cámara propia para vertical más cerca.
 
+### look y vertical juntos en `prueba` (16-nov; Gráficos fase 3, LIF-50)
+
+`prueba` = lo anterior + aprender (LIF-52) + **look** + **vertical**, con `git merge` (sin rebase): `39c10a9` (look) y
+`69565cd` (vertical). Nada fusionado a main ni publicado.
+
+**Antes de fusionar `vertical`.** Su corrida de teléfono completa 43827558470 había fallado por una sola línea:
+`[vertical_390x844] en «decision aprende_total» se tapan: saltar-rival/veredicto`. Era de la rama, no intermitente: parado, el
+veredicto va a `--sb + --bm + 44px` y «Saltar» del turno de un rival a `--sb + --bm` con 60 px de alto; cuando una explicación
+de primera vez alarga el turno, el veredicto del rival sale con «Saltar» todavía a la vista y se encimaban 16 px. Arreglo en
+`vertical` (`b20fb62`, `juego.css`): con `#saltar-rival` a la vista, el veredicto parado sube a `--sb + --bm + 68px`.
+
+**Conflictos y cómo quedaron.**
+- `stage.js`: sin conflicto de texto. Quedan las dos cosas: la gradación y la escena de look (`GRADO_LOOK`, `Look`) y las 3
+  líneas de vertical en `primerPlano` (márgenes `rig.inset`, `encuadre.dAbs`, ×1,7 parado).
+- `main.js`, `juego.css`, `aprende.js`, `telefono.js`: solo los tocó vertical (look no), entraron sin conflicto.
+- Workflows: unión de las ramas en los filtros de `pruebas.yml` y `telefono.yml` (… aprender, look, vertical). `graficos.yml`
+  queda con `[graficos, graficos2, look]`.
+- `HANDOFF.md`: las tres secciones (aprender, look, vertical), una detrás de otra.
+
+**Para cuando entre `pov` (primera persona; todavía no fusionada).** Prueba de fusión con `git merge-tree` contra
+`origin/pov` (`a91ca97`): conflictos de texto solo en `graficos.yml` (`look` contra `pov` en el filtro de ramas; unir),
+`pruebas.yml`, `telefono.yml` (unir) y `HANDOFF.md` (dejar las secciones). `stage.js`, `cameras.js`, `main.js` y `athlete.js` se
+fusionan solos, pero hay que mirar a mano:
+- `cameras.js → CameraRig.update`: `pov` agrega `if (this.propia) { … return; }` **antes** del amortiguado de `this.inset`
+  (`I[k] = damp(…)`): en primera persona los márgenes del teléfono parado no se aplican. Mantener `inset` (lo usa el juego
+  parado) y decidir si la vista `pov` parada respeta techo y pie o si parado no se ofrece `pov`.
+- `cameras.js → _mezclar`: `pov` cambia la transición a un arco alrededor del blanco; los planos de vertical (pesista entero en
+  el llamado, ×1,7) pasan por ahí: revisar las capturas paradas.
+- `stage.js → primerPlano`: `pov` agrega planos (`PLANOS`) y la cámara propia; la línea de vertical
+  (`const I = this.rig.inset; … dAbs …`) tiene que seguir antes de `const dAbs = encuadre?.dAbs || base?.dAbs`, y los planos
+  nuevos de `pov` con `dAbs` propio no se alejan ×1,7 (está bien así).
+- `main.js`: `pov` agrega `'pov'` a `CAMARAS_ELEGIBLES` y `camVista`; parado la cámara principal es la lateral (`camPrincipal`):
+  definir qué pasa si se elige `pov` con el teléfono parado y sumar ese caso a `check_telefono`.
+- `athlete.js`: look agrega `setAspecto` y uniforms de piel/tela; `pov` oculta la cabeza propia escalando el cuello: ver que
+  el aspecto no reaparezca la cabeza en primera persona (`check_pov`).
+
+**Corridas en verde** (sobre `69565cd`, por software): pruebas 43874523067 (los 4 grupos), teléfono 43874528418 (con los tres
+casos parados; `decision aprende_total` ya no se tapa), gráficos 43874533806, muro 43874537892 y servidor 43874543024. En
+`vertical`, la corrida completa de teléfono con el arreglo: 43874261461. Servidor falló la primera vez en `check_analitica`
+(sección 7, juego dibujado por software): el primer clic en «Jugar» no terminó en 30 s; relanzado el job, pasó. Los cuadros por
+software tardan lo mismo que antes de look (≈1,5–2,2 s): se anota como **inestable**, a vigilar si se repite con look.
+Sin navegador, en la Mac: sim, servidor, worker, perf, ritmo, barra_bots, chance y rivales en verde.
+
+**Capturas miradas.** Gráficos: Alta 3/4 y frontal (madera de la tarima, gradación, utilería y LED de look). Teléfono parado
+390×844: el llamado con la explicación encima del panel (pesista entero entre el tablero y la explicación) y la barrita encima
+del botón. Teléfono acostado 844×390: llamado y barrita como antes (el cuadro `05_llamado_` sale en negro, igual que en la
+corrida de `aprender` 43796645436: se toma durante el fundido).
+
+**Pendiente.** Lo de cada rama (ver sus secciones): placa real para el costo de look, teléfono de verdad parado; los planos
+cerrados parados (×1,7) mirados con el arte nuevo de look en un teléfono real.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.
