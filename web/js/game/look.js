@@ -485,13 +485,13 @@ export class Look {
 
   /** Lo que depende de la calidad: los rayos solo con post y haces; `A.rayos` escala su fuerza. */
   setNivel(Q) {
-    setSuperficies(!Q.directo && (Q.amb?.superficies ?? true));
+    const sup = !Q.directo && (Q.amb?.superficies ?? true); setSuperficies(sup);
     // camino directo: la pantalla sin grano por píxel y la utilería sin mapa de normales (se pagaban en «Baja» y «Móvil»)
     { const d = !!Q.directo; if (this.ledPlano !== d) { this.ledPlano = d; const m = this.arena.pantalla?.material; if (m) m.needsUpdate = true; }
       for (const m of this.utilMats || []) { const n = d ? null : m.userData.normal; if (m.normalMap !== n) { m.normalMap = n; m.needsUpdate = true; } } }
     FINO.value = Q.directo ? 0 : 1;
     // en el camino directo la pared de chapa (material físico en mucha pantalla) no se dibuja: queda el telón, como antes
-    this.arena.group.traverse(o => { if (o.material === this.chapaMat) o.visible = !Q.directo; });
+    this.arena.group.traverse(o => { if (o.material === this.chapaMat) o.visible = sup; });      // la chapa es toda por función: sin superficies sería un paño liso
     BOKEH.uScale.value = Q.directo ? .12 : .18;      // luces de fondo: puntos con halo en el camino directo (eran discos grises), bokeh moderado con post      // superficies por función solo con post
     const A = Q.amb || {}, k = A.rayos ?? 1; this.group.visible = !Q.directo && !!Q.beams && k > 0;
     for (const r of this.rayos || []) r.mat.uniforms.uFuerza.value = r.base * k;

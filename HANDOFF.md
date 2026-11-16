@@ -1732,8 +1732,9 @@ humanos reales». Nada fusionado ni publicado. La cámara en primera persona y l
 - `barbell.js`: goma de los discos con mapa de rugosidad y relieve, y caras con roces en arco, golpes y magnesio.
 - `graficos.yml`: rama `look`, entradas `niveles` y `con_alta`, fotos del laboratorio.
 
-**Calidades.** Móvil y Baja: luz, gradación, texturas (1024/512 en teléfono), utilería, LED con grano; sin superficies por
-función, sin rayos, sin pared de chapa y sin el detalle fino del pesista. Media, Alta y Ultra: todo.
+**Calidades.** Móvil y Baja: luz, gradación, texturas (1024/512 en teléfono), utilería sin normales y LED sin grano por
+píxel; sin superficies por función, rayos, pared de chapa ni detalle fino del pesista. Media: más el detalle fino del pesista,
+LED con grano y normales. Alta: más los rayos y el reflejo. Ultra: más las superficies por función y la pared de chapa.
 
 **Rondas del director de arte** (un agente que solo ve capturas y las referencias de Saltline; puntaje contra Saltline = 10):
 
@@ -1758,7 +1759,25 @@ antes `saltline_ref/tarima_hoy.jpg`; después `look/r5/graficos-out/graficos/fot
 `alta_jurado-vale.png`, `movil_3-4.png`, `movil_frontal.png`; laboratorio `look/r4/graficos-out/graficos/lab/lab_chapa-usado.png`. Las mismas
 fotos salen de cada corrida de `graficos.yml` (artefacto `graficos-out`).
 
-**Costo.** COSTO_PENDIENTE
+**Costo: NO quedó dentro de lo pedido; falta medir en una placa.** Todo por software en Actions (`graficos.yml` con
+`comparar` y `con_alta`, banco alternado contra `prueba` en la misma máquina, ms de un cuadro a 1 MP, media de tres corridas):
+
+| corrida (commit) | Baja prueba → look | Móvil prueba → look | Alta prueba → look |
+|---|---|---|---|
+| 43794611899 (96c3745, primera versión completa) | 2022 → 2522 (**+25 %**) | 830 → 979 (+18 %, una vuelta) | — |
+| 43795590519 (a90d1cf) | 2011 → 2484 (+24 %) | 1343 → 1899 (ruidosa) | 2582 → 3346 (**+30 %**) |
+| 43797739944 (9648418: sin detalle fino del pesista ni chapa en el camino directo, discos sin relieve) | 1619 → 1939 (**+20 %**) | 706 → 793 (**+12 %**) | — |
+| 43820928256 (94587d7: superficies más baratas, dos rayos, LED sin grano y utilería sin normales en directo) | 997 → 1188 (**+19 %**) | 974 → 954 (ruidosa: 823 a 1179) | 1141 → 1620 (**+42 %**) |
+
+Después de esa última medición, «Alta» quedó **sin superficies por función ni pared de chapa** (`AMBIENTE.alta.superficies =
+false`: solo «Ultra» las lleva) y eso **no se volvió a medir**. Lectura: por software cada lectura de textura y cada cuenta por
+píxel pesa mucho más que en una placa, así que estos porcentajes son un techo pesimista, pero el pedido era no empeorar el
+piso y **en «Baja» sigue 19 % arriba sin causa aislada** (candidatos: la utilería con materiales físicos, los discos
+instanciados, el mapa de rugosidad de los discos de la barra, el sombreador del pesista). Próximo paso concreto: agregar al
+banco las variantes «sin utilería» y «pesista de antes» para aislarlo, y correr `juego.html?banco=1` en la Mac del dueño
+(antes elegía Alta a 2,94 MP con 15 % de margen) y en un teléfono. Si en la placa «Baja» o «Móvil» pierden margen, lo
+primero a apagar ahí es `look.props` (una línea en `setNivel`). Generar las texturas suma ~1,2 s de carga en computadora
+(madera 2048) y ~0,3 s a 1024, medido en Node con la Mac ocupada; en un teléfono real, sin medir.
 
 **Límites del modelo actual que solo se resuelven en Blender** (no se tocaron mallas, poses ni esqueleto):
 - *Cara*: ojos muy abiertos y fijos, sin párpados que cierren ni ceño de esfuerzo (no hay morphs de expresión); cejas pintadas.
