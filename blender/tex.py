@@ -220,7 +220,7 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
         ven=np.maximum(ven*fl,ven2*.8)*STY.get('veins',.8); H+=ven*.00055; tint(ven*.08,VEIN)
         strands(fl*sm(.74,.7,t)*sm(.0,.15,t),(th*75,t*38+th*2.5),40+sgn,a=.32)
         # axila
-        pit=T.g((sgn*(sh[0]-.035*K),sh[1]+.005,sh[2]-.085*K),.042*K)*sm(.8,.45,T.ao)*sd_; mix(pit*np.clip(.55+T.n3(900,45,1,(1,1,.15))*2,0,1)*.7*min(1,bh*1.6),hair*.75,.62)
+        pit=T.g((sgn*(sh[0]-.035*K),sh[1]+.005,sh[2]-.085*K),.042*K)*sm(.8,.45,T.ao)*sd_; mix(pit*np.clip(.55+T.n3(900,45,1,(1,1,.15))*2,0,1)*.22*min(1,bh*1.6),hair*.6+SKIN*.4,.62)
         # mano
         hand=fl*sm(1.03,1.05,t); W_=BA[side+'Hand'][0]; i1=BA[side+'HandIndex1'][0]; p1=BA[side+'HandPinky1'][0]; m1=BA[side+'HandMiddle1'][0]
         pn=np.cross(i1-W_,p1-W_); pn/=np.linalg.norm(pn); pn*=(-1 if sgn>0 else 1)          # normal de la palma

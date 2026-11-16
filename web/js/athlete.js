@@ -354,9 +354,9 @@ function eyeMaterial(src) {
   // al blanco y la sombra que el párpado y las pestañas de arriba echan sobre el globo (lo que más lo saca de «ojo de muñeco»).
   const m = new THREE.MeshPhysicalMaterial({ name: src.name, map: src.map, color: src.color, roughness: .38, metalness: 0, clearcoat: .7, clearcoatRoughness: .08, envMapIntensity: .45, side: src.side });
   m.onBeforeCompile = sh => {
-    sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n{ float arriba = normalize( vNormal ).y; diffuseColor.rgb *= 0.82 * mix( 0.38, 1.0, smoothstep( 0.62, 0.05, arriba ) ) * mix( 0.8, 1.0, smoothstep( -0.75, -0.2, arriba ) ); }');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n{ float arriba = normalize( vNormal ).y; diffuseColor.rgb *= 0.66 * mix( 0.3, 1.0, smoothstep( 0.5, -0.05, arriba ) ) * mix( 0.8, 1.0, smoothstep( -0.75, -0.2, arriba ) ); }');
   };
-  m.customProgramCacheKey = () => 'tarima-eye-2';
+  m.customProgramCacheKey = () => 'tarima-eye-3';
   return m;
 }
 
