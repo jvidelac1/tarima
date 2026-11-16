@@ -71,6 +71,9 @@ const RELLENO = .5;
 /** Segundos que tarda en subir y en bajar la paleta. */
 const SUBE = .35, BAJA = .55;
 
+/** Mallas de la gente lejana en sus dos versiones: look.js muestra `fino` con post y `liviano` en el camino directo. */
+export const LEJOS = { fino: [], liviano: [] };
+
 export class Jueces {
   constructor({ reduceMotion = false } = {}) {
     this.group = new THREE.Group(); this.group.name = 'Jueces'; this.reduce = reduceMotion;
@@ -108,20 +111,25 @@ export class Jueces {
     for (let i = 0; i < 3; i++) { this.paletas.setColorAt(i, GUARDADA); this._posar(i); }
     this.paletas.instanceColor.needsUpdate = true;
 
+    // Lo que sigue (jurado lateral, mesa técnica y gente de pie) se arma dos veces: con malla fina (Media en adelante) y liviana
+    // (Móvil y Baja: la cuenta de triángulos pesa en el teléfono). look.js elige cuál se ve (LEJOS).
+    for (const det of [1, 0]) { const lejos = [];
     // jurado lateral (cinco, mesa larga) y mesa técnica (dos mesas sobre el escenario): de lejos, sin gesto
     const ML = asiento(-8.3, FLOOR_Y, .1, Math.PI / 2), lat = en(mesa(6.2, BASE), ML);
-    for (let i = 0; i < 5; i++) lat.push(...en(persona(gente(i + 3, ['#40434d', '#2f4a45', '#5a2f33', '#343a4b', '#4a4436'][i], '#2a2c33'), { det: 0, pelo: ['melena', 'corto', 'cola', 'entradas', 'rapado'][i], corbata: i === 0, k: i + 3, gesto: ['mesa', 'cruzados', 'menton', 'mesa', 'falda'][i], ropa: ['saco', 'buzo', 'remera', 'saco', 'buzo'][i] }), ML.clone().multiply(correr((i - 2) * 1.25 + [0, .08, -.06, .05, -.1][i], -.5))));      // cinco distintos: ropa, pelo y postura
-    this.fijos.push(malla(lat, 'jurado lateral'));
+    for (let i = 0; i < 5; i++) lat.push(...en(persona(gente(i + 3, ['#40434d', '#2f4a45', '#5a2f33', '#343a4b', '#4a4436'][i], '#2a2c33'), { det, pelo: ['melena', 'corto', 'cola', 'entradas', 'rapado'][i], corbata: i === 0, k: i + 3, gesto: ['mesa', 'cruzados', 'menton', 'mesa', 'falda'][i], ropa: ['saco', 'buzo', 'remera', 'saco', 'buzo'][i] }), ML.clone().multiply(correr((i - 2) * 1.25 + [0, .08, -.06, .05, -.1][i], -.5))));      // cinco distintos: ropa, pelo y postura
+    lejos.push(malla(lat, 'jurado lateral ' + det));
     const tec = [];
-    [[5.0, -4.3, -.86], [5.75, -3.3, -1.05]].forEach(([x, z, ry], i) => { const M = asiento(x, STAGE_Y, z, ry); tec.push(...en(mesa(1.1, BASE), M), ...en(persona(gente(i + 8, i ? '#3c2f4a' : '#30384e', '#2a2e38'), { det: 0, pelo: i ? 'cola' : 'entradas', k: i + 8, ropa: i ? 'buzo' : 'saco', gesto: i ? 'menton' : 'mesa' }), M.clone().multiply(correr(0, -.5)))); });
-    this.fijos.push(malla(tec, 'mesa técnica'));
+    [[5.0, -4.3, -.86], [5.75, -3.3, -1.05]].forEach(([x, z, ry], i) => { const M = asiento(x, STAGE_Y, z, ry); tec.push(...en(mesa(1.1, BASE), M), ...en(persona(gente(i + 8, i ? '#3c2f4a' : '#30384e', '#2a2e38'), { det, pelo: i ? 'cola' : 'entradas', k: i + 8, ropa: i ? 'buzo' : 'saco', gesto: i ? 'menton' : 'mesa' }), M.clone().multiply(correr(0, -.5)))); });
+    lejos.push(malla(tec, 'mesa técnica ' + det));
     // gente de pie en penumbra a los costados del escenario (entrenadores, cargadores, un camarógrafo): siluetas oscuras, sin detalle; la sala está habitada
     const pie = [];
-    [[-6.05, -3.5, 'cruzados', 'buzo', 'corto', '#3a1d22'], [-5.95, 4.55, 'atras', 'remera', 'corto', '#22304f'], [-5.3, 4.95, 'cruzados', 'remera', 'cola', '#22304f'], [5.65, 4.7, 'abajo', 'remera', 'entradas', '#26282e']].forEach(([x, z, gesto, ropa, pelo, tono], i) => {
+    [[-6.05, -3.5, 'cruzados', 'buzo', 'corto', '#3a1d22'], [-5.95, 4.55, 'atras', 'remera', 'corto', '#22304f'], [-5.3, 4.95, 'cruzados', 'remera', 'cola', '#22304f']].forEach(([x, z, gesto, ropa, pelo, tono], i) => {
       const C0 = gente(i + 13, tono, '#15171c'), C = {}; for (const k in C0) C[k] = C0[k].clone().multiplyScalar(.42);
-      pie.push(...en(persona(C, { det: 0, pelo, k: i + 13, gesto, ropa, dePie: true }), asiento(x, STAGE_Y, z, Math.atan2(-x, .4 - z))));
+      pie.push(...en(persona(C, { det, pelo, k: i + 13, gesto, ropa, dePie: true }), asiento(x, STAGE_Y, z, Math.atan2(-x, .4 - z))));
     });
-    this.fijos.push(malla(pie, 'gente de pie'));
+    lejos.push(malla(pie, 'gente de pie ' + det));
+      for (const m of lejos) { m.visible = det === 1; this.fijos.push(m); } LEJOS[det ? 'fino' : 'liviano'] = lejos;
+    }
     // cartel iluminado en el frente de la mesa de los árbitros
     if (typeof document !== 'undefined') {
       const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 176; const g = cv.getContext('2d'), lg = g.createLinearGradient(0, 0, 0, 176); lg.addColorStop(0, '#1d2740'); lg.addColorStop(1, '#0d1220'); g.fillStyle = lg; g.fillRect(0, 0, 1024, 176);

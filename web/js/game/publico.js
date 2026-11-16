@@ -53,7 +53,7 @@ void main(){
 /** Ganancia con la que se guarda la tribuna horneada (8 bits: el público es oscuro y sin esto se escalona). */
 const HORNEO = 6;
 /** En el camino directo (sin gradación ni viñeta del pase final) el mismo público queda más claro: se baja acá. */
-const DIRECTO = .3;
+const DIRECTO = .36;
 
 export class Publico {
   /** `animo`: el uniform {value} del ánimo del público (ambiente.publico.uAnimo). `chico`: texturas a la mitad (teléfono). */

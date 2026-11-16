@@ -113,7 +113,7 @@ function cabeza(n, forma, { anteojos = false } = {}) {
     const x = P.getX(i), y = P.getY(i), z = P.getZ(i); if (z < .02) continue;
     let k = 1;
     if (fino) {
-      for (const s of [-1, 1]) { k -= .4 * G2(x, y, s * .031, .1305, .019, .0095); k -= .5 * G2(x, y, s * .0085, .0805, .0045, .003); k -= .16 * G2(x, y, s * .0165, .104, .006, .02); k -= .1 * G2(x, y, s * .05, .07, .014, .03); }      // cuencas y narinas
+      for (const s of [-1, 1]) { k -= .5 * G2(x, y, s * .031, .1305, .02, .0105); k -= .5 * G2(x, y, s * .0085, .0805, .0045, .003); k -= .16 * G2(x, y, s * .0165, .104, .006, .02); k -= .1 * G2(x, y, s * .05, .07, .014, .03); }      // cuencas y narinas
       k -= .62 * G2(x, y, 0, .0518, .022, .0024); k -= .12 * G2(x, y, 0, .076, .018, .005);                                                  // línea de la boca y bajo la nariz
       const labio = Math.max(G2(x, y, 0, .058, .019, .0042), G2(x, y, 0, .0452, .017, .0048)), mej = Math.max(G2(x, y, -.046, .094, .02, .02), G2(x, y, .046, .094, .02, .02));
       const bb = barba * suave(.092, .064, y) * (1 - .85 * labio) * (1 - .6 * G2(x, y, 0, .09, .012, .02));
@@ -212,7 +212,7 @@ export function brazo(S, H, { lado = 1, polo = null, manga = 'larga', tela = 'tr
   const sup = miembro([S.clone().add(V(0, .012, 0)), S.clone().lerp(E, .5), E], [[.064 * g, .066 * g], [.054 * g, .056 * g], [.046 * g, .048 * g]], n, 3);
   const inf = miembro([E, E.clone().lerp(W, .55), W], [[.047 * g, .048 * g], [.042 * g, .043 * g], [manga === 'larga' ? .034 * g : .028, manga === 'larga' ? .032 * g : .025]], n, 3);
   const pz = [{ g: sup, parte: tela, tramo: 0 }, { g: inf, parte: manga === 'larga' ? tela : 'piel', tramo: 1 }];
-  for (const m of mano(W, f, palma || V(0, -1, 0).addScaledVector(f, f.y).normalize(), k)) pz.push({ ...m, tramo: 1 });
+  for (const m of mano(W, f, palma || V(0, -1, 0).addScaledVector(f, f.y).normalize(), k * .86)) pz.push({ ...m, tramo: 1 });
   return { piezas: pz, S, E, W, f };
 }
 /** Manos de cada gesto, por lado (s = ±1), para una persona sentada con los hombros a la altura hy. */
@@ -262,7 +262,7 @@ export function persona({ cuerpo = .5, talla = 1, pelo: estilo = 'corto', forma 
       g.setAttribute('position', new THREE.Float32BufferAttribute(q, 3)); g.setIndex(s2 > 0 ? [0, 5, 1, 1, 5, 2, 5, 4, 2, 4, 3, 2] : [0, 1, 5, 1, 2, 5, 5, 2, 4, 4, 2, 3]); g.computeVertexNormals(); add(g, 'solapa'); }
   } else if (ropa === 'buzo') add(miembro([V(0, 1.08, -.014), V(0, 1.118, -.016)], [[.075, .08], [.064, .07]], 12, 1), 'ropa');      // capucha o cuello alto
   // cabeza (mentón en yc), girada e inclinada
-  const M = new THREE.Matrix4().compose(V(0, yc, .004), new THREE.Quaternion().setFromEuler(new THREE.Euler(cabezaInc, cabezaGiro, 0, 'YXZ')), V(1.07, 1.07, 1.07));
+  const M = new THREE.Matrix4().compose(V(0, yc, .004), new THREE.Quaternion().setFromEuler(new THREE.Euler(cabezaInc, cabezaGiro, 0, 'YXZ')), V(1, 1, 1));
   for (const p of [...cabeza(det ? 26 : 16, forma, { anteojos }), ...pelo(estilo, det ? 26 : 16, r, forma)]) { p.g.applyMatrix4(M); P.push(p); }
   // brazos
   const G = typeof gesto === 'function' ? gesto : GESTOS[gesto] || GESTOS.falda, manga = ropa === 'remera' ? 'corta' : 'larga', tela = saco ? 'traje' : 'ropa';

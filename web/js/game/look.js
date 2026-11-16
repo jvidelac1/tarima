@@ -18,6 +18,7 @@ import { EVENT } from '../config.js';
 import { BOKEH } from '../post.js';
 import { FINO } from '../athlete.js';
 import { conSuperficie, setSuperficies, chapa, USO } from './materiales.js';
+import { LEJOS } from './jueces.js';
 
 /** Gradación del juego: exposición, saturación, contraste, gamma de sombras, tinte de sombras y de altas, viñeta y negro. */
 export const GRADO_LOOK = Object.freeze({ exp: 1.0, sat: .88, con: 1.03, gam: 1.0, frio: [.92, .995, 1.09], calido: [1.07, 1.0, .91], vin: .36, negro: .004 });
@@ -559,6 +560,9 @@ export class Look {
     { const t = canvasTexture(brilloPiso(), { aniso: 2 }); this.texturas.push(t);
       const o = new THREE.Mesh(new THREE.PlaneGeometry(7.8, 3.0), new THREE.MeshBasicMaterial({ name: 'brillo de la pantalla en el piso', map: t, color: new THREE.Color(.5, .5, .5), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
       o.rotation.x = -Math.PI / 2; o.position.set(0, Y0 + .004, -3.45); o.renderOrder = 2; P.add(o); (this.calcos ||= []).push(o); }
+    { const cv = makeCanvas(256, 64, g => { g.fillStyle = '#000'; g.fillRect(0, 0, 256, 64); for (let i = 0; i < 6; i++) { const x = (i + .5) * 256 / 6, rg = g.createRadialGradient(x, 30, 0, x, 30, 40); rg.addColorStop(0, 'rgba(255,226,190,.55)'); rg.addColorStop(1, 'rgba(255,226,190,0)'); g.fillStyle = rg; g.fillRect(x - 40, 0, 80, 64); } }), t = canvasTexture(cv, { aniso: 2 }); this.texturas.push(t);
+      const o = new THREE.Mesh(new THREE.PlaneGeometry(12.6, 2.9), new THREE.MeshBasicMaterial({ name: 'luz del truss del frente en el piso', map: t, color: new THREE.Color(.11, .11, .11), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+      o.rotation.x = -Math.PI / 2; o.position.set(0, Y0 + .004, 3.95); o.renderOrder = 2; P.add(o); (this.calcos ||= []).push(o); }
     // pared de chapa pintada a los lados de la pantalla (materiales.js: toda por función), con columnas, caño y tablero eléctrico
     { const ch = this.chapaMat = chapa('#2a4350'); this.propMats.add(ch);
       for (const s of [-1, 1]) { const g = grupo(s * 7.05, -5.72, 0, -1);
@@ -666,6 +670,7 @@ export class Look {
       // En el camino directo no se dibuja (Media para arriba sí), hasta medir en una placa
       for (const o of this.utileria()) if (o !== this.props) o.visible = !d; this.props.visible = !d; }
     FINO.value = Q.directo ? 0 : 1;
+    for (const m of LEJOS.fino) m.visible = !Q.directo; for (const m of LEJOS.liviano) m.visible = !!Q.directo;      // gente lejana: malla completa con post, liviana en Móvil y Baja
     if (this.haloMat) { this.haloMat.uniforms.uDirecto.value = Q.directo ? 1 : 0; this.haloMat.uniforms.uMax.value = Q.directo ? 72 : 240; for (const b of this.arena.beams || []) b.puesto = false; }      // en el camino directo, halos chicos: poca pantalla de mezcla
     // en el camino directo la pared de chapa (material físico en mucha pantalla) no se dibuja: queda el telón, como antes
     this.arena.group.traverse(o => { if (o.material === this.chapaMat) o.visible = sup; });      // la chapa es toda por función: sin superficies sería un paño liso
