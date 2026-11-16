@@ -167,7 +167,14 @@ async function corrida(via) {
             if (s.pantalla === 'llamado') {      // el panel único: a veces sube un kilo (cuenta como cambio) y elige envión
               llamado = P.firma;
               if (o.cambia && /intento 2/.test(llamado)) { if (tactil) await pulsa('#kg-mas'); else { const k0 = await page.locator('#kg-val').textContent(); await page.keyboard.press('ArrowRight'); if (+(await page.locator('#kg-val').textContent()) !== +k0 + 1) mal('la flecha derecha no sumó un kilo'); } }
-              if (o.pesado?.(llamado)) for (let i = 0; i < 5; i++) { if (tactil) await pulsa('#kg-mas5'); else await page.keyboard.press('ArrowUp'); }
+              // 25 kg de más: en el teléfono acostado el panel compacto no muestra los ±5 (LIF-31), así que con el dedo se toca
+              // «+1» 25 veces; y se verifica que el peso subió (antes, si no estaba el «+5», el intento salía con el peso de siempre)
+              if (o.pesado?.(llamado)) {
+                const k0 = +(await page.locator('#kg-val').textContent());
+                if (tactil) { if (!await pulsa('#kg-mas5')) { for (let i = 0; i < 25; i++) await pulsa('#kg-mas'); } else for (let i = 0; i < 4; i++) await pulsa('#kg-mas5'); }
+                else for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowUp');
+                const k1 = +(await page.locator('#kg-val').textContent()); if (k1 !== k0 + 25) mal(`«${llamado.split('|')[0]}»: los 25 kg de más no entraron (${k0} → ${k1})`);
+              }
               // LIF-31 y LIF-43: el estilo de envión se elige en el primer dos tiempos con un solo botón (sin abrir opciones) y
               // después queda fijo, con candado y sin botones para cambiarlo
               if (o.envion && /Dos tiempos/.test(llamado)) {
