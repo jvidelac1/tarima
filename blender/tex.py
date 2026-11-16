@@ -309,7 +309,7 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     def decal(txt,cx,cz,width,u,mask,c,r=.36,hh=.00012):
         nonlocal H
         t_=text_mask(FONT,txt); h=width*t_.shape[0]/t_.shape[1]; uu=(u-(cx-width/2))/width; vv=((cz+h/2)-z)/h; ok=(uu>=0)&(uu<1)&(vv>=0)&(vv<1)
-        s_=np.zeros_like(z); s_[ok]=t_[(vv[ok]*t_.shape[0]).astype(int),(uu[ok]*t_.shape[1]).astype(int)]; s_=blur(s_,.8*S)*mask; mix(s_,c,r); H+=s_*hh
+        s_=np.zeros_like(z); s_[ok]=t_[(vv[ok]*t_.shape[0]).astype(int),(uu[ok]*t_.shape[1]).astype(int)]; s_=blur(s_,.8*S)*mask*np.clip(.84+cl*1.6+knit*.10,0,1); mix(s_*.9,c,r); H+=s_*hh     # estampado: toma la trama y el desgaste de la tela, no es una calcomanía pareja
     decal(STY['code'],0,sh[2]-.165*K,.13*K,x,suit*(y<-.04),TRIM); decal(STY['name'],0,sh[2]-.13*K,.21*K,-x,suit*(y>.03),TRIM)
     sweatc=suit*np.maximum(np.exp(-((x/.07)**2+((z-(sh[2]-.17))/.10)**2))*(ny<0),np.exp(-((x/.06)**2+((z-(sh[2]-.22))/.16)**2))*(ny>0))*np.clip(.6+cl*2,0,1)
     col*=1-.16*sweatc[:,:,None]; rough-=.10*sweatc
@@ -395,12 +395,12 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
         chalk=np.maximum(chalk,fl*sm(.70,.80,t)*sm(1.1,1.0,t)*cn*cf*.35)
     smear=sm(.0,.38,T.n3(26,102,3,(1,1,.22))+.08)*np.clip(.3+cn,0,1)
     thf=sm(.45,.55,F('thigh'))*sm(.1,-.4,ny)*sm(knee[2]+.11,knee[2]+.17,z)*sm(hip[2]+.02,hip[2]-.06,z)
-    thf*=np.exp(-(((axo-knee[0])/.06)**2)); soft=blur(thf*smear,7*S)*(.45+.55*cf)*.42
+    thf*=np.exp(-(((axo-knee[0])/.06)**2)); soft=blur(thf*smear,7*S)*(.45+.55*cf)*.62
     smh=sm(.0,.36,T.n3(30,103,3,(.25,.25,1))+.06)*cn
     soft=np.maximum(soft,blur(sm(sh[2]-.035,sh[2]+.0,z)*sm(sh[2]+.085,sh[2]+.05,z)*sm(.2,-.3,ny)*sm(.22,.17,axo)*(1-head)*(1-farm)*smh,7*S)*(.45+.55*cf)*.22*skinm)
     chalk=np.maximum(chalk,soft*cov)
     pch=suit*(ny<-.2)*np.exp(-((x/.085)**2+((z-(sh[2]-.12))/.06)**2))*smh
-    chalk=np.maximum(chalk,(blur(pch,6*S)*.34+blur(slv*sm(.1,-.4,ny)*smear,6*S)*.26)*(.45+.55*cf)*cov)
+    chalk=np.maximum(chalk,(blur(pch,6*S)*.5+blur(slv*sm(.1,-.4,ny)*smear,6*S)*.26)*(.45+.55*cf)*cov)
     chalk=np.clip(chalk*STY.get('chalk',1.),0,.93)*cov
     mix(chalk,np.array([.93,.93,.91],f32)*(1+cf[:,:,None]*.05-.03),.93)
     chalkH=chalk*(.00012+cf*.00018)
@@ -422,7 +422,7 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     cavA=np.clip(1+anatC*am*(115/K),.70,1.05); del anatC                              # los surcos entre grupos musculares oscurecen (son anchos: el pasa-altos de 3 px no los ve)
     aoS=T.ao*(1-suit)+blur(T.ao,22*S)*suit
     cav=np.clip(1+(H-blur(H,3*S))*900,0.55,1.1); ao=np.clip((.12+.88*aoS)*cav*cavA,0,1)
-    tn=np.array([.47,.36,.33],f32); aoc=.45+.55*aoS*np.clip(cav,0,1)*cavA; col=col*(tn[None,None,:]+(1-tn[None,None,:])*aoc[:,:,None])
+    tn=np.array([.55,.47,.46],f32); aoc=.62+.38*aoS*np.clip(cav,0,1)*cavA; col=col*(tn[None,None,:]+(1-tn[None,None,:])*aoc[:,:,None])
     col=np.clip(col,0,1); col[~cov]=SKIN; nrm[~cov]=(.5,.5,1); rough[~cov]=.5; ao[~cov]=1
     save(col[::-1],OUT+'body_color.png',compress_level=3); save(nrm[::-1],OUT+'body_normal.png',compress_level=3)
     save(np.stack([ao,rough,np.zeros_like(rough)],2)[::-1],OUT+'body_orm.png',compress_level=3)

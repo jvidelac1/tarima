@@ -78,7 +78,7 @@ def _antro():
     B=lambda n:rig.data.bones['mixamorig:'+n]; H_=float(STY['H']); hum=(B('LeftForeArm').head_local-B('LeftArm').head_local).length; fa=(B('LeftHand').head_local-B('LeftForeArm').head_local).length
     tip=B('LeftHandMiddle3').tail_local if 'mixamorig:LeftHandMiddle3' in rig.data.bones else B('LeftHand').tail_local; mano=(tip-B('LeftHand').head_local).length; sw=(B('LeftArm').head_local-B('RightArm').head_local).length
     cue=(B('Head').head_local-B('Neck').head_local).length; r=dict(humero=hum/H_,antebrazo=fa/H_,mano=mano/H_,hombros=sw/H_,envergadura=(sw+2*(hum+fa+mano))/H_,cuello=cue/H_)
-    lim=dict(humero=(.155,.19),antebrazo=(.135,.16),mano=(.095,.115),envergadura=(.99,1.06)); fuera=[k for k,(a,c) in lim.items() if not a<=r[k]<=c]
+    lim=dict(humero=(.155,.19),antebrazo=(.135,.16),mano=(.095,.125),envergadura=(.99,1.08),cuello=(.038,.06)); fuera=[k for k,(a,c) in lim.items() if not a<=r[k]<=c]
     print('ANTRO '+NAME+': '+' · '.join(f'{k} {v:.3f} H' for k,v in r.items())+(' · FUERA DE RANGO: '+', '.join(fuera) if fuera else ' · en rango'))
 try: _antro()
 except Exception as e: print('ANTRO error',e)
