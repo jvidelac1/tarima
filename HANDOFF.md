@@ -2038,8 +2038,12 @@ Desde la ronda 2 el director tiene la imagen objetivo; la base se repuntuó con 
 | 1b (base, criterio nuevo) | 38086eb | 4 | 5 | 6 | 5 | 3 | 5 | 4,5 | — | — |
 | 2 (sala 1.ª pasada) | e51f4c0 | 4,5 | 5 | 6 | 5 | 3 | 5 | 4 | — | — |
 | 3 (sala 2.ª + pesista 1.ª) | c6bb768 | 4,5 | 5,5 | 6,5 | 5,5 | 3,5 | 5,5 | 4,5 | — | — |
+| 4 (sala 3.ª + pesista 2.ª + final nuevo) | 6ee2ad5 | 5,5 | 6 | 6,5 | 6 | 4,5 | 6 | 5 | — (se rehace) | 5 |
 
-Partes del pesista en la ronda 3: cara 4, piel 5, pelo y barba 3,5, anatomía 4,5, manos 3,5, ropa 6 (era 3,5).
+Partes del pesista en la ronda 4: cara 4,5, piel 6, pelo y barba 4, anatomía 5, manos 4, ropa 6,5 (ronda 3: 4 / 5 / 3,5 / 4,5 / 3,5 / 6).
+La primera persona se rehace por pedido del dueño (16-nov a la noche): vista realista desde los ojos (se ve el jurado; los
+brazos solo cuando mira abajo o cuando la barra cruza la vista), cabeza leve, tensión previa y un recuadro chico con el
+levantamiento desde afuera. `pruebas.yml` en verde en `6ee2ad5` (los cuatro grupos).
 Meta: conjunto, pesista, primera persona y final ≥ 7; Móvil ≥ 6; nada bajo 6. **No se llegó; sigue en curso.**
 
 **Actions por software contra la Mac del dueño (M1 Pro, Metal):** misma imagen (diferencia media de 0,4 a 2,1 sobre 255 por
