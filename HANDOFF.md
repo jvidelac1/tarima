@@ -1855,6 +1855,57 @@ y después. El tiempo de generación de texturas en un teléfono real. `USO` tod
 juego para nada más que el aspecto. Los discos de la barra no llevan superficie por función (se mueven: haría falta espacio
 de objeto). La chapa elige su eje por derivadas: en una esfera se estira (en la pared no).
 
+### Jugar en vertical (16-nov, rama `vertical`; LIF-50)
+
+Pedido: la mayoría abre el enlace con el teléfono parado (Instagram, TikTok, WhatsApp) y hasta ahora se le giraba el contenido
+90° para jugar acostado. Ahora **se juega parado sin girar nada**; acostado sigue igual. Rama `vertical` desde `prueba`. Nada
+fusionado ni publicado.
+
+- **`telefono.js`**: `html.vert` (táctil y más alto que ancho; también tabletas paradas) y `html.angosto` (≤ 380 px).
+  `telefono.parado` y `telefono.orientacion` ('vertical'/'horizontal'). Mide y pone en px `--boton-v` (botón redondo, 12,5 %
+  del alto entre 84 y 124 px), `--pie-v` (botón + barrita + área segura de abajo) y `--techo-v` (botones chicos + área segura de
+  arriba). El contenido girado (`html.rotado`) queda solo con `?vertical=girado`. Pantalla completa ya no fija la orientación.
+- **Diseño parado** (`juego.css`, sección «teléfono parado»), una cosa por zona: arriba a la derecha sonido, pausa y ayuda en
+  fila; arriba a la izquierda el tablero (sin la columna AHORA/SIGUE ni la personalidad del rival) o la energía; **abajo al
+  centro el botón redondo** (igual para las dos manos); **justo encima, LA indicación del momento**: la barrita (sin verbo: el
+  botón dice TOCA), la señal o el veredicto (con el veredicto se va el botón y abajo queda «Toca: seguir»); «Saltar» del turno
+  de un rival en el lugar del botón. El acuse va sin la tecla dibujada (solo el motivo de un toque que no sirvió). Los paneles
+  suben desde abajo, a lo ancho; títulos, tabla (sin la columna de energía) y selector de kilos ajustados al ancho.
+- **Cámara** (sin tocar `cameras.js`): `main.js → margenVertical()` le pasa a la cámara `setInsets({t: --techo-v, b: --pie-v})`
+  (lo que ya existía para la gráfica), así el encuadre automático pone al pesista y la barra entre el techo y el pie. En
+  `stage.js → primerPlano` (3 líneas): con esos márgenes, los primeros planos sin encuadre propio van al centro de lo libre y
+  los cerrados del visor (torso, cara…) 1,7 veces más lejos. En el llamado (`encuadreLibre`), parado va **el pesista entero**
+  entre el tablero y la explicación de primera vez (o el panel), en lugar del plano americano que el panel cortaba. La cámara
+  del levantamiento parado es la lateral (ya era así: `camPrincipal`). **Para la fusión con `pov`**: si `pov` cambia
+  `CameraRig.update` o los planos, mantener `inset` (lo usa el juego parado) y que `primerPlano` acepte `encuadre.dAbs`.
+- **Explicación de primera vez** (`aprende.js`): parada, la de la esquina va a lo ancho, apilada encima de lo que haya abajo
+  (veredicto, «Saltar», botón), recolocada en cada cuadro.
+- **Analítica**: súper propiedad `orientacion` en todos los eventos, `orientacion` en `juego_abierto` y evento
+  `orientacion_cambio` (`orientacion`, `antes`, `pantalla`) si se gira el teléfono en medio del juego. Para comparar: finales
+  terminadas, `siguio_jugando` y el cartel por `orientacion`.
+- **Pruebas**: `check_telefono` suma `vertical_390x844` (iPhone con muesca: final entera solo con toques, dos dedos, toque en el
+  borde), `vertical_375x667` en inglés hasta el cartel de anotarse (`?muro=firme&etapa=arranque`) y `vertical_430x932`; mide el
+  tapado, el alto del panel del llamado (tope 40 %), que el botón principal de cada panel quede en la mitad de abajo (pulgar),
+  y que al girar a horizontal y volver cada orientación use su diseño y salgan los eventos. `telefono.yml` tiene la entrada
+  `solo` (p. ej. `-f solo=vertical`) para correr solo esos casos.
+
+**Medido** (Actions, por software): tapado del pesista (`tools/tapa.mjs`) en 390×844 (es), 375×667 (en) y 430×932 (es): **0 % del cuerpo en el
+llamado (con la explicación de primera vez encima del panel), con la barrita quieta y corriendo, en el levantamiento y en el
+turno de un rival** (antes de corregir: 35 % en el llamado, 13 % con la barrita, 15–17 % la explicación); veredicto 14 % (el
+cartel tapa los pies un momento; sin tope); explicación «luces» 7–15 % (lo tapa el tablero, no el cartelito: 0 %). Panel del
+llamado 141 px = 15–21 % del alto (tope 40 %); botón principal de cada panel entre 0,80 y 0,93 del alto (pulgar). Final entera en
+390×844 solo con toques: 6 válidos, 17 toques (todos aceptados), podio. Cartel de anotarse parado en inglés (375×667) entra sin
+desplazar. Girar a horizontal y volver: diseño correcto y eventos `orientacion_cambio`. Acostado sin cambios (844×390: llamado
+0 %, barrita ≤ 13 %, como antes). Corridas: teléfono `solo=vertical` 43826541641 en verde. Capturas miradas: 390×844 de punta a
+punta (inicio, presentación, apertura, llamado con la explicación, barrita, levantamiento con la barra arriba, veredicto, turno
+de un rival con «Cambiar», intervalo, ceremonia), 375×667 en inglés (inicio, presentación, cartel), 430×932 y 667×375 acostado
+después de girar.
+
+**Pendiente / estimación.** Verlo en un teléfono de verdad (Safari con la barra de abajo, teclado del editor parado). El reloj y
+las luces quedan arriba a la derecha, chicos: en el veredicto las luces quedan cerca de la barra arriba de la cabeza. La
+ceremonia y los planos cerrados se alejaron a ojo (×1,7): revisar con el arte nuevo de `look`. Medir en PostHog la retención por
+`orientacion` antes de decidir si vale una cámara propia para vertical más cerca.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.

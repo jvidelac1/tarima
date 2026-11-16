@@ -78,7 +78,7 @@ export class Aprende {
   /** Al cambiar de pantalla: la del panel se va con el panel; la de la esquina sigue en el turno de un rival y en los veredictos. */
   alVisitar(p) { const a = this.act; if (a && (a.donde === 'panel' ? p !== 'llamado' : !ESQUINA.has(p))) this.cerrar('sola'); }
   /** En cada cuadro: el tope de VIDA_MS. */
-  tic(now) { if (this.act && now - this.act.t0 >= VIDA_MS) this.cerrar('sola'); }
+  tic(now) { if (this.act && now - this.act.t0 >= VIDA_MS) this.cerrar('sola'); else if (this.act?.donde === 'esquina' && document.documentElement.classList.contains('vert')) this.colocar(); }
   /**
    * Encima del panel del llamado (alineada a su derecha y del mismo ancho), o abajo a la izquierda (clase CSS). Si encima del
    * panel no entra (el detalle abierto lo agranda), se oculta mientras tanto.
@@ -86,7 +86,7 @@ export class Aprende {
   colocar() {
     const el = this.el, a = this.act; if (!a) return;
     const s = el.style; s.left = s.right = s.bottom = s.width = ''; el.classList.remove('sin-lugar');
-    if (a.donde !== 'panel') return;
+    if (a.donde !== 'panel') { this._apilar(); return; }
     const pn = this.o.panel(), tv = el.parentElement; if (!pn || !tv) return;
     const rotado = document.documentElement.classList.contains('rotado');
     // con el contenido girado (teléfono en vertical) las cajas salen rotadas: ahí se usan los desplazamientos
@@ -97,6 +97,19 @@ export class Aprende {
     // arriba quedan la caja de las luces y los botones de sonido, pausa y ayuda
     const techo = Math.max(...['.relojbox', '#pausa', '#sonidob', '#ayudab'].map(q => { const e = document.querySelector(q); if (!e || e.hidden || !e.offsetParent) return 0; return rotado ? de(e).y - o0.y + e.offsetHeight : e.getBoundingClientRect().bottom - tv.getBoundingClientRect().top; }));
     if (caja.t - gap - el.offsetHeight < techo + gap) el.classList.add('sin-lugar');
+  }
+  /**
+   * Teléfono parado (LIF-50): la de la esquina va a lo ancho, justo encima de lo que haya abajo (el veredicto, «Saltar», el
+   * botón redondo, «Toca: seguir»), que cambia mientras está a la vista: se recoloca en cada cuadro (tic).
+   */
+  _apilar() {
+    if (!document.documentElement.classList.contains('vert')) return;
+    const tv = this.el.parentElement, q = tv?.getBoundingClientRect(); if (!q) return;
+    let arriba = q.bottom;
+    for (const sel of ['#veredicto', '#saltar-rival', '#zona', '#seguir', '#barrita', '#senal']) {
+      const e = document.querySelector(sel); if (!e || e.hidden) continue; const r = e.getBoundingClientRect(); if (r.width > 0 && r.height > 0 && r.top < arriba) arriba = r.top;      // #zona es fija: sin offsetParent
+    }
+    this.el.style.bottom = Math.round(q.bottom - arriba + 8) + 'px';
   }
   /** Para las pruebas: lo que está a la vista. */
   estado() { const a = this.act; return a ? { clave: a.clave, donde: a.donde, ms: Math.round(this.o.ahora() - a.t0), texto: this.el.textContent.replace('✕', '').trim() } : null; }

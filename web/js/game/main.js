@@ -886,6 +886,28 @@ async function repeticion(lev, r, linea = '', o = {}) {
 /** Dificultad de la barrita al abrir (rules.js → NIVELES_B): ?dif= primero, después la elegida en Opciones; Fácil por defecto. */
 function difInicial() { const q = params.get('dif'), g = guardado.get('tarima.dificultad'); return DIFICULTADES.includes(q) ? q : DIFICULTADES.includes(g) ? g : 'facil'; }
 /** La dificultad como súper propiedad de la analítica (`dificultad` en cada evento): Clásico es 'clasico'. */
+/**
+ * LIF-50: cómo se juega, parado ('vertical') o acostado ('horizontal'). Va como súper propiedad `orientacion` en cada evento
+ * (para comparar retención y finales entre las dos) y, si cambia en medio del juego, el evento `orientacion_cambio`.
+ * En vertical, además, la cámara encuadra al pesista arriba de la barrita y el botón (margenVertical).
+ */
+function orientacion() {
+  const o = telefono.orientacion; margenVertical();
+  if (o === E.orientacion) return; const antes = E.orientacion; E.orientacion = o;
+  try { analitica?.propiedades({ orientacion: o }); } catch { /* métricas */ }
+  if (antes) ev('orientacion_cambio', { orientacion: o, antes, pantalla: E.pantalla });
+}
+/**
+ * Teléfono parado (html.vert): el lienzo ocupa toda la pantalla, pero abajo van la barrita y el botón y arriba los botones
+ * chicos y el tablero. La cámara (cameras.js, setInsets) encuadra al pesista y la barra en el rectángulo que queda libre.
+ * Las medidas salen de las variables de juego.css (--pie-v y --techo-v, en px), así un cambio de diseño no se desfasa.
+ */
+function margenVertical() {
+  if (!escena?.rig) return; const gl = $('gl'), H = gl?.clientHeight || 0;
+  if (!document.documentElement.classList.contains('vert') || !H) { escena.rig.setInsets({ t: 0, b: 0, l: 0, r: 0 }); return; }
+  const cs = getComputedStyle(document.documentElement), px = k => parseFloat(cs.getPropertyValue(k)) || 0;
+  escena.rig.setInsets({ t: Math.min(.25, px('--techo-v') / H), b: Math.min(.4, px('--pie-v') / H), l: 0, r: 0 });
+}
 function fijarDificultad(cfg) { E.dificultad = cfg.ctl === 'c' ? 'clasico' : cfg.ctl === 'b' ? cfg.dif : cfg.ctl; try { analitica?.propiedades({ dificultad: E.dificultad }); } catch { /* métricas */ } }
 function ctlInicial() { const q = params.get('ctl'); if (q === 'c' || q === 'f' || q === 'u' || q === 'b') return q; return guardado.get('tarima.ctl') === 'c' ? 'c' : 'b'; }
 /**
@@ -1110,6 +1132,16 @@ function encuadreLibre() {
   // el tablero de la final (arriba a la izquierda): el pesista se encuadra debajo, no detrás
   const tb = $('tablero'); if (tb && !tb.hidden && tb.offsetHeight) { const b = (tb.offsetTop + tb.offsetHeight) / c.height + .015; if (b < .45 && tb.offsetLeft / c.width < (x0 + x1) / 2) y0 = Math.max(y0, b); }
   const fov = 22, tg = 2 * Math.tan(fov / 2 * Math.PI / 180), asp = c.width / c.height;
+  if (document.documentElement.classList.contains('vert')) {
+    // LIF-50, teléfono parado: el panel va abajo a lo ancho y la explicación de primera vez justo encima. Ahí el plano
+    // americano quedaba cortado por las rodillas: va el pesista entero (de los pies a la cabeza, con aire) en lo que queda
+    // libre entre el tablero y la explicación (o el panel). El sujeto del plano (entre el cuello y la cadera) va más arriba
+    // del centro de esa parte, para que entren los pies.
+    const ap = $('aprende'); if (ap && !ap.hidden && ap.dataset.donde === 'panel' && !ap.classList.contains('sin-lugar') && ap.offsetHeight) { const t = ap.offsetTop / c.height; if (t > .25) y1 = Math.min(y1, t - .01); }
+    y0 = Math.max(y0, (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--techo-v')) || 0) / c.height);
+    const h = escena.P?.h || 1.75, arriba = 1.12 * h, abajo = -.06 * h, sujeto = .66 * h, alto = arriba - abajo;
+    return { x: .5, y: y0 + (y1 - y0) * (arriba - sujeto) / alto, dAbs: Math.max(alto / (tg * (y1 - y0)), .9 / (tg * asp)) };
+  }
   return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, dAbs: Math.max(1.6 / (tg * (y1 - y0)), 1 / (tg * asp * (x1 - x0))) };
 }
 
@@ -1578,6 +1610,7 @@ async function iniciar() {
   cargaUI.titulo('carga.msg');
   alCambiarIdioma(() => { pintarFijos(); senalUI?.repintar(); barritaUI?.repintar(); if (E.sobre) pintarSobre(E.sobre.tipo); E.repintar?.(); if (TB.p && !TB.congelado) tablero(TB.p); else { PD.html = ''; pintarPedido(); } if ($('saltar-rival') && !$('saltar-rival').hidden) botonSaltar(true); });
   addEventListener('resize', () => { if (TB.p && !TB.congelado) tablero(TB.p); });      // teléfono acostado: el tablero compacto
+  telefono.alGirar(orientacion); orientacion();
   // P0: el estado del servidor (y la medición) en paralelo con los datos; el muro al cargar si corresponde
   const origen = params.get('lang') ? 'url' : guardado.get('tarima.idioma') ? 'guardado' : 'defecto';
   const arranque = conexion.arranque({ idioma: idiomaActual(), idioma_origen: origen, version: VERSION_JUEGO, pantalla: () => E.pantalla });
@@ -1588,7 +1621,7 @@ async function iniciar() {
   if (C.auto) C.Q = { ...C.Q, dpr: 2 };      // en automático el tope de píxeles lo pone la calibración, no la densidad de cada calidad
   // LIF-33: sin WebGL (contexto que no se crea) el aviso del 3D y nunca la interfaz sin el pesista
   try { escena = new Escena($('gl'), C.Q, { reduceMotion }); } catch (e) { cargaUI.ocultar(); return falloGrafico('webgl', e); }
-  escena.poses = poses; nombrar();
+  escena.poses = poses; nombrar(); orientacion();
   // un programa que no compila: se anota (three no lo dice de otra forma) y revisarShaders() decide antes de jugar
   escena.renderer.debug.onShaderError = (gl, program, vs, fs) => {
     const log = [gl.getProgramInfoLog(program), gl.getShaderInfoLog(vs), gl.getShaderInfoLog(fs)].map(x => String(x || '').trim()).filter(Boolean).join(' · ').replace(/\s+/g, ' ').slice(0, 160);
@@ -1616,7 +1649,7 @@ async function iniciar() {
   cargaUI.ocultar();
   ultimo = reloj.ahora(); requestAnimationFrame(bucle);
   const A = await arranque;
-  ev('juego_abierto', { carga_ms: Math.round(performance.now()), pantalla_inicial: A.muro ? 'muro' : 'bienvenida', reintentos_modulo: window.__tarimaReintentos || 0 });
+  ev('juego_abierto', { carga_ms: Math.round(performance.now()), pantalla_inicial: A.muro ? 'muro' : 'bienvenida', reintentos_modulo: window.__tarimaReintentos || 0, orientacion: telefono.orientacion });
   (async () => {
     if (A.muro) { visita('muro'); await mostrarMuro('carga', A); }
     let cfg = null; for (;;) { if (!cfg) cfg = await inicio(); const r = await partida(cfg); cfg = r === 'revancha' ? { ...cfg, calentar: false, primera: false } : null; }
