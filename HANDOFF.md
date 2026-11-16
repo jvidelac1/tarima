@@ -1731,7 +1731,7 @@ muestras vecinas (3500 a 3900 °/s al desandarlo muestra por muestra). En el lev
 no molesta; por eso los brazos del final van de fase en fase y no muestra por muestra.
 
 **Herramientas nuevas.** `tools/check_pov.mjs` (A: finales con medidas; B: primera persona, hojas y reglas: imagen no vacía,
-cabeza oculta, giro de la mirada ≤ 200 °/s, cámara a ≤ 60 cm de la cabeza), `tools/hojas.mjs` (hojas de contactos),
+cabeza oculta, giro de la mirada ≤ 160 °/s, cámara a ≤ 60 cm de la cabeza), `tools/hojas.mjs` (hojas de contactos),
 `check_barra --camara= --final --out=`, y en `JUEGO.test`: `posa()` y `medir()`. Job `pov` en `graficos.yml` (artefacto `pov-out`).
 
 **Estimaciones y pendientes.**

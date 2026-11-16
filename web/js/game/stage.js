@@ -212,7 +212,7 @@ export const PLANOS = {
  * barra a medias y despacio. Reglas, iguales para cualquier biotipo y cualquier fase:
  * - ojo = cabeza + `arriba` m a lo largo del cuello + `adelante` m hacia el frente del tronco (por metro de estatura / 1,7).
  * - LA BARRA Y LAS MANOS SE VEN SIEMPRE (pedido del dueño). La mirada apunta a la barra con un corrimiento, y llega con
- *   retardo (`giro` por segundo); entre `abajo` y `tope` rad:
+ *   retardo (`giro` por segundo) y sin pasar de `giroMax` rad/s; entre `abajo` y `tope` rad:
  *   · barra bien abajo de los ojos (más de `bajo[1]` m: el agarre y el tirón): queda `margen` rad por debajo del centro de
  *     la imagen (hasta casi a plomo: en la salida la barra queda debajo de los ojos). Se ven las manos, las rodillas y la
  *     barra que sube pegada al cuerpo; la barrita de timing queda debajo.
@@ -221,7 +221,8 @@ export const PLANOS = {
  *   · barra por encima de los ojos (más de `alto[1]` m: recepción del arranque, envión arriba): queda `encima` rad por
  *     encima del centro: arriba la barra con las manos y los brazos, abajo la tribuna.
  *   · con la barra cerca de la cabeza la cámara retrocede: `atras[0]` m con la barra en los hombros y `atras[0] + atras[1]`
- *     con la barra arriba. Es la licencia de esta vista: desde los ojos de verdad la barra en los hombros queda bajo el
+ *     con la barra arriba; y `atras[2]` con la barra abajo (en la salida queda debajo de los ojos: así sube en la imagen y
+ *     la barrita de timing no tapa las rodillas). Es la licencia de esta vista: desde los ojos de verdad la barra en los hombros queda bajo el
  *     mentón y la de arriba, detrás de la frente, y no entrarían en ninguna imagen que mire al frente.
  *   · con la barra suelta (después del intento: cae, rebota y rueda), la mirada la sigue en la caída (`suelta[0]` del
  *     ángulo hacia ella, con `suelta[2]` de rapidez, porque cae en medio segundo) sin bajar de `suelta[1]` rad: se la ve
@@ -231,7 +232,7 @@ export const PLANOS = {
  * - la cabeza propia no se dibuja en esta vista ni mientras la cámara esté a menos de `sinCabeza` m de los ojos (el hueso del cuello se
  *   achica a un punto entre las clavículas: cuello, cara, pelo, ojos y pestañas van pesados a él o a la cabeza, su hijo). La sombra sale sin cabeza: cae detrás del pesista.
  */
-export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 3.3, margen: .17, hombros: .38, encima: .45, abajo: -1.53, frente: -.21, tope: .6, bajo: [.12, .42], alto: [-.05, .3], atras: [.12, .26], suelta: [1, -.8, 9], sinCabeza: .6, foco: 1.6,
+export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 3.3, giroMax: 2.6, margen: .17, hombros: .38, encima: .45, abajo: -1.53, frente: -.21, tope: .6, bajo: [.12, .42], alto: [-.05, .3], atras: [.12, .26, .1], suelta: [1, -.8, 9], sinCabeza: .6, foco: 1.6,
   resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003 }, temblor: .006 };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
@@ -633,12 +634,14 @@ export class Escena {
     // cuánto está la barra lejos por debajo (1) o cerca de la cara (0), y cuánto por encima de los ojos (0 a 1); con eso, el retroceso
     const dy0 = b.y - o.y, lejos = paso(-dy0, POV.bajo[0], POV.bajo[1]), arriba = paso(dy0, POV.alto[0], POV.alto[1]);
     // el retroceso llega con su propio retardo: al soltar la barra la cámara vuelve a los ojos de a poco, no de golpe
-    const retro = this._suelta ? 0 : POV.atras[0] * (1 - lejos) + POV.atras[1] * arriba; S.retro = S.nueva ? retro : S.retro + (retro - S.retro) * (1 - Math.exp(-(this._suelta ? 3 : 12) * dt)); o.z -= S.retro;
+    const retro = this._suelta ? 0 : POV.atras[2] * lejos + POV.atras[0] * (1 - lejos) + POV.atras[1] * arriba; S.retro = S.nueva ? retro : S.retro + (retro - S.retro) * (1 - Math.exp(-(this._suelta ? 3 : 12) * dt)); o.z -= S.retro;
     if (S.nueva) S.p.copy(o); else S.p.lerp(o, 1 - Math.exp(-POV.sigue * dt));
     // inclinación de la mirada (reglas de POV): a la barra, con el corrimiento que toca según dónde está
     const dy = b.y - S.p.y, dz = b.z - S.p.z, hacia = Math.atan2(dy, dz), corr = POV.margen + (POV.hombros - POV.margen) * (1 - lejos) + (-POV.encima - POV.hombros) * arriba;
     const incT = this._suelta ? Math.max(POV.suelta[1], Math.min(POV.frente, hacia * POV.suelta[0])) : Math.max(POV.abajo, Math.min(POV.tope, hacia + corr));
-    S.inc = S.nueva ? incT : S.inc + (incT - S.inc) * (1 - Math.exp(-(quieto ? 60 : this._suelta ? POV.suelta[2] : POV.giro) * dt)); S.nueva = false;
+    // con retardo y con tope de velocidad (`giroMax` rad/s: cuando la barra pasa junto a la cámara el ángulo hacia ella cambia de golpe)
+    const dInc = (incT - S.inc) * (1 - Math.exp(-(quieto ? 60 : this._suelta ? POV.suelta[2] : POV.giro) * dt)), topeG = POV.giroMax * dt;
+    S.inc = S.nueva ? incT : S.inc + (quieto ? dInc : Math.max(-topeG, Math.min(topeG, dInc))); S.nueva = false;
     let inc = S.inc, bal = 0, y = 0;
     if (!quieto) {
       const w = S.t * Math.PI * 2 * POV.resp.hz, T = Math.min(1, Math.max(0, this._temblor)) * POV.temblor;
