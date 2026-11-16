@@ -158,14 +158,14 @@ def cfg(k):
     # grupos musculares (peso del target de MPFB). La mujer: piernas y glúteos de pesista, tren superior con menos volumen, sin pectoral ni cuello de toro.
     # Con grasa, el volumen del tren superior lo pone la grasa y no el músculo marcado (si no, el pesado sale con hombros y cuello de culturista).
     if F: musc = dict(pierna=.95 * mu, gemelo=.5 * mu, hombro=.55 * mu * (1 - .5 * g), brazo=.45 * mu, antebrazo=.65 * mu, pectoral=0, dorsal=.75 * mu * (1 - .4 * g), abdomen=.5 * (1 - g), cuello=.12 * mu)
-    else: musc = dict(pierna=1.0 * mu, gemelo=.6 * mu, hombro=1.0 * mu * (1 - .45 * g), brazo=.85 * mu * (1 - .35 * g), antebrazo=1.0 * mu, pectoral=.85 * mu * (1 - .4 * g), dorsal=1.0 * mu * (1 - .35 * g), abdomen=.5 * (1 - g), cuello=.7 * mu * (1 - .5 * g))
+    else: musc = dict(pierna=1.0 * mu, gemelo=.6 * mu, hombro=1.0 * mu * (1 - .85 * g), brazo=.85 * mu * (1 - .6 * g), antebrazo=1.0 * mu, pectoral=.85 * mu * (1 - .4 * g), dorsal=1.0 * mu * (1 - .35 * g), abdomen=.5 * (1 - g), cuello=.7 * mu * (1 - .5 * g))
     extra = [('torso/torso-vshape-incr', (.10 if F else .45) * (1 - .7 * g)), ('buttocks/buttocks-volume-incr', _clip(gluteos, 0, 1)),
              ('hip/hip-scale-horiz-' + ('incr' if cadera >= 0 else 'decr'), _clip(abs(cadera), 0, 1)),
-             ('torso/measure-waist-circ-incr', _clip(cintura, 0, 1)),
+             ('torso/measure-waist-circ-incr', _clip(cintura, 0, 1)), ('arms/measure-upperarm-circ-decr', _clip(.7 * g, 0, 1)),
              # boca: los labios de MPFB salen muy gruesos con estos macros
              ('mouth/mouth-upperlip-volume-decr', .45), ('mouth/mouth-lowerlip-volume-decr', .45),
              # mirada: párpados algo entornados y cejas apenas bajas (concentración), en vez de los ojos bien abiertos del mallado base
-             ('expression/units/caucasian/eye-left-slit', .32), ('expression/units/caucasian/eye-right-slit', .32), ('expression/units/caucasian/eyebrows-left-down', .25), ('expression/units/caucasian/eyebrows-right-down', .25),
+             ('expression/units/caucasian/eye-left-slit', .75), ('expression/units/caucasian/eye-right-slit', .75), ('expression/units/caucasian/eye-left-closure', .18), ('expression/units/caucasian/eye-right-closure', .18), ('expression/units/caucasian/eyebrows-left-down', .25), ('expression/units/caucasian/eyebrows-right-down', .25),
              # antebrazo grueso de pesista
              ('arms/l-lowerarm-scale-horiz-incr', .22 if F else .4), ('arms/r-lowerarm-scale-horiz-incr', .22 if F else .4), ('arms/l-lowerarm-scale-depth-incr', .22 if F else .4), ('arms/r-lowerarm-scale-depth-incr', .22 if F else .4),
              # la panza del pesado: alta, redonda y firme (no caída), y la cara más llena
@@ -185,7 +185,7 @@ def sty(k):
     h = dict(color='#17120f', peinado='rodete' if F else 'corto', largo=None, barba=0. if F else .2, entradas=None, degrade=None); h.update(p.get('pelo', {}))
     u = dict(malla='#444444', vivo='#f0f0f0', rodillera='#151518', rodillera2='#2a2a30', cinturon=None, zapatillas=('#f2f1ec', '#d8d4c8', '#444444', '#9a6b3c')); u.update(p.get('uniforme', {}))
     rod = h['peinado'] in ('rodete', 'rodete_alto')
-    largo = h['largo'] if h['largo'] is not None else dict(corto=.015, rapado=.0022, rodete=.003, rodete_alto=.003)[h['peinado']]
+    largo = h['largo'] if h['largo'] is not None else dict(corto=.015, rapado=.0022, rodete=.0013, rodete_alto=.0013)[h['peinado']]
     S = dict(H=p['estatura'], genero=p['genero'], skin=_hex(p.get('piel', 'media')), suit=u['malla'], trim=u['vivo'], sleeve=u['rodillera'], sleeve2=u['rodillera2'],
              code=p['codigo'], name=p['nombre'].split()[-1].upper(), hair=h['color'], hairlen=largo, beard=h['barba'], tattoo=bool(p.get('tatuaje')),
              shoe=tuple(u['zapatillas']), belt=u['cinturon'], iris=p.get('ojos', '#5a3d24'), peinado=h['peinado'],
@@ -193,7 +193,7 @@ def sty(k):
              entradas=h['entradas'] if h['entradas'] is not None else (.015 if F else .09), degrade=h['degrade'] if h['degrade'] is not None else (0. if rod else (.6 if h['peinado'] == 'rapado' else 1.)),
              hairline=.0 if F else .025, afeitado=0. if F else .45, bodyhair=.04 if F else .5 * (1 - .3 * g), cejas=.72 if F else 1.,
              # labios: el color sale del tono de piel (más oscuro y algo más rojo), no de un rosa fijo; borde de la pintura más adentro; párpado sin delineado fuerte; menos brillo de sudor
-             labio=_labio(_hex(p.get('piel', 'media')), F), labio_borde=(.5, .95), delineado=.3, sweat=.55,
+             esclera=.84, labio=_labio(_hex(p.get('piel', 'media')), F), labio_borde=(.5, .95), delineado=.3, sweat=.55,
              # definición: venas y surcos se apagan con la grasa; la mujer, relieve más suave
              veins=_clip((.25 if F else .8) * (1 - g), 0, 1), cut=_clip((.55 if F else 1.) * (1 - .85 * g) * (.5 + .5 * mu), .05, 1.2), folds=1. if not F else .6,
              anat=dict(masa=_clip((.6 if F else 1.) * (1 - .5 * g), 0, 1), pec=0. if F else _clip(1 - .6 * g, 0, 1), abd=_clip((.5 if F else 1.) * (1 - 1.6 * g), 0, 1),

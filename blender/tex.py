@@ -432,7 +432,7 @@ def eye(OUT,STY,S=1024):
     def pn(fu,fr,seed):     # ruido periódico en u
         k=np.random.default_rng(seed).random((max(2,int(fr)),int(fu)),dtype=f32); k=np.concatenate([k,k[:,:1]],1)
         return np.asarray(Image.fromarray(k).resize((S+S//int(fu),S),Image.BICUBIC))[:,:S]-.5
-    sc=np.array([.93,.915,.885],f32)*(1-.10*sm(.75,.3,v))[:,:,None]*np.ones((S,S,3),f32)
+    sc=np.array([.93,.915,.885],f32)*STY.get('esclera',1.)*(1-.10*sm(.75,.3,v))[:,:,None]*np.ones((S,S,3),f32)
     pink=sm(1.4,3.2,rho); sc*=1-pink[:,:,None]*np.array([.02,.10,.10],f32)
     vz=1-np.abs(2*pn(22,9,1)+pn(60,20,2)*.6); vein=sm(.86,.97,vz)*sm(1.15,2.0,rho)*(.35+.65*np.clip(pn(6,3,3)+.5,0,1)); sc+=(np.array([.72,.30,.27],f32)-sc)*(vein*.33)[:,:,None]
     ic=hexc(STY.get('iris','#5a3d24')); fib=pn(110,3,4)*.9+pn(260,6,5)*.6+pn(40,2,6)*.5

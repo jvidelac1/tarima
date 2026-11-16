@@ -62,6 +62,13 @@ def masks(x,y,z,F,soft):
         wrap=np.maximum(wrap,fl*sm(.75-E*.3,.75+E*.3,t)*sm(1.1,1.08,t))
     return suit,slv,sock,wrap
 suit,slv,sock,wrap=masks(x,y,z,F,.06)
+if STY.get('genero')=='F':
+    # Busto bajo la malla: el top deportivo lo contiene y lo alisa. Suavizado laplaciano del frente del pecho cubierto por la tela (quita la punta, baja algo el volumen).
+    E_=np.empty(len(me.edges)*2,dtype=np.int64); me.edges.foreach_get('vertices',E_); E_=E_.reshape(-1,2); dg_=np.maximum(np.bincount(E_.ravel(),minlength=N),1)[:,None]
+    wb=(suit*sm(sh.z-.32*KM,sh.z-.24*KM,z)*sm(sh.z-.03*KM,sh.z-.09*KM,z)*(y<neck.y))[:,None]; c2=co.copy()
+    for _ in range(14):
+        A_=np.zeros_like(c2); np.add.at(A_,E_[:,0],c2[E_[:,1]]); np.add.at(A_,E_[:,1],c2[E_[:,0]]); c2=c2*(1-.65*wb)+A_/dg_*(.65*wb)
+    print(f'BUSTO {NAME}: alisado bajo la malla, {int((wb[:,0]>.05).sum())} vértices, desplazamiento máx {np.linalg.norm(c2-co,axis=1).max()*1000:.1f} mm'); co=c2; x,y,z=co.T; axo=np.abs(x)
 disp=np.maximum.reduce([suit*.0015,slv*.0045,sock*.003,wrap*.0025,F['scalp']*.003])
 me.vertices.foreach_set('co',(co+no*disp[:,None]).ravel()); me.update()
 for p in me.polygons: p.use_smooth=True
