@@ -6,7 +6,7 @@ name: Gráficos (fotos por calidad y banco, por software)
 
 on:
   push:
-    branches: [graficos, graficos2]
+    branches: [graficos, graficos2, plantel]
     paths:
       - 'web/js/**'
       - 'tools/banco.mjs'

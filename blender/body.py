@@ -47,12 +47,14 @@ def build(name,probe=False):
     x=np.zeros(n); b,rig,r,lines=run(x); en=x.copy(); J=np.zeros((n,n))
     for i in range(n):
         xi=x.copy(); xi[i]=.35 if goal[i]>=r[i] else -.35; _,_,ri,_=run(xi); J[:,i]=(ri-r)/xi[i]; en=xi
-    for it in range(5):
+    libre=np.ones(n,bool)     # una meta cuyo target llegó al tope se suelta: no se compensa deformando las otras
+    for it in range(6):
         err=goal-r
-        if np.abs(err).max()<.0015: break
-        dx=np.linalg.solve(J.T@J+1e-9*np.eye(n),J.T@err); xn=np.clip(x+dx,-1,1); b,rig,rn,lines=run(xn); en=xn; s_=xn-x
+        if not libre.any() or np.abs(err[libre]).max()<.0015: break
+        dx=np.zeros(n); dx[libre]=np.linalg.solve(J[np.ix_(libre,libre)]+1e-9*np.eye(int(libre.sum())),err[libre]); xn=x+dx; tope=(np.abs(xn)>1)&libre; xn=np.clip(xn,-1,1)
+        b,rig,rn,lines=run(xn); en=xn; s_=xn-x
         if s_@s_>1e-6: J+=np.outer((rn-r)-J@s_,s_)/(s_@s_)
-        x,r=xn,rn
+        x,r=xn,rn; libre&=~tope
     if not np.array_equal(en,x): b,rig,r,lines=run(x)
     err=goal-r; print('\n'.join(lines))
     print(f"PROP {name}: "+' · '.join(f"{k} {r[i]:.3f} (meta {goal[i]:.3f}, target {x[i]:+.2f})" for i,k in enumerate(ks))+f" · {cnt[0]} armados"+(''.join(f" · {k} NO ALCANZA la meta (queda a {err[i]*100:+.1f} % de la estatura)" for i,k in enumerate(ks) if abs(err[i])>=.004)),flush=True)
