@@ -289,6 +289,31 @@ void main(){
   gl_FragColor = vec4( uColor * uFuerza * borde * cae * veta, 1.0 );
 }`;
 
+
+// ---------- halos de los focos ----------
+// Un foco de escenario visto de frente no es un disco blanco: es un punto que quema con un halo ancho, un destello
+// horizontal corto (el de un lente de transmisión) y una estrella leve. Un sprite por luminaria (un solo dibujo de puntos),
+// aditivo; brilla según cuánto mira el foco a la cámara y se apaga de costado. Sin lecturas de textura.
+const HALO_VS = /* glsl */`attribute vec3 aColor; attribute vec3 aDir; attribute float aTam;
+uniform float uAlto; uniform float uFuerza; uniform float uMax; varying vec3 vCol; varying float vK;
+void main(){
+  vec4 mv = modelViewMatrix * vec4( position, 1.0 ); float d = max( - mv.z, 0.1 );
+  vec3 alOjo = normalize( cameraPosition - position ); float f = max( dot( normalize( aDir ), alOjo ), 0.0 );
+  float k = 0.1 + 0.9 * pow( f, 5.0 ); vK = k; vCol = aColor * uFuerza * ( 0.25 + 0.75 * k );
+  gl_PointSize = clamp( aTam * ( 0.55 + 0.45 * k ) * projectionMatrix[ 1 ][ 1 ] * uAlto * 0.5 / d, 2.0, uMax );
+  gl_Position = projectionMatrix * mv;
+}`;
+const HALO_FS = /* glsl */`uniform float uDirecto; varying vec3 vCol; varying float vK;
+void main(){
+  vec2 p = gl_PointCoord * 2.0 - 1.0; float r = length( p ), borde = 1.0 - smoothstep( 0.82, 1.0, r );
+  float nucleo = exp( - r * r * 90.0 ) * 2.6, halo = exp( - r * 5.5 ) * 0.34 + exp( - r * r * 9.0 ) * 0.1;
+  float raya = exp( - abs( p.y ) * 46.0 ) * exp( - abs( p.x ) * 3.4 ) * 0.5 * vK;                      // destello anamórfico
+  float estrella = ( exp( - abs( p.x ) * 70.0 ) * exp( - abs( p.y ) * 6.0 ) + exp( - abs( p.x + p.y ) * 60.0 ) * exp( - r * 7.0 ) * 0.5 + exp( - abs( p.x - p.y ) * 60.0 ) * exp( - r * 7.0 ) * 0.5 ) * 0.16 * vK;
+  vec3 c = vCol * ( nucleo + halo + raya + estrella ) * borde;
+  if ( uDirecto > 0.5 ) c = pow( min( c * 0.55, vec3( 1.0 ) ), vec3( 0.4545 ) ) * 0.9;                  // camino directo: va al lienzo sin pase de tono
+  gl_FragColor = vec4( c, 1.0 );
+}`;
+
 // ---------- utilería ----------
 const DISCOS = ['#a8241f', '#1d3f96', '#c79a12', '#1f7436', '#a8241f', '#1d3f96'];
 
@@ -314,6 +339,7 @@ export class Look {
     this.goma = null; paso('goma de disco', () => { this.goma = gomaDisco(256); this.texturas.push(this.goma.roughnessMap, this.goma.bumpMap); });
     paso('utilería', () => this._utileria(aniso, grande));
     paso('rayos', () => this._rayos(lighting));
+    paso('halos', () => this._halos());
   }
 
   /** Luz de competencia: sala a oscuras, clave casi cenital, contraluz cálido marcado desde atrás a la izquierda. */
@@ -476,6 +502,23 @@ export class Look {
   /** Todo lo que dibuja la utilería (después de juntarFijos las piezas fijas son mallas por material en la arena): para la variante «sin utilería» del banco. */
   utileria() { const M = this.propMats, o = []; this.arena.group.traverse(x => { if (x === this.props || x === this.discos || (x.isMesh && M.has(x.material))) o.push(x); }); return o; }
 
+
+  /** Halos de las luminarias del truss y de las torres (las mismas posiciones que arma arena.js). */
+  _halos() {
+    const TY = 7.1, TB = 6.3, L = [], luz = (pos, hacia, color, tam, k = 1) => L.push({ pos, hacia, color, tam, k });
+    for (let i = 0; i < 8; i++) { const x = -6.3 + i * 1.8; luz([x, TB - .3, -4.6], [x * .25, .4, -.2], i < 4 ? '#ffb877' : '#d6e4ff', 2.3, 1); }
+    for (let i = 0; i < 6; i++) { const x = -5 + i * 2; luz([x, TY - .3, 6.8], [x * .2, 1, 0], '#ffe6c4', 2.3, 1); }
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) luz([s * 7.4, TY - .35 - i * .05, 3.6 - i * 2.8], [0, 1, 0], i === 1 ? '#fff0d8' : (s < 0 ? '#ffc48a' : '#cfe0ff'), 2.0, .9);
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) luz([s * 5.75, 1.5 + i * .95, -4.38], [s * 1.2, 1.2, 0], i === 1 ? '#ffd9a0' : '#f4f0ff', 1.25, .55);
+    const n = L.length, P = new Float32Array(n * 3), C = new Float32Array(n * 3), D = new Float32Array(n * 3), T = new Float32Array(n), c = new THREE.Color(), a = new THREE.Vector3(), b = new THREE.Vector3();
+    L.forEach((l, i) => { a.set(...l.pos); b.set(...l.hacia).sub(a).normalize(); a.addScaledVector(b, .14); a.toArray(P, i * 3); b.toArray(D, i * 3); c.set(l.color).multiplyScalar(l.k); c.toArray(C, i * 3); T[i] = l.tam; });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('aColor', new THREE.BufferAttribute(C, 3)); g.setAttribute('aDir', new THREE.BufferAttribute(D, 3)); g.setAttribute('aTam', new THREE.BufferAttribute(T, 1));
+    const m = this.haloMat = new THREE.ShaderMaterial({ name: 'halos de focos', vertexShader: HALO_VS, fragmentShader: HALO_FS, uniforms: { uAlto: { value: 720 }, uFuerza: { value: 3.2 }, uDirecto: { value: 0 }, uMax: { value: 220 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+    const o = this.halos = new THREE.Points(g, m); o.name = 'halos de focos'; o.frustumCulled = false; o.renderOrder = 6;
+    const tam = new THREE.Vector2(); o.onBeforeRender = r => { const rt = r.getRenderTarget(); m.uniforms.uAlto.value = rt ? rt.height : r.getDrawingBufferSize(tam).y; };
+    this.arena.group.add(o);
+  }
+
   /** Conos de bruma de la clave y de los dos contraluces. Solo se ven con post (setNivel). */
   _rayos(L) {
     const geo = new THREE.CylinderGeometry(.05, 1, 1, 32, 1, true); geo.translate(0, -.5, 0); this.rayos = [];
@@ -502,6 +545,7 @@ export class Look {
       // En el camino directo no se dibuja (Media para arriba sí), hasta medir en una placa
       for (const o of this.utileria()) if (o !== this.props) o.visible = !d; this.props.visible = !d; }
     FINO.value = Q.directo ? 0 : 1;
+    if (this.haloMat) { this.haloMat.uniforms.uDirecto.value = Q.directo ? 1 : 0; this.haloMat.uniforms.uMax.value = Q.directo ? 84 : 220; }      // en el camino directo, halos chicos: poca pantalla de mezcla
     // en el camino directo la pared de chapa (material físico en mucha pantalla) no se dibuja: queda el telón, como antes
     this.arena.group.traverse(o => { if (o.material === this.chapaMat) o.visible = sup; });      // la chapa es toda por función: sin superficies sería un paño liso
     BOKEH.uScale.value = Q.directo ? .12 : .18;      // luces de fondo: puntos con halo en el camino directo (eran discos grises), bokeh moderado con post      // superficies por función solo con post

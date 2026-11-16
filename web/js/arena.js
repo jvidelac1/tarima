@@ -349,7 +349,8 @@ export class Arena {
     const ribbon = new THREE.Mesh(new THREE.CylinderGeometry(32, 32, .22, 64, 1, true), new THREE.MeshBasicMaterial({ color: hdr('#ffc98a', .9), side: THREE.BackSide })); ribbon.position.y = 9.2; this.group.add(ribbon);
     // luminarias de techo y pasarelas, por encima de las tribunas
     const r = rng(77), pal = ['#ffffff', '#ffd9a0', '#ffe9c9', '#bcd0ff', '#ffb070'];
-    for (let i = 0; i < 70; i++) { const a = r() * Math.PI * 2, d = 30 + r() * 10; glint(Math.cos(a) * d, 9.5 + r() * 9, Math.sin(a) * d, pal[i % pal.length], .3 + r() * 1.1, .1 + r() * .12); }
+    // en hileras, como las pasarelas de un pabellón: dos anillos de luminarias parejas (sueltas al azar se leían como puntitos sin sentido)
+    for (const [d, y, n, k, tam] of [[31, 11.2, 36, .8, .13], [37, 15.4, 44, .5, .11]]) for (let i = 0; i < n; i++) { if (r() < .12) continue; const a = (i + .5) / n * Math.PI * 2; glint(Math.cos(a) * d, y + (r() - .5) * .15, Math.sin(a) * d, pal[1 + (i % 3 === 0 ? 2 : 0)], k * (.75 + r() * .4), tam); }
 
     this.discTex = canvasTexture(softDisc(), { aniso: 1 });
     this._buildCrowd(banner, glint);

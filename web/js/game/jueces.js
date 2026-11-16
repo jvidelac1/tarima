@@ -21,10 +21,10 @@ const suave = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a)
 /** Geometría con color por vértice y la luz pintada en el color (oclusión y rebote, sin luces de más). */
 function pintar(g, color) {
   limpiar(g);
-  const N = g.attributes.normal, P = g.attributes.position, n = N.count, c = new Float32Array(n * 3), so = g.attributes.sombra;
+  const N = g.attributes.normal, P = g.attributes.position, n = N.count, c = new Float32Array(n * 3), so = g.attributes.sombra, ti = g.attributes.tinte;
   // lo que mira hacia abajo, más oscuro; lo que mira a la tarima (+z), más claro: el rebote de la luz del escenario
-  for (let i = 0; i < n; i++) { const k = (1 + .34 * Math.min(0, N.getY(i)) + .28 * Math.max(0, N.getZ(i))) * (so ? so.getX(i) : 1); c[i * 3] = color.r * k; c[i * 3 + 1] = color.g * k; c[i * 3 + 2] = color.b * k; }
-  g.deleteAttribute('sombra'); g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+  for (let i = 0; i < n; i++) { const k = (1 + .34 * Math.min(0, N.getY(i)) + .28 * Math.max(0, N.getZ(i))) * (so ? so.getX(i) : 1); c[i * 3] = color.r * k * (ti ? ti.getX(i) : 1); c[i * 3 + 1] = color.g * k * (ti ? ti.getY(i) : 1); c[i * 3 + 2] = color.b * k * (ti ? ti.getZ(i) : 1); }
+  g.deleteAttribute('sombra'); g.deleteAttribute('tinte'); g.setAttribute('color', new THREE.BufferAttribute(c, 3));
   return g;
 }
 const pieza = (g, color, pos = [0, 0, 0], rot = null, esc = null) => pintar(g.applyMatrix4(_m.compose(V(...pos), rot || _q.identity(), esc ? V(...esc) : UNO)), color);
@@ -49,8 +49,8 @@ function brazoPaleta(C, radial) {
  * `paleta`: sin el brazo derecho (va aparte, animado). Devuelve las piezas fijas, ya pintadas.
  */
 function persona(C, { det = 1, paleta = false, pelo = 'corto', corbata = true, k = 0 } = {}) {
-  const P = de(personaGente({ cuerpo: .45 + .12 * ((k * 3) % 4), pelo: pelo === 'calvo' ? 'entradas' : pelo, ropa: 'saco', gesto: 'mesa', det, silla: true, sinBrazo: paleta ? -1 : 0, corbata, semilla: 31 + k * 5,
-    cabezaGiro: ((k * 7) % 5 - 2) * .06, cabezaInc: .03, forma: { ancho: .97 + .03 * ((k * 5) % 3), mandibula: .95 + .06 * (k % 3) } }).piezas, C);
+  const P = de(personaGente({ cuerpo: .45 + .12 * ((k * 3) % 4), pelo: pelo === 'calvo' ? 'entradas' : pelo, ropa: 'saco', gesto: 'mesa', det, silla: true, sinBrazo: paleta ? -1 : 0, corbata, semilla: 31 + k * 5, anteojos: k % 3 === 1,
+    cabezaGiro: ((k * 7) % 5 - 2) * .06, cabezaInc: .03, forma: { ancho: .97 + .03 * ((k * 5) % 3), mandibula: .95 + .06 * (k % 3), barba: [.5, .15, .8, 0, .35][k % 5] } }).piezas, C);
   // de la cintura para abajo, debajo de la mesa, llega menos luz
   for (const g of P) { const p = g.attributes.position, c = g.attributes.color; for (let i = 0; i < p.count; i++) { const q = .5 + .5 * suave(.3, .95, p.getY(i)); c.setXYZ(i, c.getX(i) * q, c.getY(i) * q, c.getZ(i) * q); } }
   return P;
@@ -61,7 +61,7 @@ const correr = (x, z) => new THREE.Matrix4().makeTranslation(x, 0, z);
 
 const PIEL = ['#c99672', '#8d5a3c', '#e2b490', '#b07a54', '#6f4630', '#d6a37c'].map(col), PELO = ['#2a1d14', '#0e0e10', '#77777c', '#4a3020', '#b9b3a8', '#3a2a1c'].map(col);
 const CORBATA = ['#6e1f2a', '#27406e', '#4a4e58'].map(col), ESTILO = ['corto', 'melena', 'calvo', 'corto', 'melena', 'corto'];
-const BASE = { camisa: col('#d9dce2'), zapato: col('#0d0d10'), silla: col('#3a3d49'), ojo: col('#17120f'), mango: col('#3a2c20'), tapa: col('#2b3248'), mantel: col('#222a42'), banda: col('#aab0c2') };
+const BASE = { esclera: col('#8f8983'), iris: col('#1b130d'), marco: col('#0c0c0e'), camisa: col('#d9dce2'), zapato: col('#0d0d10'), silla: col('#3a3d49'), ojo: col('#17120f'), mango: col('#3a2c20'), tapa: col('#2b3248'), mantel: col('#222a42'), banda: col('#aab0c2') };
 /** Colores de la persona k de un grupo con su uniforme (saco y pantalón). */
 const gente = (k, traje, pantalon) => ({ ...BASE, traje: col(traje), pantalon: col(pantalon), piel: PIEL[(k * 5 + 1) % PIEL.length], pelo: PELO[(k * 7 + 2) % PELO.length], corbata: CORBATA[k % CORBATA.length] });
 

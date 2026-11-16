@@ -69,29 +69,93 @@ function enCabeza(y, a, mas = 0, forma = null) {
   const p = perfil(y), c = Math.cos(a), s = Math.sin(a), ancho = forma?.ancho ?? 1, mand = forma ? 1 + (forma.mandibula - 1) * suave(.09, .02, y) : 1;
   return V((p.rx * ancho * mand + mas) * se(c, EXP), y, p.zc + (p.rz + mas) * se(s, EXP));
 }
+const G2 = (x, y, cx, cy, sx, sy) => Math.exp(-(((x - cx) / sx) ** 2 + ((y - cy) / sy) ** 2));
 /**
- * Cabeza con cuello, nariz y orejas. `forma`: { ancho, mandibula } (1 = media). Devuelve piezas de piel; la cara va pintada
- * en `sombra` (atributo por vértice, 0 a 1: cuencas, boca, bajo la nariz y el mentón), que cada uso multiplica en su color.
+ * Relieve de la cara (metros hacia afuera) en el punto (x, y) del frente de la cabeza: cuencas, arco de las cejas, pómulos,
+ * nariz con lomo, punta y aletas, labios con su línea, mentón. Medidas de un adulto: ojos a 128 mm del mentón y 62 mm entre
+ * pupilas, base de la nariz a 80 mm, boca a 52 mm.
  */
-function cabeza(n, forma) {
-  const filas = [], NY = 22;
-  for (let j = 0; j <= NY; j++) { const y = .228 * j / NY, f = []; for (let k = 0; k < n; k++) f.push(enCabeza(y, k / n * Math.PI * 2, 0, forma)); filas.push(f); }
-  const g = grilla(filas, { polo0: V(0, -.004, .05), polo1: V(0, Y_TOPE, -.008) }), P = g.attributes.position, sombra = new Float32Array(P.count).fill(1);
+function relieve(x, y) {
+  let d = 0;
+  for (const s of [-1, 1]) {
+    d -= .0085 * G2(x, y, s * .031, .127, .0165, .0105);      // cuenca
+    d += .0032 * G2(x, y, s * .03, .1465, .022, .0055);       // arco superciliar
+    d += .0036 * G2(x, y, s * .047, .1, .019, .017);          // pómulo
+    d += .0058 * G2(x, y, s * .0125, .0855, .0058, .0062);    // aleta de la nariz
+    d -= .0022 * G2(x, y, s * .026, .07, .008, .016);         // surco de la nariz a la boca
+  }
+  d += .0026 * G2(x, y, 0, .147, .011, .008);                 // entrecejo
+  const t = suave(.14, .089, y), lomo = (.0028 + .0215 * t * t) * Math.exp(-((x / (.0058 + .0078 * t)) ** 2)) * suave(.0755, .0865, y) * suave(.156, .138, y);
+  d += lomo;
+  d += .0036 * G2(x, y, 0, .0585, .0205, .0042) + .0042 * G2(x, y, 0, .0452, .018, .005) - .0032 * G2(x, y, 0, .0518, .023, .0017);      // labios y su línea
+  d -= .0022 * G2(x, y, 0, .0345, .02, .005) ; d += .0045 * G2(x, y, 0, .019, .021, .013);      // hueco bajo el labio y mentón
+  return d;
+}
+/** z de la cara (con relieve) en (x, y): para apoyar ojos, cejas y anteojos sobre la superficie. */
+function zCara(x, y, forma) {
+  const p = perfil(y), ancho = forma?.ancho ?? 1, mand = forma ? 1 + (forma.mandibula - 1) * suave(.09, .02, y) : 1;
+  const c = Math.min(1, Math.abs(x) / (p.rx * ancho * mand)) ** (1 / EXP), sn = Math.sqrt(Math.max(0, 1 - c * c));
+  return p.zc + p.rz * sn ** EXP + relieve(x, y);
+}
+/**
+ * Cabeza con cuello, cara y orejas. `forma`: { ancho, mandibula, barba } (1 = media; barba 0 a 1: sombra de barba).
+ * `n` ≥ 24: cabeza fina (los jueces y el atlas del público), con la malla más densa en la cara, ojos con párpados, cejas y,
+ * si se pide, anteojos. La cara va pintada en `sombra` (por vértice, 0 a 1) y `tinte` (rgb: labios, mejillas, barba), que
+ * cada uso multiplica en su color.
+ */
+function cabeza(n, forma, { anteojos = false } = {}) {
+  const fino = n >= 24, NA = fino ? 46 : n, NY = fino ? 44 : 22, filas = [];
+  // columnas: más juntas en el frente (la cara) que en la nuca
+  const ang = k => { const t = k / NA * Math.PI * 2 - Math.PI; return Math.PI / 2 + t - (fino ? .56 : 0) * Math.sin(t); };
+  for (let j = 0; j <= NY; j++) { const y = Math.max(.0005, .228 * j / NY), f = []; for (let k = 0; k < NA; k++) { const p = enCabeza(y, ang(k), 0, forma); if (fino && p.z > .012) p.z += relieve(p.x, y) * suave(.012, .04, p.z); f.push(p); } filas.push(f); }
+  const g = grilla(filas, { polo0: V(0, -.004, .05), polo1: V(0, Y_TOPE, -.008) }), P = g.attributes.position, sombra = new Float32Array(P.count).fill(1), tinte = new Float32Array(P.count * 3).fill(1), barba = forma?.barba ?? 0;
   for (let i = 0; i < P.count; i++) {
     const x = P.getX(i), y = P.getY(i), z = P.getZ(i); if (z < .02) continue;
     let k = 1;
-    for (const s of [-1, 1]) { k -= .5 * Math.exp(-(((x - s * .031) / .017) ** 2 + ((y - .128) / .011) ** 2)); k -= .3 * Math.exp(-(((x - s * .03) / .02) ** 2 + ((y - .143) / .0045) ** 2)); }      // cuencas y cejas
-    k -= .38 * Math.exp(-((x / .024) ** 2 + ((y - .052) / .0045) ** 2));      // boca
-    k -= .22 * Math.exp(-((x / .02) ** 2 + ((y - .078) / .006) ** 2));        // bajo la nariz
+    if (fino) {
+      for (const s of [-1, 1]) { k -= .2 * G2(x, y, s * .031, .129, .017, .009); k -= .5 * G2(x, y, s * .0085, .0805, .0045, .003); }      // cuencas y narinas
+      k -= .62 * G2(x, y, 0, .0518, .022, .0024); k -= .12 * G2(x, y, 0, .076, .018, .005);                                                  // línea de la boca y bajo la nariz
+      const labio = Math.max(G2(x, y, 0, .058, .019, .0042), G2(x, y, 0, .0452, .017, .0048)), mej = Math.max(G2(x, y, -.046, .094, .02, .02), G2(x, y, .046, .094, .02, .02));
+      const bb = barba * suave(.092, .064, y) * (1 - .85 * labio) * (1 - .6 * G2(x, y, 0, .09, .012, .02));
+      const L = .72 * labio, M = .4 * mej;
+      tinte[i * 3] = (1 + .04 * M) * (1 - .26 * bb) * (1 - .04 * L); tinte[i * 3 + 1] = (1 - .3 * L - .06 * M) * (1 - .24 * bb); tinte[i * 3 + 2] = (1 - .3 * L - .08 * M) * (1 - .2 * bb);
+    } else {
+      for (const s of [-1, 1]) { k -= .5 * Math.exp(-(((x - s * .031) / .017) ** 2 + ((y - .128) / .011) ** 2)); k -= .3 * Math.exp(-(((x - s * .03) / .02) ** 2 + ((y - .143) / .0045) ** 2)); }      // cuencas y cejas
+      k -= .38 * Math.exp(-((x / .024) ** 2 + ((y - .052) / .0045) ** 2));      // boca
+      k -= .22 * Math.exp(-((x / .02) ** 2 + ((y - .078) / .006) ** 2));        // bajo la nariz
+    }
     k -= .18 * suave(.02, 0, y);                                              // bajo el mentón
     sombra[i] = Math.max(.25, k);
   }
-  g.setAttribute('sombra', new THREE.BufferAttribute(sombra, 1));
-  // nariz: cuña con puente, punta y aletas
-  const nz = new THREE.BufferGeometry(), pn = [0, .132, .09, 0, .088, .114, -.0165, .08, .09, .0165, .08, .09, 0, .077, .096, -.011, .112, .085, .011, .112, .085];
-  nz.setAttribute('position', new THREE.Float32BufferAttribute(pn, 3)); nz.setIndex([0, 5, 1, 0, 1, 6, 5, 2, 1, 6, 1, 3, 2, 4, 1, 4, 3, 1]); nz.computeVertexNormals();
-  const piezas = [{ g, parte: 'piel' }, { g: nz, parte: 'piel' }];
-  for (const s of [-1, 1]) { const o = new THREE.SphereGeometry(1, 8, 6); o.applyMatrix4(new THREE.Matrix4().compose(V(s * .0735 * (forma?.ancho ?? 1), .112, -.012), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, s * -.35, s * -.12)), V(.009, .03, .017))); piezas.push({ g: o, parte: 'piel' }); }
+  g.setAttribute('sombra', new THREE.BufferAttribute(sombra, 1)); g.setAttribute('tinte', new THREE.BufferAttribute(tinte, 3));
+  const piezas = [{ g, parte: 'piel' }], ax = forma?.ancho ?? 1;
+  if (!fino) {
+    // nariz: cuña con puente, punta y aletas
+    const nz = new THREE.BufferGeometry(), pn = [0, .132, .09, 0, .088, .114, -.0165, .08, .09, .0165, .08, .09, 0, .077, .096, -.011, .112, .085, .011, .112, .085];
+    nz.setAttribute('position', new THREE.Float32BufferAttribute(pn, 3)); nz.setIndex([0, 5, 1, 0, 1, 6, 5, 2, 1, 6, 1, 3, 2, 4, 1, 4, 3, 1]); nz.computeVertexNormals(); piezas.push({ g: nz, parte: 'piel' });
+  } else {
+    const esf = (r, c, e = V(1, 1, 1)) => { const o = new THREE.SphereGeometry(r, 12, 9); o.applyMatrix4(new THREE.Matrix4().compose(c, new THREE.Quaternion(), e)); return o; };
+    for (const s of [-1, 1]) {
+      const ex = s * .031, ey = .1272, R = .0118, c = V(ex, ey, zCara(ex, ey, forma) - R + .0042);
+      piezas.push({ g: esf(R, c), parte: 'esclera' }, { g: esf(.0064, c.clone().add(V(-s * .0008, -.0004, R - .0036))), parte: 'iris' });
+      // párpados: dos casquetes de piel apenas más grandes que el ojo, corridos arriba y abajo; queda una hendidura de 7 mm
+      piezas.push({ g: esf(.0134, c.clone().add(V(0, .0046, -.0008)), V(1.12, 1, 1)), parte: 'piel' }, { g: esf(.0128, c.clone().add(V(0, -.0074, -.0018)), V(1.1, 1, 1)), parte: 'piel' });
+      { const pos = [], idx = [], NL = 6; for (let i = 0; i <= NL; i++) { const dx = (i / NL - .5) * .023, yy = c.y + .0012 - 18 * dx * dx, zz = c.z + Math.sqrt(Math.max(1e-6, .0134 * .0134 - dx * dx / 1.25)) - .0002; pos.push(c.x + dx, yy + .0011, zz, c.x + dx, yy - .0006, zz + .0004); }
+        for (let i = 0; i < NL; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2, a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+        const lp = new THREE.BufferGeometry(); lp.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); lp.setIndex(idx); lp.computeVertexNormals(); piezas.push({ g: lp, parte: 'iris' }); }
+      // ceja: una tira de pelo apoyada en el arco, más gruesa adentro, con una leve curva
+      const pos = [], idx = [], NB = 7;
+      for (let i = 0; i <= NB; i++) { const u = i / NB, x = s * (.011 + .043 * u), y = .1462 + .0042 * Math.sin(Math.PI * u ** .8) - .0034 * u * u, th = .0034 - .0019 * u; for (const q of [-1, 1]) { const yy = y + q * th; pos.push(x, yy, zCara(x, yy, forma) + .0016); } }
+      for (let i = 0; i < NB; i++) { const a = i * 2; if (s > 0) idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); else idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+      const cj = new THREE.BufferGeometry(); cj.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); cj.setIndex(idx); cj.computeVertexNormals(); piezas.push({ g: cj, parte: 'pelo' });
+      if (anteojos) {
+        const zl = zCara(ex, .127, forma) + .0125, aro = new THREE.TorusGeometry(.0228, .0015, 5, 22); aro.applyMatrix4(new THREE.Matrix4().compose(V(ex, .1265, zl), new THREE.Quaternion(), V(1.08, .86, 1))); piezas.push({ g: aro, parte: 'marco' });
+        piezas.push({ g: new THREE.BoxGeometry(.0026, .0026, .095).translate(s * .0585 * ax, .129, zl - .05), parte: 'marco' });
+      }
+    }
+    if (anteojos) piezas.push({ g: new THREE.BoxGeometry(.016, .0024, .0024).translate(0, .131, zCara(.031, .127, forma) + .0125), parte: 'marco' });
+  }
+  for (const s of [-1, 1]) { const o = new THREE.SphereGeometry(1, 8, 6); o.applyMatrix4(new THREE.Matrix4().compose(V(s * .0735 * ax, .112, -.012), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, s * -.35, s * -.12)), V(.009, .03, .017))); piezas.push({ g: o, parte: 'piel' }); }
   piezas.push({ g: miembro([V(0, -.1, -.03), V(0, -.03, -.022), V(0, .04, -.012)], [[.056, .058], [.05, .052], [.05, .05]], Math.max(8, n >> 1), 2), parte: 'piel' });      // cuello
   return piezas;
 }
@@ -112,13 +176,13 @@ function pelo(estilo, n, r, forma) {
       // volumen: nace pegado, se abre enseguida; más arriba y atrás que en la sien; mechones
       const mech = 1 + .28 * Math.sin(a * 7 + fase + v * 3) * Math.sin(v * 9 + a * 3 + fase) + .14 * Math.sin(a * 17 + v * 11);
       const mas = gr * (.25 + .75 * suave(0, .22, v)) * (.75 + .25 * suave(.1, .19, y)) * mech + .0015;
-      const p = enCabeza(Math.max(y, -.2), a, mas, forma);
+      const p = enCabeza(Math.max(y, -.2), a, mas, forma); p.y += mas * suave(.15, .225, y) * .95;
       if (bajo) { const cae = suave(0, -.1, y); p.x *= 1 + .12 * cae; p.z -= .012 * cae; if (s > -.2) p.z = Math.min(p.z, -.02); }      // el pelo largo cae detrás de los hombros
       f.push(p);
     }
     filas.push(f);
   }
-  const gp = grilla(filas, { polo1: V(0, Y_TOPE + gr * 1.05, -.012) }), so = new Float32Array(gp.attributes.position.count).fill(1);
+  const gp = grilla(filas, { polo1: V(0, Y_TOPE + gr * 1.02 + .002, -.012) }), so = new Float32Array(gp.attributes.position.count).fill(1);
   // mechones (franjas que siguen la caída del pelo), raíz más oscura y un brillo ancho en la coronilla
   for (let j = 0; j <= NV; j++) for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2, v = j / NV; so[j * n + k] = (.72 + .2 * Math.sin(a * 5 + fase) + .12 * Math.sin(a * 9 + v * 4 + fase * 2)) * (.7 + .3 * suave(0, .25, v)) * (1 + .45 * Math.exp(-(((v - .62) / .16) ** 2))); }
   gp.setAttribute('sombra', new THREE.BufferAttribute(so, 1));
@@ -166,9 +230,9 @@ const GESTOS = {
  * 'remera', 'buzo'), gesto (clave de GESTOS o función), det (0 lejos, 1 cerca), silla, sinBrazo (lado que se arma aparte),
  * piernas. Devuelve { piezas, hombro(s), hy }.
  */
-export function persona({ cuerpo = .5, talla = 1, pelo: estilo = 'corto', forma = null, ropa = 'saco', gesto = 'falda', det = 1, silla = false, sinBrazo = 0, piernas = true, corbata = true, semilla = 1, cabezaGiro = 0, cabezaInc = 0 } = {}) {
+export function persona({ cuerpo = .5, talla = 1, pelo: estilo = 'corto', forma = null, ropa = 'saco', gesto = 'falda', det = 1, silla = false, sinBrazo = 0, piernas = true, corbata = true, semilla = 1, cabezaGiro = 0, cabezaInc = 0, anteojos = false } = {}) {
   const r = azar(semilla), P = [], add = (g, parte) => P.push({ g, parte }), n = det ? 18 : 12, nl = det ? 10 : 7;
-  const w = mix(.82, 1.06, cuerpo), hy = 1.0, sx = .19 * w;
+  const w = mix(.86, 1.08, cuerpo), hy = 1.0, sx = .2 * w;
   if (silla) {
     add(new THREE.BoxGeometry(.44, .04, .42).translate(0, .45, -.02), 'silla'); add(new THREE.BoxGeometry(.4, .36, .035).translate(0, .71, -.235), 'silla');
     for (const a of [-1, 1]) for (const b of [-1, 1]) add(new THREE.BoxGeometry(.03, .45, .03).translate(a * .19, .225, -.02 + b * .18), 'silla');
@@ -180,8 +244,8 @@ export function persona({ cuerpo = .5, talla = 1, pelo: estilo = 'corto', forma 
   }
   // tronco: cadera, cintura, pecho, hombros con caída de trapecio, base del cuello
   const saco = ropa === 'saco', b = saco ? 1.04 : 1;
-  add(tronco([[.47, .17 * w * b, .122 * b, 0], [.6, .162 * w * b, .118 * b, .002], [.76, .168 * w * b, .12 * b, .006], [.9, .188 * w * b, .126 * b, .012], [.975, .206 * w * b, .12 * b, .01, 2.3],
-    [1.03, .2 * w * b, .1 * b, .003, 2.1], [1.06, .15 * w, .084, -.002, 2], [1.08, .095 * w, .07, -.006, 2], [1.094, .062, .058, -.01, 2]], n), saco ? 'traje' : 'ropa');
+  add(tronco([[.47, .17 * w * b, .122 * b, 0], [.6, .162 * w * b, .118 * b, .002], [.76, .168 * w * b, .12 * b, .006], [.9, .192 * w * b, .126 * b, .012], [.975, .214 * w * b, .12 * b, .01, 2.5],
+    [1.03, .212 * w * b, .1 * b, .003, 2.6], [1.058, .168 * w, .086, -.002, 2.3], [1.08, .095 * w, .07, -.006, 2], [1.094, .062, .058, -.01, 2]], n), saco ? 'traje' : 'ropa');
   const yc = 1.128;      // altura del mentón
   if (saco) {
     // camisa en V, corbata y cuello de camisa
@@ -192,10 +256,10 @@ export function persona({ cuerpo = .5, talla = 1, pelo: estilo = 'corto', forma 
   } else if (ropa === 'buzo') add(miembro([V(0, 1.08, -.014), V(0, 1.118, -.016)], [[.075, .08], [.064, .07]], 12, 1), 'ropa');      // capucha o cuello alto
   // cabeza (mentón en yc), girada e inclinada
   const M = new THREE.Matrix4().compose(V(0, yc, .004), new THREE.Quaternion().setFromEuler(new THREE.Euler(cabezaInc, cabezaGiro, 0, 'YXZ')), V(1.07, 1.07, 1.07));
-  for (const p of [...cabeza(det ? 26 : 16, forma), ...pelo(estilo, det ? 26 : 16, r, forma)]) { p.g.applyMatrix4(M); P.push(p); }
+  for (const p of [...cabeza(det ? 26 : 16, forma, { anteojos }), ...pelo(estilo, det ? 26 : 16, r, forma)]) { p.g.applyMatrix4(M); P.push(p); }
   // brazos
   const G = typeof gesto === 'function' ? gesto : GESTOS[gesto] || GESTOS.falda, manga = ropa === 'remera' ? 'corta' : 'larga', tela = saco ? 'traje' : 'ropa';
-  const hombro = s => V(s * (sx + .012), hy + .008, -.004);
+  const hombro = s => V(s * (sx + .016), hy + .008, -.004);
   for (const s of [-1, 1]) { if (s === sinBrazo) continue; const [H, polo] = G(s, hy); P.push(...brazo(hombro(s), H, { lado: s, polo, manga, tela, n: nl, grosor: mix(.92, 1.1, cuerpo) }).piezas); }
   if (talla !== 1) { const S = new THREE.Matrix4().makeScale(talla, talla, talla); for (const p of P) p.g.applyMatrix4(S); }
   return { piezas: P, hombro, hy };

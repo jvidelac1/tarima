@@ -11,7 +11,7 @@ import { VARIANTES, QUIETAS, armar } from './publico_gente.js';
 import { azar } from './gente.js';
 
 const COLS = 8, FILAS = 2, CW = .9, CH = 1.25, Y0 = .4, PX = 144, PY = 200;
-const MAT = { piel: .5, pelo: 1 }, TONO = { pantalon: .34, zapato: .2, silla: .3, camisa: 1.5, corbata: .6 };
+const MAT = { piel: .5, pelo: 1, esclera: .5, iris: 1, marco: 1 }, TONO = { pantalon: .34, zapato: .2, silla: .3, camisa: 1.5, corbata: .6, esclera: .9, iris: .5 };
 const ATLAS_VS = /* glsl */`attribute float aMat; attribute float aTono; varying vec3 vN; varying float vMat; varying float vTono;
 void main(){ vN = normal; vMat = aMat; vTono = aTono; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`;
 const ATLAS_FS = /* glsl */`varying vec3 vN; varying float vMat; varying float vTono;
@@ -26,27 +26,32 @@ function mallaVariante(v, i) {
   const gs = armar(v, i).map(({ g, parte }) => {
     const n = g.attributes.position.count, m = new Float32Array(n).fill(MAT[parte] ?? 0), t = new Float32Array(n).fill(TONO[parte] ?? 1), s = g.attributes.sombra;
     if (s) for (let k = 0; k < n; k++) t[k] *= s.getX(k);
-    g.deleteAttribute('sombra'); g.setAttribute('aMat', new THREE.BufferAttribute(m, 1)); g.setAttribute('aTono', new THREE.BufferAttribute(t, 1)); return g;
+    g.deleteAttribute('sombra'); g.deleteAttribute('tinte'); g.setAttribute('aMat', new THREE.BufferAttribute(m, 1)); g.setAttribute('aTono', new THREE.BufferAttribute(t, 1)); return g;
   });
   const g = mergeGeometries(gs); gs.forEach(x => x.dispose()); return g;
 }
 
 const CROWD_FS = /* glsl */`
-uniform sampler2D map; uniform float uGain; uniform vec3 uRebote; uniform vec3 uSala; uniform float uHorneo;
+uniform sampler2D map; uniform float uGain; uniform vec3 uRebote; uniform vec3 uSala; uniform float uHorneo; uniform float uSuave;
 varying vec2 vUv; varying vec3 vCloth; varying vec3 vSkin; varying vec3 vHair;
 #include <fog_pars_fragment>
 void main(){
-  vec4 t = texture2D( map, vUv ); if ( t.a < 0.4 ) discard;
-  vec3 col = mix( vCloth, vSkin, smoothstep( 0.2, 0.42, t.b ) ); col = mix( col, vHair, smoothstep( 0.68, 0.9, t.b ) );
-  col = mix( vec3( dot( col, vec3( 0.3, 0.6, 0.1 ) ) ), col, 0.62 );      // ropa apagada: el público no compite con la tarima
-  gl_FragColor = vec4( col * ( uSala * ( t.r * uGain ) + uRebote * t.g ), 1.0 );
+  // uSuave: sesgo de mipmap. La tribuna de una foto de competencia está fuera de foco: siluetas blandas, no recortes nítidos
+  vec4 t = texture2D( map, vUv, uSuave ); if ( t.a < 0.38 ) discard;
+  // ropa: en la penumbra nadie viste de blanco; lo claro se comprime y todo pierde color (la sala la pinta la luz, no la ropa)
+  vec3 ropa = vCloth; float lr = dot( ropa, vec3( 0.3, 0.6, 0.1 ) ); ropa *= mix( 1.0, 0.36, smoothstep( 0.1, 0.55, lr ) );
+  vec3 col = mix( ropa, vSkin * 0.82, smoothstep( 0.2, 0.42, t.b ) ); col = mix( col, vHair * 0.7, smoothstep( 0.68, 0.9, t.b ) );
+  col = mix( vec3( dot( col, vec3( 0.3, 0.6, 0.1 ) ) ), col, 0.5 );
+  // luz: la de sala cae pareja y fría; la del escenario llega de frente, cálida, y solo levanta lo que la mira (cara, pecho, rodillas)
+  float esc = t.g * t.g * ( 3.0 - 2.0 * t.g );
+  gl_FragColor = vec4( col * ( uSala * ( t.r * uGain ) + uRebote * esc ), 1.0 );
   #include <fog_fragment>
   if ( uHorneo > 0.0 ) gl_FragColor.rgb = pow( clamp( gl_FragColor.rgb * uHorneo, 0.0, 1.0 ), vec3( 1.0 / 2.2 ) );
 }`;
 /** Ganancia con la que se guarda la tribuna horneada (8 bits: el público es oscuro y sin esto se escalona). */
 const HORNEO = 6;
 /** En el camino directo (sin gradación ni viñeta del pase final) el mismo público queda más claro: se baja acá. */
-const DIRECTO = .5;
+const DIRECTO = .42;
 
 export class Publico {
   /** `animo`: el uniform {value} del ánimo del público (ambiente.publico.uAnimo). `chico`: texturas a la mitad (teléfono). */
@@ -58,15 +63,15 @@ export class Publico {
     const m = crowd.material, g = crowd.geometry, P = g.attributes.position;
     const nuevo = new THREE.PlaneGeometry(CW, CH); nuevo.translate(0, CH / 2 - (.45 - Y0), 0); P.array.set(nuevo.attributes.position.array); P.needsUpdate = true; nuevo.dispose();
     const r = azar(4242), aV = g.attributes.aVar;
-    for (let i = 0; i < aV.count; i++) { const x = r(); aV.setX(i, x < .84 ? Math.floor(r() * QUIETAS) : x < .93 ? 10 + Math.floor(r() * 2) : 12 + Math.floor(r() * 4)); }
+    for (let i = 0; i < aV.count; i++) { const x = r(); aV.setX(i, x < .975 ? Math.floor(r() * QUIETAS) : 10 + Math.floor(r() * 2)); /* quietos: los brazos en alto son de la ovación (uFiesta) */ }
     aV.needsUpdate = true;
     m.vertexShader = m.vertexShader.replace('varying vec2 vUv;', 'uniform float uFiesta; varying vec2 vUv;')
       .replace('vUv = vec2( ( uv.x + aVar ) * 0.25, uv.y );', `float var = aVar; float h = fract( dot( instanceMatrix[ 3 ].xyz, vec3( 0.731, 1.37, 0.413 ) ) );
   if ( uFiesta * 0.75 > h && var < ${QUIETAS}.0 ) var = 10.0 + floor( fract( h * 7.3 ) * 6.0 );      // con la ovación, más gente aplaude o festeja
   vUv = vec2( ( uv.x + mod( var, ${COLS}.0 ) ) / ${COLS}.0, ( uv.y + floor( var / ${COLS}.0 ) ) / ${FILAS}.0 );`);
     m.fragmentShader = CROWD_FS; m.userData.conTono = false;
-    Object.assign(m.uniforms, { uFiesta: animo, uSala: { value: new THREE.Color(.62, .7, .92) }, uHorneo: { value: 0 } });
-    m.uniforms.map.value = this.atlas.texture; m.uniforms.uGain.value = .075; m.uniforms.uRebote.value.set(.2, .15, .1); m.needsUpdate = true;
+    Object.assign(m.uniforms, { uFiesta: animo, uSala: { value: new THREE.Color(.5, .62, .95) }, uHorneo: { value: 0 }, uSuave: { value: 1.1 } });
+    m.uniforms.map.value = this.atlas.texture; m.uniforms.uGain.value = .05; m.uniforms.uRebote.value.set(.085, .06, .04); m.needsUpdate = true;
     arena.crowdTex?.dispose(); arena.crowdTex = this.atlas.texture;
     // --- tribunas horneadas: se arman la primera vez que una calidad sin profundidad de campo las pide
     if (arena.impostors) { arena.impostors.removeFromParent(); arena.impostors.traverse(o => { o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose(); }); arena.impostors = null; }
