@@ -112,7 +112,8 @@ const SKIN_MATERIAL = /* glsl */`
   float skinRough = clamp( max( material.roughness, uSkinRough ) + gGrain * 0.09 + ( 0.5 - gPatch ) * 0.3 - uSweat * 0.1 * gPatch, 0.42, 1.0 );      // zonas mates y zonas húmedas, no un brillo parejo
   material.roughness = mix( material.roughness, skinRough, gMask.r );
   float f0k = mix( 1.0, 0.5, gMask.r ); material.specularColor *= f0k; material.specularColorBlended *= f0k;     // F0 de piel (~0,028) por debajo del 0,04 genérico
-  material.specularF90 *= mix( 1.0, 0.42, gMask.r );      // el brillo rasante de la piel bajo los contraluces era un borde blanco de goma
+  material.specularF90 *= mix( 1.0, 0.42, gMask.r );
+  { float hb = smoothstep( 0.25, 0.8, gMask.b ) * step( 0.5, uMaskMode ); material.roughness = mix( material.roughness, 0.95, hb ); float hk = 1.0 - 0.85 * hb; material.specularColor *= hk; material.specularColorBlended *= hk; material.specularF90 *= hk; }      // pelo pintado (rapado, degradé, cejas): mate; con el brillo de la piel se leía una franja gris en el nacimiento      // el brillo rasante de la piel bajo los contraluces era un borde blanco de goma
 }
 #ifdef USE_SHEEN
   material.sheenColor *= gMask.g * mix( vec3( 1.0 ), diffuseColor.rgb * 2.5, 0.75 );      // brillo satinado del color de la tela, no un velo blanco
@@ -249,7 +250,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
       .replace('#include <normal_fragment_maps>', THREE.ShaderChunk.normal_fragment_maps.replaceAll('texture2D( normalMap, vNormalMapUv )', 'texture2D( normalMap, vNormalMapUv, uNormBias * gMask.r )') + '\n' + SKIN_DETAIL)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + SKIN_MATERIAL);
   };
-  m.customProgramCacheKey = () => 'tarima-skin-24';
+  m.customProgramCacheKey = () => 'tarima-skin-25';
   m.userData.skin = uniforms;
   return m;
 }
