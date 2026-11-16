@@ -362,7 +362,8 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     st=1+T.n2(1,93)*1.1+T.nq((az*420,z*900),94)*1.0+s1*.5        # barba: grano fino, sin vetas
     upper=lips[2]+.004+.3*np.clip(y-lips[1],0,.2)
     jaw=sm(upper+.014+s1*.012,upper-.012+s1*.012,z)*np.maximum(sm(.024,.034,axo),sm(lips[2]-.006,lips[2]-.014,z))
-    must=sm(lips[2]+.005,lips[2]+.009,z)*sm(nose[2]-.003,nose[2]-.008,z)*sm(.034,.024,axo)*sm(lips[1]+.03,lips[1]+.02,y)
+    dnl=max(float(nose[2]-lips[2]),.004)     # con nariz corta o cara llena la franja fija entre labio y nariz quedaba vacía (barba sin bigote): los bordes se achican con esa distancia
+    must=sm(lips[2]+min(.005,.2*dnl),lips[2]+min(.009,.4*dnl),z)*sm(nose[2]-min(.003,.1*dnl),nose[2]-min(.008,.3*dnl),z)*sm(.034*max(1.,hs),.024*max(1.,hs),axo)*sm(lips[1]+.03,lips[1]+.02,y)
     burn=sm(ear[1]-.034,ear[1]-.028,y)*sm(ear[1]-.008,ear[1]-.014,y)*sm(eL[2]+.012,eL[2]+.002,z)*sm(lips[2],lips[2]+.01,z)
     fade=sm(chin[2]-.045+s1*.01,chin[2]-.004+s1*.01,z)*sm(ear[1]-.006,ear[1]-.02,y)
     bz=head*np.maximum.reduce([jaw*fade,must,burn])*(1-np.clip(F('lips')*4,0,1))

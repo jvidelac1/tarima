@@ -129,7 +129,7 @@ def proporciones(genero, H, m):
     la halterofilia. Son una estimación, no una medición de ninguna persona."""
     F = genero == 'F'; z = (H - (1.60 if F else 1.72)) / .10; t = _clip((m - (48 if F else 60)) / 60., 0, 1.3)
     return dict(femur=_clip(.236 + .007 * z, .215, .262), tibia=_clip(.242 + .003 * z, .23, .255), brazo=_clip(.312 + .006 * z, .295, .335),
-                hombros=(.212 if F else .242) + .012 * t,
+                hombros=(.215 if F else .242) + .012 * t,
                 # antebrazo: parte del brazo (hombro a muñeca) que es antebrazo. Con antebrazo más largo que el brazo (más de 0,51) el codo no llega
                 # a la altura del rack con el agarre de cargada: es un límite real de esa palanca, y check() lo marca (codo-rack).
                 antebrazo=.495)
@@ -140,12 +140,14 @@ def cfg(k):
     if p.get('legado'): return dict(_LEGADO_CFG[k], genero=p['genero'], categoria=p['categoria'])
     validar(k, p)
     F = p['genero'] == 'F'; H = p['estatura']; m = masa(p); g = p.get('grasa', .2); mu = p.get('musculo', 1.0 if not F else .85)
-    q = dict(proporciones(p['genero'], H, m), torso=0, cadera=None, gluteos=None, cintura=None); q.update(p.get('prop', {}))
+    q = dict(proporciones(p['genero'], H, m), torso=0, cadera=None, gluteos=None, cintura=None)
+    if not F: q['hombros'] -= .012 * _clip((m - 60) / 60., 0, 1.3) * _clip(1.2 * g, 0, 1)     # el pesado con grasa crece de tronco, no de hombros (si no, sale en V de culturista)
+    q.update(p.get('prop', {}))
     # Reglas por categoría: a más masa, hombros y cintura más anchos; la mujer, hombros más angostos y más cadera y glúteo.
     t = _clip((m - (48 if F else 60)) / 60., 0, 1.3)
     cadera = q['cadera'] if q['cadera'] is not None else (.15 + .15 * t if F else .0 + .15 * t * g)
-    gluteos = q['gluteos'] if q['gluteos'] is not None else (.65 if F else .50) + .15 * t
-    cintura = q['cintura'] if q['cintura'] is not None else (.15 if F else .25) + .45 * g
+    gluteos = q['gluteos'] if q['gluteos'] is not None else (.30 if F else .25) + .10 * t
+    cintura = q['cintura'] if q['cintura'] is not None else (.15 if F else .25) + .65 * g
     if F: extra_f = [('breast/breast-point-decr', 1.), ('breast/breast-volume-vert-up', .3)]     # busto contenido por el top deportivo: sin punta
     else: extra_f = []
     r = p.get('rasgos', (0, 0, 1)); s = sum(r) or 1
@@ -157,22 +159,22 @@ def cfg(k):
     if F: macro.update(cupsize=_clip(.35 + .40 * g, 0, 1), firmness=_clip(.9 - .2 * g, 0, 1))
     # grupos musculares (peso del target de MPFB). La mujer: piernas y glúteos de pesista, tren superior con menos volumen, sin pectoral ni cuello de toro.
     # Con grasa, el volumen del tren superior lo pone la grasa y no el músculo marcado (si no, el pesado sale con hombros y cuello de culturista).
-    if F: musc = dict(pierna=.95 * mu, gemelo=.5 * mu, hombro=.55 * mu * (1 - .5 * g), brazo=.45 * mu, antebrazo=.65 * mu, pectoral=0, dorsal=.75 * mu * (1 - .4 * g), abdomen=.5 * (1 - g), cuello=.12 * mu)
+    if F: musc = dict(pierna=.95 * mu, gemelo=.5 * mu, hombro=.70 * mu * (1 - .4 * g), brazo=.45 * mu, antebrazo=.65 * mu, pectoral=0, dorsal=.75 * mu * (1 - .4 * g), abdomen=.5 * (1 - g), cuello=.25 * mu)
     else: musc = dict(pierna=1.0 * mu, gemelo=.6 * mu, hombro=1.0 * mu * (1 - .85 * g), brazo=.85 * mu * (1 - .6 * g), antebrazo=1.0 * mu, pectoral=.85 * mu * (1 - .4 * g), dorsal=1.0 * mu * (1 - .35 * g), abdomen=.5 * (1 - g), cuello=.7 * mu * (1 - .5 * g))
-    extra = [('torso/torso-vshape-incr', (.10 if F else .45) * (1 - .7 * g)), ('buttocks/buttocks-volume-incr', _clip(gluteos, 0, 1)),
+    extra = [('torso/torso-vshape-incr', (.10 if F else .45) * _clip(1 - 1.3 * g, 0, 1)), ('buttocks/buttocks-volume-incr', _clip(gluteos, 0, 1)),
              ('hip/hip-scale-horiz-' + ('incr' if cadera >= 0 else 'decr'), _clip(abs(cadera), 0, 1)),
              ('torso/measure-waist-circ-incr', _clip(cintura, 0, 1)), ('arms/measure-upperarm-circ-decr', _clip(.7 * g, 0, 1)),
              # boca: los labios de MPFB salen muy gruesos con estos macros
-             ('mouth/mouth-upperlip-volume-decr', .45), ('mouth/mouth-lowerlip-volume-decr', .45),
-             # mirada: párpados algo entornados y cejas apenas bajas (concentración), en vez de los ojos bien abiertos del mallado base
-             ('expression/units/caucasian/eye-left-slit', .75), ('expression/units/caucasian/eye-right-slit', .75), ('expression/units/caucasian/eye-left-closure', .18), ('expression/units/caucasian/eye-right-closure', .18), ('expression/units/caucasian/eyebrows-left-down', .25), ('expression/units/caucasian/eyebrows-right-down', .25),
+             ('mouth/mouth-upperlip-volume-decr', .7), ('mouth/mouth-lowerlip-volume-decr', .65), ('mouth/mouth-angles-up', .35), ('forehead/forehead-scale-vert-decr', .6 if F else .35),
+             # mirada: párpados apenas entornados y cejas apenas bajas (concentración). Con 'slit' en .75 y 'closure' los ojos salían cerrados (ronda 1 del director de arte)
+             ('expression/units/caucasian/eye-left-slit', .22), ('expression/units/caucasian/eye-right-slit', .22), ('expression/units/caucasian/eyebrows-left-down', .25), ('expression/units/caucasian/eyebrows-right-down', .25),
              # antebrazo grueso de pesista
              ('arms/l-lowerarm-scale-horiz-incr', .22 if F else .4), ('arms/r-lowerarm-scale-horiz-incr', .22 if F else .4), ('arms/l-lowerarm-scale-depth-incr', .22 if F else .4), ('arms/r-lowerarm-scale-depth-incr', .22 if F else .4),
              # la panza del pesado: alta, redonda y firme (no caída), y la cara más llena
-             ('stomach/stomach-pregnant-incr', _clip(.30 * g * g, 0, 1)), ('torso/torso-scale-depth-incr', _clip(.5 * g, 0, 1)), ('head/head-fat-incr', _clip(.7 * g, 0, 1)), ('neck/neck-double-incr', _clip(.5 * g * g, 0, 1))]
+             ('stomach/stomach-pregnant-incr', _clip(.45 * g * g, 0, 1)), ('torso/torso-scale-depth-incr', _clip(.5 * g, 0, 1)), ('head/head-fat-incr', _clip(.7 * g, 0, 1)), ('neck/neck-double-incr', _clip(.5 * g * g, 0, 1))]
     # Si con el macro 'weight' al máximo la masa no alcanza (categorías abiertas), body.py suma este paquete de volumen de 0 a 1.
-    volumen = [('torso/torso-scale-horiz-incr', .6), ('torso/torso-scale-depth-incr', .4), ('stomach/stomach-pregnant-incr', .08), ('hip/hip-scale-depth-incr', .5), ('buttocks/buttocks-volume-incr', .4), ('hip/hip-scale-horiz-incr', .35),
-               ('torso/measure-waist-circ-incr', .5), ('neck/measure-neck-circ-incr', .12 if F else .22)] + [(f'{a}/{s_}-{b_}', w) for s_ in 'lr' for a, b_, w in (('legs', 'upperleg-fat-incr', .9), ('legs', 'lowerleg-fat-incr', .5), ('arms', 'upperarm-fat-incr', .35), ('arms', 'lowerarm-fat-incr', .4))]
+    volumen = [('torso/torso-scale-horiz-incr', .7), ('torso/torso-scale-depth-incr', .55), ('stomach/stomach-pregnant-incr', .15), ('hip/hip-scale-depth-incr', .3), ('buttocks/buttocks-volume-incr', .12), ('hip/hip-scale-horiz-incr', .35),
+               ('torso/measure-waist-circ-incr', .5), ('neck/measure-neck-circ-incr', .12 if F else .22)] + [(f'{a}/{s_}-{b_}', w) for s_ in 'lr' for a, b_, w in (('legs', 'upperleg-fat-incr', .9), ('legs', 'lowerleg-fat-incr', .5), ('arms', 'upperarm-fat-incr', .2), ('arms', 'lowerarm-fat-incr', .25))]
     return dict(height=H, macro=macro, legs=dict(up=0, low=0), arms=dict(up=0, low=0), torso=q['torso'], extra=extra + extra_f, face=list(p.get('cara', [])),
                 metas=dict(femur=q['femur'], tibia=q['tibia'], brazo=q['brazo'], hombros=q['hombros'], antebrazo=q['antebrazo']),
                 musc=musc, masa=m, rho=1.07 - .07 * g, volumen=volumen, genero=p['genero'], categoria=p['categoria'])
@@ -204,7 +206,7 @@ def sty(k):
              # corte de la malla: escote (ancho, alto) y sisa (borde interno, alto), en m para 1,69 m. La malla femenina sube el escote y cierra la sisa.
              # barra reglamentaria: hombres 20 kg y 28 mm de diámetro; mujeres 15 kg y 25 mm (cambia el agarre: la mano chica cierra el hook)
              rbar=.0125 if F else .014, barkg=15 if F else 20,
-             escote=(.078, .125) if F else (.085, .19), sisa=(.112, .15) if F else (.118, .2))
+             escote=(.078, .125) if F else (.085, .19), sisa=(.112, .15) if F else (.118, .2 - .06 * g))     # con grasa la sisa del hombre sube: baja dejaba el costado del pesado desnudo
     if rod:
         # moño: dirección desde el centro de la cabeza (X lateral, +Y atrás, +Z arriba) y radio en m para 1,69 m
         a = math.radians(62 if h['peinado'] == 'rodete_alto' else 18); S['bun'] = dict(dir=(0., math.cos(a), math.sin(a)), r=.043 if h['peinado'] == 'rodete_alto' else .046)
