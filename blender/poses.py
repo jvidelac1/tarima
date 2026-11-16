@@ -538,7 +538,7 @@ def _solve(P,bv=None):
     off=hand_off(fT,ga,gb); hands=[]
     for sgn,side in SIDES:
         if mode=='none':
-            wT=Vector((sgn*math.sin(D(25)),math.cos(D(25)),0)); f_=Vector((sgn*.05,-.12,-1)).normalized(); W=Vector((sgn*(SHX+.045*K),-sf-.02*K,sz-(UA+FA)*.985))
+            wT=Vector((sgn*math.sin(D(25)),math.cos(D(25)),0)); f_=Vector((sgn*.02,-.16,-1)).normalized(); W=Vector((sgn*(SHX+.030*K),-sf-.035*K,sz-(UA+FA)*.962))     # parado: brazos colgando cerca del cuerpo, codo apenas flexionado y manos un poco adelante (antes: brazos rectos y abiertos en A)
         else: wT=Vector((sgn,0,0)); f_=Vector((sgn*fT.x,fT.y,fT.z)); W=Vector((sgn*(g+off.x),-fb+off.y,zb+off.z))
         hands.append(dict(W=W,wT=wT,fT=f_))
     # orientación de la mano como ángulos (giro alrededor de la barra, guiñada): se interpolan como escalares para que el giro vaya por el lado correcto
@@ -754,7 +754,7 @@ def check(T,bp):
 
 # ---------- secuencias ----------
 FLOOR=dict(mode='floor',z=BARZ); RACK=dict(mode='rack',elb=-.05); OVER=dict(mode='over',back=.035)
-PULL=dict(stance=.66,toe=14); OH=dict(phi=118,shrug=28,epole=(1,.15,0)); OHS=dict(OH,phi=-242,turn=-1)
+PULL=dict(stance=.66,toe=14); OH=dict(phi=118,shrug=42,epole=(1,.15,0))     # ritmo escápulo-humeral: con la barra arriba la escápula pone unos 40-60° de la elevación (antes 28: el brazo salía del torso como un tubo); OHS=dict(OH,phi=-242,turn=-1)
 RK=dict(bar=RACK,shrug=20,prot=34,arch=8)     # rack: escápulas elevadas y en protracción para armar el estante de deltoides
 # Tiempos: 'vk' = velocidad de la barra (m/s) al pasar por la fase; entre dos fases con 'vk' la barra acelera de forma constante sobre su recorrido real.
 # Donde no hay 'vk' en los dos extremos vale 't' (segundos hasta la fase siguiente). 'hold' = el cuerpo pasa por la fase con velocidad cero. Todo pensado para 1,69 m; se escala con raíz de K.
@@ -762,10 +762,10 @@ GRAV=9.81
 def pull(g,sn):
     """Tirón (común a cargada y arranque): salida, despegue con el mismo ángulo de espalda, primer tirón hasta la rodilla, transición (doble flexión de rodilla), posición de potencia y triple extensión."""
     kz=AZ+SHN
-    sal=dict(PULL,grip=g,shin=29 if sn else 27,ahead=.075 if sn else .055,shrug=-8,ko=9 if sn else 7,bar=FLOOR,head=-14,arch=8,epole=(1,.3,0),vk=0,hold=True)
+    sal=dict(PULL,grip=g,shin=29 if sn else 27,ahead=.075 if sn else .055,shrug=-8,ko=9 if sn else 7,bar=FLOOR,head=4,arch=8,epole=(1,.3,0),vk=0,hold=True)
     return [('Salida',sal),
-            ('Despegue',dict(PULL,grip=g,bx=(29 if sn else 27,-.004),ahead=.085 if sn else .065,leanas=(sal,1.0),shrug=-8,ko=8 if sn else 6,bar=dict(mode='floor',z=BARZ+.08*K),head=-13,arch=8,epole=(1,.3,0),vk=.6)),
-            ('Primer tirón',dict(PULL,grip=g,shin=4,ahead=.11 if sn else .10,shrug=-6,ko=5,bar=dict(mode='floor',z=kz+.015*K,gap=.006),head=-10,arch=7,epole=(1,.3,0),vk=1.2 if sn else 1.0)),
+            ('Despegue',dict(PULL,grip=g,bx=(29 if sn else 27,-.004),ahead=.085 if sn else .065,leanas=(sal,1.0),shrug=-8,ko=8 if sn else 6,bar=dict(mode='floor',z=BARZ+.08*K),head=3,arch=8,epole=(1,.3,0),vk=.6)),
+            ('Primer tirón',dict(PULL,grip=g,shin=4,ahead=.11 if sn else .10,shrug=-6,ko=5,bar=dict(mode='floor',z=kz+.015*K,gap=.006),head=0,arch=7,epole=(1,.3,0),vk=1.2 if sn else 1.0)),
             ('Transición',dict(PULL,grip=g,shin=8 if sn else 7,thigh=26 if sn else 28,ko=6,lean=36 if sn else 32,shrug=-2,bar=dict(mode='hang',gap=.0),head=-4,arch=6,epole=(1,.3,0),vk=1.5 if sn else 1.15)),
             ('Segundo tirón',dict(PULL,grip=g,shin=17 if sn else 11,thigh=24 if sn else 30,ko=6,lean=6 if sn else 9,bar=dict(mode='hang',gap=.0),head=0,arch=5,epole=(1,.3,0),vk=1.7 if sn else 1.3)),
             ('Triple extensión',dict(PULL,grip=g,shin=-7,thigh=-4,ko=5,heel=24,lean=-14,shrug=15,bar=dict(mode='hang',gap=.008),head=2,arch=6,epole=(1,.3,0),vk=1.95 if sn else 1.3))]
@@ -810,7 +810,7 @@ def seqs(g,gs):
         ('Recepción',rcs),
         ('Recuperación',{**dict(SNQ,grip=gs,shin=4,thigh=0,ko=10,bar=OVER,head=0,arch=5),**OHS})]
     return dict(clean=clean,split=split,power=power,squat=squat,snatch=sn)
-IDLE=('Parado',dict(PULL,grip=SHX,shin=3,thigh=5,ko=6,lean=1,bar=dict(mode='none'),head=0,arch=2,epole=(.25,1,0),t=1.2,hold=True))
+IDLE=('Parado',dict(PULL,grip=SHX,shin=3,thigh=5,ko=6,lean=1,shrug=-5,bar=dict(mode='none'),head=0,arch=2,epole=(.25,1,0),t=1.2,hold=True))
 
 # agarre de cargada: se ensancha lo mínimo para que el brazo pase por fuera de la rodilla
 G_CLEAN=SHX+.07*K     # algo por fuera de los hombros
