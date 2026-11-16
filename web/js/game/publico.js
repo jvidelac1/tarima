@@ -74,7 +74,7 @@ export class Publico {
   vUv = vec2( ( uv.x + mod( var, ${COLS}.0 ) ) / ${COLS}.0, ( uv.y + floor( var / ${COLS}.0 ) ) / ${FILAS}.0 ); vBajo = smoothstep( -0.7, 2.4, instanceMatrix[ 3 ].y );`);
     m.fragmentShader = CROWD_FS; m.userData.conTono = false;
     Object.assign(m.uniforms, { uFiesta: animo, uSala: { value: new THREE.Color(.75, .86, 1.12) }, uFilo: { value: new THREE.Color(.05, .041, .032) }, uHorneo: { value: 0 }, uSuave: { value: 1.7 } });
-    m.uniforms.map.value = this.atlas.texture; m.uniforms.uGain.value = .8; m.uniforms.uRebote.value.set(.75, .55, .4); m.needsUpdate = true;
+    m.uniforms.map.value = this.atlas.texture; m.uniforms.uGain.value = .8; m.uniforms.uRebote.value.set(.42, .34, .28);      /* menos rebote cálido de frente: una tribuna quedaba lavada de beige */ m.needsUpdate = true;
     arena.crowdTex?.dispose(); arena.crowdTex = this.atlas.texture;
     // --- tribunas horneadas: se arman la primera vez que una calidad sin profundidad de campo las pide
     if (arena.impostors) { arena.impostors.removeFromParent(); arena.impostors.traverse(o => { o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose(); }); arena.impostors = null; }
