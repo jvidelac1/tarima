@@ -19,8 +19,8 @@ def vista(yaw):
     vis = nd < .15; u = (x * sc + S / 2).astype(int); v = (S * .52 - z * sc).astype(int)
     img = np.full((S, S, 3), .16, np.float32); zb = np.full((S, S), 9., np.float32)
     o = np.argsort(-d[vis]); uu, vv, cc, dd = u[vis][o], v[vis][o], (c[vis] * lam[vis, None])[o], d[vis][o]
-    for du in (0, 1):
-        for dv in (0, 1):
+    for du in (-1, 0, 1):
+        for dv in (-1, 0, 1):
             a = uu + du; b = vv + dv; ok = (a >= 0) & (a < S) & (b >= 0) & (b < S); img[b[ok], a[ok]] = cc[ok]
     return img
 out = np.concatenate([vista(0), vista(.7), vista(1.45)], 1)

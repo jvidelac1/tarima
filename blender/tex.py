@@ -354,9 +354,10 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     # nacimiento del pelo: al frente no sigue el borde recto del grupo 'scalp' sino una línea con entradas en las sienes, difusa e irregular
     fr_=(scalp>.5)&(np.abs(az)<.2)&(vy<0)&cov; e_c=float(np.percentile(el[fr_],1)) if fr_.any() else .5
     e0=e_c+STY.get('hairline',.025)+STY.get('entradas',.09)*np.exp(-((np.abs(az)-.85)/.32)**2); frontw=sm(1.5,1.05,np.abs(az))*(vy<.02)
-    hl=sm(-.04,.08,el-e0+s1*.05+s2*.04+s3*.025)*sm(.0,.25,scalp+.25*(el>e0))
+    wob=T.nq((az*5,el*3),89)*.035      # la línea ondula despacio (no es un arco de compás)
+    hl=sm(-.05,.11,el-e0+wob+s1*.012+s2*.02+s3*.07)*sm(.0,.25,scalp+.25*(el>e0))
     sidefade=sm(ear[2]-.015,ear[2]+.05*hs,z)
-    hm=(frontw*hl+(1-frontw)*sm(.22,.75,scalp+s1*.55+s2*.25))*dfade(.38)        # degradé en los costados
+    hm=(frontw*hl+(1-frontw)*sm(.22,.75,scalp+s1*.16+s2*.2+s3*.35))*dfade(.38)        # degradé en los costados
     al_=np.clip(hm*(1.0+s2*.45+s3*.2)+sm(.02,.30,scalp)*(1-hm)*(1-frontw)*np.clip(.42+s3*1.3+s2*.6,0,1)*.55,0,1); mix(al_,HAIR[None,None,:]*(1+(s1*.9+s2*.7)[:,:,None]),.62)
     hairH=al_*(.0005+s2*.0005+s1*.0003+s3*.00012); hairm=al_.copy(); rough+=hm*s2*.25
     st=1+T.n2(1,93)*1.1+T.nq((az*420,z*900),94)*1.0+s1*.5        # barba: grano fino, sin vetas
@@ -370,9 +371,9 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     tint(bz*(1-STY['beard'])*.5*STY.get('afeitado',1.),(.80,.82,.86))                                            # sombra de barba afeitada
     beard=np.clip(bz*STY['beard']*st,0,1); mix(beard,HAIR*(1+s3[:,:,None]*.5),.68); hairH+=beard*(.0004+s3*.0004); hairm=np.maximum(hairm,beard)
     zc=eL[2]+.0235*hs-9*(axo-.032*hs)**2; thb=(.0042*sm(.056,.03,axo)+.001)*STY.get('cejas',1.)
-    brow=head*sm(thb*1.3,thb*.3,np.abs(z-zc))*sm(.007,.014,axo)*sm(.058,.048,axo)*(y<eL[1]+.02)
-    brow=np.clip(brow*(.9+T.nq((z*2600+axo*1100,axo*520),95)*1.5+s3*.7),0,1); mix(brow*.94,HAIR*.9,.6); hairH+=brow*.0004; hairm=np.maximum(hairm,brow)
-    lp=sm(*STY.get('labio_borde',(.3,.8)),F('lips')); mix(lp*.78,(hexc(STY['labio']) if STY.get('labio') else hexc('#a4605a'))*(1+T.nq((x*700,z*90),96)[:,:,None]*.25),.34)
+    brow=head*sm(thb*1.35,thb*.15,np.abs(z-zc))*sm(.0105*hs,.019*hs,axo)*sm(.058,.046,axo)*(y<eL[1]+.02)
+    brow=np.clip(brow*(.75+T.nq((z*2600+axo*1100,axo*520),95)*1.7+s3*1.1),0,1); mix(brow*.86,HAIR*.9+SKIN*.1,.6); hairH+=brow*.0004; hairm=np.maximum(hairm,brow)
+    lp=sm(*STY.get('labio_borde',(.3,.8)),F('lips')); mix(lp*STY.get('labio_mezcla',.6),(hexc(STY['labio']) if STY.get('labio') else hexc('#a4605a'))*(1+T.nq((x*700,z*90),96)[:,:,None]*.25),.34)
     rough+=lp*.10; lipH=-lp*.00016*(1-np.abs(2*T.nq((x*520,z*60),97)))**2
     skinm=np.clip(skinm-hairm,0,1)
     # largo del pelo para las capas de volumen de finish.py (geo.hair_shells): 255 = 20 mm

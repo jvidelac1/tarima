@@ -104,8 +104,8 @@ def _clip(v, a, b): return max(a, min(b, v))
 def _hex(c): return PIEL.get(c, c)
 
 def _labio(piel, F):
-    r, g_, b = [int(piel[i:i + 2], 16) / 255 for i in (1, 3, 5)]; k = .80 if F else .84
-    return '#%02x%02x%02x' % tuple(int(255 * _clip(v, 0, 1)) for v in (r * k + .035, g_ * k * .80, b * k * .84))
+    r, g_, b = [int(piel[i:i + 2], 16) / 255 for i in (1, 3, 5)]; k = .84 if F else .9
+    return '#%02x%02x%02x' % tuple(int(255 * _clip(v, 0, 1)) for v in (r * k + .03, g_ * k * .84, b * k * .87))
 
 def masa(p):
     """Masa corporal objetivo (kg): la que se pone, o el tope de la categoría."""
@@ -193,7 +193,8 @@ def sty(k):
              shoe=tuple(u['zapatillas']), belt=u['cinturon'], iris=p.get('ojos', '#5a3d24'), peinado=h['peinado'],
              # nacimiento del pelo: entradas en las sienes (hombre) y degradé de los costados (corte corto); el pelo atado no lleva ninguno de los dos
              entradas=h['entradas'] if h['entradas'] is not None else (.015 if F else .09), degrade=h['degrade'] if h['degrade'] is not None else (0. if rod else (.6 if h['peinado'] == 'rapado' else 1.)),
-             hairline=.0 if F else .025, afeitado=0. if F else .45, bodyhair=.04 if F else .5 * (1 - .3 * g), cejas=.72 if F else 1.,
+             hairline=-.16 if F else -.05,     # el nacimiento baja de donde termina el grupo 'scalp' de la malla base (dejaba la frente enorme)
+              afeitado=0. if F else .45, bodyhair=.04 if F else .5 * (1 - .3 * g), cejas=.72 if F else 1.,
              # labios: el color sale del tono de piel (más oscuro y algo más rojo), no de un rosa fijo; borde de la pintura más adentro; párpado sin delineado fuerte; menos brillo de sudor
              esclera=.84, labio=_labio(_hex(p.get('piel', 'media')), F), labio_borde=(.5, .95), delineado=.3, sweat=.55,
              # definición: venas y surcos se apagan con la grasa; la mujer, relieve más suave
