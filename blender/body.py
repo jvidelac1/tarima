@@ -1,34 +1,92 @@
 import bpy, os, sys, bmesh, json, numpy as np
 sys.path.insert(0,os.path.dirname(os.path.abspath(__file__))); from common import *
 from mathutils import Vector
-CFG={
- 'ventura':dict(height=1.70,macro=dict(gender=1.0,age=.5,muscle=1.0,weight=.62,height=.4,proportions=.8,african=.15,asian=.15,caucasian=.7),
-   legs=dict(up=-.05,low=-.3),arms=dict(up=.15,low=.12),torso=.4,extra=[('torso/torso-vshape-incr',.3),('buttocks/buttocks-volume-incr',.6),('torso/measure-shoulder-dist-incr',.35)],
-   # estructura de la cara (ficticia): cabeza cuadrada, mandíbula ancha, pómulos marcados, nariz corta y ancha
-   face=[('head/head-square',.55),('chin/chin-width-incr',.5),('chin/chin-bones-incr',.4),('nose/nose-width2-incr',.4),('nose/nose-scale-vert-decr',.3),('cheek/l-cheek-bones-incr',.5),('cheek/r-cheek-bones-incr',.5),('forehead/forehead-nubian-incr',.3),('eyebrows/eyebrows-trans-down',.4)]),
- 'brenner':dict(height=1.83,macro=dict(gender=1.0,age=.5,muscle=1.0,weight=.5,height=.6,proportions=.75,african=.0,asian=.0,caucasian=1.0),
-   legs=dict(up=.4,low=.25),arms=dict(up=.6,low=.45),torso=0,extra=[('torso/torso-vshape-incr',.45),('buttocks/buttocks-volume-incr',.4),('torso/measure-shoulder-dist-incr',.6)],
-   # cara larga y angulosa: mentón prominente con hoyuelo, nariz larga con caballete, mejillas hundidas
-   face=[('head/head-rectangular',.5),('chin/chin-prominent-incr',.45),('chin/chin-cleft-incr',.5),('chin/chin-height-incr',.3),('nose/nose-hump-incr',.45),('nose/nose-scale-vert-incr',.35),('nose/nose-width2-decr',.3),('cheek/l-cheek-volume-decr',.4),('cheek/r-cheek-volume-decr',.4),('forehead/forehead-temple-decr',.3),('eyebrows/eyebrows-angle-down',.3)]),
-}
+import plantel
+CFG=plantel.CFGS   # parámetros de cuerpo por pesista: salen de blender/plantel.py (ventura y brenner quedan como estaban)
+# peso de los targets de grupos musculares de MPFB cuando el pesista no trae 'musc' (los dos originales)
+MUSC0=dict(pierna=1.0,gemelo=.6,hombro=1.0,brazo=.85,antebrazo=.8,pectoral=.85,dorsal=.8,abdomen=.5,cuello=.7)
+def _mix(b):
+    """Posiciones con los targets aplicados según su valor actual (antes de hornearlos son shape keys relativas a la base)."""
+    me=b.data; n=len(me.vertices); sk=me.shape_keys
+    if sk is None:
+        a=np.empty(n*3); me.vertices.foreach_get('co',a); return a.reshape(n,3)
+    kb=sk.key_blocks; base=np.empty(n*3); kb[0].data.foreach_get('co',base); co=base.copy(); a=np.empty(n*3)
+    for k in kb[1:]:
+        if abs(k.value)>1e-6 and not k.mute: k.data.foreach_get('co',a); co+=(a-base)*k.value
+    return co.reshape(n,3)
+def _tris(b):
+    """Triángulos de la piel (grupo 'body' del mallado base: sin ojos, dientes ni geometría auxiliar) y sus vértices."""
+    me=b.data; gi=b.vertex_groups['body'].index; inb=np.zeros(len(me.vertices),bool)
+    for v in me.vertices: inb[v.index]=any(g.group==gi for g in v.groups)
+    T=[]
+    for p in me.polygons:
+        vs=list(p.vertices)
+        if all(inb[i] for i in vs): T+=[(vs[0],vs[i],vs[i+1]) for i in range(1,len(vs)-1)]
+    return np.array(T),inb
+def masa_estimada(b,H,rho,cache={}):
+    """Masa (kg) del cuerpo actual llevado a la estatura H: volumen encerrado por la piel x densidad media (kg/l)."""
+    key=b.name_full+str(b.as_pointer())
+    if key not in cache: cache.clear(); cache[key]=_tris(b)
+    T,inb=cache[key]; co=_mix(b); z=co[inb,2]; k=H/(z.max()-z.min()); P=co*k
+    v=abs(float(np.einsum('ij,ij->i',P[T[:,0]],np.cross(P[T[:,1]],P[T[:,2]])).sum())/6.)
+    return v*1000*rho,v*1000
 def build(name,probe=False):
     cfg=CFG[name]
     HS=di('mpfb.services.humanservice','HumanService'); TS=di('mpfb.services.targetservice','TargetService'); HP=di('mpfb.entities.objectproperties','HumanObjectProperties'); LS=di('mpfb.services.locationservice','LocationService')
     b=HS.create_human()
     for k,v in cfg['macro'].items(): HP.set_value(k,v,entity_reference=b)
     TS.reapply_macro_details(b)
-    T=LS.get_mpfb_data('targets')
+    T=LS.get_mpfb_data('targets'); KEYS={}; KB=lambda p:b.data.shape_keys.key_blocks[KEYS[p]]
     def tg(p,w):
+        """Carga un target (o suma al que ya estaba) y recuerda el nombre de su shape key."""
         if abs(w)<1e-6: return
+        if p in KEYS: KB(p).value=min(1.,KB(p).value+w); return
+        antes={k.name for k in b.data.shape_keys.key_blocks} if b.data.shape_keys else set()
         TS.load_target(b,os.path.join(T,p+'.target.gz'),weight=w)
+        nuevos=[k.name for k in b.data.shape_keys.key_blocks if k.name not in antes]
+        if nuevos: KEYS[p]=nuevos[0]
     def pm(base,w): tg(base+('-incr' if w>0 else '-decr'),abs(w))
+    M=cfg.get('musc',MUSC0)
     for s in 'lr':
-        tg(f'legs/{s}-upperleg-muscle-incr',1.0); tg(f'legs/{s}-lowerleg-muscle-incr',.6)
-        tg(f'arms/{s}-upperarm-shoulder-muscle-incr',1.0); tg(f'arms/{s}-upperarm-muscle-incr',.85); tg(f'arms/{s}-lowerarm-muscle-incr',.8)   # físico de levantador: volumen de deltoides, brazo y antebrazo (no cambia largos)
+        tg(f'legs/{s}-upperleg-muscle-incr',M['pierna']); tg(f'legs/{s}-lowerleg-muscle-incr',M['gemelo'])
+        tg(f'arms/{s}-upperarm-shoulder-muscle-incr',M['hombro']); tg(f'arms/{s}-upperarm-muscle-incr',M['brazo']); tg(f'arms/{s}-lowerarm-muscle-incr',M['antebrazo'])   # físico de levantador: volumen de deltoides, brazo y antebrazo (no cambia largos)
         pm(f'legs/{s}-upperleg-scale-vert',cfg['legs']['up']); pm(f'legs/{s}-lowerleg-scale-vert',cfg['legs']['low'])
     pm('arms/measure-upperarm-length',cfg['arms']['up']); pm('arms/measure-lowerarm-length',cfg['arms']['low']); pm('torso/torso-scale-vert',cfg['torso'])
-    tg('torso/torso-muscle-pectoral-incr',.85); tg('torso/torso-muscle-dorsi-incr',.8); tg('stomach/stomach-tone-incr',.5); tg('neck/measure-neck-circ-incr',.7)
+    tg('torso/torso-muscle-pectoral-incr',M['pectoral']); tg('torso/torso-muscle-dorsi-incr',M['dorsal']); tg('stomach/stomach-tone-incr',M['abdomen']); tg('neck/measure-neck-circ-incr',M['cuello'])
     for p,w in cfg['extra']+cfg.get('face',[]): tg(p,w)
+    H=cfg['height']; rho=cfg.get('rho',1.05)
+    if cfg.get('masa'):
+        # La categoría manda: se busca el macro 'weight' de MPFB con el que la masa estimada da la del pesista. Si con el máximo no
+        # alcanza (categorías abiertas), se suma de a poco el paquete 'volumen' (tronco, cadera, muslos y brazos más gruesos).
+        goal=cfg['masa']; ms=lambda:masa_estimada(b,H,rho)[0]
+        def setw(w): HP.set_value('weight',float(w),entity_reference=b); TS.reapply_macro_details(b)
+        def bis(f,lo,hi,n=7):
+            for _ in range(n):
+                mid=(lo+hi)/2
+                if f(mid)<goal: lo=mid
+                else: hi=mid
+            return (lo+hi)/2
+        w=1.; g=0.; setw(1.); mmax=ms()
+        if mmax>goal:
+            setw(0.); mmin=ms()
+            w=0. if mmin>=goal else bis(lambda x:(setw(x),ms())[1],0.,1.)
+            setw(w)
+        else:
+            base={}
+            for p,wt in cfg.get('volumen',[]):
+                if p not in KEYS: tg(p,1e-4)
+                if p in KEYS: base[p]=KB(p).value
+            def setg(x):
+                for p,wt in cfg.get('volumen',[]):
+                    if p in base: KB(p).value=min(1.,base[p]+x*wt)
+            setg(1.)
+            g=bis(lambda x:(setg(x),ms())[1],0.,1.) if ms()>goal else 1.
+            setg(g)
+        m,v=masa_estimada(b,H,rho)
+        print(f"MASA {name}: {m:.1f} kg estimados (objetivo {goal:.1f} kg, categoría {cfg.get('categoria')} {cfg.get('genero')}) · volumen {v:.1f} l x {rho:.3f} kg/l · IMC {m/H**2:.1f} · macro weight={w:.3f} (rango {mmax:.0f} kg con 1) · paquete de volumen={g:.2f}"+('' if abs(m-goal)<.03*goal else ' · NO ALCANZA el objetivo'))
+    else:
+        try: m,v=masa_estimada(b,H,rho); print(f"MASA {name}: {m:.1f} kg estimados (sin objetivo: cuerpo fijado a mano) · volumen {v:.1f} l x {rho:.3f} kg/l · IMC {m/H**2:.1f}")
+        except Exception as e: print('MASA',name,'sin dato:',e)
     TS.bake_targets(b)
     me=b.data
     zs=[v.co.z for v in me.vertices]; gi={g.name:g.index for g in b.vertex_groups}; body=gi['body']

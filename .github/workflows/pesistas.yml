@@ -43,8 +43,8 @@ defaults:
 
 env:
   # Lo que corre un push que toca este archivo (sirve para dispararlo sin `gh workflow run`)
-  MODO_PUSH: rapido
-  PESISTAS_PUSH: ventura
+  MODO_PUSH: sonda
+  PESISTAS_PUSH: ""
   MPFB_COMMIT: 6ff1eb358f6c1959ced77e79e6dd2406d9a71f49   # el MPFB con el que se hicieron ventura y brenner (24-oct-2026)
 
 jobs:

@@ -3,7 +3,10 @@ sys.path.insert(0,os.path.dirname(os.path.abspath(__file__))); from common impor
 from mathutils import Vector
 R=int(os.environ.get('TARIMA_TEX','4096'))   # resolución de horneado (posición, máscaras, AO, normal de objeto)
 import body
+from style import STYLES
 NAME=sys.argv[1]; OUT=out_dir(NAME)
+# corte de la malla (escote y sisa): los pesistas del plantel paramétrico lo traen en su estilo, en m para 1,69 m; los dos originales usan el de siempre
+STY=STYLES[NAME]; KM=STY['H']/1.687 if 'escote' in STY else 1.; ESC=STY.get('escote',(.085,.19)); SIS=STY.get('sisa',(.118,.2))
 boot()
 b,rig=body.build(NAME)
 me=b.data
@@ -46,8 +49,8 @@ hemz=knee.z+.42*(hip.z-knee.z)
 def masks(x,y,z,F,soft):
     axo=np.abs(x); E=soft
     front=y<neck.y
-    scoop=np.where(front,np.sqrt((x/.085)**2+((z-(neck.z+.03))/.19)**2),np.sqrt((x/.075)**2+((z-(neck.z+.03))/.1)**2))
-    arm=np.sqrt(((axo-(sh.x+.03))/(sh.x+.03-.118))**2+((z-(sh.z+.04))/.2)**2)
+    scoop=np.where(front,np.sqrt((x/(ESC[0]*KM))**2+((z-(neck.z+.03*KM))/(ESC[1]*KM))**2),np.sqrt((x/(.075*KM))**2+((z-(neck.z+.03*KM))/(.1*KM))**2))
+    arm=np.sqrt(((axo-(sh.x+.03*KM))/(sh.x+.03*KM-SIS[0]*KM))**2+((z-(sh.z+.04*KM))/(SIS[1]*KM))**2)
     suit=np.maximum(F['torso']*sm(1-E,1+E,scoop)*sm(1-E,1+E,arm)*sm(neck.z+.03,neck.z+.02,z),F['thigh']*sm(hemz-E*.1,hemz+E*.1,z))
     slv=F['leg']*sm(knee.z-.112-E*.1,knee.z-.112+E*.1,z)*sm(knee.z+.102+E*.1,knee.z+.102-E*.1,z)
     sock=F['low']*sm(ank.z+.132+E*.1,ank.z+.132-E*.1,z)
