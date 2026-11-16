@@ -2024,6 +2024,29 @@ Tres frentes en paralelo, cada uno en su rama desde `visual` (se fusionan acá y
 Iteración rápida de fotos: `gh workflow run graficos.yml --ref <rama> -f solo=fotos -f niveles=alta -f tomas=3-4,medio,cara`
 (entradas nuevas `tomas` y `solo`). `PESISTAS_RUN` pasa a la corrida 43918976509 (texturas de `0068995`).
 
+**Dirección de arte decidida (16-nov, el dueño delegó):** semirrealista heroico, con la imagen del dueño
+(`~/Desktop/tarima/referencias-codex/03-referencia-original/referencia-usuario.png`) como vara del pesista y de la sala, junto
+a Saltline. Los pesistas siguen ficticios. Pedidos del dueño de esa tarde: brazos, hombro y cuello naturales («como un
+humano»), y la barra que se suelta hacia adelante como una caída real.
+
+**Rondas del director a ciegas de la sesión 2** (carpetas y notas completas en `~/tarima-datos/ver_visual/ronda*/NOTAS.md`).
+Desde la ronda 2 el director tiene la imagen objetivo; la base se repuntuó con ese criterio (1b). Ruido del método: ±0,5.
+
+| ronda | commit | pesista | sala | materiales | luz | público y jueces | conjunto Alta | Móvil | 1.ª persona | final |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 (criterio viejo) | 38086eb | 5 | 5 | 6,5 | 5 | 3,5 | 5,5 | 4,5 | 4 | 4,5 |
+| 1b (base, criterio nuevo) | 38086eb | 4 | 5 | 6 | 5 | 3 | 5 | 4,5 | — | — |
+| 2 (sala 1.ª pasada) | e51f4c0 | 4,5 | 5 | 6 | 5 | 3 | 5 | 4 | — | — |
+| 3 (sala 2.ª + pesista 1.ª) | c6bb768 | 4,5 | 5,5 | 6,5 | 5,5 | 3,5 | 5,5 | 4,5 | — | — |
+
+Partes del pesista en la ronda 3: cara 4, piel 5, pelo y barba 3,5, anatomía 4,5, manos 3,5, ropa 6 (era 3,5).
+Meta: conjunto, pesista, primera persona y final ≥ 7; Móvil ≥ 6; nada bajo 6. **No se llegó; sigue en curso.**
+
+**Actions por software contra la Mac del dueño (M1 Pro, Metal):** misma imagen (diferencia media de 0,4 a 2,1 sobre 255 por
+canal en 12 tomas de `38086eb`); las rondas se siguen puntuando con fotos de Actions. **Costo:** Alta, Ultra y Media sin tope
+(decisión con el dueño: mejor imagen); Móvil y Baja ≤ +10 % contra `prueba`. Medido en la 2.ª pasada de sala: Baja +7 %;
+Móvil sin lectura comparable (hay que repetirla con los mismos MP en las dos ramas).
+
 **Cápsula del pecho (`chestU`, `95bf4fd`): sigue PENDIENTE DE APROBACIÓN DEL DUEÑO.** La alternativa por regla
 (`plantel-alt-capsula`) dio 9 BAD en halvard, así que no reemplaza a `chestU`. Los cuatro del plantel dan 0 BAD con `95bf4fd`
 (corridas 43875357534 y 43918976509); queda aislado en ese commit y se saca con `git revert 95bf4fd`.
