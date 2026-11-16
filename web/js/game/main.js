@@ -351,7 +351,7 @@ function alTeclado(e) {
   // «Saltar» del turno de un rival: la tecla S (Espacio no saltea nada de los rivales)
   if ((k === TECLA_SALTAR || k === TECLA_SALTAR.toUpperCase()) && E.saltarRival && !E.sobre && !e.repeat) { e.preventDefault(); E.saltarRival('tecla'); return; }
   if (k === 'Escape') { e.preventDefault(); if (E.saltar) E.saltar(); else if (E.sobre) cerrarSobre(); else abrirSobre('pausa'); return; }      // en el tutorial, Esc lo saltea
-  if ((k === 'c' || k === 'C') && !E.sobre && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); cambiarCamara(); return; }
+  if ((k === 'v' || k === 'V') && !E.sobre && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); cambiarCamara(); return; }
   if (k === 'h' || k === 'H' || k === '?') { if (!E.sobre) { if (abrirSobre('ayuda')) e.preventDefault(); } else { e.preventDefault(); if (E.sobre.tipo === 'ayuda') cerrarSobre(); else pintarSobre('ayuda'); } return; }
   const raiz = E.sobre ? $('sobre').firstElementChild : $('capa').firstElementChild;
   if (!raiz) { if (k === 'Tab') e.preventDefault(); return; }      // sin panel, Espacio es del levantamiento, y Tab no saca el foco de la página
@@ -386,7 +386,7 @@ const veredicto = (txt, sub, mal) => { $('veredicto').hidden = !txt; $('veredict
 const guiaTxt = txt => { const g = $('guia'); if (g.textContent !== txt) g.textContent = txt; g.hidden = !txt; };
 const etiqueta = et => { $('etiqueta').hidden = !et?.length; $('etiqueta').textContent = (et || []).map(e => ETIQUETAS[e]).join(' · '); };
 /**
- * Cámara del levantamiento (LIF-38): la general de siempre, o la elegida en Opciones, con la tecla C o con `?camara=`
+ * Cámara del levantamiento (LIF-38): la general de siempre, o la elegida en Opciones, con la tecla V o con `?camara=`
  * (jurado: por encima de los hombros de los tres árbitros; lado: lateral; baja: frontal). Se recuerda en este navegador y
  * deja el evento `camara_elegida`. Una ventana más alta que ancha usa la lateral.
  */
