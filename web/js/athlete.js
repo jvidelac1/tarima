@@ -51,7 +51,7 @@ const SKIN_MASK = /* glsl */`
   diffuseColor.rgb = mix( diffuseColor.rgb, mix( vec3( dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) ) ), diffuseColor.rgb, uSkinSat ), gMask.r );
   // tono de piel (parámetro del personaje) y su variación: parches grandes más rojizos o más pálidos (uTone), como la piel de verdad
   { vec2 tv = texture2D( tDetailSkin, vMapUv * 2.3 + 0.13 ).xy + texture2D( tDetailSkin, vMapUv * 0.9 + 0.41 ).xy - 1.0; float tono = clamp( ( tv.x + tv.y ) * 2.5, -1.0, 1.0 );
-    vec3 piel = diffuseColor.rgb * uSkinTint * ( 1.0 + uTone * tono * vec3( 0.09, -0.02, -0.07 ) );
+    vec3 piel = diffuseColor.rgb * uSkinTint * ( 1.0 + uTone * tono * vec3( 0.10, -0.03, -0.08 ) ) * ( 1.0 - 0.12 * uTone * abs( tono ) );
     diffuseColor.rgb = mix( diffuseColor.rgb, piel, gMask.r ); }
   diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * uClothTint, gMask.g * step( 0.5, uMaskMode ) );      // tinte de la tela (conserva el diseño horneado)
   // tela de color plano (el juego la usa para un pesista que comparte modelo): tapa lo que la textura trae horneado
@@ -95,7 +95,7 @@ const SKIN_MATERIAL = /* glsl */`
 {
   float skinRough = clamp( max( material.roughness, uSkinRough ) + gGrain * 0.08 - uSweat * 0.2 * gPatch, 0.36, 1.0 );
   material.roughness = mix( material.roughness, skinRough, gMask.r );
-  float f0k = mix( 1.0, 0.72, gMask.r ); material.specularColor *= f0k; material.specularColorBlended *= f0k;     // F0 de piel (~0,028) por debajo del 0,04 genérico
+  float f0k = mix( 1.0, 0.5, gMask.r ); material.specularColor *= f0k; material.specularColorBlended *= f0k;     // F0 de piel (~0,028) por debajo del 0,04 genérico
 }
 #ifdef USE_SHEEN
   material.sheenColor *= gMask.g;
@@ -203,9 +203,9 @@ function metersPerUv(geo) {
  *   arrugas: pliegues en las normales; brillo: reflejo satinado de la lycra (sheen).
  */
 export const ASPECTO = Object.freeze({
-  piel: Object.freeze({ tono: '#ffffff', saturacion: .78, variacion: .5, rugosidad: .56, sudor: .55, brillo: .6, dispersion: [.5, .17, .1] }),
+  piel: Object.freeze({ tono: '#f3e4d6', saturacion: .9, variacion: .9, rugosidad: .64, sudor: .55, brillo: .4, dispersion: [.62, .2, .11] }),
   pelo: Object.freeze({ color: null }),
-  tela: Object.freeze({ tinte: '#ffffff', plano: null, arrugas: .22, brillo: .5 }),
+  tela: Object.freeze({ tinte: '#ffffff', plano: null, arrugas: .5, brillo: .5 }),
 });
 const _color = (c, out) => (Array.isArray(c) ? out.setRGB(c[0], c[1], c[2]) : out.set(c ?? '#ffffff'));
 function bodyMaterial(src, mask, aniso, detail, mpu) {
@@ -217,8 +217,8 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
   if (src.normalMap) m.normalScale.copy(src.normalScale);
   for (const t of [m.map, m.normalMap, m.roughnessMap, m.aoMap]) if (t) t.anisotropy = aniso;
   const uniforms = { tDetailSkin: { value: detail.skin }, tDetailCloth: { value: detail.cloth }, uTile: { value: new THREE.Vector2(mpu / .012, mpu / .008) }, uDetail: { value: 1 }, tMask: { value: mask }, uMaskMode: { value: mask ? 1 : 0 },
-    uScatter: { value: new THREE.Color(.5, .17, .1) }, uSweat: { value: .55 }, uSkinSat: { value: .78 }, uSkinRough: { value: .56 }, uHairColor: { value: new THREE.Color(.03, .025, .02) }, uClothFlat: { value: new THREE.Vector4(0, 0, 0, 0) },
-    uSkinTint: { value: new THREE.Color(1, 1, 1) }, uClothTint: { value: new THREE.Color(1, 1, 1) }, uTone: { value: ASPECTO.piel.variacion }, uWrinkle: { value: ASPECTO.tela.arrugas }, uGloss: { value: ASPECTO.piel.brillo } };
+    uScatter: { value: new THREE.Color(...ASPECTO.piel.dispersion) }, uSweat: { value: ASPECTO.piel.sudor }, uSkinSat: { value: ASPECTO.piel.saturacion }, uSkinRough: { value: ASPECTO.piel.rugosidad }, uHairColor: { value: new THREE.Color(.03, .025, .02) }, uClothFlat: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uSkinTint: { value: new THREE.Color(ASPECTO.piel.tono) }, uClothTint: { value: new THREE.Color(1, 1, 1) }, uTone: { value: ASPECTO.piel.variacion }, uWrinkle: { value: ASPECTO.tela.arrugas }, uGloss: { value: ASPECTO.piel.brillo } };
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, uniforms);
     sh.fragmentShader = sh.fragmentShader

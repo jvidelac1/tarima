@@ -51,7 +51,7 @@ try {
     fs.mkdirSync(FOTOS, { recursive: true });
     for (let i = 0; i < info.lista.length; i++) {
       const nombre = await page.evaluate(async i => { const n = await window.BANCO_FOTOS.poner(i); await new Promise(r => requestAnimationFrame(() => r())); return n; }, i);
-      await page.screenshot({ path: path.join(FOTOS, nombre + '.png') }); console.log(`  ${nombre}.png`);
+      await page.screenshot({ path: path.join(FOTOS, nombre + '.png'), timeout: 180000 }); console.log(`  ${nombre}.png`);
     }
     console.log(`${info.gl} · ${info.lista.length} fotos en ${FOTOS} · opacidad de la sombra en la tarima: ${info.sombra} (calculada ${info.cruda})`);
     if (!info.lista.length) problemas.push('no hubo fotos');

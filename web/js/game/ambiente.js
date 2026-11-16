@@ -87,7 +87,7 @@ void main(){
     p = uCaja0 + q * uCajaT;
     peso = smoothstep( 0.0, 0.1, q.y ) * smoothstep( 1.0, 0.8, q.y ) * ( 0.55 + 0.45 * sin( t * ( 1.5 + 3.0 * f ) + f * 40.0 ) );
   }
-  vec3 luz = vec3( 0.006, 0.0065, 0.008 );
+  vec3 luz = vec3( 0.002, 0.0022, 0.0027 );
   for ( int i = 0; i < 4; i ++ ) {
     float c = dot( normalize( uLuzPos[ i ] - p ), uLuzDir[ i ] );
     luz += uLuzCol[ i ] * smoothstep( uLuzCono[ i ].x, uLuzCono[ i ].y, c );

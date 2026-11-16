@@ -39,11 +39,15 @@ export async function laboratorio(B, { escena, cargas, params, msg, decir }) {
   };
   const poner = u => { USO.value = u; rango.value = u; valor.textContent = Math.round(u * 100) + ' %'; };
   rango.addEventListener('input', () => { poner(+rango.value); dibujar(); });
-  escena.bucle(1.3, 0); for (let k = 0; k < 3; k++) escena.cuadro(k ? .016 : 5, true);
+  // los cuadros de la escena dibujan el reflejo de la tarima: las muestras (que usan ese mismo material) no entran ahí
+  g.visible = false; escena.bucle(1.3, 0); for (let k = 0; k < 3; k++) escena.cuadro(k ? .016 : 5, true); g.visible = true;
+  if (escena.reflejo?.activo) { escena.reflejo.setActivo(false); }
+  const fin = () => { try { escena.renderer.getContext().finish(); } catch { /* sin contexto */ } };
   const tomas = [['lab_fila-nuevo', 'fila', 0], ['lab_fila-usado', 'fila', 1], ['lab_cerca-nuevo', 'cerca', .1], ['lab_cerca-usado', 'cerca', 1], ['lab_chapa-nuevo', 'cercaB', 0], ['lab_chapa-usado', 'cercaB', 1], ['lab_piel', 'piel', .5], ['lab_tela', 'tela', .5]];
   window.BANCO_FOTOS = { lista: tomas.map(t => ({ nombre: t[0] })), listo: true, opacidadSombra: null, opacidadCruda: null,
-    async poner(i) { const t = tomas[i]; vista = t[1]; g.visible = !/piel|tela/.test(vista); poner(t[2]); dibujar(); dibujar(); return t[0]; } };
-  poner(.45); dibujar();
+    async poner(i) { const t = tomas[i]; vista = t[1]; g.visible = !/piel|tela/.test(vista); poner(t[2]); dibujar(); dibujar(); fin(); return t[0]; } };
+  for (const k of Object.keys(VISTAS)) { vista = k; g.visible = !/piel|tela/.test(k); dibujar(); fin(); }      // deja compilado lo de cada vista
+  vista = 'fila'; g.visible = true; poner(.45); dibujar(); fin();
   if (!params.get('fotos')) { const lazo = () => { dibujar(); requestAnimationFrame(lazo); }; requestAnimationFrame(lazo); addEventListener('keydown', e => { const k = Object.keys(VISTAS)[+e.key - 1]; if (k) { vista = k; g.visible = !/piel|tela/.test(k); } }); }
   B.etapa = 'laboratorio'; decir('laboratorio de materiales (teclas 1 a 5: vistas)');
 }
