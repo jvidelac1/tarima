@@ -2185,6 +2185,24 @@ cabeza… un poco más leves»; «el momento de tensión antes»; «una pantalla
 - `check_pov`: tiras a tiempo real desde los ojos (`tira_*`: preparación completa, levantamiento y final cada 0,1 s, con el
   recuadro); reglas: mirada ≤ 60 °/s, cámara a ≤ 15 cm de los ojos, cabeza y tronco propios sin dibujar, recuadro presente.
 
+**Final, después de la ronda 4 del director (5/10; meta 7).** Lo que cambió (`caida.js`: `GUIA`, `guiaEn`, `gestoDe`;
+`stage.js`: `_dosHuesos`, `_pies`, `_gesto`; `main.js`: `veredicto`, `fijarCamara`):
+- **Bajada en dos tramos**: de arriba a los hombros pegada al cuerpo (0,44 s, codos que flexionan, rodillas que ceden 4 cm
+  con los pies plantados) y de los hombros a la cadera con los brazos casi estirados (0,27 s); ahí se suelta. Las manos se
+  abren hacia abajo y vuelven al costado en 0,3 s. La barra cae adelante de los pies y rebota más de una vez (rebote 0,42).
+- **Paso atrás con los pies** (16 cm en 0,5 s, un pie y después el otro) mientras cae.
+- **Variación por semilla del intento** (`pl.var`, `pl.ritmo`): ritmo de 0,88 a 1,15 y uno de tres festejos (dos puños que
+  marcan; un puño arriba con el hombro acompañando; palmada de magnesio) o de tres reacciones (cabeza gacha y negación; manos
+  a la cintura; mira arriba y suelta el aire). Ninguno queda fijo: después mira al público despacio, la cabeza vuelve a medias.
+- **Fallos con la barra arriba**: los brazos reaccionan enseguida (atrás: bajan por delante a los 0,04 s; adelante: la
+  empujan lejos 0,3 s y bajan cuando la barra ya pasó).
+- **Veredicto grande** y centrado arriba con las tres luces durante 1,5 s (pantallas de 900 px o más; en teléfono queda
+  como estaba para no tapar nada), después chico en su lugar.
+- **Cámara congelada desde que termina el intento** (`fijarCamara`): el lente que volvía de la barrita (0,93 → 1) era el
+  reencuadre leve que se veía antes de soltar la barra.
+- Sin hacer de esa lista: desfase entre los extremos de la barra al rebotar, juntar los pies desde la tijera por regla (lo
+  hace el clip), darse vuelta medio paso, y medir el reencuadre en lo jugado con una prueba.
+
 Lo de abajo («no tocar» y «sigue mal») es de las cinco rondas anteriores, con la cámara vieja.
 
 Lo que las cinco rondas dejaron bien («no tocar»): barra arriba (recepción y recuperación del arranque, empuje, tijera y
