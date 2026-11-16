@@ -138,7 +138,7 @@ def proporciones(genero, H, m):
     la halterofilia. Son una estimación, no una medición de ninguna persona."""
     F = genero == 'F'; z = (H - (1.60 if F else 1.72)) / .10; t = _clip((m - (48 if F else 60)) / 60., 0, 1.3)
     return dict(femur=_clip(.236 + .007 * z, .215, .262), tibia=_clip(.242 + .003 * z, .23, .255), brazo=_clip(.305 + .004 * z, .29, .325),     # hombro a muñeca. Antes .312 + .006 z: con hombros anchos la envergadura pasaba de 1,08 de la estatura («brazos largos», dueño, 16-nov)
-                hombros=(.212 if F else .232) + .012 * t,     # entre articulaciones del hombro (el ancho heroico va en el deltoide, no en separar las articulaciones)
+                hombros=(.215 if F else .232) + .012 * t,     # entre articulaciones del hombro (el ancho heroico va en el deltoide, no en separar las articulaciones)
                 # antebrazo: parte del brazo (hombro a muñeca) que es antebrazo. Con antebrazo más largo que el brazo (más de 0,51) el codo no llega
                 # a la altura del rack con el agarre de cargada: es un límite real de esa palanca, y check() lo marca (codo-rack).
                 antebrazo=.495 if F else .47)     # húmero algo más largo que el antebrazo, como en una persona (antes .495)
@@ -182,7 +182,7 @@ def cfg(k):
              # físico heroico de pesista (dirección de arte del 16-nov): cuello, brazo y muslo gruesos. La masa manda: body.py compensa bajando el macro 'weight', así el volumen se va de la cintura a los grupos musculares
              ('neck/measure-neck-circ-incr', (.25 if F else .5) * mu * (1 - g)),
              # cuello con largo de persona: con 'muscle' y masa altos MPFB lo acorta (medido: 0,027-0,034 de la estatura entre Neck y Head en los hombres contra 0,044 en la mujer) y la cabeza quedaba hundida entre los hombros
-             ('neck/neck-scale-vert-incr', 0. if F else _clip(.7 + .4 * g, 0, 1)), ('arms/measure-upperarm-circ-incr', (.15 if F else .45) * mu * (1 - g)), ('legs/measure-thigh-circ-incr', (.3 if F else .45) * mu * (1 - .6 * g)),
+             ('neck/neck-scale-vert-incr', 0. if F else _clip(.6 + .2 * g, 0, 1)), ('arms/measure-upperarm-circ-incr', (.15 if F else .45) * mu * (1 - g)), ('legs/measure-thigh-circ-incr', (.3 if F else .45) * mu * (1 - .6 * g)),
              # antebrazo grueso de pesista
              ('arms/l-lowerarm-scale-horiz-incr', .22 if F else .4), ('arms/r-lowerarm-scale-horiz-incr', .22 if F else .4), ('arms/l-lowerarm-scale-depth-incr', .22 if F else .4), ('arms/r-lowerarm-scale-depth-incr', .22 if F else .4),
              # la panza del pesado: alta, redonda y firme (no caída), y la cara más llena
@@ -208,7 +208,7 @@ def sty(k):
              shoe=tuple(u['zapatillas']), belt=u['cinturon'], panel=u['panel'], iris=p.get('ojos', '#5a3d24'), peinado=h['peinado'],
              # nacimiento del pelo: entradas en las sienes (hombre) y degradé de los costados (corte corto); el pelo atado no lleva ninguno de los dos
              entradas=h['entradas'] if h['entradas'] is not None else (.015 if F else .09), degrade=h['degrade'] if h['degrade'] is not None else (0. if rod else (.6 if h['peinado'] == 'rapado' else 1.)),
-             hairline=-.16 if F else -.05,     # el nacimiento baja de donde termina el grupo 'scalp' de la malla base (dejaba la frente enorme)
+             hairline=-.16 if F else -.10,     # el nacimiento baja de donde termina el grupo 'scalp' de la malla base (dejaba la frente enorme)
               afeitado=0. if F else .45, bodyhair=.04 if F else .5 * (1 - .3 * g), cejas=.72 if F else 1.,
              # labios: el color sale del tono de piel (más oscuro y algo más rojo), no de un rosa fijo; borde de la pintura más adentro; párpado sin delineado fuerte; menos brillo de sudor
              esclera=.66, labio=_labio(_hex(p.get('piel', 'media')), F), labio_borde=(.5, .95), delineado=.3, sweat=.55,
