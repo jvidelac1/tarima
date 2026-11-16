@@ -51,7 +51,7 @@ void main(){
 /** Ganancia con la que se guarda la tribuna horneada (8 bits: el público es oscuro y sin esto se escalona). */
 const HORNEO = 6;
 /** En el camino directo (sin gradación ni viñeta del pase final) el mismo público queda más claro: se baja acá. */
-const DIRECTO = .8;
+const DIRECTO = .55;
 
 export class Publico {
   /** `animo`: el uniform {value} del ánimo del público (ambiente.publico.uAnimo). `chico`: texturas a la mitad (teléfono). */
@@ -126,7 +126,7 @@ export class Publico {
       r.setRenderTarget(prev); r.setClearColor(col, al); r.autoClear = auto; r.shadowMap.autoUpdate = sm; r.shadowMap.needsUpdate = need;
       rt.viewport.set(0, 0, W, banda * st.rows); rt.scissorTest = false; g.dispose(); im.dispose();
       const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); pg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); pg.setIndex(idx);
-      const q = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ map: rt.texture, alphaTest: .5, side: THREE.DoubleSide, color: new THREE.Color(.82 / HORNEO, .92 / HORNEO, 1.18 / HORNEO).multiplyScalar(DIRECTO) }));
+      const q = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ map: rt.texture, alphaTest: .5, side: THREE.DoubleSide, color: new THREE.Color(.9 / HORNEO, .95 / HORNEO, 1.12 / HORNEO).multiplyScalar(DIRECTO) }));
       q.matrixAutoUpdate = false; q.frustumCulled = false; q.userData.rt = rt; grupo.add(q);
     });
     mat.uniforms.uHorneo.value = 0;

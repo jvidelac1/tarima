@@ -71,9 +71,6 @@ const RELLENO = .4;
 /** Segundos que tarda en subir y en bajar la paleta. */
 const SUBE = .35, BAJA = .55;
 
-/** La malla de la gente sentada en los bancos: look.js la oculta cuando no dibuja la utilería (los bancos). */
-export const EQUIPO = { malla: null };
-
 export class Jueces {
   constructor({ reduceMotion = false } = {}) {
     this.group = new THREE.Group(); this.group.name = 'Jueces'; this.reduce = reduceMotion;
@@ -103,7 +100,9 @@ export class Jueces {
     // las paletas: un disco instanciado, sin luces (se lee igual en cualquier calidad)
     const { S, E, W, f } = this._bp, lado = f.clone().cross(UP).normalize(), nrm = lado.clone().cross(f).normalize();
     const disco = new THREE.CylinderGeometry(.098, .098, .014, 20); disco.applyMatrix4(_m.compose(W.clone().addScaledVector(f, .045 + .25), new THREE.Quaternion().setFromUnitVectors(UP, nrm), UNO));
-    this.paletas = new THREE.InstancedMesh(disco, new THREE.MeshBasicMaterial({ color: 0xffffff }), 3); this.paletas.name = 'paletas'; this.paletas.matrixAutoUpdate = false;
+    let txP = null;
+    if (typeof document !== 'undefined') { const cvP = document.createElement('canvas'); cvP.width = cvP.height = 64; const g = cvP.getContext('2d'), rg = g.createRadialGradient(28, 26, 2, 32, 32, 32); rg.addColorStop(0, '#ffffff'); rg.addColorStop(.7, '#e9e7e0'); rg.addColorStop(.93, '#cfccc4'); rg.addColorStop(1, '#8f8c86'); g.fillStyle = rg; g.fillRect(0, 0, 64, 64); txP = new THREE.CanvasTexture(cvP); txP.colorSpace = THREE.SRGBColorSpace; }
+    this.paletas = new THREE.InstancedMesh(disco, new THREE.MeshBasicMaterial({ color: 0xffffff, map: txP }), 3); this.paletas.name = 'paletas'; this.paletas.matrixAutoUpdate = false;
     this.paletas.boundingSphere = gb.boundingSphere.clone(); this.paletas.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.group.add(this.paletas);
     this._r = { S, u0: E.clone().sub(S), f0: f, u1: CODO_ARRIBA(-1).sub(S).normalize(), f1: ANTEBRAZO_ARRIBA(-1) }; this._r.Lu = this._r.u0.length(); this._r.u0.normalize(); this._r.E0 = E;
     for (let i = 0; i < 3; i++) { this.paletas.setColorAt(i, GUARDADA); this._posar(i); }
@@ -116,13 +115,6 @@ export class Jueces {
     const tec = [];
     [[5.0, -4.3, -.86], [5.75, -3.3, -1.05]].forEach(([x, z, ry], i) => { const M = asiento(x, STAGE_Y, z, ry); tec.push(...en(mesa(1.1, BASE), M), ...en(persona(gente(i + 8, '#30384e', '#2a2e38'), { det: 0, pelo: ESTILO[(i + 2) % ESTILO.length], k: i + 8 }), M.clone().multiply(correr(0, -.5)))); });
     this.fijos.push(malla(tec, 'mesa técnica'));
-    // entrenadores y pesistas que esperan, sentados en los bancos del costado del escenario (buzo de equipo): la sala no está vacía
-    const eq = [];
-    [[-5.35, .78, Math.PI / 2 + .06, 'corto', '#4d1c22', 'falda'], [-5.25, 2.55, Math.PI / 2 - .03, 'cola', '#1c343d', 'cruzados'], [-5.25, 3.4, Math.PI / 2 - .03, 'rapado', '#2b2f3a', 'menton'], [5.45, 1.42, -Math.PI / 2 - .05, 'entradas', '#22324f', 'cruzados']].forEach(([x, z, ry, pelo, buzo, gesto], i) => {
-      const C = { ...gente(i + 11, buzo, '#17191e'), ropa: col(buzo) }, M = asiento(x, STAGE_Y + .03, z, ry);
-      eq.push(...en(de(personaGente({ cuerpo: .55 + .12 * (i % 3), pelo, ropa: 'buzo', gesto, det: 1, silla: false, semilla: 71 + i * 3, cabezaGiro: (i - 1.5) * .16, cabezaInc: .05, forma: { ancho: .98 + .02 * (i % 3), mandibula: .96 + .05 * (i % 2), barba: i % 2 ? 0 : .6 } }).piezas, C), M));
-    });
-    this.fijos.push(EQUIPO.malla = malla(eq, 'equipo en los bancos'));
     this.group.traverse(o => { o.castShadow = false; o.receiveShadow = false; o.updateMatrix?.(); });
   }
   /** Lleva el brazo y la paleta del árbitro i a su posición (a.a: 0 apoyado en la mesa, 1 levantado). */
@@ -157,5 +149,5 @@ export class Jueces {
       this._posar(i);
     }
   }
-  dispose() { this.group.removeFromParent(); for (const m of [...this.fijos, this.brazos, this.paletas]) m.geometry.dispose(); this.mat.dispose(); this.paletas.material.dispose(); }
+  dispose() { this.group.removeFromParent(); for (const m of [...this.fijos, this.brazos, this.paletas]) m.geometry.dispose(); this.mat.dispose(); this.paletas.material.map?.dispose(); this.paletas.material.dispose(); }
 }

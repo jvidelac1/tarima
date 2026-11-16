@@ -18,7 +18,6 @@ import { EVENT } from '../config.js';
 import { BOKEH } from '../post.js';
 import { FINO } from '../athlete.js';
 import { conSuperficie, setSuperficies, chapa, USO } from './materiales.js';
-import { EQUIPO } from './jueces.js';
 
 /** Gradación del juego: exposición, saturación, contraste, gamma de sombras, tinte de sombras y de altas, viñeta y negro. */
 export const GRADO_LOOK = Object.freeze({ exp: 1.0, sat: .88, con: 1.03, gam: 1.0, frio: [.92, .995, 1.09], calido: [1.07, 1.0, .91], vin: .36, negro: .004 });
@@ -416,7 +415,7 @@ export class Look {
     // los dos cargadores de pie eran cápsulas azules fuera de escala (lo único que queda en esos lotes en el juego): fuera
     for (const o of A.group.children) if (o.isInstancedMesh && (o.geometry.type === 'CapsuleGeometry' || (o.geometry.type === 'SphereGeometry' && Math.abs(o.geometry.parameters.radius - .105) < 1e-6))) o.visible = false;
     // la bruma de sala (velos aditivos) lavaba los negros: a un tercio
-    { const hechos = new Set(); A.group.traverse(o => { const m = o.material; if (m?.map === A.hazeTex && m.color && !hechos.has(m)) { hechos.add(m); m.color.multiplyScalar(.3); } }); }
+    { const hechos = new Set(); A.group.traverse(o => { const m = o.material; if (m?.map === A.hazeTex && m.color && !hechos.has(m)) { hechos.add(m); m.color.set('#8fa0b8').multiplyScalar(.004); /* casi nada y frío: de costado los velos se sumaban en un banco beige sobre la tribuna */ } }); }
     if (this.ambiente?.uPolvo) this.ambiente.uPolvo.uTam.value = .0045;
   }
   /** Pantalla LED: fondo oscuro y grano de píxel en el sombreador (un punto por LED; de lejos se promedia: sin muaré). */
@@ -580,7 +579,7 @@ export class Look {
       for (const o of this.calcos || []) o.visible = !d;
       // medido (run 43827293011): ni sin mapas la utilería entraba en la meta de «Baja» (+16 %); el banco dice que es el 22 % del cuadro.
       // En el camino directo no se dibuja (Media para arriba sí), hasta medir en una placa
-      for (const o of this.utileria()) if (o !== this.props) o.visible = !d; this.props.visible = !d; if (EQUIPO.malla) EQUIPO.malla.visible = !d; }
+      for (const o of this.utileria()) if (o !== this.props) o.visible = !d; this.props.visible = !d; }
     FINO.value = Q.directo ? 0 : 1;
     if (this.haloMat) { this.haloMat.uniforms.uDirecto.value = Q.directo ? 1 : 0; this.haloMat.uniforms.uMax.value = Q.directo ? 84 : 220; }      // en el camino directo, halos chicos: poca pantalla de mezcla
     // en el camino directo la pared de chapa (material físico en mucha pantalla) no se dibuja: queda el telón, como antes
