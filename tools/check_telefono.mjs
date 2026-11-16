@@ -9,8 +9,11 @@
 //    dentro de lo visible, con «Listo»; Espacio y Enter son del campo (no cuentan como toques ni activan botones) y el
 //    texto vuelve entero al campo del panel.
 //  - Mano izquierda (?mano=izq): el botón va a la izquierda sin tapar nada.
-//  - En vertical (390 × 844, teléfono con la rotación trabada): el contenido se gira 90° (html.rotado) y se juega igual,
-//    con toques sobre el botón; al girar el teléfono de verdad, se usa la orientación real.
+//  - Parado (LIF-50): 390 × 844 (iPhone, con muesca y barra de inicio; una final entera solo con el pulgar), 375 × 667 en
+//    inglés (hasta el cartel de anotarse, con ?muro=firme&etapa=arranque) y 430 × 932. Sin girar nada (html.vert): el
+//    botón redondo abajo al centro, la barrita encima, los paneles abajo. Además de lo de siempre: el botón principal de
+//    cada panel queda al alcance del pulgar (mitad de abajo de la pantalla), y al girar el teléfono a horizontal y volver,
+//    cada orientación usa su diseño. `?vertical=girado` deja el contenido girado como antes (no se prueba acá).
 // Sin --dibujo el 3D no se dibuja solo (?dibujo=0, como check_game): antes de cada captura se fuerza un cuadro.
 // Cuánto tapa la interfaz al pesista (tools/tapa.mjs) en el llamado, con la barrita quieta y corriendo, en el levantamiento, en el
 // veredicto y en el turno de un rival, por tamaño de pantalla (tabla al final y out/telefono/tapa.json). Falla
@@ -32,7 +35,7 @@ const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
-const SOLO = arg('solo'), HEADED = process.argv.includes('--headed'), DIBUJO = process.argv.includes('--dibujo'), OUT = path.resolve(ROOT, arg('capturas') || 'out/telefono');
+const SOLO = (arg('solo') || '').split(',').filter(Boolean), HEADED = process.argv.includes('--headed'), DIBUJO = process.argv.includes('--dibujo'), OUT = path.resolve(ROOT, arg('capturas') || 'out/telefono');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.svg': 'image/svg+xml' };
 const server = http.createServer((req, res) => {
   if (sinApi(req, res)) return;      // /api/estado y /api/partida: juego sin límite (tools/sin_api.mjs)
@@ -43,11 +46,11 @@ const server = http.createServer((req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/`;
 fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT, { recursive: true });
-const problemas = [], notas = [], TAPA = [], PANEL = [], INFORMA = process.env.TAPA_INFORMA === '1';      // TAPA_INFORMA=1: solo informa (para medir un antes)
+const problemas = [], notas = [], TAPA = [], PANEL = [], PULGAR = [], INFORMA = process.env.TAPA_INFORMA === '1';      // TAPA_INFORMA=1: solo informa (para medir un antes)
 // LIF-31: alto del panel del llamado con el detalle plegado (teléfono acostado, 'b'): ≤ 38 % del alto de la pantalla, y cada
 // botón a la vista del panel con 40 px de alto o más (el toque en el teléfono).
 // PANEL_INFORMA=1: solo informa (para medir un antes)
-const PANEL_TOPE = .38, BOTON_MIN = 40, PANEL_INFORMA = process.env.PANEL_INFORMA === '1';
+const PANEL_TOPE = .38, PANEL_TOPE_V = .4, BOTON_MIN = 40, PANEL_INFORMA = process.env.PANEL_INFORMA === '1';
 const browser = await chromium.launch(launchOptions({ headed: HEADED }));
 
 const CASOS = [
@@ -57,7 +60,10 @@ const CASOS = [
   // iPhone en Safari de costado, con la barra de direcciones a la vista: quedan unos 340 px de alto
   { nombre: 'safari_844x340', w: 844, h: 340, dpr: 3, seguras: { top: 0, right: 47, bottom: 21, left: 47 }, hastaIntentos: 2 },
   { nombre: 'android_932x430', w: 932, h: 430, dpr: 3, hastaIntentos: 2, lang: 'en' },      // en inglés (LIF-52: las explicaciones de primera vez en los dos idiomas)
-  { nombre: 'vertical_390x844', w: 390, h: 844, dpr: 3, vertical: true, hastaIntentos: 2 },
+  // LIF-50: parado, sin girar el contenido
+  { nombre: 'vertical_390x844', w: 390, h: 844, dpr: 3, vertical: true, partida: true, dedos: true, seguras: { top: 47, right: 0, bottom: 34, left: 0 } },
+  { nombre: 'vertical_375x667', w: 375, h: 667, dpr: 2, vertical: true, lang: 'en', url: '&muro=firme&etapa=arranque', hastaPantalla: 'muro' },
+  { nombre: 'vertical_430x932', w: 430, h: 932, dpr: 3, vertical: true, hastaIntentos: 3, seguras: { top: 59, right: 0, bottom: 34, left: 0 } },
 ];
 
 async function correr(C) {
@@ -88,16 +94,12 @@ async function correr(C) {
   if (!S0.tactil) mal('la emulación no da puntero grueso: la prueba no sirve');
   if (C.seguras && S0.seguras.left !== C.seguras.left) { notas.push(`${tag} áreas seguras pedidas ${JSON.stringify(C.seguras)}, la página ve ${JSON.stringify(S0.seguras)}`); seguras = S0.seguras; }
 
-  // ---------- vertical: el contenido va girado 90° (html.rotado) y se juega igual ----------
+  // ---------- parado (LIF-50): sin girar nada, con el diseño vertical ----------
   if (C.vertical) {
-    const g = () => J(() => { const app = document.getElementById('app'), r = app.getBoundingClientRect(), tf = getComputedStyle(app).transform; return { rotado: document.documentElement.classList.contains('rotado'), horiz: document.documentElement.classList.contains('horiz'), tf, caja: [Math.round(r.width), Math.round(r.height)], interior: [app.clientWidth, app.clientHeight], girar: !!document.getElementById('girar'), scroll: document.scrollingElement.scrollHeight > innerHeight + 1 || document.scrollingElement.scrollWidth > innerWidth + 1 }; });
-    const v = await g(); await foto('vertical_girado');
-    console.log(`${tag} en vertical: html.rotado ${v.rotado}, #app ${v.interior.join('x')} girado a ${v.caja.join('x')} (${v.tf})`);
-    if (!v.rotado || !v.horiz) mal(`en vertical el contenido no se giró (html.rotado ${v.rotado}, html.horiz ${v.horiz})`);
-    if (v.interior[0] < v.interior[1]) mal(`en vertical, el juego girado no quedó apaisado: ${v.interior.join('x')}`);
-    if (Math.abs(v.caja[0] - C.w) > 2 || Math.abs(v.caja[1] - C.h) > 2) mal(`en vertical, el contenido girado no ocupa la pantalla: ${v.caja.join('x')} en ${C.w}x${C.h}`);
-    if (v.girar) mal('sigue en la página el aviso «Gira el teléfono»');
-    if (v.scroll) mal('en vertical la página se desplaza');
+    const v = await J(() => { const h = document.documentElement.classList, app = document.getElementById('app'); return { vert: h.contains('vert'), rotado: h.contains('rotado'), horiz: h.contains('horiz'), tf: getComputedStyle(app).transform, scroll: document.scrollingElement.scrollHeight > innerHeight + 1 || document.scrollingElement.scrollWidth > innerWidth + 1, pie: getComputedStyle(document.documentElement).getPropertyValue('--pie-v'), boton: getComputedStyle(document.documentElement).getPropertyValue('--boton-v') }; });
+    console.log(`${tag} parado: html.vert ${v.vert}, rotado ${v.rotado}, botón ${v.boton}, pie ${v.pie}`);
+    if (!v.vert || v.rotado || v.horiz || v.tf !== 'none') mal(`parado: no quedó el diseño vertical (${JSON.stringify(v)})`);
+    if (v.scroll) mal('parado: la página se desplaza');
   }
 
   if (!await J(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
@@ -121,7 +123,7 @@ async function correr(C) {
       const caja = el => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
       const cruza = (a, b) => a.l < b.r - 1 && a.r > b.l + 1 && a.t < b.b - 1 && a.b > b.t + 1;
       const o = { scroll: se.scrollWidth > W + 1 || se.scrollHeight > H + 1 || scrollX !== 0 || scrollY !== 0, fuera: [], seguras: [], cruces: [], panel: null, zona: ve($('zona')) };
-      const ids = ['zona', 'senal', 'barrita', 'margen', 'zocalo', 'acuse', 'guia', 'veredicto', 'cartel', 'rival', 'etiqueta', 'pausa', 'ayudab', 'sonidob', 'saltar', 'turno', 'marcador', 'tablero', 'saltar-rival', 'aprende'], B = {};
+      const ids = ['seguir', 'zona', 'senal', 'barrita', 'margen', 'zocalo', 'acuse', 'guia', 'veredicto', 'cartel', 'rival', 'etiqueta', 'pausa', 'ayudab', 'sonidob', 'saltar', 'turno', 'marcador', 'tablero', 'saltar-rival', 'aprende'], B = {};
       for (const id of ids) if (ve($(id))) B[id] = caja($(id));
       for (const k of ['bug', 'relojbox']) { const el = document.querySelector('.' + k); if (ve(el)) B[k] = caja(el); }
       for (const [id, b] of Object.entries(B)) {
@@ -129,7 +131,7 @@ async function correr(C) {
         // lo que se toca o se lee no va debajo de la muesca ni de la barra de inicio (el veredicto y el cartel van centrados)
         if (!['veredicto', 'cartel'].includes(id) && (b.l < seg.left - 1 || b.r > W - seg.right + 1 || b.b > H - seg.bottom + 1)) o.seguras.push(id);
       }
-      for (const [a, b] of [['zona', 'barrita'], ['barrita', 'zocalo'], ['barrita', 'guia'], ['barrita', 'margen'], ['zona', 'senal'], ['zona', 'zocalo'], ['zona', 'acuse'], ['zona', 'guia'], ['zona', 'rival'], ['zona', 'pausa'], ['zona', 'saltar'], ['zona', 'sonidob'], ['sonidob', 'pausa'], ['sonidob', 'bug'], ['sonidob', 'senal'], ['ayudab', 'relojbox'], ['senal', 'zocalo'], ['senal', 'guia'], ['senal', 'etiqueta'], ['senal', 'bug'], ['zocalo', 'acuse'], ['guia', 'zocalo'], ['acuse', 'guia'], ['turno', 'sonidob'], ['turno', 'pausa'], ['turno', 'ayudab'], ['turno', 'marcador'], ['margen', 'guia'], ['margen', 'senal'], ['veredicto', 'margen'], ['veredicto', 'turno'], ['tablero', 'veredicto'], ['tablero', 'sonidob'], ['tablero', 'pausa'], ['tablero', 'ayudab'], ['tablero', 'relojbox'], ['tablero', 'senal'], ['tablero', 'margen'], ['tablero', 'acuse'], ['saltar-rival', 'acuse'], ['saltar-rival', 'veredicto'], ['saltar-rival', 'zona'],
+      for (const [a, b] of [...(seg.vertical ? [['seguir', 'zona'], ['seguir', 'saltar-rival'], ['seguir', 'veredicto'], ['seguir', 'acuse'], ['veredicto', 'zona'], ['barrita', 'acuse'], ['senal', 'acuse'], ['tablero', 'guia'], ['aprende', 'seguir'], ['tablero', 'saltar'], ['saltar', 'pausa'], ['saltar', 'sonidob'], ['margen', 'saltar']] : []), ['zona', 'barrita'], ['barrita', 'zocalo'], ['barrita', 'guia'], ['barrita', 'margen'], ['zona', 'senal'], ['zona', 'zocalo'], ['zona', 'acuse'], ['zona', 'guia'], ['zona', 'rival'], ['zona', 'pausa'], ['zona', 'saltar'], ['zona', 'sonidob'], ['sonidob', 'pausa'], ['sonidob', 'bug'], ['sonidob', 'senal'], ['ayudab', 'relojbox'], ['senal', 'zocalo'], ['senal', 'guia'], ['senal', 'etiqueta'], ['senal', 'bug'], ['zocalo', 'acuse'], ['guia', 'zocalo'], ['acuse', 'guia'], ['turno', 'sonidob'], ['turno', 'pausa'], ['turno', 'ayudab'], ['turno', 'marcador'], ['margen', 'guia'], ['margen', 'senal'], ['veredicto', 'margen'], ['veredicto', 'turno'], ['tablero', 'veredicto'], ['tablero', 'sonidob'], ['tablero', 'pausa'], ['tablero', 'ayudab'], ['tablero', 'relojbox'], ['tablero', 'senal'], ['tablero', 'margen'], ['tablero', 'acuse'], ['saltar-rival', 'acuse'], ['saltar-rival', 'veredicto'], ['saltar-rival', 'zona'],
         // LIF-52: la explicación de primera vez no se encima con nada
         ...['tablero', 'veredicto', 'zona', 'saltar-rival', 'pausa', 'sonidob', 'ayudab', 'relojbox', 'acuse', 'margen', 'senal', 'barrita', 'guia', 'saltar', 'bug'].map(x => ['aprende', x])])
         if (B[a] && B[b] && cruza(B[a], B[b])) o.cruces.push(`${a}/${b}`);
@@ -141,7 +143,7 @@ async function correr(C) {
         o.panel = { titulo: (pn.querySelector('h1,h2')?.textContent || '').trim().slice(0, 50), alto: Math.round(b.b - b.t), sobraAlto: pn.scrollHeight - pn.clientHeight, sobraAncho: pn.scrollWidth - pn.clientWidth, fuera: b.l < seg.left - 1 || b.r > W - seg.right + 1 || b.t < -1 || b.b > H - seg.bottom + 1, cortados, tapa: B.zona && cruza(B.zona, b), aprende: !!B.aprende && cruza(B.aprende, b) };
       }
       return o;
-    }, seguras);
+    }, { ...seguras, vertical: !!C.vertical });
     const d = `en «${donde}»`;
     if (R.scroll) mal(`${d} la página se desplaza o es más grande que la pantalla`);
     if (R.fuera.length) mal(`${d} se sale de la pantalla: ${R.fuera.join(', ')}`);
@@ -200,7 +202,7 @@ async function correr(C) {
   };
   const probado = { detalle: false, estilo: false }, aprendes = new Set(); let aprendeCerrada = false;
   const vistas = new Set(), pantallas = new Set(); let firma = '', dedosProbados = false, bordesProbados = false, campoSolo = false, nIntentos = 0, ultToque = 0, hecho = '', revisadas = 0;
-  const hasta = s => s.pantalla === 'fin' || (C.hastaIntentos && nIntentos >= C.hastaIntentos);
+  const hasta = s => s.pantalla === 'fin' || (C.hastaIntentos && nIntentos >= C.hastaIntentos) || (C.hastaPantalla && s.pantalla === C.hastaPantalla);
   for (let n = 0; n < 60000; n++) {
     const s = await J(() => JUEGO.estado());
     if (s.errores.length) throw new Error('error en el juego: ' + s.errores[0]);
@@ -212,13 +214,15 @@ async function correr(C) {
       firma = clave; pantallas.add(s.pantalla);
       if (s.panel) await av(450);
       const R = await revisar(clave.replace(/\|+/g, ' ').trim()); revisadas++;
-      if (s.panel && s.pantalla === 'llamado' && R.panel && !C.vertical) {
+      if (s.panel && s.pantalla === 'llamado' && R.panel) {
         const d = await J(() => { const pn = document.querySelector('#capa .panel'); return { detalle: !!pn?.querySelector('.pn-detalle:not([hidden])'), estilo: (pn?.querySelector('.pn-estilo')?.textContent || '').replace(/\s+/g, ' ').trim(),
           botones: [...(pn?.querySelectorAll('button') || [])].filter(b => b.offsetParent && b.getBoundingClientRect().height > 0).map(b => ({ id: b.id || b.className || b.textContent.trim().slice(0, 12), alto: Math.round(b.getBoundingClientRect().height) })) }; });
         const chicos = d.botones.filter(b => b.alto < BOTON_MIN); d.botonMin = Math.min(...d.botones.map(b => b.alto)); delete d.botones;
         if (chicos.length && !PANEL_INFORMA) mal(`en el panel del llamado «${R.panel.titulo}» hay botones de menos de ${BOTON_MIN} px: ${chicos.map(b => `${b.id} ${b.alto}`).join(', ')}`);
         const pct = R.panel.alto / C.h; PANEL.push({ p: C.nombre, titulo: R.panel.titulo, alto: R.panel.alto, pct, ...d });
         if (!d.detalle && pct > PANEL_TOPE && ['iphone_844x390', 'android_667x375'].includes(C.nombre) && !PANEL_INFORMA) mal(`el panel del llamado «${R.panel.titulo}» ocupa ${Math.round(pct * 100)} % del alto con el detalle plegado (tope ${PANEL_TOPE * 100} %)`);
+        // parado (LIF-50): el panel sube desde abajo y el pesista queda arriba: como mucho el 40 % del alto
+        if (C.vertical && !d.detalle && pct > PANEL_TOPE_V && !PANEL_INFORMA) mal(`parado: el panel del llamado «${R.panel.titulo}» ocupa ${Math.round(pct * 100)} % del alto (tope ${PANEL_TOPE_V * 100} %)`);
       }
       // con el dedo: «Detalles» se abre y se cierra, y el estilo de envión se elige sin salir del panel; todo entra en la pantalla
       if (s.panel && s.pantalla === 'llamado' && C.partida && R.panel) {
@@ -250,6 +254,11 @@ async function correr(C) {
             if (x.vis || !x.ev.some(e => e.via === 'boton' && e.leida)) mal(`la ✕ no cerró la explicación (${JSON.stringify(x)})`);
             if (x.toques !== t0) mal(`tocar la ✕ de la explicación contó ${x.toques - t0} toques del juego`); }
         }
+      }
+      // parado (LIF-50): el botón principal del panel, al alcance del pulgar (en la mitad de abajo de la pantalla)
+      if (C.vertical && s.panel) {
+        const y = await J(() => { const pn = document.querySelector('#sobre:not([hidden]) .panel') || document.querySelector('#capa .panel'); const b = [...(pn?.querySelectorAll('button.ir, button.grande') || [])].find(x => x.getBoundingClientRect().height > 0); if (!b) return null; const r = b.getBoundingClientRect(); return { y: (r.top + r.bottom) / 2 / innerHeight, txt: b.textContent.trim().slice(0, 24) }; });
+        if (y) { PULGAR.push({ p: C.nombre, donde: clave.replace(/\|+/g, ' ').trim(), ...y }); if (y.y < .5) mal(`parado: en «${clave}» el botón «${y.txt}» queda arriba (${Math.round(y.y * 100)} % del alto): fuera del pulgar`); }
       }
       const sg = I && I.propio ? I.senal : null;
       if (s.panel && ['inicio', 'presentacion', 'apertura', 'intervalo'].includes(s.pantalla)) await tapa(s.pantalla);
@@ -319,20 +328,28 @@ async function correr(C) {
   if (C.partida && (!probado.detalle || !probado.estilo)) mal(`no se llegó a probar ${!probado.detalle ? '«Detalles»' : 'el estilo de envión'} en el panel del llamado`);
   // la última pantalla (el podio con sus botones) también se revisa
   if (fin.s.pantalla === 'fin') { await av(3000); await revisar('fin (podio con botones)'); }
-  if (C.vertical) {      // el teléfono gira de verdad: orientación real, sin girar el contenido
-    await page.setViewportSize({ width: C.h, height: C.w }); await page.waitForTimeout(300);
-    const r = await J(() => ({ rotado: document.documentElement.classList.contains('rotado'), horiz: document.documentElement.classList.contains('horiz'), tf: getComputedStyle(document.getElementById('app')).transform }));
-    if (r.rotado || !r.horiz || r.tf !== 'none') mal(`al girar el teléfono a horizontal el contenido sigue girado (${JSON.stringify(r)})`);
-    await foto('girado_a_horizontal');
+  if (C.hastaPantalla) {      // el cartel (muro) parado: entra, se lee y se toca con el pulgar
+    const s2 = await J(() => JUEGO.estado()); if (s2.pantalla !== C.hastaPantalla) mal(`no se llegó a «${C.hastaPantalla}» (pantalla ${s2.pantalla})`);
+    else { await page.waitForFunction(() => document.querySelector('#capa .panel'), null, { timeout: 15000 }).catch(() => null); await av(600); await revisar(C.hastaPantalla); await tapa(C.hastaPantalla); await foto(C.hastaPantalla); }
+  }
+  if (C.vertical) {      // gira a horizontal y vuelve: cada orientación con su diseño, sin recargar
+    const o = () => J(() => { const h = document.documentElement.classList; return { vert: h.contains('vert'), horiz: h.contains('horiz'), rotado: h.contains('rotado'), ev: JUEGO.eventos.filter(e => e.ev === 'orientacion_cambio').map(e => e.props.orientacion) }; });
+    await page.setViewportSize({ width: C.h, height: C.w }); await page.waitForTimeout(400); const r = await o(); await foto('girado_a_horizontal');
+    if (r.vert || !r.horiz || r.rotado) mal(`al girar a horizontal no se usó el diseño acostado (${JSON.stringify(r)})`);
+    await page.setViewportSize({ width: C.w, height: C.h }); await page.waitForTimeout(400); const r2 = await o(); await foto('de_nuevo_parado');
+    if (!r2.vert || r2.horiz) mal(`al volver a vertical no se usó el diseño parado (${JSON.stringify(r2)})`);
+    if (r2.ev.join(',') !== 'horizontal,vertical') mal(`eventos orientacion_cambio: ${r2.ev.join(',') || 'ninguno'} (se esperaban horizontal y vertical)`);
+    const pr = await J(() => JUEGO.eventos.find(e => e.ev === 'juego_abierto')?.props.orientacion); if (pr !== 'vertical') mal(`juego_abierto lleva orientacion=${pr} (se esperaba vertical)`);
   }
   await foto('final'); await ctx.close();
 }
 
-try { for (const C of CASOS.filter(c => !SOLO || c.nombre === SOLO)) await correr(C); }
+try { for (const C of CASOS.filter(c => !SOLO.length || SOLO.some(x => c.nombre.startsWith(x)))) await correr(C); }
 catch (e) { problemas.push('excepción de la prueba: ' + (e.stack || e.message)); }
 await browser.close(); server.close();
 if (TAPA.length) { console.log('\nCuánto tapa la interfaz al pesista (caja proyectada desde three; tools/tapa.mjs):'); for (const id of [...new Set(TAPA.map(x => x.p))]) { console.log(`  [${id}]`); for (const x of TAPA.filter(y => y.p === id)) console.log('    ' + fila(x.momento, x.x)); } fs.writeFileSync(path.join(OUT, 'tapa.json'), JSON.stringify(TAPA, null, 1)); }
 if (PANEL.length) { console.log('\nAlto del panel del llamado (con el detalle plegado salvo que diga «detalle»):'); for (const x of PANEL) console.log(`  [${x.p}] ${x.titulo}: ${x.alto} px · ${Math.round(x.pct * 100)} % del alto${x.botonMin ? ` · botón más bajo ${x.botonMin} px` : ''}${x.detalle ? ' · detalle' : ''}${x.estilo ? ` · «${x.estilo}»` : ''}`); fs.writeFileSync(path.join(OUT, 'panel.json'), JSON.stringify(PANEL, null, 1)); }
+if (PULGAR.length) { console.log('\nParado: altura del botón principal de cada panel (0 = arriba, 1 = abajo; pulgar ≥ 0,5):'); for (const x of PULGAR) console.log(`  [${x.p}] ${x.donde}: «${x.txt}» a ${x.y.toFixed(2)}`); }
 for (const n of notas) console.log('nota: ' + n);
 if (problemas.length) { console.log(`\nFALLÓ (${problemas.length}):`); for (const p of problemas.slice(0, 40)) console.log('  ' + p); process.exit(1); }
-console.log('\nOK: teléfono de costado (dos tamaños y mano izquierda) y en vertical con el contenido girado, jugado con toques, campos de texto con el editor de arriba y dos dedos, sin cortes ni superposiciones');
+console.log('\nOK: teléfono de costado (dos tamaños y mano izquierda) y parado (tres tamaños, sin girar el contenido), jugado con toques, campos de texto con el editor de arriba y dos dedos, sin cortes ni superposiciones');
