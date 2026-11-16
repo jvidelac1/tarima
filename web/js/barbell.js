@@ -114,7 +114,7 @@ export class Barbell {
     const steel = { color: new THREE.Color('#c9ccd0'), metalness: 1, envMapIntensity: 1.25 };
     this.mat = {
       smooth: new THREE.MeshStandardMaterial({ ...steel, roughness: .2 }),
-      knurl: new THREE.MeshStandardMaterial({ ...steel, color: new THREE.Color('#b4b7bc'), roughness: .46, normalMap: knurl, normalScale: new THREE.Vector2(2.2, 2.2) }),
+      knurl: new THREE.MeshStandardMaterial({ ...steel, color: new THREE.Color('#7e8187'), roughness: .66, envMapIntensity: .7, normalMap: knurl, normalScale: new THREE.Vector2(2.2, 2.2) }),
       sleeve: new THREE.MeshStandardMaterial({ ...steel, roughness: .24, normalMap: ridge, normalScale: new THREE.Vector2(.35, .35) }),
       chrome: new THREE.MeshStandardMaterial({ ...steel, color: new THREE.Color('#d8dade'), roughness: .12 }),
       hub: new THREE.MeshStandardMaterial({ color: new THREE.Color('#c4c7cc'), metalness: .92, roughness: .4, envMapIntensity: 1.6 }),

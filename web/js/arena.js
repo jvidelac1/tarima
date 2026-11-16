@@ -76,7 +76,9 @@ function ledWallCanvas(w, h) {
 function bannerCanvas(w, h) {
   return makeCanvas(w, h, g => {
     g.fillStyle = '#161a2c'; g.fillRect(0, 0, w, h); g.textBaseline = 'middle'; g.textAlign = 'center';
-    for (let i = 0; i < 4; i++) { const cx = w * (i + .5) / 4; drawLogo(g, cx - w * .085, h / 2, h * .26, '#35e6d6'); g.font = `800 ${h * .56}px ${DISPLAY}`; g.fillStyle = '#fff'; g.fillText(EVENT.marca, cx + w * .02, h * .54); }
+    // la marca una sola vez por vuelta; el resto, auspiciantes ficticios y la gráfica del evento (la marca repetida en cada valla abarataba)
+    const T = [[EVENT.marca, '#fff', '#35e6d6'], ['NORDVIK ACERO', '#d9dde6', '#8fa4c8'], ['OPEN · ' + EVENT.session.toUpperCase(), '#ffd23f', '#ffd23f'], ['TALKO MAGNESIO', '#e6dfd0', '#c9a25a']];
+    for (let i = 0; i < 4; i++) { const cx = w * (i + .5) / 4, [t, c1, c2] = T[i]; if (i % 2 === 0) drawLogo(g, cx - w * .1, h / 2, h * .26, c2); else { g.fillStyle = c2; g.beginPath(); g.moveTo(cx - w * .112, h * .72); g.lineTo(cx - w * .098, h * .28); g.lineTo(cx - w * .084, h * .72); g.fill(); } g.font = `800 ${h * (i % 2 ? .44 : .56)}px ${DISPLAY}`; g.fillStyle = c1; g.fillText(t, cx + w * .02, h * .54, w * .17); }
     g.fillStyle = '#ffd23f'; g.fillRect(0, 0, w, h * .06); g.fillRect(0, h * .94, w, h * .06);
   });
 }
