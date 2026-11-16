@@ -71,7 +71,7 @@ PESISTAS = {
    # cara ovalada y fina: pómulos altos, nariz corta y angosta, mentón angosto, cejas arqueadas
    cara=[('head/head-oval',.5),('cheek/l-cheek-bones-incr',.4),('cheek/r-cheek-bones-incr',.4),('nose/nose-scale-vert-decr',.25),('nose/nose-width2-decr',.2),('chin/chin-width-decr',.3),('eyebrows/eyebrows-angle-up',.25),('mouth/mouth-scale-horiz-decr',.15)],
    pelo=dict(color='#15100d', peinado='rodete_alto'),
-   uniforme=dict(malla='#0f7a4a', vivo='#f4f2ec', rodillera='#141418', rodillera2='#2c2c33', cinturon=None, zapatillas=('#f4f3ee','#d9d5ca','#0f7a4a','#8a5f36')),
+   uniforme=dict(malla='#0f7a4a', panel='#12202b', vivo='#f4f2ec', rodillera='#141418', rodillera2='#2c2c33', cinturon='#241a14', zapatillas=('#f4f3ee','#d9d5ca','#0f7a4a','#8a5f36')),
    juego=dict(color='#35c487', bandera='linear-gradient(180deg,#0f7a4a 0 33%,#f4f2ec 33% 67%,#e8a33d 67%)', dorsal=21, kg=dict(s=84, c=106))),
  'halvard': dict(nombre='Greta Halvard', pais='Karsund', codigo='KSD', genero='F', categoria='+86', estatura=1.74, masa=112,
    musculo=.9, grasa=.62,
@@ -81,13 +81,13 @@ PESISTAS = {
    pelo=dict(color='#a8865a', peinado='rodete'),
    uniforme=dict(malla='#6e1423', vivo='#f0c36a', rodillera='#1a1a1f', rodillera2='#6e1423', cinturon='#2a1c14', zapatillas=('#1b1b20','#e6e3da','#f0c36a','#2a2a2e')),
    juego=dict(color='#e0607a', bandera='linear-gradient(90deg,#6e1423 0 28%,#f0c36a 28% 40%,#6e1423 40%)', dorsal=34, kg=dict(s=128, c=166))),
- 'ilarraz': dict(nombre='Tadeo Ilarraz', pais='Montelar', codigo='MTL', genero='M', categoria='65', estatura=1.62,
+ 'ilarraz': dict(nombre='Tadeo Ilarraz', pais='Montelar', codigo='MTL', genero='M', categoria='71', estatura=1.61,
    musculo=1.0, grasa=.08, prop=dict(femur=.222, tibia=.250),     # compacto: fémur corto y torso largo; la tibia larga viene con sus rasgos base
    rasgos=(.75, .05, .20), piel='oscura', ojos='#2e1d12',
    # cara de triángulo invertido: pómulos marcados, nariz recta y ancha, orejas algo abiertas, cejas bajas
    cara=[('head/head-invertedtriangular',.4),('cheek/l-cheek-bones-incr',.5),('cheek/r-cheek-bones-incr',.5),('nose/nose-greek-incr',.4),('nose/nose-width2-incr',.2),('eyebrows/eyebrows-trans-down',.3),('chin/chin-jaw-drop-incr',.2),('ears/l-ear-wing-incr',.3),('ears/r-ear-wing-incr',.3)],
-   pelo=dict(color='#0f0c0a', peinado='corto', barba=0.),
-   uniforme=dict(malla='#e26a1b', vivo='#15151a', rodillera='#15151a', rodillera2='#e26a1b', cinturon=None, zapatillas=('#17171c','#e8e6df','#e26a1b','#3a3a40')),
+   pelo=dict(color='#0f0c0a', peinado='corto', largo=.019, barba=0.),
+   uniforme=dict(malla='#e26a1b', panel='#1b1b21', vivo='#f1ede2', rodillera='#15151a', rodillera2='#e26a1b', cinturon='#2b1d14', zapatillas=('#efeee9','#d9d5ca','#e26a1b','#8a5f36')),
    juego=dict(color='#f29a4a', bandera='linear-gradient(135deg,#15151a 0 50%,#e26a1b 50%)', dorsal=16, kg=dict(s=138, c=170))),
  'jastrev': dict(nombre='Borko Jastrev', pais='Veldania', codigo='VLD', genero='M', categoria='+110', estatura=1.86, masa=146,
    musculo=1.0, grasa=.72, prop=dict(brazo=.326),     # brazos largos
@@ -95,7 +95,7 @@ PESISTAS = {
    # cabeza redonda y cuadrada: mandíbula muy ancha, nariz ancha y corta, mejillas llenas, cejas caídas
    cara=[('head/head-round',.45),('head/head-square',.3),('chin/chin-width-incr',.6),('nose/nose-width2-incr',.5),('nose/nose-scale-vert-decr',.2),('cheek/l-cheek-volume-incr',.5),('cheek/r-cheek-volume-incr',.5),('eyebrows/eyebrows-angle-down',.2)],
    pelo=dict(color='#3b2a1c', peinado='rapado', barba=.85),
-   uniforme=dict(malla='#17171c', vivo='#d7263d', rodillera='#d7263d', rodillera2='#17171c', cinturon='#1a1a1e', zapatillas=('#eeede8','#d6d2c6','#d7263d','#7a5a3a')),
+   uniforme=dict(malla='#17171c', panel='#a81d2f', vivo='#efece4', rodillera='#d7263d', rodillera2='#17171c', cinturon='#1a1a1e', zapatillas=('#eeede8','#d6d2c6','#d7263d','#7a5a3a')),
    juego=dict(color='#e5565f', bandera='linear-gradient(180deg,#17171c 0 40%,#d7263d 40% 60%,#f1efe9 60%)', dorsal=45, kg=dict(s=196, c=240))),
 }
 NUEVOS = [k for k, v in PESISTAS.items() if not v.get('legado')]
@@ -185,12 +185,12 @@ def sty(k):
     if p.get('legado'): return dict(_LEGADO_STY[k], genero=p['genero'])
     F = p['genero'] == 'F'; g = p.get('grasa', .2); mu = p.get('musculo', 1.0 if not F else .85)
     h = dict(color='#17120f', peinado='rodete' if F else 'corto', largo=None, barba=0. if F else .2, entradas=None, degrade=None); h.update(p.get('pelo', {}))
-    u = dict(malla='#444444', vivo='#f0f0f0', rodillera='#151518', rodillera2='#2a2a30', cinturon=None, zapatillas=('#f2f1ec', '#d8d4c8', '#444444', '#9a6b3c')); u.update(p.get('uniforme', {}))
+    u = dict(malla='#444444', panel=None, vivo='#f0f0f0', rodillera='#151518', rodillera2='#2a2a30', cinturon=None, zapatillas=('#f2f1ec', '#d8d4c8', '#444444', '#9a6b3c')); u.update(p.get('uniforme', {}))
     rod = h['peinado'] in ('rodete', 'rodete_alto')
     largo = h['largo'] if h['largo'] is not None else dict(corto=.015, rapado=.0022, rodete=.0013, rodete_alto=.0013)[h['peinado']]
     S = dict(H=p['estatura'], genero=p['genero'], skin=_hex(p.get('piel', 'media')), suit=u['malla'], trim=u['vivo'], sleeve=u['rodillera'], sleeve2=u['rodillera2'],
              code=p['codigo'], name=p['nombre'].split()[-1].upper(), hair=h['color'], hairlen=largo, beard=h['barba'], tattoo=bool(p.get('tatuaje')),
-             shoe=tuple(u['zapatillas']), belt=u['cinturon'], iris=p.get('ojos', '#5a3d24'), peinado=h['peinado'],
+             shoe=tuple(u['zapatillas']), belt=u['cinturon'], panel=u['panel'], iris=p.get('ojos', '#5a3d24'), peinado=h['peinado'],
              # nacimiento del pelo: entradas en las sienes (hombre) y degradé de los costados (corte corto); el pelo atado no lleva ninguno de los dos
              entradas=h['entradas'] if h['entradas'] is not None else (.015 if F else .09), degrade=h['degrade'] if h['degrade'] is not None else (0. if rod else (.6 if h['peinado'] == 'rapado' else 1.)),
              hairline=-.16 if F else -.05,     # el nacimiento baja de donde termina el grupo 'scalp' de la malla base (dejaba la frente enorme)

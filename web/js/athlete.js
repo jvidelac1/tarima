@@ -66,7 +66,7 @@ const SKIN_MASK = /* glsl */`
     vec3 tl = diffuseColor.rgb * mix( 0.8, uClothGain, smoothstep( 0.15, 0.6, ( mx - mn ) / max( mx, 1e-3 ) ) ); float lt = dot( tl, vec3( 0.2126, 0.7152, 0.0722 ) ); tl = max( vec3( 0.0 ), mix( vec3( lt ), tl, 1.25 ) );      // la tela bajo los focos: el tono AgX lava lo muy claro (la malla salía del color de la piel)
     diffuseColor.rgb = mix( diffuseColor.rgb, tl, gMask.g * step( 0.5, uMaskMode ) ); }
   // tela de color plano (el juego la usa para un pesista que comparte modelo): tapa lo que la textura trae horneado
-  diffuseColor.rgb = mix( diffuseColor.rgb, uClothFlat.rgb, uClothFlat.a * smoothstep( 0.5, 0.9, gMask.g ) * step( 0.5, uMaskMode ) );
+  diffuseColor.rgb = mix( diffuseColor.rgb, uClothFlat.rgb, uClothFlat.a * smoothstep( 0.3, 0.6, gMask.g ) * step( 0.5, uMaskMode ) );
   // bajo el pelo en capas (canal B) la piel toma el color del pelo: entre hebra y hebra no se ve cuero cabelludo claro
   diffuseColor.rgb = mix( diffuseColor.rgb, uHairColor, uHairMix * smoothstep( 0.25, 0.8, gMask.b ) * step( 0.5, uMaskMode ) );
 #endif
@@ -249,7 +249,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
       .replace('#include <normal_fragment_maps>', THREE.ShaderChunk.normal_fragment_maps.replaceAll('texture2D( normalMap, vNormalMapUv )', 'texture2D( normalMap, vNormalMapUv, uNormBias * gMask.r )') + '\n' + SKIN_DETAIL)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + SKIN_MATERIAL);
   };
-  m.customProgramCacheKey = () => 'tarima-skin-22';
+  m.customProgramCacheKey = () => 'tarima-skin-23';
   m.userData.skin = uniforms;
   return m;
 }
@@ -278,17 +278,30 @@ void RE_Direct_Hair( const in IncidentLight directLight, const in vec3 geometryP
  * alrededor de la cabeza) y una hebra opaca tapa las capas de abajo. El desplazamiento de polígono evita el z-fighting de
  * la capa interior contra el cuero cabelludo.
  */
-function hairMaterial(src) {
+/**
+ * Nacimiento del pelo y borde de la barba: las capas traen como segundo UV el del cuerpo (blender/geo.py, `UVCuero`) y se
+ * recortan con el canal B de la máscara, que es el nacimiento pintado (curvo, ralo, con entradas). Sin eso el borde de las
+ * capas es el de sus polígonos: un serrucho. Los modelos sin segundo UV quedan como antes (`uCuero` en 0).
+ */
+function conCuero(sh, U) {
+  Object.assign(sh.uniforms, U);
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n#ifndef USE_UV1\nattribute vec2 uv1;\n#endif\nvarying vec2 vCuero;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvCuero = uv1;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D tCuero; uniform float uCuero; varying vec2 vCuero;')
+    .replace('#include <alphatest_fragment>', 'if ( uCuero > 0.5 ) diffuseColor.a *= smoothstep( 0.3, 0.8, texture2D( tCuero, vCuero ).b );\n#include <alphatest_fragment>');
+}
+function hairMaterial(src, mask, uv1) {
+  const U = { tCuero: { value: mask || null }, uCuero: { value: mask && uv1 ? 1 : 0 } }; src.userData.cuero = U;
   src.transparent = true; src.depthWrite = false; src.alphaTest = .03; src.roughness = .85; src.metalness = 0; src.envMapIntensity = .12; src.side = THREE.FrontSide;
   src.polygonOffset = true; src.polygonOffsetFactor = -1; src.polygonOffsetUnits = -2;
   // Una capa vista de canto (en la silueta de la cabeza) es una película pareja del alfa medio de la textura: con brillo
   // especular se lee como un halo a 1–2 cm de la cabeza. Se desvanece con el ángulo de vista y el pelo queda casi sin brillo.
   src.onBeforeCompile = sh => {
+    conCuero(sh, U);
     sh.fragmentShader = sh.fragmentShader.replace('#include <alphatest_fragment>', 'diffuseColor.a *= smoothstep( 0.2, 0.62, abs( dot( normalize( vNormal ), normalize( vViewPosition ) ) ) );\n#include <alphatest_fragment>')
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.2; material.specularColorBlended *= 0.2;')
       .replace('#include <lights_physical_pars_fragment>', '#include <lights_physical_pars_fragment>\n' + HAIR_PARS);
   };
-  src.customProgramCacheKey = () => 'tarima-hair-4';
+  src.customProgramCacheKey = () => 'tarima-hair-5';
   return src;
 }
 /** Color medio (lineal) de las hebras opacas de la textura de pelo. */
@@ -327,7 +340,9 @@ function hairColor(tex, out) {
   return out;
 }
 function hairDepthMaterial(src) {
-  return new THREE.MeshBasicMaterial({ name: 'HairDepth', map: src.map, alphaTest: .45, colorWrite: false, depthWrite: true, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+  const m = new THREE.MeshBasicMaterial({ name: 'HairDepth', map: src.map, alphaTest: .45, colorWrite: false, depthWrite: true, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+  if (src.userData.cuero) { m.onBeforeCompile = sh => conCuero(sh, src.userData.cuero); m.customProgramCacheKey = () => 'tarima-hairdepth-2'; }
+  return m;
 }
 function lashMaterial(src) {
   src.transparent = true; src.depthWrite = false; src.alphaTest = .03; src.side = THREE.DoubleSide; src.opacity = .85; src.roughness = .7; src.envMapIntensity = .2;
@@ -399,7 +414,7 @@ export class Athlete {
         let m = src;
         if (src.name === 'Body') m = bodyMaterial(src, mask, aniso, detail, this.metersPerUv = metersPerUv(o.geometry));
         else if (src.name === 'Eyes') m = eyeMaterial(src);
-        else if (src.name === 'Hair') m = hairMaterial(src);
+        else if (src.name === 'Hair') m = hairMaterial(src, mask, !!o.geometry.attributes.uv1);
         else if (src.name === 'Lashes') m = lashMaterial(src);
         else { m.envMapIntensity = .8; if (m.normalMap) m.normalMap.anisotropy = aniso; }
         if (m !== src) src.dispose();
