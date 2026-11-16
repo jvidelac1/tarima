@@ -238,7 +238,7 @@ export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .
   barra: [.3, .45, -.16, .5], alto: [-.05, .3], atras: [.12, .26], agarre: .72, atrasMax: .75, suelta: [1, -.45, 9], sinCabeza: .6, foco: 1.6,
   resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003 }, temblor: .006,
   // «brazos de primera persona» (como el arma de un juego en primera persona): ver _povCam y _vm
-  vm: { bajo: [-.31, -.22], lejos: .6, rack: .42, alto: [.12, .5], cruce: [-.3, .2], codo: [-.55, .05], fuera: -.98, agarre: [.7, .82], toma: [.14, .3], sigue: 14 } };
+  vm: { bajo: [-.31, -.22], lejos: .6, rack: .42, alto: [.04, .5], cruce: [-.3, .2], codo: [-.55, .05], fuera: -.98, agarre: [.7, .82], toma: [.14, .3], sigue: 14 } };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
 
@@ -587,16 +587,16 @@ export class Escena {
       if (g?.tipo === 'festejo' && g.w > 0) {
         // dos puños al frente, a la altura de los hombros, que marcan dos veces
         const golpe = quieto ? 0 : Math.max(0, Math.sin((g.t - GESTO.festejo.sube) * Math.PI * 2 * 2.2)) * (g.t > GESTO.festejo.sube && g.t < GESTO.festejo.sube + .95 ? 1 : 0);
-        this._apuntarHueso(a, L + 'Arm', L + 'ForeArm', _pe.set(sx * .3, -.72 + .1 * golpe, .5).normalize(), g.w);
-        this._apuntarHueso(a, L + 'ForeArm', L + 'Hand', _pf.set(-sx * .12, .82 - .5 * golpe, .42 + .3 * golpe).normalize(), g.w);
+        this._apuntarHueso(a, L + 'Arm', L + 'ForeArm', _pe.set(sx * .42, -.4 + .12 * golpe, .6).normalize(), g.w);
+        this._apuntarHueso(a, L + 'ForeArm', L + 'Hand', _pf.set(-sx * .1, .93 - .45 * golpe, .25 + .35 * golpe).normalize(), g.w);
         a.dedosDe?.(L, g.dedos, g.w);
       }
     }
     if (g?.tipo === 'festejo' && g.w > 0) { for (const k of ['Spine1', 'Spine2']) this._girarHueso(a, k, _pa.set(1, 0, 0), -.035 * g.w); this._girarHueso(a, 'Head', _pa.set(1, 0, 0), -.1 * g.w); }
     if (g?.tipo === 'bronca' && g.w > 0) {
       // la cabeza cae, los hombros se vencen y niega con la cabeza (dos veces, cada vez menos)
-      for (const k of ['Spine1', 'Spine2']) this._girarHueso(a, k, _pa.set(1, 0, 0), .07 * g.w);
-      this._girarHueso(a, 'Neck', _pa.set(1, 0, 0), .2 * g.w); this._girarHueso(a, 'Head', _pa.set(1, 0, 0), .24 * g.w);
+      for (const k of ['Spine1', 'Spine2']) this._girarHueso(a, k, _pa.set(1, 0, 0), .1 * g.w);
+      this._girarHueso(a, 'Neck', _pa.set(1, 0, 0), .28 * g.w); this._girarHueso(a, 'Head', _pa.set(1, 0, 0), .32 * g.w);
       if (!quieto) this._girarHueso(a, 'Head', _pa.set(0, 1, 0), .2 * g.w * Math.sin((g.t - .5) * Math.PI * 2 * .9) * Math.max(0, Math.min(1, (g.t - .5) / .2)) * Math.max(0, 1 - (g.t - .5) / 2.2));
     }
     a.root.updateMatrixWorld(true);
@@ -721,7 +721,7 @@ export class Escena {
       const yBajo = V.bajo[0] + (V.bajo[1] - V.bajo[0]) * Math.min(1, Math.max(0, (hy + 1.2) / .9)), zBajo = V.rack + (V.lejos - V.rack) * ext;
       // arriba solo con los brazos estirados: con el codo doblado (giro de codos, barra en los hombros, empuje) las manos se quedan
       // abajo, donde el codo cae fuera de la imagen; la barra pasa al cuarto de arriba cuando el brazo se estira
-      const k = sube * ext, Ty = (yBajo + (V.alto[0] - yBajo) * k) * kE, Tz = Math.max((zBajo + (V.alto[1] - zBajo) * k) * kE, medio / ((V.agarre[0] + (V.agarre[1] - V.agarre[0]) * k) * Math.max(.3, tH)));
+      const k = sube * paso(ext, .8, 1), Ty = (yBajo + (V.alto[0] - yBajo) * k) * kE, Tz = Math.max((zBajo + (V.alto[1] - zBajo) * k) * kE, medio / ((V.agarre[0] + (V.agarre[1] - V.agarre[0]) * k) * Math.max(.3, tH)));
       S.Ty = sigue(S.Ty ?? Ty, Ty, V.sigue); S.Tz = sigue(S.Tz ?? Tz, Tz, V.sigue); S.ext = sigue(S.ext ?? ext, ext, V.sigue);
       let rot = Math.atan2(V.codo[0] * kE - S.Ty, V.codo[1] * kE - S.Tz) - Math.atan2(el.y - hm.y, el.z - hm.z); rot -= Math.round(rot / (2 * Math.PI)) * 2 * Math.PI;
       // el corte del cuerpo propio (el hombro con el brazo estirado; el codo si no) tiene que quedar fuera de la imagen, por debajo de
