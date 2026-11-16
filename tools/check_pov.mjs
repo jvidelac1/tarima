@@ -118,6 +118,9 @@ if (!SOLO || SOLO === 'pov') {
       for (let s = 0; s <= n; s += 5) { await J(o => window.JUEGO.test.posa(o), { id, lev, seg, s, camara: 'pov', dt: .5, dibujar: false }); const m = await J(o => window.JUEGO.test.posa(o), { id, lev, seg, s, camara: 'pov', dt: .5 }); const b = await toma(); lista.push({ t: `${seg} ${s} · ${G(m.cam.inc).toFixed(0)}°`, b }); if (b.length < 9000) problemas.push(`${id} ${seg} ${s}: la imagen en primera persona salió vacía (${b.length} bytes)`); if (!m.pov || !m.sinCabeza) problemas.push(`${id} ${seg} ${s}: la primera persona no quedó puesta o la cabeza propia se dibuja`); }
       await hoja(`pov_${id}_${seg}`, lista, 5, 384);
       // seguido, a 60 c/s y un segundo de clip por fase: cuánto se mueve y gira la cámara
+      // con el reloj del juego detenido: si no, el bucle del juego mueve la cámara por su cuenta entre una muestra y la otra
+      // (cuadros de más, en tiempo real) y la medida sale más alta que el movimiento de verdad, y distinta en cada corrida
+      await J(() => window.JUEGO.test.manual());
       let ant = null, vMax = 0, wMax = 0, aMax = 0, vAnt = 0, incMin = 9, incMax = -9, lejos = 0;
       for (let k = 0; k <= n * 6; k++) {
         const s = k / 6, m = await J(o => window.JUEGO.test.posa(o), { id, lev, seg, s, camara: 'pov', dt: 1 / 60, dibujar: false });
@@ -129,6 +132,7 @@ if (!SOLO || SOLO === 'pov') {
         }
         ant = m;
       }
+      await J(() => window.JUEGO.test.real());
       console.log(`${id.padEnd(8)} ${seg.padEnd(7)} cámara: hasta ${vMax.toFixed(2)} m/s y ${aMax.toFixed(0)} m/s² · mirada entre ${G(incMin).toFixed(0)}° y ${G(incMax).toFixed(0)}°, gira hasta ${G(wMax).toFixed(0)} °/s · a lo sumo a ${(lejos * 100).toFixed(0)} cm del hueso de la cabeza`);
       // reglas: la mirada no gira más de 160 °/s (sigue a la barra, con tope de 150) y la cámara no se aleja más de 60 cm de la cabeza (retrocede con la barra arriba)
       if (G(wMax) > 160) problemas.push(`${id} ${seg}: la mirada gira a ${G(wMax).toFixed(0)} °/s`);
