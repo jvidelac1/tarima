@@ -169,7 +169,7 @@ def cfg(k):
     # grupos musculares (peso del target de MPFB). La mujer: piernas y glúteos de pesista, tren superior con menos volumen, sin pectoral ni cuello de toro.
     # Con grasa, el volumen del tren superior lo pone la grasa y no el músculo marcado (si no, el pesado sale con hombros y cuello de culturista).
     if F: musc = dict(pierna=.95 * mu, gemelo=.5 * mu, hombro=.70 * mu * (1 - .4 * g), brazo=.45 * mu, antebrazo=.65 * mu, pectoral=0, dorsal=.75 * mu * (1 - .4 * g), abdomen=.5 * (1 - g), cuello=.25 * mu)
-    else: musc = dict(pierna=1.0 * mu, gemelo=.6 * mu, hombro=1.0 * mu * (1 - .85 * g), brazo=.85 * mu * (1 - .6 * g), antebrazo=1.0 * mu, pectoral=.85 * mu * (1 - .4 * g), dorsal=1.0 * mu * (1 - .35 * g), abdomen=.5 * (1 - g), cuello=.7 * mu * (1 - .5 * g))
+    else: musc = dict(pierna=1.0 * mu, gemelo=.6 * mu, hombro=1.0 * mu * (1 - .85 * g), brazo=.85 * mu * (1 - .6 * g), antebrazo=1.0 * mu, pectoral=.4 * mu * (1 - .4 * g), dorsal=1.0 * mu * (1 - .35 * g), abdomen=.5 * (1 - g), cuello=.7 * mu * (1 - .5 * g))
     extra = [('torso/torso-vshape-incr', (.10 if F else .45) * _clip(1 - 1.3 * g, 0, 1)), ('buttocks/buttocks-volume-incr', _clip(gluteos, 0, 1)),
              ('hip/hip-scale-horiz-' + ('incr' if cadera >= 0 else 'decr'), _clip(abs(cadera), 0, 1)),
              ('torso/measure-waist-circ-incr', _clip(cintura, 0, 1)), ('arms/measure-upperarm-circ-decr', _clip(.7 * g, 0, 1)),
@@ -217,7 +217,7 @@ def sty(k):
              esclera=.78, labio=_labio(_hex(p.get('piel', 'media')), F), labio_borde=(.5, .95), delineado=.3, sweat=.55,
              # definición: venas y surcos se apagan con la grasa; la mujer, relieve más suave
              veins=_clip((.25 if F else .8) * (1 - g), 0, 1), cut=_clip((.55 if F else 1.) * (1 - .85 * g) * (.5 + .5 * mu), .05, 1.2), folds=1. if not F else .6,
-             anat=dict(masa=_clip((.6 if F else 1.) * (1 - .5 * g), 0, 1), pec=0. if F else _clip(1 - .6 * g, 0, 1), abd=_clip((.5 if F else 1.) * (1 - 1.6 * g), 0, 1),
+             anat=dict(masa=_clip((.6 if F else 1.) * (1 - .5 * g), 0, 1), pec=0. if F else _clip(.45 * (1 - .6 * g), 0, 1), abd=_clip((.5 if F else 1.) * (1 - 1.6 * g), 0, 1),
                        # físico de pesista: espalda (dorsal y erectores), trapecio y antebrazo con más masa que la media
                        espalda=1.9 * mu, trap=1.7 * mu, antebrazo=1.6 * mu),
              # pelo corto con volumen: mechones de largo desparejo y más capas; el pelo atado va liso
@@ -225,7 +225,7 @@ def sty(k):
              # corte de la malla: escote (ancho, alto) y sisa (borde interno, alto), en m para 1,69 m. La malla femenina sube el escote y cierra la sisa.
              # barra reglamentaria: hombres 20 kg y 28 mm de diámetro; mujeres 15 kg y 25 mm (cambia el agarre: la mano chica cierra el hook)
              rbar=.0125 if F else .014, barkg=15 if F else 20,
-             escote=(.078, .125) if F else (.085, .19), sisa=(.112, .15) if F else (.118, .2 - .06 * g))     # con grasa la sisa del hombre sube: baja dejaba el costado del pesado desnudo
+             escote=(.078, .125) if F else (.082, .14), sisa=(.112, .15) if F else (.118, .2 - .06 * g))     # con grasa la sisa del hombre sube: baja dejaba el costado del pesado desnudo
     if rod:
         # moño: dirección desde el centro de la cabeza (X lateral, +Y atrás, +Z arriba) y radio en m para 1,69 m
         a = math.radians(62 if h['peinado'] == 'rodete_alto' else 18); S['bun'] = dict(dir=(0., math.cos(a), math.sin(a)), r=.043 if h['peinado'] == 'rodete_alto' else .046)
