@@ -103,7 +103,7 @@ PESISTAS = {
    rasgos=(.0, .4, .6), piel='trigueña', ojos='#33261a',
    # cara larga de mentón marcado y pómulos altos, nariz angosta con caballete, mejillas secas, cejas bajas (distinta de la del pesado)
    cara=[('head/head-rectangular',.45),('chin/chin-prominent-incr',.35),('chin/chin-bones-incr',.4),('cheek/l-cheek-bones-incr',.5),('cheek/r-cheek-bones-incr',.5),('cheek/l-cheek-volume-decr',.35),('cheek/r-cheek-volume-decr',.35),('nose/nose-hump-incr',.3),('nose/nose-width2-decr',.25),('eyebrows/eyebrows-trans-down',.45)],
-   pelo=dict(color='#14100d', peinado='corto', largo=.022, barba=.5),
+   pelo=dict(color='#14100d', peinado='corto', largo=.022, barba=.62),
    uniforme=dict(malla='#ece8dd', panel='#0f5a66', vivo='#12181c', rodillera='#14171a', rodillera2='#0f5a66', cinturon='#2a1d15', zapatillas=('#efeee9','#d9d5ca','#0f5a66','#8a5f36')),
    juego=dict(color='#2fb3c4', bandera='linear-gradient(90deg,#0f5a66 0 30%,#ece8dd 30% 70%,#12181c 70%)', dorsal=9, kg=dict(s=178, c=216))),
 }

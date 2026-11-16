@@ -283,11 +283,11 @@ void RE_Direct_Hair( const in IncidentLight directLight, const in vec3 geometryP
  * recortan con el canal B de la máscara, que es el nacimiento pintado (curvo, ralo, con entradas). Sin eso el borde de las
  * capas es el de sus polígonos: un serrucho. Los modelos sin segundo UV quedan como antes (`uCuero` en 0).
  */
-function conCuero(sh, U) {
+function conCuero(sh, U, lo = '0.5', hi = '0.92') {
   Object.assign(sh.uniforms, U);
   sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n#ifndef USE_UV1\nattribute vec2 uv1;\n#endif\nvarying vec2 vCuero;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvCuero = uv1;');
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D tCuero; uniform float uCuero; varying vec2 vCuero;')
-    .replace('#include <alphatest_fragment>', 'if ( uCuero > 0.5 ) diffuseColor.a = min( 1.0, diffuseColor.a * 1.5 ) * smoothstep( 0.5, 0.92, texture2D( tCuero, vCuero, 2.5 ).b );\n#include <alphatest_fragment>');
+    .replace('#include <alphatest_fragment>', 'if ( uCuero > 0.5 ) diffuseColor.a = min( 1.0, diffuseColor.a * 1.5 ) * smoothstep( ' + lo + ', ' + hi + ', texture2D( tCuero, vCuero, 2.5 ).b );\n#include <alphatest_fragment>');
 }
 function hairMaterial(src, mask, uv1) {
   const U = { tCuero: { value: mask || null }, uCuero: { value: mask && uv1 ? 1 : 0 } }; src.userData.cuero = U;
@@ -344,8 +344,8 @@ function capMaterial(src, mask, uv1) {
   const U = { tCuero: { value: mask || null }, uCuero: { value: mask && uv1 ? 1 : 0 } }; if (U.uCuero.value) src.alphaTest = .5;      // el borde del casco lo corta el nacimiento pintado (máscara, canal B)
   src.roughness = Math.max(src.roughness ?? .8, .78); src.metalness = 0; src.envMapIntensity = .1; src.side = THREE.FrontSide;
   if (src.normalMap) src.normalScale.set(.8, .8);
-  src.onBeforeCompile = sh => { conCuero(sh, U); sh.fragmentShader = sh.fragmentShader.replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.45; material.specularColorBlended *= 0.45; material.specularF90 *= 0.5;'); };
-  src.customProgramCacheKey = () => 'tarima-pelo-2';
+  src.onBeforeCompile = sh => { conCuero(sh, U, '0.2', '0.44'); sh.fragmentShader = sh.fragmentShader.replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.45; material.specularColorBlended *= 0.45; material.specularF90 *= 0.5;'); };
+  src.customProgramCacheKey = () => 'tarima-pelo-3';
   return src;
 }
 function hairDepthMaterial(src) {
