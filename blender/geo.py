@@ -303,13 +303,14 @@ def hair_cap(b,OUT,mat,LM,K):
     crestab=1-.30*sm(.45,1.,gb)+.12*np.sin(np.floor(laneb)*7.31)
     h=ln[U]*(cresta*onda*(1-barba)+crestab*barba)+.0008
     atras=np.array([0,1.,-.15]); pos=co[U]+no[U]*h[:,None]+atras[None,:]*(h*.22*(1-barba))[:,None]
-    bm=bmesh.new(); uv=bm.loops.layers.uv.new('UVMap'); vs=[bm.verts.new(q) for q in pos]
-    uu=np.where(barba>.5,-co[U,2]*9.,(.5*np.pi-el)*.55)+.07*np.sin(idl*5.1); vv=np.where(barba>.5,laneb/46*6,lane/NG*5)
+    bm=bmesh.new(); uv=bm.loops.layers.uv.new('UVMap'); uv2=bm.loops.layers.uv.new('UVCuero'); vs=[bm.verts.new(q) for q in pos]
+    LU=np.empty(len(me.loops)*2); me.uv_layers.active.data.foreach_get('uv',LU); LU=LU.reshape(-1,2)     # UV del cuerpo: el visor recorta el borde del casco con el nacimiento pintado (curva suave, no el serrucho de los polígonos)
+    uu=np.where(barba>.5,-co[U,2]*8.,(.5*np.pi-el)*.55+.07*np.sin(idl*5.1)); vv=np.where(barba>.5,az*3.,lane/NG*5)     # barba: hebras hacia abajo, sin torcer (torcidas se leían veta de madera)
     for p in sel:
         fc=bm.faces.new([vs[ix[v_]] for v_ in p.vertices]); fc.smooth=True
         ii=[ix[v_] for v_ in p.vertices]; v0=vv[ii[0]]
-        for lp,i in zip(fc.loops,ii):
-            vvi=vv[i]
+        for lp,i,li in zip(fc.loops,ii,p.loop_indices):
+            lp[uv2].uv=(float(LU[li][0]),float(LU[li][1])); vvi=vv[i]
             if abs(vvi-v0)>2.5: vvi=v0      # la costura del ángulo (±pi) no estira la textura a lo ancho de una cara
             lp[uv].uv=(float(uu[i]),float(vvi))
     m=bpy.data.meshes.new('Pelo'); bm.to_mesh(m); bm.free(); o=bpy.data.objects.new('Pelo',m); bpy.context.scene.collection.objects.link(o); m.materials.append(mat)

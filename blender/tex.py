@@ -386,7 +386,7 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     rough+=lp*.10; lipH=-lp*.00016*(1-np.abs(2*T.nq((x*520,z*60),97)))**2
     skinm=np.clip(skinm-np.maximum(hairm,browm*.5),0,1)
     # largo del pelo para las capas de volumen de finish.py (geo.hair_shells): 255 = 20 mm
-    hlen=np.maximum.reduce([(0. if STY.get('peinado')=='rapado' else 1.)*np.clip(al_,0,1)*sm(.5,.92,hm)*STY.get('hairlen',.010)*dfade(.70)*(1+s1*.5)*(np.clip(1+STY['mechones']*1.6*T.n3(55,98,2),.35,1.9) if STY.get('mechones') else 1.),beard*(.003+.008*STY['beard'])*(STY['beard']>.35)])
+    hlen=np.maximum.reduce([(0. if STY.get('peinado')=='rapado' else 1.)*np.clip(al_,0,1)*sm(.2,.8,hm)*STY.get('hairlen',.010)*dfade(.70)*(1+s1*.5)*(np.clip(1+STY['mechones']*1.6*T.n3(55,98,2),.35,1.9) if STY.get('mechones') else 1.),beard*(.003+.008*STY['beard'])*(STY['beard']>.35)])
     Image.fromarray((np.clip(hlen/.02,0,1)*cov*255+.5).astype(np.uint8)[::-1]).resize((2048,2048),Image.BILINEAR).save(OUT+'hair_len.png')   # con barba rala (<0,35) la barba queda solo en la textura
     # ================= TIZA (magnesio) =================
     cn=np.clip(.5+T.n3(55,100,3)*2.6,0,1); cf=np.clip(.5+T.n3(700,101,2)*3,0,1); chalk=np.zeros((R,R),f32)

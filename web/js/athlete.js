@@ -340,11 +340,12 @@ function hairColor(tex, out) {
   return out;
 }
 /** Pelo y barba como malla opaca con volumen (plantel nuevo, blender/geo.py `hair_cap`): mate, casi sin reflejo del ambiente; la forma la dan los gajos de la malla y la luz de contorno. */
-function capMaterial(src) {
+function capMaterial(src, mask, uv1) {
+  const U = { tCuero: { value: mask || null }, uCuero: { value: mask && uv1 ? 1 : 0 } }; if (U.uCuero.value) src.alphaTest = .5;      // el borde del casco lo corta el nacimiento pintado (máscara, canal B)
   src.roughness = Math.max(src.roughness ?? .8, .78); src.metalness = 0; src.envMapIntensity = .1; src.side = THREE.FrontSide;
   if (src.normalMap) src.normalScale.set(.8, .8);
-  src.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.45; material.specularColorBlended *= 0.45; material.specularF90 *= 0.5;'); };
-  src.customProgramCacheKey = () => 'tarima-pelo-1';
+  src.onBeforeCompile = sh => { conCuero(sh, U); sh.fragmentShader = sh.fragmentShader.replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.45; material.specularColorBlended *= 0.45; material.specularF90 *= 0.5;'); };
+  src.customProgramCacheKey = () => 'tarima-pelo-2';
   return src;
 }
 function hairDepthMaterial(src) {
@@ -422,7 +423,7 @@ export class Athlete {
         let m = src;
         if (src.name === 'Body') m = bodyMaterial(src, mask, aniso, detail, this.metersPerUv = metersPerUv(o.geometry));
         else if (src.name === 'Eyes') m = eyeMaterial(src);
-        else if (src.name === 'Hair') m = src.transparent ? hairMaterial(src, mask, !!o.geometry.attributes.uv1) : capMaterial(src);
+        else if (src.name === 'Hair') m = src.transparent ? hairMaterial(src, mask, !!o.geometry.attributes.uv1) : capMaterial(src, mask, !!o.geometry.attributes.uv1);
         else if (src.name === 'Lashes') m = lashMaterial(src);
         else { m.envMapIntensity = .8; if (m.normalMap) m.normalMap.anisotropy = aniso; }
         if (m !== src) src.dispose();
