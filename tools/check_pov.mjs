@@ -130,9 +130,9 @@ if (!SOLO || SOLO === 'pov') {
         ant = m;
       }
       console.log(`${id.padEnd(8)} ${seg.padEnd(7)} cámara: hasta ${vMax.toFixed(2)} m/s y ${aMax.toFixed(0)} m/s² · mirada entre ${G(incMin).toFixed(0)}° y ${G(incMax).toFixed(0)}°, gira hasta ${G(wMax).toFixed(0)} °/s · a lo sumo a ${(lejos * 100).toFixed(0)} cm del hueso de la cabeza`);
-      // reglas: la mirada no gira más de 120 °/s (no marea) y la cámara no se aleja más de 35 cm de la cabeza (se vería el cuerpo sin cabeza)
-      if (G(wMax) > 120) problemas.push(`${id} ${seg}: la mirada gira a ${G(wMax).toFixed(0)} °/s`);
-      if (lejos > .35) problemas.push(`${id} ${seg}: la cámara queda a ${(lejos * 100).toFixed(0)} cm de la cabeza`);
+      // reglas: la mirada no gira más de 200 °/s (sigue a la barra) y la cámara no se aleja más de 60 cm de la cabeza (retrocede con la barra arriba)
+      if (G(wMax) > 200) problemas.push(`${id} ${seg}: la mirada gira a ${G(wMax).toFixed(0)} °/s`);
+      if (lejos > .6) problemas.push(`${id} ${seg}: la cámara queda a ${(lejos * 100).toFixed(0)} cm de la cabeza`);
     }
   }
   // fotos grandes de las fases clave (Ventura y Brenner) y en un teléfono acostado

@@ -209,22 +209,26 @@ export const PLANOS = {
  * filtro corto, y la mirada es sintética: siempre al frente (sin guiñada ni balanceo), con una inclinación que sigue a la
  * barra a medias y despacio. Reglas, iguales para cualquier biotipo y cualquier fase:
  * - ojo = cabeza + `arriba` m a lo largo del cuello + `adelante` m hacia el frente del tronco (por metro de estatura / 1,7).
- * - inclinación de la mirada, hacia un destino que llega con retardo (`giro` por segundo):
- *   · mientras la barra está por debajo del mentón (más de `bajo[1]` m bajo los ojos), se la sigue: queda `margen` rad por
- *     debajo del centro de la imagen, con las manos (hasta `abajo` rad, casi a plomo: en la salida la barra queda debajo de
- *     los ojos). Se ven el agarre, las rodillas y la barra que sube pegada al cuerpo; la barrita de timing queda debajo.
- *   · cuando la barra llega a la cara (a menos de `bajo[0]` m bajo los ojos: el final del tirón, la barra en los hombros),
- *     la mirada va al frente (`frente` rad, un poco hacia abajo): jueces y público, y los antebrazos en el borde de abajo.
- *   · con la barra suelta (después del intento: cae, rebota y rueda), también al frente: se la ve caer por delante y
- *     quedan a la vista los árbitros con sus paletas y la tribuna.
- *   · con la barra por encima de los ojos, apenas hacia arriba (hasta `tope` rad): la barra queda fuera de cuadro, como en
- *     la realidad, y se ven el jurado y la tribuna.
+ * - LA BARRA Y LAS MANOS SE VEN SIEMPRE (pedido del dueño). La mirada apunta a la barra con un corrimiento, y llega con
+ *   retardo (`giro` por segundo); entre `abajo` y `tope` rad:
+ *   · barra bien abajo de los ojos (más de `bajo[1]` m: el agarre y el tirón): queda `margen` rad por debajo del centro de
+ *     la imagen (hasta casi a plomo: en la salida la barra queda debajo de los ojos). Se ven las manos, las rodillas y la
+ *     barra que sube pegada al cuerpo; la barrita de timing queda debajo.
+ *   · barra cerca de la cara y por debajo (menos de `bajo[0]` m: en los hombros): queda `hombros` rad por debajo del centro:
+ *     abajo la barra y las manos, arriba los jueces y el público.
+ *   · barra por encima de los ojos (más de `alto[1]` m: recepción del arranque, envión arriba): queda `encima` rad por
+ *     encima del centro: arriba la barra con las manos y los brazos, abajo la tribuna.
+ *   · con la barra cerca de la cabeza la cámara retrocede: `atras[0]` m con la barra en los hombros y `atras[0] + atras[1]`
+ *     con la barra arriba. Es la licencia de esta vista: desde los ojos de verdad la barra en los hombros queda bajo el
+ *     mentón y la de arriba, detrás de la frente, y no entrarían en ninguna imagen que mire al frente.
+ *   · con la barra suelta (después del intento: cae, rebota y rueda), a medias: `suelta[0]` del ángulo hacia la barra, sin
+ *     bajar de `suelta[1]` rad: se la ve caer y rebotar en la parte de abajo y arriba quedan los árbitros con sus paletas.
  * - lente: `fov` grados de alto, o lo que dé `fovAncho` de ancho en pantallas muy anchas; el acercamiento de la barrita lo cierra un poco.
  * - respiración (sube y baja unos milímetros y cabecea unas décimas de grado) y temblor del esfuerzo: nada con movimiento reducido.
- * - la cabeza propia no se dibuja mientras la cámara esté a menos de `sinCabeza` m de los ojos (el hueso de la cabeza se
+ * - la cabeza propia no se dibuja en esta vista ni mientras la cámara esté a menos de `sinCabeza` m de los ojos (el hueso de la cabeza se
  *   achica a un punto: cara, pelo, ojos y pestañas van pesados a él). La sombra sale sin cabeza: cae detrás del pesista.
  */
-export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 4.5, margen: .17, abajo: -1.53, frente: -.21, tope: .14, bajo: [.12, .42], sinCabeza: .35, foco: 1.6,
+export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 4.5, margen: .17, hombros: .38, encima: .5, abajo: -1.53, frente: -.21, tope: .6, bajo: [.12, .42], alto: [-.05, .3], atras: [.12, .26], suelta: [.6, -.7], sinCabeza: .35, foco: 1.6,
   resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003 }, temblor: .006 };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
@@ -620,12 +624,14 @@ export class Escena {
   /** La cámara en primera persona de este cuadro (la llama el rig en lugar de su encuadre). */
   _povCam(cam, dt) {
     const S = this.pov, R = this.rig, o = this.ojos(_pd), quieto = this.reduceMotion; S.t += dt;
+    const b = this.barbell.group.position, paso = (x, a, c) => { const t = Math.min(1, Math.max(0, (x - a) / (c - a))); return t * t * (3 - 2 * t); };
+    // cuánto está la barra lejos por debajo (1) o cerca de la cara (0), y cuánto por encima de los ojos (0 a 1); con eso, el retroceso
+    const dy0 = b.y - o.y, lejos = paso(-dy0, POV.bajo[0], POV.bajo[1]), arriba = paso(dy0, POV.alto[0], POV.alto[1]);
+    if (!this._suelta) o.z -= POV.atras[0] * (1 - lejos) + POV.atras[1] * arriba;
     if (S.nueva) S.p.copy(o); else S.p.lerp(o, 1 - Math.exp(-POV.sigue * dt));
-    // inclinación de la mirada (reglas de POV): sigue a la barra mientras está abajo; al frente cuando llega a la cara o va suelta; apenas arriba si está por encima
-    const b = this.barbell.group.position, dy = b.y - S.p.y, dz = b.z - S.p.z, paso = (x, a, c) => { const t = Math.min(1, Math.max(0, (x - a) / (c - a))); return t * t * (3 - 2 * t); };
-    const mirar = this._suelta ? 0 : paso(-dy, POV.bajo[0], POV.bajo[1]);
-    const alFrente = dy > 0 ? Math.min(POV.tope, POV.frente + (POV.tope - POV.frente) * paso(dy, 0, .35)) : POV.frente;
-    const incT = alFrente + (Math.max(POV.abajo, Math.min(alFrente, Math.atan2(dy, dz) + POV.margen)) - alFrente) * mirar;
+    // inclinación de la mirada (reglas de POV): a la barra, con el corrimiento que toca según dónde está
+    const dy = b.y - S.p.y, dz = b.z - S.p.z, hacia = Math.atan2(dy, dz), corr = POV.margen + (POV.hombros - POV.margen) * (1 - lejos) + (-POV.encima - POV.hombros) * arriba;
+    const incT = this._suelta ? Math.max(POV.suelta[1], Math.min(POV.frente, hacia * POV.suelta[0])) : Math.max(POV.abajo, Math.min(POV.tope, hacia + corr));
     S.inc = S.nueva ? incT : S.inc + (incT - S.inc) * (1 - Math.exp(-(quieto ? 60 : POV.giro) * dt)); S.nueva = false;
     let inc = S.inc, bal = 0, y = 0;
     if (!quieto) {
@@ -640,7 +646,7 @@ export class Escena {
   }
   /** La cabeza propia no se dibuja con la cámara pegada a los ojos (ver POV): entrando o saliendo de la primera persona, tampoco. */
   _cabeza() {
-    const a = this.activo, cerca = !!a && a.root.visible && this.rig.camera.position.distanceTo(this.ojos(_pd)) < POV.sinCabeza, quien = cerca ? a : null;
+    const a = this.activo, cerca = !!a && a.root.visible && (!!this.pov || this.rig.camera.position.distanceTo(this.ojos(_pd)) < POV.sinCabeza), quien = cerca ? a : null;
     if (quien === this._sinCabeza) return;
     for (const [x, e] of [[this._sinCabeza, 1], [quien, 1e-4]]) { const h = x?._byName.get('Head'); if (h) { h.scale.setScalar(e); h.updateMatrixWorld(true); } }
     this._sinCabeza = quien; this.sombra = Math.max(this.sombra, 2);
