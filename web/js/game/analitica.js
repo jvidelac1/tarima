@@ -39,6 +39,8 @@ export const EVENTOS = new Set([
   'muro_camino', 'muro_resultado', 'siguio_jugando', 'anotar_respuesta', 'encuesta_error',
   // LIF-33: si se vio el pesista y por qué no
   'escena_visible', 'carga_fallida',
+  // orden de turnos (LIF-4): «Cambiar» el pedido en el turno de un rival
+  'pedido_cambiado',
 ]);
 
 export const BANDERAS = { 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio' };

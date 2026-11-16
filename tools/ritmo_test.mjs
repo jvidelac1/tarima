@@ -24,7 +24,10 @@
 // (RITMO.fundido). Dos espectadores: el que MIRA todo (informativo: sin meta de final ni de espera, pero ningún turno de rival
 // pasa de 12 s) y el que SALTA cada rival con el botón al segundo de empezar (`--reaccion`, 1 s): ese tiene que seguir
 // cumpliendo las metas de siempre (final mediana ≤ 150 s en Fácil, espera máxima ≤ 20 s).
-// Uso: node tools/ritmo_test.mjs [--semillas=60] [--panel=2.5] [--ctl=b|u] [--dif=facil,medio,dificil] [--reaccion=1] [--espectador=mira,salta]
+// Orden de los turnos (LIF-3, match.js → TURNOS): por defecto 'rondas', como el juego; --orden=oficial o --orden=viejo (sin
+// turnos: los registros de antes) para comparar. Informa además cuántos turnos de rivales seguidos ve el jugador entre dos
+// levantamientos propios (máximo y p90).
+// Uso: node tools/ritmo_test.mjs [--semillas=60] [--panel=2.5] [--ctl=b|u] [--dif=facil,medio,dificil] [--reaccion=1] [--espectador=mira,salta] [--orden=rondas|oficial|viejo]
 import { Partida } from '../web/js/sim/match.js';
 import { HUELLA_IA } from '../web/js/sim/ai.js';      // los rivales del juego (con personalidad)
 import { Intento, simular } from '../web/js/sim/attempt.js';
@@ -40,6 +43,7 @@ const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('
 const SEM = +(arg('semillas') || 60), PANEL = +(arg('panel') || 2.5), CTL = arg('ctl') || 'b';
 const JUGADORES = CTL === 'u' ? { novato: { ...BOTS_U.reactivo, lag: 60 }, ausente: BOTS_U.ausente } : { novato: PERFILES.novato, lento: { ...PERFILES.novato, reac: 9000 } };
 const jugar = (ctx, B, sem) => (CTL === 'b' ? jugarBarra(ctx, B, sem) : jugarUno(ctx, B, sem));
+const ORDEN = arg('orden') || 'rondas', TURNOS_CFG = ORDEN === 'viejo' ? {} : { turnos: ORDEN };
 const REACCION = +(arg('reaccion') || 1), ESPECTADORES = (arg('espectador') || 'mira,salta').split(',');
 const FUNDIDO = (RITMO.fundido.fuera + RITMO.fundido.dentro) / 1000, MAX_RIVAL = 12;
 const INFORMATIVO = (q, esp) => q === 'lento' || esp === 'mira';
@@ -58,28 +62,54 @@ function durFinal(res, mov) {
   const c = armarCaida(res, mov, { y, z: 0 }, .225); return c ? c.dur : 0;
 }
 
+/**
+ * Barras caídas con lo que trae el panel, en una muestra más grande (`--semillas-caidas`, 250 por defecto): con 60 semillas
+ * la cifra se mueve ±2 puntos según en qué orden salen los llamados (la semilla de cada intento depende de su número de
+ * llamado), y en Medio está a 1 punto de la meta. Solo juega los intentos (sin tiempos de pantalla). Una vez por nivel y jugador.
+ */
+const SEM_C = +(arg('semillas-caidas') || 250), CAIDAS = {};
+function caidasPanel(dif, B, D, R) {
+  const k0 = dif + JSON.stringify(B); if (CAIDAS[k0] !== undefined) return CAIDAS[k0];
+  let n = 0, x = 0;
+  for (const nivel of ['amistoso', 'normal']) for (const id of ATL) for (let k = 0; k < SEM_C; k++) {
+    const yo = ATL.indexOf(id), semilla = mezclar(k, 4242, yo, nivel === 'normal' ? 1 : 0), f = datos.atletas[id];
+    const p = new Partida(datos, { semilla, nivel, cal: 0, primera: false, ctl: CTL, tactil: true, ia: HUELLA_IA, envFijo: true, ...TURNOS_CFG, ...D, atletas: ATL.map((y, i) => ({ id: y, ctrl: i === yo ? 'persona' : 'juego' })) });
+    for (const lev of ['s', 'c']) { const [lo, hi] = p.rangoApertura(yo, lev); p.abrir(yo, lev, Math.max(lo, Math.min(hi, Math.round(f.techo[lev] * (CTL === 'b' ? R.apertura / 1000 : .9))))); }
+    p.empezar();
+    for (let g = 0; p.fase !== 'fin' && g < 80; g++) {
+      if (p.fase === 'intervalo') { p.empezar(); continue; }
+      const L = p.llamado; if (p.at[L.a].ctrl !== 'persona') { p.resolverIA(); continue; }
+      const kg = p.at[yo].cambios === 0 ? sugerencia(p, yo, L.lev) : null;
+      if (kg !== null && kg !== L.kg && !p.cambioValido(0, kg) && p.cambio(0, kg).desplazado) continue;
+      const env = L.lev === 'c' ? cuerpoDe(id).casa : undefined, ctx = p.contexto(env), S = jugar(ctx, B, mezclar(semilla, g));
+      p.resolver({ conf: S.conf, env, ent: S.ent }); n++; if (S.m.res.res !== 'valido') x++;
+    }
+  }
+  return (CAIDAS[k0] = x * 100 / n);
+}
+
 const mal = [], DIFS = CTL === 'b' ? (arg('dif') ? arg('dif').split(',') : DIFICULTADES) : ['facil'];
 // espera máxima: en Medio y Difícil el panel propone menos kilos y hay más turnos de rivales seguidos (21 s en lugar de 20)
 const META = { facil: { final: 150, s: 10, c: 15, caidas: 15, espera: 20 }, medio: { final: 165, s: 12, c: 16, caidas: 18, espera: 21 }, dificil: { final: 180, s: 14, c: 18, caidas: 25, espera: 21 } };
 for (const dif of DIFS) for (const esp of ESPECTADORES) for (const [quien, NOVATO] of Object.entries(JUGADORES)) {
 const R = reglasB(dif), MT = META[dif], D = CTL === 'b' && dif !== 'facil' ? { dif } : {};
-const peores = [], filas = [], decisivos = [], esperas = [], finales = [], rivalesNo = [], verOk = [], verMal = [], intS = [], intC = [], caidasPlan = { n: 0, caidas: 0 };
+const rachas = [], peores = [], filas = [], decisivos = [], esperas = [], finales = [], rivalesNo = [], verOk = [], verMal = [], intS = [], intC = [], caidasPlan = { n: 0, caidas: 0 };
 for (const nivel of ['amistoso', 'normal']) for (const id of ATL) for (let k = 0; k < SEM; k++) {
   const yo = ATL.indexOf(id), semilla = mezclar(k, 4242, yo, nivel === 'normal' ? 1 : 0);
-  const p = new Partida(datos, { semilla, nivel, cal: 0, primera: false, ctl: CTL, tactil: true, ia: HUELLA_IA, envFijo: true, ...D, atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
+  const p = new Partida(datos, { semilla, nivel, cal: 0, primera: false, ctl: CTL, tactil: true, ia: HUELLA_IA, envFijo: true, ...TURNOS_CFG, ...D, atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
   const f = datos.atletas[id];
   for (const lev of ['s', 'c']) { const [lo, hi] = p.rangoApertura(yo, lev); p.abrir(yo, lev, Math.max(lo, Math.min(hi, Math.round(f.techo[lev] * (CTL === 'b' ? R.apertura / 1000 : .9))))); }
   p.empezar();
-  let reloj = 0, espera = null, seguidos = 0, enteros = 0, ultimo = null; const mias = [];
+  let reloj = 0, espera = null, seguidos = 0, enteros = 0, ultimo = null, hay = false; const mias = [];
   const cierraEspera = () => { if (espera !== null) { esperas.push(reloj - espera); if (reloj - espera > 20) peores.push(`${(reloj - espera).toFixed(1)} s: ${traza.join(' + ')}`); espera = null; } traza = []; };
   let traza = [];
   for (let g = 0; p.fase !== 'fin' && g < 80; g++) {
-    if (p.fase === 'intervalo') { cierraEspera(); reloj += PANEL; p.empezar(); continue; }      // panel del intervalo (apertura del dos tiempos)
+    if (p.fase === 'intervalo') { cierraEspera(); reloj += PANEL; p.empezar(); hay = false; seguidos = 0; continue; }      // panel del intervalo (apertura del dos tiempos)
     const L = { ...p.llamado }, a = p.at[L.a];
     if (a.ctrl === 'persona') {
       if (ultimo !== null && ultimo !== yo) reloj += FUNDIDO;      // del rival al jugador, fundido corto
       ultimo = yo;
-      cierraEspera(); seguidos = 0; enteros = 0; reloj += PANEL;
+      if (hay) rachas.push(seguidos); hay = true; cierraEspera(); seguidos = 0; enteros = 0; reloj += PANEL;
       const kg = p.at[yo].cambios === 0 ? sugerencia(p, yo, L.lev) : null;
       if (kg !== null && kg !== L.kg && !p.cambioValido(0, kg) && p.cambio(0, kg).desplazado) { reloj += 1.8; continue; }      // desplazado: su cartel y sigue otro
       const env = L.lev === 'c' ? cuerpoDe(id).casa : undefined, ctx = p.contexto(env), S = jugar(ctx, NOVATO, mezclar(semilla, g)), res = S.m.res;
@@ -110,12 +140,14 @@ for (const nivel of ['amistoso', 'normal']) for (const id of ATL) for (let k = 0
 const s = x => x.toFixed(1);
 const mFinal = q(finales, .5), eMax = Math.max(...esperas), e90 = q(esperas, .9), e50 = q(esperas, .5), rMax = Math.max(...rivalesNo), vOk = Math.max(...verOk), vMal = Math.max(...verMal), pS = q(intS, .9), pC = q(intC, .9), caidas = caidasPlan.caidas * 100 / caidasPlan.n;
 console.log(`\n[${esp === 'salta' ? `salta cada rival con el botón a los ${REACCION} s` : 'mira cada rival entero'}] ${quien === 'novato' ? (CTL === 'b' ? 'Novato (±120 ms, primera o segunda pasada)' : 'Novato (toca, a veces no)') : quien === 'lento' ? 'Lento (espera a que el puntero vaya despacio: informativo)' : 'Ausente (no toca nunca)'} · ritmo de la final en '${CTL}'${CTL === 'b' ? ` (${dif})` : ''} · ${finales.length} finales (${SEM} semillas × 3 pesistas × rivales amistosos y normales) · panel ${PANEL} s por decisión`);
+console.log(`orden ${ORDEN} · turnos de rivales seguidos entre dos levantamientos propios: mediana ${q(rachas, .5)}, p90 ${q(rachas, .9)}, máximo ${Math.max(...rachas)}`);
 console.log(`final completa: mediana ${s(mFinal)} s, p90 ${s(q(finales, .9))} s, máxima ${s(Math.max(...finales))} s   meta mediana ≤ ${MT.final} s`);
 console.log(`espera sin tocar entre un levantamiento propio y el siguiente panel: mediana ${s(e50)} s, p90 ${s(e90)} s, máxima ${s(eMax)} s   meta ≤ 10 · ≤ 15 · ≤ ${MT.espera} s`);
 console.log(`turno de rival (con su fundido): mediana ${s(q(rivalesNo.concat(decisivos), .5))} s, p90 ${s(q(rivalesNo.concat(decisivos), .9))} s, máximo ${s(Math.max(rMax, ...decisivos))} s · decisivos (con repetición si caen): mediana ${s(q(decisivos, .5))} s, máximo ${s(Math.max(0, ...decisivos))} s · ${decisivos.length} de ${decisivos.length + rivalesNo.length} turnos   meta ≤ ${MAX_RIVAL} s`);
 console.log(`veredicto propio después de las luces: válido ${s(vOk)} s, caída ${verMal.length ? s(vMal) : '—'} s   meta válido ≤ 3 s en total, caída tVer + 2,4 s`);
 console.log(`intento propio: arranque p90 ${s(pS)} s · dos tiempos p90 ${s(pC)} s   meta ${quien === 'ausente' ? '≤ 9 · ≤ 14' : CTL === 'b' ? `≤ ${MT.s} · ≤ ${MT.c}` : '≤ 7 · ≤ 12'} s`);
-console.log(`con lo que trae el panel: ${s(caidas)} % de barras caídas   meta ≤ ${MT.caidas} %`);
+const caidasG = caidasPanel(dif, NOVATO, D, R);
+console.log(`con lo que trae el panel: ${s(caidasG)} % de barras caídas en ${SEM_C} semillas (${s(caidas)} % en estas ${SEM}: informativo)   meta ≤ ${MT.caidas} %`);
 if (peores.length) console.log(`esperas de más de 20 s (${peores.length}): ${peores.slice(0, 4).join(' · ')}`);
 if (mFinal > MT.final && !INFORMATIVO(quien, esp)) mal.push(`${dif} ${quien}: final: mediana ${s(mFinal)} s (meta ≤ ${MT.final})`);
 if ((eMax > MT.espera || e90 > 15 || e50 > 10) && !INFORMATIVO(quien, esp)) mal.push(`${dif} ${quien}: espera: mediana ${s(e50)}, p90 ${s(e90)}, máxima ${s(eMax)} s (meta ≤ 10 · ≤ 15 · ≤ ${MT.espera})`);
@@ -124,7 +156,7 @@ if (veredictoPropio(true).total > 3) mal.push(`el veredicto propio válido dura 
 // en 'b' el jugador elige cuándo tira (la barrita reemplaza a ¡TIRA! y ¡ARRIBA!, que salían solas a los 2 s): ≤ 10 · ≤ 15 s
 const [mS, mC] = quien === 'ausente' ? [9, 14] : CTL === 'b' ? [MT.s, MT.c] : [7, 12];      // 'b': + el esfuerzo de pararse en los exigentes      // quien no toca espera a que cada paso salga solo: un poco más largo, nunca trabado
 if ((pS > mS || pC > mC) && !INFORMATIVO(quien, esp)) mal.push(`${quien}: intento propio p90: arranque ${s(pS)} s, dos tiempos ${s(pC)} s (meta ≤ ${mS} · ≤ ${mC})`);
-if (caidas > MT.caidas && !INFORMATIVO(quien, esp)) mal.push(`${dif} ${quien}: con lo que trae el panel se caen el ${s(caidas)} % de las barras (meta ≤ ${MT.caidas} %)`);
+if (caidasG > MT.caidas && !INFORMATIVO(quien, esp)) mal.push(`${dif} ${quien}: con lo que trae el panel se caen el ${s(caidasG)} % de las barras en ${SEM_C} semillas (meta ≤ ${MT.caidas} %)`);
 if (verMal.length && Math.max(...verMal) > RITMO.propioFallo + .01) mal.push(`${quien}: el veredicto de una caída propia dura ${s(Math.max(...verMal))} s después de las luces (meta tVer + 2,4)`);
 }
 console.log(mal.length ? `\nFALLÓ:\n  ${mal.join('\n  ')}` : '\nOK: el ritmo de la final cumple el presupuesto de G2.7');

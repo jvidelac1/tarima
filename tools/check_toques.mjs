@@ -8,6 +8,7 @@
 //  4. Un toque largo (700 ms apretado) en ¡TIRA! cuenta como uno y, como sigue apoyado cuando abre ¡SALTA!, también la cumple.
 //  5. Un botón con el foco dentro del intento: Espacio es del levantamiento (el botón no se activa, la página no se mueve).
 //  6. Después de una pausa (Esc en el llamado, Esc para volver) el primer toque de ¡TIRA! funciona.
+//  8. En otro turno de un rival, «Cambiar» (LIF-4): C, «+» y «Pedir» suben el pedido propio dos kilos en el tablero.
 //  7. En el turno de un rival: el tablero dice «Ahora» en su fila, sin señal ni botón de levantar, y está el botón «Saltar»
 //     con su tecla (S). Espacio NO lo saltea (queda anotado «espera»); la tecla S sí (evento rival_salteado con via 'tecla').
 //  8. Acuse (meta I de G2.9): del timeStamp del keydown al cambio en pantalla (en el mismo manejador) y al cuadro siguiente.
@@ -65,14 +66,14 @@ const espacio = async (ms = 35) => { await page.keyboard.down('Space'); enviados
 const enter = async () => { await page.keyboard.press('Enter'); enviados++; };
 
 let propios = 0, pausaProbada = false, ultSalto = 0, k = 0, rivalVisto = null, rivalSalto = null;
-const R = { guardado: null, largo: null, cambio: null, doble: null, rafagas: 0, pausa: null };
+const R = { pedido: null, guardado: null, largo: null, cambio: null, doble: null, rafagas: 0, pausa: null };
 let estadoIntento = null;      // lo que hace la prueba dentro del intento propio en curso
 const t0 = Date.now();
 for (;;) {
   if (Date.now() - t0 > 6 * 60000) { mal('la prueba no avanza en 6 minutos'); break; }
   const s = await J(() => { const e = JUEGO.estado(); e.propios = (JUEGO.E.propios || []).length; const tr = document.querySelector('#tablero tr.ahora'), sb = document.getElementById('saltar-rival'); e.turno = { ve: !!tr && !tr.classList.contains('yo') && !document.getElementById('tablero').hidden, txt: tr ? tr.textContent : '', senal: !document.getElementById('senal').hidden, zona: getComputedStyle(document.getElementById('zona')).display !== 'none', saltar: !!sb && !sb.hidden, boton: sb ? sb.textContent : '' }; return e; });
   if (s.errores.length) { mal('error en el juego: ' + s.errores[0]); break; }
-  if (s.propios >= 3 && rivalVisto && !(s.intento && s.intento.propio) && s.pantalla !== 'decision') break;      // los tres primeros propios y al menos un turno de un rival
+  if (s.propios >= 3 && rivalVisto && (R.pedido || s.propios >= 6) && !(s.intento && s.intento.propio) && s.pantalla !== 'decision') break;      // los tres primeros propios y al menos un turno de un rival
   const I = s.intento;
   if (I && I.propio && s.modo !== 'panel') {
     if (!estadoIntento) { k++; estadoIntento = { k, prep: false, tira: null, hecho: '', ultClave: '', ultEmp: 0, cambioHecho: false, dobleHecho: false, largo: false, ent0: I.entradas }; }
@@ -110,6 +111,17 @@ for (;;) {
     rivalSalto = { espacioNoSalta: b.ev.length === a.ev.length && b.p === 'rival' && b.now !== null && b.now > (a.now ?? 0), teclaS: c.ev.length === a.ev.length + 1 && c.ev.at(-1).via === 'tecla', despues: c.p, ev: c.ev.at(-1) || null };
     ultSalto = Date.now(); continue;
   }
+  // 8. «Cambiar» en el turno de un rival (LIF-4): la tecla C lo abre, «+» sube un kilo y «Pedir» lo pide; la fila propia del
+  // tablero muestra el peso nuevo y sale el evento pedido_cambiado. Con el mouse: no cuenta como toque
+  if (s.pantalla === 'rival' && s.turno.saltar && rivalSalto && !R.pedido) {
+    const leer = () => J(() => ({ boton: !!document.querySelector('#tablero [data-pedido="abrir"]'), abierto: !!document.querySelector('#tablero [data-pedido="ok"]'), kg: +(document.querySelector('#tablero tr.yo .tb-pide b')?.textContent || 0), ev: JUEGO.eventos.filter(e => e.ev === 'pedido_cambiado').map(e => e.props) }));
+    const a = await leer(); if (!a.boton) { R.pedido = { boton: false }; continue; }
+    await page.keyboard.press('KeyC'); await dormir(250); const b = await leer();
+    await J(() => document.querySelector('#tablero [data-pedido="mas"]')?.click()); await dormir(120);
+    await J(() => document.querySelector('#tablero [data-pedido="ok"]')?.click()); await dormir(350); const c = await leer();
+    R.pedido = { boton: true, abrio: b.abierto, antes: a.kg, despues: c.kg, ev: c.ev, cerro: !c.abierto };
+    continue;
+  }
   if (s.turno.saltar && Date.now() - ultSalto > 1500) { await page.keyboard.press('KeyS'); ultSalto = Date.now(); continue; }
   if (s.panel && !s.sobre) {
     const P = await J(() => { const pn = document.querySelector('#capa .panel'), ir = pn?.querySelector('button.ir:not(:disabled)'); return { ir: !!ir, foco: document.activeElement === ir }; });
@@ -133,6 +145,9 @@ if (fin.total !== enviados) mal(`la prueba mandó ${enviados} pulsaciones y el j
 if (sinResolver.length) mal(`${sinResolver.length} pulsaciones sin resolver: ${JSON.stringify(sinResolver.slice(0, 3))}`);
 if (sinMotivo.length) mal(`${sinMotivo.length} descartadas sin motivo: ${JSON.stringify(sinMotivo.slice(0, 3))}`);
 if (sinAcuse.length) mal(`${sinAcuse.length} descartadas sin palabra en el acuse: ${JSON.stringify(sinAcuse.slice(0, 3))}`);
+if (!R.pedido) mal('no se llegó a probar «Cambiar» en el turno de un rival');
+else if (!R.pedido.boton || !R.pedido.abrio || R.pedido.ev.length !== 1 || R.pedido.ev[0].kg !== R.pedido.antes + 2 || R.pedido.despues !== R.pedido.antes + 2 || !R.pedido.cerro) mal(`«Cambiar» en el turno de un rival: ${JSON.stringify(R.pedido)}`);
+else console.log(`  «Cambiar»: ${R.pedido.antes} → ${R.pedido.despues} kg con C, «+» y «Pedir» (evento ${JSON.stringify(R.pedido.ev[0])})`);
 if (!R.guardado) mal('no se llegó a probar el toque durante PREPÁRATE');
 else if (!R.guardado.arranco) mal(`un toque durante PREPÁRATE no levantó: con ¡TIRA! en pantalla ${R.guardado.ms} ms y nada`);
 const g = fin.T.find(x => x.motivo === 'guardado'); if (R.guardado && !g) mal('el toque durante PREPÁRATE no quedó como «guardado»');

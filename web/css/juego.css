@@ -577,6 +577,24 @@ body:has(#tablero:not([hidden])) .bug{display:none}
 .tb-pie{border-top:1px solid var(--line);margin-top:calc(var(--u)*.3);padding-top:calc(var(--u)*.25)}
 .tb-pie p{margin:0;font-family:var(--body);font-size:calc(var(--u)*.92);line-height:1.3;color:var(--ink);white-space:normal}
 .tb-pie p.est{color:var(--gold);font-weight:600}
+.tb-pie p.cambia{color:var(--gold);font-weight:700}
+/* «Cambiar» el pedido en el turno de un rival (LIF-4): un botón chico debajo del tablero; abierto, una sola fila − kg + Pedir */
+.tablero .tb-pedido{pointer-events:auto;margin-top:calc(var(--u)*.35);font-family:var(--body);text-transform:none}
+.tablero .tb-pedido button{font-family:var(--display);font-weight:800;font-size:calc(var(--u)*.95);letter-spacing:.06em;min-height:max(30px,calc(var(--u)*2.2));padding:.15em .7em;background:rgba(6,14,48,.9);border:1px solid var(--teal);color:#fff;border-radius:.3em}
+.tablero .tb-pedido button:disabled{opacity:.35}
+.tablero .tb-pedido button.ir{background:var(--teal);color:#04121a}
+.tablero .tb-cambiar .tecla{font-size:.8em;margin-left:.3em}
+.tablero .tb-ped{display:flex;flex-wrap:wrap;align-items:center;gap:calc(var(--u)*.35)}
+.tablero .tb-ped b{font-family:var(--display);font-size:calc(var(--u)*1.5);color:var(--gold);min-width:2.2em;text-align:center}
+.tablero .tb-ped small{font-size:calc(var(--u)*.8);color:var(--mute)}
+.tablero .tb-ped .tb-ped-nota{flex-basis:100%}
+@media (pointer:coarse){.tablero .tb-pedido button{min-height:40px;min-width:40px;font-size:15px}}
+/* teléfono acostado: «Cambiar» debajo del tablero, pero no con el veredicto a la vista (va abajo a la izquierda y se taparían;
+   al costado del tablero choca con los botones de arriba) */
+:where(html.horiz.bajo) .tablero .tb-pedido{margin-top:4px}
+:where(html.horiz.bajo) .tablero .tb-pedido button{min-height:36px;padding:0 .8em;font-size:13px}
+:where(html.horiz.bajo) .tablero .tb-ped .tb-ped-nota{display:none}
+:where(html.horiz.bajo) body:has(#veredicto:not([hidden])) #tablero .tb-pedido{display:none}
 @media (prefers-reduced-motion:no-preference){.tb tr.cambio .tb-pide b{animation:tbCambio 1.2s ease-out 2}}
 @keyframes tbCambio{0%{text-shadow:0 0 0 transparent}30%{text-shadow:0 0 12px var(--gold)}100%{text-shadow:0 0 0 transparent}}
 /* lo que el tablero ya dice no se repite: ni marcador, ni cartel del turno, ni avisos sueltos, ni zócalo, ni etiqueta ('b' y 'u') */
