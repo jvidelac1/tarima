@@ -88,7 +88,7 @@ export function planCaida(tipo, causa, valido = false) {
  * segundo sin la barra y bajaban en cruz, y los pies se arrastraban desde la tijera o la sentadilla hasta juntarse).
  * Con `R` (muestras globales del clip, las arma main.js con los nombres de las fases; nada por personaje):
  * - Los BRAZOS acompañan la barra: desde que se suelta desandan el clip por sus fases, de la pose del final a la de
- *   brazos estirados con la barra colgando (`R.brazosA`: la triple extensión; en el envión, a medio empuje), pasando por
+ *   brazos estirados con la barra colgando (`R.brazosA`: la triple extensión; en el envión no desandan: ver main.js), pasando por
  *   la pose de cada fase anterior a la recepción (`R.brazosDe`) a `DESANDAR` s por fase, con arranque y llegada suaves;
  *   después van a «Parado» con el resto del cuerpo. Las manos salen `MANOS` s después que la barra: van detrás de ella y
  *   no por delante (en el envión, sin esa espera, los antebrazos cruzaban la barra que caía: BAD en check_escenas). Van de fase en fase y no muestra por muestra: el giro de codos del clip
@@ -126,7 +126,7 @@ export function poseCaida(pl, g0, destino, t, R = null) {
   const s = Math.min(1, Math.max(0, (t - t0) / dur)), w = suave(s); if (conSalto) dy += SALTITO.alto * Math.sin(Math.PI * s);
   // brazos: desandan el clip desde que se suelta la barra y después bajan a «Parado» mientras el cuerpo llega
   const K = clavesBrazos(g0, R), n = K.length - 1, tD = n * DESANDAR, tb = t - pl.suelta - MANOS, x = tb <= 0 || !n ? 0 : suave(tb / tD) * n, kB = Math.min(Math.max(0, n - 1), Math.floor(x));
-  const tBajar = Math.max(pl.suelta + MANOS + tD, tM - .15), wB = suave((t - tBajar) / Math.max(.3, tM + mz - tBajar));
+  const tBajar = pl.suelta + MANOS + tD, wB = suave((t - tBajar) / Math.min(.8, Math.max(.3, tM + mz - tBajar)));
   const i = Math.floor(gC), a0 = K[kB], a1 = K[Math.min(n, kB + 1)], f0 = Math.floor(a0);
   // la primera pose puede ser fraccionaria (g0): se aproxima a su muestra más cercana solo si no es entera
   return { i, j: i + 1, u: gC - i, k: destino, w, dz, dy, t, brazos: { i: n ? Math.round(a0) : f0, j: n ? Math.round(a1) : f0 + 1, u: n ? x - kB : g0 - f0, k: destino, w: wB } };

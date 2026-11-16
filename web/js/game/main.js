@@ -759,10 +759,11 @@ const PARADO = P => { const G = tramo(P, 'clean'); return G.base + G.i('Parado')
  * Reglas del cuerpo en el final (game/caida.js, poseCaida), en muestras globales del clip y por nombre de fase: desde dónde
  * el cuerpo se para siguiendo el clip (`rec`, la recepción) y hasta dónde (`fin`, el final del segmento); y el tramo que
  * desandan los brazos: de la recepción (después ya no se mueven) a la barra colgando con los brazos estirados (arranque y
- * cargada: la triple extensión) o a medio empuje (envión: no hasta los hombros, porque ahí las manos quedan adelante justo
- * por donde cae la barra: check_escenas daba BAD de antebrazos contra la barra a los 0,37 s de soltar).
+ * cargada: la triple extensión). En el envión los brazos no desandan nada: las poses anteriores a la recepción (empuje,
+ * impulso) tienen las manos delante de la cara, justo por donde cae la barra (check_escenas daba BAD de antebrazos contra la
+ * barra a los 0,3 s de soltar, con cualquier espera); bajan directo a «Parado», por los costados, apenas se va la barra.
  */
-const FASES_FINAL = { snatch: ['Recepción', 'Triple extensión'], clean: ['Recepción', 'Triple extensión'], split: ['Envión · Tijera', 'Envión · Empuje'], power: ['Power jerk · Recepción', 'Envión · Empuje'], squat: ['Squat jerk · Recepción', 'Envión · Empuje'] };
+const FASES_FINAL = { snatch: ['Recepción', 'Triple extensión'], clean: ['Recepción', 'Triple extensión'], split: ['Envión · Tijera', 'Envión · Tijera'], power: ['Power jerk · Recepción', 'Power jerk · Recepción'], squat: ['Squat jerk · Recepción', 'Squat jerk · Recepción'] };
 function reglasFinal(P, seg) {
   const F = FASES_FINAL[seg]; if (!F) return null; const G = tramo(P, seg), rec = G.base + G.i(F[0]);
   return { sub: P.sub, rec, fin: G.base + G.n - 1, brazosDe: rec, brazosA: G.base + G.i(F[1]) };

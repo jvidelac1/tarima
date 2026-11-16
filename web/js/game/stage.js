@@ -231,7 +231,7 @@ export const PLANOS = {
  * - la cabeza propia no se dibuja en esta vista ni mientras la cámara esté a menos de `sinCabeza` m de los ojos (el hueso del cuello se
  *   achica a un punto entre las clavículas: cuello, cara, pelo, ojos y pestañas van pesados a él o a la cabeza, su hijo). La sombra sale sin cabeza: cae detrás del pesista.
  */
-export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 4.5, margen: .17, hombros: .38, encima: .5, abajo: -1.53, frente: -.21, tope: .6, bajo: [.12, .42], alto: [-.05, .3], atras: [.12, .26], suelta: [1, -.8, 9], sinCabeza: .6, foco: 1.6,
+export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 3.3, margen: .17, hombros: .38, encima: .45, abajo: -1.53, frente: -.21, tope: .6, bajo: [.12, .42], alto: [-.05, .3], atras: [.12, .26], suelta: [1, -.8, 9], sinCabeza: .6, foco: 1.6,
   resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003 }, temblor: .006 };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
