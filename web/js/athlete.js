@@ -33,7 +33,7 @@ void RE_Direct_Skin( const in IncidentLight directLight, const in vec3 geometryP
   // transpiración: una película fina y lisa encima de la piel, en parches (segundo lóbulo angosto; uGloss lo gradúa)
   if ( uFino > 0.5 ) {
   float nh = saturate( dot( geometryNormal, normalize( directLight.direction + geometryViewDir ) ) );
-  reflectedLight.directSpecular += gMask.r * uGloss * uSweat * gPatch * directLight.color * saturate( ndl ) * ( pow( nh, 90.0 ) * 0.2 + pow( nh, 18.0 ) * 0.03 );
+  reflectedLight.directSpecular += gMask.r * uGloss * uSweat * gPatch * directLight.color * saturate( ndl ) * ( pow( nh, 48.0 ) * 0.07 + pow( nh, 14.0 ) * 0.035 );
   }
 }
 #undef RE_Direct
@@ -82,12 +82,11 @@ const SKIN_DETAIL = /* glsl */`
   if ( uDetail > 0.0 ) {      // en plano general ningún mosaico se resuelve (athlete.js lo apaga): se ahorran las cuatro lecturas
   vec2 uvS = vMapUv * uTile.x, uvC = vMapUv * uTile.y;
   float fS = max( fwidth( uvS.x ), fwidth( uvS.y ) ), fC = max( fwidth( uvC.x ), fwidth( uvC.y ) );   // mosaicos por píxel
-  vec3 s1 = texture2D( tDetailSkin, uvS ).xyz * 2.0 - 1.0, s2 = texture2D( tDetailSkin, uvS * 0.21 + 0.37 ).xyz * 2.0 - 1.0;
+  vec3 s1 = texture2D( tDetailSkin, uvS ).xyz * 2.0 - 1.0;
   vec3 c1 = texture2D( tDetailCloth, uvC ).xyz * 2.0 - 1.0, c2 = texture2D( tDetailCloth, uvC * 0.3 ).xyz * 2.0 - 1.0;
-  vec2 pores = s1.xy * ( 1.0 - smoothstep( 0.02, 0.07, fS ) ) + s2.xy * 0.06 * ( 1.0 - smoothstep( 0.1, 0.4, fS ) );
   vec2 weave = c1.xy * ( 1.0 - smoothstep( 0.03, 0.09, fC ) ) + c2.xy * 0.6 * ( 1.0 - smoothstep( 0.1, 0.32, fC ) );
-  gGrain = s1.x + s1.y;
-  d += ( pores * 0.38 * gMask.r + weave * 0.8 * gMask.g ) * uDetail;
+  gGrain = ( s1.x + s1.y ) * ( 1.0 - smoothstep( 0.02, 0.07, fS ) );      // el poro no mueve la normal (en mosaico se leía escamas): solo rompe el brillo, y solo de cerca
+  d += weave * 0.8 * gMask.g * uDetail;
   }
   d.y = - d.y;   // textura +Y con UV de glTF (v hacia abajo)
   if ( uDetail > 0.0 || uFino > 0.5 ) {
@@ -102,7 +101,7 @@ const SKIN_DETAIL = /* glsl */`
 // Piel mate con brillo roto: rugosidad base alta, grano de alta frecuencia y sudor en parches (no un lóbulo liso de plástico).
 const SKIN_MATERIAL = /* glsl */`
 {
-  float skinRough = clamp( max( material.roughness, uSkinRough ) + gGrain * 0.05 + ( 0.5 - gPatch ) * 0.3 - uSweat * 0.1 * gPatch, 0.42, 1.0 );      // zonas mates y zonas húmedas, no un brillo parejo
+  float skinRough = clamp( max( material.roughness, uSkinRough ) + gGrain * 0.09 + ( 0.5 - gPatch ) * 0.3 - uSweat * 0.1 * gPatch, 0.42, 1.0 );      // zonas mates y zonas húmedas, no un brillo parejo
   material.roughness = mix( material.roughness, skinRough, gMask.r );
   float f0k = mix( 1.0, 0.5, gMask.r ); material.specularColor *= f0k; material.specularColorBlended *= f0k;     // F0 de piel (~0,028) por debajo del 0,04 genérico
 }
@@ -240,7 +239,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' + SKIN_DETAIL)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + SKIN_MATERIAL);
   };
-  m.customProgramCacheKey = () => 'tarima-skin-18';
+  m.customProgramCacheKey = () => 'tarima-skin-19';
   m.userData.skin = uniforms;
   return m;
 }
@@ -308,7 +307,14 @@ function lashMaterial(src) {
 }
 
 function eyeMaterial(src) {
-  return new THREE.MeshPhysicalMaterial({ name: src.name, map: src.map, color: src.color, roughness: .32, metalness: 0, clearcoat: 1, clearcoatRoughness: .04, envMapIntensity: 1.6, side: src.side });
+  // Ojo húmedo pero no de vidrio: una capa lisa fina (reflejo chico de la luz, no el ambiente entero), esclerótica que no llega
+  // al blanco y la sombra que el párpado y las pestañas de arriba echan sobre el globo (lo que más lo saca de «ojo de muñeco»).
+  const m = new THREE.MeshPhysicalMaterial({ name: src.name, map: src.map, color: src.color, roughness: .38, metalness: 0, clearcoat: .7, clearcoatRoughness: .08, envMapIntensity: .45, side: src.side });
+  m.onBeforeCompile = sh => {
+    sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n{ float arriba = normalize( vNormal ).y; diffuseColor.rgb *= 0.82 * mix( 0.38, 1.0, smoothstep( 0.62, 0.05, arriba ) ) * mix( 0.8, 1.0, smoothstep( -0.75, -0.2, arriba ) ); }');
+  };
+  m.customProgramCacheKey = () => 'tarima-eye-2';
+  return m;
 }
 
 export class Athlete {
