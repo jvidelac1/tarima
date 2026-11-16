@@ -188,6 +188,13 @@ jobs:
         env:
           TAPA_INFORMA: 1
         run: node tools/check_barra.mjs --solo=tel_en --camara=pov --out=out/barra_pov_tel 2>&1 | tee out/logs/check_barra_pov_tel.log
+      - name: Teléfono parado con la primera persona elegida (check_barra --solo=vert_es --camara=pov)
+        if: ${{ !cancelled() && inputs.solo_claves != true }}
+        timeout-minutes: 10
+        continue-on-error: true
+        env:
+          TAPA_INFORMA: 1
+        run: node tools/check_barra.mjs --solo=vert_es --camara=pov --out=out/barra_pov_vert 2>&1 | tee out/logs/check_barra_pov_vert.log
       - name: Tres arranques jugados en primera persona, con el final denso (check_barra --camara=pov --final)
         if: ${{ !cancelled() && inputs.solo_claves != true }}
         timeout-minutes: 12

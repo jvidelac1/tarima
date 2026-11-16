@@ -62,7 +62,9 @@ const PANTALLAS = [
   { id: 'bajo_en', lang: 'en', vp: { width: 1800, height: 560 }, tactil: false, soloInicio: true },
   { id: 'pc600_es', lang: 'es', vp: { width: 1280, height: 600 }, tactil: false, soloInicio: true },
   { id: 'pc700_en', lang: 'en', vp: { width: 1440, height: 700 }, tactil: false, soloInicio: true },
-].filter(x => !SOLO || x.id === SOLO);
+  // teléfono parado: solo a pedido (--solo=vert_es); ahí la cámara del levantamiento es la lateral, se elija la que se elija
+  { id: 'vert_es', lang: 'es', vp: { width: 390, height: 844 }, tactil: true, pedido: true },
+].filter(x => (SOLO ? x.id === SOLO : !x.pedido));
 
 for (const P of PANTALLAS) try {
   const tag = `[${P.id}]`, mal = t => problemas.push(`${tag} ${t}`);
