@@ -27,6 +27,7 @@ import { CamaraViva } from './camara_viva.js';
 import { Ambiente } from './ambiente.js';
 import { Jueces } from './jueces.js';
 import { Reflejo } from './reflejo.js';
+import { Look, GRADO_LOOK, SALA } from './look.js';
 
 /**
  * Lo que el pase final de post.js hace después del AgX (saturación, contraste, gamma de sombras y tinte frío/cálido), como
@@ -34,18 +35,19 @@ import { Reflejo } from './reflejo.js';
  * son los de los uniforms del pase final (uSat 1,04, uContrast 1,03, uShadowGamma 0,86). La exposición (1,12) la pone
  * renderer.toneMappingExposure, que AgXToneMapping ya usa. Solo cambia CustomToneMapping, que el visor no usa.
  */
+const GL = GRADO_LOOK;      // la gradación del juego (look.js): la misma en el pase final, acá y en tonoJS
 const GRADO = `vec3 CustomToneMapping( vec3 color ) {
 	color = AgXToneMapping( color );
 	float l = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
-	color = mix( vec3( l ), color, 1.04 );
-	color = max( ( color - 0.5 ) * 1.03 + 0.5, 0.0 );
-	color = mix( pow( color, vec3( 0.86 ) ), color, smoothstep( 0.0, 0.5, l ) );
-	color *= mix( vec3( 0.985, 0.995, 1.025 ), vec3( 1.03, 1.0, 0.965 ), smoothstep( 0.05, 0.85, l ) );
+	color = mix( vec3( l ), color, ${GL.sat.toFixed(3)} );
+	color = max( ( color - 0.5 ) * ${GL.con.toFixed(3)} + 0.5, 0.0 );
+	color = mix( pow( color, vec3( ${GL.gam.toFixed(3)} ) ), color, smoothstep( 0.0, 0.5, l ) );
+	color *= mix( vec3( ${GL.frio.map(x => x.toFixed(3)).join(', ')} ), vec3( ${GL.calido.map(x => x.toFixed(3)).join(', ')} ), smoothstep( 0.05, 0.85, l ) );
 	return color;
 }`;
 const VACIA = 'vec3 CustomToneMapping( vec3 color ) { return color; }';
 if (THREE.ShaderChunk.tonemapping_pars_fragment.includes(VACIA)) THREE.ShaderChunk.tonemapping_pars_fragment = THREE.ShaderChunk.tonemapping_pars_fragment.replace(VACIA, GRADO);
-export const EXPOSICION = 1.12;
+export const EXPOSICION = GL.exp;
 
 /** El mismo tono en JavaScript (AgX de three y GRADO), para pasar a la pantalla colores que se mezclan después del tono (la niebla). */
 export function tonoJS(c) {
@@ -58,8 +60,8 @@ export function tonoJS(c) {
   v = v.map(x => ap(Math.min(1, Math.max(0, (Math.log2(Math.max(x, 1e-10)) + 12.47393) / (4.026069 + 12.47393)))));
   v = mul(B, mul(OUT, v).map(x => Math.pow(Math.max(0, x), 2.2))).map(x => Math.min(1, Math.max(0, x)));
   const s = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-  const l = .2126 * v[0] + .7152 * v[1] + .0722 * v[2], ti = s(.05, .85, l), T = [.985 + (1.03 - .985) * ti, .995 + (1 - .995) * ti, 1.025 + (.965 - 1.025) * ti];
-  v = v.map(x => Math.max(0, (l + (x - l) * 1.04 - .5) * 1.03 + .5)).map((x, i) => (Math.pow(x, .86) + (x - Math.pow(x, .86)) * s(0, .5, l)) * T[i]);
+  const l = .2126 * v[0] + .7152 * v[1] + .0722 * v[2], ti = s(.05, .85, l), T = GL.frio.map((f, i) => f + (GL.calido[i] - f) * ti);
+  v = v.map(x => Math.max(0, (l + (x - l) * GL.sat - .5) * GL.con + .5)).map((x, i) => (Math.pow(x, GL.gam) + (x - Math.pow(x, GL.gam)) * s(0, .5, l)) * T[i]);
   return new THREE.Color().setRGB(...v.map(x => new THREE.Color().setRGB(x, x, x).convertLinearToSRGB().r));
 }
 /**
@@ -69,7 +71,7 @@ export function tonoJS(c) {
  */
 export function vineta() {
   const s = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-  const paradas = [0, .35, .5, .6, .7, .8, .9, 1].map(t => { const v = .26 * s(.14, .66, .5 * t * t), a = 1 - .98 * Math.pow(1 - v, 1 / 2.2), c = Math.round(255 * Math.min(1, .02 / a)); return `rgba(${c},${c},${c},${a.toFixed(4)}) ${Math.round(t * 100)}%`; });
+  const paradas = [0, .35, .5, .6, .7, .8, .9, 1].map(t => { const v = GL.vin * s(.14, .66, .5 * t * t), a = 1 - (1 - GL.negro) * Math.pow(1 - v, 1 / 2.2), c = Math.round(255 * Math.min(1, GL.negro / a)); return `rgba(${c},${c},${c},${a.toFixed(4)}) ${Math.round(t * 100)}%`; });
   return `radial-gradient(ellipse farthest-corner at 50% 50%, ${paradas.join(', ')})`;
 }
 /** Los ShaderMaterial de la arena (haces, discos de luz, público) no aplican tono ni sRGB solos: en el camino directo hace falta. */
@@ -134,7 +136,7 @@ export function juntarFijos(raiz, fuera) {
 //   (la misma cuenta de un foco, sin sombra); 'luces' es como el visor; 'no' los apaga (variante del banco).
 
 /** Tono de los haces en colores de pantalla: d(x) = A · max(x − X0, 0)^P imita a tonoJS por canal (error menor a 0,03). */
-export const CURVA_HAZ = { A: 1.0467, X0: .0158, P: .36 };
+export const CURVA_HAZ = { A: 1.06, X0: .019, P: .44 };      // ajustada a la gradación de look.js (GRADO_LOOK)
 const HAZ_FS = /* glsl */`uniform vec3 uColor; uniform float uStrength; varying vec3 vN; varying vec3 vV; varying float vT;
 void main(){
 	float edge = pow( abs( dot( normalize( vN ), normalize( vV ) ) ), 2.2 ); float fall = pow( clamp( vT, 0.0, 1.0 ), 1.6 );
@@ -213,22 +215,26 @@ export class Escena {
     // mosaico y casi no cuesta; en el camino con post (Media y Alta) el pase final lo pisa entero y no agrega nada visible.
     const r = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', stencil: false });
     r.shadowMap.enabled = true; r.shadowMap.type = THREE.VSMShadowMap; r.shadowMap.autoUpdate = false;
-    this.scene = new THREE.Scene(); this.scene.background = new THREE.Color('#070b16'); this.scene.fog = new THREE.FogExp2('#0b1226', .015);
+    this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(SALA.fondo); this.scene.fog = new THREE.FogExp2(SALA.niebla, SALA.densidad);
     this._niebla = { hdr: this.scene.fog.color.clone(), directo: tonoJS(this.scene.fog.color) };      // en el camino directo la niebla se mezcla ya en colores de pantalla
     if (canvas.parentElement && typeof document !== 'undefined') { const d = this.velo = document.createElement('div'); d.setAttribute('aria-hidden', 'true'); d.style.cssText = `position:absolute;inset:0;pointer-events:none;background:${vineta()}`; canvas.after(d); }
     this.rig = new CameraRig(canvas, { reduceMotion, interactive: false }); this.viva = new CamaraViva({ reduceMotion });
     this.trace = new BarTrace(); this.scene.add(this.trace.group);
     const coarse = matchMedia('(pointer:coarse)').matches, aniso = Math.min(Q.aniso || 4, r.capabilities.getMaxAnisotropy());
-    this.arena = new Arena({ tex: coarse || Q.tex <= 1024 ? 1024 : 2048, aniso, reduceMotion, oficiales: false }); this.scene.add(this.arena.group);
+    this.arena = new Arena({ tex: 64, aniso, reduceMotion, oficiales: false });      // la madera de la tarima la pone look.js (acá, una de relleno) this.scene.add(this.arena.group);
     // jueces y oficiales sentados (jueces.js): los árbitros levantan la paleta con cada luz
     const jueces = this.jueces = new Jueces({ reduceMotion }); this.scene.add(jueces.group);
     // ambiente del juego (ambiente.js): retoca texturas y sombreadores de la arena antes de que se dibuje nada, y recibe lo
     // mismo que el tablero y las luces de la arena (main.js no cambia: sigue llamando a arena.setBoard y arena.setDecision)
-    const amb = this.ambiente = new Ambiente(this.arena, { tex: coarse || Q.tex <= 1024 ? 1024 : 2048, aniso, reduceMotion }); this.scene.add(amb.group);
+    const amb = this.ambiente = new Ambiente(this.arena, { tex: coarse || Q.tex <= 1024 ? 1024 : 2048, aniso, reduceMotion, look: true }); this.scene.add(amb.group);
     { const A = this.arena, tablero = A.setBoard.bind(A), decision = A.setDecision.bind(A); A.setBoard = b => { tablero(b); amb.setCartel(b); }; A.setDecision = d => { decision(d); amb.setDecision(d); jueces.setDecision(d); }; }
     this.reflejo = new Reflejo(0); this.reflejo.parchar(this.arena.madera);
-    this.lighting = new Lighting(this.scene); amb.setLuces(this.lighting);
-    this.barbell = new Barbell({ aniso, texSize: coarse ? 512 : 1024 }); this.scene.add(this.barbell.group);
+    this.lighting = new Lighting(this.scene);
+    // el look de competencia (look.js): luces, texturas de la tarima y del piso, pantalla con grano, utilería y rayos de luz.
+    // Texturas grandes en una computadora (aunque arranque en «Baja»: la calibración sube sin rehacer texturas); chicas en un teléfono
+    this.look = new Look({ arena: this.arena, ambiente: amb, lighting: this.lighting, aniso, grande: !coarse, reduceMotion }); this.scene.add(this.look.group);
+    amb.setLuces(this.lighting);
+    this.barbell = new Barbell({ aniso, texSize: coarse ? 512 : 1024, goma: this.look.goma }); this.scene.add(this.barbell.group);
     this.arena.setQuality(Q); this.lighting.setQuality(Q); this._ambiente(Q);
     this.arena.group.traverse(o => { o.castShadow = false; if (o.material) [].concat(o.material).forEach(conTono); });      // en la sombra, solo el pesista y la barra
     this._capaSombra();
@@ -240,7 +246,7 @@ export class Escena {
     this.vigia = { p: new THREE.Vector3(), d: new THREE.Vector3(), q: new THREE.Vector3(), cad: new THREE.Vector3(), fov: 0, bar: [0, 0], listo: false, id: null };
     this.alCorte = null; this.velado = false;
     this.barbell.setLoad(100); this._sombraBarra(); this.barbell.setPosition(v.set(0, PLATE_R, 0)); this.barbell.settle(PLATE_R);
-    this.resize(); this.lighting.bake(r, [this.barbell.group, this.trace.group, this.ambiente.group]);
+    this.resize(); this.lighting.bake(r, [this.barbell.group, this.trace.group, this.ambiente.group, this.look.group]);
     // después de hornear el entorno (que la ve igual): la arena fija en pocas mallas
     const A = this.arena; this.fijos = juntarFijos(A.group, new Set([A.impostors, A.crowd, A.bokeh, A.flashMesh, ...A.beamMeshes, ...(A.lamps || [])].filter(Boolean)));
     this.barato = null; this.setBarato(Q.barato);
@@ -330,11 +336,13 @@ export class Escena {
   _ambiente(Q) {
     const A = Q.amb || {}; this.ambiente.setNivel(A, !!Q.dof);
     const esc = !Q.directo && A.reflejo > 0 ? A.reflejo : 0; if (esc) this.reflejo.escala = esc; this.reflejo.setActivo(esc > 0);
+    this.look?.setNivel(Q);
   }
   _post(Q) {
     const p = this.post = new Post(this.renderer, this.scene, this.rig.camera, Q); p.reduceMotion = this.reduceMotion; p.motionObject = this.barbell.group;
     // después del desenfoque van los discos de luz de la arena y el polvo de magnesio (un contenedor suelto: no cambia de quién son hijos)
     const tras = this._tras ||= Object.assign(new THREE.Object3D(), { matrixAutoUpdate: false }); tras.children = [this.arena.bokeh, this.ambiente.polvo]; p.bokehObject = tras;
+    this.look?.post(p);
     // Sin oclusión ni profundidad de campo ningún pase lee la profundidad de la escena: no se resuelve (una pasada de pantalla
     // completa menos por cuadro) ni se guarda la del MSAA (cuatro muestras por píxel que no salen de la memoria de la placa).
     const lee = !!(Q.ao || Q.dof || Q.mblur); p.sceneRT.resolveDepthBuffer = lee; p.sceneRT.storeMultisampledDepthBuffer = lee;

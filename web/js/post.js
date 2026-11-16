@@ -129,7 +129,7 @@ void main(){
 }`;
 
 const FINAL_FS = /* glsl */`
-uniform sampler2D tDiffuse; uniform sampler2D tBloom; uniform vec2 uRes; uniform float uTime, uVignette, uGrain, uCA, uSat, uContrast, uShadowGamma, uBloom;
+uniform sampler2D tDiffuse; uniform sampler2D tBloom; uniform vec2 uRes; uniform float uTime, uVignette, uGrain, uCA, uSat, uContrast, uShadowGamma, uBloom, uNegro; uniform vec3 uFrio, uCalido;
 varying vec2 vUv;
 #include <tonemapping_pars_fragment>
 float hash( vec2 p ){ vec3 p3 = fract( vec3( p.xyx ) * 0.1031 ); p3 += dot( p3, p3.yzx + 33.33 ); return fract( ( p3.x + p3.y ) * p3.z ); }
@@ -150,10 +150,10 @@ void main(){
   col = mix( vec3( l ), col, uSat );
   col = max( ( col - 0.5 ) * uContrast + 0.5, 0.0 );
   col = mix( pow( col, vec3( uShadowGamma ) ), col, smoothstep( 0.0, 0.5, l ) );
-  col *= mix( vec3( 0.985, 0.995, 1.025 ), vec3( 1.03, 1.0, 0.965 ), smoothstep( 0.05, 0.85, l ) );
+  col *= mix( uFrio, uCalido, smoothstep( 0.05, 0.85, l ) );
   col *= 1.0 - uVignette * smoothstep( 0.14, 0.66, r2 );
   col = sRGBTransferOETF( vec4( max( col, 0.0 ), 1.0 ) ).rgb;
-  col = col * 0.98 + vec3( 0.02, 0.02, 0.023 );   // negros levantados, como señal de TV
+  col = col * ( 1.0 - uNegro ) + uNegro * vec3( 1.0, 1.0, 1.15 );   // negros levantados, como señal de TV
   col += ( hash( vUv * uRes + fract( uTime ) * 311.7 ) - 0.5 ) * uGrain;
   gl_FragColor = vec4( col, 1.0 );
 }`;
@@ -208,7 +208,7 @@ export class Post {
     }
     this.finalMat = new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: FINAL_FS, depthTest: false, depthWrite: false, defines: { ...(dof ? { USE_CA: 1 } : {}), ...(this.bloom ? { USE_BLOOM: 1 } : {}) }, uniforms: {
       tDiffuse: { value: null }, tBloom: { value: this.bloom ? this.bloom.renderTargetsHorizontal[0].texture : null }, uBloom: { value: 1 }, uRes: { value: new THREE.Vector2() }, uTime: { value: 0 }, toneMappingExposure: { value: 1.12 },
-      uVignette: { value: .26 }, uGrain: { value: .02 }, uCA: { value: .0045 }, uSat: { value: 1.04 }, uContrast: { value: 1.03 }, uShadowGamma: { value: .86 },
+      uVignette: { value: .26 }, uGrain: { value: .02 }, uCA: { value: .0045 }, uSat: { value: 1.04 }, uContrast: { value: 1.03 }, uShadowGamma: { value: .86 }, uFrio: { value: new THREE.Vector3(.985, .995, 1.025) }, uCalido: { value: new THREE.Vector3(1.03, 1, .965) }, uNegro: { value: .02 },
     } });
     if (quality.smaa) { this.smaa = new SMAAPass(); this.rtC = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false }); }
   }

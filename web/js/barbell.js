@@ -53,6 +53,11 @@ function plateFace(spec, size, aniso) {
     g.fillStyle = relief ? '#000' : spec.color; g.fillRect(0, 0, s, s);
     if (!relief) {   // desgaste: vetas radiales y polvo de magnesio
       for (let i = 0; i < 900; i++) { const a = Math.random() * 7, r = R * (.5 + Math.random() * .5); g.fillStyle = `rgba(${Math.random() < .5 ? '255,255,255' : '0,0,0'},${Math.random() * .035})`; g.beginPath(); g.arc(c + Math.cos(a) * r, c + Math.sin(a) * r, 1 + Math.random() * 5, 0, 7); g.fill(); }
+      // roces en arco (el disco gira contra otro), golpes del borde y manos con magnesio
+      g.lineCap = 'round';
+      for (let i = 0; i < 70; i++) { const a = Math.random() * 7, r = R * (.57 + Math.random() * .42), l = .05 + Math.random() * Math.random() * .9; g.strokeStyle = `rgba(${Math.random() < .45 ? '245,242,232' : '8,8,10'},${.04 + Math.random() * .13})`; g.lineWidth = s * (.001 + Math.random() * .004); g.beginPath(); g.arc(c, c, r, a, a + l); g.stroke(); }
+      for (let i = 0; i < 9; i++) { const a = Math.random() * 7, r = R * (.62 + Math.random() * .33), x = c + Math.cos(a) * r, y = c + Math.sin(a) * r, rad = s * (.03 + Math.random() * .07), rg = g.createRadialGradient(x, y, 0, x, y, rad); rg.addColorStop(0, `rgba(244,242,234,${.1 + Math.random() * .16})`); rg.addColorStop(1, 'rgba(244,242,234,0)'); g.fillStyle = rg; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); }
+      { const rg = g.createRadialGradient(c, c, R * .9, c, c, R); rg.addColorStop(0, 'rgba(0,0,0,0)'); rg.addColorStop(1, 'rgba(10,10,12,.28)'); g.fillStyle = rg; g.fillRect(0, 0, s, s); }
     }
     const ink = relief ? '#fff' : spec.ink;
     g.fillStyle = ink; g.strokeStyle = ink;
@@ -94,9 +99,9 @@ function knurlTextures(aniso) {
 }
 
 export class Barbell {
-  constructor({ aniso = 8, texSize = 1024 } = {}) {
+  constructor({ aniso = 8, texSize = 1024, goma = null } = {}) {      // goma: {roughnessMap, bumpMap} enlosables para el caucho de los discos (el juego, look.js)
     this.group = new THREE.Group(); this.group.name = 'Barbell';
-    this.aniso = aniso; this.texSize = texSize;
+    this.aniso = aniso; this.texSize = texSize; this.goma = goma || {};
     this.grip = .55; this.q = 0; this.v = 0; this.acc = 0; this.flexGain = 1; this.onFloor = false;
     this._faces = new Map(); this._plateGeo = new Map(); this._disposables = [];
     const { knurl, ridge } = knurlTextures(aniso); this._disposables.push(knurl, ridge);
@@ -142,7 +147,7 @@ export class Barbell {
   }
 
   _rubberMat(color) {
-    if (!this._rubber.has(color)) this._rubber.set(color, new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: .62, metalness: 0, envMapIntensity: .55 }));
+    if (!this._rubber.has(color)) this._rubber.set(color, new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: this.goma.roughnessMap ? 1 : .62, roughnessMap: this.goma.roughnessMap || null, bumpMap: this.goma.bumpMap || null, bumpScale: 1.2, metalness: 0, envMapIntensity: .55 }));
     return this._rubber.get(color);
   }
 
@@ -163,7 +168,7 @@ export class Barbell {
       // UV del anillo: el canvas cubre el cuadrado [-ringOut, ringOut]
       const p = ring.attributes.position, uv = ring.attributes.uv;
       for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / ringOut * .5 + .5, p.getY(i) / ringOut * .5 + .5);
-      const faceMat = new THREE.MeshStandardMaterial({ map: face.map, normalMap: face.normalMap || null, roughness: .6, metalness: 0, envMapIntensity: .55 });
+      const faceMat = new THREE.MeshStandardMaterial({ map: face.map, normalMap: face.normalMap || null, roughness: this.goma.roughnessMap ? .95 : .6, roughnessMap: this.goma.roughnessMap || null, metalness: 0, envMapIntensity: .55 });
       if (face.normalMap) faceMat.normalScale.set(1.3, 1.3);
       this._plateGeo.set(key, { body, ring, faceMat, inset });
     }
