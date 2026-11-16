@@ -269,7 +269,7 @@ export function mesa(L) {
   return [{ g: new THREE.BoxGeometry(L, .035, .62).translate(0, .7425, 0), parte: 'tapa' }, { g: new THREE.BoxGeometry(L, .725, .025).translate(0, .3625, .297), parte: 'mantel' },
     { g: new THREE.BoxGeometry(.025, .725, .6).translate(-L / 2 + .0125, .3625, 0), parte: 'mantel' }, { g: new THREE.BoxGeometry(.025, .725, .6).translate(L / 2 - .0125, .3625, 0), parte: 'mantel' },
     { g: new THREE.BoxGeometry(L, .05, .012).translate(0, .64, .312), parte: 'banda' },
-    { g: new THREE.BoxGeometry(L + .05, .014, .67).translate(0, .767, 0), parte: 'canto' }, { g: new THREE.BoxGeometry(L + .02, .07, .03).translate(0, .035, .3), parte: 'zocalo' },
+    { g: new THREE.BoxGeometry(L + .05, .014, .67).translate(0, .767, 0), parte: 'tapa' }, { g: new THREE.BoxGeometry(L + .02, .07, .03).translate(0, .035, .3), parte: 'zocalo' },
     { g: new THREE.BoxGeometry(.035, .725, .035).translate(-L / 2 + .012, .3625, .297), parte: 'canto' }, { g: new THREE.BoxGeometry(.035, .725, .035).translate(L / 2 - .012, .3625, .297), parte: 'canto' }];
 }
 /** Deja cada pieza sin UV ni índice propio raro, con normales, lista para juntar. */

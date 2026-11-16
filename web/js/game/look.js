@@ -256,7 +256,7 @@ function mural(W = 384, H = 640, calido = false) {
   return canvasTexture(makeCanvas(W, H, g => {
     const r = rng(calido ? 57 : 43), lg = g.createLinearGradient(0, 0, 0, H); lg.addColorStop(0, calido ? '#2a211c' : '#1c2229'); lg.addColorStop(1, '#0c0d10'); g.fillStyle = lg; g.fillRect(0, 0, W, H);
     for (let i = 0; i < 260; i++) { g.strokeStyle = `rgba(${calido ? '230,190,150' : '170,200,220'},${.015 + r() * .04})`; g.lineWidth = 2 + r() * 14; const x = r() * W, y = r() * H; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (r() - .5) * 60, y + 40 + r() * 160); g.stroke(); }      // brochazos
-    const tinta = calido ? 'rgba(236,214,186,.72)' : 'rgba(206,220,230,.7)'; g.strokeStyle = tinta; g.fillStyle = tinta; g.lineCap = 'round'; g.lineJoin = 'round';
+    const tinta = calido ? 'rgba(236,214,186,.55)' : 'rgba(206,220,230,.52)'; g.strokeStyle = tinta; g.fillStyle = tinta; g.lineCap = 'round'; g.lineJoin = 'round';
     const L = (pts, w) => { g.lineWidth = w * W; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x * W, y * H) : g.moveTo(x * W, y * H))); g.stroke(); };
     L([[.04, .2], [.96, .2]], .016);                                                         // barra
     for (const s of [-1, 1]) for (const [d, hh] of [[.34, .2], [.385, .2], [.425, .15]]) { g.fillRect((.5 + s * d - .016) * W, (.2 - hh / 2) * H, .032 * W, hh * H); }      // discos
@@ -392,7 +392,7 @@ export class Look {
     this.props = new THREE.Group(); this.props.name = 'Utilería'; arena.group.add(this.props);      // fijo: stage.js lo junta por material
     const paso = (nombre, f) => { try { f(); } catch (e) { console.warn('look:', nombre, e); } };
     { const g = ambiente.golpe.bind(ambiente); ambiente.golpe = (z, k) => { g(z, k); USO.value = Math.min(1, USO.value + .03); }; }      // cada barra que cae deja más magnesio
-    { const s = ambiente.setLuces.bind(ambiente); ambiente.setLuces = L => { s(L); for (const c of ambiente.uPolvo.uLuzCol.value) c.multiplyScalar(.16); }; }      // el polvo solo se insinúa en los conos (se leía como nieve)
+    { const s = ambiente.setLuces.bind(ambiente); ambiente.setLuces = L => { s(L); for (const c of ambiente.uPolvo.uLuzCol.value) c.multiplyScalar(.24); }; }      // el polvo solo se insinúa en los conos (se leía como nieve)
     { const u = ambiente.update.bind(ambiente); ambiente.update = dt => { u(dt); this.update(dt); }; }      // avanza con el ambiente (stage.js no cambia)
     paso('luces', () => this._luces(lighting));
     paso('tarima', () => this._tarima(grande ? 2048 : 1024, aniso));
@@ -580,7 +580,7 @@ export class Look {
     A.group.traverse(o => { if (o.geometry?.type === 'CircleGeometry' && o.geometry.parameters.radius === 42) o.visible = false; });
     const te = new THREE.Mesh(new THREE.PlaneGeometry(84, 84), new THREE.MeshBasicMaterial({ name: 'techo', map: tx(techo()), color: new THREE.Color(.5, .5, .5), fog: false })); te.rotation.x = Math.PI / 2; te.position.y = 13; te.frustumCulled = false; G.add(te);
     // murales a los lados de la pantalla, detrás del tablero y del reloj
-    for (const s of [-1, 1]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 5.0), new THREE.MeshBasicMaterial({ name: 'mural', map: tx(mural(384, 640, s > 0)), color: new THREE.Color(.42, .42, .42) })); m.position.set(s * 7.2, 2.55, -5.55); G.add(m); }
+    for (const s of [-1, 1]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 5.0), new THREE.MeshBasicMaterial({ name: 'mural', map: tx(mural(384, 640, s > 0)), color: new THREE.Color(.26, .26, .26) })); m.position.set(s * 7.2, 2.55, -5.55); G.add(m); }
     // banderas ficticias grandes, colgadas del techo sobre las tribunas (las mismas ocho de los banderines)
     const bt = tx(canvasTexture(banderines(), { aniso: 4 })), pos = [], uv = [], idx = [], N = 8;
     const colgar = (cx, cz, nx, nz, i, w = 3.2, h = 5.2, y1 = 12.4) => { const tx2 = -nz, tz = nx, b = pos.length / 3, y0 = y1 - h; pos.push(cx - tx2 * w / 2, y0, cz - tz * w / 2, cx + tx2 * w / 2, y0, cz + tz * w / 2, cx + tx2 * w / 2, y1, cz + tz * w / 2, cx - tx2 * w / 2, y1, cz - tz * w / 2); uv.push(i / N, 0, (i + 1) / N, 0, (i + 1) / N, 1, i / N, 1); idx.push(b, b + 1, b + 2, b, b + 2, b + 3); };

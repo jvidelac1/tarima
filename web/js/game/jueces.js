@@ -61,7 +61,7 @@ const correr = (x, z) => new THREE.Matrix4().makeTranslation(x, 0, z);
 
 const PIEL = ['#b98562', '#85543a', '#cc9a78', '#a36f4c', '#6a4330', '#c08f6c'].map(col), PELO = ['#2a1d14', '#0e0e10', '#77777c', '#4a3020', '#b9b3a8', '#3a2a1c'].map(col);
 const CORBATA = ['#6e1f2a', '#27406e', '#4a4e58'].map(col), ESTILO = ['corto', 'melena', 'calvo', 'corto', 'melena', 'corto'];
-const BASE = { canto: col('#7c828f'), zocalo: col('#0c0e14'), esclera: col('#8f8983'), iris: col('#1b130d'), marco: col('#0c0c0e'), camisa: col('#d9dce2'), zapato: col('#0d0d10'), silla: col('#3a3d49'), ojo: col('#17120f'), mango: col('#3a2c20'), tapa: col('#232838'), mantel: col('#1b2032'), banda: col('#aab0c2') };
+const BASE = { canto: col('#7c828f'), zocalo: col('#0c0e14'), esclera: col('#8f8983'), iris: col('#1b130d'), marco: col('#0c0c0e'), camisa: col('#d9dce2'), zapato: col('#0d0d10'), silla: col('#3a3d49'), ojo: col('#17120f'), mango: col('#3a2c20'), tapa: col('#2a3044'), mantel: col('#1b2032'), banda: col('#aab0c2') };
 /** Colores de la persona k de un grupo con su uniforme (saco y pantalón). */
 const gente = (k, traje, pantalon) => ({ ...BASE, traje: col(traje), pantalon: col(pantalon), piel: PIEL[(k * 5 + 1) % PIEL.length], pelo: PELO[(k * 7 + 2) % PELO.length], corbata: CORBATA[k % CORBATA.length] });
 
