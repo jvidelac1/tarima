@@ -28,6 +28,7 @@ import { Ambiente } from './ambiente.js';
 import { Jueces } from './jueces.js';
 import { Reflejo } from './reflejo.js';
 import { Look, GRADO_LOOK, SALA } from './look.js';
+import { Publico } from './publico.js';
 
 /**
  * Lo que el pase final de post.js hace después del AgX (saturación, contraste, gamma de sombras y tinte frío/cálido), como
@@ -193,6 +194,8 @@ export const CAM = Object.fromEntries(CAMERAS.map((c, i) => [c.key, i]));
  */
 export const PLANOS = {
   medio: { key: 'medio', at: ['Neck', 'Hips'], up: -.05, d: 2.05, az: .5, el: .05, fov: 22 },
+  cara: { key: 'cara', at: ['Head'], up: .0, d: .62, az: .42, el: .04, fov: 22 },      // primer plano de control (fotos del banco): cara, cuello y hombros
+  torso: { key: 'torso', at: ['Neck', 'Spine'], up: 0, d: 1.25, az: .55, el: .06, fov: 22 },
   caida: { key: 'caida', at: [], up: 0, dAbs: 4.6, az: .72, el: .14, fov: 30, punto: 'caida' },
   manga: { key: 'manga', at: [], up: 0, dAbs: 1.45, az: 1.05, el: .2, fov: 30, punto: 'manga' },
   // el jurado (LIF-38): desde atrás de la mesa de los tres árbitros, por encima de sus hombros. Abajo, sus cabezas y las
@@ -234,6 +237,8 @@ export class Escena {
     // Texturas grandes en una computadora (aunque arranque en «Baja»: la calibración sube sin rehacer texturas); chicas en un teléfono
     this.look = new Look({ arena: this.arena, ambiente: amb, lighting: this.lighting, aniso, grande: !coarse, reduceMotion }); this.scene.add(this.look.group);
     amb.setLuces(this.lighting);
+    // público de personas (publico.js): atlas dibujado una vez y tribunas horneadas para las calidades sin desenfoque
+    try { this.publico = new Publico(this.arena, r, { animo: amb.publico?.uAnimo, chico: coarse }); } catch (e) { console.warn('publico', e); }
     this.barbell = new Barbell({ aniso, texSize: coarse ? 512 : 1024, goma: this.look.goma }); this.scene.add(this.barbell.group);
     this.arena.setQuality(Q); this.lighting.setQuality(Q); this._ambiente(Q);
     this.arena.group.traverse(o => { o.castShadow = false; if (o.material) [].concat(o.material).forEach(conTono); });      // en la sombra, solo el pesista y la barra

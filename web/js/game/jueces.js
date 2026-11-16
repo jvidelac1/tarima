@@ -8,6 +8,7 @@
 // 0,35 s por luz) y las tres paletas un dibujo instanciado. Sin sombras propias, sin huesos, sin trabajo por cuadro en reposo.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { persona as personaGente, brazo as brazoGente, mesa as mesaGente, limpiar } from './gente.js';
 
 const FLOOR_Y = -1, STAGE_Y = -.1;      // los de arena.js
 /** Dónde se sientan (lo mismo que arena.js: la mesa en el origen del asiento, la persona medio metro detrás). */
@@ -16,91 +17,45 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z), col = hex => new THREE.Color(
 const UP = V(0, 1, 0), UNO = V(1, 1, 1), _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _a = V(0, 0, 0), _b = V(0, 0, 0);
 const suave = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
-// ---------- geometría ----------
-/** Una pieza con color por vértice, ya en su lugar, con la luz pintada en el color (oclusión y rebote, sin luces de más). */
-function pieza(g, color, pos = [0, 0, 0], rot = null, esc = null) {
-  g.deleteAttribute('uv');
-  g.applyMatrix4(_m.compose(V(...pos), rot || _q.identity(), esc ? V(...esc) : UNO));
-  if (!g.attributes.normal) g.computeVertexNormals();
-  const N = g.attributes.normal, n = N.count, c = new Float32Array(n * 3);
+// ---------- geometría: las personas salen de gente.js; acá se les pinta el color y la luz ----------
+/** Geometría con color por vértice y la luz pintada en el color (oclusión y rebote, sin luces de más). */
+function pintar(g, color) {
+  limpiar(g);
+  const N = g.attributes.normal, P = g.attributes.position, n = N.count, c = new Float32Array(n * 3), so = g.attributes.sombra;
   // lo que mira hacia abajo, más oscuro; lo que mira a la tarima (+z), más claro: el rebote de la luz del escenario
-  for (let i = 0; i < n; i++) { const k = 1 + .34 * Math.min(0, N.getY(i)) + .28 * Math.max(0, N.getZ(i)); c[i * 3] = color.r * k; c[i * 3 + 1] = color.g * k; c[i * 3 + 2] = color.b * k; }
-  g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+  for (let i = 0; i < n; i++) { const k = (1 + .34 * Math.min(0, N.getY(i)) + .28 * Math.max(0, N.getZ(i))) * (so ? so.getX(i) : 1); c[i * 3] = color.r * k; c[i * 3 + 1] = color.g * k; c[i * 3 + 2] = color.b * k; }
+  g.deleteAttribute('sombra'); g.setAttribute('color', new THREE.BufferAttribute(c, 3));
   return g;
 }
-const rotX = a => new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), a);
-/** Cápsula entre dos puntos (brazos y piernas). */
+const pieza = (g, color, pos = [0, 0, 0], rot = null, esc = null) => pintar(g.applyMatrix4(_m.compose(V(...pos), rot || _q.identity(), esc ? V(...esc) : UNO)), color);
+/** Cápsula entre dos puntos (el mango de la paleta). */
 function tramo(a, b, r, color, radial = 8) {
   const A = V(...a), B = V(...b), d = B.clone().sub(A), len = d.length();
   return pieza(new THREE.CapsuleGeometry(r, len, 2, radial), color, A.add(B).multiplyScalar(.5).toArray(), new THREE.Quaternion().setFromUnitVectors(UP, d.normalize()));
 }
-/** Cuerpo por secciones [y, radio en x, radio en z, corrimiento en z]: superelipses unidas, cerrado arriba. Para el saco. */
-function cuerpo(sec, n, e = 2.6) {
-  const pos = [], idx = [], p = 2 / e;
-  for (const [y, rx, rz, z0 = 0] of sec) for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2, c = Math.cos(a), s = Math.sin(a); pos.push(rx * Math.sign(c) * Math.abs(c) ** p, y, z0 + rz * Math.sign(s) * Math.abs(s) ** p); }
-  for (let j = 0; j < sec.length - 1; j++) for (let k = 0; k < n; k++) { const a = j * n + k, b = j * n + (k + 1) % n, c = a + n, d = b + n; idx.push(a, c, b, b, c, d); }
-  const [yT, , , zT = 0] = sec[sec.length - 1], t = pos.length / 3, base = (sec.length - 1) * n; pos.push(0, yT + .008, zT);
-  for (let k = 0; k < n; k++) idx.push(base + k, t, base + (k + 1) % n);
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
-}
-/** Tira plana que mira a +z, por filas [y, medio ancho, z]: la camisa en V y la corbata, apoyadas sobre el pecho. */
-function tira(filas) {
-  const pos = [], idx = [];
-  for (const [y, hw, z] of filas) pos.push(-hw, y, z, hw, y, z);
-  for (let j = 0; j < filas.length - 1; j++) { const a = j * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
-}
-const TORSO = [[.47, .185, .125, 0], [.62, .18, .12, 0], [.8, .195, .125, .005], [.95, .215, .125, .01], [1.035, .21, .105, .005], [1.075, .12, .085, 0], [1.092, .06, .06, 0]];
-// brazo: hombro, codo y muñeca (lado s = ±1) con el antebrazo apoyado en la mesa; y el brazo de la paleta levantado
-const HOMBRO = s => V(s * .228, 1.0, 0), CODO = s => V(s * .268, .825, .15), MUNECA = s => V(s * .15, .805, .41);
+const de = (piezas, C) => piezas.map(({ g, parte }) => pintar(g, C[parte] || C.traje));
+// brazo de la paleta (lado s = -1): hombro, codo y muñeca apoyado en la mesa, y levantado
+const HOMBRO = s => V(s * .212, 1.008, -.004), MANO_MESA = s => V(s * .15, .8, .41), POLO = s => V(s * .6, -.6, -.5);
 const CODO_ARRIBA = s => V(s * .345, .9, .14), ANTEBRAZO_ARRIBA = s => V(s * .02, .97, .2).normalize();
-/** Brazo como piezas [geometría, junta]: 0 gira en el hombro, 1 en el codo. `paleta`: con el mango (el disco va instanciado aparte). */
-function brazo(s, C, radial, paleta = false) {
-  const S = HOMBRO(s), E = CODO(s), W = MUNECA(s), f = W.clone().sub(E).normalize(), mano = W.clone().addScaledVector(f, .045);
-  const p = [[tramo(S.toArray(), E.toArray(), .052, C.traje, radial), 0], [tramo(E.toArray(), W.toArray(), .043, C.traje, radial), 1],
-    [pieza(new THREE.SphereGeometry(.04, 7, 5), C.piel, mano.toArray(), new THREE.Quaternion().setFromUnitVectors(V(0, 0, 1), f), [.95, .62, 1.3]), 1]];
-  if (paleta) p.push([tramo(mano.toArray(), W.clone().addScaledVector(f, .2).toArray(), .011, C.mango, 6), 1]);
-  return p;
+/** Brazo de la paleta como piezas [geometría, junta]: 0 gira en el hombro, 1 en el codo; con el mango (el disco va instanciado aparte). */
+function brazoPaleta(C, radial) {
+  const b = brazoGente(HOMBRO(-1), MANO_MESA(-1), { lado: -1, polo: POLO(-1), n: radial }), p = b.piezas.map(x => [pintar(x.g, C[x.parte] || C.traje), x.tramo]);
+  const mano = b.W.clone().addScaledVector(b.f, .045);
+  p.push([tramo(mano.toArray(), b.W.clone().addScaledVector(b.f, .2).toArray(), .011, C.mango, 6), 1]);
+  return { p, ...b };
 }
 /**
- * Una persona sentada mirando a +z, con el piso en y = 0 y la silla debajo. `det` 1: árbitro (cara con nariz, ojos y orejas,
- * más segmentos); 0: de lejos. `paleta`: sin el brazo derecho (va aparte, animado). Devuelve las piezas fijas.
+ * Una persona sentada mirando a +z, con el piso en y = 0 y la silla debajo. `det` 1: árbitro (más segmentos); 0: de lejos.
+ * `paleta`: sin el brazo derecho (va aparte, animado). Devuelve las piezas fijas, ya pintadas.
  */
-function persona(C, { det = 1, paleta = false, pelo = 'corto', corbata = true } = {}) {
-  const P = [], rs = det ? 8 : 6, add = g => { P.push(g); };
-  // silla
-  add(pieza(new THREE.BoxGeometry(.44, .04, .42), C.silla, [0, .45, -.02])); add(pieza(new THREE.BoxGeometry(.4, .34, .035), C.silla, [0, .7, -.235]));
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) add(pieza(new THREE.BoxGeometry(.03, .45, .03), C.silla, [sx * .19, .225, -.02 + sz * .18]));
-  // piernas y zapatos
-  for (const s of [-1, 1]) { add(tramo([s * .1, .555, -.04], [s * .1, .555, .36], .08, C.pantalon, rs)); add(tramo([s * .1, .5, .41], [s * .1, .1, .43], .058, C.pantalon, rs)); add(pieza(new THREE.BoxGeometry(.09, .07, .24), C.zapato, [s * .1, .035, .48])); }
-  // saco, camisa en V, corbata, cuello
-  add(pieza(cuerpo(TORSO, det ? 14 : 10), C.traje));
-  add(pieza(tira([[1.066, .056, .106], [.95, .034, .143], [.8, 0, .138]]), C.camisa));
-  if (corbata) { add(pieza(tira([[1.058, .02, .113], [.95, .026, .149], [.84, .03, .146], [.8, 0, .144]]), C.corbata)); add(pieza(new THREE.BoxGeometry(.042, .034, .022), C.corbata, [0, 1.06, .108])); }
-  add(pieza(new THREE.CylinderGeometry(.057, .062, .036, 10), C.camisa, [0, 1.092, .004])); add(pieza(new THREE.CylinderGeometry(.045, .05, .1, 10), C.piel, [0, 1.125, .006]));
-  // cabeza
-  const cy = 1.25, cz = .02;
-  add(pieza(new THREE.SphereGeometry(.098, det ? 14 : 10, det ? 10 : 7), C.piel, [0, cy, cz], null, [.92, 1.14, 1.02]));
-  if (det) {
-    for (const s of [-1, 1]) { add(pieza(new THREE.SphereGeometry(.02, 6, 4), C.piel, [s * .09, cy - .008, cz - .006], null, [.5, 1, .8])); add(pieza(new THREE.SphereGeometry(.011, 6, 4), C.ojo, [s * .034, cy + .016, cz + .087])); }
-    add(pieza(new THREE.SphereGeometry(.016, 6, 4), C.piel, [0, cy - .014, cz + .098], null, [.8, 1.35, 1]));
-  }
-  const sp = det ? 14 : 10;
-  if (pelo === 'calvo') add(pieza(new THREE.SphereGeometry(.102, sp, 6, 0, Math.PI * 2, 0, Math.PI * .46), C.pelo, [0, cy - .012, cz - .008], rotX(-1.25), [.95, 1.02, 1.1]));
-  else add(pieza(new THREE.SphereGeometry(.103, sp, 7, 0, Math.PI * 2, 0, Math.PI * .52), C.pelo, [0, cy + .01, cz - .006], rotX(-.62), [.95, 1.13, 1.06]));
-  if (pelo === 'melena') add(pieza(new THREE.SphereGeometry(.1, sp, 7), C.pelo, [0, cy - .06, cz - .05], null, [1.02, 1.2, .7]));
-  // brazos apoyados en la mesa (el de la paleta, s = -1, va aparte)
-  for (const s of paleta ? [1] : [-1, 1]) for (const [g] of brazo(s, C, rs)) add(g);
+function persona(C, { det = 1, paleta = false, pelo = 'corto', corbata = true, k = 0 } = {}) {
+  const P = de(personaGente({ cuerpo: .45 + .12 * ((k * 3) % 4), pelo: pelo === 'calvo' ? 'entradas' : pelo, ropa: 'saco', gesto: 'mesa', det, silla: true, sinBrazo: paleta ? -1 : 0, corbata, semilla: 31 + k * 5,
+    cabezaGiro: ((k * 7) % 5 - 2) * .06, cabezaInc: .03, forma: { ancho: .97 + .03 * ((k * 5) % 3), mandibula: .95 + .06 * (k % 3) } }).piezas, C);
   // de la cintura para abajo, debajo de la mesa, llega menos luz
-  for (const g of P) { const p = g.attributes.position, c = g.attributes.color; for (let i = 0; i < p.count; i++) { const k = .5 + .5 * suave(.3, .95, p.getY(i)); c.setXYZ(i, c.getX(i) * k, c.getY(i) * k, c.getZ(i) * k); } }
+  for (const g of P) { const p = g.attributes.position, c = g.attributes.color; for (let i = 0; i < p.count; i++) { const q = .5 + .5 * suave(.3, .95, p.getY(i)); c.setXYZ(i, c.getX(i) * q, c.getY(i) * q, c.getZ(i) * q); } }
   return P;
 }
-/** Mesa de largo L con mantel hasta el piso y una banda clara; el frente (+z) mira a la tarima. */
-function mesa(L, C) {
-  return [pieza(new THREE.BoxGeometry(L, .035, .62), C.tapa, [0, .7425, 0]), pieza(new THREE.BoxGeometry(L, .725, .025), C.mantel, [0, .3625, .297]),
-    pieza(new THREE.BoxGeometry(.025, .725, .6), C.mantel, [-L / 2 + .0125, .3625, 0]), pieza(new THREE.BoxGeometry(.025, .725, .6), C.mantel, [L / 2 - .0125, .3625, 0]),
-    pieza(new THREE.BoxGeometry(L, .05, .012), C.banda, [0, .64, .312])];
-}
+const mesa = (L, C) => de(mesaGente(L), C);
 const asiento = (x, y, z, ry) => new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, ry), UNO);
 const correr = (x, z) => new THREE.Matrix4().makeTranslation(x, 0, z);
 
@@ -119,7 +74,7 @@ const SUBE = .35, BAJA = .55;
 export class Jueces {
   constructor({ reduceMotion = false } = {}) {
     this.group = new THREE.Group(); this.group.name = 'Jueces'; this.reduce = reduceMotion;
-    const mat = this.mat = new THREE.MeshLambertMaterial({ vertexColors: true }); mat.name = 'jueces';
+    const mat = this.mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }); mat.name = 'jueces';
     mat.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n\treflectedLight.indirectDiffuse += diffuseColor.rgb * ${RELLENO.toFixed(3)};`); };
     const malla = (lista, nombre) => { const g = mergeGeometries(lista); lista.forEach(x => x.dispose()); const m = new THREE.Mesh(g, mat); m.name = nombre; m.matrixAutoUpdate = false; this.group.add(m); return m; };
     const en = (lista, M) => lista.map(g => g.applyMatrix4(M));
@@ -129,12 +84,12 @@ export class Jueces {
     this.arb = [];
     for (let i = 0; i < 3; i++) {
       const C = gente(i, '#313a52', '#2a2e38'), M = MA.clone().multiply(correr(-(i - 1) * A.sep, -.5));
-      fijos.push(...en(persona(C, { det: 1, paleta: true, pelo: ESTILO[i] }), M));
+      fijos.push(...en(persona(C, { det: 1, paleta: true, pelo: ESTILO[i], k: i }), M));
       // consola con sus dos botones delante de cada uno
       fijos.push(...en([pieza(new THREE.BoxGeometry(.2, .04, .12), BASE.silla, [.22, .78, .62]), pieza(new THREE.SphereGeometry(.014, 6, 4), col('#e8e6dc'), [.18, .803, .62]), pieza(new THREE.SphereGeometry(.014, 6, 4), col('#c8261c'), [.26, .803, .62])], M));
-      const p = brazo(-1, C, 8, true), g = mergeGeometries(p.map(x => x[0])), junta = new Uint8Array(g.attributes.position.count); let o = 0;
+      const bp = brazoPaleta(C, 10), p = bp.p, g = mergeGeometries(p.map(x => x[0])), junta = new Uint8Array(g.attributes.position.count); let o = 0;
       for (const [x, j] of p) { junta.fill(j, o, o + x.attributes.position.count); o += x.attributes.position.count; x.dispose(); }
-      brazos.push(g); this.arb.push({ M, junta, k: 0, a: 0, hecho: -1 });
+      brazos.push(g); this.arb.push({ M, junta, k: 0, a: 0, hecho: -1 }); this._bp = bp;
     }
     this.fijos = [malla(fijos, 'árbitros')];
     // los tres brazos de las paletas: una malla; posiciones y normales en reposo aparte, para recalcularlas al moverse
@@ -143,7 +98,7 @@ export class Jueces {
     gb.boundingSphere = new THREE.Sphere(V(A.x, A.y + 1, A.z + .4), A.sep + 1.2);
     this.brazos = new THREE.Mesh(gb, mat); this.brazos.name = 'brazos de las paletas'; this.brazos.matrixAutoUpdate = false; this.group.add(this.brazos);
     // las paletas: un disco instanciado, sin luces (se lee igual en cualquier calidad)
-    const S = HOMBRO(-1), E = CODO(-1), W = MUNECA(-1), f = W.clone().sub(E).normalize(), lado = f.clone().cross(UP).normalize(), nrm = lado.clone().cross(f).normalize();
+    const { S, E, W, f } = this._bp, lado = f.clone().cross(UP).normalize(), nrm = lado.clone().cross(f).normalize();
     const disco = new THREE.CylinderGeometry(.098, .098, .014, 20); disco.applyMatrix4(_m.compose(W.clone().addScaledVector(f, .045 + .25), new THREE.Quaternion().setFromUnitVectors(UP, nrm), UNO));
     this.paletas = new THREE.InstancedMesh(disco, new THREE.MeshBasicMaterial({ color: 0xffffff }), 3); this.paletas.name = 'paletas'; this.paletas.matrixAutoUpdate = false;
     this.paletas.boundingSphere = gb.boundingSphere.clone(); this.paletas.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.group.add(this.paletas);
@@ -153,10 +108,10 @@ export class Jueces {
 
     // jurado lateral (cinco, mesa larga) y mesa técnica (dos mesas sobre el escenario): de lejos, sin gesto
     const ML = asiento(-8.3, FLOOR_Y, .1, Math.PI / 2), lat = en(mesa(6.2, BASE), ML);
-    for (let i = 0; i < 5; i++) lat.push(...en(persona(gente(i + 3, '#454955', '#2c2f37'), { det: 0, pelo: ESTILO[(i + 3) % ESTILO.length], corbata: i % 2 === 0 }), ML.clone().multiply(correr((i - 2) * 1.25, -.5))));
+    for (let i = 0; i < 5; i++) lat.push(...en(persona(gente(i + 3, '#454955', '#2c2f37'), { det: 0, pelo: ESTILO[(i + 3) % ESTILO.length], corbata: i % 2 === 0, k: i + 3 }), ML.clone().multiply(correr((i - 2) * 1.25, -.5))));
     this.fijos.push(malla(lat, 'jurado lateral'));
     const tec = [];
-    [[5.0, -4.3, -.86], [5.75, -3.3, -1.05]].forEach(([x, z, ry], i) => { const M = asiento(x, STAGE_Y, z, ry); tec.push(...en(mesa(1.1, BASE), M), ...en(persona(gente(i + 8, '#30384e', '#2a2e38'), { det: 0, pelo: ESTILO[(i + 2) % ESTILO.length] }), M.clone().multiply(correr(0, -.5)))); });
+    [[5.0, -4.3, -.86], [5.75, -3.3, -1.05]].forEach(([x, z, ry], i) => { const M = asiento(x, STAGE_Y, z, ry); tec.push(...en(mesa(1.1, BASE), M), ...en(persona(gente(i + 8, '#30384e', '#2a2e38'), { det: 0, pelo: ESTILO[(i + 2) % ESTILO.length], k: i + 8 }), M.clone().multiply(correr(0, -.5)))); });
     this.fijos.push(malla(tec, 'mesa técnica'));
     this.group.traverse(o => { o.castShadow = false; o.receiveShadow = false; o.updateMatrix?.(); });
   }

@@ -71,7 +71,7 @@ jobs:
       - name: Fotos de cada calidad (banco --fotos --niveles)
         if: ${{ !cancelled() }}
         timeout-minutes: 25
-        run: node tools/banco.mjs --fotos=out/graficos/fotos --niveles${{ inputs.niveles && format('={0}', inputs.niveles) || '' }} --ancho=1280 --alto=620 2>&1 | tee out/logs/fotos.log
+        run: node tools/banco.mjs --fotos=out/graficos/fotos --niveles${{ inputs.niveles && format('={0}', inputs.niveles) || (github.event_name == 'push' && '=alta,movil' || '') }} --ancho=1280 --alto=620 2>&1 | tee out/logs/fotos.log
       - name: Fotos del laboratorio de materiales (banco --fotos --lab)
         if: ${{ !cancelled() }}
         timeout-minutes: 10

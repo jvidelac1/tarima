@@ -138,6 +138,7 @@ async function fotosNiveles(B, { escena, cargas, params, msg, decir }) {
   const tomas = [
     { n: '3-4', c: '3/4', t: 1.3, luces: null }, { n: 'frontal', c: 'baja', t: 1.3, luces: null }, { n: 'lado', c: 'lado', t: fin, luces: null },
     { n: 'jurado-vale', c: 'jurado', t: fin, luces: [true, true, true] }, { n: 'jurado-nulo', c: 'jurado', t: fin, luces: [false, true, false] }, { n: 'reversa-vale', c: 'rev', t: fin, luces: [true, true, true] },
+    { n: 'medio', c: 'medio', t: fin, luces: null }, { n: 'torso', c: 'torso', t: fin, luces: null }, { n: 'cara', c: 'cara', t: fin, luces: null }, { n: 'medio-salida', c: 'medio', t: 1.3, luces: null },
     { n: 'jueces-vale', c: 'jueces', t: fin, luces: [true, true, true] }, { n: 'jueces-nulo', c: 'jueces', t: fin, luces: [false, true, false] },
   ];
   const lista = niveles.flatMap(q => tomas.map(x => ({ ...x, q, nombre: `${q}_${x.n}` }))); let puesta = null;
