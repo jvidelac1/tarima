@@ -1367,6 +1367,8 @@ Nada fusionado ni publicado.
   dice «Arranque · Ronda 2» (computadora), el cambio de un rival al pie («Brenner cambia a 167», en dorado; en el teléfono esa
   línea reemplaza a la de la estrategia) y, en el turno de un rival, un botón chico **«Cambiar»** debajo del tablero (tecla C).
   Abierto: «− 167 +» con «X de 10» (en 'b' y 'u'), «Pedir 167», ✕ y «Te quedan 2 cambios»; flechas, Enter y Esc con teclado.
+  En el teléfono acostado el botón va debajo del tablero compacto y se oculta mientras está el veredicto (abajo a la izquierda:
+  se tapaban en check_telefono; al costado del tablero chocaba con los botones de arriba).
   Con el tablero quieto (el resultado del rival ya está calculado) solo se pone al día la fila propia («antes 165»). Si en la
   partida ya le toca a la persona (el rival que se ve ya se resolvió), el pedido queda pendiente y entra como cambio de su
   llamado al abrirlo (`E.pedidoPend`; si la desplaza, sale otro). Evento `pedido_cambiado` (docs/MVP.md). `ui/pedido.js` es
