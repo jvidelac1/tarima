@@ -110,16 +110,16 @@ export class Jueces {
 
     // jurado lateral (cinco, mesa larga) y mesa técnica (dos mesas sobre el escenario): de lejos, sin gesto
     const ML = asiento(-8.3, FLOOR_Y, .1, Math.PI / 2), lat = en(mesa(6.2, BASE), ML);
-    for (let i = 0; i < 5; i++) lat.push(...en(persona(gente(i + 3, ['#40434d', '#2f4a45', '#5a2f33', '#343a4b', '#4a4436'][i], '#2a2c33'), { det: 1, pelo: ['melena', 'corto', 'cola', 'entradas', 'rapado'][i], corbata: i === 0, k: i + 3, gesto: ['mesa', 'cruzados', 'menton', 'mesa', 'falda'][i], ropa: ['saco', 'buzo', 'remera', 'saco', 'buzo'][i] }), ML.clone().multiply(correr((i - 2) * 1.25 + [0, .08, -.06, .05, -.1][i], -.5))));      // cinco distintos: ropa, pelo y postura
+    for (let i = 0; i < 5; i++) lat.push(...en(persona(gente(i + 3, ['#40434d', '#2f4a45', '#5a2f33', '#343a4b', '#4a4436'][i], '#2a2c33'), { det: 0, pelo: ['melena', 'corto', 'cola', 'entradas', 'rapado'][i], corbata: i === 0, k: i + 3, gesto: ['mesa', 'cruzados', 'menton', 'mesa', 'falda'][i], ropa: ['saco', 'buzo', 'remera', 'saco', 'buzo'][i] }), ML.clone().multiply(correr((i - 2) * 1.25 + [0, .08, -.06, .05, -.1][i], -.5))));      // cinco distintos: ropa, pelo y postura
     this.fijos.push(malla(lat, 'jurado lateral'));
     const tec = [];
-    [[5.0, -4.3, -.86], [5.75, -3.3, -1.05]].forEach(([x, z, ry], i) => { const M = asiento(x, STAGE_Y, z, ry); tec.push(...en(mesa(1.1, BASE), M), ...en(persona(gente(i + 8, i ? '#3c2f4a' : '#30384e', '#2a2e38'), { det: 1, pelo: i ? 'cola' : 'entradas', k: i + 8, ropa: i ? 'buzo' : 'saco', gesto: i ? 'menton' : 'mesa' }), M.clone().multiply(correr(0, -.5)))); });
+    [[5.0, -4.3, -.86], [5.75, -3.3, -1.05]].forEach(([x, z, ry], i) => { const M = asiento(x, STAGE_Y, z, ry); tec.push(...en(mesa(1.1, BASE), M), ...en(persona(gente(i + 8, i ? '#3c2f4a' : '#30384e', '#2a2e38'), { det: 0, pelo: i ? 'cola' : 'entradas', k: i + 8, ropa: i ? 'buzo' : 'saco', gesto: i ? 'menton' : 'mesa' }), M.clone().multiply(correr(0, -.5)))); });
     this.fijos.push(malla(tec, 'mesa técnica'));
     // gente de pie en penumbra a los costados del escenario (entrenadores, cargadores, un camarógrafo): siluetas oscuras, sin detalle; la sala está habitada
     const pie = [];
     [[-6.05, -3.5, 'cruzados', 'buzo', 'corto', '#3a1d22'], [-5.95, 4.55, 'atras', 'remera', 'corto', '#22304f'], [-5.3, 4.95, 'cruzados', 'remera', 'cola', '#22304f'], [5.65, 4.7, 'abajo', 'remera', 'entradas', '#26282e']].forEach(([x, z, gesto, ropa, pelo, tono], i) => {
       const C0 = gente(i + 13, tono, '#15171c'), C = {}; for (const k in C0) C[k] = C0[k].clone().multiplyScalar(.42);
-      pie.push(...en(persona(C, { det: 1, pelo, k: i + 13, gesto, ropa, dePie: true }), asiento(x, STAGE_Y, z, Math.atan2(-x, .4 - z))));
+      pie.push(...en(persona(C, { det: 0, pelo, k: i + 13, gesto, ropa, dePie: true }), asiento(x, STAGE_Y, z, Math.atan2(-x, .4 - z))));
     });
     this.fijos.push(malla(pie, 'gente de pie'));
     // cartel iluminado en el frente de la mesa de los árbitros

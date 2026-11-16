@@ -53,7 +53,7 @@ void main(){
 /** Ganancia con la que se guarda la tribuna horneada (8 bits: el público es oscuro y sin esto se escalona). */
 const HORNEO = 6;
 /** En el camino directo (sin gradación ni viñeta del pase final) el mismo público queda más claro: se baja acá. */
-const DIRECTO = .7;
+const DIRECTO = .3;
 
 export class Publico {
   /** `animo`: el uniform {value} del ánimo del público (ambiente.publico.uAnimo). `chico`: texturas a la mitad (teléfono). */
@@ -104,7 +104,7 @@ export class Publico {
    */
   _hornear() {
     const A = this.arena, crowd = A.crowd, mat = crowd.material, g0 = crowd.geometry, grupo = new THREE.Group(); grupo.name = 'tribunas horneadas';
-    const BH = 1.5, M = new THREE.Matrix4(), r = this.renderer, fondo = new THREE.Color(.1, .112, .14), suave = mat.uniforms.uSuave.value; mat.uniforms.uHorneo.value = HORNEO; mat.uniforms.uSuave.value = 0;      /* fondo más oscuro que la gente; sin sesgo de mipmap (la textura ya es chica) */      // fondo opaco del tono de la sombra de la tribuna: la masa es continua, sin recortes dentados ni huecos negros
+    const BH = 1.5, M = new THREE.Matrix4(), r = this.renderer, fondo = new THREE.Color(.075, .085, .105), suave = mat.uniforms.uSuave.value; mat.uniforms.uHorneo.value = HORNEO; mat.uniforms.uSuave.value = 0;      /* fondo más oscuro que la gente; sin sesgo de mipmap (la textura ya es chica) */      // fondo opaco del tono de la sombra de la tribuna: la masa es continua, sin recortes dentados ni huecos negros
     A.stands.forEach((st, si) => {
       const ids = []; A.seats.forEach((s, i) => { if (s.si === si) ids.push(i); });
       const g = new THREE.InstancedBufferGeometry(); g.index = g0.index; for (const k of ['position', 'uv']) g.setAttribute(k, g0.attributes[k]);

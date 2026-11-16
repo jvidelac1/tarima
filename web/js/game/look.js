@@ -666,7 +666,7 @@ export class Look {
       // En el camino directo no se dibuja (Media para arriba sí), hasta medir en una placa
       for (const o of this.utileria()) if (o !== this.props) o.visible = !d; this.props.visible = !d; }
     FINO.value = Q.directo ? 0 : 1;
-    if (this.haloMat) { this.haloMat.uniforms.uDirecto.value = Q.directo ? 1 : 0; this.haloMat.uniforms.uMax.value = Q.directo ? 120 : 240; for (const b of this.arena.beams || []) b.puesto = false; }      // en el camino directo, halos chicos: poca pantalla de mezcla
+    if (this.haloMat) { this.haloMat.uniforms.uDirecto.value = Q.directo ? 1 : 0; this.haloMat.uniforms.uMax.value = Q.directo ? 72 : 240; for (const b of this.arena.beams || []) b.puesto = false; }      // en el camino directo, halos chicos: poca pantalla de mezcla
     // en el camino directo la pared de chapa (material físico en mucha pantalla) no se dibuja: queda el telón, como antes
     this.arena.group.traverse(o => { if (o.material === this.chapaMat) o.visible = sup; });      // la chapa es toda por función: sin superficies sería un paño liso
     BOKEH.uScale.value = Q.directo ? .12 : .18;      // luces de fondo: puntos con halo en el camino directo (eran discos grises), bokeh moderado con post      // superficies por función solo con post
