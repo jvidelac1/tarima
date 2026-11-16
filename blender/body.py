@@ -71,6 +71,7 @@ def _build(name,cfg,x):
         if abs(w)<1e-6: return
         if p in KEYS: KB(p).value=min(1.,KB(p).value+w); return
         antes={k.name for k in b.data.shape_keys.key_blocks} if b.data.shape_keys else set()
+        if not os.path.exists(os.path.join(T,p+'.target.gz')): print('TARGET no existe (se saltea):',p); return
         TS.load_target(b,os.path.join(T,p+'.target.gz'),weight=w)
         nuevos=[k.name for k in b.data.shape_keys.key_blocks if k.name not in antes]
         if nuevos: KEYS[p]=nuevos[0]

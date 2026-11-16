@@ -176,7 +176,9 @@ def cfg(k):
              # boca: los labios de MPFB salen muy gruesos con estos macros
              ('mouth/mouth-upperlip-volume-decr', .7), ('mouth/mouth-lowerlip-volume-decr', .65), ('mouth/mouth-angles-up', .35), ('forehead/forehead-scale-vert-decr', .6 if F else .35),
              # mirada: párpados apenas entornados y cejas apenas bajas (concentración). Con 'slit' en .75 y 'closure' los ojos salían cerrados (ronda 1 del director de arte)
-             ('expression/units/caucasian/eye-left-slit', .22), ('expression/units/caucasian/eye-right-slit', .22), ('expression/units/caucasian/eyebrows-left-down', .25), ('expression/units/caucasian/eyebrows-right-down', .25),
+             ('expression/units/caucasian/eye-left-slit', .30 if F else .36), ('expression/units/caucasian/eye-right-slit', .30 if F else .36), ('expression/units/caucasian/eyebrows-left-down', .3 if F else .55), ('expression/units/caucasian/eyebrows-right-down', .3 if F else .55),
+             # físico heroico de pesista (dirección de arte del 16-nov): cuello, brazo y muslo gruesos. La masa manda: body.py compensa bajando el macro 'weight', así el volumen se va de la cintura a los grupos musculares
+             ('neck/measure-neck-circ-incr', (.25 if F else .55) * mu * (1 - .5 * g)), ('arms/measure-upperarm-circ-incr', (.15 if F else .45) * mu * (1 - g)), ('legs/measure-thigh-circ-incr', (.3 if F else .45) * mu * (1 - .6 * g)),
              # antebrazo grueso de pesista
              ('arms/l-lowerarm-scale-horiz-incr', .22 if F else .4), ('arms/r-lowerarm-scale-horiz-incr', .22 if F else .4), ('arms/l-lowerarm-scale-depth-incr', .22 if F else .4), ('arms/r-lowerarm-scale-depth-incr', .22 if F else .4),
              # la panza del pesado: alta, redonda y firme (no caída), y la cara más llena
