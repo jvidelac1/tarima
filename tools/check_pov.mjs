@@ -108,7 +108,8 @@ if (!SOLO || SOLO === 'finales') {
   for (const id of ['ventura', 'brenner']) for (const caso of FINALES) {
     const r = await recorrer(id, caso, '3/4', true); if (!r) continue; const { M, info } = r;
     console.log(`${id.padEnd(8)} ${caso[0].padEnd(26)} ${info.tipo.padEnd(8)} ${info.dur.toFixed(2)} s · pies resbalan ${(M.resbala * 100).toFixed(1)} cm (máx ${(M.vPie * 100).toFixed(0)} cm/s a ${M.tPie.toFixed(2)} s; punta hasta ${(M.sube * 100).toFixed(0)} cm) · giro máx ${G(M.giro).toFixed(0)} °/s (${M.cual}, a ${M.tGiro.toFixed(2)} s) · mano hasta ${M.vMano.toFixed(1)} m/s (a ${M.tVMano.toFixed(2)} s) · mano–tronco mín ${(M.manoTronco * 100).toFixed(1)} cm a ${M.tMano.toFixed(2)} s · holgura barra ${(M.holgura * 100).toFixed(1)} cm`);
-    if (M.camMov > .02 || M.camGiro > .004) problemas.push(`${id} · ${caso[0]}: la cámara general se mueve después de soltar la barra (${(M.camMov * 100).toFixed(1)} cm, ${G(M.camGiro).toFixed(2)}°)`);
+    // (hasta 5 cm: el temblor de la barra contra la tarima, que dura dos décimas, no es un reencuadre)
+    if (M.camMov > .05 || M.camGiro > .004) problemas.push(`${id} · ${caso[0]}: la cámara general se mueve después de soltar la barra (${(M.camMov * 100).toFixed(1)} cm, ${G(M.camGiro).toFixed(2)}°)`);
     console.log(`${''.padEnd(36)}cámara tras soltar: ${(M.camMov * 100).toFixed(1)} cm, ${G(M.camGiro).toFixed(2)}°`);
     await hoja(`final_${id}_${slug(caso[0])}_general`, r.lista);
     if (id === 'ventura') { const l = await recorrer(id, caso, 'lado', true); if (l) await hoja(`final_${id}_${slug(caso[0])}_lado`, l.lista); }

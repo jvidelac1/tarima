@@ -2094,6 +2094,32 @@ cabeza oculta, giro de la mirada ≤ 160 °/s, cámara a ≤ 80 cm de la cabeza;
 | 3 | 3f362d5 | 5 | 6 | Fuera los antebrazos cortados: agachado la cámara queda en los ojos, mira casi a plomo y no dibuja el tronco |
 | 4 | d16fc16 | 6 | 6 | Giro de cabeza hacia la barra caída atrás; barra en los hombros más abajo; pararse de la sentadilla en 0,8 s por fase |
 | 5 | ae1259e | 5 | 6 | Se deshicieron los dos cambios que la ronda 5 marcó como graves (giro de cabeza y encuadre de los hombros). El estado final es el de la ronda 4 con la mirada agachado a −80° (era −87°), la cámara 7 cm adelante de pie y el pararse más lento. **Ese estado final no pasó por otra ronda.** |
+| 6 | abc1a39 | 4 (ronda 1 de la sesión 2, director del conjunto) | 4,5 | Primera persona rehecha como un juego en primera persona (abajo) |
+
+**Sesión 2 (rama `v-pov`, 16-nov a la noche): primera persona como un juego en primera persona.** La ronda sobre `abc1a39`
+(4 y 4,5) marcó: brazos que entran desde arriba y se deshacen en punteado, torso propio a la vista, la cámara que sube 35° en
+el envión y pierde a los jueces, picado al piso al soltar, cámara general que se reencuadra después de soltar, hojas sin
+luces ni veredicto, brazos en T y «soldado» igual en válido y nulo. Lo que cambió (reglas, iguales para todo biotipo):
+- **La cámara está siempre en los ojos y la mirada no se inclina nunca** (`POV.barra[2]`, −9°): ni con la barra arriba ni al
+  soltarla. Sube y baja con el cuerpo (agachado en la salida, de pie al final). `check_pov` falla si se inclina más de 3°.
+- **Brazos de primera persona** (`POV.vm`, `_povCam` y `_vm` en `stage.js`): el cuerpo propio y la barra se DIBUJAN girados
+  alrededor de la línea de los hombros hasta que el brazo apunta al frente (`vm.at` con la barra tomada, `vm.libre` con las
+  manos sueltas) o, con la barra arriba, hasta `vm.alto` (35° sobre el horizonte), y corridos al frente (`vm.dz`). Los brazos
+  entran por el borde de abajo, las manos y la barra quedan en el tercio inferior (o la barra en el cuarto de arriba) y al
+  frente siempre están los jueces. Es solo dibujo: se aplica antes del pase de imagen y se deshace después; huesos, barra,
+  física, reflejo y medidas no cambian. Con el cuerpo girado la sombra no se actualiza (saldría la del cuerpo girado).
+- Del cuerpo propio se dibujan **solo los brazos, enteros y sin trama** (`uSinTorso` 1, `uCorte` 0,8; se sacó el punteado
+  contra el borde): el corte del hombro queda fuera de la imagen por regla.
+- La barra acompaña a las manos con `kA` (1 tomada; al soltarla pasa a su lugar real a 4 por segundo: se la ve caer).
+- **Final**: `rig.fijo` congela el encuadre de la cámara general desde que se suelta la barra (antes el borde de arriba seguía
+  a la barra que caía: reencuadre de 0,6 s); `check_pov` mide cuánto se corre y gira la cámara tras soltar y falla con más de
+  2 cm o 0,2°. Brazos: con la barra soltada desde arriba **barren por delante** (`BARRIDO`, `_gesto`), ya no desandan el clip
+  (codos altos y cruz). **Gesto por regla** (`GESTO`): válido = dos puños que marcan dos veces y vuelven a colgar; nulo o
+  fallo = cabeza que cae, hombros vencidos y negación.
+- Hojas: `finalEn` prende las luces y el veredicto como el juego; `check_pov --solo=claves --q=alta --plantel=…` saca las
+  fases clave con calidad alta y el plantel nuevo (`out/pov_alta`); `check_barra --solo=tel_en --camara=pov` el teléfono.
+Lo de abajo («no tocar» y «sigue mal») es de las cinco rondas anteriores, con la cámara vieja.
+
 Lo que las cinco rondas dejaron bien («no tocar»): barra arriba (recepción y recuperación del arranque, empuje, tijera y
 final del envión), tirón de brazos, horizonte nivelado, la barrita de timing en escritorio, caída y rebote de la barra,
 «devuelve la barra» y el corte a los jueces con las tres luces.

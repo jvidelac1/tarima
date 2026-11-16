@@ -145,7 +145,9 @@ export function poseCaida(pl, g0, destino, t, R = null) {
   }
   const i = Math.floor(gC), a0 = K[kB], a1 = K[Math.min(n, kB + 1)], f0 = Math.floor(a0);
   // la primera pose puede ser fraccionaria (g0): se aproxima a su muestra más cercana solo si no es entera
-  return { i, j: i + 1, u: gC - i, k: destino, w, dz, dy, t, brazos: { i: n ? Math.round(a0) : f0, j: n ? Math.round(a1) : f0 + 1, u: n ? x - kB : g0 - f0, k: destino, w: wB } };
+  // los demás fallos (barra que no sube, devuelta, perdida sentado): la misma bronca, apenas llega a «Parado»
+  const tG = t - (tM + mz) + .25, gesto = tG > 0 ? { tipo: 'bronca', w: suave(tG / GESTO.bronca.sube), t: tG } : null;
+  return { i, j: i + 1, u: gC - i, k: destino, w, dz, dy, t, brazos: { i: n ? Math.round(a0) : f0, j: n ? Math.round(a1) : f0 + 1, u: n ? x - kB : g0 - f0, k: destino, w: wB }, gesto };
 }
 
 /** Escena entera: plan, barra (desde que se suelta) y duración. `bar`: {y, z} de la barra dibujada en el instante final. `g0` y `R`: ver poseCaida. */
