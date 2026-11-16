@@ -232,7 +232,7 @@ export const PLANOS = {
  * - la cabeza propia no se dibuja en esta vista ni mientras la cámara esté a menos de `sinCabeza` m de los ojos (el hueso del cuello se
  *   achica a un punto entre las clavículas: cuello, cara, pelo, ojos y pestañas van pesados a él o a la cabeza, su hijo). La sombra sale sin cabeza: cae detrás del pesista.
  */
-export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 3.3, giroMax: 2.6, margen: .4, hombros: .38, encima: .38, abajo: -1.02, frente: -.21, tope: .6, bajo: [.12, .42], alto: [-.05, .3], atras: [.12, .26], abajoAgachado: -1.52, agarre: .72, atrasMax: .75, fovBajo: 88, fovAnchoBajo: 122, suelta: [1, -.8, 9, .45], jueces: -.13, sinCabeza: .6, foco: 1.6,
+export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 3.3, giroMax: 2.6, margen: .4, hombros: .5, encima: .38, abajo: -1.02, frente: -.21, tope: .6, bajo: [.12, .42], alto: [-.05, .3], atras: [.12, .26], atrasAgachado: 0, pecho: .07, vuelta: 2.9, abajoAgachado: -1.4, agarre: .72, atrasMax: .75, fovBajo: 88, fovAnchoBajo: 122, suelta: [1, -.8, 9, .45], jueces: -.13, sinCabeza: .6, foco: 1.6,
   resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003 }, temblor: .006 };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
@@ -630,11 +630,12 @@ export class Escena {
   /** Cuánto del tronco propio se deja sin dibujar (0 a 1; athlete.js: aTorso). El cinturón sale con él. */
   _torso(a, k) {
     if (this._sinTorso && this._sinTorso !== a) { const x = this._sinTorso; this._sinTorso = null; this._torso(x, 0); }
-    if (!a?.skin?.uSinTorso) return; a.skin.uSinTorso.value = k; this._sinTorso = k > 0 ? a : null;
+    if (!a?.skin?.uSinTorso) return; a.skin.uSinTorso.value = k; this._sinTorso = k > 0 || this.pov ? a : null;
     for (const m of a.meshes) {
       const nm = m.material?.name || ''; if (/^Belt/.test(nm)) m.visible = k < .5;
-      // con el tronco oculto el cuerpo se dibuja de los dos lados: por el corte del hombro y de la cintura no se ve a través de la malla
-      if (nm === 'Body') { const lado = k > 0 ? THREE.DoubleSide : THREE.FrontSide; if (m.material.side !== lado) { m.material.shadowSide = THREE.BackSide; m.material.side = lado; m.material.needsUpdate = true; } }
+      // con el tronco oculto el cuerpo se dibuja de los dos lados: por el corte del hombro y de la cintura no se ve a través de la malla;
+      // y siempre en primera persona: el cuello achicado deja un embudo que, visto desde atrás, mostraba el piso a través del pecho
+      if (nm === 'Body') { const lado = k > 0 || this.pov ? THREE.DoubleSide : THREE.FrontSide; if (m.material.side !== lado) { m.material.shadowSide = THREE.BackSide; m.material.side = lado; m.material.needsUpdate = true; } }
     }
   }
   /** La cámara en primera persona de este cuadro (la llama el rig en lugar de su encuadre). */
@@ -650,7 +651,7 @@ export class Escena {
     // y los pies. `kT`: cuánto (0 de pie, 1 agachado: los ojos más de 30 cm por delante de la cadera).
     const a = this.activo;
     const kT = this._suelta || !a ? 0 : lejos * paso(o.z - a.boneWorld('Hips', _pb).z, .12, .3);
-    const retro = this._suelta ? 0 : POV.atras[0] * (1 - lejos) + POV.atras[1] * arriba; // y lo que haga falta para que las dos manos entren en la imagen (agarre ancho del arranque): la barra a no menos de
+    const retro = this._suelta ? 0 : POV.atrasAgachado * kT - POV.pecho * lejos * (1 - kT) + POV.atras[0] * (1 - lejos) + POV.atras[1] * arriba; // y lo que haga falta para que las dos manos entren en la imagen (agarre ancho del arranque): la barra a no menos de
     // medio agarre / (`agarre` × tangente de medio lente a lo ancho) de la cámara, sin pasar de `atrasMax`
     let retro2 = retro;
     if (!this._suelta && this.activo) {
@@ -664,10 +665,14 @@ export class Escena {
     // barra suelta: la mirada la sigue mientras cae y, `suelta[3]` s después de soltarla, sube a los jueces (`jueces` rad): ahí se prenden las luces
     S.tSuelta = this._suelta ? (S.tSuelta || 0) + dt : 0;
     // «quieta»: la barra suelta lleva `suelta[3]` s casi sin moverse (o cayó detrás, donde no se la ve): recién ahí la mirada sube
-    { const v = dt > 0 && S.bAnt ? Math.hypot(b.y - S.bAnt[0], b.z - S.bAnt[1]) / dt : 9; S.bAnt = [b.y, b.z]; S.tQuieta = this._suelta && (v < .15 || b.z < S.p.z - .1) ? (S.tQuieta || 0) + dt : 0; }
-    const incT = this._suelta ? (S.tQuieta > POV.suelta[3] ? POV.jueces : Math.max(POV.suelta[1], Math.min(POV.frente, hacia * POV.suelta[0]))) : Math.max(POV.abajo + (POV.abajoAgachado - POV.abajo) * (S.kT || 0), Math.min(POV.tope, hacia + corr));
+    // Si cayó detrás, la cabeza gira a buscarla por encima del hombro (`vuelta` rad de guiñada) y vuelve al frente cuando queda quieta.
+    const atrasB = this._suelta && b.z < S.p.z - .1;
+    if (dt > 0) { const v = S.bAnt ? Math.hypot(b.y - S.bAnt[0], b.z - S.bAnt[1]) / dt : 9; S.bAnt = [b.y, b.z]; S.tQuieta = this._suelta && v < .15 ? (S.tQuieta || 0) + dt : 0; }
+    const quietaYa = S.tQuieta > POV.suelta[3] + (atrasB ? .8 : 0), yawT = atrasB && !quietaYa ? POV.vuelta : 0;
+    S.yaw = S.nueva || quieto ? 0 : (S.yaw || 0) + (yawT - (S.yaw || 0)) * (1 - Math.exp(-4.5 * dt));
+    const incT = this._suelta ? (quietaYa ? POV.jueces : atrasB ? Math.max(-1, -Math.atan2(Math.abs(dy), Math.max(.3, Math.abs(dz)))) : Math.max(POV.suelta[1], Math.min(POV.frente, hacia * POV.suelta[0]))) : Math.max(POV.abajo + (POV.abajoAgachado - POV.abajo) * (S.kT || 0), Math.min(POV.tope, hacia + corr));
     // con retardo y con tope de velocidad (`giroMax` rad/s: cuando la barra pasa junto a la cámara el ángulo hacia ella cambia de golpe)
-    const dInc = (incT - S.inc) * (1 - Math.exp(-(quieto ? 60 : this._suelta ? (S.tQuieta > POV.suelta[3] ? 2.2 : POV.suelta[2]) : POV.giro) * dt)), topeG = POV.giroMax * dt;
+    const dInc = (incT - S.inc) * (1 - Math.exp(-(quieto ? 60 : this._suelta ? (quietaYa ? 2.2 : POV.suelta[2]) : POV.giro) * dt)), topeG = POV.giroMax * dt;
     S.inc = S.nueva ? incT : S.inc + (quieto ? dInc : Math.max(-topeG, Math.min(topeG, dInc))); S.nueva = false;
     let inc = S.inc, bal = 0, y = 0;
     if (!quieto) {
@@ -675,7 +680,7 @@ export class Escena {
       y = POV.resp.y * Math.sin(w); inc += POV.resp.cabeceo * Math.sin(w - .9) + T * (Math.sin(S.t * 47) * .6 + Math.sin(S.t * 83 + 1.3) * .4);
       bal = POV.resp.balanceo * Math.sin(w * .5 + 1) + T * .6 * (Math.sin(S.t * 39 + .7) * .6 + Math.sin(S.t * 71) * .4);
     }
-    cam.position.copy(S.p); cam.position.y += y; cam.rotation.set(inc, Math.PI, bal, 'YXZ');
+    cam.position.copy(S.p); cam.position.y += y; cam.rotation.set(inc, Math.PI + (S.yaw || 0), bal, 'YXZ');
     // con la barra abajo el lente se abre (`fovBajo`, como una cámara de casco): la barra queda a plomo bajo los ojos y solo así
     // entran a la vez la barra con las manos (abajo) y los jueces (arriba) mirando adelante y abajo, sin mirar el piso en picado
     S.ancho = S.ancho === undefined ? lejos : S.ancho + (lejos - S.ancho) * (1 - Math.exp(-(quieto ? 60 : 5) * dt)); const kA = this._suelta ? 0 : S.ancho;

@@ -97,7 +97,7 @@ export function planCaida(tipo, causa, valido = false) {
  *   final del segmento (`R.fin`: la recuperación validada, con los pies donde van) a `PARARSE` s por fase; recién ahí pasa
  *   a «Parado», y lo que les falta a los pies lo hacen en un saltito (`SALTITO`: la raíz sube y la mezcla ocurre en el aire).
  */
-export const PARARSE = .5, DESANDAR = .24, MANOS = .2, SALTITO = { dur: .3, alto: .04 };
+export const PARARSE = .8, DESANDAR = .24, MANOS = .2, SALTITO = { dur: .3, alto: .04 };
 /** Lo que tarda en pasar a «Parado» (s): con saltito, medio segundo como mucho (el saltito va en el medio). */
 const mezclaDe = (pl, g0, R) => (R && g0 >= R.rec ? Math.min(pl.mezcla, SALTITO.dur + .2) : pl.mezcla);
 /** Poses (muestras globales) por las que pasan los brazos: la del final y la de cada fase anterior, hasta `R.brazosA`. */
