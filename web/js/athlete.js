@@ -62,7 +62,8 @@ const SKIN_MASK = /* glsl */`
     diffuseColor.rgb = mix( diffuseColor.rgb, piel, gMask.r ); }
   else diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * uSkinTint, gMask.r );
   diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * uClothTint, gMask.g * step( 0.5, uMaskMode ) );      // tinte de la tela (conserva el diseño horneado)
-  { vec3 tl = diffuseColor.rgb * uClothGain; float lt = dot( tl, vec3( 0.2126, 0.7152, 0.0722 ) ); tl = max( vec3( 0.0 ), mix( vec3( lt ), tl, 1.18 ) );      // la tela bajo los focos: el tono AgX lava lo muy claro (la malla salía del color de la piel)
+  { float mx = max( diffuseColor.r, max( diffuseColor.g, diffuseColor.b ) ), mn = min( diffuseColor.r, min( diffuseColor.g, diffuseColor.b ) );
+    vec3 tl = diffuseColor.rgb * mix( 0.8, uClothGain, smoothstep( 0.15, 0.6, ( mx - mn ) / max( mx, 1e-3 ) ) ); float lt = dot( tl, vec3( 0.2126, 0.7152, 0.0722 ) ); tl = max( vec3( 0.0 ), mix( vec3( lt ), tl, 1.25 ) );      // la tela bajo los focos: el tono AgX lava lo muy claro (la malla salía del color de la piel)
     diffuseColor.rgb = mix( diffuseColor.rgb, tl, gMask.g * step( 0.5, uMaskMode ) ); }
   // tela de color plano (el juego la usa para un pesista que comparte modelo): tapa lo que la textura trae horneado
   diffuseColor.rgb = mix( diffuseColor.rgb, uClothFlat.rgb, uClothFlat.a * smoothstep( 0.5, 0.9, gMask.g ) * step( 0.5, uMaskMode ) );
@@ -236,7 +237,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
   for (const t of [m.map, m.normalMap, m.roughnessMap, m.aoMap]) if (t) t.anisotropy = aniso;
   const uniforms = { tDetailSkin: { value: detail.skin }, tDetailCloth: { value: detail.cloth }, uTile: { value: new THREE.Vector2(mpu / .012, mpu / .008) }, uDetail: { value: 1 }, tMask: { value: mask }, uMaskMode: { value: mask ? 1 : 0 },
     uScatter: { value: new THREE.Color(...ASPECTO.piel.dispersion) }, uSweat: { value: ASPECTO.piel.sudor }, uSkinSat: { value: ASPECTO.piel.saturacion }, uSkinRough: { value: ASPECTO.piel.rugosidad }, uHairColor: { value: new THREE.Color(.03, .025, .02) }, uClothFlat: { value: new THREE.Vector4(0, 0, 0, 0) },
-    uSkinTint: { value: new THREE.Color(ASPECTO.piel.tono) }, uClothTint: { value: new THREE.Color(1, 1, 1) }, uTone: { value: ASPECTO.piel.variacion }, uWrinkle: { value: ASPECTO.tela.arrugas }, uGloss: { value: ASPECTO.piel.brillo }, uFino: FINO, uClothGain: { value: .66 }, uNormBias: { value: 1.7 },
+    uSkinTint: { value: new THREE.Color(ASPECTO.piel.tono) }, uClothTint: { value: new THREE.Color(1, 1, 1) }, uTone: { value: ASPECTO.piel.variacion }, uWrinkle: { value: ASPECTO.tela.arrugas }, uGloss: { value: ASPECTO.piel.brillo }, uFino: FINO, uClothGain: { value: .46 }, uNormBias: { value: 1.7 },
     uHairMix: { value: .7 }, uPiel: { value: new THREE.Color(.6, .42, .33) }, uSinCabeza: { value: 0 }, uSinTorso: { value: 0 }, uCorte: { value: .5 } };
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, uniforms);
@@ -248,7 +249,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
       .replace('#include <normal_fragment_maps>', THREE.ShaderChunk.normal_fragment_maps.replaceAll('texture2D( normalMap, vNormalMapUv )', 'texture2D( normalMap, vNormalMapUv, uNormBias * gMask.r )') + '\n' + SKIN_DETAIL)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + SKIN_MATERIAL);
   };
-  m.customProgramCacheKey = () => 'tarima-skin-21';
+  m.customProgramCacheKey = () => 'tarima-skin-22';
   m.userData.skin = uniforms;
   return m;
 }
@@ -264,8 +265,8 @@ void RE_Direct_Hair( const in IncidentLight directLight, const in vec3 geometryP
   vec3 h = normalize( directLight.direction + geometryViewDir );
   float ndl = saturate( dot( geometryNormal, directLight.direction ) * 0.6 + 0.4 );
   float a1 = dot( normalize( t + geometryNormal * 0.12 ), h ), a2 = dot( normalize( t - geometryNormal * 0.2 ), h );
-  float banda = pow( sqrt( max( 0.0, 1.0 - a1 * a1 ) ), 90.0 ) * 0.05 + pow( sqrt( max( 0.0, 1.0 - a2 * a2 ) ), 22.0 ) * 0.035;
-  reflectedLight.directSpecular += directLight.color * ndl * banda * ( 0.35 + material.diffuseContribution * 6.0 );
+  float banda = pow( sqrt( max( 0.0, 1.0 - a1 * a1 ) ), 90.0 ) * 0.0035 + pow( sqrt( max( 0.0, 1.0 - a2 * a2 ) ), 22.0 ) * 0.002;      // muy bajo: las capas se suman y los focos son fuertes
+  reflectedLight.directSpecular += directLight.color * ndl * banda * ( 0.3 + material.diffuseContribution * 5.0 );
 }
 #undef RE_Direct
 #define RE_Direct RE_Direct_Hair
@@ -287,7 +288,7 @@ function hairMaterial(src) {
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.2; material.specularColorBlended *= 0.2;')
       .replace('#include <lights_physical_pars_fragment>', '#include <lights_physical_pars_fragment>\n' + HAIR_PARS);
   };
-  src.customProgramCacheKey = () => 'tarima-hair-3';
+  src.customProgramCacheKey = () => 'tarima-hair-4';
   return src;
 }
 /** Color medio (lineal) de las hebras opacas de la textura de pelo. */
