@@ -840,9 +840,6 @@ async function decision(a, lev, res, et, propio, o = {}) {
     if (fin && conFinal) dibujarFinal(fin, t, dt, vivo);
     while (hito.luz < 3 && t >= tLuz + hito.luz * paso) { const i = hito.luz++; d[i] = res.luces[i]; setLuces(d); if (vivo) { sonido.luz(d[i]); if (limite && i < 2) sonido.latido(); if (ok && i === 1) sonido.festejo(lento || limite ? 1 : .6); } }
     if (!hito.caida && t >= tCaida) { hito.caida = true; escena.primerPlano('caida', null, .6); }
-    // en primera persona, si la barra suelta cae detrás del pesista (no se la puede ver desde los ojos: quedaba la tarima vacía
-    // durante todo el veredicto), la cámara sale con un movimiento suave al plano de la barra que cae
-    if (pov && fin && !ok && !hito.atras && escena.pov && escena.barraAtras()) { hito.atras = true; escena.primerPlano('caida', null, .6); }
     if (!hito.rev && t >= tRev) { hito.rev = true; escena.camara('rev', 1.1); }
     if (!hito.ver && t >= tVer) { hito.ver = true; veredicto(titulo, sub, !ok); try { o.alVer?.(); } catch (e) { console.warn('alVer:', e); } if (vivo && !ok && (!fin || fin.tipo === 'bajada')) sonido.ovacion(false); }
   };

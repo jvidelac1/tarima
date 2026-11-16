@@ -71,6 +71,8 @@ async function recorrer(id, [nombre, lev, seg, fase, mov, res], camara, fotos, c
   const info = await J(o => window.JUEGO.test.final(o), { id, lev, seg, fase, mov, res, camara });
   if (!info) { problemas.push(`${id} · ${nombre}: no armó escena`); return null; }
   await J(() => window.JUEGO.test.medir());
+  // la cámara se asienta en la pose del final antes de la primera foto (venía de la escena anterior)
+  await J(() => { window.JUEGO.test.finalEn(0, false, 1 / 60, .5); window.JUEGO.test.finalEn(0, false, 1 / 60, .5); });
   let piso = 9; const M = { resbala: 0, vPie: 0, tPie: 0, giro: 0, cual: '', tGiro: 0, manoTronco: 9, tMano: 0, vMano: 0, tVMano: 0, holgura: 9, sube: 0 }, lista = []; let ant = null, prox = 0;
   for (let t = 0; t <= info.dur + .3; t += 1 / 60) {
     const sacar = fotos && t >= prox - 1e-9;
