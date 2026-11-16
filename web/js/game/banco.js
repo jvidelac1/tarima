@@ -279,6 +279,7 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
     { id: 'haces', nombre: 'sin haces de luz', poner: () => ocultar(A.beamMeshes) },
     { id: 'aniso', nombre: 'anisotropía 1 en todas las texturas', poner: v => anisotropia(1, v) },
     { id: 'anisoIgual', nombre: 'anisotropía puesta otra vez en el mismo valor (control de «aniso»)', poner: v => anisotropia(null, v) },
+    { id: 'utileria', nombre: 'sin la utilería del look (cajones, bancos, baúles, cables, discos, chapa)', defecto: false, poner: () => ocultar(escena.look?.utileria() || []) },
     { id: 'arena', nombre: 'sin arena (solo pesista y barra)', poner: () => ocultar([A.group]) },
     { id: 'pesista', nombre: 'sin pesista', poner: () => ocultar([escena.activo.root]) },
     { id: 'lod', nombre: 'pesista con la malla completa (sin nivel de detalle)', poner: () => { escena.lodFijo = 9999; return () => { escena.lodFijo = LOD_PLANO; }; } },

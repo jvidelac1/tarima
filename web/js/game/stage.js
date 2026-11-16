@@ -216,7 +216,7 @@ export class Escena {
     const r = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', stencil: false });
     r.shadowMap.enabled = true; r.shadowMap.type = THREE.VSMShadowMap; r.shadowMap.autoUpdate = false;
     this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(SALA.fondo); this.scene.fog = new THREE.FogExp2(SALA.niebla, SALA.densidad);
-    this._niebla = { hdr: this.scene.fog.color.clone(), directo: tonoJS(this.scene.fog.color) };      // en el camino directo la niebla se mezcla ya en colores de pantalla
+    this._niebla = { hdr: this.scene.fog.color.clone(), directo: tonoJS(new THREE.Color(SALA.nieblaDirecto)) };      // en el camino directo la niebla se mezcla ya en colores de pantalla
     if (canvas.parentElement && typeof document !== 'undefined') { const d = this.velo = document.createElement('div'); d.setAttribute('aria-hidden', 'true'); d.style.cssText = `position:absolute;inset:0;pointer-events:none;background:${vineta()}`; canvas.after(d); }
     this.rig = new CameraRig(canvas, { reduceMotion, interactive: false }); this.viva = new CamaraViva({ reduceMotion });
     this.trace = new BarTrace(); this.scene.add(this.trace.group);

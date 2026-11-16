@@ -22,7 +22,7 @@ import { conSuperficie, setSuperficies, chapa, USO } from './materiales.js';
 /** Gradación del juego: exposición, saturación, contraste, gamma de sombras, tinte de sombras y de altas, viñeta y negro. */
 export const GRADO_LOOK = Object.freeze({ exp: 1.0, sat: .88, con: 1.03, gam: 1.0, frio: [.92, .995, 1.09], calido: [1.07, 1.0, .91], vin: .36, negro: .004 });
 /** Niebla y fondo de la sala (a oscuras, azul petróleo). */
-export const SALA = Object.freeze({ fondo: '#070a11', niebla: '#0a0f18', densidad: .021 });
+export const SALA = Object.freeze({ fondo: '#070a11', niebla: '#0a0f18', densidad: .021, nieblaDirecto: '#1b2740' });      // nieblaDirecto: en «Baja» y «Móvil» la bruma es más clara y azul (da fondo y profundidad sin costo: la niebla ya se calculaba)
 
 const DISPLAY = "'Saira Condensed','Arial Narrow',sans-serif";
 const Y0 = -.1;      // piso del escenario (la tarima tiene su cara de arriba en 0)
@@ -354,6 +354,8 @@ export class Look {
     // los focos del fondo: ámbar a la izquierda (acompañan al contraluz), blanco frío a la derecha; nada de rosa y celeste
     (A.beams || []).forEach((b, i) => b.mat.uniforms.uColor.value.set(i < 5 ? (i % 2 ? '#ffb469' : '#ffc890') : (i % 2 ? '#cfe0ff' : '#e9eeff')));
     this.salaImpostor = 1.7;
+    // los dos cargadores de pie eran cápsulas azules fuera de escala (lo único que queda en esos lotes en el juego): fuera
+    for (const o of A.group.children) if (o.isInstancedMesh && (o.geometry.type === 'CapsuleGeometry' || (o.geometry.type === 'SphereGeometry' && Math.abs(o.geometry.parameters.radius - .105) < 1e-6))) o.visible = false;
     // la bruma de sala (velos aditivos) lavaba los negros: a un tercio
     { const hechos = new Set(); A.group.traverse(o => { const m = o.material; if (m?.map === A.hazeTex && m.color && !hechos.has(m)) { hechos.add(m); m.color.multiplyScalar(.3); } }); }
     if (this.ambiente?.uPolvo) this.ambiente.uPolvo.uTam.value = .0045;
@@ -383,6 +385,7 @@ export class Look {
     const ply = new THREE.MeshStandardMaterial({ name: 'terciado', ...tx(terciado(S)), roughness: 1, metalness: 0, envMapIntensity: .4 });
     const negro = new THREE.MeshStandardMaterial({ name: 'goma negra', color: new THREE.Color('#0d0d10'), roughness: .7, envMapIntensity: .4 });
     const tela = new THREE.MeshStandardMaterial({ name: 'tela', color: new THREE.Color('#b9b6ac'), roughness: .95 });
+    this.propMats = new Set([metal, acero, baul, ply, negro, tela]);
     this.utilMats = [metal, baul, ply]; for (const m of this.utilMats) m.userData.normal = m.normalMap;
     const caja = new THREE.BoxGeometry(1, 1, 1), cil = new THREE.CylinderGeometry(1, 1, 1, 14);
     /** Caja o cilindro de tamaño (sx, sy, sz) centrado en (x, y, z) dentro de `g`. */
@@ -455,7 +458,7 @@ export class Look {
     calcoDe('tiza', -3.15, -1.9, 1.7); calcoDe('tiza', 3.2, -1.95, 1.5, 1); calcoDe('cinta', -3.6, 3.3, 1.5); calcoDe('cinta', 3.6, -3.0, 1.5, Math.PI);
 
     // pared de chapa pintada a los lados de la pantalla (materiales.js: toda por función), con columnas, caño y tablero eléctrico
-    { const ch = this.chapaMat = chapa('#2a4350');
+    { const ch = this.chapaMat = chapa('#2a4350'); this.propMats.add(ch);
       for (const s of [-1, 1]) { const g = grupo(s * 7.05, -5.72, 0, -1);
         pz(g, caja, ch, 3.5, 6.6, .06, 0, 3.3, 0);
         for (const x of [-1.72, 0, 1.72]) pz(g, caja, metal, .14, 6.6, .12, x, 3.3, .08);
@@ -469,6 +472,9 @@ export class Look {
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
       const o = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ name: 'banderines', map: t, color: new THREE.Color(.2, .2, .2), side: THREE.DoubleSide })); o.frustumCulled = false; P.add(o); }
   }
+
+  /** Todo lo que dibuja la utilería (después de juntarFijos las piezas fijas son mallas por material en la arena): para la variante «sin utilería» del banco. */
+  utileria() { const M = this.propMats, o = []; this.arena.group.traverse(x => { if (x === this.props || x === this.discos || (x.isMesh && M.has(x.material))) o.push(x); }); return o; }
 
   /** Conos de bruma de la clave y de los dos contraluces. Solo se ven con post (setNivel). */
   _rayos(L) {
