@@ -136,9 +136,9 @@ if (!SOLO || SOLO === 'pov') {
       }
       await J(() => window.JUEGO.test.real());
       console.log(`${id.padEnd(8)} ${seg.padEnd(7)} cámara: hasta ${vMax.toFixed(2)} m/s y ${aMax.toFixed(0)} m/s² · mirada entre ${G(incMin).toFixed(0)}° y ${G(incMax).toFixed(0)}°, gira hasta ${G(wMax).toFixed(0)} °/s · a lo sumo a ${(lejos * 100).toFixed(0)} cm del hueso de la cabeza`);
-      // reglas: la mirada no gira más de 160 °/s (sigue a la barra, con tope de 150) y la cámara no se aleja más de 80 cm de la cabeza (retrocede para que entren la barra y las dos manos)
+      // reglas: la mirada no gira más de 160 °/s (sigue a la barra, con tope de 150) y la cámara no se aleja más de 1,4 m de la cabeza (acompaña a la barra: con la barra en el piso queda a la altura de las rodillas)
       if (G(wMax) > 160) problemas.push(`${id} ${seg}: la mirada gira a ${G(wMax).toFixed(0)} °/s`);
-      if (lejos > .8) problemas.push(`${id} ${seg}: la cámara queda a ${(lejos * 100).toFixed(0)} cm de la cabeza`);
+      if (lejos > 1.4) problemas.push(`${id} ${seg}: la cámara queda a ${(lejos * 100).toFixed(0)} cm de la cabeza`);
     }
   }
   // fotos grandes de las fases clave (Ventura y Brenner) y en un teléfono acostado

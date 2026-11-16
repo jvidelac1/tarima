@@ -675,7 +675,8 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
         // sin cortes (pedido del dueño): la cámara general llega con un movimiento suave; un rival que no decide nada se ve
         // entero desde la misma cámara general
         if (m.fase === 'acomodo') { const cv = camVista(propio); escena.camara(cv, cv === 'pov' ? .3 : .6); }      // a los ojos entra rápido: la barrita ya está a la vista y la imagen tiene que estar quieta
-        if (m.fase === 'fijacion' && m.trabaMs < 0 && !camFija && (propio || decisivo) && !escena.pov) { escena.primerPlano('arriba', null, .5); camFija = true; }
+        // (el primer plano de los brazos en la fijación se sacó: el veredicto se ve desde el mismo plano, quieto, y un primer
+        // plano dejaba al pesista cortado y sin la barra cuando la soltaba; pedido del dueño del 16-nov: sin movimientos al terminar)
         if (m.fase === 'tiron' || m.fase === 'flexion') sonido.despegue();
         visto.fase = m.fase;
       }
@@ -801,7 +802,7 @@ const terminarFinal = c => { if (c) { c.golpes = 1e9; dibujarFinal(c, c.dur + 5,
 async function decision(a, lev, res, et, propio, o = {}) {
   visita('decision'); E.modo = 'tv'; const lento = et?.some(e => e === 'oro' || e === 'medalla' || e === 'todo_o_nada');
   const fin = o.fin || null, ok = res.res === 'valido', pov = !!escena.pov;      // en primera persona no hay planos de afuera
-  if (!fin) { if (res.res === 'fallo') sonido.fallo(); escena.posar(poseParado(escena.P, lev), lev); if (!o.fija && !pov) escena.camara('rev', .8); }
+  if (!fin) { if (res.res === 'fallo') sonido.fallo(); escena.posar(poseParado(escena.P, lev), lev); }
   // un toque que llegó cuando la barra ya estaba perdida (o recién terminado el intento) no pasa por «no tocaste»: la línea dice
   // que fue tarde. Uno descartado más de 400 ms después del final ya es otra cosa (por ejemplo, saltear el veredicto)
   const tarde = propio && o.tRes ? toques.ultimos.find(T => T.via !== 'mouse' && T.ok === false && T.t > o.tRes - 400 && T.t < o.tRes + 900 && (T.motivo === 'tarde' || T.motivo === 'termino' || (T.t >= o.tRes && T.t < o.tRes + 400))) : null;
@@ -831,11 +832,10 @@ async function decision(a, lev, res, et, propio, o = {}) {
   // de frente y las tres luces arriba). Se queda ahí hasta el fundido que sigue; la barra que se cae (fallo) no pasa por acá
   // (antes, en el válido, la cámara salía hacia el jurado, a los 0,7 s la interrumpía el plano de la barra que cae y 1,1 s
   // después giraba al público: tres movimientos encadenados en menos de 3 s. Ahora, uno solo: al jurado, y se queda)
-  const alJurado = !pov && !!fin && propio && (ok || res.res === 'nulo') && !o.fija && !R0 && !escena.vertical;
-  if (pov) { /* se queda en los ojos del pesista */ }
-  else if (alJurado) escena.camara('jurado', 1.3);
-  else if (fin && !ok && !o.fija) escena.primerPlano('caida', null, .45);
-  const t0 = reloj.ahora(), d = [null, null, null], hito = { luz: 0, ver: false, caida: !fin || !ok || !!o.fija || pov || alJurado, rev: !!o.fija || pov || alJurado };
+  // Pedido del dueño (16-nov): al terminar NO hay movimiento de cámara (ni al jurado, ni a la barra que cae, ni giro al
+  // público): el plano del intento queda quieto, con el pesista, las tres luces y el resultado en pantalla. Vale para
+  // cualquier vista; en primera persona tampoco hay corte a otra.
+  const t0 = reloj.ahora(), d = [null, null, null], hito = { luz: 0, ver: false, caida: true, rev: true };
   const avanzar = (t, dt, vivo, conFinal = true) => {
     if (fin && conFinal) dibujarFinal(fin, t, dt, vivo);
     while (hito.luz < 3 && t >= tLuz + hito.luz * paso) { const i = hito.luz++; d[i] = res.luces[i]; setLuces(d); if (vivo) { sonido.luz(d[i]); if (limite && i < 2) sonido.latido(); if (ok && i === 1) sonido.festejo(lento || limite ? 1 : .6); } }
