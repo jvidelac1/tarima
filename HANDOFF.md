@@ -1502,7 +1502,8 @@ Rama `graficos2`, desde `prueba` (primera-vez + utm + graficos). Nada fusionado 
   | Baja | 1159 · 1157 · 1188 (media 1168) | 1167 · 1165 · 1171 (media 1168) |
   | Móvil | 503* · 843 · 838 | 829 · 842 · 841 |
 
-  (*una sola vuelta: no vale.) Lo mismo dentro del ruido. La variante «sin los jueces» dice que ahorra 141 a 159 ms, pero «sin
+  (*una sola vuelta: no vale.) Lo mismo dentro del ruido. Repetido sobre el último código (run 43781091245): Baja 1187 · 1204 ·
+  1179 (media 1190) contra 1181 · 1202 · 1177 (media 1187). La variante «sin los jueces» dice que ahorra 141 a 159 ms, pero «sin
   el ambiente» en `prueba` dice 149 a 176 con el mismo rango (−16 a 300): es el sesgo de la medición de variantes, no un costo.
 - Cortes (`check_recorrido`, run 43776253714): 0 cortes bruscos y 20 fundidos mirando todo, 0 y 32 saltando rivales: igual
   que la base. **En ese recorrido no salió ningún nulo propio**: la vista del jurado en el nulo usa la misma llamada que el

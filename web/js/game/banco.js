@@ -538,6 +538,6 @@ ${B.notas.length ? `<p style="margin:10px 0 0;color:#ffd23f">${B.notas.map(e).jo
     aviso.textContent = ok ? 'copiado' : 'no se pudo copiar solo: el JSON quedó seleccionado acá abajo, copialo a mano';
   };
   const copiar = () => { aviso.textContent = 'copiando…'; try { const pr = navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(json()) : null; if (pr && pr.then) pr.then(() => { aviso.textContent = 'copiado'; }, aMano); else aMano(); } catch { aMano(); } };
-  const tocar = (b, fn) => { let t = -1e9; const f = ev => { ev.preventDefault(); ev.stopPropagation(); const a = performance.now(); if (a - t < 600) return; t = a; fn(); }; b.addEventListener('click', f); b.addEventListener('pointerup', ev => { if (ev.pointerType !== 'mouse') f(ev); }); };
+  const tocar = (b, fn) => { let t = -1e9; const f = ev => { ev.preventDefault(); ev.stopPropagation(); const a = performance.now(); if (a - t < 600) return; t = a; fn(); }; if (!b) return; if (!b.addEventListener) { b.onclick = fn; return; } b.addEventListener('click', f); b.addEventListener('pointerup', ev => { if (ev.pointerType !== 'mouse') f(ev); }); };
   tocar(el.querySelector('#banco-copiar'), copiar); tocar(el.querySelector('#banco-cerrar'), () => el.remove());
 }
