@@ -64,6 +64,17 @@ jobs:
         if: ${{ !cancelled() }}
         timeout-minutes: 25
         run: node tools/banco.mjs --fotos=out/graficos/fotos --niveles --ancho=1280 --alto=620 2>&1 | tee out/logs/fotos.log
+      - name: Fotos del plantel nuevo (vestuario ?plantel=, calidad alta)
+        # Rama plantel: el juego con los pesistas del plantel paramétrico (docs/PLANTEL.md). Cada terna de data/plantel.json,
+        # con el pesista en escena en cada una de las tres plazas (Compacto, Largo, Potente).
+        if: ${{ !cancelled() && hashFiles('web/data/plantel.json') != '' }}
+        timeout-minutes: 30
+        run: |
+          for terna in $(node -e 'const p=require("./web/data/plantel.json"); console.log(["mujeres","hombres"].filter(t=>p.ternas[t]).join(" "))'); do
+            for plaza in ventura brenner marangi; do
+              node tools/banco.mjs --fotos=out/graficos/plantel/${terna}_${plaza} --niveles=alta --plantel=$terna --pesista=$plaza --ancho=1280 --alto=620 2>&1 | tee -a out/logs/fotos_plantel.log || true
+            done
+          done
       - name: Banco de medición con el ambiente (banco)
         if: ${{ !cancelled() && inputs.banco }}
         timeout-minutes: 20

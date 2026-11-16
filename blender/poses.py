@@ -19,7 +19,7 @@ TH=(hd('LeftLeg')-hd('LeftUpLeg')).length; SHN=(hd('LeftFoot')-hd('LeftLeg')).le
 UA=(hd('LeftForeArm')-hd('LeftArm')).length; FA=(hd('LeftHand')-hd('LeftForeArm')).length
 C0=(hd('LeftUpLeg')+hd('RightUpLeg'))/2; V0=hd('LeftArm')-C0; HW=hd('LeftUpLeg').x; SHX=hd('LeftArm').x; SHZ0=hd('LeftArm').z
 ANK=hd('LeftFoot'); FA_F=-ANK.y; AZ=ANK.z; MID=FA_F+.07*K
-SOLE=.016; BARZ=.225-SOLE; RBAR=.014; LW=(UA+FA)*.996
+SOLE=.016; BARZ=.225-SOLE; RBAR=STY.get('rbar',.014); LW=(UA+FA)*.996     # barra de hombres 28 mm; la de mujeres es de 25 mm (STY['rbar'])
 Tm=Matrix.Translation
 
 # ---------- radios del cuerpo medidos sobre la malla (para contactos y chequeo de superposición) ----------
@@ -973,44 +973,75 @@ def timing(seg,seq,pts,hz):
     for i in range(1,n-1):
         d0=z[i*SUB]-z[(i-1)*SUB]; d1=z[(i+1)*SUB]-z[i*SUB]
         if vk[i] and d0*d1<0 and min(abs(d0),abs(d1))>.01: bad.append((seg,seq[i][0],0,'vk-en-ápice: la barra invierte el sentido en una fase con velocidad vertical distinta de cero'))
-    vm=[vk[i] is not None and vk[i+1] is not None and vk[i]+vk[i+1]>0 and Lz[i]>.02 for i in range(n-1)]; loc=[None]*(n-1)
-    for i in range(n-1):
-        if vm[i]:
-            v0=vk[i]*rk; v1=vk[i+1]*rk; cum=0.0; l=[0.0]
-            for k in range(SUB):
-                cum+=met(i*SUB+k); v=math.sqrt(max(v0*v0+(v1*v1-v0*v0)*cum/Lr[i],0)); l.append(2*cum/(v0+v)*Lz[i]/Lr[i])
-            loc[i]=l
-    def rate(i):
-        # avance de pose (fases por segundo) al pasar por la fase i
-        if i in (0,n-1) or seq[i][1].get('hold'): return 0.0
-        if vm[i-1]: return (1/SUB)/(loc[i-1][-1]-loc[i-1][-2])
-        if vm[i]: return (1/SUB)/(loc[i][1]-loc[i][0])
-        h0=seq[i-1][1].get('t',.5)*rk; h1=seq[i][1].get('t',.5)*rk; w1=2*h1+h0; w2=h1+2*h0; return (w1+w2)/(w1*h0+w2*h1)
-    def warp(i,h):
-        m0=min(rate(i)*h,2.9); m1=min(rate(i+1)*h,2.9); l=[0.0]
-        for k in range(1,SUB):
-            lo,hi=0.0,1.0
+    def armar(vk):
+        vm=[vk[i] is not None and vk[i+1] is not None and vk[i]+vk[i+1]>0 and Lz[i]>.02 for i in range(n-1)]; loc=[None]*(n-1)
+        for i in range(n-1):
+            if vm[i]:
+                v0=vk[i]*rk; v1=vk[i+1]*rk; cum=0.0; l=[0.0]
+                for k in range(SUB):
+                    cum+=met(i*SUB+k); v=math.sqrt(max(v0*v0+(v1*v1-v0*v0)*cum/Lr[i],0)); l.append(2*cum/(v0+v)*Lz[i]/Lr[i])
+                loc[i]=l
+        def rate(i):
+            # avance de pose (fases por segundo) al pasar por la fase i
+            if i in (0,n-1) or seq[i][1].get('hold'): return 0.0
+            if vm[i-1]: return (1/SUB)/(loc[i-1][-1]-loc[i-1][-2])
+            if vm[i]: return (1/SUB)/(loc[i][1]-loc[i][0])
+            h0=seq[i-1][1].get('t',.5)*rk; h1=seq[i][1].get('t',.5)*rk; w1=2*h1+h0; w2=h1+2*h0; return (w1+w2)/(w1*h0+w2*h1)
+        def warp(i,h):
+            m0=min(rate(i)*h,2.9); m1=min(rate(i+1)*h,2.9); l=[0.0]
+            for k in range(1,SUB):
+                lo,hi=0.0,1.0
+                for _ in range(40):
+                    md=(lo+hi)/2
+                    if herm(0,1,m0,m1,md)<k/SUB: lo=md
+                    else: hi=md
+                l.append(h*lo)
+            return l+[h]
+        for i in range(n-1):
+            if vm[i]: continue
+            h=seq[i][1].get('t',.5)*rk; zs=z[i*SUB:(i+1)*SUB+1]; hs_=hz[i*SUB:(i+1)*SUB+1]
             for _ in range(40):
-                md=(lo+hi)/2
-                if herm(0,1,m0,m1,md)<k/SUB: lo=md
-                else: hi=md
-            l.append(h*lo)
-        return l+[h]
-    for i in range(n-1):
-        if vm[i]: continue
-        h=seq[i][1].get('t',.5)*rk; zs=z[i*SUB:(i+1)*SUB+1]; hs_=hz[i*SUB:(i+1)*SUB+1]
-        for _ in range(40):
-            l=warp(i,h); vz=[(zs[k+1]-zs[k])/(l[k+1]-l[k]) for k in range(SUB)]; amin=min((vz[k]-vz[k-1])/((l[k+1]-l[k-1])/2) for k in range(1,SUB))
-            if rate(i)==0: amin=min(amin,vz[0]/(l[1]-l[0]))
-            if rate(i+1)==0: amin=min(amin,-vz[-1]/(l[-1]-l[-2]))
-            hmin=min((hs_[k+1]-hs_[k])/(l[k+1]-l[k]) for k in range(SUB))
-            if amin>=-.95*GRAV and hmin>=-.92*THR['hip']*rk: break
-            h*=1.05
-        loc[i]=l
-    tt=[0.0]
-    for l in loc:
-        t0=tt[-1]; tt+=[t0+x for x in l[1:]]
+                l=warp(i,h); vz=[(zs[k+1]-zs[k])/(l[k+1]-l[k]) for k in range(SUB)]; amin=min((vz[k]-vz[k-1])/((l[k+1]-l[k-1])/2) for k in range(1,SUB))
+                if rate(i)==0: amin=min(amin,vz[0]/(l[1]-l[0]))
+                if rate(i+1)==0: amin=min(amin,-vz[-1]/(l[-1]-l[-2]))
+                hmin=min((hs_[k+1]-hs_[k])/(l[k+1]-l[k]) for k in range(SUB))
+                if amin>=-.95*GRAV and hmin>=-.92*THR['hip']*rk: break
+                h*=1.05
+            loc[i]=l
+        tt=[0.0]
+        for l in loc:
+            t0=tt[-1]; tt+=[t0+x for x in l[1:]]
+        return tt
+    # La velocidad de paso 'vk' está pensada para un cuerpo medio. Con otro cuerpo el recorrido cambia (el pecho o la panza llevan la barra más adelante y el giro
+    # barre más distancia horizontal), y a la misma velocidad la barra caería a más de lo que da la gravedad o cambiaría de rumbo de golpe. Regla: si pasa eso, las
+    # fases vecinas a esa muestra se pasan más despacio (de a 4 %) hasta que la barra cumple, con margen, lo mismo que mide traj() (ventanas de 25 ms).
+    esvk=lambda i:0<=i<n-1 and vk[i] is not None and vk[i+1] is not None and vk[i]+vk[i+1]>0 and Lz[i]>.02; antes=None
+    for _ in range(16):
+        tt=armar(vk); ks,az,jy,hw=fisica(pts,tt,hz)
+        if not ks: break
+        qa=min(range(len(ks)),key=lambda q:az[q]); qj=max(range(len(ks)),key=lambda q:jy[q])
+        if az[qa]<-TIM['gdown']*GRAV: k=ks[qa]; peor=('g',-az[qa])
+        elif jy[qj]>TIM['dvy']: k=ks[qj]; peor=('y',jy[qj])
+        else: break
+        if antes and antes[0][0]==peor[0] and peor[1]>antes[0][1]*.995: vk[:]=antes[1]; tt=armar(vk); break     # bajar la velocidad no lo mejora: se deja como estaba (lo marcará check())
+        if not any(esvk(i) for i in ([k//SUB] if k%SUB else [k//SUB-1,k//SUB])): break                          # la muestra no está en un tramo con 'vk'
+        cerca=sorted({k//SUB,min(n-1,k//SUB+1)} if k%SUB else {max(0,k//SUB-1),k//SUB,min(n-1,k//SUB+1)});     # los dos extremos del tramo; en una unión, la fase y sus dos vecinas
+        toca=[i for i in cerca if num(vk[i]) and vk[i]>0]
+        if not toca: break
+        antes=(peor,list(vk))
+        for i in toca: vk[i]*=.96
+        print(f"TIMING {NAME} {seg}: {seq[toca[0]][0]}{' y '+seq[toca[-1]][0] if len(toca)>1 else ''} se pasa 4 % más despacio (caída {az[qa]:+.1f} m/s², salto horizontal {jy[qj]:.2f} m/s en la muestra {k})")
     return tt
+TIM=dict(gdown=1.18,dvy=.68)     # margen de la regla de tiempos: algo por dentro de lo que exige check() (THR: 1,2 g y 0,7 m/s)
+def fisica(pts,tt,hz):
+    """Física de la barra y de la cadera con ventanas de 25 ms a cada lado de cada muestra (las muestras van de 5 a 60 ms; así el umbral vale lo mismo en todas):
+    aceleración vertical de la barra (m/s²), cambio de su velocidad horizontal entre ventanas seguidas (m/s) y velocidad vertical de la cadera (m/s). Lo usan timing() y traj()."""
+    N=len(pts); dt=[max(tt[k+1]-tt[k],1e-6) for k in range(N-1)]
+    WN=.025; ta_=np.array(tt); ip=lambda arr,t:float(np.interp(t,ta_,arr)); zy=(np.array([p.z for p in pts]),np.array([p.y for p in pts]),np.array(hz))
+    wk=lambda k:max(WN,dt[min(k,N-2)],dt[max(k-1,0)])     # donde las muestras están más separadas que 25 ms la ventana es el paso de muestreo (entre muestras la posición es lineal)
+    ks=[k for k in range(1,N-1) if tt[k]-wk(k)>=tt[0]-1e-9 and tt[k]+wk(k)<=tt[-1]+1e-9]; va=lambda arr,k:(ip(arr,tt[k]+wk(k))-ip(arr,tt[k]))/wk(k); vb=lambda arr,k:(ip(arr,tt[k])-ip(arr,tt[k]-wk(k)))/wk(k)
+    az=[(va(zy[0],k)-vb(zy[0],k))/wk(k) for k in ks]; jy=[abs(va(zy[1],k)-vb(zy[1],k))*WN/wk(k) for k in ks]; hw=[va(zy[2],k) for k in ks]
+    return ks,az,jy,hw
 def traj(seg,seq,pts,tt,hz):
     names=[n for n,_ in seq]; N=len(pts); ok=all(tt[k+1]>tt[k] for k in range(N-1)) and len(tt)==N; rk=math.sqrt(K)
     dt=[max(tt[k+1]-tt[k],1e-6) for k in range(N-1)]
@@ -1018,10 +1049,7 @@ def traj(seg,seq,pts,tt,hz):
     ph=lambda k:f"{names[min(k//SUB,len(names)-1)]}+{k%SUB}/{SUB}"
     # física de la barra y de la cadera, medida con ventanas de 25 ms a cada lado de cada muestra (las muestras van de 5 a 60 ms; así el umbral vale lo mismo en todas):
     # sin apoyo la barra no cae a más de 1,2 g, no acelera hacia arriba a más de 2,5 g, su velocidad horizontal no cambia más de 0,7 m/s entre ventanas seguidas, y la cadera no baja más rápido que su tope
-    WN=.025; ta_=np.array(tt); ip=lambda arr,t:float(np.interp(t,ta_,arr)); zy=(np.array([p.z for p in pts]),np.array([p.y for p in pts]),np.array(hz))
-    wk=lambda k:max(WN,dt[min(k,N-2)],dt[max(k-1,0)])     # donde las muestras están más separadas que 25 ms la ventana es el paso de muestreo (entre muestras la posición es lineal)
-    ks=[k for k in range(1,N-1) if tt[k]-wk(k)>=tt[0]-1e-9 and tt[k]+wk(k)<=tt[-1]+1e-9]; va=lambda arr,k:(ip(arr,tt[k]+wk(k))-ip(arr,tt[k]))/wk(k); vb=lambda arr,k:(ip(arr,tt[k])-ip(arr,tt[k]-wk(k)))/wk(k)
-    az=[(va(zy[0],k)-vb(zy[0],k))/wk(k) for k in ks]; jy=[abs(va(zy[1],k)-vb(zy[1],k))*WN/wk(k) for k in ks]; hw=[va(zy[2],k) for k in ks]
+    ks,az,jy,hw=fisica(pts,tt,hz)
     for tag,src,idx,un in (('barra-cae',az,[q for q in range(len(ks)) if az[q]<-THR['gdown']*GRAV],'m/s²'),('barra-acelera',az,[q for q in range(len(ks)) if az[q]>THR['gup']*GRAV],'m/s²'),
                            ('barra-zigzag',jy,[q for q in range(len(ks)) if jy[q]>THR['dvy']],'m/s'),('cadera-cae',hw,[q for q in range(len(ks)) if hw[q]<-THR['hip']*rk],'m/s')):
         if idx:
@@ -1198,7 +1226,7 @@ if ONLY: sys.exit(0)
 sc.frame_start=1; sc.frame_end=frame0-STEP
 rig.animation_data.action.name='Poses'
 bpy.data.objects.remove(plateprev); bpy.data.objects.remove(barprev)
-json.dump(dict(name=NAME,h=STY['H'],grip=dict(clean=2*G_CLEAN,snatch=2*G_SNATCH),sub=SUB,seg=dict(femur=TH,tibia=SHN,arm=UA+FA,torso=SHZ0-C0.z),segs=meta),open(OUT+'poses.json','w'),ensure_ascii=False)
+json.dump(dict(name=NAME,h=STY['H'],bar=dict(r=RBAR,kg=STY.get('barkg',20)),grip=dict(clean=2*G_CLEAN,snatch=2*G_SNATCH),sub=SUB,seg=dict(femur=TH,tibia=SHN,arm=UA+FA,torso=SHZ0-C0.z),segs=meta),open(OUT+'poses.json','w'),ensure_ascii=False)
 sc.frame_set(1)
 bpy.ops.wm.save_as_mainfile(filepath=OUT+'s4.blend')
 bpy.ops.object.select_all(action='DESELECT'); b.select_set(True); rig.select_set(True)

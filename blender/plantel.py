@@ -180,6 +180,8 @@ def sty(k):
              veins=_clip((.25 if F else .8) * (1 - g), 0, 1), cut=_clip((.55 if F else 1.) * (1 - .85 * g) * (.5 + .5 * mu), .05, 1.2), folds=1. if not F else .6,
              anat=dict(masa=_clip((.6 if F else 1.) * (1 - .5 * g), 0, 1), pec=0. if F else _clip(1 - .6 * g, 0, 1), abd=_clip((.5 if F else 1.) * (1 - 1.6 * g), 0, 1)),
              # corte de la malla: escote (ancho, alto) y sisa (borde interno, alto), en m para 1,69 m. La malla femenina sube el escote y cierra la sisa.
+             # barra reglamentaria: hombres 20 kg y 28 mm de diámetro; mujeres 15 kg y 25 mm (cambia el agarre: la mano chica cierra el hook)
+             rbar=.0125 if F else .014, barkg=15 if F else 20,
              escote=(.078, .125) if F else (.085, .19), sisa=(.112, .15) if F else (.118, .2))
     if rod:
         # moño: dirección desde el centro de la cabeza (X lateral, +Y atrás, +Z arriba) y radio en m para 1,69 m

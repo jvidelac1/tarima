@@ -28,7 +28,7 @@ if read -r CQ CP 2>/dev/null < /sys/fs/cgroup/cpu.max && [ "$CQ" != max ] && [ "
 fi
 export TARIMA_THREADS="${TARIMA_THREADS:-$(( NCPU < 6 ? NCPU : 6 ))}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-$TARIMA_THREADS}" VECLIB_MAXIMUM_THREADS="${VECLIB_MAXIMUM_THREADS:-$TARIMA_THREADS}"
-KEY='MEASURE|MASA|PROP|BUN|RADII|SKEL|GRIP|POSE|rack|TRAJ|UNION|PUSH|CHK|BAD|HAIR|LASH|GLB|CYCLES|BAKE dispositivo|MAPS|TEX |Error|ERROR|Traceback|^ +File "|Exception|SystemExit|No encuentro|Definí'
+KEY='MEASURE|MASA|PROP|BUN|TIMING|RADII|SKEL|GRIP|POSE|rack|TRAJ|UNION|PUSH|CHK|BAD|HAIR|LASH|GLB|CYCLES|BAKE dispositivo|MAPS|TEX |Error|ERROR|Traceback|^ +File "|Exception|SystemExit|No encuentro|Definí'
 
 # Nunca más de un Blender a la vez: si hay otro proceso de blender/*.py, se espera.
 while pgrep -f "blender/(make|finish|pose_only|ctl[0-9]*)\.py" >/dev/null 2>&1; do echo "== hay otro proceso de Blender corriendo: espero 30 s =="; sleep 30; done
