@@ -309,7 +309,7 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     def decal(txt,cx,cz,width,u,mask,c,r=.36,hh=.00012):
         nonlocal H
         t_=text_mask(FONT,txt); h=width*t_.shape[0]/t_.shape[1]; uu=(u-(cx-width/2))/width; vv=((cz+h/2)-z)/h; ok=(uu>=0)&(uu<1)&(vv>=0)&(vv<1)
-        s_=np.zeros_like(z); s_[ok]=t_[(vv[ok]*t_.shape[0]).astype(int),(uu[ok]*t_.shape[1]).astype(int)]; s_=blur(s_,.8*S)*mask; mix(s_,c,r); H+=s_*hh
+        s_=np.zeros_like(z); s_[ok]=t_[(vv[ok]*t_.shape[0]).astype(int),(uu[ok]*t_.shape[1]).astype(int)]; s_=blur(s_,.8*S)*mask*np.clip(.84+cl*1.6+knit*.10,0,1); mix(s_*.9,c,r); H+=s_*hh     # estampado: toma la trama y el desgaste de la tela, no es una calcomanía pareja
     decal(STY['code'],0,sh[2]-.165*K,.13*K,x,suit*(y<-.04),TRIM); decal(STY['name'],0,sh[2]-.13*K,.21*K,-x,suit*(y>.03),TRIM)
     sweatc=suit*np.maximum(np.exp(-((x/.07)**2+((z-(sh[2]-.17))/.10)**2))*(ny<0),np.exp(-((x/.06)**2+((z-(sh[2]-.22))/.16)**2))*(ny>0))*np.clip(.6+cl*2,0,1)
     col*=1-.16*sweatc[:,:,None]; rough-=.10*sweatc
@@ -386,7 +386,7 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     rough+=lp*.10; lipH=-lp*.00016*(1-np.abs(2*T.nq((x*520,z*60),97)))**2
     skinm=np.clip(skinm-np.maximum(hairm,browm*.5),0,1)
     # largo del pelo para las capas de volumen de finish.py (geo.hair_shells): 255 = 20 mm
-    hlen=np.maximum.reduce([np.clip(al_,0,1)*sm(.5,.92,hm)*STY.get('hairlen',.010)*dfade(.70)*(1+s1*.5)*(np.clip(1+STY['mechones']*1.6*T.n3(55,98,2),.35,1.9) if STY.get('mechones') else 1.),beard*(.0015+.006*STY['beard'])*(STY['beard']>.35)])
+    hlen=np.maximum.reduce([(0. if STY.get('peinado')=='rapado' else 1.)*np.clip(al_,0,1)*sm(.2,.8,hm)*STY.get('hairlen',.010)*dfade(.70)*(1+s1*.5)*(np.clip(1+STY['mechones']*1.6*T.n3(55,98,2),.35,1.9) if STY.get('mechones') else 1.),beard*(.003+.008*STY['beard'])*(STY['beard']>.35)])
     Image.fromarray((np.clip(hlen/.02,0,1)*cov*255+.5).astype(np.uint8)[::-1]).resize((2048,2048),Image.BILINEAR).save(OUT+'hair_len.png')   # con barba rala (<0,35) la barba queda solo en la textura
     # ================= TIZA (magnesio) =================
     cn=np.clip(.5+T.n3(55,100,3)*2.6,0,1); cf=np.clip(.5+T.n3(700,101,2)*3,0,1); chalk=np.zeros((R,R),f32)
@@ -395,12 +395,12 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
         chalk=np.maximum(chalk,fl*sm(.70,.80,t)*sm(1.1,1.0,t)*cn*cf*.35)
     smear=sm(.0,.38,T.n3(26,102,3,(1,1,.22))+.08)*np.clip(.3+cn,0,1)
     thf=sm(.45,.55,F('thigh'))*sm(.1,-.4,ny)*sm(knee[2]+.11,knee[2]+.17,z)*sm(hip[2]+.02,hip[2]-.06,z)
-    thf*=np.exp(-(((axo-knee[0])/.06)**2)); soft=blur(thf*smear,7*S)*(.45+.55*cf)*.42
+    thf*=np.exp(-(((axo-knee[0])/.06)**2)); soft=blur(thf*smear,7*S)*(.45+.55*cf)*.62
     smh=sm(.0,.36,T.n3(30,103,3,(.25,.25,1))+.06)*cn
     soft=np.maximum(soft,blur(sm(sh[2]-.035,sh[2]+.0,z)*sm(sh[2]+.085,sh[2]+.05,z)*sm(.2,-.3,ny)*sm(.22,.17,axo)*(1-head)*(1-farm)*smh,7*S)*(.45+.55*cf)*.22*skinm)
     chalk=np.maximum(chalk,soft*cov)
     pch=suit*(ny<-.2)*np.exp(-((x/.085)**2+((z-(sh[2]-.12))/.06)**2))*smh
-    chalk=np.maximum(chalk,(blur(pch,6*S)*.34+blur(slv*sm(.1,-.4,ny)*smear,6*S)*.26)*(.45+.55*cf)*cov)
+    chalk=np.maximum(chalk,(blur(pch,6*S)*.5+blur(slv*sm(.1,-.4,ny)*smear,6*S)*.26)*(.45+.55*cf)*cov)
     chalk=np.clip(chalk*STY.get('chalk',1.),0,.93)*cov
     mix(chalk,np.array([.93,.93,.91],f32)*(1+cf[:,:,None]*.05-.03),.93)
     chalkH=chalk*(.00012+cf*.00018)
@@ -422,11 +422,11 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     cavA=np.clip(1+anatC*am*(115/K),.70,1.05); del anatC                              # los surcos entre grupos musculares oscurecen (son anchos: el pasa-altos de 3 px no los ve)
     aoS=T.ao*(1-suit)+blur(T.ao,22*S)*suit
     cav=np.clip(1+(H-blur(H,3*S))*900,0.55,1.1); ao=np.clip((.12+.88*aoS)*cav*cavA,0,1)
-    tn=np.array([.47,.36,.33],f32); aoc=.45+.55*aoS*np.clip(cav,0,1)*cavA; col=col*(tn[None,None,:]+(1-tn[None,None,:])*aoc[:,:,None])
+    tn=np.array([.55,.47,.46],f32); aoc=.62+.38*aoS*np.clip(cav,0,1)*cavA; col=col*(tn[None,None,:]+(1-tn[None,None,:])*aoc[:,:,None])
     col=np.clip(col,0,1); col[~cov]=SKIN; nrm[~cov]=(.5,.5,1); rough[~cov]=.5; ao[~cov]=1
     save(col[::-1],OUT+'body_color.png',compress_level=3); save(nrm[::-1],OUT+'body_normal.png',compress_level=3)
     save(np.stack([ao,rough,np.zeros_like(rough)],2)[::-1],OUT+'body_orm.png',compress_level=3)
-    MR=min(R,2048); mk=np.stack([skinm*cov,cloth*cov,hairm*cov],2)[::-1]
+    MR=min(R,2048); mk=np.stack([skinm*cov,cloth*cov,np.maximum(hairm,np.clip(brow*.9,0,1))*cov],2)[::-1]     # las cejas van en el canal de pelo de la máscara (el visor las sombrea como pelo: como piel salían grises)
     # segunda máscara, para separar del resto de la tela lo que no es la malla: R rodilleras, G medias, B vendas de muñeca (mismo UV)
     Image.fromarray((np.clip(np.stack([slv*cov,sock*cov,wrapm*cov],2)[::-1],0,1)*255+.5).astype(np.uint8)).resize((MR,MR),Image.BILINEAR).save(OUT+'body_mask2.png',optimize=True)
     Image.fromarray((np.clip(mk,0,1)*255+.5).astype(np.uint8)).resize((MR,MR),Image.BILINEAR).save(OUT+'body_mask.png',optimize=True)
@@ -443,7 +443,7 @@ def tn(shape,cell,seed,aspect=1.):
     return np.asarray(Image.fromarray(rng.random(k,dtype=f32)).resize((w,h),Image.BICUBIC))-.5
 _dash=lambda s_,per=.004:(((s_/per)%1)>.4).astype(f32)
 def eye(OUT,STY,S=1024):
-    yy,xx=np.mgrid[0:S,0:S].astype(f32); v=1-(yy+.5)/S; u=(xx+.5)/S; rho=(1-v)/.155            # 0 centro de la pupila, 1 limbo
+    yy,xx=np.mgrid[0:S,0:S].astype(f32); v=1-(yy+.5)/S; u=(xx+.5)/S; rho=(1-v)/.172            # 0 centro de la pupila, 1 limbo
     def pn(fu,fr,seed):     # ruido periódico en u
         k=np.random.default_rng(seed).random((max(2,int(fr)),int(fu)),dtype=f32); k=np.concatenate([k,k[:,:1]],1)
         return np.asarray(Image.fromarray(k).resize((S+S//int(fu),S),Image.BICUBIC))[:,:S]-.5
@@ -468,6 +468,14 @@ def hair(OUT,STY,S=512,size=.024):
     lo=pblur(rng.random((S,S)).astype(f32)-.5,S/12.); lo/=np.abs(lo).max()+1e-9
     c=hexc(STY['hair'])[None,None,:]*(.75+.7*tone+.25*lo)[:,:,None]+.05*al[:,:,None]
     Image.fromarray((np.clip(np.dstack([c,al]),0,1)*255+.5).astype(np.uint8),'RGBA').save(OUT+'hair.png')
+def pelo(OUT,STY,Sx=512,Sy=512):
+    """Mechones del casco de pelo y barba (geo.hair_cap): hebras a lo largo de u, agrupadas en mechones a lo ancho; mate, con variación por mechón."""
+    rng=np.random.default_rng(13)
+    def st(n,k,sig):
+        a=rng.random((n,k)).astype(f32); a=np.concatenate([a,a[:,:1]],1); a=np.asarray(Image.fromarray(a).resize((Sx+Sx//k,Sy),Image.BICUBIC))[:,:Sx]; return blur(a,sig)-.5
+    fino=st(Sy,5,.6); medio=st(Sy//4,3,1.4); gajo=st(Sy//20,2,5.); s=fino*.5+medio*.7+gajo*1.0
+    c=np.clip(hexc(STY['hair'])[None,None,:]*(1.25+1.0*s)[:,:,None]+.028+.03*sm(.15,.45,s)[:,:,None],0,1); h=fino*.00035+medio*.0005+gajo*.0009
+    save(c,OUT+'pelo.png'); save(normal_from_height(h,.0003,.0003),OUT+'pelo_normal.png')
 def bun(OUT,STY,Sx=512,Sy=256):
     """Moño (pelo atado): hebras a lo largo de u, que en la malla (geo.bun) da vueltas alrededor del eje del moño. Opaca; u se repite."""
     if not STY.get('bun'): return

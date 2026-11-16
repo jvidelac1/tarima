@@ -167,9 +167,9 @@ mir=lambda q:(q[0],q[1],-q[2],-q[3])
 HINGE={'knee':(('UpLeg','Leg','Foot'),(60,140)),'elbow':(('Arm','ForeArm','Hand'),(60,140)),'wrist':(('ForeArm','Hand','HandMiddle1'),(35,85))}   # huesos y rango de flexión (grados)
 # Escultura por reglas del hombro con el brazo arriba (se suma al Corrective Smooth en la pose de referencia, en espacio posado).
 # Cada término: (nombre, centro o segmento en el marco del brazo [a lo largo del brazo, lateral, frente] en m para 1,69 m, radio, empuje sobre la normal)
-ARMUP_SCULPT=dict(delt=((.030,-.035,.0),None,.062,.018),deltA=((.050,-.005,.040),None,.040,.007),trap=((-.005,-.085,-.015),None,.058,.017),pit=((-.075,.030,.005),None,.040,-.026),
+ARMUP_SCULPT=dict(delt=((.030,-.035,.0),None,.062,.018),deltA=((.050,-.005,.040),None,.040,.007),trap=((-.005,-.085,-.015),None,.058,.007),pit=((-.075,.030,.005),None,.058,-.011),
                   lat=((-.035,.034,-.050),(-.210,.015,-.050),.027,.018),pec=((-.035,.014,.050),(-.135,-.045,.072),.024,.016),tri=((.085,.040,-.020),(.200,.036,-.022),.028,.006))
-def armup_sculpt(rig,K,co):
+def armup_sculpt(rig,K,co,sin=()):
     pb=rig.pose.bones; J=lambda n:np.array(pb[PRE+n].matrix.translation)
     def f(P,Nn):
         D=np.zeros_like(P)
@@ -177,6 +177,7 @@ def armup_sculpt(rig,K,co):
             A=J(side+'Arm'); u=J(side+'ForeArm')-A; u/=np.linalg.norm(u); l=np.array([sgn,0,0.]); l-=u*(l@u); l/=np.linalg.norm(l); fr=np.cross(l,u); fr*=(-1 if fr[1]>0 else 1)
             pt=lambda c:A+K*(u*c[0]+l*c[1]+fr*c[2]); sd=(co[:,0]*sgn>0)
             for nm,(c0,c1,r,amp) in ARMUP_SCULPT.items():
+                if nm in sin: continue
                 a=pt(c0)
                 if c1 is None: w=np.exp(-(np.linalg.norm(P-a,axis=1)/(r*K))**2)
                 else:
@@ -190,7 +191,7 @@ def armup_weight(rig,side):
     pb=rig.pose.bones; s2=pb[PRE+'Spine2']; d=s2.matrix.to_3x3().inverted()@(pb[PRE+side+'ForeArm'].matrix.translation-pb[PRE+side+'Arm'].matrix.translation)
     r=s2.bone.matrix_local.to_3x3().inverted()@(rig.data.bones[PRE+side+'ForeArm'].head_local-rig.data.bones[PRE+side+'Arm'].head_local)
     return float(sm(math.radians(ARMUP_RANGE[0]),math.radians(ARMUP_RANGE[1]),d.angle(r)))
-def correctives(b,rig,K):
+def correctives(b,rig,K,fem=False):
     co=coords(b); pb=rig.pose.bones; H=lambda n:head(rig,n); sides=((1,'Left'),(-1,'Right')); keys={}
     def region(c,r,sgn,c2=None):
         m=sm(r,r*.55,np.linalg.norm(co-c,axis=1))
@@ -204,7 +205,7 @@ def correctives(b,rig,K):
     for p in pb: p.matrix_basis=Matrix()
     for n,q in basis.items(): pb[PRE+n].matrix_basis=Quaternion(q).to_matrix().to_4x4()
     bpy.context.view_layer.update(); w0={side:armup_weight(rig,side) for _,side in sides}
-    d=_delta(b,rig,basis,mask,24,.55,sculpt=armup_sculpt(rig,K,co))
+    d=_delta(b,rig,basis,mask,36,.6,sculpt=armup_sculpt(rig,K,co,('pec',) if fem else ()))     # la mujer no lleva el empuje del pectoral (bajo la malla era un bulto en punta)
     for sgn,side in sides: keys['corr_armUp_'+side[0]]=d*((co[:,0]*sgn>0)[:,None])/max(w0[side],.5)
     # rodilla en flexión profunda y codo cerrado: peso = smoothstep(lo,hi, flexión), flexión = ángulo entre los dos segmentos
     for nm,ref,(p0,p1,p2),r in (('knee',KNEE,HINGE['knee'][0],.15),('elbow',ELBOW,HINGE['elbow'][0],.10),('wrist',WRIST,HINGE['wrist'][0],.075)):
@@ -277,6 +278,49 @@ def hair_shells(b,OUT,mat,layers=None,size=.024):
         for i in nz:
             for k in range(layers): vg.add([int(k*nu+i)],float(w[i]),'REPLACE')
     print(f'HAIR capas {layers}, caras por capa {len(sel)}, largo máx {ln[U].max()*1000:.1f} mm'); return o
+def hair_cap(b,OUT,mat,LM,K):
+    """Pelo y barba como UNA malla opaca con volumen (dirección de arte del 16-nov: «pelo agrupado en formas»). Sale del cuero
+    cabelludo y de la zona de barba del cuerpo (donde hair_len.png da largo), desplazada por la normal: el largo viene de la
+    textura (arriba más alto, costados cortos) y encima van los gajos (mechones con cresta, surco y ondas, peinados desde la
+    coronilla; en la barba, mechones cortos y finos). El largo decae hacia el borde, así el casco muere sobre la piel, donde
+    la textura trae el degradé pintado. Mismos pesos que la piel de abajo (sigue a la cabeza y a la mandíbula). UV: u a lo
+    largo del mechón, v a lo ancho (tex.pelo). Devuelve None si no hay nada con largo (rapado sin barba)."""
+    me=b.data; N=len(me.vertices); ln=_hairlen(b,OUT); co=coords(b); no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3)
+    ln*=(co[:,2]>head(rig_of(b),'Neck')[2]-.02)
+    E=np.empty(len(me.edges)*2,int); me.edges.foreach_get('vertices',E); E=E.reshape(-1,2); deg=np.maximum(np.bincount(E.ravel(),minlength=N),1)
+    for _ in range(5):      # el largo decae suave hacia el borde
+        A=np.zeros(N); np.add.at(A,E[:,0],ln[E[:,1]]); np.add.at(A,E[:,1],ln[E[:,0]]); ln=np.minimum(ln,.5*ln+.5*A/deg)
+    sel=[p for p in me.polygons if min(ln[v] for v in p.vertices)>.0005]
+    if len(sel)<20: print('PELO sin malla (rapado y sin barba)'); return None
+    used=sorted({v for p in sel for v in p.vertices}); ix={v:i for i,v in enumerate(used)}; U=np.array(used)
+    ear=np.asarray(LM['ears'],float); hc=np.array([0,ear[1]+.005,ear[2]+.03]); v=co[U]-hc
+    az=np.arctan2(v[:,0],-v[:,1]); el=np.arctan2(v[:,2],np.hypot(v[:,0],v[:,1]))
+    barba=sm(ear[2]-.012*K,ear[2]-.03*K,co[U,2])*(co[U,1]<ear[1]+.01)       # 1 en la barba (debajo de la oreja y al frente), 0 en el pelo
+    # gajos: carriles alrededor de la cabeza, torcidos con la altura para que no sean meridianos de compás
+    NG=17; lane=az*NG/(2*np.pi)+.45*np.sin(el*3.1+1.7)+.18*np.sin(el*7.3+az*2.1); g=np.abs((lane%1)-.5)*2; idl=np.floor(lane)
+    cresta=1-.40*sm(.50,1.,g); onda=1+.13*np.sin(el*10.+idl*2.4)+.10*np.sin(idl*12.9898)        # surco entre mechones, ondas a lo largo y mechones más altos que otros
+    laneb=az*46/(2*np.pi)+.6*np.sin(co[U,2]*190)+.3*np.sin(co[U,2]*410+az*5); gb=np.abs((laneb%1)-.5)*2
+    crestab=1-.30*sm(.45,1.,gb)+.12*np.sin(np.floor(laneb)*7.31)
+    h=ln[U]*(cresta*onda*(1-barba)+crestab*barba)+.0008
+    atras=np.array([0,1.,-.15]); pos=co[U]+no[U]*h[:,None]+atras[None,:]*(h*.22*(1-barba))[:,None]
+    bm=bmesh.new(); uv=bm.loops.layers.uv.new('UVMap'); uv2=bm.loops.layers.uv.new('UVCuero'); vs=[bm.verts.new(q) for q in pos]
+    LU=np.empty(len(me.loops)*2); me.uv_layers.active.data.foreach_get('uv',LU); LU=LU.reshape(-1,2)     # UV del cuerpo: el visor recorta el borde del casco con el nacimiento pintado (curva suave, no el serrucho de los polígonos)
+    uu=np.where(barba>.5,-co[U,2]*8.,(.5*np.pi-el)*.55+.07*np.sin(idl*5.1)); vv=np.where(barba>.5,az*3.,lane/NG*5)     # barba: hebras hacia abajo, sin torcer (torcidas se leían veta de madera)
+    for p in sel:
+        fc=bm.faces.new([vs[ix[v_]] for v_ in p.vertices]); fc.smooth=True
+        ii=[ix[v_] for v_ in p.vertices]; v0=vv[ii[0]]
+        for lp,i,li in zip(fc.loops,ii,p.loop_indices):
+            lp[uv2].uv=(float(LU[li][0]),float(LU[li][1])); vvi=vv[i]
+            if abs(vvi-v0)>2.5: vvi=v0      # la costura del ángulo (±pi) no estira la textura a lo ancho de una cara
+            lp[uv].uv=(float(uu[i]),float(vvi))
+    m=bpy.data.meshes.new('Pelo'); bm.to_mesh(m); bm.free(); o=bpy.data.objects.new('Pelo',m); bpy.context.scene.collection.objects.link(o); m.materials.append(mat)
+    names,W=wget(b)
+    for j,n in enumerate(names):
+        w=W[U,j]; nz=np.nonzero(w>.004)[0]
+        if len(nz)==0: continue
+        vg=o.vertex_groups.new(name=n)
+        for i in nz: vg.add([int(i)],float(w[i]),'REPLACE')
+    print(f'PELO malla: {len(sel)} caras, alto máx {h.max()*1000:.1f} mm, barba {int((barba>.5).sum())} vértices'); return o
 def rig_of(b): return next(m.object for m in b.modifiers if m.type=='ARMATURE')
 def bun(b,K,STY,LM,mat):
     """Moño del pelo atado: un ovillo achatado apoyado en el cráneo, en la dirección STY['bun']['dir'] desde el centro de la cabeza.
