@@ -67,9 +67,12 @@ const gente = (k, traje, pantalon) => ({ ...BASE, traje: col(traje), pantalon: c
 
 const BLANCA = new THREE.Color(1.12, 1.1, 1.02), ROJA = new THREE.Color(.5, .012, .008), GUARDADA = new THREE.Color(.05, .05, .06);
 /** Luz de sala propia de las mesas (fracción del color de cada superficie): las luces del escenario apuntan a la tarima y sin esto quedan en negro. */
-const RELLENO = .26;
+const RELLENO = .4;
 /** Segundos que tarda en subir y en bajar la paleta. */
 const SUBE = .35, BAJA = .55;
+
+/** La malla de la gente sentada en los bancos: look.js la oculta cuando no dibuja la utilería (los bancos). */
+export const EQUIPO = { malla: null };
 
 export class Jueces {
   constructor({ reduceMotion = false } = {}) {
@@ -83,7 +86,7 @@ export class Jueces {
     const A = MESA_ARBITROS, MA = asiento(A.x, A.y, A.z, A.ry), fijos = en(mesa(A.sep * 2 + 1, BASE), MA), brazos = [];
     this.arb = [];
     for (let i = 0; i < 3; i++) {
-      const C = gente(i, ['#262a36', '#1d2333', '#2c2c31'][i], '#1f2229'), M = MA.clone().multiply(correr(-(i - 1) * A.sep, -.5));
+      const C = gente(i, ['#343b50', '#2b334a', '#3a3b45'][i], '#24272f'), M = MA.clone().multiply(correr(-(i - 1) * A.sep, -.5));
       fijos.push(...en(persona(C, { det: 1, paleta: true, pelo: ESTILO[i], k: i }), M));
       // consola con sus dos botones delante de cada uno
       fijos.push(...en([pieza(new THREE.BoxGeometry(.2, .04, .12), BASE.silla, [.22, .78, .62]), pieza(new THREE.SphereGeometry(.014, 6, 4), col('#e8e6dc'), [.18, .803, .62]), pieza(new THREE.SphereGeometry(.014, 6, 4), col('#c8261c'), [.26, .803, .62])], M));
@@ -108,11 +111,18 @@ export class Jueces {
 
     // jurado lateral (cinco, mesa larga) y mesa técnica (dos mesas sobre el escenario): de lejos, sin gesto
     const ML = asiento(-8.3, FLOOR_Y, .1, Math.PI / 2), lat = en(mesa(6.2, BASE), ML);
-    for (let i = 0; i < 5; i++) lat.push(...en(persona(gente(i + 3, ['#33363f', '#272b38', '#3a3436'][i % 3], '#24262c'), { det: 0, pelo: ESTILO[(i + 3) % ESTILO.length], corbata: i % 2 === 0, k: i + 3 }), ML.clone().multiply(correr((i - 2) * 1.25, -.5))));
+    for (let i = 0; i < 5; i++) lat.push(...en(persona(gente(i + 3, ['#40434d', '#343a4b', '#453f42'][i % 3], '#2a2c33'), { det: 0, pelo: ESTILO[(i + 3) % ESTILO.length], corbata: i % 2 === 0, k: i + 3 }), ML.clone().multiply(correr((i - 2) * 1.25, -.5))));
     this.fijos.push(malla(lat, 'jurado lateral'));
     const tec = [];
     [[5.0, -4.3, -.86], [5.75, -3.3, -1.05]].forEach(([x, z, ry], i) => { const M = asiento(x, STAGE_Y, z, ry); tec.push(...en(mesa(1.1, BASE), M), ...en(persona(gente(i + 8, '#30384e', '#2a2e38'), { det: 0, pelo: ESTILO[(i + 2) % ESTILO.length], k: i + 8 }), M.clone().multiply(correr(0, -.5)))); });
     this.fijos.push(malla(tec, 'mesa técnica'));
+    // entrenadores y pesistas que esperan, sentados en los bancos del costado del escenario (buzo de equipo): la sala no está vacía
+    const eq = [];
+    [[-5.35, .78, Math.PI / 2 + .06, 'corto', '#4d1c22', 'falda'], [-5.25, 2.55, Math.PI / 2 - .03, 'cola', '#1c343d', 'cruzados'], [-5.25, 3.4, Math.PI / 2 - .03, 'rapado', '#2b2f3a', 'menton'], [5.45, 1.42, -Math.PI / 2 - .05, 'entradas', '#22324f', 'cruzados']].forEach(([x, z, ry, pelo, buzo, gesto], i) => {
+      const C = { ...gente(i + 11, buzo, '#17191e'), ropa: col(buzo) }, M = asiento(x, STAGE_Y + .03, z, ry);
+      eq.push(...en(de(personaGente({ cuerpo: .55 + .12 * (i % 3), pelo, ropa: 'buzo', gesto, det: 1, silla: false, semilla: 71 + i * 3, cabezaGiro: (i - 1.5) * .16, cabezaInc: .05, forma: { ancho: .98 + .02 * (i % 3), mandibula: .96 + .05 * (i % 2), barba: i % 2 ? 0 : .6 } }).piezas, C), M));
+    });
+    this.fijos.push(EQUIPO.malla = malla(eq, 'equipo en los bancos'));
     this.group.traverse(o => { o.castShadow = false; o.receiveShadow = false; o.updateMatrix?.(); });
   }
   /** Lleva el brazo y la paleta del árbitro i a su posición (a.a: 0 apoyado en la mesa, 1 levantado). */

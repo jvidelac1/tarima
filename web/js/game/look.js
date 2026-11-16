@@ -18,6 +18,7 @@ import { EVENT } from '../config.js';
 import { BOKEH } from '../post.js';
 import { FINO } from '../athlete.js';
 import { conSuperficie, setSuperficies, chapa, USO } from './materiales.js';
+import { EQUIPO } from './jueces.js';
 
 /** Gradación del juego: exposición, saturación, contraste, gamma de sombras, tinte de sombras y de altas, viñeta y negro. */
 export const GRADO_LOOK = Object.freeze({ exp: 1.0, sat: .88, con: 1.03, gam: 1.0, frio: [.92, .995, 1.09], calido: [1.07, 1.0, .91], vin: .36, negro: .004 });
@@ -243,10 +244,22 @@ function telon(W = 1024, H = 384) {
 /** Fondo de la pantalla LED: casi negro, con líneas finas y dos paneles apagados; lo brillante son los textos y las luces. */
 function ledFondo(w, h) {
   return makeCanvas(w, h, g => {
-    const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, '#143642'); gr.addColorStop(.35, '#0c1a24'); gr.addColorStop(.65, '#1a1416'); gr.addColorStop(1, '#4a2a14'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
-    for (let i = -2; i < 26; i++) { const x = i * w / 24, calido = i >= 12; g.fillStyle = calido ? `rgba(255,150,60,${.08 + .06 * (i & 1)})` : `rgba(70,190,210,${.07 + .05 * (i & 1)})`; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + w * .012, 0); g.lineTo(x + w * .05, h); g.lineTo(x + w * .038, h); g.closePath(); g.fill(); }
-    const cg = g.createRadialGradient(w / 2, h * .62, h * .1, w / 2, h * .62, w * .32); cg.addColorStop(0, 'rgba(0,0,0,.55)'); cg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = cg; g.fillRect(0, 0, w, h);
+    const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, '#1a4958'); gr.addColorStop(.33, '#0e202b'); gr.addColorStop(.67, '#1d1719'); gr.addColorStop(1, '#5c3417'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    for (let i = -2; i < 26; i++) { const x = i * w / 24, calido = i >= 12; g.fillStyle = calido ? `rgba(255,150,60,${.1 + .08 * (i & 1)})` : `rgba(70,190,210,${.09 + .07 * (i & 1)})`; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + w * .012, 0); g.lineTo(x + w * .05, h); g.lineTo(x + w * .038, h); g.closePath(); g.fill(); }
+    // marca de agua del evento, enorme y apenas visible, y una guarda de pictogramas abajo: la pantalla nunca es un paño vacío
+    g.save(); g.globalAlpha = .07; g.fillStyle = '#dff6ff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `800 ${h * .62}px ${DISPLAY}`; g.fillText(EVENT.marca, w / 2, h * .46, w * .9); g.restore();
+    g.save(); g.globalAlpha = .16; for (let i = 0; i < 30; i++) { const x = (i + .5) * w / 30, c = i < 15 ? '#6fe6f0' : '#ffb060', s2 = h * .022; g.fillStyle = c; g.fillRect(x - s2 * 2, h * .873, s2 * 4, s2 * .22); for (const sx of [-1, 1]) { g.fillRect(x + sx * s2 * 1.45 - s2 * .14, h * .873 - s2 * .7, s2 * .28, s2 * 1.6); } } g.restore();
+    const cg = g.createRadialGradient(w / 2, h * .62, h * .1, w / 2, h * .62, w * .3); cg.addColorStop(0, 'rgba(0,0,0,.5)'); cg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = cg; g.fillRect(0, 0, w, h);
+    { const lg = g.createLinearGradient(0, h * .6, 0, h); lg.addColorStop(0, 'rgba(120,200,220,0)'); lg.addColorStop(1, 'rgba(120,200,220,.1)'); g.fillStyle = lg; g.fillRect(0, h * .6, w / 2, h * .4); const lw = g.createLinearGradient(0, h * .6, 0, h); lw.addColorStop(0, 'rgba(255,170,90,0)'); lw.addColorStop(1, 'rgba(255,170,90,.11)'); g.fillStyle = lw; g.fillRect(w / 2, h * .6, w / 2, h * .4); }
     g.fillStyle = 'rgba(255,170,70,.85)'; g.fillRect(0, h * .93, w, h * .01); g.fillStyle = 'rgba(210,225,230,.5)'; g.fillRect(0, h * .952, w, h * .005);
+  });
+}
+/** Reflejo de la pantalla en el piso del escenario: una mancha de luz teal a la izquierda y ámbar a la derecha que se apaga hacia la tarima. */
+function brilloPiso(W = 256, H = 64) {
+  return makeCanvas(W, H, g => {
+    const gr = g.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, 'rgb(40,120,140)'); gr.addColorStop(.42, 'rgb(22,40,52)'); gr.addColorStop(.58, 'rgb(46,30,24)'); gr.addColorStop(1, 'rgb(150,84,36)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    const cae = g.createLinearGradient(0, 0, 0, H); cae.addColorStop(0, 'rgba(0,0,0,.15)'); cae.addColorStop(.35, 'rgba(0,0,0,.62)'); cae.addColorStop(1, 'rgba(0,0,0,1)'); g.fillStyle = cae; g.fillRect(0, 0, W, H);
+    for (const x of [0, 1]) { const b = g.createLinearGradient(x ? W : 0, 0, x ? W * .88 : W * .12, 0); b.addColorStop(0, 'rgba(0,0,0,1)'); b.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = b; g.fillRect(x ? W * .88 : 0, 0, W * .12, H); }
   });
 }
 /** Ocho banderines ficticios en una tira (ninguno copia una bandera real: diagonales, discos corridos, rombos y cuñas en colores raros). */
@@ -503,6 +516,10 @@ export class Look {
       const o = new THREE.Mesh(new THREE.PlaneGeometry(w, w), m); o.rotation.set(-Math.PI / 2, 0, ry); o.position.set(x, Y0 + .003, z); o.receiveShadow = true; o.renderOrder = 1; P.add(o); (this.calcos ||= []).push(o); };
     calcoDe('tiza', -3.15, -1.9, 1.7); calcoDe('tiza', 3.2, -1.95, 1.5, 1); calcoDe('cinta', -3.6, 3.3, 1.5); calcoDe('cinta', 3.6, -3.0, 1.5, Math.PI);
 
+    // la pantalla tiñe el piso delante suyo (aditivo, solo con post: va con las calcomanías)
+    { const t = canvasTexture(brilloPiso(), { aniso: 2 }); this.texturas.push(t);
+      const o = new THREE.Mesh(new THREE.PlaneGeometry(10.6, 3.0), new THREE.MeshBasicMaterial({ name: 'brillo de la pantalla en el piso', map: t, color: new THREE.Color(.5, .5, .5), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+      o.rotation.x = -Math.PI / 2; o.position.set(0, Y0 + .004, -3.45); o.renderOrder = 2; P.add(o); (this.calcos ||= []).push(o); }
     // pared de chapa pintada a los lados de la pantalla (materiales.js: toda por función), con columnas, caño y tablero eléctrico
     { const ch = this.chapaMat = chapa('#2a4350'); this.propMats.add(ch);
       for (const s of [-1, 1]) { const g = grupo(s * 7.05, -5.72, 0, -1);
@@ -548,7 +565,7 @@ export class Look {
       const g = new THREE.Group(); g.position.copy(l.position); g.lookAt(hasta); g.rotateX(-Math.PI / 2);
       const m = new THREE.Mesh(geo, mat); m.scale.set(rad, len, rad); m.renderOrder = 5; m.frustumCulled = false; g.add(m); this.group.add(g); this.rayos.push({ mat, base: fuerza });
     };
-    rayo(L.rimA, .017, .62); rayo(L.rimB, .009, .6);      // solo los dos contraluces: los conos de la clave y del pelo casi no se veían y eran pantalla entera de mezcla
+    rayo(L.rimA, .013, .42); rayo(L.rimB, .008, .4);      // haces angostos y definidos: anchos eran un banco de niebla beige sobre la tribuna      // solo los dos contraluces: los conos de la clave y del pelo casi no se veían y eran pantalla entera de mezcla
     this.group.visible = false;
   }
 
@@ -563,7 +580,7 @@ export class Look {
       for (const o of this.calcos || []) o.visible = !d;
       // medido (run 43827293011): ni sin mapas la utilería entraba en la meta de «Baja» (+16 %); el banco dice que es el 22 % del cuadro.
       // En el camino directo no se dibuja (Media para arriba sí), hasta medir en una placa
-      for (const o of this.utileria()) if (o !== this.props) o.visible = !d; this.props.visible = !d; }
+      for (const o of this.utileria()) if (o !== this.props) o.visible = !d; this.props.visible = !d; if (EQUIPO.malla) EQUIPO.malla.visible = !d; }
     FINO.value = Q.directo ? 0 : 1;
     if (this.haloMat) { this.haloMat.uniforms.uDirecto.value = Q.directo ? 1 : 0; this.haloMat.uniforms.uMax.value = Q.directo ? 84 : 220; }      // en el camino directo, halos chicos: poca pantalla de mezcla
     // en el camino directo la pared de chapa (material físico en mucha pantalla) no se dibuja: queda el telón, como antes

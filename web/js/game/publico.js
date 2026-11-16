@@ -39,9 +39,9 @@ void main(){
   // uSuave: sesgo de mipmap. La tribuna de una foto de competencia está fuera de foco: siluetas blandas, no recortes nítidos
   vec4 t = texture2D( map, vUv, uSuave ); if ( t.a < 0.38 ) discard;
   // ropa: en la penumbra nadie viste de blanco; lo claro se comprime y todo pierde color (la sala la pinta la luz, no la ropa)
-  vec3 ropa = vCloth; float lr = dot( ropa, vec3( 0.3, 0.6, 0.1 ) ); ropa *= mix( 1.0, 0.36, smoothstep( 0.1, 0.55, lr ) );
-  vec3 col = mix( ropa, vSkin * 0.82, smoothstep( 0.2, 0.42, t.b ) ); col = mix( col, vHair * 0.7, smoothstep( 0.68, 0.9, t.b ) );
-  col = mix( vec3( dot( col, vec3( 0.3, 0.6, 0.1 ) ) ), col, uHorneo > 0.0 ? 0.3 : 0.5 );      // horneada (sin gradación encima): menos color todavía
+  vec3 ropa = vCloth; float lr = dot( ropa, vec3( 0.3, 0.6, 0.1 ) ); ropa *= mix( 1.0, 0.5, smoothstep( 0.1, 0.55, lr ) );
+  vec3 col = mix( ropa, vSkin * 0.58, smoothstep( 0.2, 0.42, t.b ) ); col = mix( col, vHair * 0.7, smoothstep( 0.68, 0.9, t.b ) );
+  col = mix( vec3( dot( col, vec3( 0.3, 0.6, 0.1 ) ) ), col, uHorneo > 0.0 ? 0.4 : 0.5 );      // horneada (sin gradación encima): menos color todavía
   // luz: la de sala cae pareja y fría; la del escenario llega de frente, cálida, y solo levanta lo que la mira (cara, pecho, rodillas)
   float esc = t.g * t.g * ( 3.0 - 2.0 * t.g );
   gl_FragColor = vec4( col * ( uSala * ( t.r * uGain ) + uRebote * esc ), 1.0 );
@@ -51,7 +51,7 @@ void main(){
 /** Ganancia con la que se guarda la tribuna horneada (8 bits: el público es oscuro y sin esto se escalona). */
 const HORNEO = 6;
 /** En el camino directo (sin gradación ni viñeta del pase final) el mismo público queda más claro: se baja acá. */
-const DIRECTO = .3;
+const DIRECTO = .8;
 
 export class Publico {
   /** `animo`: el uniform {value} del ánimo del público (ambiente.publico.uAnimo). `chico`: texturas a la mitad (teléfono). */
@@ -71,7 +71,7 @@ export class Publico {
   vUv = vec2( ( uv.x + mod( var, ${COLS}.0 ) ) / ${COLS}.0, ( uv.y + floor( var / ${COLS}.0 ) ) / ${FILAS}.0 );`);
     m.fragmentShader = CROWD_FS; m.userData.conTono = false;
     Object.assign(m.uniforms, { uFiesta: animo, uSala: { value: new THREE.Color(.5, .62, .95) }, uHorneo: { value: 0 }, uSuave: { value: 1.7 } });
-    m.uniforms.map.value = this.atlas.texture; m.uniforms.uGain.value = .075; m.uniforms.uRebote.value.set(.05, .035, .024); m.needsUpdate = true;
+    m.uniforms.map.value = this.atlas.texture; m.uniforms.uGain.value = .09; m.uniforms.uRebote.value.set(.08, .058, .04); m.needsUpdate = true;
     arena.crowdTex?.dispose(); arena.crowdTex = this.atlas.texture;
     // --- tribunas horneadas: se arman la primera vez que una calidad sin profundidad de campo las pide
     if (arena.impostors) { arena.impostors.removeFromParent(); arena.impostors.traverse(o => { o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose(); }); arena.impostors = null; }
