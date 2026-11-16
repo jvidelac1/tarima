@@ -2001,6 +2001,95 @@ nuevo dentro del juego; (4) fluidez. Después de cada tanda, ronda del director 
 artefacto de cada pesista. Con eso `blender/tex.py` corre con numpy en segundos:
 `TARIMA_OUT=<carpeta>/ python3 blender/tex.py <nombre> 1024` (la carpeta tiene `<nombre>/maps.npz`, `lm.json`, `bones.json`,
 `bones_all.json`). Sirve para la línea del pelo, cejas, labios y zonas de color; el detalle fino se mira en el build.
+### Primera persona y el final del levantamiento (16-nov, rama `pov`, desde `prueba`)
+
+Pedido del dueño después de probar `prueba`: «cuando terminás el levantamiento hacen movimientos medio raros. Yo quiero poder
+cambiar la vista y ser un point of view y hacer el levantamiento como si lo estuviera haciendo yo realmente». Nada fusionado ni
+publicado. El look (luces, materiales, texturas) lo lleva otro agente: acá no se tocó `arena.js`, `ambiente.js` ni `post.js`.
+
+**1. Vista «Primera persona / First person»** (`stage.js`: `POV`, `_povCam`, `ojos`, `_cabeza`; `cameras.js`: `rig.propia`).
+Quinta cámara de la fila de Opciones, de la tecla V y `?camara=pov`; se recuerda en `tarima.camara` y deja `camara_elegida`
+con `vista: 'pov'`. Reglas (todas en `POV`, iguales para los dos biotipos y cualquier fase; nada por personaje):
+- *Posición*: los ojos salen de los huesos (cabeza + 10 cm a lo largo del cuello + 8,5 cm hacia el frente del tronco, por
+  estatura), con un filtro corto. No se copia el giro de la cabeza: la mirada es sintética, siempre al frente, sin guiñada.
+- *La barra y las manos se ven siempre* (pedido del dueño). La mirada apunta a la barra con un corrimiento, con retardo y
+  tope de velocidad (`giroMax`, 150 °/s). Tres casos, por dónde está la barra y cómo está el cuerpo (nada por fase ni personaje):
+  · *De pie con la barra abajo* (parado, segundo tirón): mirada adelante y abajo (hasta −58°), lente abierto a 88° (como una
+    cámara de casco), cuerpo entero; la cámara va 7 cm por delante de los ojos para que el pecho no tape la barra.
+  · *Agachado* (salida y primer tirón: los ojos a más de 30 cm por delante de la cadera, `kT`): la barra queda debajo y detrás
+    de los ojos, así que la mirada baja a −80° y el tronco propio no se dibuja (era el pecho y la entrepierna llenando la
+    imagen). Se ven los antebrazos enteros, las manos en la barra, las rodillas y los pies. No se ven los jueces.
+  · *Barra en los hombros o arriba*: barra y manos abajo o arriba, jueces y público al frente (sin cambios de fondo).
+- *Licencia de la vista*: con la barra en los hombros la cámara retrocede 12 cm y con la barra arriba 38 cm; con el agarre
+  ancho del arranque, lo que haga falta para que entren las dos manos (`agarre`, hasta 75 cm). Desde los ojos de verdad la
+  barra en los hombros queda bajo el mentón y la de arriba detrás de la frente.
+- *Cuerpo propio* (`_cabeza`, `_torso`; `athlete.js`: `pesoCabeza`, atributos `aCabeza` y `aTorso`): la cabeza no se dibuja
+  (el cuello se achica a un punto; pelo, ojos y pestañas se apagan y lo que queda se pinta de piel lisa, `uPiel`) mientras
+  la cámara esté en esta vista o a menos de 60 cm de los ojos. Agachado, tampoco el tronco (columna, clavículas y cuello: el
+  sombreador descarta esos fragmentos, `uSinTorso`, con una trama de 0,1 s al entrar y salir) ni el cinturón. En primera
+  persona el cuerpo se dibuja de los dos lados. La sombra sale entera salvo la cabeza.
+- *Barra suelta*: la mirada la sigue mientras cae y, cuando lleva 0,45 s quieta, sube a los jueces (`jueces`). Si cae
+  detrás no se la ve: la mirada queda al frente (girar la cabeza a buscarla, `vuelta`, se probó y quedó apagado: el hombro
+  propio tapaba media imagen).
+- *Sensación*: lente de 76° de alto (112° de ancho como mucho en pantallas muy anchas), respiración (4 mm y décimas de
+  grado), temblor del esfuerzo, el dip y el temblor de `CamaraViva` al recibir, y la barrita de timing cierra el lente un
+  poco. Con movimiento reducido, nada de eso.
+- *En el juego* (`main.js`): es solo de los levantamientos propios; a un rival se lo mira desde la general (`camVista`).
+  Mientras dura no hay planos de afuera (ni el de los brazos en la fijación, ni jurado, ni caída, ni giro al público): el
+  veredicto se ve desde los ojos. A los ojos se entra en 0,3 s, girando por rumbo e inclinación (horizonte nivelado). Llamado, paneles y repetición siguen en tercera persona.
+  La barrita de timing no cambia (es HTML encima del lienzo): `check_barra --camara=pov` juega tres arranques y pega en
+  el verde, el amarillo y el rojo donde se toca.
+
+**2. Lo raro después del levantamiento: qué era y cómo quedó.** Diagnóstico con `tools/check_pov.mjs` (hojas de fotos cada
+0,15 s y medidas a 60 c/s) y con tres arranques jugados (`check_barra --final`: 32 fotos desde que termina cada intento).
+| Qué se veía | Causa | Arreglo (regla) |
+|---|---|---|
+| Brazos arriba medio segundo sin la barra, después en cruz (pose en T) y hacia adelante | `poseCaida` mezclaba en línea recta de la pose del final a «Parado», empezando 0,5 s después de soltar | Los brazos desandan el clip por fases desde que se suelta la barra (recepción → giro → tirón de brazos → triple extensión) y enseguida bajan; en el envión bajan directo por los costados (las poses del empuje tienen las manos por donde cae la barra). Salen 0,2 s después que la barra: van detrás (`caida.js`: `clavesBrazos`, `DESANDAR`, `MANOS`; `athlete.js`: `setParts`) |
+| Pies que se arrastran (26 a 31 cm en un válido, 100 a 150 cm sumando los dos pies al salir de la sentadilla o la tijera) | La misma mezcla en línea recta desde la tijera o la sentadilla | El cuerpo sigue el clip hasta el final del segmento (la recuperación validada, 0,5 s por fase) y pasa a «Parado» con un saltito de 4 cm y 0,3 s. Medido: 0,3 a 0,6 cm en los válidos |
+| En el válido propio, tres movimientos de cámara encadenados en menos de 3 s; en el giro al público la cámara le pasaba al pesista por al lado | `decision()`: jurado (1,3 s), interrumpido a los 0,7 s por el plano de la caída, y a los 1,8 s el giro; y `_mezclar` iba por la cuerda | Válido propio: un solo movimiento, al jurado, y se queda (como el nulo). `_mezclar` rodea al sujeto en arco |
+| De pie como una estatua mientras se lee el veredicto | No había nada | Respiración agitada del tronco (`RESPIRA`: 0,9° por hueso a 0,55 Hz), nada con movimiento reducido |
+Sin regenerar nada en Blender: todo es reproducción (`caida.js`, `athlete.js`, `stage.js`, `cameras.js`, `main.js`).
+**Un defecto del clip que quedó a la vista**: entre «Giro de codos» y «Recepción» de la cargada el brazo gira 58° entre dos
+muestras vecinas (3500 a 3900 °/s al desandarlo muestra por muestra). En el levantamiento normal es el latigazo de codos y
+no molesta; por eso los brazos del final van de fase en fase y no muestra por muestra.
+
+**Herramientas nuevas.** `tools/check_pov.mjs` (A: finales con medidas; B: primera persona, hojas y reglas: imagen no vacía,
+cabeza oculta, giro de la mirada ≤ 160 °/s, cámara a ≤ 80 cm de la cabeza; la velocidad se mide con el reloj del juego detenido), `tools/hojas.mjs` (hojas de contactos),
+`check_barra --camara= --final --out=`, y en `JUEGO.test`: `posa()` y `medir()`. Job `pov` en `graficos.yml` (artefacto `pov-out`).
+
+**Dirección de arte a ciegas (16-nov, cinco rondas; un agente nuevo por ronda, solo imágenes, sin telemetría ni código).**
+78 imágenes por ronda, sacadas en esta máquina con `check_pov` y `check_barra --final` (armadas con el guion de
+`scratchpad/herr/pov_armar.sh`). Meta del coordinador: 7/10 en primera persona y 6/10 en el final. **No se llegó en primera persona.**
+| Ronda | Commit | Primera persona | Final | Qué se cambió después |
+|---|---|---|---|---|
+| 1 | 2be6076 | no aprobado (sin nota) | aprobado con observaciones | Pelo, ojos y barba propios apagados y cuello pintado de piel (pozo oscuro entre las clavículas); entrada a los ojos con el horizonte nivelado; mirada adelante y abajo |
+| 2 | f7f9b85 | 5,5 | 6 | Fuera la trama de puntos del cuerpo propio; la mirada sube a los jueces después de soltar |
+| 3 | 3f362d5 | 5 | 6 | Fuera los antebrazos cortados: agachado la cámara queda en los ojos, mira casi a plomo y no dibuja el tronco |
+| 4 | d16fc16 | 6 | 6 | Giro de cabeza hacia la barra caída atrás; barra en los hombros más abajo; pararse de la sentadilla en 0,8 s por fase |
+| 5 | ae1259e | 5 | 6 | Se deshicieron los dos cambios que la ronda 5 marcó como graves (giro de cabeza y encuadre de los hombros). El estado final es el de la ronda 4 con la mirada agachado a −80° (era −87°), la cámara 7 cm adelante de pie y el pararse más lento. **Ese estado final no pasó por otra ronda.** |
+Lo que las cinco rondas dejaron bien («no tocar»): barra arriba (recepción y recuperación del arranque, empuje, tijera y
+final del envión), tirón de brazos, horizonte nivelado, la barrita de timing en escritorio, caída y rebote de la barra,
+«devuelve la barra» y el corte a los jueces con las tres luces.
+Lo que sigue mal, repetido en las rondas 4 y 5:
+- *Primera persona*: (1) manos en los hombros (cargada y arranque del envión) enormes, pálidas y con los dedos cortados por
+  los bordes; entre la barra y el pecho se ve el piso (el cuello achicado tira de los vértices del pecho que pesan con él).
+  Arreglarlo de verdad pide un modelo de primera persona (manos y antebrazos aparte) o repesar el cuello en Blender.
+  (2) Salida y primer tirón: mirada casi a plomo, dos tercios de piso, sin jueces, y la barra queda a 90 px de la barrita
+  de timing. Geométricamente la barra está debajo y detrás de los ojos: con la mirada a −60° solo entra retrocediendo la
+  cámara, y entonces se ve el corte del tronco (rondas 2 y 3). (3) Fallo con la barra atrás: no se ve ni barra ni manos.
+  (4) En «PREPÁRATE» no se ven las manos y el pecho asoma abajo. (5) La mirada rebota al recibir (18° → 9° → 16°).
+  (6) Muslos con trama durante 0,1 s al pasar de agachado a de pie. (7) Sin captura de teléfono con interfaz.
+- *Final*: (1) en el válido la barra se suelta desde arriba y los brazos pasan por codos altos («doble bíceps») y por la
+  cruz; en el fallo con barra atrás eso se lee como festejo. (2) Estatua de 1 a 2,4 s igual en válido y nulo, sin paso ni
+  gesto. (3) Barra atrás pegada al pie de atrás en la tijera. Los tres piden animación nueva (manos que acompañan la barra,
+  festejo, bronca, paso): con poses de `poses.json` desandadas no sale.
+
+**Estimaciones y pendientes.**
+- Nada de esto pasó por `check()` de Blender ni se comparó con video: son reglas de reproducción (como ya lo era `caida.js`).
+- Sin probar en una placa real ni en un teléfono: en Actions se dibuja por software. Falta que el dueño lo juegue.
+- En una ventana más alta que ancha la cámara sigue siendo la lateral, se elija lo que se elija (también la primera persona).
+- En Clásico las ayudas pegadas a la barra (anillo, línea) no se ven en primera persona cuando la barra queda fuera de cuadro.
+- Después del válido el pesista queda de pie respirando: no hay festejo (haría falta una animación nueva).
 
 ## Contratos entre Blender y el visor
 

@@ -186,6 +186,11 @@ function conBorde(m) {
 }
 
 const v = new THREE.Vector3(), v2 = new THREE.Vector3();
+const _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _pc = new THREE.Vector3(), _pd = new THREE.Vector3(), _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion();
+/** Respiración del pesista de pie después del intento (posarMezcla): grados de cabeceo por hueso del tronco y ciclos por segundo. */
+export const RESPIRA = { grados: .9, hz: .55 };
+/** Escala del hueso del cuello con la cabeza propia oculta: cuello, cabeza, pelo y ojos quedan en un punto entre las clavículas. */
+const SIN_CABEZA = 1e-3;
 export const CAM = Object.fromEntries(CAMERAS.map((c, i) => [c.key, i]));
 /**
  * Planos propios del juego (el visor no los ve). `medio`: plano americano del pesista que se prepara en el llamado (de las
@@ -205,6 +210,33 @@ export const PLANOS = {
   // los tres árbitros de frente, desde el borde del escenario (para las fotos de control de banco.js)
   jueces: { key: 'jueces', at: [], up: 0, dAbs: 3.7, az: Math.PI, el: .12, fov: 34, punto: 'jueces' },
 };
+/**
+ * Primera persona (pedido del dueño: «hacer el levantamiento como si lo estuviera haciendo yo»; su referencia: una foto en
+ * primera persona con las dos manos grandes abajo, lo que se mira al frente y al centro, horizonte derecho). La mirada es
+ * sintética: siempre al frente, sin guiñada ni balanceo, sin picados al piso. Reglas, iguales para cualquier biotipo y fase:
+ * - CON LA BARRA EN LAS MANOS Y HASTA LOS HOMBROS, LA CÁMARA ACOMPAÑA A LA BARRA (como el arma de un juego en primera
+ *   persona): va `barra[0]` m detrás de la barra (o lo que haga falta para que entren las dos manos: medio agarre /
+ *   (`agarre` × tangente de medio lente a lo ancho), hasta `barra[3]`) y `barra[1]` m más arriba por cada metro de esa
+ *   distancia, mirando al frente con `barra[2]` rad de inclinación. La barra cruza la imagen en el tercio de abajo con las
+ *   manos y los antebrazos; al frente, los jueces y el público. Sube con la barra: del piso a la altura de los ojos.
+ *   Mientras tanto del cuerpo propio solo se dibujan antebrazos y manos (la cámara queda dentro del cuerpo: athlete.js, aTorso).
+ * - CON LA BARRA POR ENCIMA DE LOS OJOS (más de `alto[1]` m: recepción del arranque, envión arriba) la cámara vuelve a los
+ *   ojos (cabeza + `arriba` m a lo largo del cuello + `adelante` m al frente), retrocede `atras[0] + atras[1]` (o lo que pida
+ *   el agarre, hasta `atrasMax`) y mira a la barra dejándola `encima` rad por encima del centro: arriba la barra con las
+ *   manos y los brazos, abajo la tribuna. El cuerpo se dibuja entero menos la cabeza.
+ * - CON LA BARRA SUELTA (después del intento) la cámara vuelve a los ojos de a poco y la mirada sigue a la barra que cae
+ *   (`suelta[0]` del ángulo hacia ella, con `suelta[2]` de rapidez) sin bajar de `suelta[1]` rad ni subir de `frente`. No hay
+ *   giros ni cortes: las luces y el resultado van en pantalla (pedido del dueño).
+ * - la mirada llega con retardo (`giro` por segundo) y sin pasar de `giroMax` rad/s; la posición, con `sigue` por segundo.
+ * - lente de `fov`° de alto (en una pantalla muy ancha se cierra para no pasar de `fovAncho`° de ancho); plano cercano a `cerca` m.
+ * - respiración (`resp`) y temblor del esfuerzo (`temblor` rad con esfuerzo 1), y el dip y el temblor de CamaraViva al recibir
+ *   y con cada golpe de la barra. Con movimiento reducido, nada de eso: la cámara queda clavada.
+ * - la cabeza propia no se dibuja en esta vista ni mientras la cámara esté a menos de `sinCabeza` m de los ojos (el hueso del
+ *   cuello se achica a un punto; pelo, ojos y pestañas se apagan). La sombra sale sin cabeza: cae detrás del pesista.
+ */
+export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 3.3, giroMax: 2.6, encima: .38, abajo: -1.02, frente: -.21, tope: .6,
+  barra: [.3, .45, -.16, .5], alto: [-.05, .3], atras: [.12, .26], agarre: .72, atrasMax: .75, suelta: [1, -.8, 9], sinCabeza: .6, foco: 1.6,
+  resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003 }, temblor: .006 };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
 
@@ -222,6 +254,7 @@ export class Escena {
     this._niebla = { hdr: this.scene.fog.color.clone(), directo: tonoJS(new THREE.Color(SALA.nieblaDirecto)) };      // en el camino directo la niebla se mezcla ya en colores de pantalla
     if (canvas.parentElement && typeof document !== 'undefined') { const d = this.velo = document.createElement('div'); d.setAttribute('aria-hidden', 'true'); d.style.cssText = `position:absolute;inset:0;pointer-events:none;background:${vineta()}`; canvas.after(d); }
     this.rig = new CameraRig(canvas, { reduceMotion, interactive: false }); this.viva = new CamaraViva({ reduceMotion });
+    this.pov = null; this._povFn = (cam, dt) => this._povCam(cam, dt); this._ojo = new THREE.Vector3(); this._sinCabeza = null; this._temblor = 0;
     this.trace = new BarTrace(); this.scene.add(this.trace.group);
     const coarse = matchMedia('(pointer:coarse)').matches, aniso = Math.min(Q.aniso || 4, r.capabilities.getMaxAnisotropy());
     this.arena = new Arena({ tex: 64, aniso, reduceMotion, oficiales: false }); this.scene.add(this.arena.group);      // tex 64: la madera de la tarima la pone look.js (acá, una de relleno)
@@ -492,9 +525,10 @@ export class Escena {
   posar(pose, lev, dt = 0, temblor = 0, t = 0) {
     const a = this.activo; if (!a) return;
     aplicarEsfuerzo(a, temblor, t, this.reduceMotion);
-    const g = pose.base + pose.s, i = Math.floor(g); a.setPair(i, i + 1, g - i);
+    this._temblor = temblor;
+    const g = pose.base + pose.s, i = Math.floor(g); a.setPair(i, i + 1, g - i); this._suelta = false;
     // el pesista recibe la barra (la muestra cruza la fase de recepción en reproducción continua): dip de la cámara
-    if (dt > 0 && dt < .1 && this._rec?.seg === pose.seg && this._rec.s < pose.s && pose.s - this._rec.s < 8) { const r = this._recepcion(pose.seg); if (r >= 0 && this._rec.s < r && pose.s >= r) this.viva.dip(1); }
+    if (dt > 0 && dt < .1 && this._rec?.seg === pose.seg && this._rec.s < pose.s && pose.s - this._rec.s < 8) { const r = this._recepcion(pose.seg); if (r >= 0 && this._rec.s < r && pose.s >= r) { this.viva.dip(1); if (this.pov) this.viva.golpe(.55); } }
     (this._rec ||= {}).seg = pose.seg; this._rec.s = pose.s;
     a.barWorld(v); if (pose.primero) this._tl(lev).barFix(pose.tau, v);
     if (v.y < PLATE_R) v.y = PLATE_R;
@@ -509,8 +543,17 @@ export class Escena {
    */
   posarMezcla(p) {
     const a = this.activo; if (!a) return;
+    this._temblor = 0;
     aplicarEsfuerzo(a, 0, 0, true); a.root.position.z += p.dz || 0; a.root.position.y += p.dy || 0;
-    a.setMix(p.i, p.j, p.u, p.k, p.w); this.rig.headY = a.boneWorld('Head', v2).y + .14; this.sombra = 3;
+    if (p.brazos) a.setParts(p, p.brazos); else a.setMix(p.i, p.j, p.u, p.k, p.w);
+    // de pie después del intento no queda de estatua: respira agitado (el pecho cabecea alrededor del eje lateral del mundo,
+    // RESPIRA.grados en cada hueso del tronco, a RESPIRA.hz), tanto más cuanto más cerca de «Parado». Nada con movimiento reducido.
+    if (p.w > 0 && p.t !== undefined && !this.reduceMotion) {
+      const ang = THREE.MathUtils.degToRad(RESPIRA.grados) * p.w * Math.sin(p.t * Math.PI * 2 * RESPIRA.hz);
+      for (const k of ['Spine1', 'Spine2']) { const h = a._byName.get(k); if (!h) continue; h.parent.getWorldQuaternion(_qa); h.quaternion.premultiply(_qb.setFromAxisAngle(_pa.set(1, 0, 0), ang).premultiply(_qc.copy(_qa).invert()).multiply(_qa)); }
+      a.root.updateMatrixWorld(true);
+    }
+    this.rig.headY = a.boneWorld('Head', v2).y + .14; this.sombra = 3;
   }
   /**
    * Barra suelta en {y, z, ang} (m y radianes: rueda sobre su eje). Con `dt` la flexión de la barra sigue la aceleración
@@ -519,7 +562,7 @@ export class Escena {
   barraSuelta(b, dt = 0) {
     // la barra contra la tarima (venía bajando y frenó de golpe cerca del piso): temblor según la velocidad del golpe
     if (dt > 0 && dt < .1) { const v0 = (this._py[0] - this._py[1]) / dt, v1 = (b.y - this._py[0]) / dt; if (v0 < -1.2 && v1 - v0 > 1.2 && b.y < this.pisoBarra + .08) { const k = Math.min(.85, .18 - v0 * .11); this.viva.golpe(k); this.ambiente.golpe(b.z, k); } }
-    v.set(0, b.y, b.z); this.barbell.setPosition(v); this.barbell.group.rotation.x = b.ang || 0;
+    v.set(0, b.y, b.z); this.barbell.setPosition(v); this.barbell.group.rotation.x = b.ang || 0; this._suelta = true;
     this.barY = b.y; this.barZ = b.z; this.rig.barY = b.y; this.rig.barAhead = b.y;
     if (dt > 0 && dt < .1) { const acc = (b.y - 2 * this._py[0] + this._py[1]) / (dt * dt); this.barbell.step(dt, b.y, acc); } else this.barbell.settle(b.y);
     this._py[1] = dt > 0 ? this._py[0] : b.y; this._py[0] = b.y; this.sombra = 3;
@@ -573,13 +616,94 @@ export class Escena {
   /** Acercamiento sutil de la cámara (1 = el plano tal cual; 0,92 = un poco más cerca), amortiguado por el rig. */
   acercar(z = 1) { if (this.rig) this.rig.zoomT = z; }
   /** Cámara fija por clave. `suave` (s): en lugar de cortar, va desde la cámara de ahora (cameras.js, suave). */
-  camara(clave, suave = 0) { if (PLANOS[clave]) { this.primerPlano(clave, null, suave); return; } if (suave) this.rig.suave(suave); else this.rig.mezcla = null; this.plano = null; this.encuadre = null; this.rig.setShot(null); this.rig.cut(CAM[clave] ?? 0); }
+  camara(clave, suave = 0) {
+    if (PLANOS[clave]) { this.primerPlano(clave, null, suave); return; }
+    if (suave) this.rig.suave(suave); else this.rig.mezcla = null;
+    this.plano = null; this.encuadre = null; this.rig.setShot(null);
+    if (clave === 'pov') { this._pov(true); return; }
+    this._pov(false); this.rig.cut(CAM[clave] ?? 0);
+  }
+  /** Prende o apaga la primera persona (ver POV). Al prenderla, la cámara arranca ya en los ojos, sin retardo. */
+  _pov(on) {
+    if (!!this.pov === on) return; const cam = this.rig.camera;
+    this.pov = on ? { p: new THREE.Vector3(), inc: 0, retro: 0, kB: 0, t: 0, nueva: true } : null; this.rig.propia = on ? this._povFn : null;
+    if (!on) { cam.near = .25; cam.updateProjectionMatrix(); this._torso(this._sinTorso, 0); }
+  }
+  /** Punto de los ojos del pesista (m, mundo), de los huesos: no usa los ejes del hueso de la cabeza. */
+  ojos(out) {
+    const a = this.activo; if (!a) return out.set(0, 1.6, .1);
+    // con la cabeza oculta el cuello está achicado (ver _cabeza) y el hueso de la cabeza cae sobre el del cuello: se deshace la escala
+    const k = (this.P?.h || 1.7) / 1.7, n = a.boneWorld('Neck', _pa), c = a.boneWorld('Head', out); if (a === this._sinCabeza) c.sub(n).multiplyScalar(1 / SIN_CABEZA).add(n);
+    const arr = n.sub(c).negate().normalize();
+    const ad = a.boneWorld('LeftArm', _pb).sub(a.boneWorld('RightArm', _pc)).cross(arr).normalize();
+    return c.addScaledVector(arr, POV.arriba * k).addScaledVector(ad, POV.adelante * k);
+  }
+  /** Cuánto del cuerpo propio (todo menos antebrazos y manos) se deja sin dibujar (0 a 1; athlete.js: aTorso). Cinturón y zapatillas salen con él. */
+  _torso(a, k) {
+    if (this._sinTorso && this._sinTorso !== a) { const x = this._sinTorso; this._sinTorso = null; this._torso(x, 0); }
+    if (!a?.skin?.uSinTorso) return; a.skin.uSinTorso.value = k; this._sinTorso = k > 0 || this.pov ? a : null;
+    for (const m of a.meshes) {
+      const nm = m.material?.name || ''; if (/^(Belt|Shoe)/.test(nm)) m.visible = k < .5;
+      // con el tronco oculto el cuerpo se dibuja de los dos lados: por el corte del hombro y de la cintura no se ve a través de la malla;
+      // y siempre en primera persona: el cuello achicado deja un embudo que, visto desde atrás, mostraba el piso a través del pecho
+      if (nm === 'Body') { const lado = k > 0 || this.pov ? THREE.DoubleSide : THREE.FrontSide; if (m.material.side !== lado) { m.material.shadowSide = THREE.BackSide; m.material.side = lado; m.material.needsUpdate = true; } }
+    }
+  }
+  /** La cámara en primera persona de este cuadro (la llama el rig en lugar de su encuadre). */
+  _povCam(cam, dt) {
+    const S = this.pov, R = this.rig, o = this.ojos(_pd), quieto = this.reduceMotion, a = this.activo; S.t += dt;
+    const b = this.barbell.group.position, paso = (x, a, c) => { const t = Math.min(1, Math.max(0, (x - a) / (c - a))); return t * t * (3 - 2 * t); };
+    // cuánto está la barra por encima de los ojos (0 a 1) y la distancia a la que entran las dos manos en la imagen
+    const dy0 = b.y - o.y, arriba = paso(dy0, POV.alto[0], POV.alto[1]), tH = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * cam.aspect;
+    const medio = a ? Math.abs(a.boneWorld('LeftHand', _pa).x - a.boneWorld('RightHand', _pb).x) / 2 : .3, D = medio / (POV.agarre * Math.max(.3, tH));
+    // cuánto es «cámara de la barra» (1) y cuánto «ojos» (0): con la barra suelta vuelve a los ojos de a poco
+    const kB = this._suelta || !a ? 0 : 1 - arriba; S.kB = S.nueva || quieto ? kB : S.kB + (kB - S.kB) * (1 - Math.exp(-(this._suelta ? 3 : 7) * dt));
+    // ojos: retroceso con la barra arriba
+    const retro = this._suelta ? 0 : Math.min(POV.atrasMax, Math.max(POV.atras[0] + POV.atras[1] * arriba, Math.sqrt(Math.max(0, D * D - dy0 * dy0)) - (b.z - o.z))) * arriba;
+    S.retro = S.nueva ? retro : S.retro + (retro - S.retro) * (1 - Math.exp(-(this._suelta ? 3 : 12) * dt)); o.z -= S.retro;
+    // cámara de la barra: detrás y un poco por encima; se guarda dónde estaba la barra al soltarla para volver desde ahí
+    if (!this._suelta) { const dist = Math.min(POV.barra[3], Math.max(POV.barra[0], D)); (S.pB ||= new THREE.Vector3()).set(o.x, b.y + POV.barra[1] * dist, b.z - dist); }
+    if (S.pB && S.kB > 0) o.lerp(S.pB, S.kB);
+    if (S.nueva) S.p.copy(o); else S.p.lerp(o, 1 - Math.exp(-POV.sigue * dt));
+    // inclinación de la mirada (reglas de POV)
+    const dy = b.y - S.p.y, dz = b.z - S.p.z, hacia = Math.atan2(dy, dz), incOjos = Math.max(POV.abajo, Math.min(POV.tope, hacia - POV.encima));
+    const incSuelta = b.z < S.p.z - .1 ? POV.frente : Math.max(POV.suelta[1], Math.min(POV.frente, hacia * POV.suelta[0]));
+    const incT = this._suelta ? incSuelta + (POV.barra[2] - incSuelta) * S.kB : incOjos + (POV.barra[2] - incOjos) * S.kB;
+    // con retardo y con tope de velocidad (`giroMax` rad/s: cuando la barra pasa junto a la cámara el ángulo hacia ella cambia de golpe)
+    const dInc = (incT - S.inc) * (1 - Math.exp(-(quieto ? 60 : this._suelta ? POV.suelta[2] : POV.giro) * dt)), topeG = POV.giroMax * dt;
+    S.inc = S.nueva ? incT : S.inc + (quieto ? dInc : Math.max(-topeG, Math.min(topeG, dInc))); S.nueva = false;
+    let inc = S.inc, bal = 0, y = 0;
+    if (!quieto) {
+      const w = S.t * Math.PI * 2 * POV.resp.hz, T = Math.min(1, Math.max(0, this._temblor)) * POV.temblor;
+      y = POV.resp.y * Math.sin(w); inc += POV.resp.cabeceo * Math.sin(w - .9) + T * (Math.sin(S.t * 47) * .6 + Math.sin(S.t * 83 + 1.3) * .4);
+      bal = POV.resp.balanceo * Math.sin(w * .5 + 1) + T * .6 * (Math.sin(S.t * 39 + .7) * .6 + Math.sin(S.t * 71) * .4);
+    }
+    cam.position.copy(S.p); cam.position.y += y; cam.rotation.set(inc, Math.PI, bal, 'YXZ');
+    // del cuerpo propio, solo antebrazos y manos mientras la cámara acompaña a la barra (trama de una décima al entrar y salir)
+    S.torso = Math.min(1, Math.max(0, (S.kB - .4) / .2)); this._torso(a, S.torso);
+    // los brazos enteros mientras cuelgan (la barra a más de 15 cm por debajo de los hombros: salen de la imagen por arriba); con la barra en los hombros, solo antebrazos y manos
+    if (a?.skin?.uCorte) a.skin.uCorte.value = b.y < a.boneWorld('LeftArm', _pa).y - .15 ? .8 : .5;
+    const fov = Math.min(POV.fov, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(POV.fovAncho / 2)) / Math.max(.5, cam.aspect)))) * (1 - (1 - R.zoom) * .5);
+    cam.fov = fov; cam.near = POV.cerca; cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+    R.focusDistance = POV.foco; R.target.set(S.p.x, S.p.y, S.p.z + POV.foco); R.subject.copy(R.target);
+  }
+  /** La cabeza propia no se dibuja con la cámara pegada a los ojos (ver POV): entrando o saliendo de la primera persona, tampoco. */
+  _cabeza() {
+    const a = this.activo, cerca = !!a && a.root.visible && (!!this.pov || this.rig.camera.position.distanceTo(this.ojos(_pd)) < POV.sinCabeza), quien = cerca ? a : null;
+    if (quien === this._sinCabeza) return;
+    for (const [x, e] of [[this._sinCabeza, 1], [quien, SIN_CABEZA]]) { const h = x?._byName.get('Neck'); if (h) { h.scale.setScalar(e); h.updateMatrixWorld(true); }
+      // pelo, barba, ojos y pestañas no se dibujan: achicados al punto del cuello quedaban como un pozo oscuro entre las clavículas al mirar hacia abajo
+      if (x) for (const m of [...x.meshes, x.hairDepth]) if (m && (m === x.hairDepth || /^(Hair|Eyes|Lashes)$/.test(m.material?.name))) m.visible = e === 1;
+      if (x?.skin?.uSinCabeza) x.skin.uSinCabeza.value = e === 1 ? 0 : 1; }      // y lo que queda del cuello se pinta de piel lisa (athlete.js: pesoCabeza)
+    this._sinCabeza = quien; this.sombra = Math.max(this.sombra, 2);
+  }
   /**
    * Primer plano por clave (SHOTS del visor o PLANOS del juego). `encuadre`: {x, y} fracción del lienzo (desde arriba a la
    * izquierda) donde tiene que quedar el sujeto, para dejarlo en la parte libre cuando un panel tapa un costado o el pie.
    */
   primerPlano(clave, encuadre = null, suave = 0) {
     if (suave) this.rig.suave(suave); else this.rig.mezcla = null;
+    this._pov(false);
     const base = PLANOS[clave] || SHOTS.find(s => s.key === clave) || null, h = this.P?.h || 1.75;
     // LIF-50, teléfono parado: con márgenes de la gráfica arriba y abajo (main.js, margenVertical), el sujeto del primer plano
     // va al centro de lo que queda libre y no detrás de la barrita y el botón
@@ -606,6 +730,7 @@ export class Escena {
   /** Punto de la barra en píxeles CSS del lienzo (para las ayudas pegadas a la barra). `y`: otra altura en metros. */
   pantalla(y = this.barY, x = 0) {
     v.set(x, y, this.barZ ?? 0).project(this.rig.camera);
+    if (v.z > 1 || v.z < -1) return { x: -9999, y: -9999 };      // detrás de la cámara (primera persona): fuera de la pantalla
     return { x: (v.x + 1) / 2 * this.canvas.clientWidth, y: (1 - v.y) / 2 * this.canvas.clientHeight };
   }
   /**
@@ -639,7 +764,7 @@ export class Escena {
   }
   /** Avanza cámara y entorno; dibuja si `pintar`. */
   cuadro(dt, pintar = true) {
-    this._apuntar(); this.rig.update(dt); this._vigilar(dt); this.viva.aplicar(this.rig.camera, dt, this.rig.focusDistance); this.trace.face(this.rig.camera); this.post.focus = this.rig.focusDistance; this.post.cerca = this.plano?.key === 'jurado' ? .1 : .35; this.arena.update(dt, this.rig.camera); this.ambiente.update(dt); this.jueces.update(dt); this._detalle();
+    this._apuntar(); this.rig.update(dt); this._cabeza(); this._vigilar(dt); this.viva.aplicar(this.rig.camera, dt, this.rig.focusDistance); this.trace.face(this.rig.camera); this.post.focus = this.pov ? 6 : this.rig.focusDistance; this.post.cerca = this.pov || this.plano?.key === 'jurado' ? .1 : .35; this.arena.update(dt, this.rig.camera); this.ambiente.update(dt); this.jueces.update(dt); this._detalle();
     if (!pintar) return;
     const r = this.renderer; r.shadowMap.needsUpdate = this.sombra > 0; if (this.sombra > 0) this.sombra--;
     this._dibujar(dt);

@@ -18,7 +18,7 @@ const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const _v = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
 
 const SKIN_PARS = /* glsl */`
-uniform sampler2D tMask; uniform sampler2D tDetailSkin; uniform sampler2D tDetailCloth; uniform vec2 uTile; uniform float uMaskMode; uniform vec3 uScatter; uniform float uSweat; uniform float uDetail; uniform float uSkinSat; uniform float uSkinRough; uniform vec3 uHairColor; uniform vec4 uClothFlat; uniform vec3 uSkinTint; uniform vec3 uClothTint; uniform float uTone; uniform float uWrinkle; uniform float uGloss; uniform float uFino;
+uniform sampler2D tMask; uniform sampler2D tDetailSkin; uniform sampler2D tDetailCloth; uniform vec2 uTile; uniform float uMaskMode; uniform vec3 uScatter; uniform float uSweat; uniform float uDetail; uniform float uSkinSat; uniform float uSkinRough; uniform vec3 uHairColor; uniform vec4 uClothFlat; uniform vec3 uSkinTint; uniform vec3 uClothTint; uniform float uTone; uniform float uWrinkle; uniform float uGloss; uniform float uFino; uniform float uHairMix; uniform vec3 uPiel; uniform float uSinCabeza; varying float vCab; uniform float uSinTorso; uniform float uCorte; varying float vTor; varying float vNdcY;
 vec3 gMask = vec3( 0.0 ); float gGrain = 0.0; float gPatch = 0.5;
 // Subsuperficie barata: difuso envuelto teñido de rojo en el terminador (la luz "dobla" la esquina dentro de la piel),
 // transmisión en contraluz por los bordes finos (orejas, dedos) y nada de eso sobre la tela.
@@ -60,8 +60,14 @@ const SKIN_MASK = /* glsl */`
   // tela de color plano (el juego la usa para un pesista que comparte modelo): tapa lo que la textura trae horneado
   diffuseColor.rgb = mix( diffuseColor.rgb, uClothFlat.rgb, uClothFlat.a * smoothstep( 0.5, 0.9, gMask.g ) * step( 0.5, uMaskMode ) );
   // bajo el pelo en capas (canal B) la piel toma el color del pelo: entre hebra y hebra no se ve cuero cabelludo claro
-  diffuseColor.rgb = mix( diffuseColor.rgb, uHairColor, 0.7 * smoothstep( 0.25, 0.8, gMask.b ) * step( 0.5, uMaskMode ) );
+  diffuseColor.rgb = mix( diffuseColor.rgb, uHairColor, uHairMix * smoothstep( 0.25, 0.8, gMask.b ) * step( 0.5, uMaskMode ) );
 #endif
+  // cuerpo propio sin dibujar salvo antebrazos y manos (primera persona con la cámara de la barra), con trama para que entre y salga de a poco
+  // y lo que queda (los brazos) se deshace hacia el borde de arriba de la imagen: el corte del hombro nunca queda a la vista
+  if ( uSinTorso > 0.0 && fract( sin( dot( floor( gl_FragCoord.xy ), vec2( 39.3468, 11.135 ) ) ) * 24634.6345 ) < uSinTorso * smoothstep( 0.55, 0.92, vNdcY ) ) discard;
+  if ( uSinTorso > 0.0 && vTor > uCorte && fract( sin( dot( floor( gl_FragCoord.xy ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) < uSinTorso ) discard;
+  // cabeza propia oculta (primera persona): lo que queda del cuello y la cabeza, achicado a un punto, se pinta de piel lisa
+  diffuseColor.rgb = mix( diffuseColor.rgb, uPiel, uSinCabeza * smoothstep( 0.55, 0.85, vCab ) );
 `;
 const SKIN_DETAIL = /* glsl */`
 #ifdef USE_MAP
@@ -223,16 +229,18 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
   for (const t of [m.map, m.normalMap, m.roughnessMap, m.aoMap]) if (t) t.anisotropy = aniso;
   const uniforms = { tDetailSkin: { value: detail.skin }, tDetailCloth: { value: detail.cloth }, uTile: { value: new THREE.Vector2(mpu / .012, mpu / .008) }, uDetail: { value: 1 }, tMask: { value: mask }, uMaskMode: { value: mask ? 1 : 0 },
     uScatter: { value: new THREE.Color(...ASPECTO.piel.dispersion) }, uSweat: { value: ASPECTO.piel.sudor }, uSkinSat: { value: ASPECTO.piel.saturacion }, uSkinRough: { value: ASPECTO.piel.rugosidad }, uHairColor: { value: new THREE.Color(.03, .025, .02) }, uClothFlat: { value: new THREE.Vector4(0, 0, 0, 0) },
-    uSkinTint: { value: new THREE.Color(ASPECTO.piel.tono) }, uClothTint: { value: new THREE.Color(1, 1, 1) }, uTone: { value: ASPECTO.piel.variacion }, uWrinkle: { value: ASPECTO.tela.arrugas }, uGloss: { value: ASPECTO.piel.brillo }, uFino: FINO };
+    uSkinTint: { value: new THREE.Color(ASPECTO.piel.tono) }, uClothTint: { value: new THREE.Color(1, 1, 1) }, uTone: { value: ASPECTO.piel.variacion }, uWrinkle: { value: ASPECTO.tela.arrugas }, uGloss: { value: ASPECTO.piel.brillo }, uFino: FINO,
+    uHairMix: { value: .7 }, uPiel: { value: new THREE.Color(.6, .42, .33) }, uSinCabeza: { value: 0 }, uSinTorso: { value: 0 }, uCorte: { value: .5 } };
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, uniforms);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aCabeza; varying float vCab; attribute float aTorso; varying float vTor; varying float vNdcY;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvCab = aCabeza; vTor = aTorso;').replace('#include <project_vertex>', '#include <project_vertex>\nvNdcY = gl_Position.y / max( 1e-4, gl_Position.w );');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <lights_physical_pars_fragment>', '#include <lights_physical_pars_fragment>\n' + SKIN_PARS)
       .replace('#include <map_fragment>', '#include <map_fragment>\n' + SKIN_MASK)
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' + SKIN_DETAIL)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + SKIN_MATERIAL);
   };
-  m.customProgramCacheKey = () => 'tarima-skin-11';
+  m.customProgramCacheKey = () => 'tarima-skin-18';
   m.userData.skin = uniforms;
   return m;
 }
@@ -257,6 +265,31 @@ function hairMaterial(src) {
   return src;
 }
 /** Color medio (lineal) de las hebras opacas de la textura de pelo. */
+/**
+ * Atributo `aCabeza` de la malla del cuerpo: cuánto pesa en cada vértice el cuello y lo que cuelga de él (cabeza, ojos). El
+ * juego oculta la cabeza propia en primera persona achicando el cuello a un punto; con esto el sombreador pinta ese resto
+ * de piel lisa (`uPiel`: el promedio del albedo en la base del cuello, donde el peso va de 0,3 a 0,6) en vez de dejar la
+ * cara y la barba estiradas.
+ */
+function pesoCabeza(mesh, skin) {
+  const g = mesh.geometry, si = g.attributes.skinIndex, sw = g.attributes.skinWeight, uv = g.attributes.uv; if (!si || !sw || g.attributes.aCabeza) return;
+  const es = mesh.skeleton.bones.map(b => { for (let x = b; x; x = x.parent) if (x.isBone && boneKey(x.name) === 'Neck') return true; return false; });
+  // `aTorso`: todo el cuerpo menos los antebrazos y las manos (1 = se descarta con `uSinTorso`): en primera persona la cámara
+  // acompaña a la barra y queda dentro del cuerpo; el juego dibuja las dos caras mientras tanto (el corte del codo no se ve hueco)
+  const mano = mesh.skeleton.bones.map(b => { for (let x = b; x; x = x.parent) if (x.isBone && /^(Left|Right)ForeArm$/.test(boneKey(x.name))) return true; return false; });
+  // el brazo (del hombro al codo) vale 0,65: con `uCorte` en 0,8 se dibuja (brazos colgando: salen de la imagen por arriba) y en 0,5 no
+  const tr = mesh.skeleton.bones.map((b, i) => (mano[i] ? 0 : /^(Left|Right)Arm$/.test(boneKey(b.name)) ? .65 : 1));
+  const w = new Float32Array(si.count), wt = new Float32Array(si.count);
+  for (let i = 0; i < si.count; i++) { let t = 0, c = 0, d = 0; for (let k = 0; k < 4; k++) { const p = sw.getComponent(i, k), h = si.getComponent(i, k); t += p; if (es[h]) c += p; d += p * tr[h]; } w[i] = t > 0 ? c / t : 0; wt[i] = t > 0 ? d / t : 0; }
+  g.setAttribute('aCabeza', new THREE.BufferAttribute(w, 1)); g.setAttribute('aTorso', new THREE.BufferAttribute(wt, 1));
+  try {
+    const im = mesh.material.map?.image; if (!im || !uv || !skin?.uPiel) return;
+    const N = 256, cv = document.createElement('canvas'); cv.width = cv.height = N; const c2 = cv.getContext('2d', { willReadFrequently: true }); c2.drawImage(im, 0, 0, N, N);
+    const d = c2.getImageData(0, 0, N, N).data; let r = 0, gr = 0, b = 0, n = 0;
+    for (let i = 0; i < si.count; i++) if (w[i] > .3 && w[i] < .6) { const x = Math.min(N - 1, Math.max(0, Math.floor((uv.getX(i) % 1 + 1) % 1 * N))), y = Math.min(N - 1, Math.max(0, Math.floor((uv.getY(i) % 1 + 1) % 1 * N))), j = (y * N + x) * 4; r += d[j]; gr += d[j + 1]; b += d[j + 2]; n++; }
+    if (n > 8) skin.uPiel.value.setRGB(r / n / 255, gr / n / 255, b / n / 255, THREE.SRGBColorSpace);
+  } catch { /* se queda el color por defecto */ }
+}
 function hairColor(tex, out) {
   try {
     const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(tex.image, 0, 0, 64, 64);
@@ -355,6 +388,7 @@ export class Athlete {
     const body = [...done.values()].find(m => m.name === 'Body'), hair = [...done.values()].find(m => m.name === 'Hair');
     if (body && hair?.map) hairColor(hair.map, body.userData.skin.uHairColor.value);
     this.skin = body?.userData.skin || null; this.cuerpo = body || null; this.pelo = hair || null; this._peloBase = this.skin ? this.skin.uHairColor.value.clone() : null;
+    for (const o of this.meshes) if (o.material?.name === 'Body') pesoCabeza(o, this.skin);
     this.hasMask = !!mask; this.hasNormalMap = [...done.values()].some(m => m.name === 'Body' && m.normalMap);
     this.materialNames = [...done.values()].map(m => m.name);
     this.barBone = this.bones.find(b => boneKey(b.name) === 'Bar');
@@ -447,8 +481,21 @@ export class Athlete {
   setPair(i, j, u) { const n = this.snap.length - 1, k = x => Math.min(n, Math.max(0, x | 0)); this._blend(this.snap[k(i)], this.snap[k(j)], Math.min(1, Math.max(0, u))); }
   /** Como setPair, y el resultado se mezcla en `w` con la muestra `k` (el juego: de la pose del fallo a otra fase validada). El visor no lo usa. */
   setMix(i, j, u, k, w) { const n = this.snap.length - 1, c = x => Math.min(n, Math.max(0, x | 0)); this._blend(this.snap[c(i)], this.snap[c(j)], Math.min(1, Math.max(0, u)), this.snap[c(k)], Math.min(1, Math.max(0, w))); }
-  _blend(A, B, u, C = null, uc = 0) {
-    for (let i = 0; i < this.bones.length; i++) { const b = this.bones[i]; b.quaternion.copy(A[i][0]).slerp(B[i][0], u); b.position.copy(A[i][1]).lerp(B[i][1], u); if (C && uc > 0) { b.quaternion.slerp(C[i][0], uc); b.position.lerp(C[i][1], uc); } }
+  /**
+   * Como setMix, por partes (el juego: el final del intento, game/caida.js): los huesos de los brazos (clavícula, brazo,
+   * antebrazo, mano y dedos) salen de `br` y el resto del cuerpo de `cu`; cada uno es {i, j, u, k, w}: la mezcla en `u` de las
+   * muestras `i` y `j` (sin `j`, la siguiente), mezclada en `w` con la muestra `k`. Así los brazos pueden desandar el clip mientras las piernas lo siguen.
+   */
+  setParts(cu, br) {
+    const n = this.snap.length - 1, c = x => Math.min(n, Math.max(0, x | 0)), S = this.snap, u01 = x => Math.min(1, Math.max(0, x));
+    this._arm ||= this.bones.map(b => /^(Left|Right)(Shoulder|Arm|ForeArm|Hand)/.test(boneKey(b.name)));
+    this._blend(S[c(cu.i)], S[c(cu.j ?? cu.i + 1)], u01(cu.u), S[c(cu.k)], u01(cu.w), { A: S[c(br.i)], B: S[c(br.j ?? br.i + 1)], u: u01(br.u), C: S[c(br.k)], uc: u01(br.w) });
+  }
+  _blend(A0, B0, u0, C0 = null, uc0 = 0, arm = null) {
+    for (let i = 0; i < this.bones.length; i++) {
+      const b = this.bones[i], P = arm && this._arm[i] ? arm : null, A = P ? P.A : A0, B = P ? P.B : B0, u = P ? P.u : u0, C = P ? P.C : C0, uc = P ? P.uc : uc0;
+      b.quaternion.copy(A[i][0]).slerp(B[i][0], u); b.position.copy(A[i][1]).lerp(B[i][1], u); if (C && uc > 0) { b.quaternion.slerp(C[i][0], uc); b.position.lerp(C[i][1], uc); }
+    }
     this.root.updateMatrixWorld(true);
     const w = this.corr;
     for (const arm of this.arms) {

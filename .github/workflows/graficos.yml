@@ -6,10 +6,12 @@ name: Gráficos (fotos por calidad y banco, por software)
 
 on:
   push:
-    branches: [graficos, graficos2, look, plantel, visual]
+    branches: [graficos, graficos2, look, plantel, visual, pov]
     paths:
       - 'web/js/**'
       - 'tools/banco.mjs'
+      - 'tools/check_pov.mjs'
+      - 'tools/check_barra.mjs'
       - '.github/workflows/graficos.yml'
   workflow_dispatch:
     inputs:
@@ -112,6 +114,62 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: graficos-out
+          path: out/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Primera persona y final del levantamiento (rama pov): hojas de fotos cuadro a cuadro del final de un válido, un nulo y
+  # una caída, con medidas (pies que resbalan, giros, manos contra el tronco); la primera persona a lo largo de cada
+  # levantamiento; y tres arranques jugados de verdad (barrita) con la cámara general y en primera persona, con 32 fotos del
+  # final de cada uno.
+  pov:
+    name: Primera persona y final del levantamiento (dibujo por software)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TARIMA_ANGLE: swiftshader
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Dependencias
+        run: npm ci
+      - name: Chrome
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || true)"
+          if [ -z "$CHROME" ]; then
+            wget -q -O "$RUNNER_TEMP/chrome.deb" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+            sudo apt-get update -q && sudo apt-get install -y -q "$RUNNER_TEMP/chrome.deb"
+            CHROME="$(command -v google-chrome)"
+          fi
+          echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
+          mkdir -p out/logs
+      - name: Final cuadro a cuadro y primera persona (check_pov)
+        timeout-minutes: 25
+        run: node tools/check_pov.mjs 2>&1 | tee out/logs/check_pov.log
+      - name: Tres arranques jugados en primera persona, con el final denso (check_barra --camara=pov --final)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 12
+        env:
+          TAPA_INFORMA: 1
+        run: |
+          node tools/check_barra.mjs --solo=pc_es --camara=pov --final --out=out/barra_pov 2>&1 | tee out/logs/check_barra_pov.log
+          node tools/hojas.mjs out/barra_pov --cols=6 --ancho=400
+      - name: Tres arranques jugados con la cámara general, con el final denso (check_barra --final)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 12
+        env:
+          TAPA_INFORMA: 1
+        run: |
+          node tools/check_barra.mjs --solo=pc_es --final --out=out/barra_general 2>&1 | tee out/logs/check_barra_general.log
+          node tools/hojas.mjs out/barra_general --cols=6 --ancho=400
+      - name: Resultado como artefacto
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: pov-out
           path: out/
           if-no-files-found: warn
           retention-days: 14

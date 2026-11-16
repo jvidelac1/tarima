@@ -409,16 +409,21 @@ const guiaTxt = txt => { const g = $('guia'); if (g.textContent !== txt) g.textC
 const etiqueta = et => { $('etiqueta').hidden = !et?.length; $('etiqueta').textContent = (et || []).map(e => ETIQUETAS[e]).join(' · '); };
 /**
  * Cámara del levantamiento (LIF-38): la general de siempre, o la elegida en Opciones, con la tecla V o con `?camara=`
- * (jurado: por encima de los hombros de los tres árbitros; lado: lateral; baja: frontal). Se recuerda en este navegador y
- * deja el evento `camara_elegida`. Una ventana más alta que ancha usa la lateral.
+ * (jurado: por encima de los hombros de los tres árbitros; lado: lateral; baja: frontal; pov: primera persona, desde los
+ * ojos del pesista del jugador). Se recuerda en este navegador y deja el evento `camara_elegida`. Una ventana más alta que
+ * ancha usa la lateral. La primera persona es solo de los levantamientos propios: a un rival se lo mira desde la general
+ * (`camVista`), y mientras dura no hay planos de afuera (ni el de los brazos, ni el jurado, ni la barra que cae, ni el giro
+ * al público): todo se ve desde los ojos, hasta el fundido que sigue.
  */
-const CAMARAS_ELEGIBLES = ['3/4', 'jurado', 'lado', 'baja'], CAMARA_NOMBRE = { '3/4': 'general', jurado: 'jurado', lado: 'lateral', baja: 'baja' };
+const CAMARAS_ELEGIBLES = ['3/4', 'jurado', 'lado', 'baja', 'pov'], CAMARA_NOMBRE = { '3/4': 'general', jurado: 'jurado', lado: 'lateral', baja: 'baja', pov: 'pov' };
 const camElegida = () => { const q = params.get('camara'), g = guardado.get('tarima.camara'); return CAMARAS_ELEGIBLES.includes(q) ? q : CAMARAS_ELEGIBLES.includes(g) ? g : '3/4'; };
 const camPrincipal = () => (escena.vertical ? 'lado' : (E.camara ||= camElegida()));
+/** La cámara con que se mira un levantamiento: la elegida si es del jugador; la de un rival nunca es la primera persona. */
+const camVista = propio => { const c = camPrincipal(); return c === 'pov' && !propio ? '3/4' : c; };
 function elegirCamara(a, via) {
   if (!CAMARAS_ELEGIBLES.includes(a)) return; E.camara = a; guardado.set('tarima.camara', a); ev('camara_elegida', { vista: CAMARA_NOMBRE[a], via, pantalla: E.pantalla });
   // si se está viendo la cámara del levantamiento, cambia ya (con un movimiento suave); en un primer plano, la próxima vez
-  if (escena && !escena.vertical && (!escena.plano || escena.plano.key === 'jurado') && (E.modo === 'intento' || E.intento)) { escena.camara(a, .8); E.forzar = true; }
+  if (escena && !escena.vertical && (!escena.plano || escena.plano.key === 'jurado') && (E.modo === 'intento' || E.intento)) { escena.camara(camVista(E.intento ? !!E.intento.propio : true), .8); E.forzar = true; }
 }
 const cambiarCamara = () => elegirCamara(CAMARAS_ELEGIBLES[(CAMARAS_ELEGIBLES.indexOf(E.camara || camElegida()) + 1) % CAMARAS_ELEGIBLES.length], 'tecla');
 /** Recuadro fijo «ESPACIO: seguir» / «Toca: seguir» de las pantallas pasivas (turno de un rival, veredicto, repetición). */
@@ -677,8 +682,9 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
       if (m.fase !== visto.fase) {
         // sin cortes (pedido del dueño): la cámara general llega con un movimiento suave; un rival que no decide nada se ve
         // entero desde la misma cámara general
-        if (m.fase === 'acomodo') escena.camara(camPrincipal(), .6);
-        if (m.fase === 'fijacion' && m.trabaMs < 0 && !camFija && (propio || decisivo)) { escena.primerPlano('arriba', null, .5); camFija = true; }
+        if (m.fase === 'acomodo') { const cv = camVista(propio); escena.camara(cv, cv === 'pov' ? .3 : .6); }      // a los ojos entra rápido: la barrita ya está a la vista y la imagen tiene que estar quieta
+        // (el primer plano de los brazos en la fijación se sacó: el veredicto se ve desde el mismo plano, quieto, y un primer
+        // plano dejaba al pesista cortado y sin la barra cuando la soltaba; pedido del dueño del 16-nov: sin movimientos al terminar)
         if (m.fase === 'tiron' || m.fase === 'flexion') sonido.despegue();
         visto.fase = m.fase;
       }
@@ -759,14 +765,27 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
 /** Muestra global de «Parado» (de pie detrás de la barra): adonde vuelve el pesista después de soltar. */
 const PARADO = P => { const G = tramo(P, 'clean'); return G.base + G.i('Parado'); };
 /**
+ * Reglas del cuerpo en el final (game/caida.js, poseCaida), en muestras globales del clip y por nombre de fase: desde dónde
+ * el cuerpo se para siguiendo el clip (`rec`, la recepción) y hasta dónde (`fin`, el final del segmento); y el tramo que
+ * desandan los brazos: de la recepción (después ya no se mueven) a la barra colgando con los brazos estirados (arranque y
+ * cargada: la triple extensión). En el envión los brazos no desandan nada: las poses anteriores a la recepción (empuje,
+ * impulso) tienen las manos delante de la cara, justo por donde cae la barra (check_escenas daba BAD de antebrazos contra la
+ * barra a los 0,3 s de soltar, con cualquier espera); bajan directo a «Parado», por los costados, apenas se va la barra.
+ */
+const FASES_FINAL = { snatch: ['Recepción', 'Triple extensión'], clean: ['Recepción', 'Triple extensión'], split: ['Envión · Tijera', 'Envión · Tijera'], power: ['Power jerk · Recepción', 'Power jerk · Recepción'], squat: ['Squat jerk · Recepción', 'Squat jerk · Recepción'] };
+function reglasFinal(P, seg) {
+  const F = FASES_FINAL[seg]; if (!F) return null; const G = tramo(P, seg), rec = G.base + G.i(F[0]);
+  return { sub: P.sub, rec, fin: G.base + G.n - 1, brazosDe: rec, brazosA: G.base + G.i(F[1]) };
+}
+/**
  * Escena del final de un intento (game/caida.js): con qué pose terminó, cómo se suelta la barra y adónde va el pesista.
  * null si no hay nada que mostrar (no se levantó la barra).
  */
 function armarFinal(r, lev) {
   if (!r || !r.grab || !r.grab.length || !escena.P) return null;
   const M = r.m?.movs?.[r.m.movs.length - 1], g = r.grab[r.grab.length - 1];
-  const c = armarCaida(r.res, M?.mov, { y: g.y, z: g.z }, escena.pisoBarra); if (!c) return null;
-  return Object.assign(c, { g0: g.pose.base + g.pose.s, pose: g.pose, destino: PARADO(escena.P), lev, golpes: 0 });
+  const g0 = g.pose.base + g.pose.s, c = armarCaida(r.res, M?.mov, { y: g.y, z: g.z }, escena.pisoBarra, g0, reglasFinal(escena.P, g.pose.seg)); if (!c) return null;
+  return Object.assign(c, { g0, pose: g.pose, destino: PARADO(escena.P), lev, golpes: 0 });
 }
 /**
  * Dibuja el final en el instante t (s desde que terminó el intento). Antes de soltar, la pose del final con la barra en las
@@ -775,7 +794,7 @@ function armarFinal(r, lev) {
 function dibujarFinal(c, t, dt, vivo) {
   const tb = t - c.pl.suelta;
   if (tb < 0) { escena.posar(c.pose, c.lev); return; }
-  escena.posarMezcla(poseCaida(c.pl, c.g0, c.destino, t)); const b = c.barra.en(tb); escena.barraSuelta(b, dt);
+  escena.posarMezcla(poseCaida(c.pl, c.g0, c.destino, t, c.R)); const b = c.barra.en(tb); escena.barraSuelta(b, dt);
   if (vivo) for (; c.golpes < b.golpes.length; c.golpes++) { const v = b.golpes[c.golpes].v; sonido.golpe(v); if (c.golpes === 0 && c.tipo !== 'bajada') sonido.lamento(); }
 }
 /** El final quieto, en su último cuadro (cuando se saltea). */
@@ -790,8 +809,8 @@ const terminarFinal = c => { if (c) { c.golpes = 1e9; dibujarFinal(c, c.dur + 5,
  */
 async function decision(a, lev, res, et, propio, o = {}) {
   visita('decision'); E.modo = 'tv'; const lento = et?.some(e => e === 'oro' || e === 'medalla' || e === 'todo_o_nada');
-  const fin = o.fin || null, ok = res.res === 'valido';
-  if (!fin) { if (res.res === 'fallo') sonido.fallo(); escena.posar(poseParado(escena.P, lev), lev); if (!o.fija) escena.camara('rev', .8); }
+  const fin = o.fin || null, ok = res.res === 'valido', pov = !!escena.pov;      // en primera persona no hay planos de afuera
+  if (!fin) { if (res.res === 'fallo') sonido.fallo(); escena.posar(poseParado(escena.P, lev), lev); }
   // un toque que llegó cuando la barra ya estaba perdida (o recién terminado el intento) no pasa por «no tocaste»: la línea dice
   // que fue tarde. Uno descartado más de 400 ms después del final ya es otra cosa (por ejemplo, saltear el veredicto)
   const tarde = propio && o.tRes ? toques.ultimos.find(T => T.via !== 'mouse' && T.ok === false && T.t > o.tRes - 400 && T.t < o.tRes + 900 && (T.motivo === 'tarde' || T.motivo === 'termino' || (T.t >= o.tRes && T.t < o.tRes + 400))) : null;
@@ -818,10 +837,13 @@ async function decision(a, lev, res, et, propio, o = {}) {
   // sin cortes: la cámara sigue a la barra que cae y gira hacia el público con movimientos suaves; un rival que no decide nada
   // (`o.fija`) queda en la cámara general
   // un válido o un nulo propio: mientras se prenden las luces, la vista del jurado (los árbitros levantan la paleta, el pesista
-  // de frente y las tres luces arriba). El nulo se queda ahí hasta el fundido que sigue; la barra que se cae (fallo) no pasa por acá
-  if (fin && propio && (ok || res.res === 'nulo') && !o.fija && !R0 && !escena.vertical) escena.camara('jurado', 1.3);
-  else if (fin && !ok && !o.fija) escena.primerPlano('caida', null, .45);
-  const t0 = reloj.ahora(), d = [null, null, null], hito = { luz: 0, ver: false, caida: !fin || !ok || !!o.fija, rev: !!o.fija };
+  // de frente y las tres luces arriba). Se queda ahí hasta el fundido que sigue; la barra que se cae (fallo) no pasa por acá
+  // (antes, en el válido, la cámara salía hacia el jurado, a los 0,7 s la interrumpía el plano de la barra que cae y 1,1 s
+  // después giraba al público: tres movimientos encadenados en menos de 3 s. Ahora, uno solo: al jurado, y se queda)
+  // Pedido del dueño (16-nov): al terminar NO hay movimiento de cámara (ni al jurado, ni a la barra que cae, ni giro al
+  // público): el plano del intento queda quieto, con el pesista, las tres luces y el resultado en pantalla. Vale para
+  // cualquier vista; en primera persona tampoco hay corte a otra.
+  const t0 = reloj.ahora(), d = [null, null, null], hito = { luz: 0, ver: false, caida: true, rev: true };
   const avanzar = (t, dt, vivo, conFinal = true) => {
     if (fin && conFinal) dibujarFinal(fin, t, dt, vivo);
     while (hito.luz < 3 && t >= tLuz + hito.luz * paso) { const i = hito.luz++; d[i] = res.luces[i]; setLuces(d); if (vivo) { sonido.luz(d[i]); if (limite && i < 2) sonido.latido(); if (ok && i === 1) sonido.festejo(lento || limite ? 1 : .6); } }
@@ -1352,7 +1374,7 @@ async function llamadoRival(p, L, cfg) {
   await pasarA(a.id, () => {
     setLuces(null); setReloj(L.reloj); escena.setCarga(L.kg, L.lev);
     const todo = simular(x.ctx, x.conf, x.ent), tv0 = desdeRival(todo, x.conf), m0 = simular(x.ctx, x.conf, x.ent, tv0), pose = m0.res && m0.res.res === 'fallo' ? null : poseDe(m0, tv0, escena.P);
-    escena.posar(pose || poseParado(escena.P, L.lev), L.lev); escena.camara(camPrincipal()); zocalo(a, L);
+    escena.posar(pose || poseParado(escena.P, L.lev), L.lev); escena.camara(camVista(false)); zocalo(a, L);
   });
   turno(a); etiqueta(etiquetasRival(L.et, yoPrimero)); botonSaltar(true);
   aprender('rival', { lev: L.lev, cambiar: !!opPedido() });
@@ -1505,7 +1527,7 @@ async function partida(cfg) {
   // subir sus texturas en medio de un levantamiento es un tirón. Todo eso lo hace escena.precalentar() (arrancó en el inicio,
   // detrás del panel) y recién después se calibra la calidad.
   cargaUI.mostrar('carga.modelos'); await cargarModelos();
-  await escena.mostrar(cfg.id); escena.posar(poseParado(escena.P, 's'), 's'); escena.camara(camPrincipal());
+  await escena.mostrar(cfg.id); escena.posar(poseParado(escena.P, 's'), 's'); escena.camara(camVista(false));
   if (DIBUJA) {
     if (E.reprecal) { E.reprecal = false; E.precal = escena.precalentar().catch(e => { console.warn('precalentar:', e); }); }      // los modelos llegaron recién con el reintento
     E.sinDibujo = true; await E.precal; E.sinDibujo = false; await telefono.horizontal(); const c0 = performance.now(), primera = !E.cargaLista; E.cargaLista = true; await calibrar(); if (primera) ev('carga_lista', { ms: Math.round(performance.now()), calibracion_ms: Math.round(performance.now() - c0), calidad: C.nombre });
@@ -1735,11 +1757,31 @@ window.JUEGO = {
       const P = escena.P, G = tramo(P, seg), k = G.i(fase), pose = { seg: G.nombre, s: k, tau: G.tt[k], base: G.base, primero: seg === (lev === 's' ? 'snatch' : 'clean') };
       escena.posar(pose, lev); escena.posar(pose, lev);
       const c = E.prueba = armarFinal({ res, grab: [{ t: 0, pose, y: escena.barY, z: escena.barZ }], m: { movs: [{ mov }] } }, lev);
-      if (!c) return null; if (camara === 'caida') escena.primerPlano('caida'); else escena.camara(camara);
+      E.camPrueba = null; if (!c) return null; if (camara === 'caida') escena.primerPlano('caida'); else escena.camara(camara);
       return { tipo: c.tipo, dur: c.dur, suelta: c.pl.suelta, y: escena.barY, z: escena.barZ };
     },
+    /**
+     * Posa al pesista `id` en la muestra local `s` (fraccionaria) del segmento `seg`, con la cámara `camara` (clave de
+     * cámara, de plano o 'pov'), avanza la cámara `dt` s y dibuja si `dibujar` (tools/check_pov.mjs). Devuelve medir().
+     */
+    async posa({ id, lev, seg, s = 0, kg = 140, camara = '3/4', dt = .5, dibujar = true, temblor = 0 }) {
+      await escena.cargar(id); if (escena.id !== id) await escena.mostrar(id); escena.setCarga(kg, lev);
+      const G = tramo(escena.P, seg), i = Math.min(G.n - 2, Math.max(0, Math.floor(s))), pose = { seg: G.nombre, s, tau: G.tt[i] + (G.tt[i + 1] - G.tt[i]) * (s - i), base: G.base, primero: seg === (lev === 's' ? 'snatch' : 'clean') };
+      escena.posar(pose, lev, dt < .1 ? dt : 0, temblor, reloj.ahora() / 1000);
+      if (E.camPrueba !== camara + id) { E.camPrueba = camara + id; escena.camara(camara); }
+      escena.cuadro(dt, dibujar); return this.medir();
+    },
+    /** Dónde están pies, manos, cadera, cabeza, barra y cámara (m), y el hueso (sin contar los dedos) que más giró desde la llamada anterior (rad). */
+    medir() {
+      const a = escena.activo; if (!a) return null; const V = escena.barbell.group.position.constructor, r = x => Math.round(x * 1e4) / 1e4, o = {};
+      for (const k of ['LeftToeBase', 'RightToeBase', 'LeftFoot', 'RightFoot', 'LeftHand', 'RightHand', 'LeftForeArm', 'RightForeArm', 'LeftArm', 'RightArm', 'Hips', 'Head']) { const p = a.boneWorld(k, new V()); o[k] = [r(p.x), r(p.y), r(p.z)]; }
+      let giro = 0, cual = ''; const antes = E.medAntes, q = a.bones.map(b => b.quaternion.clone());
+      if (antes && antes.a === a) a.bones.forEach((b, i) => { const g = q[i].angleTo(antes.q[i]); if (g > giro && !/Hand(Thumb|Index|Middle|Ring|Pinky)/.test(b.name)) { giro = g; cual = b.name.replace(/^mixamorig:?/, ''); } });
+      E.medAntes = { a, q }; const cam = escena.rig.camera, d = cam.getWorldDirection(new V()), b = escena.barbell.group.position;
+      return { ...o, giro: r(giro), cual, bar: [r(b.y), r(b.z)], cam: { p: [r(cam.position.x), r(cam.position.y), r(cam.position.z)], inc: r(Math.asin(d.y)), fov: r(cam.fov) }, pov: !!escena.pov, sinCabeza: !!escena._sinCabeza };
+    },
     /** Lleva la escena de final() al instante t (s), la dibuja si `dibujar`, y mide holguras entre la barra y el cuerpo. */
-    finalEn(t, dibujar = false, dt = 1 / 60) { const c = E.prueba; dibujarFinal(c, t, dt, false); escena.cuadro(.5, dibujar); return holgura(t - c.pl.suelta); },
+    finalEn(t, dibujar = false, dt = 1 / 60, dtCam = .5) { const c = E.prueba; dibujarFinal(c, t, dt, false); escena.cuadro(dtCam, dibujar); return holgura(t - c.pl.suelta); },
     /** Cambio de carga a mano: de `kg0` a `kg1`, con la manga en primer plano. Devuelve la duración (s). */
     async carga(kg0, kg1, id = 'ventura') { await escena.cargar(id); await escena.mostrar(id); escena.setCarga(kg0, 's'); escena.posar(poseParado(escena.P, 's'), 's'); await escena.mostrar(null); escena.barraSuelta({ y: escena.pisoBarra, z: escena.barZ, ang: 0 }); const A = E.pruebaCarga = escena.cambioDeCarga(kg1); escena.primerPlano('manga'); return A ? { dur: A.dur, sale: A.sale, entra: A.entra } : null; },
     cargaEn(t, dibujar = false) { const A = E.pruebaCarga, x = A.en(t); escena.barraSuelta({ y: escena.pisoBarra, z: escena.barZ, ang: 0 }); escena.cuadro(.5, dibujar); return x; },

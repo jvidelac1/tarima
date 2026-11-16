@@ -254,7 +254,8 @@ async function corrida(via) {
     const n1 = await J(() => ({ plano: JUEGO.escena.plano?.key || null, luces: [...document.getElementById('luces').children].map(el => el.className).join(',') }));
     console.log(`${tag} nulo propio: ${n0.ultimo?.res}:${n0.ultimo?.causa} · cámara al empezar el veredicto «${n0.plano}», 1,8 s después «${n1.plano}» · luces ${n1.luces}`);
     if (n0.n !== 2 || n0.ultimo?.res !== 'nulo') mal(`no se pudo forzar un NULO propio en la práctica: ${JSON.stringify(n0.ultimo)}`);
-    else if (n0.plano !== 'jurado' || n1.plano !== 'jurado') mal(`con un NULO propio la cámara no fue al jurado (${n0.plano} → ${n1.plano})`);
+    // pedido del dueño (16-nov): al terminar no hay movimiento de cámara: ni vista del jurado ni otro plano
+    else if (n0.plano !== n1.plano || n1.plano === 'jurado' || n1.plano === 'caida') mal(`con un NULO propio la cámara cambió de plano (${n0.plano} → ${n1.plano}): tiene que quedar quieta`);
     if (!/r/.test(n1.luces)) mal(`en el NULO no se prendió ninguna luz roja (${n1.luces})`);
     await cerrar(); return;
   }
@@ -297,8 +298,11 @@ async function corrida(via) {
   if (!await pulsa('.cam[data-cam="jurado"]')) mal('Opciones no tiene la fila de cámara');
   else {
     const c = await J(() => ({ g: localStorage.getItem('tarima.camara'), ev: (JUEGO.eventos || []).filter(e => e.ev === 'camara_elegida').at(-1)?.props, n: document.querySelectorAll('#capa .cam').length, on: document.querySelector('#capa .cam[aria-pressed=true]')?.dataset.cam }));
-    if (c.g !== 'jurado' || c.ev?.vista !== 'jurado' || c.ev?.via !== 'opciones' || c.n !== 4 || c.on !== 'jurado') mal(`la cámara elegida en Opciones no quedó: ${JSON.stringify(c)}`);
+    if (c.g !== 'jurado' || c.ev?.vista !== 'jurado' || c.ev?.via !== 'opciones' || c.n !== 5 || c.on !== 'jurado') mal(`la cámara elegida en Opciones no quedó: ${JSON.stringify(c)}`);
     await foto('opciones_camara');
+    // la primera persona (pedido del dueño): está en la fila, queda guardada y deja el evento
+    if (!await pulsa('.cam[data-cam="pov"]')) mal('Opciones no tiene la primera persona');
+    else { const p = await J(() => ({ g: localStorage.getItem('tarima.camara'), ev: (JUEGO.eventos || []).filter(e => e.ev === 'camara_elegida').at(-1)?.props })); if (p.g !== 'pov' || p.ev?.vista !== 'pov') mal(`la primera persona no quedó elegida: ${JSON.stringify(p)}`); }
     if (!await pulsa('.cam[data-cam="3/4"]') || await J(() => localStorage.getItem('tarima.camara')) !== '3/4') mal('no se pudo volver a la cámara general');
   }
   // el estilo se elige en el primer dos tiempos y queda para los tres (LIF-43): con teclado, power (no el que propone el entrenador)

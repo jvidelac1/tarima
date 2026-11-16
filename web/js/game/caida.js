@@ -83,19 +83,60 @@ export function planCaida(tipo, causa, valido = false) {
   return pl;
 }
 
-/** Pose del pesista a t s del final: {i, j, u} es la pose del fallo (muestra fraccionaria g0), `k` el destino y `w` cuánto. */
-export function poseCaida(pl, g0, destino, t) {
-  const i = Math.floor(g0), u = g0 - i, w = t <= pl.quieto ? 0 : suave((t - pl.quieto) / pl.mezcla);
+/**
+ * Reglas del cuerpo después de soltar (sin ellas, la mezcla en línea recta de antes: los brazos quedaban arriba medio
+ * segundo sin la barra y bajaban en cruz, y los pies se arrastraban desde la tijera o la sentadilla hasta juntarse).
+ * Con `R` (muestras globales del clip, las arma main.js con los nombres de las fases; nada por personaje):
+ * - Los BRAZOS acompañan la barra: desde que se suelta desandan el clip por sus fases, de la pose del final a la de
+ *   brazos estirados con la barra colgando (`R.brazosA`: la triple extensión; en el envión no desandan: ver main.js), pasando por
+ *   la pose de cada fase anterior a la recepción (`R.brazosDe`) a `DESANDAR` s por fase, con arranque y llegada suaves;
+ *   después van a «Parado» con el resto del cuerpo. Las manos salen `MANOS` s después que la barra: van detrás de ella y
+ *   no por delante (en el envión, sin esa espera, los antebrazos cruzaban la barra que caía: BAD en check_escenas). Van de fase en fase y no muestra por muestra: el giro de codos del clip
+ *   ocupa dos muestras y, desandado a esa velocidad, era un latigazo (58° en un cuadro, la mano a 13 m/s).
+ * - El CUERPO se para por el clip: si el final lo encontró de la recepción en adelante (`R.rec`), sigue el clip hasta el
+ *   final del segmento (`R.fin`: la recuperación validada, con los pies donde van) a `PARARSE` s por fase; recién ahí pasa
+ *   a «Parado», y lo que les falta a los pies lo hacen en un saltito (`SALTITO`: la raíz sube y la mezcla ocurre en el aire).
+ */
+export const PARARSE = .8, DESANDAR = .24, MANOS = .2, SALTITO = { dur: .3, alto: .04 };
+/** Lo que tarda en pasar a «Parado» (s): con saltito, medio segundo como mucho (el saltito va en el medio). */
+const mezclaDe = (pl, g0, R) => (R && g0 >= R.rec ? Math.min(pl.mezcla, SALTITO.dur + .2) : pl.mezcla);
+/** Poses (muestras globales) por las que pasan los brazos: la del final y la de cada fase anterior, hasta `R.brazosA`. */
+export function clavesBrazos(g0, R) {
+  const k = [g0]; if (!R || g0 <= R.brazosA) return k;
+  for (let g = Math.min(R.brazosDe - R.sub, Math.floor((g0 - R.sub / 2) / R.sub) * R.sub); g >= R.brazosA; g -= R.sub) k.push(g);
+  return k;
+}
+/** Tiempos (s desde el final) de las reglas de arriba: cuándo termina de pararse y cuándo llega a «Parado». */
+export function tiemposCaida(pl, g0, R) {
+  if (!R) return { sube: 0, fin: pl.quieto + pl.mezcla };
+  const sube = g0 >= R.rec && g0 < R.fin ? (R.fin - g0) / R.sub * PARARSE : 0;
+  return { sube, fin: pl.quieto + sube + mezclaDe(pl, g0, R) };
+}
+/**
+ * Pose del pesista a t s del final: {i, j, u} es la pose del fallo (muestra fraccionaria g0), `k` el destino y `w` cuánto.
+ * Con las reglas `R`, además `brazos` ({i, u, k, w} para los huesos de los brazos) y el cuerpo que sigue el clip.
+ */
+export function poseCaida(pl, g0, destino, t, R = null) {
   let dz = 0, dy = 0;
   if (pl.salto) { const s = Math.min(1, Math.max(0, (t - pl.salto.desde) / pl.salto.dur)); dz = pl.salto.dz * suave(s); dy = .05 * Math.sin(Math.PI * s); }
-  return { i, j: i + 1, u, k: destino, w, dz, dy };
+  if (!R) { const i = Math.floor(g0), w = t <= pl.quieto ? 0 : suave((t - pl.quieto) / pl.mezcla); return { i, j: i + 1, u: g0 - i, k: destino, w, dz, dy, t }; }
+  const T = tiemposCaida(pl, g0, R), tM = pl.quieto + T.sube, mz = mezclaDe(pl, g0, R);
+  // cuerpo: quieto, se para por el clip y pasa a «Parado» (con saltito si venía de una recepción: los pies no se arrastran)
+  const gC = T.sube ? g0 + (R.fin - g0) * suave((t - pl.quieto) / T.sube) : g0, conSalto = g0 >= R.rec, dur = conSalto ? SALTITO.dur : mz, t0 = conSalto ? tM + (mz - SALTITO.dur) / 2 : tM;
+  const s = Math.min(1, Math.max(0, (t - t0) / dur)), w = suave(s); if (conSalto) dy += SALTITO.alto * Math.sin(Math.PI * s);
+  // brazos: desandan el clip desde que se suelta la barra y después bajan a «Parado» mientras el cuerpo llega
+  const K = clavesBrazos(g0, R), n = K.length - 1, tD = n * DESANDAR, tb = t - pl.suelta - MANOS, x = tb <= 0 || !n ? 0 : suave(tb / tD) * n, kB = Math.min(Math.max(0, n - 1), Math.floor(x));
+  const tBajar = pl.suelta + MANOS + tD, wB = suave((t - tBajar) / Math.min(.8, Math.max(.3, tM + mz - tBajar)));
+  const i = Math.floor(gC), a0 = K[kB], a1 = K[Math.min(n, kB + 1)], f0 = Math.floor(a0);
+  // la primera pose puede ser fraccionaria (g0): se aproxima a su muestra más cercana solo si no es entera
+  return { i, j: i + 1, u: gC - i, k: destino, w, dz, dy, t, brazos: { i: n ? Math.round(a0) : f0, j: n ? Math.round(a1) : f0 + 1, u: n ? x - kB : g0 - f0, k: destino, w: wB } };
 }
 
-/** Escena entera: plan, barra (desde que se suelta) y duración. `bar`: {y, z} de la barra dibujada en el instante final. */
-export function armarCaida(res, mov, bar, piso) {
+/** Escena entera: plan, barra (desde que se suelta) y duración. `bar`: {y, z} de la barra dibujada en el instante final. `g0` y `R`: ver poseCaida. */
+export function armarCaida(res, mov, bar, piso, g0 = 0, R = null) {
   const tipo = tipoCaida(res, mov); if (!tipo) return null;
   const pl = planCaida(tipo, res.causa, res.res === 'valido');
   const barra = new BarraLibre({ y: bar.y, z: bar.z, vy: pl.vy, vz: pl.vz, piso });
-  const dur = Math.max(pl.quieto + pl.mezcla, pl.suelta + barra.reposo) + .1;
-  return { tipo, pl, barra, dur };
+  const dur = Math.max(tiemposCaida(pl, g0, R).fin, pl.suelta + barra.reposo) + .1;
+  return { tipo, pl, barra, dur, R };
 }
