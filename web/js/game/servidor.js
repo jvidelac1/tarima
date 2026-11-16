@@ -24,7 +24,7 @@
 
 import { nombreReal } from './nombre.js';
 
-export const CONSENTIMIENTO = '2026-11-e';     // versión de web/privacidad.html; el Worker acepta también de la «a» a la «d»
+export const CONSENTIMIENTO = '2026-11-f';     // versión de web/privacidad.html; el Worker acepta también de la «a» a la «e»
 
 const CLAVES = {
   dispositivo: 'tarima.dispositivo',

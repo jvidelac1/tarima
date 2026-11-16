@@ -22,15 +22,15 @@ import { esCampo } from './input.js';
 const TXT = {
   es: {
     listo: 'Listo', ok: 'Entendido',
-    'instalar.safari': 'Pantalla completa: toca Compartir (o ··· y después Compartir), elige «Agregar a inicio» y abre Tarima desde el ícono.',
-    'instalar.chrome': 'Pantalla completa: toca Compartir en la barra de la dirección, elige «Agregar a la pantalla de inicio» y abre Tarima desde el ícono.',
-    'instalar.otro': 'Pantalla completa: abre Compartir en el menú del navegador, elige «Agregar a inicio» y abre Tarima desde el ícono.',
+    'instalar.safari': 'Pantalla completa: toca Compartir (o ··· y después Compartir), elige «Agregar a inicio» y abre Lifting Game desde el ícono.',
+    'instalar.chrome': 'Pantalla completa: toca Compartir en la barra de la dirección, elige «Agregar a la pantalla de inicio» y abre Lifting Game desde el ícono.',
+    'instalar.otro': 'Pantalla completa: abre Compartir en el menú del navegador, elige «Agregar a inicio» y abre Lifting Game desde el ícono.',
   },
   en: {
     listo: 'Done', ok: 'Got it',
-    'instalar.safari': 'Full screen: tap Share (or ··· then Share), choose “Add to Home Screen” and open Tarima from the icon.',
-    'instalar.chrome': 'Full screen: tap Share in the address bar, choose “Add to Home Screen” and open Tarima from the icon.',
-    'instalar.otro': 'Full screen: open Share in the browser menu, choose “Add to Home Screen” and open Tarima from the icon.',
+    'instalar.safari': 'Full screen: tap Share (or ··· then Share), choose “Add to Home Screen” and open Lifting Game from the icon.',
+    'instalar.chrome': 'Full screen: tap Share in the address bar, choose “Add to Home Screen” and open Lifting Game from the icon.',
+    'instalar.otro': 'Full screen: open Share in the browser menu, choose “Add to Home Screen” and open Lifting Game from the icon.',
   },
 };
 const CLAVES = { listo: 'campo.listo', ok: 'instalar.cerrar', 'instalar.safari': 'instalar.safari', 'instalar.chrome': 'instalar.chrome', 'instalar.otro': 'instalar.otro' };

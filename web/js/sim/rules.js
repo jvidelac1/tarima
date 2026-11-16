@@ -99,7 +99,7 @@ export const techoMomento = (techoG, resto) => idiv(techoG * (20000 - (RESTO.ini
 export const intensidad = (kg, techoG) => idiv(kg * 1000 * 10000, techoG);
 
 /** Marco ficticio (sección 6.1). */
-export const EVENTO = { titulo: 'Mundial Tarima 2026', sesion: 'Final · 90 kg', records: { s: 179, c: 214, t: 388 } };
+export const EVENTO = { titulo: 'Lifting Game Open 2026', sesion: 'Final · 90 kg', records: { s: 179, c: 214, t: 388 } };
 export const APERTURA = { min: 880, max: 970 };            // milésimas del techo de ficha
 export const PLAN = [4, 3];                                  // saltos del plan del entrenador para el jugador
 /** Niveles: error típico de tiempo (ms) y de pelea (milésimas) de los rivales, kilos de forma y cuánto más abajo abren y declaran (milésimas del techo). */

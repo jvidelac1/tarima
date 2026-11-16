@@ -5,8 +5,8 @@ export const ATHLETES = {
   brenner: { name: 'Ilya Brenner', country: 'NVK', countryName: 'Novakia', category: '96 kg', bib: 12, flag: 'conic-gradient(from 225deg at 0 50%,#f4f1ea 0 90deg,#0000 0),linear-gradient(180deg,#5a2a82 0 50%,#18a58f 50%)', bio: '1,83 m · fémur largo · brazos largos', kg: { s: 176, c: 213 } },
 };
 
-// `marca`: lo que dicen los carteles y pantallas del estadio (el juego se llama Lifting Game); `title` queda para la gráfica del visor.
-export const EVENT = { marca: 'LIFTING GAME', title: 'TARIMA OPEN', sub: 'Campeonato Internacional de Halterofilia', year: '2026', session: 'Final A' };
+// `marca`: lo que dicen los carteles y pantallas del estadio; `title`: la gráfica del visor. Los dos dicen el nombre del juego.
+export const EVENT = { marca: 'LIFTING GAME', title: 'LIFTING GAME', sub: 'Campeonato Internacional de Halterofilia', year: '2026', session: 'Final A' };
 
 // Discos reglamentarios: kg, color, radio (m), espesor (m). Los de 10 kg o más son bumpers de 450 mm.
 export const PLATES = [

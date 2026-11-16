@@ -11,7 +11,7 @@ name: Muro y lista (punta a punta)
 
 on:
   push:
-    branches: [main, mvp, muro-medio, gameplay, primera-vez]
+    branches: [main, mvp, muro-medio, gameplay, primera-vez, nombre]
     paths:
       - 'web/js/game/conexion.js'
       - 'web/js/game/servidor.js'

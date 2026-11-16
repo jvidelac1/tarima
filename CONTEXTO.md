@@ -9,6 +9,8 @@ Este archivo es la puerta de entrada. Leelo entero antes de tocar nada; después
 ## Qué es
 
 **Tarima** es un juego web de halterofilia (three.js, módulos ES sin build) publicado en **https://liftinggame.pages.dev**.
+Adentro del juego se llama **Lifting Game** (decisión del 15 de noviembre): todo lo que ve el jugador dice Lifting Game y el
+evento ficticio es «Lifting Game Open». «Tarima» sigue como nombre interno (repo, Worker, D1, claves `tarima.*`, cookies, eventos).
 Una final de 3 pesistas ficticios (el jugador y 2 rivales), arranque y dos tiempos, 3 intentos cada uno. Se juega con una
 tecla (Espacio) o un toque. La meta del dueño es llevarlo a un **producto monetizable** en el corto plazo: primero retención y
 comunidad, después monetización. Público real: la mayoría en inglés, 2 de cada 3 desde el celular.
@@ -39,7 +41,7 @@ con las 2 preguntas de la encuesta (las dos dan juego libre en el dispositivo; `
 pide elegir pesista (Compacto) y las tarjetas salen después de la primera final; el nombre al anotarse pide 4 letras;
 eventos `muro_resultado`, `siguio_jugando`, `escena_visible`, `carga_fallida`, y `anotar_ok` (solo altas nuevas) desde el
 Worker; si la carga falla, reintentos y un aviso claro (descarga o 3D) en lugar de la interfaz sin el levantador. Variables
-del Worker: `GRATIS_ETAPA "final"`, `GRATIS "1"`, `ENCUESTA_LIBRE "1"`; consentimiento `2026-11-e`.
+del Worker: `GRATIS_ETAPA "final"`, `GRATIS "1"`, `ENCUESTA_LIBRE "1"`; consentimiento `2026-11-f`.
 
 ## Backlog
 

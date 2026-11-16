@@ -5,9 +5,10 @@
 // correos, contacto pendiente y el HMAC de la IP explicado (web/privacidad.html). 2026-11-c: grabación de sesión de la
 // página en una parte de las visitas. 2026-11-d: la encuesta opcional después de anotarse (dos preguntas, sin premio) y
 // las novedades sin frecuencia. 2026-11-e: la encuesta del cartel también desbloquea el juego libre (LIF-53, decisión del
-// dueño del 15 de noviembre). Las anteriores se siguen aceptando (páginas del juego viejas en caché).
-export const CONSENTIMIENTO = '2026-11-e';
-export const VERSIONES_CONSENTIMIENTO = new Set(['2026-11-a', '2026-11-b', '2026-11-c', '2026-11-d', CONSENTIMIENTO]);
+// dueño del 15 de noviembre). 2026-11-f: el juego pasa a llamarse Lifting Game (antes Tarima); mismos datos y usos.
+// Las anteriores se siguen aceptando (páginas del juego viejas en caché).
+export const CONSENTIMIENTO = '2026-11-f';
+export const VERSIONES_CONSENTIMIENTO = new Set(['2026-11-a', '2026-11-b', '2026-11-c', '2026-11-d', '2026-11-e', CONSENTIMIENTO]);
 export const DIA = 86400;            // segundos
 export const VENTANA_IP = 30 * DIA;  // cuenta por IP y retención del código de IP
 export const RETENCION = 180 * DIA;  // partidas y dispositivos sin lista
@@ -197,7 +198,7 @@ export const idioma = v => (v === 'es' || v === 'en' ? v : 'en');
 // opcional. Las respuestas van a PostHog como el evento `encuesta_respuesta` (propsRespuesta), sin el correo.
 
 export const ENCUESTA = {
-  plataforma: { pregunta: 'How would you rather play Tarima?', opciones: {
+  plataforma: { pregunta: 'How would you rather play Lifting Game?', opciones: {
     app: 'Mobile app (App Store / Google Play)',
     web: 'In the browser (web game)',
   } },
