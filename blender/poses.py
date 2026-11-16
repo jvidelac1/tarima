@@ -264,7 +264,8 @@ HK['relax']=HK['hook']
 def _rgrip(hx,t):
     r=RBAR+_HSL['Middle1'][0]-.002; m=HF['Left'].transposed()@(hd('LeftHandMiddle1')-hd('LeftHand')); c,s_=math.cos(D(hx)),math.sin(D(hx))
     return (m.y+t*c+r*s_, m.z*HS['Left']['Pn'].dot(HF['Left'].col[2])-t*s_+r*c, hx)
-RGRIP=[_rgrip(hx,t*K) for hx in (0,10,20,30) for t in (.008,.022)]+[_rgrip(hx,t*K) for hx in (0,15,30) for t in (.036,.050)]; HK['rack']=RGRIP[0][:2]     # las últimas: mano abierta, barra sobre las falanges medias (rack de punta de dedos)
+KH=min(K,PALM/.1069)     # escala de la mano: con mano chica para su estatura (la mujer), cuánto rueda la barra hacia los dedos se mide en manos, no en estaturas
+RGRIP=[_rgrip(hx,t*KH) for hx in (0,10,20,30) for t in (.008,.022)]+[_rgrip(hx,t*KH) for hx in (0,15,30) for t in (.036,.050)]; HK['rack']=RGRIP[0][:2]     # las últimas: mano abierta, barra sobre las falanges medias (rack de punta de dedos)
 GA,GB=HK['hook']
 
 # ---------- torso y pies ----------

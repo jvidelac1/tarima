@@ -141,6 +141,10 @@ if __name__=='__main__':
         print(f'MAT {n}: '+summary(g))
         for mk in (os.path.join(OUTR,n,'body_mask.png'),os.path.join(OUTR,n,n+'_mask.png')):   # R=piel, G=tela, B=pelo, mismo UV que Body
             if os.path.exists(mk): shutil.copy(mk,os.path.join(WEB,'models',n+'_mask.png')); data[n]['mask']=f'models/{n}_mask.png'; break
+        m2=os.path.join(OUTR,n,'body_mask2.png')     # R rodilleras, G medias, B vendas de muñeca: lo que la máscara principal junta con la malla en el canal G
+        if os.path.exists(m2):
+            from PIL import Image
+            Image.open(m2).convert('RGB').resize((1024,1024),Image.LANCZOS).save(os.path.join(WEB,'models',n+'_mask2.webp'),lossless=True,method=6); data[n]['mask2']=f'models/{n}_mask2.webp'
     detail_tiles(os.path.join(WEB,'models'))
     json.dump(data,open(dst,'w',encoding='utf-8'),ensure_ascii=False,indent=1)
     print('ok',list(data))

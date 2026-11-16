@@ -78,8 +78,8 @@ if lash_o: parts.append(lash_o)
 if not os.environ.get('TARIMA_NOSKIN'): geo.smooth_weights(b,rig,K)
 geo.subdivide(b)
 if not os.environ.get('TARIMA_NOANAT'): geo.anatomy(b,rig,K,STY.get('cut',1.))
-geo.garments(b,rig,BJ,K); geo.simplify(b,rig,BJ,K,OUT,float(os.environ['TARIMA_SIMP']) if os.environ.get('TARIMA_SIMP') else None); me=b.data
-if not os.environ.get('TARIMA_NOHAIR'): parts.append(geo.hair_shells(b,OUT,alphamat('Hair',OUT+'hair.png',.42)))
+geo.garments(b,rig,BJ,K,K if 'escote' in STY else 1.); geo.simplify(b,rig,BJ,K,OUT,float(os.environ['TARIMA_SIMP']) if os.environ.get('TARIMA_SIMP') else None); me=b.data
+if not os.environ.get('TARIMA_NOHAIR'): parts.append(geo.hair_shells(b,OUT,alphamat('Hair',OUT+'hair.png',.42),STY.get('capas')))
 if STY.get('bun') and not os.environ.get('TARIMA_NOHAIR'): parts.append(geo.bun(b,K,STY,LM,texmat('Bun',OUT+'bun.png',None,OUT+'bun_normal.png',rough=.46)))   # pelo atado: moño
 def newobj(name,bm_,mats,group):
     m=bpy.data.meshes.new(name); bm_.to_mesh(m); bm_.free(); o=bpy.data.objects.new(name,m); bpy.context.scene.collection.objects.link(o)

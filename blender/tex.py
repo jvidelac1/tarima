@@ -118,7 +118,7 @@ def _dseg(u,v,a,b):
     du,dv=b[0]-a[0],b[1]-a[1]; t=np.clip(((u-a[0])*du+(v-a[1])*dv)/(du*du+dv*dv),0,1); return np.hypot(u-a[0]-t*du,v-a[1]-t*dv),t
 # Relieve muscular por pesista (blender/plantel.py, 'anat'): masa = ganancia de las masas anchas; pec = pectoral (0 en la mujer);
 # abd = línea alba e intersecciones del recto abdominal (0 con panza). finish.py lo carga antes de usar anatomy().
-ANAT=dict(masa=1.,pec=1.,abd=1.)
+ANAT=dict(masa=1.,pec=1.,abd=1.,espalda=1.,trap=1.,antebrazo=1.)     # espalda (dorsal, romboides, erectores), trapecio y antebrazo: ganancia de esas masas
 def anatomy(P,N,J,K):
     """P, N: (n,3) posición y normal de reposo. J: nombre de hueso -> cabeza (lado izquierdo y eje). Devuelve (ancho, fino, fibra) en metros:
     'ancho' son las masas musculares (>= 2 cm: sirven como geometría), 'fino' los surcos entre grupos, 'fibra' una máscara 0..1 de deltoides y pectoral para estrías."""
@@ -137,7 +137,7 @@ def anatomy(P,N,J,K):
     fib=np.maximum(fib,aw*delt*sm(1.6,1.1,np.abs(dO))*sm(te+.02,te-.06,t))
     # ---- antebrazo ----
     t,r,th=_limb(Q,E,W); fw=rg(-.06,1.0,t,.04)*sm(.072*K,.058*K,r)
-    B+=fw*K*(.0042*G(t-.20,.20)*G(_wrap(th+75*D),.80)+.0036*G(t-.24,.22)*G(_wrap(th-110*D),.85))
+    B+=fw*K*ANAT['antebrazo']*(.0042*G(t-.20,.20)*G(_wrap(th+75*D),.80)+.0036*G(t-.24,.22)*G(_wrap(th-110*D),.85))
     F+=fw*K*(-.0013*G(_wrap(th-15*D),.16)*rg(.06,.62,t,.05)-.0012*G(_wrap(th+165*D),.16)*rg(.06,.55,t,.05)-.0007*G(_wrap(th+75*D),.10)*rg(.25,.70,t,.05))
     ta,ra,_=_limb(Q,S,E); wT=(1-sm(.04,.28,ta)*sm(.090*K,.074*K,ra))*(1-fw)*sm(H[2]-.06*K,H[2]+.02*K,Q[:,2]); del ta,ra
     # ---- torso: u, v en metros de un cuerpo de referencia (ancho de hombros 0,213 m; hombro-cadera 0,483 m) ----
@@ -149,11 +149,11 @@ def anatomy(P,N,J,K):
         +(-.0019*G(u,.010)*rg(-.43,-.19,v,.015)-.0014*(G(v+.215,.009)+G(v+.268,.009)+G(v+.325,.009))*sm(.080,.058,u)-.0016*G(u-.079,.012)*rg(-.44,-.20,v,.02))*ANAT['abd'])   # línea alba, intersecciones y línea semilunar
     ft=np.maximum(fr,top*wT*(Q[:,1]<S[1]+.02*K))
     F+=ft*K*(.0030*G(d2,.0085)-.0022*G(np.hypot(u-.075,v-.078),.030))+fr*K*.0020*G(d3,.010)*rg(.045,.17,v,.012)*(1-.5*t3)      # clavícula, hueco supraclavicular, esternocleidomastoideo
-    B+=wT*K*.0055*G(np.sqrt((u-.090)**2+((Q[:,1]-Nk[1])/K-.030)**2+(v-.085)**2),.062)                                         # trapecio
+    B+=wT*K*.0055*ANAT['trap']*G(np.sqrt((u-.090)**2+((Q[:,1]-Nk[1])/K-.030)**2+(v-.085)**2),.062)                                         # trapecio
     F+=sd*K*.0013*np.sin(2*np.pi*(v-.55*(Q[:,1]-S[1])/K)/.040)*rg(-.30,-.155,v,.02)*(Q[:,1]<S[1]+.05*K)                          # serrato
     B+=sd*K*.0030*G(v+.37,.06)*rg(-.02,.2,-(Q[:,1]-S[1])/K,.03)                                                                # oblicuo sobre la cresta ilíaca
-    d4,_=_dseg(u,v,(.0,-.235),(.125,-.035)); B+=bk*K*(.0050*G(np.hypot((u-.105)/.060,(v+.085)/.060),1.)+.0050*G(u-.150,.045)*rg(-.30,-.13,v,.04)+.0034*G(u-.036,.020)*rg(-.46,-.20,v,.04))
-    F+=bk*K*(-.0040*G(u,.014)*rg(-.46,.03,v,.02)-.0018*G(d4,.010)-.0020*G(v+.012-.10*(u-.10),.011)*rg(.06,.19,u,.015)-.0016*G(u-.062-.10*(v+.085),.010)*rg(-.155,-.02,v,.015))   # + borde medial de la escápula             # canal de la columna, borde del trapecio inferior, espina de la escápula
+    d4,_=_dseg(u,v,(.0,-.235),(.125,-.035)); B+=bk*K*ANAT['espalda']*(.0050*G(np.hypot((u-.105)/.060,(v+.085)/.060),1.)+.0050*G(u-.150,.045)*rg(-.30,-.13,v,.04)+.0034*G(u-.036,.020)*rg(-.46,-.20,v,.04))
+    F+=bk*K*min(ANAT['espalda'],1.4)*(-.0040*G(u,.014)*rg(-.46,.03,v,.02)-.0018*G(d4,.010)-.0020*G(v+.012-.10*(u-.10),.011)*rg(.06,.19,u,.015)-.0016*G(u-.062-.10*(v+.085),.010)*rg(-.155,-.02,v,.015))   # + borde medial de la escápula             # canal de la columna, borde del trapecio inferior, espina de la escápula
     fib=np.maximum(fib,fr*pec*.8*ANAT['pec'])
     # ---- muslo ----
     t,r,th=_limb(Q,H,Kn); lw=rg(.10,1.04,t,.05)*sm(.17*K,.14*K,r)*(Q[:,2]<H[2]+.02*K)
@@ -187,7 +187,7 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     cheek=T.g((.048*hs,eL[1]+.012,(nose[2]+lips[2])/2+.008),.030*hs,True)
     tint(head*(cheek*.42+T.g(nose+(0,.012,.004),.022*hs)*.45+T.g(chin+(0,-.012,.012),.022*hs)*.18)+ears*.5+head*.10*blot,HEM)
     tint(head*T.g((eL[0],eL[1]+.004,eL[2]-.013*hs),.011*hs,True)*.42,(.84,.80,.86)); tint(head*T.g(eL,.024*hs,True)*.2,MEL)
-    de=np.sqrt((axo-eL[0])**2+(y-eL[1])**2+(z-eL[2])**2); mix(head*sm(er*1.13,er*1.0,de)*.6,(.16,.10,.09))      # borde del párpado / línea de pestañas
+    de=np.sqrt((axo-eL[0])**2+(y-eL[1])**2+(z-eL[2])**2); mix(head*sm(er*1.13,er*1.0,de)*STY.get('delineado',.6),(.16,.10,.09))      # borde del párpado / línea de pestañas
     fore=head*sm(eL[2]+.022*hs,eL[2]+.034*hs,z)*sm(.062*hs,.04*hs,axo)*(y<eL[1]+.05)
     for k in range(3): H-=fore*.00007*np.exp(-((z-(eL[2]+.036*hs+k*.0085*hs+.0018*np.sin(x*70+k)+lo*.004))/.0011)**2)   # arrugas de la frente
     tzone=head*np.maximum(fore,T.g(nose+(0,.014,.008),.026*hs))                     # zona T
@@ -276,6 +276,7 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     arm=np.sqrt(((axo-(sh[0]+.03*K))/(sh[0]+.03*K-SIS[0]*K))**2+((z-(sh[2]+.04*K))/(SIS[1]*K))**2); dar=T.sd(arm,1)
     farm=np.maximum(F('farmL'),F('farmR'))
     TF=np.where(z>sh[2]-.2,(1-head*(z>neck[2]+.02))*(axo<sh[0]+.03*K)*(1-farm),sm(.35,.65,F('torso')))
+    if 'escote' in STY: TF=TF*np.where(z<sh[2]-.06*K,sm(.08,.3,blur(F('torso'),2*S)),1.)     # la cara interna del brazo (gruesa o pegada al tronco) no es tela: bajo la axila manda el hueso dominante
     suit=np.maximum(TF*sm(1-E,1+E,scoop)*sm(1-E,1+E,arm)*sm(neck[2]+.03,neck[2]+.02,z),sm(.45,.55,F('thigh'))*sm(hemz-.001,hemz+.001,z))
     SUIT=hexc(STY['suit']); TRIM=hexc(STY['trim']); cl=T.n3(30,70,3)
     mix(suit,SUIT*(1+cl[:,:,None]*.07+T.n2(1,71)[:,:,None]*.03),.74)
@@ -309,25 +310,26 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     col*=1-.16*sweatc[:,:,None]; rough-=.10*sweatc
     cloth=suit.copy(); thick=suit*.0006
     # ================= RODILLERAS (neopreno) =================
-    slv=sm(.45,.55,F('leg'))*sm(knee[2]-.112-.001,knee[2]-.112+.001,z)*sm(knee[2]+.102+.001,knee[2]+.102-.001,z)
+    KS=K if 'escote' in STY else 1.; zq=knee[2]+(z-knee[2])/KS; zs=ank[2]+(z-ank[2])/KS     # rodilleras y medias a la escala del pesista (los dos originales, medida fija)
+    slv=sm(.45,.55,F('leg'))*sm(knee[2]-.112-.001,knee[2]-.112+.001,zq)*sm(knee[2]+.102+.001,knee[2]+.102-.001,zq)
     SLV=hexc(STY['sleeve']); thk=np.arctan2(y-knee[1],axo-knee[0]).astype(f32); jn=T.n2(1,80)
     mix(slv,SLV*(1+jn[:,:,None]*.16+cl[:,:,None]*.10),.80)
     cap=T.g((knee[0],knee[1]-.06,knee[2]+.01),.05,True)*slv; col*=1+.22*cap[:,:,None]                 # desgaste claro en la rótula
-    band=np.maximum(sm(knee[2]+.092,knee[2]+.094,z),sm(knee[2]-.102,knee[2]-.104,z))*slv; mix(band,hexc(STY['sleeve2']),.7)
+    band=np.maximum(sm(knee[2]+.092,knee[2]+.094,zq),sm(knee[2]-.102,knee[2]-.104,zq))*slv; mix(band,hexc(STY['sleeve2']),.7)
     Hs=knit*.00003+jn*.00004+band*.0005
-    for zz in (knee[2]+.0935,knee[2]-.1035): Hs-=np.exp(-((z-zz)/.0005)**2)*dash(thk*.06,.0028)*.0003
+    for zz in (knee[2]+.0935,knee[2]-.1035): Hs-=np.exp(-((zq-zz)/.0005)**2)*dash(thk*.06,.0028)*.0003
     back=sm(.2,.7,np.sin(thk)); db=np.abs(np.angle(np.exp(1j*(thk-np.pi/2)))).astype(f32)*.06
-    zig=np.abs(((z/.0045)%1)-.5)*2; Hs+=-.0004*np.exp(-(db/.0011)**2)+.00025*np.exp(-((db-.0012-.0028*zig)/.0006)**2)
+    zig=np.abs(((zq/.0045)%1)-.5)*2; Hs+=-.0004*np.exp(-(db/.0011)**2)+.00025*np.exp(-((db-.0012-.0028*zig)/.0006)**2)
     mix(slv*np.exp(-((db-.0012-.0028*zig)/.0006)**2)*.8,hexc(STY['sleeve2'])*1.5)
-    Hs-=back*sm(.045,.0,np.abs(z-knee[2]))*(1-np.abs(2*T.nq((thk*3,z*210),81)))**2*.0008              # pliegues detrás de la rodilla
+    Hs-=back*sm(.045,.0,np.abs(zq-knee[2]))*(1-np.abs(2*T.nq((thk*3,zq*210),81)))**2*.0008              # pliegues detrás de la rodilla
     H=H*(1-slv)+Hs*slv; thick=np.maximum(thick*(1-slv),slv*.0012); cloth=np.maximum(cloth,slv)
     for sg in (): decal('7MM',sg*(knee[0]+.004),knee[2]-.066,.034*K,x,slv*(y<knee[1]-.035),hexc(STY['sleeve2'])*1.9+.12,r=.5,hh=.00015)
     # ================= MEDIAS (canalé) =================
-    top=ank[2]+.132; sock=sm(.45,.55,F('low'))*sm(top+.001,top-.001,z)
-    czx=ank[0]+(knee[0]-ank[0])*np.clip((z-ank[2])/(knee[2]-ank[2]),0,1); czy=ank[1]+(knee[1]-ank[1])*np.clip((z-ank[2])/(knee[2]-ank[2]),0,1); ths=np.arctan2(y-czy,axo-czx).astype(f32)
-    cuff=sm(top-.03,top-.028,z); ribs=np.where(cuff>.5,np.sin(ths*84),np.sin(ths*44)).astype(f32)
+    top=ank[2]+.132; sock=sm(.45,.55,F('low'))*sm(top+.001,top-.001,zs)
+    czx=ank[0]+(knee[0]-ank[0])*np.clip((zs-ank[2])/(knee[2]-ank[2]),0,1); czy=ank[1]+(knee[1]-ank[1])*np.clip((zs-ank[2])/(knee[2]-ank[2]),0,1); ths=np.arctan2(y-czy,axo-czx).astype(f32)
+    cuff=sm(top-.03,top-.028,zs); ribs=np.where(cuff>.5,np.sin(ths*84),np.sin(ths*44)).astype(f32)
     mix(sock,hexc('#eeede7')*(1-.07*sm(.1,-.3,ribs)[:,:,None]+jn[:,:,None]*.05),.88)
-    mix(sock*sm(top-.024,top-.023,z)*sm(top-.011,top-.012,z),SUIT,.85)
+    mix(sock*sm(top-.024,top-.023,zs)*sm(top-.011,top-.012,zs),SUIT,.85)
     H=H*(1-sock)+sock*(ribs*.00032+jn*.00003+cuff*.0003); thick=np.maximum(thick*(1-sock),sock*.0008); cloth=np.maximum(cloth,sock)
     # ================= VENDAS DE MUÑECA =================
     wrapm=np.zeros((R,R),f32)
@@ -369,11 +371,11 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     zc=eL[2]+.0235*hs-9*(axo-.032*hs)**2; thb=(.0042*sm(.056,.03,axo)+.001)*STY.get('cejas',1.)
     brow=head*sm(thb*1.3,thb*.3,np.abs(z-zc))*sm(.007,.014,axo)*sm(.058,.048,axo)*(y<eL[1]+.02)
     brow=np.clip(brow*(.9+T.nq((z*2600+axo*1100,axo*520),95)*1.5+s3*.7),0,1); mix(brow*.94,HAIR*.9,.6); hairH+=brow*.0004; hairm=np.maximum(hairm,brow)
-    lp=sm(.3,.8,F('lips')); mix(lp*.78,hexc(STY.get('labio','#a4605a'))*(1+T.nq((x*700,z*90),96)[:,:,None]*.25),.34)
+    lp=sm(*STY.get('labio_borde',(.3,.8)),F('lips')); mix(lp*.78,(hexc(STY['labio']) if STY.get('labio') else hexc('#a4605a'))*(1+T.nq((x*700,z*90),96)[:,:,None]*.25),.34)
     rough+=lp*.10; lipH=-lp*.00016*(1-np.abs(2*T.nq((x*520,z*60),97)))**2
     skinm=np.clip(skinm-hairm,0,1)
     # largo del pelo para las capas de volumen de finish.py (geo.hair_shells): 255 = 20 mm
-    hlen=np.maximum.reduce([np.clip(al_,0,1)*sm(.15,.6,hm)*STY.get('hairlen',.010)*dfade(.70)*(1+s1*.5),beard*(.0015+.006*STY['beard'])*(STY['beard']>.35),brow*.0022])
+    hlen=np.maximum.reduce([np.clip(al_,0,1)*sm(.15,.6,hm)*STY.get('hairlen',.010)*dfade(.70)*(1+s1*.5)*(np.clip(1+STY['mechones']*1.6*T.n3(55,98,2),.35,1.9) if STY.get('mechones') else 1.),beard*(.0015+.006*STY['beard'])*(STY['beard']>.35),brow*.0022])
     Image.fromarray((np.clip(hlen/.02,0,1)*cov*255+.5).astype(np.uint8)[::-1]).resize((2048,2048),Image.BILINEAR).save(OUT+'hair_len.png')   # con barba rala (<0,35) la barba queda solo en la textura
     # ================= TIZA (magnesio) =================
     cn=np.clip(.5+T.n3(55,100,3)*2.6,0,1); cf=np.clip(.5+T.n3(700,101,2)*3,0,1); chalk=np.zeros((R,R),f32)
@@ -410,6 +412,8 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     save(col[::-1],OUT+'body_color.png',compress_level=3); save(nrm[::-1],OUT+'body_normal.png',compress_level=3)
     save(np.stack([ao,rough,np.zeros_like(rough)],2)[::-1],OUT+'body_orm.png',compress_level=3)
     MR=min(R,2048); mk=np.stack([skinm*cov,cloth*cov,hairm*cov],2)[::-1]
+    # segunda máscara, para separar del resto de la tela lo que no es la malla: R rodilleras, G medias, B vendas de muñeca (mismo UV)
+    Image.fromarray((np.clip(np.stack([slv*cov,sock*cov,wrapm*cov],2)[::-1],0,1)*255+.5).astype(np.uint8)).resize((MR,MR),Image.BILINEAR).save(OUT+'body_mask2.png',optimize=True)
     Image.fromarray((np.clip(mk,0,1)*255+.5).astype(np.uint8)).resize((MR,MR),Image.BILINEAR).save(OUT+'body_mask.png',optimize=True)
     pv=np.concatenate([np.asarray(Image.open(OUT+n).convert('RGB').resize((640,640),Image.BILINEAR)) for n in ('body_color.png','body_normal.png','body_orm.png','body_mask.png')],1); Image.fromarray(pv).save(OUT+'tex_preview.png')
     log(f'TEX {NAME}: body_color/orm/normal {R}px, máscara {MR}px, tiza {chalk.mean()/cov.mean()*100:.1f}% sudor {dp.mean()/cov.mean()*100:.2f}%')

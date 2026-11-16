@@ -32,7 +32,7 @@ def masa_estimada(b,H,rho,cache={}):
     return v*1000*rho,v*1000
 # Proporciones como metas (fracción de la estatura entre articulaciones del esqueleto). Cada una tiene su target de MPFB:
 # femur -> legs/*-upperleg-scale-vert, tibia -> legs/*-lowerleg-scale-vert, brazo -> arms/measure-upperarm-length y -lowerarm-length,
-# hombros -> torso/measure-shoulder-dist. Están acopladas (alargar el fémur a estatura fija achica todo lo demás), así que se resuelven juntas.
+# hombros -> torso/measure-shoulder-dist, antebrazo (parte del brazo que es antebrazo) -> diferencia entre los dos largos del brazo. Están acopladas (alargar el fémur a estatura fija achica todo lo demás), así que se resuelven juntas.
 def build(name,probe=False):
     """Cuerpo y esqueleto del pesista. Si trae 'metas' de proporciones, rearma el cuerpo unas 8 veces (segundos cada una): mide cuánto
     mueve cada target (jacobiano por diferencias) y corrige (Newton con actualización de Broyden) hasta que el esqueleto las cumple.
@@ -80,7 +80,7 @@ def _build(name,cfg,x):
         tg(f'legs/{s}-upperleg-muscle-incr',M['pierna']); tg(f'legs/{s}-lowerleg-muscle-incr',M['gemelo'])
         tg(f'arms/{s}-upperarm-shoulder-muscle-incr',M['hombro']); tg(f'arms/{s}-upperarm-muscle-incr',M['brazo']); tg(f'arms/{s}-lowerarm-muscle-incr',M['antebrazo'])   # físico de levantador: volumen de deltoides, brazo y antebrazo (no cambia largos)
         pm(f'legs/{s}-upperleg-scale-vert',cfg['legs']['up']+x.get('femur',0)); pm(f'legs/{s}-lowerleg-scale-vert',cfg['legs']['low']+x.get('tibia',0))
-    pm('arms/measure-upperarm-length',cfg['arms']['up']+x.get('brazo',0)); pm('arms/measure-lowerarm-length',cfg['arms']['low']+x.get('brazo',0)); pm('torso/torso-scale-vert',cfg['torso'])
+    pm('arms/measure-upperarm-length',max(-1.,min(1.,cfg['arms']['up']+x.get('brazo',0)-x.get('antebrazo',0)))); pm('arms/measure-lowerarm-length',max(-1.,min(1.,cfg['arms']['low']+x.get('brazo',0)+x.get('antebrazo',0)))); pm('torso/torso-scale-vert',cfg['torso'])
     if x.get('hombros'): pm('torso/measure-shoulder-dist',x['hombros'])
     tg('torso/torso-muscle-pectoral-incr',M['pectoral']); tg('torso/torso-muscle-dorsi-incr',M['dorsal']); tg('stomach/stomach-tone-incr',M['abdomen']); tg('neck/measure-neck-circ-incr',M['cuello'])
     for p,w in cfg['extra']+cfg.get('face',[]): tg(p,w)
@@ -128,7 +128,7 @@ def _build(name,cfg,x):
     BN={x.name[10:]:x for x in rig.data.bones}; P=lambda n:BN[n].head_local
     H=cfg['height']; fem=(P('LeftLeg')-P('LeftUpLeg')).length; tib=(P('LeftFoot')-P('LeftLeg')).length; ua=(P('LeftForeArm')-P('LeftArm')).length; fa=(P('LeftHand')-P('LeftForeArm')).length; tor=P('LeftArm').z-P('LeftUpLeg').z
     say(f'MEASURE {name}: H={H:.2f} femur={fem:.3f} ({fem/H:.3f}) tibia={tib:.3f} ({tib/H:.3f}) torso={tor:.3f} ({tor/H:.3f}) arm={ua+fa:.3f} ({(ua+fa)/H:.3f}) fem/tor={fem/tor:.2f} shW={P("LeftArm").x*2:.3f} ankle_x={P("LeftFoot").x:.3f}')
-    return b,rig,dict(femur=fem/H,tibia=tib/H,brazo=(ua+fa)/H,hombros=P('LeftArm').x*2/H),lines
+    return b,rig,dict(femur=fem/H,tibia=tib/H,brazo=(ua+fa)/H,hombros=P('LeftArm').x*2/H,antebrazo=fa/(ua+fa)),lines
 if __name__=='__main__':
     boot()
     for n in CFG: build(n,True)

@@ -109,14 +109,15 @@ def simplify(b,rig,BJ,K,OUT,keep=None):
     vg=b.vertex_groups['_simp']; gi=vg.index; out=sum(1 for v in b.data.vertices if not any(g.group==gi and g.weight>.5 for g in v.groups)); b.vertex_groups.remove(vg)
     for p in b.data.polygons: p.use_smooth=True
     print(f'SIMP zonas simplificadas: {inr} de {nf} caras; triángulos {t0} -> {sum(len(p.vertices)-2 for p in b.data.polygons)}; vértices fuera de zona {N-int(ok.sum())} -> {out}')
-def garments(b,rig,BJ,K):
+def garments(b,rig,BJ,K,ks=1.):
     """Volumen de prendas sobre la malla ya subdividida. Mismos límites que la textura de finish.py."""
     names,W=wget(b); dom=np.array([n[len(PRE):] for n in names])[W.argmax(1)]; co=coords(b); me=b.data; N=len(co)
     no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3); z=co[:,2]; knee=BJ['knee'][2]; ank=BJ['ank'][2]; E=.0035
     leg=np.isin(dom,['LeftUpLeg','RightUpLeg','LeftLeg','RightLeg']); low=np.isin(dom,['LeftLeg','RightLeg','LeftFoot','RightFoot','LeftToeBase','RightToeBase'])
-    slv=leg*sm(knee-.112-E,knee-.112+E,z)*sm(knee+.102+E,knee+.102-E,z)
-    slv=slv*(1+.35*sm(knee-.10,knee-.112,z)+.35*sm(knee+.09,knee+.102,z))      # ribete más grueso en los bordes
-    sock=low*sm(ank+.132+E,ank+.132-E,z)*(1+.6*sm(ank+.115,ank+.13,z))
+    zq=knee+(z-knee)/ks; zs=ank+(z-ank)/ks     # ks: rodilleras y medias a la escala del pesista (1 = medida fija de los dos originales)
+    slv=leg*sm(knee-.112-E,knee-.112+E,zq)*sm(knee+.102+E,knee+.102-E,zq)
+    slv=slv*(1+.35*sm(knee-.10,knee-.112,zq)+.35*sm(knee+.09,knee+.102,zq))      # ribete más grueso en los bordes
+    sock=low*sm(ank+.132+E,ank+.132-E,zs)*(1+.6*sm(ank+.115,ank+.13,zs))
     wrap=np.zeros(N)
     for side in ('Left','Right'):
         a,w,_=[np.array(p) for p in BJ['arms'][side]]; d=w-a; L=np.linalg.norm(d); d/=L; t=((co-a)@d)/L
@@ -297,7 +298,7 @@ def bun(b,K,STY,LM,mat):
     for j in range(NV):
         for i in range(NU):
             i2=(i+1)%NU; f=bm.faces.new((V[j][i],V[j][i2],V[j+1][i2],V[j+1][i])); f.smooth=True
-            for lp,(a,k) in zip(f.loops,((i,j),(i+1,j),(i+1,j+1),(i,j+1))): lp[uv].uv=(a/NU*3+k/NV*.9,k/NV)
+            for lp,(a,k) in zip(f.loops,((i,j),(i+1,j),(i+1,j+1),(i,j+1))): lp[uv].uv=(a/NU*3+k/NV*.3,k/NV)
     bmesh.ops.remove_doubles(bm,verts=bm.verts,dist=1e-6); bm.normal_update()
     cc=Vector(c)
     if sum(f.normal.dot(f.calc_center_median()-cc) for f in bm.faces)<0:

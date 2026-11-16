@@ -16,7 +16,7 @@ for d in sorted(os.listdir(src)):
         if solo and k not in solo: continue
         ln=os.path.join(src,d,'out',k,'lineas.txt'); chk=re.findall(r'^CHK %s cuadros con superposición: (\d+)'%re.escape(k),open(ln,encoding='utf-8',errors='replace').read(),re.M) if os.path.exists(ln) else []
         if (not chk or int(chk[-1])!=0) and not CON_BAD: print(f'NO se suma {k}: check() dio {chk[-1] if chk else "sin dato"} cuadros BAD (--con-bad para sumarlo igual)'); continue
-        fs=[f for f in os.listdir(os.path.join(w,'models')) if re.fullmatch(re.escape(k)+r'(_1024)?\.glb|'+re.escape(k)+r'_mask\.(webp|png)',f)]
+        fs=[f for f in os.listdir(os.path.join(w,'models')) if re.fullmatch(re.escape(k)+r'(_1024)?\.glb|'+re.escape(k)+r'_mask2?\.(webp|png)',f)]
         if k+'.glb' not in fs: print(f'NO se suma {k}: falta {k}.glb en el artefacto'); continue
         for f in fs: shutil.copy(os.path.join(w,'models',f),os.path.join(WEB,'models',f))
         data[k]=v; hechos.append(k); print(f'{k}: '+', '.join(f'{f} {os.path.getsize(os.path.join(WEB,"models",f))/1e6:.2f} MB' for f in sorted(fs))+f' · check() {chk[-1] if chk else "?"} BAD')

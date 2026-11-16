@@ -52,8 +52,9 @@ def masks(x,y,z,F,soft):
     scoop=np.where(front,np.sqrt((x/(ESC[0]*KM))**2+((z-(neck.z+.03*KM))/(ESC[1]*KM))**2),np.sqrt((x/(.075*KM))**2+((z-(neck.z+.03*KM))/(.1*KM))**2))
     arm=np.sqrt(((axo-(sh.x+.03*KM))/(sh.x+.03*KM-SIS[0]*KM))**2+((z-(sh.z+.04*KM))/(SIS[1]*KM))**2)
     suit=np.maximum(F['torso']*sm(1-E,1+E,scoop)*sm(1-E,1+E,arm)*sm(neck.z+.03,neck.z+.02,z),F['thigh']*sm(hemz-E*.1,hemz+E*.1,z))
-    slv=F['leg']*sm(knee.z-.112-E*.1,knee.z-.112+E*.1,z)*sm(knee.z+.102+E*.1,knee.z+.102-E*.1,z)
-    sock=F['low']*sm(ank.z+.132+E*.1,ank.z+.132-E*.1,z)
+    zq=knee.z+(z-knee.z)/KM; zs=ank.z+(z-ank.z)/KM     # rodilleras y medias a la escala del pesista
+    slv=F['leg']*sm(knee.z-.112-E*.1,knee.z-.112+E*.1,zq)*sm(knee.z+.102+E*.1,knee.z+.102-E*.1,zq)
+    sock=F['low']*sm(ank.z+.132+E*.1,ank.z+.132-E*.1,zs)
     wrap=np.zeros_like(x)
     for side,fl in (('Left',F['farmL']),('Right',F['farmR'])):
         a=np.array(P(side+'ForeArm')); w=np.array(P(side+'Hand')); d=w-a; L=np.linalg.norm(d); d/=L
