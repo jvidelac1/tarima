@@ -48,9 +48,9 @@ function brazoPaleta(C, radial) {
  * Una persona sentada mirando a +z, con el piso en y = 0 y la silla debajo. `det` 1: árbitro (más segmentos); 0: de lejos.
  * `paleta`: sin el brazo derecho (va aparte, animado). Devuelve las piezas fijas, ya pintadas.
  */
-function persona(C, { det = 1, paleta = false, pelo = 'corto', corbata = true, k = 0, gesto = 'mesa', ropa = 'saco', dePie = false } = {}) {
+function persona(C, { det = 1, paleta = false, pelo = 'corto', corbata = true, k = 0, gesto = 'mesa', ropa = 'saco', dePie = false, giro = null, inc = .03 } = {}) {
   const P = de(personaGente({ cuerpo: .45 + .12 * ((k * 3) % 4), pelo: pelo === 'calvo' ? 'entradas' : pelo, ropa, gesto, det, silla: !dePie, dePie, sinBrazo: paleta ? -1 : 0, corbata, semilla: 31 + k * 5, anteojos: k % 3 === 1,
-    cabezaGiro: ((k * 7) % 5 - 2) * .06, cabezaInc: .03, forma: { ancho: .97 + .03 * ((k * 5) % 3), mandibula: .95 + .06 * (k % 3), barba: [.5, .15, .8, 0, .35][k % 5] } }).piezas, C);
+    cabezaGiro: giro ?? ((k * 7) % 5 - 2) * .06, cabezaInc: inc, forma: { ancho: .97 + .03 * ((k * 5) % 3), mandibula: .95 + .06 * (k % 3), barba: [.5, .15, .8, 0, .35][k % 5] } }).piezas, C);
   // de la cintura para abajo, debajo de la mesa, llega menos luz
   if (!dePie) for (const g of P) { const p = g.attributes.position, c = g.attributes.color; for (let i = 0; i < p.count; i++) { const q = .5 + .5 * suave(.3, .95, p.getY(i)); c.setXYZ(i, c.getX(i) * q, c.getY(i) * q, c.getZ(i) * q); } }
   return P;
@@ -78,7 +78,13 @@ export class Jueces {
   constructor({ reduceMotion = false } = {}) {
     this.group = new THREE.Group(); this.group.name = 'Jueces'; this.reduce = reduceMotion;
     const mat = this.mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }); mat.name = 'jueces';
-    mat.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n\treflectedLight.indirectDiffuse += diffuseColor.rgb * ${RELLENO.toFixed(3)};`); };
+    const parche = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n\treflectedLight.indirectDiffuse += diffuseColor.rgb * ${RELLENO.toFixed(3)};`); };
+    mat.onBeforeCompile = parche;
+    // los tres árbitros con su material: desde la cámara del jurado (detrás de ellos) bajan 66 cm (salen del cuadro) y quedan a contraluz
+    const uAtras = this.uAtras = { value: 0 }, matArb = this.matArb = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }); matArb.name = 'árbitros';
+    matArb.onBeforeCompile = sh => { parche(sh); sh.uniforms.uAtras = uAtras;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uAtras;').replace('#include <begin_vertex>', '#include <begin_vertex>\n\ttransformed.y -= 0.66 * uAtras;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uAtras;').replace('#include <dithering_fragment>', '#include <dithering_fragment>\n\tgl_FragColor.rgb *= 1.0 - 0.72 * uAtras;'); };
     const malla = (lista, nombre) => { const g = mergeGeometries(lista); lista.forEach(x => x.dispose()); const m = new THREE.Mesh(g, mat); m.name = nombre; m.matrixAutoUpdate = false; this.group.add(m); return m; };
     const en = (lista, M) => lista.map(g => g.applyMatrix4(M));
 
@@ -87,14 +93,18 @@ export class Jueces {
     this.arb = [];
     for (let i = 0; i < 3; i++) {
       const C = gente(i, ['#343b50', '#2b334a', '#3a3b45'][i], '#24272f'), M = MA.clone().multiply(correr(-(i - 1) * A.sep, -.5));
-      fijos.push(...en(persona(C, { det: 1, paleta: false, pelo: ESTILO[i], k: i }), M));      // las dos manos en la mesa: la decisión se ve en las luces y en la pantalla (la paleta en alto se leía como un chupetín con un brazo cortado)
+      fijos.push(...en(persona(C, { det: 1, paleta: false, pelo: ESTILO[i], k: i, gesto: ['escribe', 'mesa', 'menton'][i], giro: [.22, -.06, -.3][i], inc: [.2, .02, .07][i] }), M));
+      // lo que hay en una mesa de árbitros: papeles, botella y micrófono de cuello
+      fijos.push(...en([pieza(new THREE.BoxGeometry(.21, .003, .297), col('#cfcdc4'), [-.08 + .05 * i, .787, .5], new THREE.Quaternion().setFromAxisAngle(UP, .2 - .25 * i)), pieza(new THREE.BoxGeometry(.21, .003, .297), col('#b9b7ae'), [-.11, .784, .47], new THREE.Quaternion().setFromAxisAngle(UP, -.1)),
+        pieza(new THREE.CylinderGeometry(.03, .032, .2, 10), col('#3d5a78'), [-.33, .885, .52]), pieza(new THREE.CylinderGeometry(.014, .014, .03, 8), col('#d8d8d8'), [-.33, 1.0, .52]),
+        tramo([.38, .785, .56], [.36, .98, .5], .006, col('#15161a'), 6), pieza(new THREE.SphereGeometry(.022, 8, 6), col('#22242a'), [.36, .99, .49]), pieza(new THREE.CylinderGeometry(.045, .05, .012, 10), col('#15161a'), [.38, .786, .56])], M));      // las dos manos en la mesa: la decisión se ve en las luces y en la pantalla (la paleta en alto se leía como un chupetín con un brazo cortado)
       // consola con sus dos botones delante de cada uno
       fijos.push(...en([pieza(new THREE.BoxGeometry(.2, .04, .12), BASE.silla, [.22, .78, .62]), pieza(new THREE.SphereGeometry(.014, 6, 4), col('#e8e6dc'), [.18, .803, .62]), pieza(new THREE.SphereGeometry(.014, 6, 4), col('#c8261c'), [.26, .803, .62])], M));
       const bp = brazoPaleta(C, 10), p = bp.p, g = mergeGeometries(p.map(x => x[0])), junta = new Uint8Array(g.attributes.position.count); let o = 0;
       for (const [x, j] of p) { junta.fill(j, o, o + x.attributes.position.count); o += x.attributes.position.count; x.dispose(); }
       brazos.push(g); this.arb.push({ M, junta, k: 0, a: 0, hecho: -1 }); this._bp = bp;
     }
-    this.fijos = [malla(fijos, 'árbitros')];
+    this.fijos = [malla(fijos, 'árbitros')]; this.fijos[0].material = matArb; this.fijos[0].onBeforeRender = (r, e, cam) => { uAtras.value = cam.position.z > 7.5 ? 1 : 0; };
     // los tres brazos de las paletas: una malla; posiciones y normales en reposo aparte, para recalcularlas al moverse
     const gb = mergeGeometries(brazos); brazos.forEach(g => g.dispose());
     this.P0 = gb.attributes.position.array.slice(); this.N0 = gb.attributes.normal.array.slice(); this.nBrazo = this.P0.length / 9;
@@ -123,7 +133,7 @@ export class Jueces {
     lejos.push(malla(tec, 'mesa técnica ' + det));
     // gente de pie en penumbra a los costados del escenario (entrenadores, cargadores, un camarógrafo): siluetas oscuras, sin detalle; la sala está habitada
     const pie = [];
-    [[-6.05, -3.5, 'cruzados', 'buzo', 'corto', '#3a1d22'], [-5.95, 4.55, 'atras', 'remera', 'corto', '#22304f'], [-5.3, 4.95, 'cruzados', 'remera', 'cola', '#22304f']].forEach(([x, z, gesto, ropa, pelo, tono], i) => {
+    [[-5.95, 4.55, 'atras', 'remera', 'corto', '#22304f'], [-5.3, 4.95, 'cruzados', 'remera', 'cola', '#22304f']].forEach(([x, z, gesto, ropa, pelo, tono], i) => {
       const C0 = gente(i + 13, tono, '#15171c'), C = {}; for (const k in C0) C[k] = C0[k].clone().multiplyScalar(.42);
       pie.push(...en(persona(C, { det, pelo, k: i + 13, gesto, ropa, dePie: true }), asiento(x, STAGE_Y, z, Math.atan2(-x, .4 - z))));
     });

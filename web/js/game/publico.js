@@ -41,11 +41,12 @@ void main(){
   // Lo que le da vida es el filo de luz en cabezas y hombros (uFilo), el rebote del escenario de frente y algún celular.
   vec4 t = texture2D( map, vUv, uSuave ); if ( t.a < 0.38 ) discard;
   float lr = max( dot( vCloth, vec3( 0.3, 0.6, 0.1 ) ), 0.02 ), h = fract( dot( vCloth, vec3( 12.9, 78.2, 37.7 ) ) );
-  vec3 ropa = mix( vec3( 1.0 ), vCloth / lr, 0.18 ) * ( 0.017 + 0.02 * h );
+  vec3 ropa = mix( vec3( 1.0 ), vCloth / lr, 0.3 ) * ( 0.017 + 0.02 * h );
   vec3 piel = vec3( 0.042, 0.033, 0.028 ) * ( 0.75 + 0.9 * dot( vSkin, vec3( 0.33 ) ) );
   vec3 col = mix( ropa, piel, smoothstep( 0.2, 0.42, t.b ) ); col = mix( col, vec3( 0.008, 0.008, 0.009 ), smoothstep( 0.68, 0.9, t.b ) );
   float esc = t.g * t.g * ( 3.0 - 2.0 * t.g ), filo = pow( t.r, 5.0 );
-  vec3 c = col * ( uSala * ( 0.45 + 0.55 * t.r ) * uGain + uRebote * esc ) + uFilo * filo * ( 0.35 + 0.65 * h );
+  if ( uHorneo > 0.0 ) col = vec3( 0.02, 0.022, 0.027 );      // horneada (Móvil y Baja): siluetas de un solo tono con el filo de luz arriba; con ropa, cara y pelo a tan pocos píxeles salía un mosaico
+  vec3 c = col * ( uSala * ( 0.45 + 0.55 * t.r ) * uGain + uRebote * esc ) + uFilo * filo * ( 0.35 + 0.65 * h ) * ( uHorneo > 0.0 ? 1.6 : 1.0 );
   gl_FragColor = vec4( c * mix( 0.45, 1.0, vBajo ), 1.0 );      // las filas de abajo, las más cercanas a las cámaras, más oscuras todavía
   #include <fog_fragment>
   if ( uHorneo > 0.0 ) gl_FragColor.rgb = pow( clamp( gl_FragColor.rgb * uHorneo, 0.0, 1.0 ), vec3( 1.0 / 2.2 ) );
@@ -53,7 +54,7 @@ void main(){
 /** Ganancia con la que se guarda la tribuna horneada (8 bits: el público es oscuro y sin esto se escalona). */
 const HORNEO = 6;
 /** En el camino directo (sin gradación ni viñeta del pase final) el mismo público queda más claro: se baja acá. */
-const DIRECTO = .36;
+const DIRECTO = .45;
 
 export class Publico {
   /** `animo`: el uniform {value} del ánimo del público (ambiente.publico.uAnimo). `chico`: texturas a la mitad (teléfono). */
@@ -104,7 +105,7 @@ export class Publico {
    */
   _hornear() {
     const A = this.arena, crowd = A.crowd, mat = crowd.material, g0 = crowd.geometry, grupo = new THREE.Group(); grupo.name = 'tribunas horneadas';
-    const BH = 1.5, M = new THREE.Matrix4(), r = this.renderer, fondo = new THREE.Color(.075, .085, .105), suave = mat.uniforms.uSuave.value; mat.uniforms.uHorneo.value = HORNEO; mat.uniforms.uSuave.value = 0;      /* fondo más oscuro que la gente; sin sesgo de mipmap (la textura ya es chica) */      // fondo opaco del tono de la sombra de la tribuna: la masa es continua, sin recortes dentados ni huecos negros
+    const BH = 1.5, M = new THREE.Matrix4(), r = this.renderer, fondo = new THREE.Color(.11, .12, .15), suave = mat.uniforms.uSuave.value; mat.uniforms.uHorneo.value = HORNEO; mat.uniforms.uSuave.value = 0;      /* fondo más oscuro que la gente; sin sesgo de mipmap (la textura ya es chica) */      // fondo opaco del tono de la sombra de la tribuna: la masa es continua, sin recortes dentados ni huecos negros
     A.stands.forEach((st, si) => {
       const ids = []; A.seats.forEach((s, i) => { if (s.si === si) ids.push(i); });
       const g = new THREE.InstancedBufferGeometry(); g.index = g0.index; for (const k of ['position', 'uv']) g.setAttribute(k, g0.attributes[k]);

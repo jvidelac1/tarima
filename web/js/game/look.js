@@ -162,7 +162,7 @@ function gomaPiso(S, aniso) {
   const lento = grillas(256, 2, (u, v, o) => { o[0] = fbm(nA, u * 8, v * 8, 4); o[1] = fbm(nB, u * 4 + 3, v * 4, 3); }), M = new Float32Array(2);
   const c = generar(S, (u, v, o, px, py) => {
     lento(u, v, M); const polvo = M[0], mancha = M[1], fino = hash2(px, py), fu = (u * 2) % 1, fv = (v * 2) % 1, du = fu < .5 ? fu : 1 - fu, dv = fv < .5 ? fv : 1 - fv, dj = du < dv ? du : dv;
-    let k = .095 + .006 * sm(.4, .8, polvo) + (fino - .5) * .012, R = k, G = k * 1.02, B = k * 1.08, h = .5 + (fino - .5) * .3, rg = .5 + .12 * sm(.35, .75, polvo) - .06 * sm(.55, .8, mancha);
+    let k = .13 + .006 * sm(.4, .8, polvo) + (fino - .5) * .012, R = k, G = k * 1.02, B = k * 1.08, h = .5 + (fino - .5) * .3, rg = .5 + .12 * sm(.35, .75, polvo) - .06 * sm(.55, .8, mancha);
     const mx = px >> 1, my = py >> 1, hm = hash2(mx + 91, my + 17);
     if (hm < .05) { const P = pal[(hash2(mx, my) * pal.length) | 0], a = .35 + hm * 5; R += (P[0] - R) * a * .5; G += (P[1] - G) * a * .5; B += (P[2] - B) * a * .5; h += .1; rg += .08; }
     const gap = 1 - sm(.001, .005, dj); R *= 1 - .7 * gap; G *= 1 - .7 * gap; B *= 1 - .7 * gap; h -= gap * .45; rg += gap * .3;
@@ -248,7 +248,7 @@ function banderasLargas() {
     for (let i = 0; i < N; i++) { const x0 = i * W; g.save(); g.beginPath(); g.rect(x0, 0, W, H); g.clip();
       let x = x0; while (x < x0 + W) { const fw = 9 + r() * 20, lg = g.createLinearGradient(x, 0, x + fw, 0); lg.addColorStop(0, 'rgba(0,0,0,.42)'); lg.addColorStop(.5, 'rgba(255,255,255,.1)'); lg.addColorStop(1, 'rgba(0,0,0,.42)'); g.fillStyle = lg; g.fillRect(x, 0, fw, H); x += fw; }
       g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(x0, 0, 3, H); g.fillRect(x0 + W - 3, 0, 3, H); g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(x0, H - 10, W, 10); g.restore(); }
-    const luz = g.createLinearGradient(0, 0, 0, H); luz.addColorStop(0, 'rgba(0,0,0,.78)'); luz.addColorStop(.45, 'rgba(0,0,0,.42)'); luz.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = luz; g.fillRect(0, 0, N * W, H);
+    const luz = g.createLinearGradient(0, 0, 0, H); luz.addColorStop(0, 'rgba(0,0,0,.8)'); luz.addColorStop(.55, 'rgba(0,0,0,.4)'); luz.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = luz; g.fillRect(0, 0, N * W, H);
     g.fillStyle = 'rgba(40,36,44,.22)'; g.fillRect(0, 0, N * W, H);      // tela gastada: el color no es pleno
   }), { aniso: 4 });
 }
@@ -270,10 +270,10 @@ function mural(W = 384, H = 768, calido = false) {
     const r = rng(calido ? 57 : 43), A = calido ? ['#5a1d16', '#2a0f0d', '#ffb060'] : ['#123f4c', '#081c24', '#6fe6f0'];
     const lg = g.createLinearGradient(0, 0, 0, H); lg.addColorStop(0, A[1]); lg.addColorStop(1, A[0]); g.fillStyle = lg; g.fillRect(0, 0, W, H);
     g.fillStyle = 'rgba(255,255,255,.05)'; for (let i = -8; i < 30; i++) { g.beginPath(); g.moveTo(0, i * 56); g.lineTo(W, i * 56 - 150); g.lineTo(W, i * 56 - 122); g.lineTo(0, i * 56 + 28); g.fill(); }
-    g.save(); g.translate(W * .56, H * .5); g.rotate(-Math.PI / 2); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#f2ede2'; g.font = `800 ${W * .5}px ${DISPLAY}`; g.fillText(EVENT.marca, 0, 0, H * .78); g.restore();
+    g.save(); g.translate(W * .56, H * .5); g.rotate(-Math.PI / 2); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#f2ede2'; g.font = `800 ${W * .5}px ${DISPLAY}`; g.fillText(calido ? 'OPEN · ' + EVENT.session.toUpperCase() : EVENT.marca, 0, 0, H * .78); g.restore();
     g.fillStyle = A[2]; g.fillRect(W * .1, H * .045, W * .8, H * .012); g.fillRect(W * .1, H * .935, W * .8, H * .012);
     { const x = W * .5, y = H * .09, q = W * .2; g.fillRect(x - q, y - q * .05, q * 2, q * .1); for (const sx of [-1, 1]) { g.fillRect(x + sx * q * .72 - q * .06, y - q * .34, q * .12, q * .68); g.fillRect(x + sx * q * .9 - q * .05, y - q * .24, q * .1, q * .48); } }
-    g.fillStyle = '#f2ede2'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `700 ${W * .1}px ${DISPLAY}`; g.fillText('OPEN · ' + EVENT.session.toUpperCase(), W / 2, H * .972, W * .8);
+    g.fillStyle = '#f2ede2'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `700 ${W * .1}px ${DISPLAY}`; g.fillText(calido ? 'HALTEROFILIA' : 'OPEN · ' + EVENT.session.toUpperCase(), W / 2, H * .972, W * .8);
     let x = 0; while (x < W) { const fw = 16 + r() * 34, f = g.createLinearGradient(x, 0, x + fw, 0); f.addColorStop(0, 'rgba(0,0,0,.34)'); f.addColorStop(.5, 'rgba(255,255,255,.06)'); f.addColorStop(1, 'rgba(0,0,0,.34)'); g.fillStyle = f; g.fillRect(x, 0, fw, H); x += fw; }      // pliegues
     const som = g.createLinearGradient(0, 0, 0, H); som.addColorStop(0, 'rgba(0,0,0,.72)'); som.addColorStop(.5, 'rgba(0,0,0,.25)'); som.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = som; g.fillRect(0, 0, W, H);      // la luz le llega de abajo
   }), { aniso: 4 });
@@ -417,15 +417,17 @@ export class Look {
 
   /** Luz de competencia: sala a oscuras, clave casi cenital, contraluz cálido marcado desde atrás a la izquierda. */
   _luces(L) {
-    L.key.position.set(4.4, 9.3, 3.9); L.key.color.set('#fff0dc'); L.key.intensity = 4.7; L.key.angle = .3; L.key.penumbra = .7;
-    L.key2.color.set('#ffe9d2'); L.key2.intensity = .7; L.key2.position.set(-3.6, 4.6, 7.2);      // relleno bajo y de frente: abre las cuencas de los ojos que la cenital deja apagadas
-    L.stage.color.set('#b9c6e0'); L.stage.intensity = 1.7;
+    L.key.position.set(4.4, 9.3, 3.9); L.key.color.set('#fff0dc'); L.key.intensity = 5.1; L.key.angle = .3; L.key.penumbra = .7;
+    L.key2.color.set('#ffe9d2'); L.key2.intensity = .5; L.key2.position.set(-3.6, 4.6, 7.2);      // relleno bajo y de frente: abre las cuencas de los ojos que la cenital deja apagadas
+    L.stage.color.set('#b9c6e0'); L.stage.intensity = 2.8;
     L.hemi.color.set('#56688a'); L.hemi.groundColor.set('#2c2016'); L.hemi.intensity = .15;
     L.wash.color.set('#8fa0c4'); L.wash.intensity = .07;
     // rimA mira a la cámara general (atrás a la izquierda): es EL contraluz, cálido y ancho (también rasa el piso)
-    L.rimA.color.set('#ffa85c'); L.rimA.intensity = 4.4; L.rimA.angle = .46; L.rimA.penumbra = .85; L.rimA.position.set(-6.3, 5.6, -4.6);
-    L.rimB.color.set('#9fd0ff'); L.rimB.intensity = 3.2; L.rimB.angle = .4;
-    L.hair.color.set('#ffe2bc'); L.hair.intensity = 2.5;
+    // Contraluces heroicos: dos focos potentes desde atrás y a media altura, uno cálido y uno frío, que dibujan un filo claro en
+    // hombros, brazos, cabeza y discos desde cualquier cámara general; más la luz de pelo desde arriba y atrás.
+    L.rimA.color.set('#ffa85c'); L.rimA.intensity = 10; L.rimA.angle = .5; L.rimA.penumbra = .85; L.rimA.position.set(-5.4, 4.3, -5.0);
+    L.rimB.color.set('#9fd0ff'); L.rimB.intensity = 9; L.rimB.angle = .5; L.rimB.penumbra = .85; L.rimB.position.set(5.4, 4.5, -5.0);
+    L.hair.color.set('#ffe2bc'); L.hair.intensity = 5;
   }
   _tarima(S, aniso) {
     const A = this.arena, m = A.madera; if (!m) return;
@@ -556,6 +558,15 @@ export class Look {
       const o = new THREE.Mesh(new THREE.PlaneGeometry(w, w), m); o.rotation.set(-Math.PI / 2, 0, ry); o.position.set(x, Y0 + .003, z); o.receiveShadow = true; o.renderOrder = 1; P.add(o); (this.calcos ||= []).push(o); };
     calcoDe('tiza', -3.15, -1.9, 1.7); calcoDe('tiza', 3.2, -1.95, 1.5, 1); calcoDe('cinta', -3.6, 3.3, 1.5); calcoDe('cinta', 3.6, -3.0, 1.5, Math.PI);
 
+    // charcos de luz de los focos en el piso del escenario (alrededor de la tarima) y nube tenue de magnesio sobre el bol
+    { const cv = makeCanvas(256, 256, g => { g.fillStyle = '#000'; g.fillRect(0, 0, 256, 256); const r = rng(88);
+        const anillo = g.createRadialGradient(128, 128, 30, 128, 128, 120); anillo.addColorStop(0, 'rgba(255,214,170,.5)'); anillo.addColorStop(.5, 'rgba(200,190,200,.22)'); anillo.addColorStop(1, 'rgba(120,150,200,0)'); g.fillStyle = anillo; g.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 9; i++) { const a = i / 9 * 6.283 + r(), d = 62 + r() * 40, x = 128 + Math.cos(a) * d * 1.15, y = 128 + Math.sin(a) * d, rad = 22 + r() * 22, rg = g.createRadialGradient(x, y, 0, x, y, rad); rg.addColorStop(0, `rgba(${i % 2 ? '255,200,140' : '190,215,255'},.42)`); rg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = rg; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); } }), t = canvasTexture(cv, { aniso: 2 }); this.texturas.push(t);
+      const o = new THREE.Mesh(new THREE.PlaneGeometry(12.8, 10.8), new THREE.MeshBasicMaterial({ name: 'charcos de luz en el piso', map: t, color: new THREE.Color(.085, .085, .085), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+      o.rotation.x = -Math.PI / 2; o.position.set(0, Y0 + .0035, 0); o.renderOrder = 2; P.add(o); (this.calcos ||= []).push(o);
+      const nt = canvasTexture(makeCanvas(64, 64, g => { const rg = g.createRadialGradient(32, 32, 0, 32, 32, 31); rg.addColorStop(0, 'rgba(255,255,255,.55)'); rg.addColorStop(.5, 'rgba(255,255,255,.18)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = rg; g.fillRect(0, 0, 64, 64); }), { aniso: 1 }); this.texturas.push(nt);
+      const sm2 = new THREE.SpriteMaterial({ name: 'nube de magnesio', map: nt, color: new THREE.Color(.09, .088, .08), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+      for (const [dx, dy, sc] of [[0, 1.12, .75], [.12, 1.42, 1.05], [-.14, 1.75, 1.3]]) { const sp = new THREE.Sprite(sm2); sp.position.set(-3.15 + dx, Y0 + dy, -1.9); sp.scale.setScalar(sc); sp.renderOrder = 7; this.arena.group.add(sp); } }
     // la pantalla tiñe el piso delante suyo (aditivo, solo con post: va con las calcomanías)
     { const t = canvasTexture(brilloPiso(), { aniso: 2 }); this.texturas.push(t);
       const o = new THREE.Mesh(new THREE.PlaneGeometry(7.8, 3.0), new THREE.MeshBasicMaterial({ name: 'brillo de la pantalla en el piso', map: t, color: new THREE.Color(.5, .5, .5), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
@@ -598,9 +609,10 @@ export class Look {
     const colgar = (cx, cz, nx, nz, i, w = 2.6, y0 = 3.3, y1 = 12.4) => { const tx2 = -nz, tz = nx, b = pos.length / 3; pos.push(cx - tx2 * w / 2, y0, cz - tz * w / 2, cx + tx2 * w / 2, y0, cz + tz * w / 2, cx + tx2 * w / 2, y1, cz + tz * w / 2, cx - tx2 * w / 2, y1, cz - tz * w / 2); uv.push(i / N, 0, (i + 1) / N, 0, (i + 1) / N, 1, i / N, 1); idx.push(b, b + 1, b + 2, b, b + 2, b + 3); };
     [-8.0, -2.5, 0, 2.5, 8.0].forEach((x, k) => colgar(x, -5.62, 0, 1, (k * 3 + 1) % N, 2.3, Math.abs(x) < 4 ? 4.3 : 2.7));      // detrás de la pantalla (las del medio terminan arriba del puente de luces)
     for (const s of [-1, 1]) for (let k = 0; k < 6; k++) colgar(s * 10.9, -7.2 + k * 3.6, -s, 0, (k * 3 + (s > 0 ? 2 : 5)) % N, 2.4, 2.3 + (k % 2) * .45);      // costados, delante de las tribunas
-    for (let k = 0; k < 7; k++) colgar(-12 + k * 4, 11.5, 0, -1, (k * 3) % N, 2.6, 4.4);      // frente (lo que mira el pesista), por encima de los árbitros
+    for (let k = 0; k < 7; k++) colgar(-12 + k * 4, 11.5, 0, -1, (k * 3) % N, 2.6, 4.4);
+    for (const s of [-1, 1]) colgar(s * 6.3, -4.74, 0, 1, s > 0 ? 6 : 3, 1.7, 2.72, 6.2);      // sobre el tablero y el reloj, colgadas del truss del fondo: a cuadro en 3/4, jurado y frontal      // frente (lo que mira el pesista), por encima de los árbitros
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
-    const o = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ name: 'banderas', map: bt, color: new THREE.Color(.42, .42, .42), side: THREE.DoubleSide })); o.frustumCulled = false; G.add(o);
+    const o = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ name: 'banderas', map: bt, color: new THREE.Color(.85, .85, .85), side: THREE.DoubleSide })); o.frustumCulled = false; G.add(o);
     this._sombras();
   }
 
@@ -653,7 +665,12 @@ export class Look {
       const g = new THREE.Group(); g.position.copy(l.position); g.lookAt(hasta); g.rotateX(-Math.PI / 2);
       const m = new THREE.Mesh(geo, mat); m.scale.set(rad, len, rad); m.renderOrder = 5; m.frustumCulled = false; g.add(m); this.group.add(g); this.rayos.push({ mat, base: fuerza });
     };
-    rayo(L.rimA, .034, .36); rayo(L.rimB, .024, .34); rayo(L.key, .012, .5);      // haces angostos y definidos: anchos eran un banco de niebla beige sobre la tribuna      // solo los dos contraluces: los conos de la clave y del pelo casi no se veían y eran pantalla entera de mezcla
+    rayo(L.rimA, .02, .5); rayo(L.rimB, .016, .5); rayo(L.key, .01, .6);
+    // conos anchos y suaves desde el puente de focos y las torres hasta la tarima (focos de mentira: solo el volumen de bruma)
+    const foco = (p, t, color, ang) => ({ position: new THREE.Vector3(...p), target: { position: new THREE.Vector3(...t) }, color: new THREE.Color(color), angle: ang });
+    for (const x of [-3.0, -1.0, 1.0, 3.0]) rayo(foco([x, 3.56, -4.86], [x * .35, 0, .6], x < 0 ? '#ffd0a0' : '#dfe8ff', .2), .014, 1);
+    for (const s2 of [-1, 1]) rayo(foco([s2 * 7.22, 4.6, -4.4], [s2 * .6, 0, 0], s2 < 0 ? '#ffb877' : '#cfe0ff', .17), .013, 1);
+    for (const x of [-3, 3]) rayo(foco([x, 6.8, 6.8], [x * .3, 0, .4], '#ffe6c4', .15), .008, 1);      // haces angostos y definidos: anchos eran un banco de niebla beige sobre la tribuna      // solo los dos contraluces: los conos de la clave y del pelo casi no se veían y eran pantalla entera de mezcla
     this.group.visible = false;
   }
 
