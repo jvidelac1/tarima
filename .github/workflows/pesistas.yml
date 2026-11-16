@@ -19,7 +19,7 @@ name: Pesistas (Blender en Ubuntu)
 
 on:
   push:
-    branches: [plantel]
+    branches: [plantel, visual]
     paths:
       - '.github/workflows/pesistas.yml'
   workflow_dispatch:
@@ -144,6 +144,8 @@ jobs:
           mkdir -p "art/out/$N" art/web
           cd "out/$N" && for f in *.glb poses.json *.log *.txt *.json sheet_*.png d_*.png diag.png traj_*.png tex_preview.png uv_*.png body_mask.png hair.png hair_len.png ctl; do [ -e "$f" ] && cp -r "$f" "$GITHUB_WORKSPACE/art/out/$N/"; done; cd "$GITHUB_WORKSPACE"
           cp -r web_ci/models web_ci/data art/web/ 2>/dev/null || true
+          # mapas de horneado a un cuarto (1024): con ellos blender/tex.py corre fuera de Blender en segundos (iteración de texturas)
+          [ -s "out/$N/maps.npz" ] && .venv/bin/python -c "import numpy as np,sys; M=np.load(sys.argv[1]); st=max(1,M['PO'].shape[0]//1024); np.savez_compressed(sys.argv[2],**{k:M[k][::st,::st] for k in M.files})" "out/$N/maps.npz" "art/out/$N/maps_1024.npz" || true
           du -sh art/out/"$N" art/web || true
       - uses: actions/upload-artifact@v6
         if: ${{ always() }}
