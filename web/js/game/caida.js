@@ -47,6 +47,26 @@ export class BarraLibre {
 }
 
 /**
+ * Barra que el pesista BAJA CON LAS MANOS antes de soltarla (levantamiento terminado: válido o nulo de los jueces). Como en una
+ * tarima de verdad: afloja los codos y la barra baja por delante, pegada al cuerpo, de arriba de la cabeza (`y0`, `z0`) a la
+ * altura del pecho (`y1`, `z1`) en `dur` s, cada vez más rápido; ahí la suelta hacia adelante y cae sola (BarraLibre, con la
+ * velocidad que traía). Misma interfaz que BarraLibre; `guiada` vale true mientras va en las manos.
+ */
+export class BarraGuiada {
+  constructor({ y0, z0, y1, z1, dur, vz = .45, piso = .225 }) {
+    this.g = { y0, z0, y1: Math.max(y1, piso + .3), z1, dur }; const G = this.g;
+    this.libre = new BarraLibre({ y: G.y1, z: G.z1, vy: -2 * (G.y0 - G.y1) / dur, vz, piso }); this.en(0);
+  }
+  en(t) {
+    const G = this.g;
+    if (t < G.dur) { const u = Math.max(0, t / G.dur), k = u * u, kz = u * u * (3 - 2 * u); this.libre.reset(); Object.assign(this, { guiada: true, y: G.y0 + (G.y1 - G.y0) * k, z: G.z0 + (G.z1 - G.z0) * kz, ang: 0, apoyada: false, quieta: false, golpes: [] }); return this; }
+    const L = this.libre.en(t - G.dur);
+    Object.assign(this, { guiada: false, y: L.y, z: L.z, ang: L.ang, apoyada: L.apoyada, quieta: L.quieta, golpes: L.golpes.map(x => ({ ...x, t: x.t + G.dur })) }); return this;
+  }
+  get reposo() { return this.g.dur + this.libre.reposo; }
+}
+
+/**
  * Cómo termina el intento. null: no hay nada que soltar (nulo por reloj sin levantar).
  * - bajo: tirón sin altura o anticipado; la barra está entre la rodilla y el pecho.
  * - hombros: la barra en los hombros con el pesista de pie (devuelve, o la flexión del envión que no sale).
@@ -77,7 +97,7 @@ export function planCaida(tipo, causa, valido = false) {
     bajada: { suelta: valido ? .7 : .35, vy: .25, vz: .6, quieto: (valido ? .7 : .35) + .5, mezcla: .9 },
   }[tipo];
   if (!P) return null;
-  const pl = { tipo, causa, ...P, salto: null };
+  const pl = { tipo, causa, ...P, salto: null, valido };
   if (tipo === 'arriba' && causa === 'adelante') Object.assign(pl, { vz: 1.15, salto: { dz: -.14, desde: .05, dur: .32 } });
   if (tipo === 'arriba' && causa === 'atras') Object.assign(pl, { vz: -1.25, vy: .2, salto: { dz: .2, desde: .05, dur: .4 } });
   return pl;
@@ -98,6 +118,23 @@ export function planCaida(tipo, causa, valido = false) {
  *   a «Parado», y lo que les falta a los pies lo hacen en un saltito (`SALTITO`: la raíz sube y la mezcla ocurre en el aire).
  */
 export const PARARSE = .8, DESANDAR = .24, MANOS = .2, SALTITO = { dur: .3, alto: .04 };
+/**
+ * Con la barra soltada desde arriba de la cabeza (`bajada` y `arriba`) los brazos NO desandan el clip (pasaban por codos
+ * altos, «doble bíceps», y por la cruz): BARREN por delante, de arriba hacia abajo, detrás de la barra que cae, en
+ * `BARRIDO.dur` s (stage.js los apunta por regla: brazo y antebrazo siguen un arco en el plano del frente).
+ * Después, el GESTO (también por regla, sobre los huesos, igual para cualquier biotipo): válido = dos puños que suben y
+ * marcan dos veces («¡vamos!»), y los brazos vuelven a colgar; nulo o fallo = la cabeza cae, los hombros se vencen y niega
+ * con la cabeza. Tiempos en s desde que terminan de bajar los brazos.
+ */
+// BARRIDO.espera: s más que MANOS; la barra ya pasó por debajo de los hombros cuando los brazos bajan por delante (check_escenas)
+/**
+ * BAJADA (levantamiento terminado): la barra baja en las manos `GUIA.dur` s hasta el pecho, `GUIA.adelante` m por delante de
+ * los hombros y `GUIA.bajo` m por debajo (BarraGuiada); las manos la acompañan (stage.js: los brazos se resuelven con la mano
+ * en la barra), la sueltan, quedan abiertas al frente `GUIA.abiertas` s y bajan en `GUIA.cuelgan` s; el pesista da un paso
+ * corto hacia atrás (`GUIA.paso` m) mientras la barra cae.
+ */
+export const GUIA = { dur: .5, adelante: .3, bajo: .14, abiertas: .16, cuelgan: .45, paso: -.11 };
+export const BARRIDO = { dur: .55, espera: .22 }, GESTO = { festejo: { sube: .28, dura: 1.0, baja: .45 }, bronca: { sube: .5 } };
 /** Lo que tarda en pasar a «Parado» (s): con saltito, medio segundo como mucho (el saltito va en el medio). */
 const mezclaDe = (pl, g0, R) => (R && g0 >= R.rec ? Math.min(pl.mezcla, SALTITO.dur + .2) : pl.mezcla);
 /** Poses (muestras globales) por las que pasan los brazos: la del final y la de cada fase anterior, hasta `R.brazosA`. */
@@ -127,16 +164,38 @@ export function poseCaida(pl, g0, destino, t, R = null) {
   // brazos: desandan el clip desde que se suelta la barra y después bajan a «Parado» mientras el cuerpo llega
   const K = clavesBrazos(g0, R), n = K.length - 1, tD = n * DESANDAR, tb = t - pl.suelta - MANOS, x = tb <= 0 || !n ? 0 : suave(tb / tD) * n, kB = Math.min(Math.max(0, n - 1), Math.floor(x));
   const tBajar = pl.suelta + MANOS + tD, wB = suave((t - tBajar) / Math.min(.8, Math.max(.3, tM + mz - tBajar)));
+  if (pl.tipo === 'bajada' && pl.guia) {
+    // bajada controlada: las manos van con la barra hasta soltarla, quedan abiertas al frente y cuelgan; después, el gesto
+    const G = pl.guia, i = Math.floor(gC), f0 = Math.floor(g0), ta = t - pl.suelta, u = Math.min(1, Math.max(0, ta / G.dur)), ts = ta - G.dur, wP = suave(ta / (G.dur + GUIA.abiertas));
+    const mano = ta < 0 ? null : { y: G.y0 + (G.y1 - G.y0) * u * u, z: G.z0 + (G.z1 - G.z0) * suave(u), w: suave(ta / .08) * (1 - suave((ts - GUIA.abiertas) / GUIA.cuelgan)), dedos: suave(ts / .12) };
+    const tG = ts - GUIA.abiertas - GUIA.cuelgan * .8; let gesto = null;
+    if (tG > 0) { if (pl.valido) { const F = GESTO.festejo; gesto = { tipo: 'festejo', w: suave(tG / F.sube) * (1 - suave((tG - F.sube - F.dura) / F.baja)), t: tG, dedos: f0 }; } else gesto = { tipo: 'bronca', w: suave(tG / GESTO.bronca.sube), t: tG }; }
+    return { i, j: i + 1, u: gC - i, k: destino, w, dz, dy, t, brazos: { i: f0, j: f0 + 1, u: g0 - f0, k: destino, w: wP }, mano, gesto };
+  }
+  if (pl.tipo === 'bajada' || pl.tipo === 'arriba') {
+    // barrido: los brazos quedan en la pose del final (stage.js los apunta) y al llegar abajo pasan a «Parado»
+    const tq = tb - BARRIDO.espera, x = suave(tq / BARRIDO.dur), wP = suave((tq - BARRIDO.dur * .7) / (BARRIDO.dur * .45)), tG = t - (pl.suelta + MANOS + BARRIDO.espera + BARRIDO.dur * 1.1), i = Math.floor(gC), f0 = Math.floor(g0);
+    let gesto = null;
+    if (tG > 0) { if (pl.valido) { const F = GESTO.festejo; gesto = { tipo: 'festejo', w: suave(tG / F.sube) * (1 - suave((tG - F.sube - F.dura) / F.baja)), t: tG, dedos: f0 }; } else gesto = { tipo: 'bronca', w: suave(tG / GESTO.bronca.sube), t: tG }; }
+    return { i, j: i + 1, u: gC - i, k: destino, w, dz, dy, t, brazos: { i: f0, j: f0 + 1, u: g0 - f0, k: destino, w: wP }, barrido: tq > 0 ? { x, w: suave(tq / .1) * (1 - wP) } : null, gesto };
+  }
   const i = Math.floor(gC), a0 = K[kB], a1 = K[Math.min(n, kB + 1)], f0 = Math.floor(a0);
   // la primera pose puede ser fraccionaria (g0): se aproxima a su muestra más cercana solo si no es entera
-  return { i, j: i + 1, u: gC - i, k: destino, w, dz, dy, t, brazos: { i: n ? Math.round(a0) : f0, j: n ? Math.round(a1) : f0 + 1, u: n ? x - kB : g0 - f0, k: destino, w: wB } };
+  // los demás fallos (barra que no sube, devuelta, perdida sentado): la misma bronca, apenas llega a «Parado»
+  const tG = t - (tM + mz) + .25, gesto = tG > 0 ? { tipo: 'bronca', w: suave(tG / GESTO.bronca.sube), t: tG } : null;
+  return { i, j: i + 1, u: gC - i, k: destino, w, dz, dy, t, brazos: { i: n ? Math.round(a0) : f0, j: n ? Math.round(a1) : f0 + 1, u: n ? x - kB : g0 - f0, k: destino, w: wB }, gesto };
 }
 
 /** Escena entera: plan, barra (desde que se suelta) y duración. `bar`: {y, z} de la barra dibujada en el instante final. `g0` y `R`: ver poseCaida. */
-export function armarCaida(res, mov, bar, piso, g0 = 0, R = null) {
+export function armarCaida(res, mov, bar, piso, g0 = 0, R = null, hombros = null) {
   const tipo = tipoCaida(res, mov); if (!tipo) return null;
-  const pl = planCaida(tipo, res.causa, res.res === 'valido');
-  const barra = new BarraLibre({ y: bar.y, z: bar.z, vy: pl.vy, vz: pl.vz, piso });
+  const pl = planCaida(tipo, res.causa, res.res === 'valido'); let barra;
+  // `hombros` ({y, z} de la línea de los hombros en la pose del final): con eso, la bajada es controlada (GUIA)
+  if (tipo === 'bajada' && hombros && bar.y > hombros.y + .15) {
+    pl.guia = { y0: bar.y, z0: bar.z, y1: hombros.y - GUIA.bajo, z1: hombros.z + GUIA.adelante, dur: GUIA.dur };
+    pl.salto = { dz: GUIA.paso, desde: pl.suelta + GUIA.dur * .8, dur: .34 };
+    barra = new BarraGuiada({ ...pl.guia, piso });
+  } else barra = new BarraLibre({ y: bar.y, z: bar.z, vy: pl.vy, vz: pl.vz, piso });
   const dur = Math.max(tiemposCaida(pl, g0, R).fin, pl.suelta + barra.reposo) + .1;
   return { tipo, pl, barra, dur, R };
 }
