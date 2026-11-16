@@ -27,9 +27,9 @@ export const BARATO = Object.freeze({ piso: true, haces: 'no', bordes: 'material
 export const AMBIENTE = Object.freeze({
   movil: Object.freeze({ polvo: 50, conos: 1, reflejo: 0, publico: false }),
   baja: Object.freeze({ polvo: 120, conos: 1, reflejo: 0, publico: false }),
-  media: Object.freeze({ polvo: 260, conos: 1.6, reflejo: 0, publico: true, superficies: false, rayos: 0 }),      // superficies y rayos (look.js, materiales.js): solo Alta y Ultra
-  alta: Object.freeze({ polvo: 450, conos: 1.8, reflejo: .5, publico: true, superficies: false }),      // superficies por función: solo Ultra hasta medir en una placa (por software, Alta costaba 42 % más)
-  ultra: Object.freeze({ polvo: 800, conos: 2, reflejo: 1, publico: true }),
+  media: Object.freeze({ polvo: 260, conos: .8, reflejo: 0, publico: true, superficies: false, rayos: 0 }),      // superficies y rayos (look.js, materiales.js): solo Alta y Ultra
+  alta: Object.freeze({ polvo: 450, conos: .9, reflejo: .5, publico: true, superficies: false }),      // superficies por función: solo Ultra hasta medir en una placa (por software, Alta costaba 42 % más)
+  ultra: Object.freeze({ polvo: 800, conos: 1, reflejo: 1, publico: true }),
 });
 export const MOVIL = { amb: AMBIENTE.movil, label: 'Móvil', dpr: 1.5, maxPixels: 1280 * 720, msaa: 2, shadow: 512, shadowR: 4.5, shadow2: 0, ao: 0, aoScale: .5, dof: 0, dofSamples: 0, bloom: false, smaa: false, crowd: .3, beams: false, aniso: 2, tex: 1024, directo: true, barato: BARATO };
 /**

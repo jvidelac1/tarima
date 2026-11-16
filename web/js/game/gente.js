@@ -113,11 +113,11 @@ function cabeza(n, forma, { anteojos = false } = {}) {
     const x = P.getX(i), y = P.getY(i), z = P.getZ(i); if (z < .02) continue;
     let k = 1;
     if (fino) {
-      for (const s of [-1, 1]) { k -= .2 * G2(x, y, s * .031, .129, .017, .009); k -= .5 * G2(x, y, s * .0085, .0805, .0045, .003); }      // cuencas y narinas
+      for (const s of [-1, 1]) { k -= .4 * G2(x, y, s * .031, .1305, .019, .0095); k -= .5 * G2(x, y, s * .0085, .0805, .0045, .003); k -= .16 * G2(x, y, s * .0165, .104, .006, .02); k -= .1 * G2(x, y, s * .05, .07, .014, .03); }      // cuencas y narinas
       k -= .62 * G2(x, y, 0, .0518, .022, .0024); k -= .12 * G2(x, y, 0, .076, .018, .005);                                                  // línea de la boca y bajo la nariz
       const labio = Math.max(G2(x, y, 0, .058, .019, .0042), G2(x, y, 0, .0452, .017, .0048)), mej = Math.max(G2(x, y, -.046, .094, .02, .02), G2(x, y, .046, .094, .02, .02));
       const bb = barba * suave(.092, .064, y) * (1 - .85 * labio) * (1 - .6 * G2(x, y, 0, .09, .012, .02));
-      const L = .72 * labio, M = .4 * mej;
+      const L = .9 * labio, M = .75 * Math.max(mej, G2(x, y, 0, .092, .012, .012));
       tinte[i * 3] = (1 + .04 * M) * (1 - .26 * bb) * (1 - .04 * L); tinte[i * 3 + 1] = (1 - .3 * L - .06 * M) * (1 - .24 * bb); tinte[i * 3 + 2] = (1 - .3 * L - .08 * M) * (1 - .2 * bb);
     } else {
       for (const s of [-1, 1]) { k -= .5 * Math.exp(-(((x - s * .031) / .017) ** 2 + ((y - .128) / .011) ** 2)); k -= .3 * Math.exp(-(((x - s * .03) / .02) ** 2 + ((y - .143) / .0045) ** 2)); }      // cuencas y cejas
@@ -145,7 +145,7 @@ function cabeza(n, forma, { anteojos = false } = {}) {
         const lp = new THREE.BufferGeometry(); lp.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); lp.setIndex(idx); lp.computeVertexNormals(); piezas.push({ g: lp, parte: 'iris' }); }
       // ceja: una tira de pelo apoyada en el arco, más gruesa adentro, con una leve curva
       const pos = [], idx = [], NB = 7;
-      for (let i = 0; i <= NB; i++) { const u = i / NB, x = s * (.011 + .043 * u), y = .1462 + .0042 * Math.sin(Math.PI * u ** .8) - .0034 * u * u, th = .0034 - .0019 * u; for (const q of [-1, 1]) { const yy = y + q * th; pos.push(x, yy, zCara(x, yy, forma) + .0016); } }
+      for (let i = 0; i <= NB; i++) { const u = i / NB, x = s * (.011 + .043 * u), y = .1462 + .0042 * Math.sin(Math.PI * u ** .8) - .0034 * u * u, th = .0048 - .0026 * u; for (const q of [-1, 1]) { const yy = y + q * th; pos.push(x, yy, zCara(x, yy, forma) + .0016); } }
       for (let i = 0; i < NB; i++) { const a = i * 2; if (s > 0) idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); else idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
       const cj = new THREE.BufferGeometry(); cj.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); cj.setIndex(idx); cj.computeVertexNormals(); piezas.push({ g: cj, parte: 'pelo' });
       if (anteojos) {
@@ -252,7 +252,7 @@ export function persona({ cuerpo = .5, talla = 1, pelo: estilo = 'corto', forma 
     const tira = filas => { const pos = [], idx = []; for (const [y, hw, z] of filas) pos.push(-hw, y, z, hw, y, z); for (let j = 0; j < filas.length - 1; j++) { const a = j * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); } const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g; };
     add(tira([[1.082, .058, .07], [1.0, .046, .129], [.9, .026, .141], [.78, 0, .13]]), 'camisa');
     if (corbata) { add(tira([[1.07, .019, .083], [1.0, .024, .133], [.86, .03, .143], [.8, 0, .136]]), 'corbata'); add(new THREE.BoxGeometry(.04, .032, .02).translate(0, 1.078, .072), 'corbata'); }
-    add(miembro([V(0, 1.085, -.012), V(0, 1.122, -.012)], [[.062, .066], [.057, .06]], 12, 1), 'camisa');
+    add(miembro([V(0, 1.083, -.012), V(0, 1.108, -.014)], [[.063, .067], [.056, .06]], 12, 1), 'camisa');
   } else if (ropa === 'buzo') add(miembro([V(0, 1.08, -.014), V(0, 1.118, -.016)], [[.075, .08], [.064, .07]], 12, 1), 'ropa');      // capucha o cuello alto
   // cabeza (mentón en yc), girada e inclinada
   const M = new THREE.Matrix4().compose(V(0, yc, .004), new THREE.Quaternion().setFromEuler(new THREE.Euler(cabezaInc, cabezaGiro, 0, 'YXZ')), V(1.07, 1.07, 1.07));
@@ -268,7 +268,9 @@ export function persona({ cuerpo = .5, talla = 1, pelo: estilo = 'corto', forma 
 export function mesa(L) {
   return [{ g: new THREE.BoxGeometry(L, .035, .62).translate(0, .7425, 0), parte: 'tapa' }, { g: new THREE.BoxGeometry(L, .725, .025).translate(0, .3625, .297), parte: 'mantel' },
     { g: new THREE.BoxGeometry(.025, .725, .6).translate(-L / 2 + .0125, .3625, 0), parte: 'mantel' }, { g: new THREE.BoxGeometry(.025, .725, .6).translate(L / 2 - .0125, .3625, 0), parte: 'mantel' },
-    { g: new THREE.BoxGeometry(L, .05, .012).translate(0, .64, .312), parte: 'banda' }];
+    { g: new THREE.BoxGeometry(L, .05, .012).translate(0, .64, .312), parte: 'banda' },
+    { g: new THREE.BoxGeometry(L + .05, .014, .67).translate(0, .767, 0), parte: 'canto' }, { g: new THREE.BoxGeometry(L + .02, .07, .03).translate(0, .035, .3), parte: 'zocalo' },
+    { g: new THREE.BoxGeometry(.035, .725, .035).translate(-L / 2 + .012, .3625, .297), parte: 'canto' }, { g: new THREE.BoxGeometry(.035, .725, .035).translate(L / 2 - .012, .3625, .297), parte: 'canto' }];
 }
 /** Deja cada pieza sin UV ni índice propio raro, con normales, lista para juntar. */
 export function limpiar(g) { g.deleteAttribute('uv'); if (!g.attributes.normal) g.computeVertexNormals(); if (!g.index) { const n = g.attributes.position.count, ix = new Uint16Array(n); for (let i = 0; i < n; i++) ix[i] = i; g.setIndex(new THREE.BufferAttribute(ix, 1)); } return g; }

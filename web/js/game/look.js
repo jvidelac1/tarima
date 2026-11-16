@@ -141,7 +141,7 @@ function madera(S, aniso) {
   const fino = vetaFina(256, 512), rr = rng(505), px = S / 4, lw = Math.max(1, S / 1024 * 1.25);
   const juntas = g => { g.beginPath(); for (let i = 0; i < NP; i++) { const x0 = i * pw * px; if (i) { g.moveTo(x0, 0); g.lineTo(x0, S); } for (const [z] of tablas[i]) if (z < 4) { g.moveTo(x0, z * px); g.lineTo(x0 + pw * px, z * px); } } g.stroke(); };
   const rayas = []; for (let k = 0; k < 170; k++) rayas.push([S * (.08 + rr() * .84), S * (.2 + rr() * .7), (rr() - .5) * 1.2 + Math.PI / 2, S * (.01 + rr() * rr() * .09), .1 + rr() * .3, .6 + rr() * 1.2]);
-  const motas = []; for (let k = 0; k < 4200; k++) { const lado = rr() < .3 ? (rr() < .5 ? -1 : 1) * (.97 + (rr() - .5) * .3) : (rr() + rr() - 1) * 1.1; motas.push([S * (lado / 4 + .5), S * ((.12 + (rr() + rr() + rr() - 1.5) * .55) / 4 + .5), 1 + rr() * 1.7, .12 + rr() * .45]); }
+  const motas = []; for (let k = 0; k < 2000; k++) { const lado = rr() < .3 ? (rr() < .5 ? -1 : 1) * (.97 + (rr() - .5) * .3) : (rr() + rr() - 1) * 1.1; motas.push([S * (lado / 4 + .5), S * ((.12 + (rr() + rr() + rr() - 1.5) * .55) / 4 + .5), 1 + rr() * 1.7, .07 + rr() * .26]); }
   const subir = (base, tile, modo, alfa, extra) => makeCanvas(S, S, g => {
     g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(base, 0, 0, S, S);
     g.globalCompositeOperation = modo; g.globalAlpha = alfa; g.fillStyle = g.createPattern(tile, 'repeat'); g.fillRect(0, 0, S, S); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.lineCap = 'round';
@@ -157,13 +157,13 @@ function madera(S, aniso) {
 
 /** Goma del escenario: baldosa de 1 m con motas, junta, polvo y roces. El lienzo cubre 2 × 2 m (cuatro baldosas distintas). */
 function gomaPiso(S, aniso) {
-  const nA = ruido(11), nB = ruido(12), pal = [[.34, .37, .44], [.46, .47, .49], [.22, .3, .42], [.6, .6, .6], [.3, .31, .33]];
+  const nA = ruido(11), nB = ruido(12), pal = [[.36, .37, .39], [.46, .47, .49], [.27, .29, .32], [.55, .55, .56], [.3, .31, .33]];      // motas grises: las de color, de lejos, se leían como manchas rojas y azules
   const lento = grillas(256, 2, (u, v, o) => { o[0] = fbm(nA, u * 8, v * 8, 4); o[1] = fbm(nB, u * 4 + 3, v * 4, 3); }), M = new Float32Array(2);
   const c = generar(S, (u, v, o, px, py) => {
     lento(u, v, M); const polvo = M[0], mancha = M[1], fino = hash2(px, py), fu = (u * 2) % 1, fv = (v * 2) % 1, du = fu < .5 ? fu : 1 - fu, dv = fv < .5 ? fv : 1 - fv, dj = du < dv ? du : dv;
     let k = .095 + .04 * sm(.4, .8, polvo) + (fino - .5) * .012, R = k, G = k * 1.02, B = k * 1.08, h = .5 + (fino - .5) * .3, rg = .5 + .32 * sm(.35, .75, polvo) - .16 * sm(.55, .8, mancha);
     const mx = px >> 1, my = py >> 1, hm = hash2(mx + 91, my + 17);
-    if (hm < .085) { const P = pal[(hash2(mx, my) * pal.length) | 0], a = .35 + hm * 5; R += (P[0] - R) * a * .5; G += (P[1] - G) * a * .5; B += (P[2] - B) * a * .5; h += .1; rg += .08; }
+    if (hm < .05) { const P = pal[(hash2(mx, my) * pal.length) | 0], a = .35 + hm * 5; R += (P[0] - R) * a * .5; G += (P[1] - G) * a * .5; B += (P[2] - B) * a * .5; h += .1; rg += .08; }
     const gap = 1 - sm(.001, .005, dj); R *= 1 - .7 * gap; G *= 1 - .7 * gap; B *= 1 - .7 * gap; h -= gap * .45; rg += gap * .3;
     const borde = (1 - sm(.005, .05, dj)) * .5 * polvo; R += borde * .05; G += borde * .05; B += borde * .05;      // polvo juntado contra la junta
     o[0] = R; o[1] = G; o[2] = B; o[3] = cl(h); o[4] = cl(rg);
@@ -237,6 +237,38 @@ function telon(W = 1024, H = 384) {
     const piso = sm(0, .03, y); o[0] = cl(Math.sqrt(R * piso)); o[1] = cl(Math.sqrt(G * piso)); o[2] = cl(Math.sqrt(B * piso)); o[3] = .5; o[4] = .5;
   }, H);
   return canvasTexture(c.col, { aniso: 4 });
+}
+
+/** Parrilla del techo (84 × 84 m vista desde abajo): vigas, cerchas con diagonales, conductos y el resplandor cálido de las luces sobre el escenario. Cierra la sala desde cualquier cámara. */
+function techo(S = 1024) {
+  return canvasTexture(makeCanvas(S, S, g => {
+    g.fillStyle = '#07080b'; g.fillRect(0, 0, S, S); const m = S / 84, r = rng(31);
+    const res = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, 26 * m); res.addColorStop(0, 'rgba(255,196,130,.36)'); res.addColorStop(.35, 'rgba(210,150,100,.16)'); res.addColorStop(1, 'rgba(120,90,70,0)'); g.fillStyle = res; g.fillRect(0, 0, S, S);
+    for (let i = 0; i <= 14; i++) { const x = i * 6 * m; g.fillStyle = 'rgba(96,100,112,.5)'; g.fillRect(x - .22 * m, 0, .44 * m, S); g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(x + .22 * m, 0, .2 * m, S); }      // vigas principales
+    g.strokeStyle = 'rgba(86,90,102,.42)'; g.lineWidth = Math.max(1, .12 * m);
+    for (let j = 0; j <= 28; j++) { const y = j * 3 * m; g.fillStyle = 'rgba(70,74,86,.42)'; g.fillRect(0, y - .1 * m, S, .2 * m); if (j % 2 === 0) { g.beginPath(); for (let i = 0; i < 14; i++) { const x = i * 6 * m; g.moveTo(x, y); g.lineTo(x + 3 * m, y + 3 * m); g.lineTo(x + 6 * m, y); } g.stroke(); } }      // correas y diagonales
+    for (let k = 0; k < 7; k++) { const x = (8 + r() * 68) * m, w = (.5 + r() * .5) * m; g.fillStyle = 'rgba(58,62,72,.7)'; g.fillRect(x, 0, w, S); g.fillStyle = 'rgba(130,134,146,.25)'; g.fillRect(x, 0, w * .25, S); }      // conductos
+    for (const d of [15, 23, 31]) { g.strokeStyle = 'rgba(255,205,150,.1)'; g.lineWidth = 1.6 * m; g.beginPath(); g.arc(S / 2, S / 2, d * m, 0, 7); g.stroke(); }      // pasarelas de luminarias
+  }), { aniso: 4 });
+}
+/** Mural de lona con la silueta de un pesista con la barra arriba (dibujada a trazos, gastada), como los que visten los costados de una sala de competencia. */
+function mural(W = 384, H = 640, calido = false) {
+  return canvasTexture(makeCanvas(W, H, g => {
+    const r = rng(calido ? 57 : 43), lg = g.createLinearGradient(0, 0, 0, H); lg.addColorStop(0, calido ? '#2a211c' : '#1c2229'); lg.addColorStop(1, '#0c0d10'); g.fillStyle = lg; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 260; i++) { g.strokeStyle = `rgba(${calido ? '230,190,150' : '170,200,220'},${.015 + r() * .04})`; g.lineWidth = 2 + r() * 14; const x = r() * W, y = r() * H; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (r() - .5) * 60, y + 40 + r() * 160); g.stroke(); }      // brochazos
+    const tinta = calido ? 'rgba(236,214,186,.72)' : 'rgba(206,220,230,.7)'; g.strokeStyle = tinta; g.fillStyle = tinta; g.lineCap = 'round'; g.lineJoin = 'round';
+    const L = (pts, w) => { g.lineWidth = w * W; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x * W, y * H) : g.moveTo(x * W, y * H))); g.stroke(); };
+    L([[.04, .2], [.96, .2]], .016);                                                         // barra
+    for (const s of [-1, 1]) for (const [d, hh] of [[.34, .2], [.385, .2], [.425, .15]]) { g.fillRect((.5 + s * d - .016) * W, (.2 - hh / 2) * H, .032 * W, hh * H); }      // discos
+    L([[.4, .36], [.31, .29], [.25, .2]], .075); L([[.6, .36], [.69, .29], [.75, .2]], .075);      // brazos
+    g.beginPath(); g.arc(.5 * W, .285 * H, .058 * W, 0, 7); g.fill();                         // cabeza
+    g.beginPath(); g.moveTo(.37 * W, .35 * H); g.lineTo(.63 * W, .35 * H); g.lineTo(.585 * W, .58 * H); g.lineTo(.415 * W, .58 * H); g.closePath(); g.fill(); L([[.4, .36], [.6, .36]], .08);      // tronco
+    L([[.45, .58], [.38, .73], [.37, .9]], .1); L([[.55, .58], [.62, .73], [.63, .9]], .1);    // piernas
+    L([[.33, .915], [.4, .915]], .035); L([[.6, .915], [.67, .915]], .035);                    // pies
+    g.globalCompositeOperation = 'destination-out'; for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(0,0,0,${.1 + r() * .5})`; g.fillRect(r() * W, r() * H, 1 + r() * 5, 1 + r() * 18); } g.globalCompositeOperation = 'destination-over'; g.fillStyle = '#0d0e11'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over';      // estarcido gastado
+    g.fillStyle = 'rgba(240,236,226,.6)'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `800 ${W * .11}px ${DISPLAY}`; g.fillText(EVENT.marca, W / 2, H * .965, W * .9);
+    const som = g.createLinearGradient(0, 0, 0, H); som.addColorStop(0, 'rgba(0,0,0,.5)'); som.addColorStop(.35, 'rgba(0,0,0,.05)'); som.addColorStop(1, 'rgba(0,0,0,.25)'); g.fillStyle = som; g.fillRect(0, 0, W, H);      // la luz le llega de abajo
+  }), { aniso: 4 });
 }
 
 // ---------- gráficas ----------
@@ -372,12 +404,13 @@ export class Look {
     paso('utilería', () => this._utileria(aniso, grande));
     paso('rayos', () => this._rayos(lighting));
     paso('halos', () => this._halos());
+    paso('vestir', () => this._vestir());
   }
 
   /** Luz de competencia: sala a oscuras, clave casi cenital, contraluz cálido marcado desde atrás a la izquierda. */
   _luces(L) {
     L.key.position.set(4.4, 9.3, 3.9); L.key.color.set('#fff0dc'); L.key.intensity = 4.7; L.key.angle = .3; L.key.penumbra = .7;
-    L.key2.color.set('#c6d6ff'); L.key2.intensity = .32;
+    L.key2.color.set('#ffe9d2'); L.key2.intensity = .7; L.key2.position.set(-3.6, 4.6, 7.2);      // relleno bajo y de frente: abre las cuencas de los ojos que la cenital deja apagadas
     L.stage.color.set('#b9c6e0'); L.stage.intensity = 1.1;
     L.hemi.color.set('#56688a'); L.hemi.groundColor.set('#2c2016'); L.hemi.intensity = .15;
     L.wash.color.set('#8fa0c4'); L.wash.intensity = .07;
@@ -539,13 +572,32 @@ export class Look {
   utileria() { const M = this.propMats, o = []; this.arena.group.traverse(x => { if (x === this.props || x === this.discos || (x.isMesh && M.has(x.material))) o.push(x); }); return o; }
 
 
+
+  /** Lo que cierra y viste la sala: parrilla del techo, murales con siluetas a los lados de la pantalla y banderas grandes colgadas sobre las tribunas. Planos sin luces (todo pintado): valen en cualquier calidad. */
+  _vestir() {
+    const A = this.arena, G = A.group, tx = t => { this.texturas.push(t); return t; };
+    // techo: tapa el vacío de arriba (desde la primera persona se veía un cielo negro con puntos sueltos)
+    A.group.traverse(o => { if (o.geometry?.type === 'CircleGeometry' && o.geometry.parameters.radius === 42) o.visible = false; });
+    const te = new THREE.Mesh(new THREE.PlaneGeometry(84, 84), new THREE.MeshBasicMaterial({ name: 'techo', map: tx(techo()), color: new THREE.Color(.5, .5, .5), fog: false })); te.rotation.x = Math.PI / 2; te.position.y = 13; te.frustumCulled = false; G.add(te);
+    // murales a los lados de la pantalla, detrás del tablero y del reloj
+    for (const s of [-1, 1]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 5.0), new THREE.MeshBasicMaterial({ name: 'mural', map: tx(mural(384, 640, s > 0)), color: new THREE.Color(.42, .42, .42) })); m.position.set(s * 7.2, 2.55, -5.55); G.add(m); }
+    // banderas ficticias grandes, colgadas del techo sobre las tribunas (las mismas ocho de los banderines)
+    const bt = tx(canvasTexture(banderines(), { aniso: 4 })), pos = [], uv = [], idx = [], N = 8;
+    const colgar = (cx, cz, nx, nz, i, w = 3.2, h = 5.2, y1 = 12.4) => { const tx2 = -nz, tz = nx, b = pos.length / 3, y0 = y1 - h; pos.push(cx - tx2 * w / 2, y0, cz - tz * w / 2, cx + tx2 * w / 2, y0, cz + tz * w / 2, cx + tx2 * w / 2, y1, cz + tz * w / 2, cx - tx2 * w / 2, y1, cz - tz * w / 2); uv.push(i / N, 0, (i + 1) / N, 0, (i + 1) / N, 1, i / N, 1); idx.push(b, b + 1, b + 2, b, b + 2, b + 3); };
+    for (let k = 0; k < 6; k++) colgar(-12.5 + k * 5, 12.6, 0, -1, (k * 3) % N);              // frente (lo que mira el pesista)
+    for (let k = 0; k < 6; k++) colgar(-12.5 + k * 5, -10.2, 0, 1, (k * 3 + 1) % N);            // detrás de la pantalla
+    for (const s of [-1, 1]) for (let k = 0; k < 4; k++) colgar(s * 12.2, -7.5 + k * 5, -s, 0, (k * 3 + (s > 0 ? 2 : 5)) % N);      // costados
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+    const o = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ name: 'banderas', map: bt, color: new THREE.Color(.3, .3, .3), side: THREE.DoubleSide })); o.frustumCulled = false; G.add(o);
+  }
+
   /** Halos de las luminarias del truss y de las torres (las mismas posiciones que arma arena.js). */
   _halos() {
     const TY = 7.1, TB = 6.3, L = [], luz = (pos, hacia, color, tam, k = 1) => L.push({ pos, hacia, color, tam, k });
     for (let i = 0; i < 8; i++) { const x = -6.3 + i * 1.8; luz([x, TB - .3, -4.6], [x * .25, .4, -.2], i < 4 ? '#ffb877' : '#d6e4ff', 2.3, 1); }
     for (let i = 0; i < 6; i++) { const x = -5 + i * 2; luz([x, TY - .3, 6.8], [x * .2, 1, 0], '#ffe6c4', 2.3, 1); }
     for (const s of [-1, 1]) for (let i = 0; i < 3; i++) luz([s * 7.4, TY - .35 - i * .05, 3.6 - i * 2.8], [0, 1, 0], i === 1 ? '#fff0d8' : (s < 0 ? '#ffc48a' : '#cfe0ff'), 2.0, .9);
-    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) luz([s * 5.75, 1.5 + i * .95, -4.38], [s * 1.2, 1.2, 0], i === 1 ? '#ffd9a0' : '#f4f0ff', 1.0, .4);
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) luz([s * 7.22, 2.9 + i * .95, -4.4], [s * 1.2, 1.2, 0], i === 1 ? '#ffd9a0' : '#f4f0ff', 1.0, .4);
     const n = L.length, P = new Float32Array(n * 3), C = new Float32Array(n * 3), D = new Float32Array(n * 3), T = new Float32Array(n), c = new THREE.Color(), a = new THREE.Vector3(), b = new THREE.Vector3();
     L.forEach((l, i) => { a.set(...l.pos); b.set(...l.hacia).sub(a).normalize(); a.addScaledVector(b, .14); a.toArray(P, i * 3); b.toArray(D, i * 3); c.set(l.color).multiplyScalar(l.k); c.toArray(C, i * 3); T[i] = l.tam; });
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('aColor', new THREE.BufferAttribute(C, 3)); g.setAttribute('aDir', new THREE.BufferAttribute(D, 3)); g.setAttribute('aTam', new THREE.BufferAttribute(T, 1));
