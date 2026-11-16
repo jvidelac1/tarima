@@ -347,14 +347,14 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
         bd=np.array(STY['bun']['dir'],f32); bd/=np.linalg.norm(bd); e2=np.cross(bd,np.array([1,0,0],f32)); vn=np.maximum(np.sqrt(vx*vx+vy*vy+vz*vz),1e-6)
         elq=np.arccos(np.clip((vx*bd[0]+vy*bd[1]+vz*bd[2])/vn,-1,1)).astype(f32); azq=np.arctan2(vx,vx*e2[0]+vy*e2[1]+vz*e2[2]).astype(f32)
         s1=T.nq((azq*70,elq*4),90); s2=T.nq((azq*190,elq*9),91); del elq,azq,vn
-    FD=STY.get('degrade',1.); fade=lambda a_:(1-a_)+a_*sidefade if FD==1. else 1-a_*FD*(1-sidefade)     # degradé de los costados (corte corto); FD=0: pelo parejo (atado)
+    FD=STY.get('degrade',1.); dfade=lambda a_:(1-a_)+a_*sidefade if FD==1. else 1-a_*FD*(1-sidefade)     # degradé de los costados (corte corto); FD=0: pelo parejo (atado)
     scalp=F('scalp')
     # nacimiento del pelo: al frente no sigue el borde recto del grupo 'scalp' sino una línea con entradas en las sienes, difusa e irregular
     fr_=(scalp>.5)&(np.abs(az)<.2)&(vy<0)&cov; e_c=float(np.percentile(el[fr_],1)) if fr_.any() else .5
     e0=e_c+STY.get('hairline',.025)+STY.get('entradas',.09)*np.exp(-((np.abs(az)-.85)/.32)**2); frontw=sm(1.5,1.05,np.abs(az))*(vy<.02)
     hl=sm(-.04,.08,el-e0+s1*.05+s2*.04+s3*.025)*sm(.0,.25,scalp+.25*(el>e0))
     sidefade=sm(ear[2]-.015,ear[2]+.05*hs,z)
-    hm=(frontw*hl+(1-frontw)*sm(.22,.75,scalp+s1*.55+s2*.25))*fade(.38)        # degradé en los costados
+    hm=(frontw*hl+(1-frontw)*sm(.22,.75,scalp+s1*.55+s2*.25))*dfade(.38)        # degradé en los costados
     al_=np.clip(hm*(1.0+s2*.45+s3*.2)+sm(.02,.30,scalp)*(1-hm)*(1-frontw)*np.clip(.42+s3*1.3+s2*.6,0,1)*.55,0,1); mix(al_,HAIR[None,None,:]*(1+(s1*.9+s2*.7)[:,:,None]),.62)
     hairH=al_*(.0005+s2*.0005+s1*.0003+s3*.00012); hairm=al_.copy(); rough+=hm*s2*.25
     st=1+T.n2(1,93)*1.1+T.nq((az*420,z*900),94)*1.0+s1*.5        # barba: grano fino, sin vetas
@@ -373,7 +373,7 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     rough+=lp*.10; lipH=-lp*.00016*(1-np.abs(2*T.nq((x*520,z*60),97)))**2
     skinm=np.clip(skinm-hairm,0,1)
     # largo del pelo para las capas de volumen de finish.py (geo.hair_shells): 255 = 20 mm
-    hlen=np.maximum.reduce([np.clip(al_,0,1)*sm(.15,.6,hm)*STY.get('hairlen',.010)*fade(.70)*(1+s1*.5),beard*(.0015+.006*STY['beard'])*(STY['beard']>.35),brow*.0022])
+    hlen=np.maximum.reduce([np.clip(al_,0,1)*sm(.15,.6,hm)*STY.get('hairlen',.010)*dfade(.70)*(1+s1*.5),beard*(.0015+.006*STY['beard'])*(STY['beard']>.35),brow*.0022])
     Image.fromarray((np.clip(hlen/.02,0,1)*cov*255+.5).astype(np.uint8)[::-1]).resize((2048,2048),Image.BILINEAR).save(OUT+'hair_len.png')   # con barba rala (<0,35) la barba queda solo en la textura
     # ================= TIZA (magnesio) =================
     cn=np.clip(.5+T.n3(55,100,3)*2.6,0,1); cf=np.clip(.5+T.n3(700,101,2)*3,0,1); chalk=np.zeros((R,R),f32)
