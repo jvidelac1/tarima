@@ -54,7 +54,7 @@ void main(){
 /** Ganancia con la que se guarda la tribuna horneada (8 bits: el público es oscuro y sin esto se escalona). */
 const HORNEO = 6;
 /** En el camino directo (sin gradación ni viñeta del pase final) el mismo público queda más claro: se baja acá. */
-const DIRECTO = .6;
+const DIRECTO = .45;
 
 export class Publico {
   /** `animo`: el uniform {value} del ánimo del público (ambiente.publico.uAnimo). `chico`: texturas a la mitad (teléfono). */
@@ -112,7 +112,7 @@ export class Publico {
       for (const k of ['aCloth', 'aSkin', 'aHair', 'aVar']) { const src = g0.attributes[k], n = src.itemSize, a = new Float32Array(ids.length * n); ids.forEach((id, j) => { for (let c = 0; c < n; c++) a[j * n + c] = src.array[id * n + c]; }); g.setAttribute(k, new THREE.InstancedBufferAttribute(a, n)); }
       const im = new THREE.InstancedMesh(g, mat, ids.length); ids.forEach((id, j) => { crowd.getMatrixAt(id, M); im.setMatrixAt(j, M); }); im.frustumCulled = false;
       const sc = new THREE.Scene(); sc.add(im);
-      const W = 2048 >> (st.w < 30 ? 1 : 0),      /* chica a propósito: ampliada queda fuera de foco, como la tribuna de una foto, y pesa un cuarto */
+      const W = 1024 >> (st.w < 30 ? 1 : 0),      /* chica a propósito: ampliada queda fuera de foco, como la tribuna de una foto, y pesa un cuarto */
        ancho = st.w + .6, banda = Math.max(16, Math.round(W * BH / ancho)), rt = new THREE.WebGLRenderTarget(W, banda * st.rows, { depthBuffer: true, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, colorSpace: THREE.SRGBColorSpace });
       rt.texture.anisotropy = 4; rt.texture.name = 'tribuna horneada ' + si; rt.scissorTest = true;
       const bx = st.back[0], bz = st.back[1], atras = new THREE.Vector3(bx, 0, bz), cam = new THREE.OrthographicCamera(-ancho / 2, ancho / 2, BH / 2, -BH / 2, 9.6, 10.4), pos = [], uv = [], idx = [], der = new THREE.Vector3(), c = new THREE.Vector3();

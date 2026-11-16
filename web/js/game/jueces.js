@@ -80,10 +80,10 @@ export class Jueces {
     const mat = this.mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }); mat.name = 'jueces';
     const parche = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n\treflectedLight.indirectDiffuse += diffuseColor.rgb * ${RELLENO.toFixed(3)};`); };
     mat.onBeforeCompile = parche;
-    // los tres árbitros con su material: desde la cámara del jurado (detrás de ellos) bajan 42 cm y quedan a contraluz
+    // los tres árbitros con su material: desde la cámara del jurado (detrás de ellos) bajan 66 cm (salen del cuadro) y quedan a contraluz
     const uAtras = this.uAtras = { value: 0 }, matArb = this.matArb = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }); matArb.name = 'árbitros';
     matArb.onBeforeCompile = sh => { parche(sh); sh.uniforms.uAtras = uAtras;
-      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uAtras;').replace('#include <begin_vertex>', '#include <begin_vertex>\n\ttransformed.y -= 0.42 * uAtras;');
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uAtras;').replace('#include <begin_vertex>', '#include <begin_vertex>\n\ttransformed.y -= 0.66 * uAtras;');
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uAtras;').replace('#include <dithering_fragment>', '#include <dithering_fragment>\n\tgl_FragColor.rgb *= 1.0 - 0.72 * uAtras;'); };
     const malla = (lista, nombre) => { const g = mergeGeometries(lista); lista.forEach(x => x.dispose()); const m = new THREE.Mesh(g, mat); m.name = nombre; m.matrixAutoUpdate = false; this.group.add(m); return m; };
     const en = (lista, M) => lista.map(g => g.applyMatrix4(M));

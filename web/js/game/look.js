@@ -682,7 +682,7 @@ export class Look {
       // la utilería en el camino directo: solo el mapa de color (sin normales ni rugosidad) y sin las calcomanías del piso
       // (mezcla con luces sobre mucha pantalla): el banco decía que la utilería era el 20 % del cuadro de «Baja»
       for (const m of this.utilMats || []) { const n = d ? null : m.userData.normal, g = d ? null : m.userData.rug; if (m.normalMap !== n || m.roughnessMap !== g) { m.normalMap = n; m.roughnessMap = g; m.roughness = d ? .6 : 1; m.needsUpdate = true; } }
-      for (const o of this.calcos || []) o.visible = !d || /tiza/.test(o.material.name);
+      for (const o of this.calcos || []) o.visible = !d;
       // medido (run 43827293011): ni sin mapas la utilería entraba en la meta de «Baja» (+16 %); el banco dice que es el 22 % del cuadro.
       // En el camino directo no se dibuja (Media para arriba sí), hasta medir en una placa
       for (const o of this.utileria()) if (o !== this.props) o.visible = !d; this.props.visible = !d; }
