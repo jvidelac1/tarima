@@ -93,7 +93,7 @@ async function corrida(via) {
   if (!await J(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
   const gl = await J(() => { const g = JUEGO.escena.renderer.getContext(), e = g.getExtension('WEBGL_debug_renderer_info'); return e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : '?'; });
   console.log(`${tag} ${gl}`);
-  const vistas = new Set(), paneles = new Set(), fotos = [], pedidas = []; let senalMal = 0, senalN = 0, clicProbado = false, escProbado = false, fotosBarra = 0;
+  const vistas = new Set(), paneles = new Set(), fotos = [], pedidas = []; let estiloElegido = null, estiloFijoVisto = false, senalMal = 0, senalN = 0, clicProbado = false, escProbado = false, fotosBarra = 0;
 
   /** Juega lo que haya en pantalla hasta que `hasta(estado)` sea cierto. `manual`: la prueba adelanta el reloj. */
   async function jugar(hasta, manual, o = {}) {
@@ -168,7 +168,24 @@ async function corrida(via) {
               llamado = P.firma;
               if (o.cambia && /intento 2/.test(llamado)) { if (tactil) await pulsa('#kg-mas'); else { const k0 = await page.locator('#kg-val').textContent(); await page.keyboard.press('ArrowRight'); if (+(await page.locator('#kg-val').textContent()) !== +k0 + 1) mal('la flecha derecha no sumó un kilo'); } }
               if (o.pesado?.(llamado)) for (let i = 0; i < 5; i++) { if (tactil) await pulsa('#kg-mas5'); else await page.keyboard.press('ArrowUp'); }
-              if (o.envion && /Dos tiempos/.test(llamado)) { await pulsa('#btn-mas'); await pulsa(`.envion[data-env="${o.envion(llamado)}"]`); }
+              // LIF-31 y LIF-43: el estilo de envión se elige en el primer dos tiempos con un solo botón (sin abrir opciones) y
+              // después queda fijo, con candado y sin botones para cambiarlo
+              if (o.envion && /Dos tiempos/.test(llamado)) {
+                const E0 = await J(() => ({ fijo: !!document.querySelector('#capa .pn-estilo.fijo'), boton: !!document.querySelector('#capa #btn-estilo'), opciones: document.querySelectorAll('#capa .envion').length, txt: (document.querySelector('#capa .pn-estilo')?.textContent || '').replace(/\s+/g, ' ').trim() }));
+                if (/intento 1/.test(llamado)) {
+                  const quiere = o.envion(llamado);
+                  if (E0.fijo || !E0.boton || E0.opciones) mal(`primer dos tiempos: el estilo de envión no está en un solo botón para elegir (${JSON.stringify(E0)})`);
+                  if (!E0.txt.includes(`${ES['jerk.titulo']} ${ES['envion.split']}`)) mal(`el botón del estilo no dice «${ES['jerk.titulo']} ${ES['envion.split']}» (lo que propone el entrenador): «${E0.txt}»`);
+                  await pulsa('#btn-estilo'); const n3 = await J(() => document.querySelectorAll('#capa .envion').length); if (n3 !== 3) mal(`al tocar el estilo no aparecieron los tres (${n3})`);
+                  if (!await pulsa(`.envion[data-env="${quiere}"]`)) mal(`no se pudo elegir el estilo ${quiere}`);
+                  const d = await J(() => ({ foco: document.activeElement?.id, txt: (document.querySelector('#capa .pn-estilo')?.textContent || '').replace(/\s+/g, ' ').trim() }));
+                  if (d.foco !== 'btn-confirmar') mal(`después de elegir el estilo el foco quedó en «${d.foco}» y no en levantar`);
+                  estiloElegido = quiere; console.log(`${tag} estilo de envión elegido en el primer dos tiempos: «${d.txt}»`);
+                } else {
+                  if (!E0.fijo || E0.boton || E0.opciones || !E0.txt.includes(ES['envion.' + estiloElegido]) || !E0.txt.includes(ES['jerk.fijo'])) mal(`${llamado.split('|')[0]}: el estilo no se ve fijo con su candado (${JSON.stringify(E0)}, elegido ${estiloElegido})`);
+                  else if (!estiloFijoVisto) { estiloFijoVisto = true; console.log(`${tag} estilo fijo en «${llamado.split('|')[0]}»: «${E0.txt}»`); await foto('estilo_fijo'); }
+                }
+              }
             }
           }
           let hizo = false; for (const sel of o.botones || ['#capa .panel button.ir']) if (await pulsa(sel)) { hizo = true; break; }
@@ -256,7 +273,8 @@ async function corrida(via) {
   // ---- 1. Fácil: partida completa con el reloj inyectado, sin mouse
   const t0 = Date.now();
   if (!await pulsa('#btn-opciones') || !await pulsa('.nivel[data-n="normal"]')) mal('no se pudo elegir el nivel (en «Opciones»)');
-  const envion = tactil ? () => 'split' : clave => (/intento 1/.test(clave) ? 'split' : /intento 2/.test(clave) ? 'squat' : 'power');
+  // el estilo se elige en el primer dos tiempos y queda para los tres (LIF-43): con teclado, power (no el que propone el entrenador)
+  const envion = () => (tactil ? 'split' : 'power');
   // en 'u' un fallo no sale de tocar mal: sale de pedir mucho. El tercer arranque pide 25 kg de más (se cae, con su línea),
   // y el primer dos tiempos se juega sin tocar nada (sale solo y vale: no tocar nunca tira la barra)
   const pesado = clave => /Arranque · intento 3/.test(clave), ausente = clave => /Dos tiempos · intento 1/.test(clave);
@@ -272,6 +290,9 @@ async function corrida(via) {
   console.log(`${tag} intentos del jugador: ${r.mios} · controles ${r.registro.ctl} · corrección de atraso ${r.cal} ms · llamados ${r.registro.llamados.length}`);
   console.log(`${tag} señales vistas: ${[...vistas].join(' ')} · paneles con foco verificado: ${[...paneles].join(', ')}`);
   if (seg > 90) notas.push(`${tag} la partida tardó ${seg.toFixed(0)} s`);
+  { const yo = r.registro.atletas.findIndex(x => x.ctrl === 'persona'), envs = r.registro.llamados.filter(c => c.a === yo && c.lev === 'c' && c.fin === 'intento').map(c => c.env);
+    if (r.registro.envFijo !== true || !envs.length || envs.some(e => e !== estiloElegido) || !estiloFijoVisto) mal(`estilo de envión: registro envFijo ${r.registro.envFijo}, intentos ${envs.join(', ')}, elegido ${estiloElegido}, fijo a la vista ${estiloFijoVisto}`);
+    else console.log(`${tag} estilo de envión fijo los ${envs.length} dos tiempos: ${envs.join(', ')}`); }
   if (r.registro.ctl !== 'b') mal(`el registro no quedó en Fácil, la barrita (ctl ${r.registro.ctl})`);
   if (tactil && !r.visitados.includes('rival')) mal('final completa: no se mostró ningún intento de un rival');
   // la repetición es solo de los fallos: con el dedo los seis salen válidos y no tiene que haber ninguna

@@ -28,8 +28,9 @@ import { fileURLToPath } from 'node:url';
 import { leerDatos } from '../web/js/sim/data.js';
 import { Partida } from '../web/js/sim/match.js';
 import { Intento, simular } from '../web/js/sim/attempt.js';
-import { gestos, HUELLA_IA, PERSONALIDADES } from '../web/js/sim/ai.js';
+import { gestos, HUELLA_IA, PERSONALIDADES, envionRival } from '../web/js/sim/ai.js';
 import { recalcular, resumen } from '../web/js/sim/replay.js';
+import { chanceDe } from '../web/js/sim/entrenador.js';
 import { Azar, mezclar } from '../web/js/sim/fixed.js';
 import { RELOJ, CAUSAS, FACIL, exigenciaTabla } from '../web/js/sim/rules.js';
 import { tocar, alDia, senal, GUIADO } from '../web/js/game/controles.js';
@@ -68,7 +69,7 @@ const IDS = ['ventura', 'brenner', 'marangi'], NIV = ['amistoso', 'normal', 'dif
 // ---------- jugador simulado ----------
 /** Juega una partida entera. `persona`: índice del pesista manejado por un jugador simulado (o -1: los tres son rivales). Devuelve la partida y su bitácora. */
 function jugar(semilla, nivel, persona, estilo = {}) {
-  const r = new Azar(mezclar(semilla, 9)), cfg = { semilla, nivel, cal: estilo.cal || 0, primera: !!estilo.primera, ...(estilo.ctl ? { ctl: estilo.ctl } : {}), ...(estilo.ia ? { ia: estilo.ia } : {}), ...(estilo.dif ? { dif: estilo.dif } : {}), atletas: IDS.map((id, i) => ({ id, ctrl: i === persona ? 'persona' : 'juego' })) };
+  const r = new Azar(mezclar(semilla, 9)), cfg = { semilla, nivel, cal: estilo.cal || 0, primera: !!estilo.primera, ...(estilo.ctl ? { ctl: estilo.ctl } : {}), ...(estilo.ia ? { ia: estilo.ia } : {}), ...(estilo.dif ? { dif: estilo.dif } : {}), ...(estilo.envFijo ? { envFijo: true } : {}), atletas: IDS.map((id, i) => ({ id, ctrl: i === persona ? 'persona' : 'juego' })) };
   const p = new Partida(datos, cfg), bit = [];
   const abrir = lev => { if (persona >= 0) { const [lo, hi] = p.rangoApertura(persona, lev); p.abrir(persona, lev, r.entre(lo, hi)); } p.empezar(); };
   abrir('s');
@@ -84,7 +85,8 @@ function jugar(semilla, nivel, persona, estilo = {}) {
     // persona: a veces cambia kilos (y puede quedar desplazada), a veces deja correr el reloj, a veces toca cualquier cosa
     if (r.ent(4) === 0 && a.cambios < 2) { const kg = Math.max(p.minimo(L.a), L.kg + r.entre(-2, 4)); if (!p.cambioValido(800, kg)) { if (p.cambio(800, kg).desplazado) { bit.push({ a: L.a, lev: L.lev, n: L.n, kg: L.kg, res: 'desplazado' }); continue; } } }
     // en 'u' el juego confirma siempre (no hay reloj en el panel): nunca «se le va el reloj»
-    const env = L.lev === 'c' ? ['split', 'power', 'squat'][r.ent(3)] : undefined, ctx = p.contexto(env), modo = estilo.modo ?? (estilo.ctl === 'u' || estilo.ctl === 'b' ? 1 + r.ent(9) : r.ent(10));
+    // con el estilo fijo (LIF-43), el del primer dos tiempos (el azar se consume igual: las referencias no cambian)
+    const env0 = L.lev === 'c' ? ['split', 'power', 'squat'][r.ent(3)] : undefined, env = L.lev === 'c' ? p.estiloFijo(L.a) ?? env0 : undefined, ctx = p.contexto(env), modo = estilo.modo ?? (estilo.ctl === 'u' || estilo.ctl === 'b' ? 1 + r.ent(9) : r.ent(10));
     let rec;
     if (modo === 0) rec = { conf: null, env, ent: [] };                                                    // se le va el reloj
     else if (modo === 1) { const ent = []; let t = 2000; for (let k = 0; k < 60; k++) { t += r.entre(1, 900); ent.push([t, k % 2 ? 0 : 1]); } rec = { conf: 1500, env, ent }; }   // toca cualquier cosa
@@ -657,6 +659,43 @@ function lineaNombraToques(res, lev, I) {
     ok(dificultadDe(ch(9000)) === 'facil' && dificultadDe(ch(10300)) === 'muy', `${id} ${lev}: al 90 % ${dificultadDe(ch(9000))} y al 103 % ${dificultadDe(ch(10300))}`);
   }
   console.log(`16. tablero: ${n} llamados en ${90 * 3} finales · ${JSON.stringify(vistos)} · dificultad del peso por la chance (Fácil 9-10, Medio 7-8, Difícil 4-6, Muy difícil 0-3)`);
+}
+
+// ---------- 17. el estilo de envión queda fijo toda la competencia (LIF-43) ----------
+{
+  let n = 0, cambian = 0, falsos = 0, rivalesAntes = 0; const estilos = { split: 0, power: 0, squat: 0 };
+  for (let k = 0; k < Math.min(N, 300); k++) {
+    const semilla = mezclar(k, 4343), persona = k % 3, { p } = jugar(semilla, NIV[k % 3], persona, { ctl: 'b', ia: HUELLA_IA, envFijo: true, primera: k % 7 === 0 });
+    const reg = JSON.parse(JSON.stringify(p.reg)), rc = recalcular(reg, datos), t = resumen(p.tabla());
+    ok(reg.envFijo === true, 'el registro no dice envFijo');
+    ok(rc.ok && resumen(rc.tabla) === t, `estilo fijo, semilla ${semilla}: recalcular da ${rc.ok ? resumen(rc.tabla) : rc.error} y en vivo ${t}`);
+    for (const a of p.at) { const es = new Set(a.c.map(x => x.env)); ok(es.size <= 1, `semilla ${semilla}: ${a.id} cambió de estilo: ${[...es].join(', ')}`); if (a.c[0]) estilos[a.c[0].env]++; if (a.ctrl === 'juego' && a.c[0]) ok(a.c[0].env === envionRival(a.id, a.f), `${a.id} no usa el estilo de su personalidad: ${a.c[0].env}`); ok(p.estiloFijo(a.i) === (a.c[0]?.env ?? null), 'estiloFijo no es el del primer intento'); }
+    // el mismo registro con otro estilo en un intento que no es el primero no recalcula
+    const propios = reg.llamados.filter(c => c.a === persona && c.lev === 'c' && c.fin === 'intento');
+    if (propios.length > 1) { const g = JSON.parse(JSON.stringify(reg)), c = g.llamados.filter(x => x.a === persona && x.lev === 'c' && x.fin === 'intento')[1]; c.env = c.env === 'split' ? 'power' : 'split'; const r2 = recalcular(g, datos); falsos++; ok(!r2.ok && /estilo/.test(r2.error), `cambiar el estilo a mitad del dos tiempos recalculó: ${JSON.stringify(r2.ok ? 'ok' : r2.error)}`);
+      // sin la regla (registro sin envFijo) el error ya no es el del estilo (los rivales eligen como antes: puede no cerrar por otra cosa)
+      delete g.envFijo; const r3 = recalcular(g, datos); if (r3.ok || !/estilo/.test(r3.error)) cambian++; }
+    n++;
+  }
+  // los rivales: con las reglas de antes, alguno cambiaba de estilo a mitad (por eso hace falta la regla)
+  for (let k = 0; k < 200; k++) { const { p } = jugar(mezclar(k, 4344), NIV[k % 3], k % 3, { ctl: 'b', ia: HUELLA_IA }); for (const a of p.at) if (a.ctrl === 'juego' && new Set(a.c.map(x => x.env)).size > 1) rivalesAntes++; }
+  ok(falsos > 50 && cambian === falsos, `registros adulterados ${falsos}, sin la regla no los frena el estilo en ${cambian}`);
+  // en vivo: la persona no puede cambiar el estilo después del primer dos tiempos
+  { const p = new Partida(datos, { semilla: 77, nivel: 'normal', cal: 0, primera: false, ctl: 'b', ia: HUELLA_IA, envFijo: true, atletas: IDS.map((id, i) => ({ id, ctrl: i === 0 ? 'persona' : 'juego' })) });
+    let probado = false, coach = true;
+    const abrir = lev => { const [lo] = p.rangoApertura(0, lev); p.abrir(0, lev, lo); p.empezar(); }; abrir('s');
+    for (let g = 0; p.fase !== 'fin' && g < 60; g++) {
+      if (p.fase === 'intervalo') { abrir('c'); continue; }
+      const L = p.llamado; if (p.at[L.a].ctrl === 'juego') { p.resolverIA(); continue; }
+      const fijo = L.lev === 'c' ? p.estiloFijo(0) : null;
+      if (fijo) { try { p.resolver({ conf: 0, env: fijo === 'squat' ? 'split' : 'squat', ent: [] }); ok(false, 'la persona cambió de estilo en el segundo dos tiempos'); } catch (e) { probado = /estilo/.test(e.message); }
+        coach = coach && chanceDe(p, 0, 'c', L.kg, 'squat') === chanceDe(p, 0, 'c', L.kg, fijo) && chanceDe(p, 0, 'c', L.kg, 'split') === chanceDe(p, 0, 'c', L.kg, fijo); }
+      p.resolver({ conf: 0, env: L.lev === 'c' ? fijo ?? 'power' : undefined, ent: [] });
+    }
+    ok(probado, 'no se probó cambiar el estilo a mitad'); ok(coach, 'el entrenador cuenta otro estilo que el fijo'); ok(p.at[0].c.every(x => x.env === 'power'), 'el estilo de la persona no quedó en power'); }
+  { const g = JSON.parse(JSON.stringify(jugar(5, 'normal', 0, { ctl: 'b', envFijo: true }).p.reg)); g.envFijo = 'si'; ok(!recalcular(g, datos).ok, 'un registro con envFijo raro recalculó'); }
+  try { new Partida(datos, { semilla: 1, nivel: 'normal', cal: 0, primera: false, envFijo: 1, atletas: IDS.map(id => ({ id, ctrl: 'juego' })) }); ok(false, 'Partida aceptó envFijo raro'); } catch { /* bien */ }
+  console.log(`17. estilo de envión fijo (LIF-43): ${n} finales en vivo contra recalculadas, nadie cambia de estilo · primeros estilos ${JSON.stringify(estilos)} · ${falsos} registros con el estilo cambiado a mitad rechazados (sin la regla, el estilo no frena ninguno: ${cambian}) · con las reglas de antes, ${rivalesAntes} rivales cambiaban a mitad en 200 finales · el entrenador cuenta el estilo fijo`);
 }
 
 console.log(fallas.length ? `\nFALLÓ: ${fallas.length} problemas` : `\nOK en ${((Date.now() - t0) / 1000).toFixed(1)} s`);

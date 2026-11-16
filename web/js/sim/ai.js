@@ -118,6 +118,14 @@ export const PERSONALIDADES = {
 };
 const NEUTRA = PERSONALIDADES.brenner;
 /**
+ * Estilo de envión de cada rival para toda la competencia cuando el estilo queda fijo (LIF-43, match.js → cfg.envFijo): sale de
+ * su personalidad. Marangi («arriesga») va con power; Ventura («seguro») y Brenner («calcula»), con tijera. Si la ficha no
+ * domina ese estilo, el que usaría con su peso más alto. Va aparte de PERSONALIDADES para no cambiar HUELLA_IA: la regla la
+ * versiona `envFijo` en la cabecera del registro.
+ */
+export const ENVION_RIVAL = { seguro: 'split', calcula: 'split', arriesga: 'power' };
+export function envionRival(id, ficha) { const e = ENVION_RIVAL[(PERSONALIDADES[id] || NEUTRA).estilo]; return ficha.enviones.includes(e) ? e : elegirEnvion(ficha, 10000); }
+/**
  * Versión de las reglas de los rivales con personalidad: va en la cabecera del registro (`ia`) y replay.js la exige. La lógica
  * de planRival y decidirPlan no entra en la huella: si cambia, hay que subir `version` (y regenerar tools/sim_ref_rivales.json).
  */

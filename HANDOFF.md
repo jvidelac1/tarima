@@ -1464,6 +1464,49 @@ nombre y kilos, las tres luces en la pantalla y las tres físicas arriba.
   paga el tono por píxel). Postproceso: no se agregó nada (brillo, viñeta, grano y gradación ya estaban en Media y Alta).
 - Los árbitros siguen siendo muñecos de cápsulas: por eso el jurado es lo que ve el árbitro y no un plano de ellos.
 
+### Panel del llamado liviano y estilo de envión fijo (15-nov, rama `panel`; LIF-31 y LIF-43)
+
+Pedido del dueño (iPhone acostado): el panel ocupaba media pantalla y el envión eran tres botones grandes apilados. Nada
+fusionado a main ni publicado.
+
+- **Panel compacto** ('b' y 'u'; `panelLlamado → uPintar` y `estiloHTML` en main.js, CSS «panel del llamado compacto» al final
+  de `juego.css`, textos `panel.*` y `jerk.*`, aprobados): a la vista solo el título corto («Dos tiempos · intento 1 de 3», sin
+  el nombre: el tablero dice quién levanta) con **Detalles ▾**, los kilos ± con LEVANTAR, la dificultad y «X de 10», y en el dos
+  tiempos **«Estilo de envión: Tijera ▾»** (un botón; al tocarlo, una fila de tres con la dificultad en una palabra: fácil /
+  medio / difícil, y «Queda fijo para los 3 intentos»; al elegir, el foco vuelve a LEVANTAR). En el detalle: % del RM, el verde
+  de cada barrita, el cansancio, cómo ganar, los avisos y el pedido. «Detalles» se recuerda (`tarima.panel.detalle`). En el
+  teléfono acostado no se ven los ±5 (↑ ↓ siguen sumando 5 con teclado) ni «kg» (lo dice el botón), y todo lo que se toca mide
+  40 px de alto o más. El entrenador sigue proponiendo split (`casa`); el último estilo elegido se recuerda para la final
+  siguiente. Ya no hay «Más opciones» en 'b'.
+- **Estilo fijo** (LIF-43; `match.js → estiloFijo`, `cfg.envFijo`, cabecera `envFijo: true`): se elige en el primer intento del
+  dos tiempos y es el de los tres. `resolver` rechaza otro estilo y `recalcular` también; sin `envFijo` (registros viejos) las
+  reglas de antes. Los rivales, con la regla, usan el estilo de su personalidad toda la competencia (`ai.js → envionRival`:
+  Marangi «arriesga» power; Ventura y Brenner tijera), en lugar de power en la apertura y tijera después (antes, en 109 de cada
+  200 finales un rival cambiaba a mitad). `entrenador.js → chanceDe` cuenta el estilo fijo aunque le pasen otro. El panel lo
+  muestra con candado y «fijo»; Clásico deja deshabilitados los otros estilos.
+- **Medido** (check_telefono mide el alto del panel del llamado y el botón más bajo; `out/telefono/panel.json`; exige ≤ 38 % del
+  alto con el detalle plegado en 667×375 y 844×390 y botones de 40 px o más):
+
+| alto del panel del llamado | antes (`3516bfd`) | después (corrida 43774081868) |
+|---|---|---|
+| 667×375 · arranque | 65–75 % | 32 % |
+| 667×375 · primer dos tiempos / con el estilo fijo | 77 % | 37 % / 32 % |
+| 844×390 · arranque | 61–66 % | 31 % |
+| 844×390 · primer dos tiempos / con el estilo fijo | 73 % | 35 % / 31 % |
+| 740×360 · 844×340 (Safari) · 932×430, arranque | 63–74 % · 65–71 % · 57–61 % | 33 % · 35 % · 28 % |
+
+  Con «Detalles» abierto 62–68 %; eligiendo el estilo 59–61 % (momentáneo).
+- **Rivales** (`rivales_test`, `ENV_FIJO=0` juega con las reglas de antes para comparar): los totales medios de cada rival
+  cambian 1 kg o menos y los válidos 1 punto o menos en todas las casillas.
+- **Pruebas**: sim_test 17 (300 finales con la regla contra recalculadas, nadie cambia de estilo, cada rival con el de su
+  personalidad, registros con el estilo cambiado a mitad rechazados, el entrenador cuenta el fijo); ritmo_test, barra_bots y
+  rivales_test juegan con `envFijo`; chance_test y servidor_test en verde. check_game elige power con teclado y tijera con el
+  dedo y verifica el candado y el registro (power ×3, split ×3); check_telefono abre y cierra «Detalles» y elige el estilo con el
+  dedo. Actions sobre `b6a9da1`: pruebas.yml 43774081917 y telefono.yml 43774081868 en verde. Capturas miradas: teléfono
+  667×375 (primer dos tiempos, estilo abierto, fijo con candado, detalle) y computadora 1280×720 (fijo con candado).
+- **Pendiente**: verlo en un teléfono de verdad (los botones de 40 px con el pulgar). El estilo se elige recién en el primer dos
+  tiempos (no en el intervalo), como acordado.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.

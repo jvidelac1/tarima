@@ -197,7 +197,7 @@ if (principal) {
   for (const nivel of RIV) for (const [pf, est] of [['novato', 'panel'], ['medio', 'panel'], ['bueno', 'panel'], ['medio', 'lector'], ['bueno', 'lector']]) for (const id of ATL) {
     const F = { finales: 0, total: 0, oro: 0, val: [0, 0, 0, 0, 0, 0], int: [0, 0, 0, 0, 0, 0], fat3: 0, n3: 0 }, yo = ATL.indexOf(id);
     for (let k = 0; k < Math.max(60, Math.round(N / 4)); k++) {
-      const p = new Partida(datos, { semilla: mezclar(k, 777, yo, nivel === 'normal' ? 1 : 0), nivel, cal: 0, primera: false, ctl: 'b', tactil: true, ia: HUELLA_IA, ...D, atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
+      const p = new Partida(datos, { semilla: mezclar(k, 777, yo, nivel === 'normal' ? 1 : 0), nivel, cal: 0, primera: false, ctl: 'b', tactil: true, ia: HUELLA_IA, envFijo: true, ...D, atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
       for (const lev of ['s', 'c']) { const [lo, hi] = p.rangoApertura(yo, lev); p.abrir(yo, lev, Math.max(lo, Math.min(hi, Math.round(datos.atletas[id].techo[lev] * R.apertura / 1000)))); }
       p.empezar();
       for (let g = 0; p.fase !== 'fin' && g < 80; g++) {

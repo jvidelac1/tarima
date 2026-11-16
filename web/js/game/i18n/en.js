@@ -661,4 +661,12 @@ export default {
   'rm.nota': 'Easy: lifts 9 or 10 times out of 10 · Medium: 7 or 8 · Hard: 4 to 6 · Very hard: 3 or fewer.',
   'rm.tarjeta': '1RM: snatch {s} · C&J {c}',
   'glosario.rm.t': '1RM', 'glosario.rm.d': 'Your lifter’s best in each lift. When you pick the weight, the panel shows what percentage of your 1RM it is and whether it’s easy, medium, hard or very hard.',
+  // LIF-31 y LIF-43: panel del llamado plegable y estilo de envión fijo toda la competencia
+  'panel.titulo': '{lev} · attempt {n} of 3',
+  'panel.mas': 'Details', 'panel.menos': 'Hide',
+  'jerk.titulo': 'Jerk style:',
+  'jerk.dif.split': 'easiest', 'jerk.dif.power': 'medium', 'jerk.dif.squat': 'hardest',
+  'jerk.fijo': 'locked',
+  'jerk.regla': 'You keep it for all 3 attempts.',
+  'jerk.fijo_nota': 'You chose it on your first clean & jerk: it stays for all 3 attempts.',
 };
