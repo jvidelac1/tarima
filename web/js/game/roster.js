@@ -4,7 +4,9 @@
 import { t } from './i18n/t.js';
 
 export const PLANTEL = {
-  ventura: { modelo: 'ventura', corto: 'Ventura', color: '#e2622b', cara: true,
+  // `aspecto`: parámetros de los materiales del pesista (athlete.js, ASPECTO): tono y sudor de la piel, color del pelo, tela.
+  // Lo que no se pone queda en el valor por defecto. Sirve para que dos pesistas con el mismo modelo no sean idénticos.
+  ventura: { modelo: 'ventura', corto: 'Ventura', color: '#e2622b', cara: true, aspecto: { piel: { tono: '#f4e2d2', variacion: .6 } },
     bandera: 'linear-gradient(115deg,#e2622b 0 38%,#0e1b3d 38% 62%,#e2622b 62%)' },
   // Novakia: en el juego la bandera lleva otra disposición que la del visor (franjas verticales), para que no se lea como la de un país real.
   // Su color de la interfaz es el violeta de la bandera: el turquesa es del jugador.
@@ -12,7 +14,7 @@ export const PLANTEL = {
     bandera: 'linear-gradient(90deg,#5a2a82 0 34%,#f4f1ea 34% 66%,#18a58f 66%)' },
   // Marangi usa el modelo de Brenner con la tela de un color plano (dorado, el de su bandera: no se confunde con el rojo de
   // Ventura, el gris de Brenner ni el turquesa del jugador); comparte la cara, así que no lleva primer plano de cara
-  marangi: { modelo: 'brenner', corto: 'Marangi', color: '#d8b21c', cara: false, tela: '#b8900f',
+  marangi: { modelo: 'brenner', corto: 'Marangi', color: '#d8b21c', cara: false, tela: '#b8900f', aspecto: { piel: { tono: '#c99a78', saturacion: .9, variacion: .35, sudor: .7 }, pelo: { color: '#5a4a40' } },
     bandera: 'linear-gradient(180deg,#0f4c81 0 50%,#d8b21c 50%)' },
 };
 /**

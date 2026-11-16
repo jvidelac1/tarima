@@ -87,6 +87,7 @@ export async function correrBanco({ escena, cargas, hz, params, msg }) {
   const B = window.BANCO = { listo: false, version: 3, etapa: 'carga', progreso: '', columnas: COLUMNAS, calidades: [], variantes: [], tandas: [], notas: [], errores: [] };
   const cartel = document.createElement('div'); cartel.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:40;background:rgba(3,5,12,.82);color:#e8ecf8;font:12px/1.3 ui-monospace,Menlo,monospace;padding:6px 10px;pointer-events:none'; document.body.appendChild(cartel);
   const decir = txt => { B.progreso = txt; cartel.textContent = 'Banco de medición · ' + txt; };
+  if (params.get('lab')) { try { const { laboratorio } = await import('./lab.js'); await laboratorio(B, { escena, cargas, params, msg, decir }); } catch (e) { B.errores.push(String(e.stack || e)); console.error(e); } if (params.get('fotos')) cartel.remove(); B.listo = true; return; }      // laboratorio de materiales (lab.js)
   if (params.get('fotos') === '2') { try { await fotosNiveles(B, { escena, cargas, params, msg, decir }); } catch (e) { B.errores.push(String(e.stack || e)); console.error(e); } cartel.remove(); B.listo = true; return; }
   if (params.get('fotos')) { try { await fotos(B, { escena, cargas, params, msg, decir }); } catch (e) { B.errores.push(String(e.stack || e)); console.error(e); } cartel.remove(); B.listo = true; return; }
   try { await correr(B, { escena, cargas, hz, params, msg, decir }); } catch (e) { B.errores.push(String(e.stack || e)); console.error(e); }
@@ -278,6 +279,7 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
     { id: 'haces', nombre: 'sin haces de luz', poner: () => ocultar(A.beamMeshes) },
     { id: 'aniso', nombre: 'anisotropía 1 en todas las texturas', poner: v => anisotropia(1, v) },
     { id: 'anisoIgual', nombre: 'anisotropía puesta otra vez en el mismo valor (control de «aniso»)', poner: v => anisotropia(null, v) },
+    { id: 'utileria', nombre: 'sin la utilería del look (cajones, bancos, baúles, cables, discos, chapa)', defecto: false, poner: () => ocultar(escena.look?.utileria() || []) },
     { id: 'arena', nombre: 'sin arena (solo pesista y barra)', poner: () => ocultar([A.group]) },
     { id: 'pesista', nombre: 'sin pesista', poner: () => ocultar([escena.activo.root]) },
     { id: 'lod', nombre: 'pesista con la malla completa (sin nivel de detalle)', poner: () => { escena.lodFijo = 9999; return () => { escena.lodFijo = LOD_PLANO; }; } },

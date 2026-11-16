@@ -87,7 +87,7 @@ void main(){
     p = uCaja0 + q * uCajaT;
     peso = smoothstep( 0.0, 0.1, q.y ) * smoothstep( 1.0, 0.8, q.y ) * ( 0.55 + 0.45 * sin( t * ( 1.5 + 3.0 * f ) + f * 40.0 ) );
   }
-  vec3 luz = vec3( 0.006, 0.0065, 0.008 );
+  vec3 luz = vec3( 0.002, 0.0022, 0.0027 );
   for ( int i = 0; i < 4; i ++ ) {
     float c = dot( normalize( uLuzPos[ i ] - p ), uLuzDir[ i ] );
     luz += uLuzCol[ i ] * smoothstep( uLuzCono[ i ].x, uLuzCono[ i ].y, c );
@@ -132,13 +132,13 @@ export class Ambiente {
    * @param {import('../arena.js').Arena} arena
    * @param {{aniso:number, tex:number, reduceMotion:boolean}} o  `tex`: 1024 en teléfonos y calidades livianas
    */
-  constructor(arena, { aniso = 4, tex = 2048, reduceMotion = false } = {}) {
+  constructor(arena, { aniso = 4, tex = 2048, reduceMotion = false, look = false } = {}) {      // look: la tarima y el piso los pone look.js
     this.arena = arena; this.reduce = reduceMotion; this.t = 0; this.animo = 0; this.nivel = null; this.cartel = {}; this.luces = null;
     this.group = new THREE.Group(); this.group.name = 'Ambiente';
     this.T = { value: 0 };
     // --- tarima y piso
-    try { const cv = arena.madera?.map?.image; if (cv && cv.getContext && cv.width > 8) desgastar(cv); } catch (e) { console.warn('desgaste de la tarima:', e); }
-    if (arena.alfombra) { const G = goma(aniso), m = arena.alfombra; m.normalMap?.dispose(); m.map = G.map; m.normalMap = G.normalMap; m.normalScale.set(.8, .8); m.color.setRGB(.9, .9, .94); m.roughness = .82; m.envMapIntensity = .35; m.needsUpdate = true; }
+    if (!look) try { const cv = arena.madera?.map?.image; if (cv && cv.getContext && cv.width > 8) desgastar(cv); } catch (e) { console.warn('desgaste de la tarima:', e); }
+    if (arena.alfombra && !look) { const G = goma(aniso), m = arena.alfombra; m.normalMap?.dispose(); m.map = G.map; m.normalMap = G.normalMap; m.normalScale.set(.8, .8); m.color.setRGB(.9, .9, .94); m.roughness = .82; m.envMapIntensity = .35; m.needsUpdate = true; }
     // --- pantalla LED viva
     if (arena.pantalla) {
       const w = tex <= 1024 ? 1024 : 2048, h = Math.round(w * .3515);
@@ -230,6 +230,7 @@ export class Ambiente {
       if (todas) { g.fillStyle = vale ? 'rgba(250,250,242,.9)' : 'rgba(255,42,28,.9)'; g.fillRect(0, 0, w, h * .035); g.fillRect(0, h * .965, w, h * .035); }
     }
     // rejilla de píxeles LED
+    if (this.sinRejilla) { this.ledTex.needsUpdate = true; return; }      // el grano de píxel va en el sombreador (look.js)
     g.fillStyle = 'rgba(0,0,0,.22)'; const paso = w > 1024 ? 4 : 3; for (let x = 0; x < w; x += paso) g.fillRect(x, 0, 1, h); for (let y = 0; y < h; y += paso) g.fillRect(0, y, w, 1);
     this.ledTex.needsUpdate = true;
   }

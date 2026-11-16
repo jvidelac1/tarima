@@ -146,13 +146,13 @@ void main(){
   #include <fog_vertex>
 }`;
 const CROWD_FS = /* glsl */`
-uniform sampler2D map; uniform float uGain;
+uniform sampler2D map; uniform float uGain; uniform vec3 uRebote;
 varying vec2 vUv; varying vec3 vCloth; varying vec3 vSkin; varying vec3 vHair;
 #include <fog_pars_fragment>
 void main(){
   vec4 t = texture2D( map, vUv ); if ( t.a < 0.42 ) discard;
   vec3 col = mix( vCloth, vSkin, smoothstep( 0.3, 0.7, t.g ) ); col = mix( col, vHair, smoothstep( 0.3, 0.7, t.b ) );
-  gl_FragColor = vec4( col * t.r * uGain, 1.0 );
+  gl_FragColor = vec4( col * t.r * uGain + uRebote * smoothstep( 0.72, 1.0, t.r ) * ( 0.35 + col ), 1.0 );      // uRebote: luz del escenario en cabeza y hombros (el juego; 0 en el visor)
   #include <fog_fragment>
 }`;
 // Fuentes puntuales (teléfonos, luces de escalón, carteles de salida, luminarias): cada una se dibuja como su propio
@@ -389,7 +389,7 @@ export class Arena {
     const geo = new THREE.PlaneGeometry(.66, .88); geo.translate(0, .44, 0);
     const n = seats.length, aC = new Float32Array(n * 3), aS = new Float32Array(n * 3), aH = new Float32Array(n * 3), aV = new Float32Array(n);
     this.crowdTex = canvasTexture(crowdAtlas(), { srgb: false, aniso: 1, mip: false });      // sin mipmaps: el recorte alfa no se come las siluetas lejanas
-    const mat = new THREE.ShaderMaterial({ vertexShader: CROWD_VS, fragmentShader: CROWD_FS, fog: true, uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: null }, uGain: { value: .1 } }]) }); mat.uniforms.map.value = this.crowdTex;
+    const mat = new THREE.ShaderMaterial({ vertexShader: CROWD_VS, fragmentShader: CROWD_FS, fog: true, uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: null }, uGain: { value: .1 }, uRebote: { value: new THREE.Vector3() } }]) }); mat.uniforms.map.value = this.crowdTex;
     const mesh = this.crowd = new THREE.InstancedMesh(geo, mat, n);
     seats.forEach((s, i) => {
       o.position.set(s.x, s.y, s.z); o.rotation.set(0, s.ry + (r() - .5) * .3, 0); o.scale.set(s.s, s.s * (.92 + r() * .2), s.s); o.updateMatrix(); mesh.setMatrixAt(i, o.matrix);
