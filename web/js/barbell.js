@@ -147,7 +147,7 @@ export class Barbell {
   }
 
   _rubberMat(color) {
-    if (!this._rubber.has(color)) this._rubber.set(color, new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: this.goma.roughnessMap ? 1 : .62, roughnessMap: this.goma.roughnessMap || null, bumpMap: this.goma.bumpMap || null, bumpScale: .3, metalness: 0, envMapIntensity: .55 }));
+    if (!this._rubber.has(color)) this._rubber.set(color, new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: this.goma.roughnessMap ? 1 : .62, roughnessMap: this.goma.roughnessMap || null, metalness: 0, envMapIntensity: .55 }));
     return this._rubber.get(color);
   }
 

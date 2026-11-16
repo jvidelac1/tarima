@@ -443,7 +443,7 @@ export class Look {
 
     // discos de los cajones y las pilas: un dibujo instanciado, color por instancia
     { const geo = new THREE.CylinderGeometry(1, 1, 1, 30); const G = this.goma || {};
-      const mat = new THREE.MeshStandardMaterial({ name: 'discos de utilería', color: new THREE.Color(1, 1, 1), roughness: 1, roughnessMap: G.roughnessMap || null, bumpMap: G.bumpMap || null, bumpScale: .35, envMapIntensity: .5 }); conSuperficie(mat, 'disco');
+      const mat = new THREE.MeshStandardMaterial({ name: 'discos de utilería', color: new THREE.Color(1, 1, 1), roughness: 1, roughnessMap: G.roughnessMap || null, envMapIntensity: .5 }); conSuperficie(mat, 'disco');
       const im = new THREE.InstancedMesh(geo, mat, discos.length), c = new THREE.Color(); discos.forEach(([m, col], i) => { im.setMatrixAt(i, m); im.setColorAt(i, c.set(col)); });
       im.instanceColor.needsUpdate = true; im.frustumCulled = false; im.receiveShadow = true; im.name = 'discos de utilería'; this.arena.group.add(im); this.discos = im; }
 
