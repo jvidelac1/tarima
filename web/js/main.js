@@ -275,6 +275,7 @@ async function init() {
   new ResizeObserver(resize).observe(canvas);
   const res = await fetch('data/poses.json'); if (!res.ok) throw new Error('poses.json: ' + res.status);
   S.data = await res.json();
+  for (const k of Object.keys(ATHLETES)) { const b = document.getElementById('who-' + k); if (b) b.style.display = S.data[k] ? '' : 'none'; }      // del plantel, solo los que ya tienen modelo construido
   hud.setToggle('trace', S.trace); trace.group.visible = S.trace;
   const cam = clamp(parseInt(params.get('cam') || '0', 10) || 0, 0, CAMERAS.length - 1); rig.cut(cam); hud.setCam(cam);
   try { await setWho(ATHLETES[params.get('who')] ? params.get('who') : 'ventura'); } finally { hud.setEnabled(true); }

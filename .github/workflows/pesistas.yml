@@ -86,7 +86,7 @@ jobs:
         run: |
           mkdir -p out/sonda
           set -o pipefail
-          .venv/bin/python blender/sonda.py ${{ needs.lista.outputs.nombres }} 2>&1 | tee out/sonda/sonda.log | grep --line-buffered -E 'MEASURE|MASA|SONDA|Error|ERROR|Traceback|^ +File "|Exception'
+          .venv/bin/python blender/sonda.py ${{ needs.lista.outputs.nombres }} 2>&1 | tee out/sonda/sonda.log | grep --line-buffered -E 'MEASURE|MASA|PROP|SONDA|Error|ERROR|Traceback|^ +File "|Exception'
       - uses: actions/upload-artifact@v6
         if: ${{ always() }}
         with:
