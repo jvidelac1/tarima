@@ -36,8 +36,8 @@ float superficie( vec3 P, inout vec3 col, inout float rug, inout float met ){
   col *= 1.0 + ( hilo - 0.5 ) * 0.22 * v1; rug = clamp( rug + ( hilo - 0.5 ) * 0.12 * v1 + raya * 0.25, 0.05, 1.0 );
   float centro = exp( - dot( p * vec2( 0.85, 1.25 ) - vec2( 0.0, 0.15 ), p * vec2( 0.85, 1.25 ) - vec2( 0.0, 0.15 ) ) ), discos = exp( - pow( ( abs( p.x ) - 0.97 ) / 0.22, 2.0 ) ) * ( 1.0 - smoothstep( 0.5, 1.1, abs( p.y - 0.1 ) ) );
   float nube = sF( p * 3.1 + 4.0 ), grumo = sF( p * 46.0 ) * v2 + 0.5 * ( 1.0 - v2 );
-  float tiza = smoothstep( 0.62 - 0.4 * uUso, 0.95 - 0.35 * uUso, nube * ( 0.45 + 0.9 * centro + 0.6 * discos ) ) * ( 0.35 + 0.65 * smoothstep( 0.3, 0.7, grumo ) );
-  tiza = clamp( tiza * ( 0.25 + 0.9 * uUso ), 0.0, 0.85 );
+  float tiza = smoothstep( 0.62 - 0.24 * uUso, 0.97 - 0.2 * uUso, nube * ( 0.45 + 0.9 * centro + 0.6 * discos ) ) * ( 0.35 + 0.65 * smoothstep( 0.3, 0.7, grumo ) );
+  tiza = clamp( tiza * ( 0.25 + 0.6 * uUso ), 0.0, 0.7 );
   col = mix( col, vec3( 0.86, 0.85, 0.80 ), tiza ); rug = mix( rug, 0.98, min( 1.0, tiza * 1.8 ) );
   return ( hilo * 0.00012 - raya * 0.0002 ) * v1 + tiza * grumo * 0.0006 * v2;
 }` },

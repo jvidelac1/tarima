@@ -31,7 +31,9 @@ export async function laboratorio(B, { escena, cargas, params, msg, decir }) {
   caja.innerHTML = 'Uso (magnesio, polvo, óxido) <input type="range" min="0" max="1" step="0.01" style="vertical-align:middle;width:180px"> <span></span><br><small>' + lista.map(l => l[0]).join(' · ') + ' · detrás: piel y tela</small>';
   const rango = caja.querySelector('input'), valor = caja.querySelector('span'); document.body.append(caja);
   const cam = escena.rig.camera, mira = new THREE.Vector3();
-  const VISTAS = { fila: [[0, 1.25, 4.3], [0, .5, 1.2], 30], cerca: [[-.6, .75, 2.5], [-.75, .4, 1.3], 30], cercaB: [[.9, .75, 2.5], [.75, .4, 1.3], 30], piel: [[.55, 1.25, 1.35], [0, 1.2, .05], 26], tela: [[.5, .8, 1.25], [0, .72, 0], 24] };
+  const VISTAS = { fila: [[0, 1.25, 4.3], [0, .5, 1.2], 30], cerca: [[-.8, .95, 3.3], [-.8, .42, 1.3], 30], cercaB: [[.95, .95, 3.3], [.95, .42, 1.3], 30], piel: [[.55, 1.25, 1.35], [0, 1.2, .05], 26], tela: [[.5, .8, 1.25], [0, .72, 0], 24] };
+  // la piel y la tela se miran donde estén la cabeza y el torso del pesista en esta pose
+  const hueso = n => escena.activo?.bones?.find(b => b.name.replace(/^mixamorig:?/, '') === n), poner3 = (k, n, d) => { const b = hueso(n); if (!b) return; const p = b.getWorldPosition(new THREE.Vector3()); VISTAS[k] = [[p.x + d[0], p.y + d[1], p.z + d[2]], [p.x, p.y, p.z], VISTAS[k][2]]; };
   let vista = 'fila';
   const dibujar = () => {
     const [p, t, fov] = VISTAS[vista]; cam.position.set(...p); mira.set(...t); cam.fov = fov; cam.updateProjectionMatrix(); cam.lookAt(mira); cam.updateMatrixWorld();
@@ -43,6 +45,7 @@ export async function laboratorio(B, { escena, cargas, params, msg, decir }) {
   g.visible = false; escena.bucle(1.3, 0); for (let k = 0; k < 3; k++) escena.cuadro(k ? .016 : 5, true); g.visible = true;
   if (escena.reflejo?.activo) { escena.reflejo.setActivo(false); }
   const fin = () => { try { escena.renderer.getContext().finish(); } catch { /* sin contexto */ } };
+  escena.scene.updateMatrixWorld(true); poner3('piel', 'Head', [.42, .04, .62]); poner3('tela', 'Spine1', [.55, .05, .85]);
   const tomas = [['lab_fila-nuevo', 'fila', 0], ['lab_fila-usado', 'fila', 1], ['lab_cerca-nuevo', 'cerca', .1], ['lab_cerca-usado', 'cerca', 1], ['lab_chapa-nuevo', 'cercaB', 0], ['lab_chapa-usado', 'cercaB', 1], ['lab_piel', 'piel', .5], ['lab_tela', 'tela', .5]];
   window.BANCO_FOTOS = { lista: tomas.map(t => ({ nombre: t[0] })), listo: true, opacidadSombra: null, opacidadCruda: null,
     async poner(i) { const t = tomas[i]; vista = t[1]; g.visible = !/piel|tela/.test(vista); poner(t[2]); dibujar(); dibujar(); fin(); return t[0]; } };

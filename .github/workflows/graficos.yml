@@ -25,6 +25,10 @@ on:
         description: 'Calidades de las fotos (vacío: todas). Ej.: alta,movil'
         type: string
         default: ''
+      con_alta:
+        description: 'La comparación mide también «Alta» (tarda el doble)'
+        type: boolean
+        default: false
       base:
         description: 'Rama base de la comparación'
         type: string
@@ -121,8 +125,8 @@ jobs:
           # la variante «ambiente» existe desde la rama graficos; en main se usa «sombras» (solo para que el banco tenga una)
           VAR_BASE=sombras; grep -q "ambiente" base/tools/banco.mjs base/web/js/game/banco.js 2>/dev/null && VAR_BASE=ambiente
           for k in 1 2 3; do
-            node base/tools/banco.mjs --ancho=960 --alto=540 --limite=110 --solo=baja,movil --variantes=$VAR_BASE --vueltas=3 --json=out/comparar/main_$k.json > out/logs/comparar_main_$k.log 2>&1 || true
-            node tools/banco.mjs --ancho=960 --alto=540 --limite=110 --solo=baja,movil --variantes=jueces --vueltas=3 --json=out/comparar/rama_$k.json > out/logs/comparar_rama_$k.log 2>&1 || true
+            node base/tools/banco.mjs --ancho=960 --alto=540 --limite=${{ inputs.con_alta && 230 || 110 }} --solo=${{ inputs.con_alta && 'baja,movil,alta' || 'baja,movil' }} --variantes=$VAR_BASE --vueltas=3 --json=out/comparar/main_$k.json > out/logs/comparar_main_$k.log 2>&1 || true
+            node tools/banco.mjs --ancho=960 --alto=540 --limite=${{ inputs.con_alta && 230 || 110 }} --solo=${{ inputs.con_alta && 'baja,movil,alta' || 'baja,movil' }} --variantes=jueces --vueltas=3 --json=out/comparar/rama_$k.json > out/logs/comparar_rama_$k.log 2>&1 || true
           done
           node -e '
             const fs = require("fs");

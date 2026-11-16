@@ -21,7 +21,7 @@ import { conSuperficie, setSuperficies, chapa, USO } from './materiales.js';
 /** Gradación del juego: exposición, saturación, contraste, gamma de sombras, tinte de sombras y de altas, viñeta y negro. */
 export const GRADO_LOOK = Object.freeze({ exp: 1.0, sat: .88, con: 1.03, gam: 1.0, frio: [.92, .995, 1.09], calido: [1.07, 1.0, .91], vin: .36, negro: .004 });
 /** Niebla y fondo de la sala (a oscuras, azul petróleo). */
-export const SALA = Object.freeze({ fondo: '#04060a', niebla: '#070b12', densidad: .021 });
+export const SALA = Object.freeze({ fondo: '#070a11', niebla: '#0a0f18', densidad: .021 });
 
 const DISPLAY = "'Saira Condensed','Arial Narrow',sans-serif";
 const Y0 = -.1;      // piso del escenario (la tarima tiene su cara de arriba en 0)
@@ -352,7 +352,7 @@ export class Look {
     for (const o of A.group.children) if (o.isInstancedMesh && o.material.isMeshBasicMaterial && o.geometry.type === 'BoxGeometry' && !o.material.map) k(o.material, .6);      // escalones y barandas
     // los focos del fondo: ámbar a la izquierda (acompañan al contraluz), blanco frío a la derecha; nada de rosa y celeste
     (A.beams || []).forEach((b, i) => b.mat.uniforms.uColor.value.set(i < 5 ? (i % 2 ? '#ffb469' : '#ffc890') : (i % 2 ? '#cfe0ff' : '#e9eeff')));
-    this.salaImpostor = .5;
+    this.salaImpostor = .8;
     // la bruma de sala (velos aditivos) lavaba los negros: a un tercio
     { const hechos = new Set(); A.group.traverse(o => { const m = o.material; if (m?.map === A.hazeTex && m.color && !hechos.has(m)) { hechos.add(m); m.color.multiplyScalar(.3); } }); }
     if (this.ambiente?.uPolvo) this.ambiente.uPolvo.uTam.value = .0045;
@@ -484,7 +484,7 @@ export class Look {
   /** Lo que depende de la calidad: los rayos solo con post y haces; `A.rayos` escala su fuerza. */
   setNivel(Q) {
     setSuperficies(!Q.directo);
-    BOKEH.uScale.value = Q.directo ? .3 : .8;      // luces de fondo: puntos con halo en el camino directo (eran discos grises), bokeh moderado con post      // superficies por función solo con post
+    BOKEH.uScale.value = Q.directo ? .3 : .45;      // luces de fondo: puntos con halo en el camino directo (eran discos grises), bokeh moderado con post      // superficies por función solo con post
     const A = Q.amb || {}, k = A.rayos ?? 1; this.group.visible = !Q.directo && !!Q.beams && k > 0;
     for (const r of this.rayos || []) r.mat.uniforms.uFuerza.value = r.base * k;
     const imp = this.arena.impostors; if (imp && !imp.userData.look) { imp.userData.look = true; imp.traverse(o => { if (o.material?.color) o.material.color.multiplyScalar(this.salaImpostor || 1); }); }
@@ -494,9 +494,9 @@ export class Look {
     const u = p.finalMat.uniforms, G = GRADO_LOOK;
     u.toneMappingExposure.value = G.exp; u.uSat.value = G.sat; u.uContrast.value = G.con; u.uShadowGamma.value = G.gam; u.uVignette.value = G.vin;
     u.uFrio.value.set(...G.frio); u.uCalido.value.set(...G.calido); u.uNegro.value = G.negro; u.uGrain.value = .028;
-    if (p.bloom) { p.bloom.strength = .16; p.bloom.radius = .4; p.bloom.threshold = 2.0; }
+    if (p.bloom) { p.bloom.strength = .1; p.bloom.radius = .35; p.bloom.threshold = 2.4; }
     // menos desenfoque de fondo que la transmisión de antes: la sala (utilería, chapa, público) tiene que leerse
-    for (const m of [p.dofPre, p.dofBlur, p.mixMat]) if (m?.uniforms.uScale) m.uniforms.uScale.value = .8;
+    for (const m of [p.dofPre, p.dofBlur, p.mixMat]) if (m?.uniforms.uScale) m.uniforms.uScale.value = .45;
     if (p.mixMat) p.mixMat.uniforms.uBloomClamp.value = 7;
   }
   update(dt) { if (!this.reduce) this.T.value += dt; }
