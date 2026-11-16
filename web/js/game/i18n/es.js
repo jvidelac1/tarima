@@ -105,6 +105,7 @@ export default {
   'opciones.cam.jurado': 'Jurado',
   'opciones.cam.lateral': 'Lateral',
   'opciones.cam.baja': 'Baja',
+  'opciones.cam.pov': 'Primera persona',
   'opciones.sonido': 'Sonido',
   'opciones.sonido_si': 'Con sonido',
   'opciones.sonido_no': 'Sin sonido',

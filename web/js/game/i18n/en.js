@@ -101,6 +101,7 @@ export default {
   'opciones.cam.jurado': 'Judges',
   'opciones.cam.lateral': 'Side',
   'opciones.cam.baja': 'Low',
+  'opciones.cam.pov': 'First person',
   'opciones.sonido': 'Sound',
   'opciones.sonido_si': 'On',
   'opciones.sonido_no': 'Off',

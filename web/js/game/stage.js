@@ -183,6 +183,7 @@ function conBorde(m) {
 }
 
 const v = new THREE.Vector3(), v2 = new THREE.Vector3();
+const _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _pc = new THREE.Vector3(), _pd = new THREE.Vector3();
 export const CAM = Object.fromEntries(CAMERAS.map((c, i) => [c.key, i]));
 /**
  * Planos propios del juego (el visor no los ve). `medio`: plano americano del pesista que se prepara en el llamado (de las
@@ -200,6 +201,23 @@ export const PLANOS = {
   // los tres árbitros de frente, desde el borde del escenario (para las fotos de control de banco.js)
   jueces: { key: 'jueces', at: [], up: 0, dAbs: 3.7, az: Math.PI, el: .12, fov: 34, punto: 'jueces' },
 };
+/**
+ * Primera persona (pedido del dueño: «hacer el levantamiento como si lo estuviera haciendo yo»). La cámara va en los ojos
+ * del pesista, pero NO copia el giro de la cabeza (marea): la posición sale de los huesos (cuello, cabeza y hombros) con un
+ * filtro corto, y la mirada es sintética: siempre al frente (sin guiñada ni balanceo), con una inclinación que sigue a la
+ * barra a medias y despacio. Reglas, iguales para cualquier biotipo y cualquier fase:
+ * - ojo = cabeza + `arriba` m a lo largo del cuello + `adelante` m hacia el frente del tronco (por metro de estatura / 1,7).
+ * - inclinación = ángulo hacia la barra × peso. El peso es `pesoLejos` con la barra bien abajo de los ojos (en la tarima: se
+ *   miran la barra y las manos), `pesoCerca` con la barra cerca de la cara (hombros: se mira casi al frente y la barra queda
+ *   en el borde de abajo) y `pesoArriba` con la barra por encima (se mira apenas hacia arriba: los brazos en la periferia).
+ *   Entre `abajo` y `arriba` (rad), y llega con retardo (`giro` por segundo): la barra pasa por delante de la cara.
+ * - lente: `fov` grados de alto, o lo que dé `fovAncho` de ancho en pantallas muy anchas; el acercamiento de la barrita lo cierra un poco.
+ * - respiración (sube y baja unos milímetros y cabecea unas décimas de grado) y temblor del esfuerzo: nada con movimiento reducido.
+ * - la cabeza propia no se dibuja mientras la cámara esté a menos de `sinCabeza` m de los ojos (el hueso de la cabeza se
+ *   achica a un punto: cara, pelo, ojos y pestañas van pesados a él). La sombra sale sin cabeza: cae detrás del pesista.
+ */
+export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 5.5, pesoLejos: .74, pesoCerca: .46, pesoArriba: .4, abajo: -1.08, tope: .44, sinCabeza: .35, foco: 1.6,
+  resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003 }, temblor: .006 };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
 
@@ -217,6 +235,7 @@ export class Escena {
     this._niebla = { hdr: this.scene.fog.color.clone(), directo: tonoJS(this.scene.fog.color) };      // en el camino directo la niebla se mezcla ya en colores de pantalla
     if (canvas.parentElement && typeof document !== 'undefined') { const d = this.velo = document.createElement('div'); d.setAttribute('aria-hidden', 'true'); d.style.cssText = `position:absolute;inset:0;pointer-events:none;background:${vineta()}`; canvas.after(d); }
     this.rig = new CameraRig(canvas, { reduceMotion, interactive: false }); this.viva = new CamaraViva({ reduceMotion });
+    this.pov = null; this._povFn = (cam, dt) => this._povCam(cam, dt); this._ojo = new THREE.Vector3(); this._sinCabeza = null; this._temblor = 0;
     this.trace = new BarTrace(); this.scene.add(this.trace.group);
     const coarse = matchMedia('(pointer:coarse)').matches, aniso = Math.min(Q.aniso || 4, r.capabilities.getMaxAnisotropy());
     this.arena = new Arena({ tex: coarse || Q.tex <= 1024 ? 1024 : 2048, aniso, reduceMotion, oficiales: false }); this.scene.add(this.arena.group);
@@ -479,9 +498,10 @@ export class Escena {
   posar(pose, lev, dt = 0, temblor = 0, t = 0) {
     const a = this.activo; if (!a) return;
     aplicarEsfuerzo(a, temblor, t, this.reduceMotion);
+    this._temblor = temblor;
     const g = pose.base + pose.s, i = Math.floor(g); a.setPair(i, i + 1, g - i);
     // el pesista recibe la barra (la muestra cruza la fase de recepción en reproducción continua): dip de la cámara
-    if (dt > 0 && dt < .1 && this._rec?.seg === pose.seg && this._rec.s < pose.s && pose.s - this._rec.s < 8) { const r = this._recepcion(pose.seg); if (r >= 0 && this._rec.s < r && pose.s >= r) this.viva.dip(1); }
+    if (dt > 0 && dt < .1 && this._rec?.seg === pose.seg && this._rec.s < pose.s && pose.s - this._rec.s < 8) { const r = this._recepcion(pose.seg); if (r >= 0 && this._rec.s < r && pose.s >= r) { this.viva.dip(1); if (this.pov) this.viva.golpe(.55); } }
     (this._rec ||= {}).seg = pose.seg; this._rec.s = pose.s;
     a.barWorld(v); if (pose.primero) this._tl(lev).barFix(pose.tau, v);
     if (v.y < PLATE_R) v.y = PLATE_R;
@@ -496,6 +516,7 @@ export class Escena {
    */
   posarMezcla(p) {
     const a = this.activo; if (!a) return;
+    this._temblor = 0;
     aplicarEsfuerzo(a, 0, 0, true); a.root.position.z += p.dz || 0; a.root.position.y += p.dy || 0;
     a.setMix(p.i, p.j, p.u, p.k, p.w); this.rig.headY = a.boneWorld('Head', v2).y + .14; this.sombra = 3;
   }
@@ -560,13 +581,60 @@ export class Escena {
   /** Acercamiento sutil de la cámara (1 = el plano tal cual; 0,92 = un poco más cerca), amortiguado por el rig. */
   acercar(z = 1) { if (this.rig) this.rig.zoomT = z; }
   /** Cámara fija por clave. `suave` (s): en lugar de cortar, va desde la cámara de ahora (cameras.js, suave). */
-  camara(clave, suave = 0) { if (PLANOS[clave]) { this.primerPlano(clave, null, suave); return; } if (suave) this.rig.suave(suave); else this.rig.mezcla = null; this.plano = null; this.encuadre = null; this.rig.setShot(null); this.rig.cut(CAM[clave] ?? 0); }
+  camara(clave, suave = 0) {
+    if (PLANOS[clave]) { this.primerPlano(clave, null, suave); return; }
+    if (suave) this.rig.suave(suave); else this.rig.mezcla = null;
+    this.plano = null; this.encuadre = null; this.rig.setShot(null);
+    if (clave === 'pov') { this._pov(true); return; }
+    this._pov(false); this.rig.cut(CAM[clave] ?? 0);
+  }
+  /** Prende o apaga la primera persona (ver POV). Al prenderla, la cámara arranca ya en los ojos, sin retardo. */
+  _pov(on) {
+    if (!!this.pov === on) return; const cam = this.rig.camera;
+    this.pov = on ? { p: new THREE.Vector3(), inc: 0, t: 0, nueva: true } : null; this.rig.propia = on ? this._povFn : null;
+    if (!on) { cam.near = .25; cam.updateProjectionMatrix(); }
+  }
+  /** Punto de los ojos del pesista (m, mundo), de los huesos: no usa los ejes del hueso de la cabeza. */
+  ojos(out) {
+    const a = this.activo; if (!a) return out.set(0, 1.6, .1);
+    const k = (this.P?.h || 1.7) / 1.7, c = a.boneWorld('Head', out), arr = a.boneWorld('Neck', _pa).sub(c).negate().normalize();
+    const ad = a.boneWorld('LeftArm', _pb).sub(a.boneWorld('RightArm', _pc)).cross(arr).normalize();
+    return c.addScaledVector(arr, POV.arriba * k).addScaledVector(ad, POV.adelante * k);
+  }
+  /** La cámara en primera persona de este cuadro (la llama el rig en lugar de su encuadre). */
+  _povCam(cam, dt) {
+    const S = this.pov, R = this.rig, o = this.ojos(_pd), quieto = this.reduceMotion; S.t += dt;
+    if (S.nueva) S.p.copy(o); else S.p.lerp(o, 1 - Math.exp(-POV.sigue * dt));
+    // inclinación de la mirada: hacia la barra, a medias
+    const b = this.barbell.group.position, dy = b.y - S.p.y, hacia = Math.atan2(dy, Math.max(.25, b.z - S.p.z));
+    const u = Math.min(1, Math.max(0, (-dy - .25) / .5)), peso = dy > 0 ? POV.pesoArriba : POV.pesoCerca + (POV.pesoLejos - POV.pesoCerca) * u * u * (3 - 2 * u);
+    const incT = Math.min(POV.tope, Math.max(POV.abajo, hacia * peso));
+    S.inc = S.nueva ? incT : S.inc + (incT - S.inc) * (1 - Math.exp(-(quieto ? 60 : POV.giro) * dt)); S.nueva = false;
+    let inc = S.inc, bal = 0, y = 0;
+    if (!quieto) {
+      const w = S.t * Math.PI * 2 * POV.resp.hz, T = Math.min(1, Math.max(0, this._temblor)) * POV.temblor;
+      y = POV.resp.y * Math.sin(w); inc += POV.resp.cabeceo * Math.sin(w - .9) + T * (Math.sin(S.t * 47) * .6 + Math.sin(S.t * 83 + 1.3) * .4);
+      bal = POV.resp.balanceo * Math.sin(w * .5 + 1) + T * .6 * (Math.sin(S.t * 39 + .7) * .6 + Math.sin(S.t * 71) * .4);
+    }
+    cam.position.copy(S.p); cam.position.y += y; cam.rotation.set(inc, Math.PI, bal, 'YXZ');
+    const fov = Math.min(POV.fov, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(POV.fovAncho / 2)) / Math.max(.5, cam.aspect)))) * (1 - (1 - R.zoom) * .5);
+    cam.fov = fov; cam.near = POV.cerca; cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+    R.focusDistance = POV.foco; R.target.set(S.p.x, S.p.y, S.p.z + POV.foco); R.subject.copy(R.target);
+  }
+  /** La cabeza propia no se dibuja con la cámara pegada a los ojos (ver POV): entrando o saliendo de la primera persona, tampoco. */
+  _cabeza() {
+    const a = this.activo, cerca = !!a && a.root.visible && this.rig.camera.position.distanceTo(this.ojos(_pd)) < POV.sinCabeza, quien = cerca ? a : null;
+    if (quien === this._sinCabeza) return;
+    for (const [x, e] of [[this._sinCabeza, 1], [quien, 1e-4]]) { const h = x?._byName.get('Head'); if (h) { h.scale.setScalar(e); h.updateMatrixWorld(true); } }
+    this._sinCabeza = quien; this.sombra = Math.max(this.sombra, 2);
+  }
   /**
    * Primer plano por clave (SHOTS del visor o PLANOS del juego). `encuadre`: {x, y} fracción del lienzo (desde arriba a la
    * izquierda) donde tiene que quedar el sujeto, para dejarlo en la parte libre cuando un panel tapa un costado o el pie.
    */
   primerPlano(clave, encuadre = null, suave = 0) {
     if (suave) this.rig.suave(suave); else this.rig.mezcla = null;
+    this._pov(false);
     const base = PLANOS[clave] || SHOTS.find(s => s.key === clave) || null, h = this.P?.h || 1.75;
     const dAbs = encuadre?.dAbs || base?.dAbs, sh = base && dAbs ? { ...base, d: dAbs / h } : base;
     this.plano = sh; this.encuadre = encuadre; this.rig.setShot(sh); if (sh) this._apuntar();      // setShot primero: el corrimiento usa el ángulo del plano
@@ -588,6 +656,7 @@ export class Escena {
   /** Punto de la barra en píxeles CSS del lienzo (para las ayudas pegadas a la barra). `y`: otra altura en metros. */
   pantalla(y = this.barY, x = 0) {
     v.set(x, y, this.barZ ?? 0).project(this.rig.camera);
+    if (v.z > 1 || v.z < -1) return { x: -9999, y: -9999 };      // detrás de la cámara (primera persona): fuera de la pantalla
     return { x: (v.x + 1) / 2 * this.canvas.clientWidth, y: (1 - v.y) / 2 * this.canvas.clientHeight };
   }
   /**
@@ -621,7 +690,7 @@ export class Escena {
   }
   /** Avanza cámara y entorno; dibuja si `pintar`. */
   cuadro(dt, pintar = true) {
-    this._apuntar(); this.rig.update(dt); this._vigilar(dt); this.viva.aplicar(this.rig.camera, dt, this.rig.focusDistance); this.trace.face(this.rig.camera); this.post.focus = this.rig.focusDistance; this.post.cerca = this.plano?.key === 'jurado' ? .1 : .35; this.arena.update(dt, this.rig.camera); this.ambiente.update(dt); this.jueces.update(dt); this._detalle();
+    this._apuntar(); this.rig.update(dt); this._cabeza(); this._vigilar(dt); this.viva.aplicar(this.rig.camera, dt, this.rig.focusDistance); this.trace.face(this.rig.camera); this.post.focus = this.pov ? 6 : this.rig.focusDistance; this.post.cerca = this.pov || this.plano?.key === 'jurado' ? .1 : .35; this.arena.update(dt, this.rig.camera); this.ambiente.update(dt); this.jueces.update(dt); this._detalle();
     if (!pintar) return;
     const r = this.renderer; r.shadowMap.needsUpdate = this.sombra > 0; if (this.sombra > 0) this.sombra--;
     this._dibujar(dt);

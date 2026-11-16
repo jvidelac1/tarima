@@ -28,8 +28,10 @@ import { medirEnPagina, fila, revisar } from './tapa.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web'), OUT = path.join(ROOT, 'out/barra');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
+// --camara=pov: con esa cámara elegida (?camara=); --out=dir: otra carpeta; --final: 32 fotos cada 150 ms desde que termina cada intento
+const CAMARA = arg('camara'), DENSO = process.argv.includes('--final'), OUT = path.join(ROOT, arg('out') || 'out/barra');
 const HEADED = process.argv.includes('--headed'), SOLO = arg('solo'), SEMILLA = 20261113;
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml' };
 const server = http.createServer((req, res) => {
@@ -73,7 +75,7 @@ for (const P of PANTALLAS) try {
   // dónde se veía el puntero cuando llegó cada Espacio (antes que el juego: este oyente se registra primero)
   await page.addInitScript(() => { window.__P = []; addEventListener('keydown', e => { if (e.code !== 'Space' || e.repeat) return; const p = document.querySelector('#barrita .b-punt'); window.__P.push({ ts: e.timeStamp, izq: p ? parseFloat(p.style.left) : null, visible: !document.getElementById('barrita')?.hidden }); }, true); });
   // sin dibujo continuo (?dibujo=0, como check_game): por software cada cuadro tarda; antes de cada captura se fuerza uno
-  await page.goto(`${base}juego.html?lang=${P.lang}&q=baja&dibujo=0&semilla=${SEMILLA}`, { waitUntil: 'load' });
+  await page.goto(`${base}juego.html?lang=${P.lang}&q=baja&dibujo=0&semilla=${SEMILLA}${CAMARA ? '&camara=' + CAMARA : ''}`, { waitUntil: 'load' });
   if (!await J(() => window.JUEGO.listo)) { mal('el juego no inició'); await ctx.close(); continue; }
   await J(() => JUEGO.test.manual());
   const av = ms => J(ms => JUEGO.test.avanzar(ms), ms), ir = t => J(t => JUEGO.test.hasta(t, 8), t);
@@ -110,7 +112,7 @@ for (const P of PANTALLAS) try {
   if (P.dif) { await pulsa('#btn-opciones'); await av(250); await foto('0_opciones'); const d = await J(() => document.querySelector('#capa .dif[aria-pressed=true]')?.dataset.d); if (d !== P.dif) mal(`Opciones no muestra la dificultad elegida (${d})`); await pulsa('#btn-opciones'); await av(250); }
   if (P.soloInicio) { await ctx.close(); continue; }
   await pulsa('#btn-empezar');
-  const t0 = Date.now();
+  const t0 = Date.now(), densos = new Set();
   for (let g = 0; g < 20000 && Date.now() - t0 < 6 * 60000; g++) {
     const s = await J(() => { const e = JUEGO.estado(); e.propios = (JUEGO.E.propios || []).length; e.lev = JUEGO.E.p?.lev; return e; });
     if (s.errores.length) { mal('error en el juego: ' + s.errores[0]); break; }
@@ -162,6 +164,7 @@ for (const P of PANTALLAS) try {
       }
       await av(450); const ok = await pulsa('#capa .panel button.ir'); await av(ok ? 400 : 200); continue;
     }
+    if (DENSO && s.pantalla === 'decision' && !densos.has(s.propios)) { densos.add(s.propios); for (let i = 0; i < 32; i++) { await J(() => { try { window.JUEGO.escena?.cuadro?.(0, true); } catch { /* sin escena */ } }); await page.screenshot({ path: path.join(OUT, `${P.id}_fin${s.propios}_${String(i).padStart(2, '0')}.jpg`), type: 'jpeg', quality: 62 }); await av(150); } }
     if (s.pantalla === 'decision') {
       const v = await J(() => document.getElementById('veredicto').hidden ? '' : document.getElementById('veredicto').textContent);
       if (v && !lineas.includes(v)) { lineas.push(v); await tapa('veredicto'); await page.waitForTimeout(250); if (lineas.length <= 3) await foto(`${lineas.length}_veredicto`); }
