@@ -203,7 +203,7 @@ function metersPerUv(geo) {
  *   arrugas: pliegues en las normales; brillo: reflejo satinado de la lycra (sheen).
  */
 export const ASPECTO = Object.freeze({
-  piel: Object.freeze({ tono: '#ffffff', saturacion: .78, variacion: .5, rugosidad: .56, sudor: .55, brillo: 1, dispersion: [.5, .17, .1] }),
+  piel: Object.freeze({ tono: '#ffffff', saturacion: .78, variacion: .5, rugosidad: .56, sudor: .55, brillo: .6, dispersion: [.5, .17, .1] }),
   pelo: Object.freeze({ color: null }),
   tela: Object.freeze({ tinte: '#ffffff', plano: null, arrugas: .22, brillo: .5 }),
 });

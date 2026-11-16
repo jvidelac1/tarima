@@ -87,6 +87,7 @@ export async function correrBanco({ escena, cargas, hz, params, msg }) {
   const B = window.BANCO = { listo: false, version: 3, etapa: 'carga', progreso: '', columnas: COLUMNAS, calidades: [], variantes: [], tandas: [], notas: [], errores: [] };
   const cartel = document.createElement('div'); cartel.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:40;background:rgba(3,5,12,.82);color:#e8ecf8;font:12px/1.3 ui-monospace,Menlo,monospace;padding:6px 10px;pointer-events:none'; document.body.appendChild(cartel);
   const decir = txt => { B.progreso = txt; cartel.textContent = 'Banco de medición · ' + txt; };
+  if (params.get('lab')) { try { const { laboratorio } = await import('./lab.js'); await laboratorio(B, { escena, cargas, params, msg, decir }); } catch (e) { B.errores.push(String(e.stack || e)); console.error(e); } if (params.get('fotos')) cartel.remove(); B.listo = true; return; }      // laboratorio de materiales (lab.js)
   if (params.get('fotos') === '2') { try { await fotosNiveles(B, { escena, cargas, params, msg, decir }); } catch (e) { B.errores.push(String(e.stack || e)); console.error(e); } cartel.remove(); B.listo = true; return; }
   if (params.get('fotos')) { try { await fotos(B, { escena, cargas, params, msg, decir }); } catch (e) { B.errores.push(String(e.stack || e)); console.error(e); } cartel.remove(); B.listo = true; return; }
   try { await correr(B, { escena, cargas, hz, params, msg, decir }); } catch (e) { B.errores.push(String(e.stack || e)); console.error(e); }

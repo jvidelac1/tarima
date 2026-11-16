@@ -15,9 +15,11 @@
 import * as THREE from 'three';
 import { rng, makeCanvas, canvasTexture } from '../util.js';
 import { EVENT } from '../config.js';
+import { BOKEH } from '../post.js';
+import { conSuperficie, setSuperficies, chapa, USO } from './materiales.js';
 
 /** Gradación del juego: exposición, saturación, contraste, gamma de sombras, tinte de sombras y de altas, viñeta y negro. */
-export const GRADO_LOOK = Object.freeze({ exp: 1.0, sat: .88, con: 1.03, gam: 1.0, frio: [.92, .995, 1.09], calido: [1.07, 1.0, .91], vin: .36, negro: .01 });
+export const GRADO_LOOK = Object.freeze({ exp: 1.0, sat: .88, con: 1.03, gam: 1.0, frio: [.92, .995, 1.09], calido: [1.07, 1.0, .91], vin: .36, negro: .004 });
 /** Niebla y fondo de la sala (a oscuras, azul petróleo). */
 export const SALA = Object.freeze({ fondo: '#04060a', niebla: '#070b12', densidad: .021 });
 
@@ -101,7 +103,7 @@ function vetaFina(W, H) {
  */
 function madera(S, aniso) {
   const Sb = S >> 1, r = rng(77), nA = ruido(1), nB = ruido(2), nC = ruido(3), nD = ruido(4), NP = 26, pw = 4 / NP, tablas = [];
-  for (let i = 0; i < NP; i++) { const cortes = []; let z = -r() * 1.6; while (z < 4.2) { z += 1.1 + r() * 1.5; cortes.push([z, r(), r(), r() * 50]); } tablas.push(cortes); }
+  for (let i = 0; i < NP; i++) { const cortes = []; let z = -r() * 1.6; while (z < 4.2) { z += 1.9 + r() * 1.6; cortes.push([z, r(), r(), r() * 50]); } tablas.push(cortes); }
   // pintura: línea perimetral gastada y la marca estarcida al frente (se lee desde el jurado)
   const mask = makeCanvas(Sb, Sb, g => {
     g.fillStyle = '#000'; g.fillRect(0, 0, Sb, Sb); g.strokeStyle = '#fff'; g.lineWidth = Sb * .012; const b = Sb * .03; g.strokeRect(b, b, Sb - 2 * b, Sb - 2 * b);
@@ -118,8 +120,8 @@ function madera(S, aniso) {
     // veta: hilos a lo largo de la tabla, deformados, más bandas anchas («catedral»)
     const warp = nA(gx * 7 + off, z * .8 + off) * .65 + nA(gx * 14 + off, z * 1.6 + off) * .35;
     const hilos = fbm(nB, gx * 120 + off * 3, z * 2.4 + warp * 3, 3), banda = .5 + .5 * Math.sin((gx * 48 + warp * 8 + z * .3) * 6.2832);
-    const t = cl((.6 * hilos + .4 * banda * (.35 + .65 * nD(gx * 26 + off, z * 1.3))) * 1.15 - .08 + (B[1] - .5) * .42), tono = (.8 + .3 * B[2]) * (.78 + .36 * M[0]);
-    let R = (.80 - .31 * t) * tono, G = (.60 - .29 * t) * tono, Bc = (.37 - .22 * t) * tono, h = .62 + (hilos - .5) * .12, rg = .3 + .14 * hilos;
+    const t = cl((.6 * hilos + .4 * banda * (.35 + .65 * nD(gx * 26 + off, z * 1.3))) * 1.15 - .08 + (B[1] - .5) * .2), tono = (.9 + .13 * B[2]) * (.78 + .36 * M[0]);
+    let R = (.66 - .27 * t) * tono, G = (.47 - .23 * t) * tono, Bc = (.29 - .17 * t) * tono, h = .62 + (hilos - .5) * .12, rg = .3 + .14 * hilos;
     // barniz comido donde se paran: más claro, más parejo y mate
     const st = Math.exp(-((cx / 1.05) * (cx / 1.05) + ((cz - .12) / .75) * ((cz - .12) / .75))), w = cl(st * 1.35 * (.3 + .95 * M[1]));
     R += (R * 1.1 + .06 - R) * w * .55; G += (G * 1.1 + .055 - G) * w * .55; Bc += (Bc * 1.12 + .05 - Bc) * w * .55; rg += w * .36;
@@ -127,7 +129,7 @@ function madera(S, aniso) {
     const ax = (Math.abs(cx) - .97) / .19, gl = ax * ax < 9 ? Math.exp(-ax * ax) * sm(-.8, -.35, cz) * (1 - sm(.6, .98, cz)) : 0;
     if (gl > .01) { const mk = gl * (.35 + .9 * M[3]), kk = 1 - .5 * cl(mk); R *= kk; G *= kk; Bc *= kk; rg += mk * .25; h -= gl * sm(.64, .82, nC(x * 36, z * 36)) * .3; }
     // magnesio en nubes
-    const ch = cl(sm(.5, .74, M[2] * (.42 + .95 * st + .5 * gl)) * .5);
+    const ch = cl(sm(.55, .8, M[2] * (.42 + .95 * st + .5 * gl)) * .28);
     if (ch > 0) { R += (.93 - R) * ch; G += (.92 - G) * ch; Bc += (.88 - Bc) * ch; rg += (.97 - rg) * cl(ch * 1.7); }
     // pintura gastada
     const pm = md[(py * Sb + px) * 4];
@@ -158,7 +160,7 @@ function gomaPiso(S, aniso) {
   const lento = grillas(256, 2, (u, v, o) => { o[0] = fbm(nA, u * 8, v * 8, 4); o[1] = fbm(nB, u * 4 + 3, v * 4, 3); }), M = new Float32Array(2);
   const c = generar(S, (u, v, o, px, py) => {
     lento(u, v, M); const polvo = M[0], mancha = M[1], fino = hash2(px, py), fu = (u * 2) % 1, fv = (v * 2) % 1, du = fu < .5 ? fu : 1 - fu, dv = fv < .5 ? fv : 1 - fv, dj = du < dv ? du : dv;
-    let k = .05 + .028 * sm(.4, .8, polvo) + (fino - .5) * .012, R = k, G = k * 1.02, B = k * 1.08, h = .5 + (fino - .5) * .3, rg = .5 + .32 * sm(.35, .75, polvo) - .16 * sm(.55, .8, mancha);
+    let k = .075 + .035 * sm(.4, .8, polvo) + (fino - .5) * .012, R = k, G = k * 1.02, B = k * 1.08, h = .5 + (fino - .5) * .3, rg = .5 + .32 * sm(.35, .75, polvo) - .16 * sm(.55, .8, mancha);
     const mx = px >> 1, my = py >> 1, hm = hash2(mx + 91, my + 17);
     if (hm < .085) { const P = pal[(hash2(mx, my) * pal.length) | 0], a = .35 + hm * 5; R += (P[0] - R) * a * .5; G += (P[1] - G) * a * .5; B += (P[2] - B) * a * .5; h += .1; rg += .08; }
     const gap = 1 - sm(.001, .005, dj); R *= 1 - .7 * gap; G *= 1 - .7 * gap; B *= 1 - .7 * gap; h -= gap * .45; rg += gap * .3;
@@ -299,6 +301,7 @@ export class Look {
     this.group = new THREE.Group(); this.group.name = 'Look';                 // lo que se mueve o se suma (rayos): fuera de la arena
     this.props = new THREE.Group(); this.props.name = 'Utilería'; arena.group.add(this.props);      // fijo: stage.js lo junta por material
     const paso = (nombre, f) => { try { f(); } catch (e) { console.warn('look:', nombre, e); } };
+    { const g = ambiente.golpe.bind(ambiente); ambiente.golpe = (z, k) => { g(z, k); USO.value = Math.min(1, USO.value + .03); }; }      // cada barra que cae deja más magnesio
     { const u = ambiente.update.bind(ambiente); ambiente.update = dt => { u(dt); this.update(dt); }; }      // avanza con el ambiente (stage.js no cambia)
     paso('luces', () => this._luces(lighting));
     paso('tarima', () => this._tarima(grande ? 2048 : 1024, aniso));
@@ -313,34 +316,34 @@ export class Look {
 
   /** Luz de competencia: sala a oscuras, clave casi cenital, contraluz cálido marcado desde atrás a la izquierda. */
   _luces(L) {
-    L.key.position.set(1.6, 9.6, 4.8); L.key.color.set('#fff0dc'); L.key.intensity = 7.2; L.key.angle = .3; L.key.penumbra = .7;
+    L.key.position.set(4.4, 9.3, 3.9); L.key.color.set('#fff0dc'); L.key.intensity = 5.4; L.key.angle = .3; L.key.penumbra = .7;
     L.key2.color.set('#c6d6ff'); L.key2.intensity = .55;
-    L.stage.color.set('#b9c6e0'); L.stage.intensity = .42;
+    L.stage.color.set('#b9c6e0'); L.stage.intensity = .75;
     L.hemi.color.set('#56688a'); L.hemi.groundColor.set('#2c2016'); L.hemi.intensity = .1;
     L.wash.color.set('#8fa0c4'); L.wash.intensity = .07;
     // rimA mira a la cámara general (atrás a la izquierda): es EL contraluz, cálido y ancho (también rasa el piso)
     L.rimA.color.set('#ffa85c'); L.rimA.intensity = 9.5; L.rimA.angle = .46; L.rimA.penumbra = .85; L.rimA.position.set(-6.3, 5.6, -4.6);
-    L.rimB.color.set('#9fd0ff'); L.rimB.intensity = 3.2; L.rimB.angle = .4;
+    L.rimB.color.set('#9fd0ff'); L.rimB.intensity = 5.5; L.rimB.angle = .4;
     L.hair.color.set('#ffe2bc'); L.hair.intensity = 3.4;
   }
   _tarima(S, aniso) {
     const A = this.arena, m = A.madera; if (!m) return;
     const M = madera(S, aniso); for (const k of ['map', 'normalMap', 'roughnessMap']) { m[k]?.dispose(); m[k] = M[k]; this.texturas.push(M[k]); }
-    m.color.setRGB(.86, .86, .86); m.roughness = 1; m.metalness = 0; m.normalScale.set(.9, .9); m.envMapIntensity = .7; m.needsUpdate = true;
+    m.color.setRGB(.86, .86, .86); m.roughness = 1; m.metalness = 0; m.normalScale.set(.9, .9); m.envMapIntensity = .7; conSuperficie(m, 'madera'); m.needsUpdate = true;
     const canto = A.tarima?.material?.[0]; if (canto) { canto.color.set('#1b1612'); canto.roughness = .62; }
   }
   _piso(S, aniso) {
     const m = this.arena.alfombra; if (!m) return;
     const G = gomaPiso(S, aniso); for (const k of ['map', 'normalMap', 'roughnessMap']) { m[k]?.dispose(); m[k] = G[k]; this.texturas.push(G[k]); }
-    m.color.setRGB(1, 1, 1); m.roughness = 1; m.normalScale.set(.9, .9); m.envMapIntensity = .5; m.needsUpdate = true; this.gomaPiso = G;
+    m.color.setRGB(1, 1, 1); m.roughness = 1; m.normalScale.set(.9, .9); m.envMapIntensity = .5; conSuperficie(m, 'goma'); m.needsUpdate = true; this.gomaPiso = G;
   }
   /** Lo que no está bajo los focos queda en penumbra: tribunas, pabellón, cintas y telón. */
   _sala() {
     const A = this.arena, k = (m, f) => { if (m && m.color) m.color.multiplyScalar(f); };
-    if (A.crowd) { const u = A.crowd.material.uniforms; u.uGain.value = .05; if (u.uRebote) u.uRebote.value.set(.11, .075, .045); }
+    if (A.crowd) { const u = A.crowd.material.uniforms; u.uGain.value = .065; if (u.uRebote) u.uRebote.value.set(.11, .075, .045); }
     A.group.traverse(o => {
       const m = o.material; if (!m || Array.isArray(m) || !m.isMeshBasicMaterial) return;
-      if (o.geometry?.type === 'CylinderGeometry' && o.geometry.parameters.radiusTop > 30) k(m, o.geometry.parameters.height > 5 ? .5 : .45);      // pabellón y cinta de luz
+      if (o.geometry?.type === 'CylinderGeometry' && o.geometry.parameters.radiusTop > 30) k(m, o.geometry.parameters.height > 5 ? .75 : .5);      // pabellón y cinta de luz
       else if (o.geometry?.type === 'PlaneGeometry' && o.geometry.parameters.width === 90) m.color.set('#090a0d');                                 // piso de sala
       else if (o.geometry?.type === 'PlaneGeometry' && o.geometry.parameters.width === 17) k(m, .55);                                               // telón
     });
@@ -348,7 +351,10 @@ export class Look {
     for (const o of A.group.children) if (o.isInstancedMesh && o.material.isMeshBasicMaterial && o.geometry.type === 'BoxGeometry' && !o.material.map) k(o.material, .6);      // escalones y barandas
     // los focos del fondo: ámbar a la izquierda (acompañan al contraluz), blanco frío a la derecha; nada de rosa y celeste
     (A.beams || []).forEach((b, i) => b.mat.uniforms.uColor.value.set(i < 5 ? (i % 2 ? '#ffb469' : '#ffc890') : (i % 2 ? '#cfe0ff' : '#e9eeff')));
-    this.salaImpostor = .45;
+    this.salaImpostor = .9;
+    // la bruma de sala (velos aditivos) lavaba los negros: a un tercio
+    A.group.traverse(o => { if (o.material?.map === A.hazeTex && o.material.color) o.material.color.multiplyScalar(.35); });
+    if (this.ambiente?.uPolvo) this.ambiente.uPolvo.uTam.value = .0045;
   }
   /** Pantalla LED: fondo oscuro y grano de píxel en el sombreador (un punto por LED; de lejos se promedia: sin muaré). */
   _pantalla() {
@@ -369,7 +375,7 @@ export class Look {
 
   _utileria(aniso, grande) {
     const P = this.props, S = grande ? 512 : 256, tx = (c, o) => { const M = mapas(c, { aniso, ...o }); this.texturas.push(M.map, M.normalMap, M.roughnessMap); return M; };
-    const metal = new THREE.MeshStandardMaterial({ name: 'metal pintado', ...tx(metalPintado(S)), roughness: 1, metalness: .55, envMapIntensity: .9 });
+    const metal = this.metalMat = new THREE.MeshStandardMaterial({ name: 'metal pintado', ...tx(metalPintado(S)), roughness: 1, metalness: .55, envMapIntensity: .9 });
     const acero = new THREE.MeshStandardMaterial({ name: 'acero', color: new THREE.Color('#aeb2b8'), roughness: .3, metalness: 1, envMapIntensity: 1.1 });
     const baul = new THREE.MeshStandardMaterial({ name: 'fenólico', ...tx(fenolico(S)), roughness: 1, metalness: 0, envMapIntensity: .5 });
     const ply = new THREE.MeshStandardMaterial({ name: 'terciado', ...tx(terciado(S)), roughness: 1, metalness: 0, envMapIntensity: .4 });
@@ -435,7 +441,7 @@ export class Look {
 
     // discos de los cajones y las pilas: un dibujo instanciado, color por instancia
     { const geo = new THREE.CylinderGeometry(1, 1, 1, 30); const G = this.goma || {};
-      const mat = new THREE.MeshStandardMaterial({ name: 'discos de utilería', color: new THREE.Color(1, 1, 1), roughness: 1, roughnessMap: G.roughnessMap || null, bumpMap: G.bumpMap || null, bumpScale: .35, envMapIntensity: .5 });
+      const mat = new THREE.MeshStandardMaterial({ name: 'discos de utilería', color: new THREE.Color(1, 1, 1), roughness: 1, roughnessMap: G.roughnessMap || null, bumpMap: G.bumpMap || null, bumpScale: .35, envMapIntensity: .5 }); conSuperficie(mat, 'disco');
       const im = new THREE.InstancedMesh(geo, mat, discos.length), c = new THREE.Color(); discos.forEach(([m, col], i) => { im.setMatrixAt(i, m); im.setColorAt(i, c.set(col)); });
       im.instanceColor.needsUpdate = true; im.frustumCulled = false; im.receiveShadow = true; im.name = 'discos de utilería'; this.arena.group.add(im); this.discos = im; }
 
@@ -445,6 +451,14 @@ export class Look {
       const o = new THREE.Mesh(new THREE.PlaneGeometry(w, w), m); o.rotation.set(-Math.PI / 2, 0, ry); o.position.set(x, Y0 + .003, z); o.receiveShadow = true; o.renderOrder = 1; P.add(o); };
     calcoDe('tiza', -3.15, -1.9, 1.7); calcoDe('tiza', 3.2, -1.95, 1.5, 1); calcoDe('cinta', -3.6, 3.3, 1.5); calcoDe('cinta', 3.6, -3.0, 1.5, Math.PI);
 
+    // pared de chapa pintada a los lados de la pantalla (materiales.js: toda por función), con columnas, caño y tablero eléctrico
+    { const ch = this.chapaMat = chapa('#2a4350');
+      for (const s of [-1, 1]) { const g = grupo(s * 7.05, -5.72, 0, -1);
+        pz(g, caja, ch, 3.5, 6.6, .06, 0, 3.3, 0);
+        for (const x of [-1.72, 0, 1.72]) pz(g, caja, metal, .14, 6.6, .12, x, 3.3, .08);
+        pz(g, caja, metal, 3.5, .1, .1, 0, 4.35, .09); pz(g, caja, metal, 3.5, .1, .1, 0, 1.75, .09);
+        pz(g, cil, acero, .025, 3.4, .025, s * .1, 5.2, .16, 0, 0, Math.PI / 2); pz(g, cil, acero, .02, 4.0, .02, s * 1.2, 3.1, .13);
+        pz(g, caja, metal, .5, .7, .16, s * 1.2, 2.2, .14); pz(g, caja, acero, .06, .1, .03, s * 1.2 + .17, 2.2, .235); } }
     // banderines ficticios colgados del truss del fondo, a los lados de las luces de arbitraje
     { const t = canvasTexture(banderines(), { aniso: 4 }); this.texturas.push(t); const N = 8, pos = [], uv = [], idx = [];
       const xs = [-6.6, -5.4, -4.2, -3.0, 3.0, 4.2, 5.4, 6.6];
@@ -462,12 +476,14 @@ export class Look {
       const g = new THREE.Group(); g.position.copy(l.position); g.lookAt(hasta); g.rotateX(-Math.PI / 2);
       const m = new THREE.Mesh(geo, mat); m.scale.set(rad, len, rad); m.renderOrder = 5; m.frustumCulled = false; g.add(m); this.group.add(g); this.rayos.push({ mat, base: fuerza });
     };
-    rayo(L.key, .05, .8); rayo(L.rimA, .085, .62); rayo(L.rimB, .03, .6); rayo(L.hair, .03, .7);
+    rayo(L.key, .01, .8); rayo(L.rimA, .028, .62); rayo(L.rimB, .014, .6); rayo(L.hair, .008, .7);
     this.group.visible = false;
   }
 
   /** Lo que depende de la calidad: los rayos solo con post y haces; `A.rayos` escala su fuerza. */
   setNivel(Q) {
+    setSuperficies(!Q.directo);
+    BOKEH.uScale.value = Q.directo ? .3 : 1.5;      // luces de fondo: puntos con halo en el camino directo (eran discos grises), bokeh moderado con post      // superficies por función solo con post
     const A = Q.amb || {}, k = A.rayos ?? 1; this.group.visible = !Q.directo && !!Q.beams && k > 0;
     for (const r of this.rayos || []) r.mat.uniforms.uFuerza.value = r.base * k;
     const imp = this.arena.impostors; if (imp && !imp.userData.look) { imp.userData.look = true; imp.traverse(o => { if (o.material?.color) o.material.color.multiplyScalar(this.salaImpostor || 1); }); }
@@ -477,7 +493,9 @@ export class Look {
     const u = p.finalMat.uniforms, G = GRADO_LOOK;
     u.toneMappingExposure.value = G.exp; u.uSat.value = G.sat; u.uContrast.value = G.con; u.uShadowGamma.value = G.gam; u.uVignette.value = G.vin;
     u.uFrio.value.set(...G.frio); u.uCalido.value.set(...G.calido); u.uNegro.value = G.negro; u.uGrain.value = .028;
-    if (p.bloom) { p.bloom.strength = .34; p.bloom.radius = .55; p.bloom.threshold = 1.35; }
+    if (p.bloom) { p.bloom.strength = .16; p.bloom.radius = .4; p.bloom.threshold = 2.0; }
+    // menos desenfoque de fondo que la transmisión de antes: la sala (utilería, chapa, público) tiene que leerse
+    for (const m of [p.dofPre, p.dofBlur, p.mixMat]) if (m?.uniforms.uScale) m.uniforms.uScale.value = 1.5;
     if (p.mixMat) p.mixMat.uniforms.uBloomClamp.value = 7;
   }
   update(dt) { if (!this.reduce) this.T.value += dt; }

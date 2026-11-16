@@ -25,11 +25,11 @@ export const BARATO = Object.freeze({ piso: true, haces: 'no', bordes: 'material
  * «Móvil» y «Baja» solo suman lo que no cambia el costo del cuadro: pocas partículas y nada por píxel.
  */
 export const AMBIENTE = Object.freeze({
-  movil: Object.freeze({ polvo: 90, conos: 1, reflejo: 0, publico: false }),
-  baja: Object.freeze({ polvo: 220, conos: 1, reflejo: 0, publico: false }),
-  media: Object.freeze({ polvo: 500, conos: 3.4, reflejo: 0, publico: true }),
-  alta: Object.freeze({ polvo: 900, conos: 3.8, reflejo: .5, publico: true }),
-  ultra: Object.freeze({ polvo: 1600, conos: 4, reflejo: 1, publico: true }),
+  movil: Object.freeze({ polvo: 50, conos: 1, reflejo: 0, publico: false }),
+  baja: Object.freeze({ polvo: 120, conos: 1, reflejo: 0, publico: false }),
+  media: Object.freeze({ polvo: 260, conos: 1.6, reflejo: 0, publico: true }),
+  alta: Object.freeze({ polvo: 450, conos: 1.8, reflejo: .5, publico: true }),
+  ultra: Object.freeze({ polvo: 800, conos: 2, reflejo: 1, publico: true }),
 });
 export const MOVIL = { amb: AMBIENTE.movil, label: 'Móvil', dpr: 1.5, maxPixels: 1280 * 720, msaa: 2, shadow: 512, shadowR: 4.5, shadow2: 0, ao: 0, aoScale: .5, dof: 0, dofSamples: 0, bloom: false, smaa: false, crowd: .3, beams: false, aniso: 2, tex: 1024, directo: true, barato: BARATO };
 /**
