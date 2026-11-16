@@ -264,7 +264,7 @@ export class Arena {
     const TY = 7.1, TB = 6.3;
     truss([-7.4, TY, 6.8], [7.4, TY, 6.8]); truss([-7.4, TB, -4.6], [7.4, TB, -4.6]); truss([-7.4, TY, 6.8], [-7.4, TB, -4.6]); truss([7.4, TY, 6.8], [7.4, TB, -4.6]);
     for (const [x, z, y] of [[-7.4, 6.8, TY], [7.4, 6.8, TY], [-7.4, -4.6, TB], [7.4, -4.6, TB]]) truss([x, FLOOR_Y, z], [x, y, z]);
-    for (const s of [-1, 1]) truss([s * 5.75, STAGE_Y, -4.55], [s * 5.75, 3.7, -4.55], .12);    // torres de luz junto a la pantalla
+    // (las torres de luz junto a la pantalla tapaban el tablero y el reloj: sus focos van en las torres de las esquinas)
 
     const canGeo = new THREE.CylinderGeometry(.13, .16, .36, 14), lensGeo = new THREE.CircleGeometry(.12, 16), canMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#16171b'), roughness: .5, metalness: .5 });
     const beamGeo = new THREE.CylinderGeometry(.09, 1, 1, 28, 1, true); beamGeo.translate(0, -.5, 0);   // vértice en el foco, se abre hacia abajo
@@ -289,7 +289,7 @@ export class Arena {
     cols.forEach((c, i) => { const x = -6.3 + i * 1.8; fixture([x, TB - .3, -4.6], [x * .25, .4, -.2], c, 14, .05); });
     for (let i = 0; i < 6; i++) { const x = -5 + i * 2; fixture([x, TY - .3, 6.8], [x * .2, 1, 0], '#ffe6c4', 18, 0); }
     for (const s of [-1, 1]) for (let i = 0; i < 3; i++) fixture([s * 7.4, TY - .35 - i * .05, 3.6 - i * 2.8], [0, 1, 0], i === 1 ? '#fff0d8' : (s < 0 ? '#8fdcff' : '#ffb08a'), 12, i === 1 ? 0 : .035);
-    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) fixture([s * 5.75, 1.5 + i * .95, -4.38], [s * 1.2, 1.2, 0], i === 1 ? '#ffd9a0' : '#f4f0ff', i === 1 ? 7 : 4.5, 0, .62);
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) fixture([s * 7.22, 2.9 + i * .95, -4.4], [s * 1.2, 1.2, 0], i === 1 ? '#ffd9a0' : '#f4f0ff', i === 1 ? 7 : 4.5, 0, .62);
 
     // luces de arbitraje físicas sobre la pantalla
     const lampBox = add(new THREE.Mesh(new THREE.BoxGeometry(1.5, .46, .16), frameMat), 'r'); lampBox.position.set(0, wall.position.y + 2.18, -5.1);
@@ -349,7 +349,8 @@ export class Arena {
     const ribbon = new THREE.Mesh(new THREE.CylinderGeometry(32, 32, .22, 64, 1, true), new THREE.MeshBasicMaterial({ color: hdr('#ffc98a', .9), side: THREE.BackSide })); ribbon.position.y = 9.2; this.group.add(ribbon);
     // luminarias de techo y pasarelas, por encima de las tribunas
     const r = rng(77), pal = ['#ffffff', '#ffd9a0', '#ffe9c9', '#bcd0ff', '#ffb070'];
-    for (let i = 0; i < 70; i++) { const a = r() * Math.PI * 2, d = 30 + r() * 10; glint(Math.cos(a) * d, 9.5 + r() * 9, Math.sin(a) * d, pal[i % pal.length], .3 + r() * 1.1, .1 + r() * .12); }
+    // en hileras, como las pasarelas de un pabellón: dos anillos de luminarias parejas (sueltas al azar se leían como puntitos sin sentido)
+    for (const [d, y, n, k, tam] of [[15, 12.6, 16, .9, .14], [23, 12.6, 26, .75, .13], [31, 12.6, 36, .6, .12]]) for (let i = 0; i < n; i++) { if (r() < .12) continue; const a = (i + .5) / n * Math.PI * 2; glint(Math.cos(a) * d, y + (r() - .5) * .15, Math.sin(a) * d, pal[1 + (i % 3 === 0 ? 2 : 0)], k * (.75 + r() * .4), tam); }
 
     this.discTex = canvasTexture(softDisc(), { aniso: 1 });
     this._buildCrowd(banner, glint);

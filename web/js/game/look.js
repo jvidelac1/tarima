@@ -22,7 +22,7 @@ import { conSuperficie, setSuperficies, chapa, USO } from './materiales.js';
 /** Gradación del juego: exposición, saturación, contraste, gamma de sombras, tinte de sombras y de altas, viñeta y negro. */
 export const GRADO_LOOK = Object.freeze({ exp: 1.0, sat: .88, con: 1.03, gam: 1.0, frio: [.92, .995, 1.09], calido: [1.07, 1.0, .91], vin: .36, negro: .004 });
 /** Niebla y fondo de la sala (a oscuras, azul petróleo). */
-export const SALA = Object.freeze({ fondo: '#070a11', niebla: '#0a0f18', densidad: .021, nieblaDirecto: '#1b2740' });      // nieblaDirecto: en «Baja» y «Móvil» la bruma es más clara y azul (da fondo y profundidad sin costo: la niebla ya se calculaba)
+export const SALA = Object.freeze({ fondo: '#070a11', niebla: '#0a0f18', densidad: .021, nieblaDirecto: '#111a2a' });      // nieblaDirecto: en «Baja» y «Móvil» la bruma es más clara y azul (da fondo y profundidad sin costo: la niebla ya se calculaba)
 
 const DISPLAY = "'Saira Condensed','Arial Narrow',sans-serif";
 const Y0 = -.1;      // piso del escenario (la tarima tiene su cara de arriba en 0)
@@ -141,7 +141,7 @@ function madera(S, aniso) {
   const fino = vetaFina(256, 512), rr = rng(505), px = S / 4, lw = Math.max(1, S / 1024 * 1.25);
   const juntas = g => { g.beginPath(); for (let i = 0; i < NP; i++) { const x0 = i * pw * px; if (i) { g.moveTo(x0, 0); g.lineTo(x0, S); } for (const [z] of tablas[i]) if (z < 4) { g.moveTo(x0, z * px); g.lineTo(x0 + pw * px, z * px); } } g.stroke(); };
   const rayas = []; for (let k = 0; k < 170; k++) rayas.push([S * (.08 + rr() * .84), S * (.2 + rr() * .7), (rr() - .5) * 1.2 + Math.PI / 2, S * (.01 + rr() * rr() * .09), .1 + rr() * .3, .6 + rr() * 1.2]);
-  const motas = []; for (let k = 0; k < 4200; k++) { const lado = rr() < .3 ? (rr() < .5 ? -1 : 1) * (.97 + (rr() - .5) * .3) : (rr() + rr() - 1) * 1.1; motas.push([S * (lado / 4 + .5), S * ((.12 + (rr() + rr() + rr() - 1.5) * .55) / 4 + .5), 1 + rr() * 1.7, .12 + rr() * .45]); }
+  const motas = []; for (let k = 0; k < 2000; k++) { const lado = rr() < .3 ? (rr() < .5 ? -1 : 1) * (.97 + (rr() - .5) * .3) : (rr() + rr() - 1) * 1.1; motas.push([S * (lado / 4 + .5), S * ((.12 + (rr() + rr() + rr() - 1.5) * .55) / 4 + .5), 1 + rr() * 1.7, .07 + rr() * .26]); }
   const subir = (base, tile, modo, alfa, extra) => makeCanvas(S, S, g => {
     g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(base, 0, 0, S, S);
     g.globalCompositeOperation = modo; g.globalAlpha = alfa; g.fillStyle = g.createPattern(tile, 'repeat'); g.fillRect(0, 0, S, S); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.lineCap = 'round';
@@ -157,13 +157,13 @@ function madera(S, aniso) {
 
 /** Goma del escenario: baldosa de 1 m con motas, junta, polvo y roces. El lienzo cubre 2 × 2 m (cuatro baldosas distintas). */
 function gomaPiso(S, aniso) {
-  const nA = ruido(11), nB = ruido(12), pal = [[.34, .37, .44], [.46, .47, .49], [.22, .3, .42], [.6, .6, .6], [.3, .31, .33]];
+  const nA = ruido(11), nB = ruido(12), pal = [[.36, .37, .39], [.46, .47, .49], [.27, .29, .32], [.55, .55, .56], [.3, .31, .33]];      // motas grises: las de color, de lejos, se leían como manchas rojas y azules
   const lento = grillas(256, 2, (u, v, o) => { o[0] = fbm(nA, u * 8, v * 8, 4); o[1] = fbm(nB, u * 4 + 3, v * 4, 3); }), M = new Float32Array(2);
   const c = generar(S, (u, v, o, px, py) => {
     lento(u, v, M); const polvo = M[0], mancha = M[1], fino = hash2(px, py), fu = (u * 2) % 1, fv = (v * 2) % 1, du = fu < .5 ? fu : 1 - fu, dv = fv < .5 ? fv : 1 - fv, dj = du < dv ? du : dv;
     let k = .095 + .04 * sm(.4, .8, polvo) + (fino - .5) * .012, R = k, G = k * 1.02, B = k * 1.08, h = .5 + (fino - .5) * .3, rg = .5 + .32 * sm(.35, .75, polvo) - .16 * sm(.55, .8, mancha);
     const mx = px >> 1, my = py >> 1, hm = hash2(mx + 91, my + 17);
-    if (hm < .085) { const P = pal[(hash2(mx, my) * pal.length) | 0], a = .35 + hm * 5; R += (P[0] - R) * a * .5; G += (P[1] - G) * a * .5; B += (P[2] - B) * a * .5; h += .1; rg += .08; }
+    if (hm < .05) { const P = pal[(hash2(mx, my) * pal.length) | 0], a = .35 + hm * 5; R += (P[0] - R) * a * .5; G += (P[1] - G) * a * .5; B += (P[2] - B) * a * .5; h += .1; rg += .08; }
     const gap = 1 - sm(.001, .005, dj); R *= 1 - .7 * gap; G *= 1 - .7 * gap; B *= 1 - .7 * gap; h -= gap * .45; rg += gap * .3;
     const borde = (1 - sm(.005, .05, dj)) * .5 * polvo; R += borde * .05; G += borde * .05; B += borde * .05;      // polvo juntado contra la junta
     o[0] = R; o[1] = G; o[2] = B; o[3] = cl(h); o[4] = cl(rg);
@@ -219,14 +219,78 @@ function gomaDisco(S) {
   return { roughnessMap: rough, bumpMap: bump };
 }
 
+/**
+ * Telón de fondo con luz: pliegues verticales y bañadores de piso que lo lavan desde abajo (ámbar a la izquierda, azul frío
+ * a la derecha, como los contraluces), con la caída de la luz hacia arriba. Va horneado en la textura: el telón sigue
+ * siendo un plano sin luces. 17 × 6,4 m.
+ */
+function telon(W = 1024, H = 384) {
+  const n = ruido(91), r = rng(19), pl = []; let x = 0; while (x < 1) { const w = (.012 + r() * .02); pl.push([x, w, r()]); x += w; }
+  const focos = []; for (let i = 0; i < 9; i++) { const u = (i + .5) / 9; if (Math.abs(u - .5) < .27) continue; focos.push([u + (r() - .5) * .01, u < .5 ? [1, .56, .24] : [.42, .62, 1], .8 + r() * .4]); }
+  let k = 0;
+  const c = generar(W, (u, v, o) => {
+    while (k < pl.length - 1 && pl[k + 1][0] <= u) k++; if (u < pl[k][0]) k = 0; while (k < pl.length - 1 && pl[k + 1][0] <= u) k++;
+    const P = pl[k], t = (u - P[0]) / P[1], pliegue = .5 - .5 * Math.cos(t * 6.2832), y = 1 - v;      // y: 0 en el piso, 1 arriba
+    const base = .012 + .03 * pliegue * (.6 + .4 * P[2]) + .01 * fbm(n, u * 40, v * 6, 2);
+    let R = base * .75, G = base * .85, B = base * 1.15;
+    for (const [fu, col, f] of focos) { const dx = (u - fu) * 17, ancho = .35 + y * 6.4 * .42, g = Math.exp(-(dx * dx) / (ancho * ancho)) * Math.exp(-y * 3.1) * f * (.35 + .65 * pliegue) * .5; R += col[0] * g; G += col[1] * g; B += col[2] * g; }
+    const piso = sm(0, .03, y); o[0] = cl(Math.sqrt(R * piso)); o[1] = cl(Math.sqrt(G * piso)); o[2] = cl(Math.sqrt(B * piso)); o[3] = .5; o[4] = .5;
+  }, H);
+  return canvasTexture(c.col, { aniso: 4 });
+}
+
+/** Parrilla del techo (84 × 84 m vista desde abajo): vigas, cerchas con diagonales, conductos y el resplandor cálido de las luces sobre el escenario. Cierra la sala desde cualquier cámara. */
+function techo(S = 1024) {
+  return canvasTexture(makeCanvas(S, S, g => {
+    g.fillStyle = '#07080b'; g.fillRect(0, 0, S, S); const m = S / 84, r = rng(31);
+    const res = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, 26 * m); res.addColorStop(0, 'rgba(255,196,130,.36)'); res.addColorStop(.35, 'rgba(210,150,100,.16)'); res.addColorStop(1, 'rgba(120,90,70,0)'); g.fillStyle = res; g.fillRect(0, 0, S, S);
+    for (let i = 0; i <= 14; i++) { const x = i * 6 * m; g.fillStyle = 'rgba(96,100,112,.5)'; g.fillRect(x - .22 * m, 0, .44 * m, S); g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(x + .22 * m, 0, .2 * m, S); }      // vigas principales
+    g.strokeStyle = 'rgba(86,90,102,.42)'; g.lineWidth = Math.max(1, .12 * m);
+    for (let j = 0; j <= 28; j++) { const y = j * 3 * m; g.fillStyle = 'rgba(70,74,86,.42)'; g.fillRect(0, y - .1 * m, S, .2 * m); if (j % 2 === 0) { g.beginPath(); for (let i = 0; i < 14; i++) { const x = i * 6 * m; g.moveTo(x, y); g.lineTo(x + 3 * m, y + 3 * m); g.lineTo(x + 6 * m, y); } g.stroke(); } }      // correas y diagonales
+    for (let k = 0; k < 7; k++) { const x = (8 + r() * 68) * m, w = (.5 + r() * .5) * m; g.fillStyle = 'rgba(58,62,72,.7)'; g.fillRect(x, 0, w, S); g.fillStyle = 'rgba(130,134,146,.25)'; g.fillRect(x, 0, w * .25, S); }      // conductos
+    for (const d of [15, 23, 31]) { g.strokeStyle = 'rgba(255,205,150,.1)'; g.lineWidth = 1.6 * m; g.beginPath(); g.arc(S / 2, S / 2, d * m, 0, 7); g.stroke(); }      // pasarelas de luminarias
+  }), { aniso: 4 });
+}
+/** Mural de lona con la silueta de un pesista con la barra arriba (dibujada a trazos, gastada), como los que visten los costados de una sala de competencia. */
+function mural(W = 384, H = 640, calido = false) {
+  return canvasTexture(makeCanvas(W, H, g => {
+    const r = rng(calido ? 57 : 43), lg = g.createLinearGradient(0, 0, 0, H); lg.addColorStop(0, calido ? '#2a211c' : '#1c2229'); lg.addColorStop(1, '#0c0d10'); g.fillStyle = lg; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 260; i++) { g.strokeStyle = `rgba(${calido ? '230,190,150' : '170,200,220'},${.015 + r() * .04})`; g.lineWidth = 2 + r() * 14; const x = r() * W, y = r() * H; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (r() - .5) * 60, y + 40 + r() * 160); g.stroke(); }      // brochazos
+    const tinta = calido ? 'rgba(236,214,186,.55)' : 'rgba(206,220,230,.52)'; g.strokeStyle = tinta; g.fillStyle = tinta; g.lineCap = 'round'; g.lineJoin = 'round';
+    const L = (pts, w) => { g.lineWidth = w * W; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x * W, y * H) : g.moveTo(x * W, y * H))); g.stroke(); };
+    L([[.04, .2], [.96, .2]], .016);                                                         // barra
+    for (const s of [-1, 1]) for (const [d, hh] of [[.34, .2], [.385, .2], [.425, .15]]) { g.fillRect((.5 + s * d - .016) * W, (.2 - hh / 2) * H, .032 * W, hh * H); }      // discos
+    L([[.4, .36], [.31, .29], [.25, .2]], .075); L([[.6, .36], [.69, .29], [.75, .2]], .075);      // brazos
+    g.beginPath(); g.arc(.5 * W, .285 * H, .058 * W, 0, 7); g.fill();                         // cabeza
+    g.beginPath(); g.moveTo(.37 * W, .35 * H); g.lineTo(.63 * W, .35 * H); g.lineTo(.585 * W, .58 * H); g.lineTo(.415 * W, .58 * H); g.closePath(); g.fill(); L([[.4, .36], [.6, .36]], .08);      // tronco
+    L([[.45, .58], [.38, .73], [.37, .9]], .1); L([[.55, .58], [.62, .73], [.63, .9]], .1);    // piernas
+    L([[.33, .915], [.4, .915]], .035); L([[.6, .915], [.67, .915]], .035);                    // pies
+    g.globalCompositeOperation = 'destination-out'; for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(0,0,0,${.1 + r() * .5})`; g.fillRect(r() * W, r() * H, 1 + r() * 5, 1 + r() * 18); } g.globalCompositeOperation = 'destination-over'; g.fillStyle = '#0d0e11'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over';      // estarcido gastado
+    g.fillStyle = 'rgba(240,236,226,.6)'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `800 ${W * .11}px ${DISPLAY}`; g.fillText(EVENT.marca, W / 2, H * .965, W * .9);
+    const som = g.createLinearGradient(0, 0, 0, H); som.addColorStop(0, 'rgba(0,0,0,.5)'); som.addColorStop(.35, 'rgba(0,0,0,.05)'); som.addColorStop(1, 'rgba(0,0,0,.25)'); g.fillStyle = som; g.fillRect(0, 0, W, H);      // la luz le llega de abajo
+  }), { aniso: 4 });
+}
+
 // ---------- gráficas ----------
 /** Fondo de la pantalla LED: casi negro, con líneas finas y dos paneles apagados; lo brillante son los textos y las luces. */
 function ledFondo(w, h) {
   return makeCanvas(w, h, g => {
-    const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, '#143642'); gr.addColorStop(.35, '#0c1a24'); gr.addColorStop(.65, '#1a1416'); gr.addColorStop(1, '#4a2a14'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
-    for (let i = -2; i < 26; i++) { const x = i * w / 24, calido = i >= 12; g.fillStyle = calido ? `rgba(255,150,60,${.08 + .06 * (i & 1)})` : `rgba(70,190,210,${.07 + .05 * (i & 1)})`; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + w * .012, 0); g.lineTo(x + w * .05, h); g.lineTo(x + w * .038, h); g.closePath(); g.fill(); }
-    const cg = g.createRadialGradient(w / 2, h * .62, h * .1, w / 2, h * .62, w * .32); cg.addColorStop(0, 'rgba(0,0,0,.55)'); cg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = cg; g.fillRect(0, 0, w, h);
+    const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, '#1a4958'); gr.addColorStop(.33, '#0e202b'); gr.addColorStop(.67, '#1d1719'); gr.addColorStop(1, '#5c3417'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    for (let i = -2; i < 26; i++) { const x = i * w / 24, calido = i >= 12; g.fillStyle = calido ? `rgba(255,150,60,${.1 + .08 * (i & 1)})` : `rgba(70,190,210,${.09 + .07 * (i & 1)})`; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + w * .012, 0); g.lineTo(x + w * .05, h); g.lineTo(x + w * .038, h); g.closePath(); g.fill(); }
+    // marca de agua del evento, enorme y apenas visible, y una guarda de pictogramas abajo: la pantalla nunca es un paño vacío
+    g.save(); g.globalAlpha = .07; g.fillStyle = '#dff6ff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `800 ${h * .62}px ${DISPLAY}`; g.fillText(EVENT.marca, w / 2, h * .46, w * .9); g.restore();
+    g.save(); g.globalAlpha = .16; for (let i = 0; i < 30; i++) { const x = (i + .5) * w / 30, c = i < 15 ? '#6fe6f0' : '#ffb060', s2 = h * .022; g.fillStyle = c; g.fillRect(x - s2 * 2, h * .873, s2 * 4, s2 * .22); for (const sx of [-1, 1]) { g.fillRect(x + sx * s2 * 1.45 - s2 * .14, h * .873 - s2 * .7, s2 * .28, s2 * 1.6); } } g.restore();
+    const cg = g.createRadialGradient(w / 2, h * .62, h * .1, w / 2, h * .62, w * .3); cg.addColorStop(0, 'rgba(0,0,0,.5)'); cg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = cg; g.fillRect(0, 0, w, h);
+    { const lg = g.createLinearGradient(0, h * .6, 0, h); lg.addColorStop(0, 'rgba(120,200,220,0)'); lg.addColorStop(1, 'rgba(120,200,220,.1)'); g.fillStyle = lg; g.fillRect(0, h * .6, w / 2, h * .4); const lw = g.createLinearGradient(0, h * .6, 0, h); lw.addColorStop(0, 'rgba(255,170,90,0)'); lw.addColorStop(1, 'rgba(255,170,90,.11)'); g.fillStyle = lw; g.fillRect(w / 2, h * .6, w / 2, h * .4); }
     g.fillStyle = 'rgba(255,170,70,.85)'; g.fillRect(0, h * .93, w, h * .01); g.fillStyle = 'rgba(210,225,230,.5)'; g.fillRect(0, h * .952, w, h * .005);
+  });
+}
+/** Reflejo de la pantalla en el piso del escenario: una mancha de luz teal a la izquierda y ámbar a la derecha que se apaga hacia la tarima. */
+function brilloPiso(W = 256, H = 64) {
+  return makeCanvas(W, H, g => {
+    const gr = g.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, 'rgb(40,120,140)'); gr.addColorStop(.42, 'rgb(22,40,52)'); gr.addColorStop(.58, 'rgb(46,30,24)'); gr.addColorStop(1, 'rgb(150,84,36)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    const cae = g.createLinearGradient(0, 0, 0, H); cae.addColorStop(0, 'rgba(0,0,0,.15)'); cae.addColorStop(.35, 'rgba(0,0,0,.62)'); cae.addColorStop(1, 'rgba(0,0,0,1)'); g.fillStyle = cae; g.fillRect(0, 0, W, H);
+    for (const x of [0, 1]) { const b = g.createLinearGradient(x ? W : 0, 0, x ? W * .88 : W * .12, 0); b.addColorStop(0, 'rgba(0,0,0,1)'); b.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = b; g.fillRect(x ? W * .88 : 0, 0, W * .12, H); }
   });
 }
 /** Ocho banderines ficticios en una tira (ninguno copia una bandera real: diagonales, discos corridos, rombos y cuñas en colores raros). */
@@ -289,6 +353,31 @@ void main(){
   gl_FragColor = vec4( uColor * uFuerza * borde * cae * veta, 1.0 );
 }`;
 
+
+// ---------- halos de los focos ----------
+// Un foco de escenario visto de frente no es un disco blanco: es un punto que quema con un halo ancho, un destello
+// horizontal corto (el de un lente de transmisión) y una estrella leve. Un sprite por luminaria (un solo dibujo de puntos),
+// aditivo; brilla según cuánto mira el foco a la cámara y se apaga de costado. Sin lecturas de textura.
+const HALO_VS = /* glsl */`attribute vec3 aColor; attribute vec3 aDir; attribute float aTam;
+uniform float uAlto; uniform float uFuerza; uniform float uMax; varying vec3 vCol; varying float vK;
+void main(){
+  vec4 mv = modelViewMatrix * vec4( position, 1.0 ); float d = max( - mv.z, 0.1 );
+  vec3 alOjo = normalize( cameraPosition - position ); float f = max( dot( normalize( aDir ), alOjo ), 0.0 );
+  float k = 0.1 + 0.9 * pow( f, 5.0 ); vK = k; vCol = aColor * uFuerza * ( 0.25 + 0.75 * k );
+  gl_PointSize = clamp( aTam * ( 0.55 + 0.45 * k ) * projectionMatrix[ 1 ][ 1 ] * uAlto * 0.5 / d, 2.0, uMax );
+  gl_Position = projectionMatrix * mv;
+}`;
+const HALO_FS = /* glsl */`uniform float uDirecto; varying vec3 vCol; varying float vK;
+void main(){
+  vec2 p = gl_PointCoord * 2.0 - 1.0; float r = length( p ), borde = 1.0 - smoothstep( 0.82, 1.0, r );
+  float nucleo = exp( - r * r * 90.0 ) * 2.6, halo = exp( - r * 5.5 ) * 0.34 + exp( - r * r * 9.0 ) * 0.1;
+  float raya = exp( - abs( p.y ) * 46.0 ) * exp( - abs( p.x ) * 3.4 ) * 0.5 * vK;                      // destello anamórfico
+  float estrella = ( exp( - abs( p.x ) * 70.0 ) * exp( - abs( p.y ) * 6.0 ) + exp( - abs( p.x + p.y ) * 60.0 ) * exp( - r * 7.0 ) * 0.5 + exp( - abs( p.x - p.y ) * 60.0 ) * exp( - r * 7.0 ) * 0.5 ) * 0.16 * vK;
+  vec3 c = vCol * ( nucleo + halo + raya + estrella ) * borde;
+  if ( uDirecto > 0.5 ) c = min( vCol * 0.5 * ( exp( - r * r * 60.0 ) * 2.4 + exp( - r * 7.0 ) * 0.3 + raya * 0.8 ) * borde, vec3( 1.0 ) );      // camino directo: va al lienzo sin pase de tono (valores de pantalla, caída más corta)
+  gl_FragColor = vec4( c, 1.0 );
+}`;
+
 // ---------- utilería ----------
 const DISCOS = ['#a8241f', '#1d3f96', '#c79a12', '#1f7436', '#a8241f', '#1d3f96'];
 
@@ -303,7 +392,7 @@ export class Look {
     this.props = new THREE.Group(); this.props.name = 'Utilería'; arena.group.add(this.props);      // fijo: stage.js lo junta por material
     const paso = (nombre, f) => { try { f(); } catch (e) { console.warn('look:', nombre, e); } };
     { const g = ambiente.golpe.bind(ambiente); ambiente.golpe = (z, k) => { g(z, k); USO.value = Math.min(1, USO.value + .03); }; }      // cada barra que cae deja más magnesio
-    { const s = ambiente.setLuces.bind(ambiente); ambiente.setLuces = L => { s(L); for (const c of ambiente.uPolvo.uLuzCol.value) c.multiplyScalar(.16); }; }      // el polvo solo se insinúa en los conos (se leía como nieve)
+    { const s = ambiente.setLuces.bind(ambiente); ambiente.setLuces = L => { s(L); for (const c of ambiente.uPolvo.uLuzCol.value) c.multiplyScalar(.24); }; }      // el polvo solo se insinúa en los conos (se leía como nieve)
     { const u = ambiente.update.bind(ambiente); ambiente.update = dt => { u(dt); this.update(dt); }; }      // avanza con el ambiente (stage.js no cambia)
     paso('luces', () => this._luces(lighting));
     paso('tarima', () => this._tarima(grande ? 2048 : 1024, aniso));
@@ -314,12 +403,14 @@ export class Look {
     this.goma = null; paso('goma de disco', () => { this.goma = gomaDisco(256); this.texturas.push(this.goma.roughnessMap, this.goma.bumpMap); });
     paso('utilería', () => this._utileria(aniso, grande));
     paso('rayos', () => this._rayos(lighting));
+    paso('halos', () => this._halos());
+    paso('vestir', () => this._vestir());
   }
 
   /** Luz de competencia: sala a oscuras, clave casi cenital, contraluz cálido marcado desde atrás a la izquierda. */
   _luces(L) {
     L.key.position.set(4.4, 9.3, 3.9); L.key.color.set('#fff0dc'); L.key.intensity = 4.7; L.key.angle = .3; L.key.penumbra = .7;
-    L.key2.color.set('#c6d6ff'); L.key2.intensity = .32;
+    L.key2.color.set('#ffe9d2'); L.key2.intensity = .7; L.key2.position.set(-3.6, 4.6, 7.2);      // relleno bajo y de frente: abre las cuencas de los ojos que la cenital deja apagadas
     L.stage.color.set('#b9c6e0'); L.stage.intensity = 1.1;
     L.hemi.color.set('#56688a'); L.hemi.groundColor.set('#2c2016'); L.hemi.intensity = .15;
     L.wash.color.set('#8fa0c4'); L.wash.intensity = .07;
@@ -347,7 +438,7 @@ export class Look {
       const m = o.material; if (!m || Array.isArray(m) || !m.isMeshBasicMaterial) return;
       if (o.geometry?.type === 'CylinderGeometry' && o.geometry.parameters.radiusTop > 30) k(m, o.geometry.parameters.height > 5 ? 1.25 : .6);      // pabellón y cinta de luz
       else if (o.geometry?.type === 'PlaneGeometry' && o.geometry.parameters.width === 90) m.color.set('#090a0d');                                 // piso de sala
-      else if (o.geometry?.type === 'PlaneGeometry' && o.geometry.parameters.width === 17) m.color.multiply(new THREE.Color(.75, .85, 1.1));                                               // telón
+      else if (o.geometry?.type === 'PlaneGeometry' && o.geometry.parameters.width === 17) { const t = telon(); this.texturas.push(t); m.map?.dispose(); m.map = t; m.color.setRGB(1.15, 1.15, 1.15); m.needsUpdate = true; }                                               // telón
     });
     if (A.cinta) { const vistos = new Set(); for (const o of A.group.children) { const m = o.material; if (m?.map?.source === A.cinta.source && !vistos.has(m)) { vistos.add(m); k(m, .55); } } }
     for (const o of A.group.children) if (o.isInstancedMesh && o.material.isMeshBasicMaterial && o.geometry.type === 'BoxGeometry' && !o.material.map) k(o.material, .6);      // escalones y barandas
@@ -357,7 +448,7 @@ export class Look {
     // los dos cargadores de pie eran cápsulas azules fuera de escala (lo único que queda en esos lotes en el juego): fuera
     for (const o of A.group.children) if (o.isInstancedMesh && (o.geometry.type === 'CapsuleGeometry' || (o.geometry.type === 'SphereGeometry' && Math.abs(o.geometry.parameters.radius - .105) < 1e-6))) o.visible = false;
     // la bruma de sala (velos aditivos) lavaba los negros: a un tercio
-    { const hechos = new Set(); A.group.traverse(o => { const m = o.material; if (m?.map === A.hazeTex && m.color && !hechos.has(m)) { hechos.add(m); m.color.multiplyScalar(.3); } }); }
+    { const hechos = new Set(); A.group.traverse(o => { const m = o.material; if (m?.map === A.hazeTex && m.color && !hechos.has(m)) { hechos.add(m); m.color.set('#8fa0b8').multiplyScalar(.004); /* casi nada y frío: de costado los velos se sumaban en un banco beige sobre la tribuna */ } }); }
     if (this.ambiente?.uPolvo) this.ambiente.uPolvo.uTam.value = .0045;
   }
   /** Pantalla LED: fondo oscuro y grano de píxel en el sombreador (un punto por LED; de lejos se promedia: sin muaré). */
@@ -457,6 +548,10 @@ export class Look {
       const o = new THREE.Mesh(new THREE.PlaneGeometry(w, w), m); o.rotation.set(-Math.PI / 2, 0, ry); o.position.set(x, Y0 + .003, z); o.receiveShadow = true; o.renderOrder = 1; P.add(o); (this.calcos ||= []).push(o); };
     calcoDe('tiza', -3.15, -1.9, 1.7); calcoDe('tiza', 3.2, -1.95, 1.5, 1); calcoDe('cinta', -3.6, 3.3, 1.5); calcoDe('cinta', 3.6, -3.0, 1.5, Math.PI);
 
+    // la pantalla tiñe el piso delante suyo (aditivo, solo con post: va con las calcomanías)
+    { const t = canvasTexture(brilloPiso(), { aniso: 2 }); this.texturas.push(t);
+      const o = new THREE.Mesh(new THREE.PlaneGeometry(10.6, 3.0), new THREE.MeshBasicMaterial({ name: 'brillo de la pantalla en el piso', map: t, color: new THREE.Color(.5, .5, .5), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+      o.rotation.x = -Math.PI / 2; o.position.set(0, Y0 + .004, -3.45); o.renderOrder = 2; P.add(o); (this.calcos ||= []).push(o); }
     // pared de chapa pintada a los lados de la pantalla (materiales.js: toda por función), con columnas, caño y tablero eléctrico
     { const ch = this.chapaMat = chapa('#2a4350'); this.propMats.add(ch);
       for (const s of [-1, 1]) { const g = grupo(s * 7.05, -5.72, 0, -1);
@@ -476,6 +571,42 @@ export class Look {
   /** Todo lo que dibuja la utilería (después de juntarFijos las piezas fijas son mallas por material en la arena): para la variante «sin utilería» del banco. */
   utileria() { const M = this.propMats, o = []; this.arena.group.traverse(x => { if (x === this.props || x === this.discos || (x.isMesh && M.has(x.material))) o.push(x); }); return o; }
 
+
+
+  /** Lo que cierra y viste la sala: parrilla del techo, murales con siluetas a los lados de la pantalla y banderas grandes colgadas sobre las tribunas. Planos sin luces (todo pintado): valen en cualquier calidad. */
+  _vestir() {
+    const A = this.arena, G = A.group, tx = t => { this.texturas.push(t); return t; };
+    // techo: tapa el vacío de arriba (desde la primera persona se veía un cielo negro con puntos sueltos)
+    A.group.traverse(o => { if (o.geometry?.type === 'CircleGeometry' && o.geometry.parameters.radius === 42) o.visible = false; });
+    const te = new THREE.Mesh(new THREE.PlaneGeometry(84, 84), new THREE.MeshBasicMaterial({ name: 'techo', map: tx(techo()), color: new THREE.Color(.5, .5, .5), fog: false })); te.rotation.x = Math.PI / 2; te.position.y = 13; te.frustumCulled = false; G.add(te);
+    // murales a los lados de la pantalla, detrás del tablero y del reloj
+    for (const s of [-1, 1]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 5.0), new THREE.MeshBasicMaterial({ name: 'mural', map: tx(mural(384, 640, s > 0)), color: new THREE.Color(.26, .26, .26) })); m.position.set(s * 7.2, 2.55, -5.55); G.add(m); }
+    // banderas ficticias grandes, colgadas del techo sobre las tribunas (las mismas ocho de los banderines)
+    const bt = tx(canvasTexture(banderines(), { aniso: 4 })), pos = [], uv = [], idx = [], N = 8;
+    const colgar = (cx, cz, nx, nz, i, w = 3.2, h = 5.2, y1 = 12.4) => { const tx2 = -nz, tz = nx, b = pos.length / 3, y0 = y1 - h; pos.push(cx - tx2 * w / 2, y0, cz - tz * w / 2, cx + tx2 * w / 2, y0, cz + tz * w / 2, cx + tx2 * w / 2, y1, cz + tz * w / 2, cx - tx2 * w / 2, y1, cz - tz * w / 2); uv.push(i / N, 0, (i + 1) / N, 0, (i + 1) / N, 1, i / N, 1); idx.push(b, b + 1, b + 2, b, b + 2, b + 3); };
+    for (let k = 0; k < 6; k++) colgar(-12.5 + k * 5, 12.6, 0, -1, (k * 3) % N);              // frente (lo que mira el pesista)
+    for (let k = 0; k < 6; k++) colgar(-12.5 + k * 5, -10.2, 0, 1, (k * 3 + 1) % N);            // detrás de la pantalla
+    for (const s of [-1, 1]) for (let k = 0; k < 4; k++) colgar(s * 12.2, -7.5 + k * 5, -s, 0, (k * 3 + (s > 0 ? 2 : 5)) % N);      // costados
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+    const o = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ name: 'banderas', map: bt, color: new THREE.Color(.3, .3, .3), side: THREE.DoubleSide })); o.frustumCulled = false; G.add(o);
+  }
+
+  /** Halos de las luminarias del truss y de las torres (las mismas posiciones que arma arena.js). */
+  _halos() {
+    const TY = 7.1, TB = 6.3, L = [], luz = (pos, hacia, color, tam, k = 1) => L.push({ pos, hacia, color, tam, k });
+    for (let i = 0; i < 8; i++) { const x = -6.3 + i * 1.8; luz([x, TB - .3, -4.6], [x * .25, .4, -.2], i < 4 ? '#ffb877' : '#d6e4ff', 2.3, 1); }
+    for (let i = 0; i < 6; i++) { const x = -5 + i * 2; luz([x, TY - .3, 6.8], [x * .2, 1, 0], '#ffe6c4', 2.3, 1); }
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) luz([s * 7.4, TY - .35 - i * .05, 3.6 - i * 2.8], [0, 1, 0], i === 1 ? '#fff0d8' : (s < 0 ? '#ffc48a' : '#cfe0ff'), 2.0, .9);
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) luz([s * 7.22, 2.9 + i * .95, -4.4], [s * 1.2, 1.2, 0], i === 1 ? '#ffd9a0' : '#f4f0ff', 1.0, .4);
+    const n = L.length, P = new Float32Array(n * 3), C = new Float32Array(n * 3), D = new Float32Array(n * 3), T = new Float32Array(n), c = new THREE.Color(), a = new THREE.Vector3(), b = new THREE.Vector3();
+    L.forEach((l, i) => { a.set(...l.pos); b.set(...l.hacia).sub(a).normalize(); a.addScaledVector(b, .14); a.toArray(P, i * 3); b.toArray(D, i * 3); c.set(l.color).multiplyScalar(l.k); c.toArray(C, i * 3); T[i] = l.tam; });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('aColor', new THREE.BufferAttribute(C, 3)); g.setAttribute('aDir', new THREE.BufferAttribute(D, 3)); g.setAttribute('aTam', new THREE.BufferAttribute(T, 1));
+    const m = this.haloMat = new THREE.ShaderMaterial({ name: 'halos de focos', vertexShader: HALO_VS, fragmentShader: HALO_FS, uniforms: { uAlto: { value: 720 }, uFuerza: { value: 3.2 }, uDirecto: { value: 0 }, uMax: { value: 220 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+    const o = this.halos = new THREE.Points(g, m); o.name = 'halos de focos'; o.frustumCulled = false; o.renderOrder = 6;
+    const tam = new THREE.Vector2(); o.onBeforeRender = r => { const rt = r.getRenderTarget(); m.uniforms.uAlto.value = rt ? rt.height : r.getDrawingBufferSize(tam).y; };
+    this.arena.group.add(o);
+  }
+
   /** Conos de bruma de la clave y de los dos contraluces. Solo se ven con post (setNivel). */
   _rayos(L) {
     const geo = new THREE.CylinderGeometry(.05, 1, 1, 32, 1, true); geo.translate(0, -.5, 0); this.rayos = [];
@@ -485,7 +616,7 @@ export class Look {
       const g = new THREE.Group(); g.position.copy(l.position); g.lookAt(hasta); g.rotateX(-Math.PI / 2);
       const m = new THREE.Mesh(geo, mat); m.scale.set(rad, len, rad); m.renderOrder = 5; m.frustumCulled = false; g.add(m); this.group.add(g); this.rayos.push({ mat, base: fuerza });
     };
-    rayo(L.rimA, .03, .62); rayo(L.rimB, .014, .6);      // solo los dos contraluces: los conos de la clave y del pelo casi no se veían y eran pantalla entera de mezcla
+    rayo(L.rimA, .013, .42); rayo(L.rimB, .008, .4);      // haces angostos y definidos: anchos eran un banco de niebla beige sobre la tribuna      // solo los dos contraluces: los conos de la clave y del pelo casi no se veían y eran pantalla entera de mezcla
     this.group.visible = false;
   }
 
@@ -502,6 +633,7 @@ export class Look {
       // En el camino directo no se dibuja (Media para arriba sí), hasta medir en una placa
       for (const o of this.utileria()) if (o !== this.props) o.visible = !d; this.props.visible = !d; }
     FINO.value = Q.directo ? 0 : 1;
+    if (this.haloMat) { this.haloMat.uniforms.uDirecto.value = Q.directo ? 1 : 0; this.haloMat.uniforms.uMax.value = Q.directo ? 84 : 220; }      // en el camino directo, halos chicos: poca pantalla de mezcla
     // en el camino directo la pared de chapa (material físico en mucha pantalla) no se dibuja: queda el telón, como antes
     this.arena.group.traverse(o => { if (o.material === this.chapaMat) o.visible = sup; });      // la chapa es toda por función: sin superficies sería un paño liso
     BOKEH.uScale.value = Q.directo ? .12 : .18;      // luces de fondo: puntos con halo en el camino directo (eran discos grises), bokeh moderado con post      // superficies por función solo con post
