@@ -17,7 +17,7 @@ Blender **no se corre en la Mac del dueño**: los personajes se construyen en Gi
 | `masa` | Kilos. Por defecto, el tope de la categoría; obligatoria en las abiertas (`+110`, `+86`). |
 | `musculo` | 0 a 1: masa muscular. |
 | `grasa` | 0 a 1: panza, cara más llena, menos definición y menos venas. |
-| `prop` | Proporciones. `femur`, `tibia`, `brazo` y `hombros` como **fracción de la estatura** medida en el esqueleto; `torso`, `cadera`, `gluteos` y `cintura` como desvío de -1 a 1. |
+| `prop` | Proporciones. `femur`, `tibia`, `brazo` y `hombros` como **fracción de la estatura** medida en el esqueleto; `antebrazo` como parte del brazo que es antebrazo (0,495 por defecto); `torso`, `cadera`, `gluteos` y `cintura` como desvío de -1 a 1. |
 | `rasgos` | Mezcla (africano, asiático, caucásico) de los rasgos base. |
 | `cara` | Lista de (target de MPFB, peso): forma de cabeza, mentón, nariz, pómulos, cejas, boca, orejas. |
 | `piel` | Tono: un nombre de `PIEL` (`muy_clara` … `muy_oscura`) o `'#rrggbb'`. |
@@ -36,18 +36,24 @@ por género desde el 1 de junio de 2025, y el 8 de mayo de 2025 cambió la de 98
 - **La masa manda sobre el volumen.** `body.py` estima la masa del cuerpo (volumen encerrado por la piel por una densidad
   que baja con la grasa) y busca el macro `weight` de MPFB que da la masa pedida. Si con el máximo no alcanza, suma un
   paquete de volumen (tronco, cadera, muslos y brazos). Línea `MASA` del log.
-- **Las proporciones son metas del esqueleto.** `femur`, `tibia`, `brazo` y `hombros` se miden entre articulaciones del
-  esqueleto ya armado. El build rearma el cuerpo unas ocho veces (segundos cada una) hasta cumplirlas. Línea `PROP`; si un
-  target de MPFB llega a su tope, lo dice.
+- **Las proporciones son metas del esqueleto.** `femur`, `tibia`, `brazo`, `hombros` y `antebrazo` se miden entre
+  articulaciones del esqueleto ya armado. El build rearma el cuerpo unas ocho veces (segundos cada una) hasta cumplirlas.
+  Línea `PROP`; si un target de MPFB llega a su tope, lo dice y deja esa meta lo más cerca que puede.
+- **Límite conocido de las palancas:** con el antebrazo más largo que el brazo (más de 0,51 del brazo) el codo no llega a
+  la altura del rack con el agarre de cargada, y `check()` lo marca (`codo-rack`). No se resuelve aflojando el chequeo.
+- **Barra por género:** hombres 20 kg y 28 mm; mujeres 15 kg y 25 mm (`rbar`, `barkg` en el estilo; `bar` en `poses.json`).
+  Con la mano chica, la de 25 mm es la que deja cerrar el hook.
+- **Prendas a escala:** rodilleras y medias se escalan con la estatura; el corte de la malla (escote y sisa) cambia con el género.
 - **Reglas por género y categoría** (`plantel.cfg()` y `plantel.proporciones()`): el más alto de su género tiene palancas
   más largas; el más pesado, hombros y cintura más anchos. La mujer lleva hombros más angostos, más cadera y glúteo, busto,
   piernas de pesista y tren superior con menos volumen. Con grasa, el volumen del tren superior lo pone la grasa y no el
   músculo marcado.
-- **Cuerpo femenino**: malla con el escote más alto y la sisa más cerrada, sin sombra de barba ni vello, cejas más finas, sin
-  relieve de pectoral bajo la tela, y pelo atado (`rodete`, `rodete_alto`): hebras peinadas hacia el moño, sin entradas ni
+- **Cuerpo femenino**: malla con el escote más alto y la sisa más cerrada, busto alisado bajo la tela (como lo deja un top
+  deportivo), sin sombra de barba ni vello, cejas más finas, sin relieve de pectoral, y pelo atado (`rodete`, `rodete_alto`): hebras peinadas hacia el moño, sin entradas ni
   degradé, y un moño de malla pegado al hueso `Head`.
 - **Mismo esqueleto y mismas animaciones.** Los 52 huesos Mixamo más `Bar` y las reglas de `poses.py` son los mismos para
-  todos; `check()` no se toca.
+  todos. Lo que se generalizó en las reglas para que valgan en todo el rango de cuerpos está en `HANDOFF.md`, «Plantel
+  paramétrico»: la regla de tiempos (línea `TIMING`), la escala de la mano en el rack y la cápsula del pecho.
 
 ## Cómo se agrega un pesista
 
@@ -101,8 +107,13 @@ Para los materiales por parámetro (piel, pelo y tela) no hace falta reconstruir
 |---|---|
 | Tono de piel, color de pelo, iris, malla, vivo, rodillera, zapatilla, cinturón (hex sRGB), peinado, barba, género | `web/data/plantel.json`, `pesistas.<id>` |
 | Máscara por texel: R piel, G tela, B pelo | `web/models/<id>_mask.webp` (ruta en `poses.json`, `mask`), con el UV del material `Body` |
+| Segunda máscara: R rodilleras, G medias, B vendas de muñeca | `web/models/<id>_mask2.webp` (`mask2` en `poses.json`), mismo UV. La tela de la malla sola es `mask.G × (1 − max(mask2.R, mask2.G, mask2.B))`. Solo la traen los pesistas del plantel nuevo |
 | Materiales del GLB | `Body` (piel, malla, rodilleras, medias y vendas en un solo UV), `Eyes`, `Hair` (capas con alfa), `Lashes`, `Bun` (moño opaco, solo con pelo atado), `ShoeUpper`, `ShoeSole`, `ShoeHeel`, `ShoeStrap`, `ShoeLace`, `Belt`, `BeltMetal` |
 | Nodos de malla | `Human` (lleva los morphs correctivos) y `Human_parts` (todo lo demás) |
+
+Las zapatillas y el cinturón ya son materiales aparte (no están en el UV de `Body`). Con `Athlete.setAspecto()` de la rama
+`look`, `PLANTEL[id].aspecto` se toma de `juego.aspecto` de la ficha si existe; el vestuario nunca arrastra el aspecto del
+modelo anterior.
 
 El UV de `Body` es el mismo mallado base para todos los pesistas (MPFB): una textura o una máscara pintada sobre ese UV
 sirve para cualquiera. El color de la malla hoy está horneado en `body_color`; el juego ya lo puede tapar con un color plano
