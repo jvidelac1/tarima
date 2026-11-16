@@ -677,6 +677,7 @@ html[data-pantalla=intento] #tablero,body:has(#margen:not([hidden])) #tablero{to
 .aprende button:hover{color:var(--ink)}
 .aprende[data-donde=panel]{left:auto;max-width:none;box-sizing:border-box}
 .aprende.sin-lugar{visibility:hidden}
-html:where(.horiz).zurdo .aprende[data-donde=esquina]{left:calc(var(--boton) + var(--bm)*2 + var(--sl))}
+/* zurdo: el botón redondo (y «Saltar») ocupan la esquina de abajo a la izquierda: la explicación va justo encima */
+html:where(.horiz).zurdo .aprende[data-donde=esquina]{bottom:calc(var(--sb) + var(--bm)*2 + var(--boton))}
 :where(html.horiz.bajo) .aprende{font-size:max(11.5px,calc(var(--u)*1.05));max-width:min(32cqw,calc(var(--u)*28))}
 @media (prefers-reduced-motion:no-preference){.aprende{animation:entraL .18s ease-out}}

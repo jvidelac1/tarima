@@ -6,7 +6,7 @@
 // Dónde: con el panel del llamado abierto, encima del panel (el pesista está del otro lado); en lo demás (turno de un rival,
 // veredicto de un rival), abajo a la izquierda, donde en 'b' y 'u' no hay nada (el zócalo no se muestra) y el pesista no llega.
 // Solo en 'b' y 'u' (main.js decide); nunca durante el levantamiento propio.
-import { t } from '../i18n/t.js';
+import { t, alCambiarIdioma } from '../i18n/t.js';
 import { ENVIONES } from '../roster.js';
 
 /**
@@ -50,17 +50,20 @@ export class Aprende {
     // el botón no se lleva el foco ni el toque: Espacio sigue siendo del juego, y el toque no cuenta para el levantamiento (input.js ignora botones)
     el.querySelector('button').addEventListener('click', e => { e.preventDefault(); e.currentTarget.blur(); this.cerrar('boton'); });
     tv.appendChild(el);
+    alCambiarIdioma(() => { if (this.act) { this._pintar(); this.colocar(); } });      // cambia el idioma con una a la vista (desde la pausa)
+  }
+  _pintar() {
+    const a = this.act, { titulo, linea } = textoDe(a.clave, a.c), b = this.el.querySelector('button');
+    this.el.querySelector('b').textContent = titulo; this.el.querySelector('p span').textContent = linea; b.setAttribute('aria-label', t('aprende.cerrar')); b.title = t('aprende.cerrar');
   }
   visto(clave) { return !!this.o.guardado.get('tarima.visto.a_' + clave); }
   /** Intenta mostrar la explicación de este momento. Devuelve la clave mostrada o null. */
   momento(momento, c = {}) {
     if (this.act) { if (this.o.ahora() - this.act.t0 < LEIDO_MS) return null; this.cerrar('sola'); }
     const x = elegir(momento, c, k => this.visto(k)); if (!x) return null;
-    const { titulo, linea } = textoDe(x.clave, c), n = (+this.o.guardado.get('tarima.aprende.n_' + x.clave) || 0) + 1;
+    const n = (+this.o.guardado.get('tarima.aprende.n_' + x.clave) || 0) + 1;
     this.o.guardado.set('tarima.aprende.n_' + x.clave, String(n));
-    this.act = { clave: x.clave, t0: this.o.ahora(), donde: momento === 'llamado' ? 'panel' : 'esquina', n };
-    this.el.querySelector('b').textContent = titulo; this.el.querySelector('p span').textContent = linea;
-    const b = this.el.querySelector('button'); b.setAttribute('aria-label', t('aprende.cerrar')); b.title = t('aprende.cerrar');
+    this.act = { clave: x.clave, c, t0: this.o.ahora(), donde: momento === 'llamado' ? 'panel' : 'esquina', n }; this._pintar();
     this.el.dataset.clave = x.clave; this.el.dataset.donde = this.act.donde; this.el.hidden = false; this.colocar();
     this.o.ev('explicacion_vista', { clave: x.clave, momento, pantalla: this.o.pantalla(), vez: n });
     return x.clave;
@@ -87,11 +90,12 @@ export class Aprende {
     const pn = this.o.panel(), tv = el.parentElement; if (!pn || !tv) return;
     const rotado = document.documentElement.classList.contains('rotado');
     // con el contenido girado (teléfono en vertical) las cajas salen rotadas: ahí se usan los desplazamientos
-    const caja = rotado ? { l: pn.offsetLeft, t: pn.offsetTop, w: pn.offsetWidth } : (() => { const r = pn.getBoundingClientRect(), q = tv.getBoundingClientRect(); return { l: r.left - q.left, t: r.top - q.top, w: r.width }; })();
+    const de = e => { let x = 0, y = 0; for (let n = e; n; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; } return { x, y }; }, o0 = rotado ? de(tv) : null;
+    const caja = rotado ? (() => { const o = de(pn); return { l: o.x - o0.x, t: o.y - o0.y, w: pn.offsetWidth }; })() : (() => { const r = pn.getBoundingClientRect(), q = tv.getBoundingClientRect(); return { l: r.left - q.left, t: r.top - q.top, w: r.width }; })();
     const W = tv.clientWidth, H = tv.clientHeight, gap = 6;
     s.right = Math.max(0, W - caja.l - caja.w) + 'px'; s.width = caja.w + 'px'; s.bottom = (H - caja.t + gap) + 'px';
     // arriba quedan la caja de las luces y los botones de sonido, pausa y ayuda
-    const techo = Math.max(...['.relojbox', '#pausa', '#sonidob', '#ayudab'].map(q => { const e = document.querySelector(q); if (!e || e.hidden || !e.offsetParent) return 0; return rotado ? e.offsetTop + e.offsetHeight : e.getBoundingClientRect().bottom - tv.getBoundingClientRect().top; }));
+    const techo = Math.max(...['.relojbox', '#pausa', '#sonidob', '#ayudab'].map(q => { const e = document.querySelector(q); if (!e || e.hidden || !e.offsetParent) return 0; return rotado ? de(e).y - o0.y + e.offsetHeight : e.getBoundingClientRect().bottom - tv.getBoundingClientRect().top; }));
     if (caja.t - gap - el.offsetHeight < techo + gap) el.classList.add('sin-lugar');
   }
   /** Para las pruebas: lo que está a la vista. */
