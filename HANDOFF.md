@@ -1511,7 +1511,16 @@ Rama `graficos2`, desde `prueba` (primera-vez + utm + graficos). Nada fusionado 
 - Capturas miradas (artefacto `graficos-out`): jueces de frente, jurado con válido y con nulo, general (jurado lateral) y
   reversa (los tres árbitros con las paletas arriba), en Móvil, Baja, Media y Alta.
 
-**Pendiente / estimación.** Nada medido en una placa real. Las caras son un maniquí con nariz y ojos (sin boca ni cejas). El
+- **Banco en el teléfono** (`juego.html?banco=1`; bug del dueño: «Copiar el JSON» no respondía al toque): los botones
+  atienden `click` y `pointerup` táctil, la copia va con `navigator.clipboard.writeText` dentro del gesto y, si no hay
+  portapapeles o falla, el JSON queda seleccionado en un cuadro de texto visible para copiarlo a mano; la tabla se desplaza
+  con el dedo (`touch-action: pan-x pan-y`; el cuerpo tiene `none`) y arriba hay un resumen grande («Elige: Alta · 2,94 MP ·
+  15 % de margen» y la línea de `resultado.texto`) con los botones al lado: alcanza una captura. **Sin probar en un teléfono
+  real** (la causa exacta no se pudo reproducir: se cubrieron las tres posibles).
+- **Primera medida en una placa real** (Mac del dueño, M1 Pro, 120 Hz, Chrome, rama graficos): el banco eligió **Alta a
+  2,94 MP con 15 % de margen**; Ultra cuesta 16 % más que Alta; el ambiente nuevo no se distingue del ruido.
+
+**Pendiente / estimación.** Falta medir en un teléfono real y, con los jueces, otra vez en la Mac. Las caras son un maniquí con nariz y ojos (sin boca ni cejas). El
 selector no muestra la vista elegida detrás del panel hasta que empieza el levantamiento. En una ventana más alta que ancha
 la cámara es siempre la lateral, se elija lo que se elija. Falta una prueba de navegador que fuerce un nulo propio.
 
