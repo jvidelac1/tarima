@@ -50,9 +50,6 @@ R=dict(thigh=brad(['LeftUpLeg'],hd('LeftUpLeg'),hd('LeftLeg'),75,tr=(.25,1)),thi
        knee=brad(['LeftLeg','LeftUpLeg'],hd('LeftLeg')-(hd('LeftLeg')-hd('LeftUpLeg'))*.12,hd('LeftLeg')+(hd('LeftFoot')-hd('LeftLeg'))*.12,90,True),
        uarm=brad(['LeftArm'],hd('LeftArm'),hd('LeftForeArm'),70,tr=(.3,1)),fore=brad(['LeftForeArm'],hd('LeftForeArm'),hd('LeftHand'),70),
        hipF=float(np.percentile((C0.y-_co[:,1])[(np.abs(_co[:,2]-C0.z)<.07*K)&(np.abs(_co[:,0])<.12*K)&(_co[:,1]<C0.y)],70)),chestF=brad(['Spine1','Spine2'],hd('Spine1'),hd('Neck'),75,True,(0,.75)))
-# Pecho alto (bajo las clavículas), medido aparte: con busto o panza el radio único del pecho (chestF) sale varios centímetros más gordo que el cuerpo
-# a la altura por donde la barra entra al rack. La cápsula del pecho va de chestF abajo a este radio arriba, y nunca más gorda que chestF.
-R['chestU']=min(R['chestF'],brad(['Spine1','Spine2'],hd('Spine1'),hd('Neck'),75,True,(.5,.75)))
 print('RADII',NAME,{k:round(v,3) for k,v in R.items()})
 print(f'SKEL {NAME}: TH={TH:.3f} SHN={SHN:.3f} UA={UA:.3f} FA={FA:.3f} hipZ={C0.z:.3f} shZ={SHZ0:.3f} shX={SHX:.3f} ankle=({ANK.x:.3f},{ANK.y:.3f},{ANK.z:.3f})')
 
@@ -315,10 +312,7 @@ def bar_clear(y,z,legs,tors=True):
     if tors:
         Cc=(PB('LeftUpLeg').matrix.translation+PB('RightUpLeg').matrix.translation)/2; s1=PB('Spine1').matrix.translation; nk=PB('Neck').matrix.translation; hb=PB('Head').matrix
         s2=s1.lerp(nk,.7); hc=hb.translation+(hb.to_3x3()@Vector((0,1,0))).normalized()*.105*K
-        c=min(c,d2(y,z,Cc,s1)-R['hipF'],d2(y,z,nk,hb.translation)-.062*K,math.hypot(hc.y-y,hc.z-z)-.10*K)
-        if R['chestU']>=R['chestF']-1e-6: c=min(c,d2(y,z,s1,s2)-R['chestF'])
-        else:
-            for k in range(17): u=k/16; q=s1.lerp(s2,u); c=min(c,math.hypot(q.y-y,q.z-z)-(R['chestF']+(R['chestU']-R['chestF'])*max(0.,(u-.35)/.65)))     # el radio baja recién en el tercio alto
+        c=min(c,d2(y,z,Cc,s1)-R['hipF'],d2(y,z,s1,s2)-R['chestF'],d2(y,z,nk,hb.translation)-.062*K,math.hypot(hc.y-y,hc.z-z)-.10*K)
     return c-RBAR
 def contact(fn,hi,lo,step=.003):
     """Primer contacto viniendo desde adelante: baja de a pasos mientras fn>0 (libre) y afina por bisección, para que el resultado sea continuo entre cuadros."""
