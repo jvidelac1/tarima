@@ -79,7 +79,7 @@ export class Publico {
     // --- tribunas horneadas: se arman la primera vez que una calidad sin profundidad de campo las pide
     if (arena.impostors) { arena.impostors.removeFromParent(); arena.impostors.traverse(o => { o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose(); }); arena.impostors = null; }
     const sq = arena.setQuality.bind(arena);
-    arena.setQuality = q => { if (!q.dof && !arena.impostors) { try { this._hornear(); } catch (e) { console.warn('publico: horneado', e); } } sq(q); };
+    arena.setQuality = q => { if (!q.dof && !arena.impostors) { try { this._pintada(); } catch (e) { console.warn('publico: horneado', e); } } sq(q); };
     this.listo = true;
   }
   /** Dibuja las variantes al atlas (una vez). */
@@ -103,6 +103,34 @@ export class Publico {
    * y una tira vertical por fila en su lugar. Se ve como el público de verdad desde cualquier cámara (las filas se tapan
    * entre sí) con cuatro llamadas de dibujo en total.
    */
+  /**
+   * Tribuna pintada para «Baja» y «Móvil»: un plano inclinado por tribuna con una textura dibujada a baja frecuencia (filas de
+   * cabezas y hombros como manchas blandas sobre un degradé oscuro, con el filo de luz arriba de cada una), con filtrado
+   * lineal y mipmaps. No se puede pixelar: no hay siluetas recortadas ni filas horneadas (que a pocos píxeles se leían como
+   * un patrón de bloques). Cuatro dibujos, sin mezcla.
+   */
+  _pintada() {
+    const A = this.arena, FI = 8, CO = 16, W = 512, H = 256, r = azar(909), cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d'); g.fillStyle = '#080b12'; g.fillRect(0, 0, W, H);
+    for (let f = 0; f < FI; f++) {      // de la fila de arriba a la de abajo (las de adelante tapan a las de atrás)
+      const y0 = (f + 1) * H / FI, hh = H / FI, som = g.createLinearGradient(0, y0 - hh, 0, y0); som.addColorStop(0, 'rgba(6,8,13,0)'); som.addColorStop(1, 'rgba(4,5,9,.9)'); g.fillStyle = som; g.fillRect(0, y0 - hh, W, hh);
+      for (let c = 0; c < CO; c++) for (const dx of [0, W]) {      // dos veces: enlosa en x
+        const x = (c + .5 + (r() - .5) * .5 + (f % 2) * .5) * W / CO % W + dx - (dx ? W : 0), y = y0 - hh * (.5 + r() * .2), rw = W / CO * (.3 + r() * .08), t = 26 + r() * 16;
+        const cu = g.createRadialGradient(x, y + hh * .42, 0, x, y + hh * .42, rw * 1.5); cu.addColorStop(0, `rgba(${t},${t + 3},${t + 10},.9)`); cu.addColorStop(1, `rgba(${t},${t + 3},${t + 10},0)`); g.fillStyle = cu; g.fillRect(x - rw * 2, y, rw * 4, hh);      // hombros
+        const ca = g.createRadialGradient(x, y, 0, x, y, rw * .8); ca.addColorStop(0, `rgba(${t + 22},${t + 18},${t + 16},.95)`); ca.addColorStop(.6, `rgba(${t + 8},${t + 8},${t + 10},.7)`); ca.addColorStop(1, `rgba(${t},${t},${t + 6},0)`); g.fillStyle = ca; g.fillRect(x - rw, y - rw, rw * 2, rw * 2);      // cabeza
+        const fi = g.createRadialGradient(x, y - rw * .45, 0, x, y - rw * .45, rw * .55); fi.addColorStop(0, `rgba(${c % 3 ? '150,165,200' : '210,170,130'},${.2 + r() * .22})`); fi.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = fi; g.fillRect(x - rw, y - rw, rw * 2, rw);      // filo de luz en la coronilla
+      }
+    }
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 4; tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.name = 'tribuna pintada';
+    const grupo = new THREE.Group(), mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, color: new THREE.Color(.8, .8, .8) });
+    A.stands.forEach(st => {
+      const bx = st.back[0], bz = st.back[1], L = Math.hypot(A._rise, A._depth), len = st.rows * L + .9;
+      const X = new THREE.Vector3(-bz, 0, bx), Y = new THREE.Vector3(bx * A._depth, A._rise, bz * A._depth).normalize(), Z = new THREE.Vector3().crossVectors(X, Y);
+      const pg = new THREE.PlaneGeometry(st.w + .6, len), uv = pg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (st.w / (CO * A._pitch)), uv.getY(i) * (st.rows / FI));
+      const m = new THREE.Mesh(pg, mat); m.matrixAutoUpdate = false; m.matrix.makeBasis(X, Y, Z).setPosition(new THREE.Vector3(st.o[0], st.o[1] + .75, st.o[2]).addScaledVector(Y, len / 2 - .3)); m.frustumCulled = false; grupo.add(m);
+    });
+    grupo.name = 'tribunas pintadas'; grupo.userData.tex = tex; A.impostors = grupo; A.group.add(grupo); this.horneado = grupo;
+  }
   _hornear() {
     const A = this.arena, crowd = A.crowd, mat = crowd.material, g0 = crowd.geometry, grupo = new THREE.Group(); grupo.name = 'tribunas horneadas';
     const BH = 1.5, M = new THREE.Matrix4(), r = this.renderer, fondo = new THREE.Color(.11, .12, .15), suave = mat.uniforms.uSuave.value; mat.uniforms.uHorneo.value = HORNEO; mat.uniforms.uSuave.value = 0;      /* fondo más oscuro que la gente; sin sesgo de mipmap (la textura ya es chica) */      // fondo opaco del tono de la sombra de la tribuna: la masa es continua, sin recortes dentados ni huecos negros
@@ -135,5 +163,5 @@ export class Publico {
     mat.uniforms.uHorneo.value = 0; mat.uniforms.uSuave.value = suave;
     A.impostors = grupo; A.group.add(grupo); this.horneado = grupo;
   }
-  dispose() { this.atlas?.dispose(); this.horneado?.traverse(o => { o.userData.rt?.dispose(); o.geometry?.dispose(); o.material?.dispose(); }); }
+  dispose() { this.atlas?.dispose(); this.horneado?.userData.tex?.dispose(); this.horneado?.traverse(o => { o.userData.rt?.dispose(); o.geometry?.dispose(); o.material?.dispose(); }); }
 }
