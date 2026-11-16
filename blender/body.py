@@ -30,8 +30,29 @@ def masa_estimada(b,H,rho,cache={}):
     T,inb=cache[key]; co=_mix(b); z=co[inb,2]; k=H/(z.max()-z.min()); P=co*k
     v=abs(float(np.einsum('ij,ij->i',P[T[:,0]],np.cross(P[T[:,1]],P[T[:,2]])).sum())/6.)
     return v*1000*rho,v*1000
+# Proporciones como metas (fracción de la estatura entre articulaciones del esqueleto): qué target de MPFB mueve cada una y cuánto
+# cambia la medida por unidad de target (estimación inicial; se corrige con lo medido en cada vuelta).
+PROP=dict(femur=('legs/{s}-upperleg-scale-vert',.105),tibia=('legs/{s}-lowerleg-scale-vert',.06),brazo=('arms/measure-{p}arm-length',.09),hombros=('torso/measure-shoulder-dist',.035))
 def build(name,probe=False):
-    cfg=CFG[name]
+    """Cuerpo y esqueleto del pesista. Si trae 'metas' de proporciones, rearma el cuerpo (hasta 5 veces, unos segundos cada una)
+    corrigiendo los targets de largo hasta que el esqueleto las cumple a menos de 2 milésimas de la estatura."""
+    cfg=CFG[name]; metas=cfg.get('metas')
+    if not metas: return _build(name,cfg,{})[:2]
+    x={k:0. for k in metas}; sens={k:PROP[k][1] for k in metas}; xp=mp=None
+    for it in range(5):
+        if it: boot()
+        b,rig,med=_build(name,cfg,x); err={k:metas[k]-med[k] for k in metas}; peor=max(abs(e) for e in err.values())
+        print(f"PROP {name} vuelta {it+1}: "+' · '.join(f"{k} {med[k]:.3f} (meta {metas[k]:.3f}, target {x[k]:+.2f})" for k in metas),flush=True)
+        if peor<.002 or it==4: break
+        if xp:
+            for k in metas:
+                dx=x[k]-xp[k]; dm=med[k]-mp[k]
+                if abs(dx)>.02 and dm/dx>0: sens[k]=min(max(dm/dx,PROP[k][1]*.3),PROP[k][1]*3)
+        xp=dict(x); mp=dict(med); x={k:max(-1.,min(1.,x[k]+err[k]/sens[k])) for k in metas}
+    fuera=[k for k in metas if abs(err[k])>=.004]
+    if fuera: print(f"PROP {name}: NO ALCANZA la meta en {fuera} (el target de MPFB llegó a su tope o no converge)")
+    return b,rig
+def _build(name,cfg,x):
     HS=di('mpfb.services.humanservice','HumanService'); TS=di('mpfb.services.targetservice','TargetService'); HP=di('mpfb.entities.objectproperties','HumanObjectProperties'); LS=di('mpfb.services.locationservice','LocationService')
     b=HS.create_human()
     for k,v in cfg['macro'].items(): HP.set_value(k,v,entity_reference=b)
@@ -50,8 +71,9 @@ def build(name,probe=False):
     for s in 'lr':
         tg(f'legs/{s}-upperleg-muscle-incr',M['pierna']); tg(f'legs/{s}-lowerleg-muscle-incr',M['gemelo'])
         tg(f'arms/{s}-upperarm-shoulder-muscle-incr',M['hombro']); tg(f'arms/{s}-upperarm-muscle-incr',M['brazo']); tg(f'arms/{s}-lowerarm-muscle-incr',M['antebrazo'])   # físico de levantador: volumen de deltoides, brazo y antebrazo (no cambia largos)
-        pm(f'legs/{s}-upperleg-scale-vert',cfg['legs']['up']); pm(f'legs/{s}-lowerleg-scale-vert',cfg['legs']['low'])
-    pm('arms/measure-upperarm-length',cfg['arms']['up']); pm('arms/measure-lowerarm-length',cfg['arms']['low']); pm('torso/torso-scale-vert',cfg['torso'])
+        pm(f'legs/{s}-upperleg-scale-vert',cfg['legs']['up']+x.get('femur',0)); pm(f'legs/{s}-lowerleg-scale-vert',cfg['legs']['low']+x.get('tibia',0))
+    pm('arms/measure-upperarm-length',cfg['arms']['up']+x.get('brazo',0)); pm('arms/measure-lowerarm-length',cfg['arms']['low']+x.get('brazo',0)); pm('torso/torso-scale-vert',cfg['torso'])
+    if x.get('hombros'): pm('torso/measure-shoulder-dist',x['hombros'])
     tg('torso/torso-muscle-pectoral-incr',M['pectoral']); tg('torso/torso-muscle-dorsi-incr',M['dorsal']); tg('stomach/stomach-tone-incr',M['abdomen']); tg('neck/measure-neck-circ-incr',M['cuello'])
     for p,w in cfg['extra']+cfg.get('face',[]): tg(p,w)
     H=cfg['height']; rho=cfg.get('rho',1.05)
@@ -98,7 +120,7 @@ def build(name,probe=False):
     BN={x.name[10:]:x for x in rig.data.bones}; P=lambda n:BN[n].head_local
     H=cfg['height']; fem=(P('LeftLeg')-P('LeftUpLeg')).length; tib=(P('LeftFoot')-P('LeftLeg')).length; ua=(P('LeftForeArm')-P('LeftArm')).length; fa=(P('LeftHand')-P('LeftForeArm')).length; tor=P('LeftArm').z-P('LeftUpLeg').z
     print(f'MEASURE {name}: H={H:.2f} femur={fem:.3f} ({fem/H:.3f}) tibia={tib:.3f} ({tib/H:.3f}) torso={tor:.3f} ({tor/H:.3f}) arm={ua+fa:.3f} ({(ua+fa)/H:.3f}) fem/tor={fem/tor:.2f} shW={P("LeftArm").x*2:.3f} ankle_x={P("LeftFoot").x:.3f}')
-    return b,rig
+    return b,rig,dict(femur=fem/H,tibia=tib/H,brazo=(ua+fa)/H,hombros=P('LeftArm').x*2/H)
 if __name__=='__main__':
     boot()
     for n in CFG: build(n,True)
