@@ -118,7 +118,11 @@ function pelo(estilo, n, r, forma) {
     }
     filas.push(f);
   }
-  const piezas = [{ g: grilla(filas, { polo1: V(0, Y_TOPE + gr * 1.05, -.012) }), parte: 'pelo' }];
+  const gp = grilla(filas, { polo1: V(0, Y_TOPE + gr * 1.05, -.012) }), so = new Float32Array(gp.attributes.position.count).fill(1);
+  // mechones (franjas que siguen la caída del pelo), raíz más oscura y un brillo ancho en la coronilla
+  for (let j = 0; j <= NV; j++) for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2, v = j / NV; so[j * n + k] = (.72 + .2 * Math.sin(a * 5 + fase) + .12 * Math.sin(a * 9 + v * 4 + fase * 2)) * (.7 + .3 * suave(0, .25, v)) * (1 + .45 * Math.exp(-(((v - .62) / .16) ** 2))); }
+  gp.setAttribute('sombra', new THREE.BufferAttribute(so, 1));
+  const piezas = [{ g: gp, parte: 'pelo' }];
   if (estilo === 'rodete') { const o = new THREE.SphereGeometry(.036, 10, 8); o.translate(0, .19, -.105); piezas.push({ g: o, parte: 'pelo' }); }
   if (estilo === 'cola') piezas.push({ g: miembro([V(0, .165, -.1), V(0, .13, -.135), V(0, .04, -.13), V(0, -.06, -.115)], [[.022, .02], [.026, .022], [.022, .018], [.01, .008]], 8, 3), parte: 'pelo' });
   return piezas;

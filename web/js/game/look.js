@@ -303,7 +303,7 @@ export class Look {
     this.props = new THREE.Group(); this.props.name = 'Utilería'; arena.group.add(this.props);      // fijo: stage.js lo junta por material
     const paso = (nombre, f) => { try { f(); } catch (e) { console.warn('look:', nombre, e); } };
     { const g = ambiente.golpe.bind(ambiente); ambiente.golpe = (z, k) => { g(z, k); USO.value = Math.min(1, USO.value + .03); }; }      // cada barra que cae deja más magnesio
-    { const s = ambiente.setLuces.bind(ambiente); ambiente.setLuces = L => { s(L); for (const c of ambiente.uPolvo.uLuzCol.value) c.multiplyScalar(.4); }; }      // el polvo solo se insinúa en los conos (se leía como nieve)
+    { const s = ambiente.setLuces.bind(ambiente); ambiente.setLuces = L => { s(L); for (const c of ambiente.uPolvo.uLuzCol.value) c.multiplyScalar(.16); }; }      // el polvo solo se insinúa en los conos (se leía como nieve)
     { const u = ambiente.update.bind(ambiente); ambiente.update = dt => { u(dt); this.update(dt); }; }      // avanza con el ambiente (stage.js no cambia)
     paso('luces', () => this._luces(lighting));
     paso('tarima', () => this._tarima(grande ? 2048 : 1024, aniso));
@@ -324,9 +324,9 @@ export class Look {
     L.hemi.color.set('#56688a'); L.hemi.groundColor.set('#2c2016'); L.hemi.intensity = .15;
     L.wash.color.set('#8fa0c4'); L.wash.intensity = .07;
     // rimA mira a la cámara general (atrás a la izquierda): es EL contraluz, cálido y ancho (también rasa el piso)
-    L.rimA.color.set('#ffa85c'); L.rimA.intensity = 6.5; L.rimA.angle = .46; L.rimA.penumbra = .85; L.rimA.position.set(-6.3, 5.6, -4.6);
-    L.rimB.color.set('#9fd0ff'); L.rimB.intensity = 5.5; L.rimB.angle = .4;
-    L.hair.color.set('#ffe2bc'); L.hair.intensity = 3.4;
+    L.rimA.color.set('#ffa85c'); L.rimA.intensity = 4.4; L.rimA.angle = .46; L.rimA.penumbra = .85; L.rimA.position.set(-6.3, 5.6, -4.6);
+    L.rimB.color.set('#9fd0ff'); L.rimB.intensity = 3.2; L.rimB.angle = .4;
+    L.hair.color.set('#ffe2bc'); L.hair.intensity = 2.5;
   }
   _tarima(S, aniso) {
     const A = this.arena, m = A.madera; if (!m) return;

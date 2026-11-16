@@ -210,14 +210,14 @@ export const FINO = { value: 1 };
 export const ASPECTO = Object.freeze({
   piel: Object.freeze({ tono: '#f0dfd2', saturacion: .9, variacion: 1, rugosidad: .68, sudor: .55, brillo: .3, dispersion: [.5, .15, .08] }),
   pelo: Object.freeze({ color: null }),
-  tela: Object.freeze({ tinte: '#ffffff', plano: null, arrugas: .5, brillo: .5 }),
+  tela: Object.freeze({ tinte: '#ffffff', plano: null, arrugas: .5, brillo: .14 }),
 });
 const _color = (c, out) => (Array.isArray(c) ? out.setRGB(c[0], c[1], c[2]) : out.set(c ?? '#ffffff'));
 function bodyMaterial(src, mask, aniso, detail, mpu) {
   const m = new THREE.MeshPhysicalMaterial({
     name: src.name, map: src.map, normalMap: src.normalMap, roughnessMap: src.roughnessMap, metalnessMap: src.metalnessMap, aoMap: src.aoMap,
     color: src.color, roughness: src.roughness, metalness: src.metalness, side: src.side,
-    sheen: .5, sheenRoughness: .5, sheenColor: new THREE.Color(.5, .5, .56), envMapIntensity: .35, specularIntensity: 1,
+    sheen: .14, sheenRoughness: .6, sheenColor: new THREE.Color(.32, .32, .36), envMapIntensity: .35, specularIntensity: 1,
   });
   if (src.normalMap) m.normalScale.copy(src.normalScale);
   for (const t of [m.map, m.normalMap, m.roughnessMap, m.aoMap]) if (t) t.anisotropy = aniso;
