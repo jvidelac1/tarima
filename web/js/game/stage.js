@@ -183,7 +183,9 @@ function conBorde(m) {
 }
 
 const v = new THREE.Vector3(), v2 = new THREE.Vector3();
-const _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _pc = new THREE.Vector3(), _pd = new THREE.Vector3();
+const _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _pc = new THREE.Vector3(), _pd = new THREE.Vector3(), _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion();
+/** Respiración del pesista de pie después del intento (posarMezcla): grados de cabeceo por hueso del tronco y ciclos por segundo. */
+export const RESPIRA = { grados: .9, hz: .55 };
 export const CAM = Object.fromEntries(CAMERAS.map((c, i) => [c.key, i]));
 /**
  * Planos propios del juego (el visor no los ve). `medio`: plano americano del pesista que se prepara en el llamado (de las
@@ -207,16 +209,23 @@ export const PLANOS = {
  * filtro corto, y la mirada es sintética: siempre al frente (sin guiñada ni balanceo), con una inclinación que sigue a la
  * barra a medias y despacio. Reglas, iguales para cualquier biotipo y cualquier fase:
  * - ojo = cabeza + `arriba` m a lo largo del cuello + `adelante` m hacia el frente del tronco (por metro de estatura / 1,7).
- * - inclinación = ángulo hacia la barra × peso. El peso es `pesoLejos` con la barra bien abajo de los ojos (en la tarima: se
- *   miran la barra y las manos), `pesoCerca` con la barra cerca de la cara (hombros: se mira casi al frente y la barra queda
- *   en el borde de abajo) y `pesoArriba` con la barra por encima (se mira apenas hacia arriba: los brazos en la periferia).
- *   Entre `abajo` y `arriba` (rad), y llega con retardo (`giro` por segundo): la barra pasa por delante de la cara.
+ * - inclinación de la mirada, hacia un destino que llega con retardo (`giro` por segundo):
+ *   · con la barra apoyada en la tarima y lejos de la cara (el agarre), se la mira: la barra queda `margen` rad por debajo
+ *     del centro de la imagen, con las manos (hasta `abajo` rad: casi a plomo, porque en la salida la barra queda debajo de
+ *     los ojos). Es el momento de la barrita de timing: las manos y la barra se ven por encima de ella.
+ *   · apenas la barra despega (entre `despega[0]` y `despega[1]` m sobre su apoyo) o está cerca de la cara (a menos de
+ *     `cerca[1]`..`cerca[0]` m: en los hombros), la mirada va al frente (`frente` rad, un poco hacia abajo: jueces y público, y
+ *     los antebrazos en el borde de abajo). Así en el tirón la cámara ya está quieta y es la barra la que sube por delante.
+ *   · con la barra suelta (después del intento: cae, rebota y rueda), también al frente: se la ve caer por delante y
+ *     quedan a la vista los árbitros con sus paletas y la tribuna.
+ *   · con la barra por encima de los ojos, apenas hacia arriba (hasta `tope` rad): la barra queda fuera de cuadro, como en
+ *     la realidad, y se ven el jurado y la tribuna.
  * - lente: `fov` grados de alto, o lo que dé `fovAncho` de ancho en pantallas muy anchas; el acercamiento de la barrita lo cierra un poco.
  * - respiración (sube y baja unos milímetros y cabecea unas décimas de grado) y temblor del esfuerzo: nada con movimiento reducido.
  * - la cabeza propia no se dibuja mientras la cámara esté a menos de `sinCabeza` m de los ojos (el hueso de la cabeza se
  *   achica a un punto: cara, pelo, ojos y pestañas van pesados a él). La sombra sale sin cabeza: cae detrás del pesista.
  */
-export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 5.5, pesoLejos: .74, pesoCerca: .46, pesoArriba: .4, abajo: -1.08, tope: .44, sinCabeza: .35, foco: 1.6,
+export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 5.5, margen: .17, abajo: -1.43, frente: -.21, tope: .14, despega: [.03, .3], cerca: [.3, .6], sinCabeza: .35, foco: 1.6,
   resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003 }, temblor: .006 };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
@@ -499,7 +508,7 @@ export class Escena {
     const a = this.activo; if (!a) return;
     aplicarEsfuerzo(a, temblor, t, this.reduceMotion);
     this._temblor = temblor;
-    const g = pose.base + pose.s, i = Math.floor(g); a.setPair(i, i + 1, g - i);
+    const g = pose.base + pose.s, i = Math.floor(g); a.setPair(i, i + 1, g - i); this._suelta = false;
     // el pesista recibe la barra (la muestra cruza la fase de recepción en reproducción continua): dip de la cámara
     if (dt > 0 && dt < .1 && this._rec?.seg === pose.seg && this._rec.s < pose.s && pose.s - this._rec.s < 8) { const r = this._recepcion(pose.seg); if (r >= 0 && this._rec.s < r && pose.s >= r) { this.viva.dip(1); if (this.pov) this.viva.golpe(.55); } }
     (this._rec ||= {}).seg = pose.seg; this._rec.s = pose.s;
@@ -518,7 +527,15 @@ export class Escena {
     const a = this.activo; if (!a) return;
     this._temblor = 0;
     aplicarEsfuerzo(a, 0, 0, true); a.root.position.z += p.dz || 0; a.root.position.y += p.dy || 0;
-    a.setMix(p.i, p.j, p.u, p.k, p.w); this.rig.headY = a.boneWorld('Head', v2).y + .14; this.sombra = 3;
+    if (p.brazos) a.setParts(p, p.brazos); else a.setMix(p.i, p.j, p.u, p.k, p.w);
+    // de pie después del intento no queda de estatua: respira agitado (el pecho cabecea alrededor del eje lateral del mundo,
+    // RESPIRA.grados en cada hueso del tronco, a RESPIRA.hz), tanto más cuanto más cerca de «Parado». Nada con movimiento reducido.
+    if (p.w > 0 && p.t !== undefined && !this.reduceMotion) {
+      const ang = THREE.MathUtils.degToRad(RESPIRA.grados) * p.w * Math.sin(p.t * Math.PI * 2 * RESPIRA.hz);
+      for (const k of ['Spine1', 'Spine2']) { const h = a._byName.get(k); if (!h) continue; h.parent.getWorldQuaternion(_qa); h.quaternion.premultiply(_qb.setFromAxisAngle(_pa.set(1, 0, 0), ang).premultiply(_qc.copy(_qa).invert()).multiply(_qa)); }
+      a.root.updateMatrixWorld(true);
+    }
+    this.rig.headY = a.boneWorld('Head', v2).y + .14; this.sombra = 3;
   }
   /**
    * Barra suelta en {y, z, ang} (m y radianes: rueda sobre su eje). Con `dt` la flexión de la barra sigue la aceleración
@@ -527,7 +544,7 @@ export class Escena {
   barraSuelta(b, dt = 0) {
     // la barra contra la tarima (venía bajando y frenó de golpe cerca del piso): temblor según la velocidad del golpe
     if (dt > 0 && dt < .1) { const v0 = (this._py[0] - this._py[1]) / dt, v1 = (b.y - this._py[0]) / dt; if (v0 < -1.2 && v1 - v0 > 1.2 && b.y < this.pisoBarra + .08) { const k = Math.min(.85, .18 - v0 * .11); this.viva.golpe(k); this.ambiente.golpe(b.z, k); } }
-    v.set(0, b.y, b.z); this.barbell.setPosition(v); this.barbell.group.rotation.x = b.ang || 0;
+    v.set(0, b.y, b.z); this.barbell.setPosition(v); this.barbell.group.rotation.x = b.ang || 0; this._suelta = true;
     this.barY = b.y; this.barZ = b.z; this.rig.barY = b.y; this.rig.barAhead = b.y;
     if (dt > 0 && dt < .1) { const acc = (b.y - 2 * this._py[0] + this._py[1]) / (dt * dt); this.barbell.step(dt, b.y, acc); } else this.barbell.settle(b.y);
     this._py[1] = dt > 0 ? this._py[0] : b.y; this._py[0] = b.y; this.sombra = 3;
@@ -605,10 +622,11 @@ export class Escena {
   _povCam(cam, dt) {
     const S = this.pov, R = this.rig, o = this.ojos(_pd), quieto = this.reduceMotion; S.t += dt;
     if (S.nueva) S.p.copy(o); else S.p.lerp(o, 1 - Math.exp(-POV.sigue * dt));
-    // inclinación de la mirada: hacia la barra, a medias
-    const b = this.barbell.group.position, dy = b.y - S.p.y, hacia = Math.atan2(dy, Math.max(.25, b.z - S.p.z));
-    const u = Math.min(1, Math.max(0, (-dy - .25) / .5)), peso = dy > 0 ? POV.pesoArriba : POV.pesoCerca + (POV.pesoLejos - POV.pesoCerca) * u * u * (3 - 2 * u);
-    const incT = Math.min(POV.tope, Math.max(POV.abajo, hacia * peso));
+    // inclinación de la mirada (reglas de POV): a la barra apoyada y lejos; al frente si despegó o está cerca; apenas arriba si está por encima
+    const b = this.barbell.group.position, dy = b.y - S.p.y, dz = b.z - S.p.z, paso = (x, a, c) => { const t = Math.min(1, Math.max(0, (x - a) / (c - a))); return t * t * (3 - 2 * t); };
+    const mirar = this._suelta ? 0 : paso(Math.hypot(dy, dz), POV.cerca[0], POV.cerca[1]) * (1 - paso(b.y - this.pisoBarra, POV.despega[0], POV.despega[1]));
+    const alFrente = dy > 0 ? Math.min(POV.tope, POV.frente + (POV.tope - POV.frente) * paso(dy, 0, .35)) : POV.frente;
+    const incT = alFrente + (Math.max(POV.abajo, Math.min(alFrente, Math.atan2(dy, dz) + POV.margen)) - alFrente) * mirar;
     S.inc = S.nueva ? incT : S.inc + (incT - S.inc) * (1 - Math.exp(-(quieto ? 60 : POV.giro) * dt)); S.nueva = false;
     let inc = S.inc, bal = 0, y = 0;
     if (!quieto) {

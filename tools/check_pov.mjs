@@ -71,16 +71,16 @@ async function recorrer(id, [nombre, lev, seg, fase, mov, res], camara, fotos, c
   const info = await J(o => window.JUEGO.test.final(o), { id, lev, seg, fase, mov, res, camara });
   if (!info) { problemas.push(`${id} · ${nombre}: no armó escena`); return null; }
   await J(() => window.JUEGO.test.medir());
-  const M = { resbala: 0, vPie: 0, tPie: 0, giro: 0, cual: '', tGiro: 0, manoTronco: 9, tMano: 0, manoAtras: 0, holgura: 9, sube: 0 }, lista = []; let ant = null, prox = 0;
+  let piso = 9; const M = { resbala: 0, vPie: 0, tPie: 0, giro: 0, cual: '', tGiro: 0, manoTronco: 9, tMano: 0, manoAtras: 0, holgura: 9, sube: 0 }, lista = []; let ant = null, prox = 0;
   for (let t = 0; t <= info.dur + .3; t += 1 / 60) {
     const sacar = fotos && t >= prox - 1e-9;
     const m = await J(([t, d]) => { const h = window.JUEGO.test.finalEn(t, d, 1 / 60, 1 / 60); return { ...window.JUEGO.test.medir(), h: h ? h.h : null }; }, [t, sacar]);
     if (sacar) { lista.push({ t: t.toFixed(2) + ' s', b: await toma() }); prox += cada; }
     if (ant) {
-      // pies: un pie apoyado (la punta a menos de 6 cm de su altura mínima de apoyo) que se corre en el plano del piso
+      // pies: un pie apoyado (la punta a menos de 12 mm de la altura más baja que se le vio) que se corre en el plano del piso
       for (const L of ['Left', 'Right']) {
         const a = ant[L + 'ToeBase'], b = m[L + 'ToeBase'], d = Math.hypot(b[0] - a[0], b[2] - a[2]);
-        if (a[1] < .1 && b[1] < .1) { M.resbala += d; if (d * 60 > M.vPie) { M.vPie = d * 60; M.tPie = t; } }
+        piso = Math.min(piso, a[1], b[1]); if (a[1] < piso + .012 && b[1] < piso + .012) { M.resbala += d; if (d * 60 > M.vPie) { M.vPie = d * 60; M.tPie = t; } }
         M.sube = Math.max(M.sube, b[1]);
       }
       if (m.giro * 60 > M.giro) { M.giro = m.giro * 60; M.cual = m.cual; M.tGiro = t; }

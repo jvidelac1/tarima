@@ -411,8 +411,21 @@ export class Athlete {
   setPair(i, j, u) { const n = this.snap.length - 1, k = x => Math.min(n, Math.max(0, x | 0)); this._blend(this.snap[k(i)], this.snap[k(j)], Math.min(1, Math.max(0, u))); }
   /** Como setPair, y el resultado se mezcla en `w` con la muestra `k` (el juego: de la pose del fallo a otra fase validada). El visor no lo usa. */
   setMix(i, j, u, k, w) { const n = this.snap.length - 1, c = x => Math.min(n, Math.max(0, x | 0)); this._blend(this.snap[c(i)], this.snap[c(j)], Math.min(1, Math.max(0, u)), this.snap[c(k)], Math.min(1, Math.max(0, w))); }
-  _blend(A, B, u, C = null, uc = 0) {
-    for (let i = 0; i < this.bones.length; i++) { const b = this.bones[i]; b.quaternion.copy(A[i][0]).slerp(B[i][0], u); b.position.copy(A[i][1]).lerp(B[i][1], u); if (C && uc > 0) { b.quaternion.slerp(C[i][0], uc); b.position.lerp(C[i][1], uc); } }
+  /**
+   * Como setMix, por partes (el juego: el final del intento, game/caida.js): los huesos de los brazos (clavícula, brazo,
+   * antebrazo, mano y dedos) salen de `br` y el resto del cuerpo de `cu`; cada uno es {i, u, k, w}: la muestra fraccionaria
+   * i + u mezclada en `w` con la muestra `k`. Así los brazos pueden desandar el clip mientras las piernas lo siguen.
+   */
+  setParts(cu, br) {
+    const n = this.snap.length - 1, c = x => Math.min(n, Math.max(0, x | 0)), S = this.snap, u01 = x => Math.min(1, Math.max(0, x));
+    this._arm ||= this.bones.map(b => /^(Left|Right)(Shoulder|Arm|ForeArm|Hand)/.test(boneKey(b.name)));
+    this._blend(S[c(cu.i)], S[c(cu.i + 1)], u01(cu.u), S[c(cu.k)], u01(cu.w), { A: S[c(br.i)], B: S[c(br.i + 1)], u: u01(br.u), C: S[c(br.k)], uc: u01(br.w) });
+  }
+  _blend(A0, B0, u0, C0 = null, uc0 = 0, arm = null) {
+    for (let i = 0; i < this.bones.length; i++) {
+      const b = this.bones[i], P = arm && this._arm[i] ? arm : null, A = P ? P.A : A0, B = P ? P.B : B0, u = P ? P.u : u0, C = P ? P.C : C0, uc = P ? P.uc : uc0;
+      b.quaternion.copy(A[i][0]).slerp(B[i][0], u); b.position.copy(A[i][1]).lerp(B[i][1], u); if (C && uc > 0) { b.quaternion.slerp(C[i][0], uc); b.position.lerp(C[i][1], uc); }
+    }
     this.root.updateMatrixWorld(true);
     const w = this.corr;
     for (const arm of this.arms) {

@@ -756,14 +756,25 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
 /** Muestra global de «Parado» (de pie detrás de la barra): adonde vuelve el pesista después de soltar. */
 const PARADO = P => { const G = tramo(P, 'clean'); return G.base + G.i('Parado'); };
 /**
+ * Reglas del cuerpo en el final (game/caida.js, poseCaida), en muestras globales del clip y por nombre de fase: desde dónde
+ * el cuerpo se para siguiendo el clip (`rec`, la recepción) y hasta dónde (`fin`, el final del segmento); y el tramo que
+ * desandan los brazos: de la recepción (después ya no se mueven) a la barra colgando con los brazos estirados (arranque y
+ * cargada: la triple extensión) o en los hombros (envión: el impulso).
+ */
+const FASES_FINAL = { snatch: ['Recepción', 'Triple extensión'], clean: ['Recepción', 'Triple extensión'], split: ['Envión · Tijera', 'Envión · Impulso'], power: ['Power jerk · Recepción', 'Envión · Impulso'], squat: ['Squat jerk · Recepción', 'Envión · Impulso'] };
+function reglasFinal(P, seg) {
+  const F = FASES_FINAL[seg]; if (!F) return null; const G = tramo(P, seg), rec = G.base + G.i(F[0]);
+  return { sub: P.sub, rec, fin: G.base + G.n - 1, brazosDe: rec, brazosA: G.base + G.i(F[1]) };
+}
+/**
  * Escena del final de un intento (game/caida.js): con qué pose terminó, cómo se suelta la barra y adónde va el pesista.
  * null si no hay nada que mostrar (no se levantó la barra).
  */
 function armarFinal(r, lev) {
   if (!r || !r.grab || !r.grab.length || !escena.P) return null;
   const M = r.m?.movs?.[r.m.movs.length - 1], g = r.grab[r.grab.length - 1];
-  const c = armarCaida(r.res, M?.mov, { y: g.y, z: g.z }, escena.pisoBarra); if (!c) return null;
-  return Object.assign(c, { g0: g.pose.base + g.pose.s, pose: g.pose, destino: PARADO(escena.P), lev, golpes: 0 });
+  const g0 = g.pose.base + g.pose.s, c = armarCaida(r.res, M?.mov, { y: g.y, z: g.z }, escena.pisoBarra, g0, reglasFinal(escena.P, g.pose.seg)); if (!c) return null;
+  return Object.assign(c, { g0, pose: g.pose, destino: PARADO(escena.P), lev, golpes: 0 });
 }
 /**
  * Dibuja el final en el instante t (s desde que terminó el intento). Antes de soltar, la pose del final con la barra en las
@@ -772,7 +783,7 @@ function armarFinal(r, lev) {
 function dibujarFinal(c, t, dt, vivo) {
   const tb = t - c.pl.suelta;
   if (tb < 0) { escena.posar(c.pose, c.lev); return; }
-  escena.posarMezcla(poseCaida(c.pl, c.g0, c.destino, t)); const b = c.barra.en(tb); escena.barraSuelta(b, dt);
+  escena.posarMezcla(poseCaida(c.pl, c.g0, c.destino, t, c.R)); const b = c.barra.en(tb); escena.barraSuelta(b, dt);
   if (vivo) for (; c.golpes < b.golpes.length; c.golpes++) { const v = b.golpes[c.golpes].v; sonido.golpe(v); if (c.golpes === 0 && c.tipo !== 'bajada') sonido.lamento(); }
 }
 /** El final quieto, en su último cuadro (cuando se saltea). */
@@ -815,11 +826,14 @@ async function decision(a, lev, res, et, propio, o = {}) {
   // sin cortes: la cámara sigue a la barra que cae y gira hacia el público con movimientos suaves; un rival que no decide nada
   // (`o.fija`) queda en la cámara general
   // un válido o un nulo propio: mientras se prenden las luces, la vista del jurado (los árbitros levantan la paleta, el pesista
-  // de frente y las tres luces arriba). El nulo se queda ahí hasta el fundido que sigue; la barra que se cae (fallo) no pasa por acá
+  // de frente y las tres luces arriba). Se queda ahí hasta el fundido que sigue; la barra que se cae (fallo) no pasa por acá
+  // (antes, en el válido, la cámara salía hacia el jurado, a los 0,7 s la interrumpía el plano de la barra que cae y 1,1 s
+  // después giraba al público: tres movimientos encadenados en menos de 3 s. Ahora, uno solo: al jurado, y se queda)
+  const alJurado = !pov && !!fin && propio && (ok || res.res === 'nulo') && !o.fija && !R0 && !escena.vertical;
   if (pov) { /* se queda en los ojos del pesista */ }
-  else if (fin && propio && (ok || res.res === 'nulo') && !o.fija && !R0 && !escena.vertical) escena.camara('jurado', 1.3);
+  else if (alJurado) escena.camara('jurado', 1.3);
   else if (fin && !ok && !o.fija) escena.primerPlano('caida', null, .45);
-  const t0 = reloj.ahora(), d = [null, null, null], hito = { luz: 0, ver: false, caida: !fin || !ok || !!o.fija || pov, rev: !!o.fija || pov };
+  const t0 = reloj.ahora(), d = [null, null, null], hito = { luz: 0, ver: false, caida: !fin || !ok || !!o.fija || pov || alJurado, rev: !!o.fija || pov || alJurado };
   const avanzar = (t, dt, vivo, conFinal = true) => {
     if (fin && conFinal) dibujarFinal(fin, t, dt, vivo);
     while (hito.luz < 3 && t >= tLuz + hito.luz * paso) { const i = hito.luz++; d[i] = res.luces[i]; setLuces(d); if (vivo) { sonido.luz(d[i]); if (limite && i < 2) sonido.latido(); if (ok && i === 1) sonido.festejo(lento || limite ? 1 : .6); } }

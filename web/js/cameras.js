@@ -67,13 +67,21 @@ export class CameraRig {
    */
   suave(seg = .7) {
     if (this.reduceMotion || !(seg > 0)) { this.mezcla = null; return; }
-    const c = this.camera; this.mezcla = { p: c.position.clone(), q: c.quaternion.clone(), fov: c.fov, t: 0, dur: seg };
+    const c = this.camera; this.mezcla = { p: c.position.clone(), q: c.quaternion.clone(), fov: c.fov, t: 0, dur: seg, T: this.target.clone() };
   }
   _mezclar(dt) {
     const M = this.mezcla; if (!M) return;
     M.t += dt; const u = Math.min(1, M.t / M.dur), k = u * u * (3 - 2 * u), cam = this.camera;
     const p = (this._mp ||= new THREE.Vector3()).copy(cam.position), q = (this._mq ||= new THREE.Quaternion()).copy(cam.quaternion);
-    cam.position.copy(M.p).lerp(p, k); cam.quaternion.copy(M.q).slerp(q, k); cam.fov = M.fov + (cam.fov - M.fov) * k;
+    // Si las dos cámaras miran más o menos al mismo sujeto, la transición lo rodea (un arco alrededor del blanco, con la
+    // distancia interpolada) en vez de ir por la cuerda: en línea recta, de un costado al otro, la cámara le pasaba al
+    // pesista por al lado y lo dejaba cortado en el borde. Si miran a lugares distintos o quedan enfrentadas, línea recta.
+    const a = (this._ma ||= new THREE.Vector3()).copy(M.p).sub(M.T), b = (this._mb ||= new THREE.Vector3()).copy(p).sub(this.target), la = a.length(), lb = b.length();
+    if (la > .5 && lb > .5 && M.T.distanceTo(this.target) < 3 && a.dot(b) / (la * lb) > -.5) {
+      const g = (this._mg ||= new THREE.Quaternion()).setFromUnitVectors(a.multiplyScalar(1 / la), b.multiplyScalar(1 / lb)), h = (this._mh ||= new THREE.Quaternion()).identity().slerp(g, k);
+      cam.position.copy(M.T).lerp(this.target, k).addScaledVector(a.applyQuaternion(h), la + (lb - la) * k); if (cam.position.y < .08) cam.position.y = .08;
+    } else cam.position.copy(M.p).lerp(p, k);
+    cam.quaternion.copy(M.q).slerp(q, k); cam.fov = M.fov + (cam.fov - M.fov) * k;
     cam.updateProjectionMatrix(); cam.updateMatrixWorld();
     if (u >= 1) this.mezcla = null;
   }
