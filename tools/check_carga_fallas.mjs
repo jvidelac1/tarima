@@ -161,7 +161,7 @@ async function shader(nombre) {
   await page.waitForFunction(() => window.JUEGO?.test, null, { timeout: 90000 }).catch(() => null);
   await page.waitForTimeout(800);
   const b = page.locator('#btn-empezar'); if (await b.count()) { if (nombre === 'telefono') await b.tap(); else { await b.focus(); await page.keyboard.press('Enter'); } }
-  const a = await esperarAviso(page, J, 180000);
+  const a = await esperarAviso(page, J, 420000);      // por software, cargar, calibrar y volver a compilar con la calidad «Móvil» puede pasar de 180 s en corridas lentas (hipótesis sin confirmar: en esas corridas el aviso no llegó a verse)
   await page.screenshot({ path: path.join(OUT, `shader_${nombre}.png`) });
   revisarAviso(tag, a, 'webgl');
   { const c = (await eventos(J)).filter(e => e.ev === 'carga_fallida'); if (!c.some(x => x.props.etapa === 'shader' && !x.props.recuperada)) problemas.push(`${tag} carga_fallida: ${JSON.stringify(c)}`); }

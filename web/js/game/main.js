@@ -404,7 +404,17 @@ let cartelAhora = '';
 /** El pisotón de ¡PÁRATE!: la imagen se sacude 4 px durante 120 ms (nada con movimiento reducido). */
 function sacudir() { const gl = $('gl'); if (reduceMotion || !gl) return; gl.classList.remove('sacude'); void gl.offsetWidth; gl.classList.add('sacude'); }
 const cartel = (txt, clase = '') => { const k = (txt || '') + '|' + clase; if (k === cartelAhora) return; cartelAhora = k; $('cartel').hidden = !txt; $('cartel').textContent = txt || ''; $('cartel').className = 'cartel ' + clase; };
-const veredicto = (txt, sub, mal) => { $('veredicto').hidden = !txt; $('veredicto').innerHTML = txt ? `${esc(txt)}${sub ? `<small>${esc(sub)}</small>` : ''}` : ''; $('veredicto').className = 'veredicto' + (mal ? ' mal' : ''); };
+/**
+ * Cartel del veredicto. Con `luces` (las tres de los jueces: el resultado de un intento) sale GRANDE y centrado arriba, con
+ * las tres luces al lado, durante 1,5 s (se ve desde cualquier cámara); después queda chico donde va siempre (juego.css: `.grande`).
+ */
+let veredictoReloj = 0;
+const veredicto = (txt, sub, mal, luces = null) => {
+  const v = $('veredicto'); clearTimeout(veredictoReloj); v.hidden = !txt;
+  v.innerHTML = txt ? `${esc(txt)}${luces ? `<span class="luces" aria-hidden="true">${luces.map(x => `<i class="${x ? 'b' : 'r'}"></i>`).join('')}</span>` : ''}${sub ? `<small>${esc(sub)}</small>` : ''}` : '';
+  v.className = 'veredicto' + (mal ? ' mal' : '') + (txt && luces ? ' grande' : '');
+  if (txt && luces) veredictoReloj = setTimeout(() => { v.classList.remove('grande'); }, 1500);
+};
 const guiaTxt = txt => { const g = $('guia'); if (g.textContent !== txt) g.textContent = txt; g.hidden = !txt; };
 const etiqueta = et => { $('etiqueta').hidden = !et?.length; $('etiqueta').textContent = (et || []).map(e => ETIQUETAS[e]).join(' · '); };
 /**
@@ -786,7 +796,7 @@ function reglasFinal(P, seg) {
 function armarFinal(r, lev) {
   if (!r || !r.grab || !r.grab.length || !escena.P) return null;
   const M = r.m?.movs?.[r.m.movs.length - 1], g = r.grab[r.grab.length - 1];
-  const g0 = g.pose.base + g.pose.s, sh = escena.activo?.midWorld(['LeftArm', 'RightArm'], new escena.barbell.group.position.constructor()), c = armarCaida(r.res, M?.mov, { y: g.y, z: g.z }, escena.pisoBarra, g0, reglasFinal(escena.P, g.pose.seg), sh ? { y: sh.y, z: sh.z } : null); if (!c) return null;
+  const g0 = g.pose.base + g.pose.s, V3 = escena.barbell.group.position.constructor, sh = escena.activo?.midWorld(['LeftArm', 'RightArm'], new V3()), cad = escena.activo?.boneWorld('Hips', new V3()), c = armarCaida(r.res, M?.mov, { y: g.y, z: g.z }, escena.pisoBarra, g0, reglasFinal(escena.P, g.pose.seg), sh ? { hombros: { y: sh.y, z: sh.z }, cadera: { y: cad.y }, kg: escena.kg || 0 } : null); if (!c) return null;
   return Object.assign(c, { g0, pose: g.pose, destino: PARADO(escena.P), lev, golpes: 0 });
 }
 /**
@@ -847,12 +857,13 @@ async function decision(a, lev, res, et, propio, o = {}) {
   // público): el plano del intento queda quieto, con el pesista, las tres luces y el resultado en pantalla. Vale para
   // cualquier vista; en primera persona tampoco hay corte a otra.
   const t0 = reloj.ahora(), d = [null, null, null], hito = { luz: 0, ver: false, caida: true, rev: true };
+  escena.fijarCamara(true);      // desde acá la cámara no se mueve: ni el lente que volvía de la barrita
   const avanzar = (t, dt, vivo, conFinal = true) => {
     if (fin && conFinal) dibujarFinal(fin, t, dt, vivo);
     while (hito.luz < 3 && t >= tLuz + hito.luz * paso) { const i = hito.luz++; d[i] = res.luces[i]; setLuces(d); if (vivo) { sonido.luz(d[i]); if (limite && i < 2) sonido.latido(); if (ok && i === 1) sonido.festejo(lento || limite ? 1 : .6); } }
     if (!hito.caida && t >= tCaida) { hito.caida = true; escena.primerPlano('caida', null, .6); }
     if (!hito.rev && t >= tRev) { hito.rev = true; escena.camara('rev', 1.1); }
-    if (!hito.ver && t >= tVer) { hito.ver = true; veredicto(titulo, sub, !ok); try { o.alVer?.(); } catch (e) { console.warn('alVer:', e); } if (!propio && vivo) aprender('decision', { nulo: res.res === 'nulo', lev }); if (vivo && !ok && (!fin || fin.tipo === 'bajada')) sonido.ovacion(false); }
+    if (!hito.ver && t >= tVer) { hito.ver = true; veredicto(titulo, sub, !ok, vivo ? res.luces : null); try { o.alVer?.(); } catch (e) { console.warn('alVer:', e); } if (!propio && vivo) aprender('decision', { nulo: res.res === 'nulo', lev }); if (vivo && !ok && (!fin || fin.tipo === 'bajada')) sonido.ovacion(false); }
   };
   enCuadro = (ahora, dt) => { avanzar((ahora - t0) / 1000, dt, true); if (uno) margenUI.cuadro(ahora); };
   // un intento propio: el veredicto (y su línea) queda al menos 1 s a la vista antes de poder saltearlo, y una ráfaga que
@@ -861,7 +872,7 @@ async function decision(a, lev, res, et, propio, o = {}) {
   seguir(!o.rival); const tS = reloj.ahora();
   const salteado = o.rival ? !!(o.salto = await esperaRival(total * 1000)) : await saltable(total * 1000, propio ? Math.round((tVer + (linea ? 1 : .4)) * 1000) : R0 ? 200 : 400, propio ? Math.round(tVer * 1000) : 0);
   if (salteado && uno) ev('veredicto_salteado', { ms: Math.round(reloj.ahora() - tS), resultado: res.res });
-  const limpiar = () => { veredicto(''); setLuces(null); seguir(false); };
+  const limpiar = () => { veredicto(''); setLuces(null); seguir(false); escena.fijarCamara(false); };
   if (o.mantener) {
     // el veredicto y el paso al siguiente son un solo momento: el texto y las luces quedan, la barra termina de caer y el
     // pesista vuelve, y todo eso se va con el fundido al pesista siguiente (pasarA → limpiarVeredicto)
@@ -1793,7 +1804,7 @@ window.JUEGO = {
     /** Lleva la escena de final() al instante t (s), la dibuja si `dibujar`, y mide holguras entre la barra y el cuerpo. */
     finalEn(t, dibujar = false, dt = 1 / 60, dtCam = .5) { const c = E.prueba; dibujarFinal(c, t, dt, false);
       // las luces y el veredicto como en el juego (decision): de a una desde 0,2 s y el cartel a 1,05 s
-      if (c.resP) { const ok = c.resP.res === 'valido', L = ok ? [true, true, true] : c.resP.res === 'nulo' ? [false, true, false] : [false, false, false], n = Math.max(0, Math.min(3, Math.floor((t - .2) / .3) + 1)); setLuces(t < .2 ? null : L.map((x, i) => (i < n ? x : null))); veredicto(t >= 1.05 ? textoDe(ok ? 'veredicto.vale' : c.resP.res === 'nulo' ? 'veredicto.no_vale' : 'veredicto.cayo') : '', '', !ok); } escena.cuadro(dtCam, dibujar); return holgura(t - c.pl.suelta, c.pl.guia ? c.pl.guia.dur : 0); },
+      if (c.resP) { const ok = c.resP.res === 'valido', L = ok ? [true, true, true] : c.resP.res === 'nulo' ? [false, true, false] : [false, false, false], n = Math.max(0, Math.min(3, Math.floor((t - .2) / .3) + 1)); setLuces(t < .2 ? null : L.map((x, i) => (i < n ? x : null))); const ver = t >= 1.05 ? textoDe(ok ? 'veredicto.vale' : c.resP.res === 'nulo' ? 'veredicto.no_vale' : 'veredicto.cayo') : ''; if (ver !== c.verP) { c.verP = ver; veredicto(ver, '', !ok, ver ? L : null); clearTimeout(veredictoReloj); } $('veredicto').classList.toggle('grande', !!ver && t < 2.55); } escena.cuadro(dtCam, dibujar); return holgura(t - c.pl.suelta, c.pl.guia ? c.pl.guia.dur : 0); },
     /** Cambio de carga a mano: de `kg0` a `kg1`, con la manga en primer plano. Devuelve la duración (s). */
     async carga(kg0, kg1, id = 'ventura') { await escena.cargar(id); await escena.mostrar(id); escena.setCarga(kg0, 's'); escena.posar(poseParado(escena.P, 's'), 's'); await escena.mostrar(null); escena.barraSuelta({ y: escena.pisoBarra, z: escena.barZ, ang: 0 }); const A = E.pruebaCarga = escena.cambioDeCarga(kg1); escena.primerPlano('manga'); return A ? { dur: A.dur, sale: A.sale, entra: A.entra } : null; },
     cargaEn(t, dibujar = false) { const A = E.pruebaCarga, x = A.en(t); escena.barraSuelta({ y: escena.pisoBarra, z: escena.barZ, ang: 0 }); escena.cuadro(.5, dibujar); return x; },

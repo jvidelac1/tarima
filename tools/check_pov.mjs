@@ -150,7 +150,7 @@ if (!SOLO || SOLO === 'pov' || SOLO === 'claves') {
   // TIRAS a tiempo real desde los ojos, con el recuadro: una foto cada 0,1 s de la preparación completa (de pie mirando al
   // frente, baja a la barra, agarra, ajusta, levanta la vista y espera: ahí corre la barrita), del levantamiento y del final
   await page.setViewportSize({ width: 1280, height: 720 }); await page.waitForTimeout(200);
-  await J(() => window.JUEGO.test.manual());
+  await J(() => { window.JUEGO.test.manual(); const v = document.getElementById('veredicto'); if (v) v.hidden = true; });
   const tira = async (id, nombre, tramos) => {
     const lista = []; let reloj = 0;
     for (const [seg, lev, espera] of tramos) {

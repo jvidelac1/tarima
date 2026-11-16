@@ -102,7 +102,7 @@ export class CameraRig {
 
   update(dt) {
     const c = CAMERAS[this.index], cam = this.camera; if (!this.fijo) this.time += dt;      // `fijo` (el juego, al terminar el intento): ni deriva, ni reencuadre, ni márgenes nuevos
-    this.az = damp(this.az, this.azT, 7, dt); this.el = damp(this.el, this.elT, 7, dt); this.zoom = damp(this.zoom, this.zoomT, 7, dt);
+    if (!this.fijo) { this.az = damp(this.az, this.azT, 7, dt); this.el = damp(this.el, this.elT, 7, dt); this.zoom = damp(this.zoom, this.zoomT, 7, dt); }
     // cámara propia (el juego: primera persona): `propia(cam, dt)` la arma entera; acá solo se le suma la transición suave
     if (this.propia) { this.propia(cam, dt); this.top = 99; this._mezclar(dt); return; }
     if (this.shot) {

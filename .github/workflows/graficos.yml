@@ -181,7 +181,7 @@ jobs:
       - name: Final cuadro a cuadro y primera persona (check_pov)
         if: ${{ !cancelled() && inputs.solo_claves != true }}
         timeout-minutes: 25
-        run: node tools/check_pov.mjs 2>&1 | tee out/logs/check_pov.log
+        run: node tools/check_pov.mjs --plantel=$TERNA 2>&1 | tee out/logs/check_pov.log
       - name: Teléfono acostado en primera persona, con la interfaz y la barrita (check_barra --solo=tel_en --camara=pov)
         if: ${{ !cancelled() && inputs.solo_claves != true }}
         timeout-minutes: 10
