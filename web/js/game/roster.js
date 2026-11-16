@@ -58,6 +58,8 @@ export function vestir(lista, fichas, poses) {
     const repetido = usados.has(m); usados.add(m);
     // un modelo repetido comparte la cara: el segundo lleva la tela de otro color y no tiene primer plano (como Marangi con Brenner)
     Object.assign(PLANTEL[id], { modelo: m, corto: f.corto, nombre: f.nombre, pais: f.pais, codigo: f.codigo, genero: f.genero, categoria: f.categoria, vestido: true,
+      // `aspecto` (rama look: Athlete.setAspecto): el del modelo nuevo si su ficha lo trae (`juego.aspecto` en blender/plantel.py); nunca el del modelo anterior
+      aspecto: f.aspecto || undefined,
       cara: !repetido, tela: repetido ? TELAS[k] : undefined, color: (!repetido && f.color) || PLANTEL[id].color, bandera: (!repetido && f.bandera) || PLANTEL[id].bandera });
     CUERPO[id] = { estatura: P.h, femur: P.seg.femur / P.h, brazos: P.seg.arm / P.h, movilidad: CUERPO[id].movilidad };
     hechos.push(id);
