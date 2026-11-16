@@ -1716,8 +1716,9 @@ transmisión. Todo lo visual pasa a otro agente; esto queda como punto de partid
 - **Los cuatro modelos nuevos no están en `web/models` ni en `web/data/poses.json`**; `plantel.json` los sigue marcando
   `listo: false`. No se corrieron `pruebas.yml` ni `graficos.yml` con el plantel.
 - Hubo **una sola** ronda de director de arte (sobre 43827465589). La segunda no se llegó a mirar.
-- Corrida **43875357534** (sobre `b05f1af`, correcciones de la ronda 1): quedó en curso al cerrar. **Nadie miró su
-  resultado**: ni CHK ni imágenes. Los cambios de cuerpo de ese commit pueden haber dado cuadros BAD.
+- Corrida **43875357534** (sobre `b05f1af`, correcciones de la ronda 1), leída del log después del cierre: **0 BAD en los
+  cuatro**, masas en objetivo (48,0 / 111,9 / 65,0 / 145,8 kg), hombros de jastrev de 0,258 a 0,243. **Las imágenes no se
+  miraron**: no se sabe si las correcciones se ven bien. Sus artefactos (retención 14 días) son los que hay que mirar y sumar.
 
 **Ronda 1 del director de arte (a ciegas, sin nota; dos agentes: retratos y hojas).**
 - Bloqueantes de retratos: ojos cerrados o caídos en los cuatro; pezones marcados bajo la malla en las dos mujeres; el brazo
