@@ -386,7 +386,7 @@ export class Look {
     const negro = new THREE.MeshStandardMaterial({ name: 'goma negra', color: new THREE.Color('#0d0d10'), roughness: .7, envMapIntensity: .4 });
     const tela = new THREE.MeshStandardMaterial({ name: 'tela', color: new THREE.Color('#b9b6ac'), roughness: .95 });
     this.propMats = new Set([metal, acero, baul, ply, negro, tela]);
-    this.utilMats = [metal, baul, ply]; for (const m of this.utilMats) m.userData.normal = m.normalMap;
+    this.utilMats = [metal, baul, ply]; for (const m of this.utilMats) { m.userData.normal = m.normalMap; m.userData.rug = m.roughnessMap; }
     const caja = new THREE.BoxGeometry(1, 1, 1), cil = new THREE.CylinderGeometry(1, 1, 1, 14);
     /** Caja o cilindro de tamaño (sx, sy, sz) centrado en (x, y, z) dentro de `g`. */
     const pz = (g, geo, mat, sx, sy, sz, x, y, z, rx = 0, ry = 0, rz = 0) => { const o = new THREE.Mesh(geo, mat); o.scale.set(sx, sy, sz); o.position.set(x, y, z); o.rotation.set(rx, ry, rz); o.receiveShadow = true; g.add(o); return o; };
@@ -454,7 +454,7 @@ export class Look {
     // calcomanías del piso: magnesio derramado junto a la magnesiera y a la caja, cinta y número
     const calcoDe = (tipo, x, z, w, ry = 0) => { const t = canvasTexture(calco(tipo), { aniso: 4 }); this.texturas.push(t);
       const m = new THREE.MeshStandardMaterial({ name: 'calco ' + tipo, map: t, transparent: true, depthWrite: false, roughness: tipo === 'tiza' ? 1 : .7, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-      const o = new THREE.Mesh(new THREE.PlaneGeometry(w, w), m); o.rotation.set(-Math.PI / 2, 0, ry); o.position.set(x, Y0 + .003, z); o.receiveShadow = true; o.renderOrder = 1; P.add(o); };
+      const o = new THREE.Mesh(new THREE.PlaneGeometry(w, w), m); o.rotation.set(-Math.PI / 2, 0, ry); o.position.set(x, Y0 + .003, z); o.receiveShadow = true; o.renderOrder = 1; P.add(o); (this.calcos ||= []).push(o); };
     calcoDe('tiza', -3.15, -1.9, 1.7); calcoDe('tiza', 3.2, -1.95, 1.5, 1); calcoDe('cinta', -3.6, 3.3, 1.5); calcoDe('cinta', 3.6, -3.0, 1.5, Math.PI);
 
     // pared de chapa pintada a los lados de la pantalla (materiales.js: toda por función), con columnas, caño y tablero eléctrico
@@ -494,7 +494,10 @@ export class Look {
     const sup = !Q.directo && (Q.amb?.superficies ?? true); setSuperficies(sup);
     // camino directo: la pantalla sin grano por píxel y la utilería sin mapa de normales (se pagaban en «Baja» y «Móvil»)
     { const d = !!Q.directo; if (this.ledPlano !== d) { this.ledPlano = d; const m = this.arena.pantalla?.material; if (m) m.needsUpdate = true; }
-      for (const m of this.utilMats || []) { const n = d ? null : m.userData.normal; if (m.normalMap !== n) { m.normalMap = n; m.needsUpdate = true; } } }
+      // la utilería en el camino directo: solo el mapa de color (sin normales ni rugosidad) y sin las calcomanías del piso
+      // (mezcla con luces sobre mucha pantalla): el banco decía que la utilería era el 20 % del cuadro de «Baja»
+      for (const m of this.utilMats || []) { const n = d ? null : m.userData.normal, g = d ? null : m.userData.rug; if (m.normalMap !== n || m.roughnessMap !== g) { m.normalMap = n; m.roughnessMap = g; m.roughness = d ? .6 : 1; m.needsUpdate = true; } }
+      for (const o of this.calcos || []) o.visible = !d; }
     FINO.value = Q.directo ? 0 : 1;
     // en el camino directo la pared de chapa (material físico en mucha pantalla) no se dibuja: queda el telón, como antes
     this.arena.group.traverse(o => { if (o.material === this.chapaMat) o.visible = sup; });      // la chapa es toda por función: sin superficies sería un paño liso
