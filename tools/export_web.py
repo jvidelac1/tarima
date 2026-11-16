@@ -36,8 +36,9 @@ def repack(src,dst,imgdir):
         nm=os.path.splitext(im.get('name',''))[0]; p=os.path.join(imgdir,nm+'.png')
         if nm in ALPHA and 'bufferView' in im and os.path.exists(p):
             b=io.BytesIO(); Image.open(p).convert('RGBA').save(b,'PNG',optimize=True); chunks[im['bufferView']]=b.getvalue(); im['mimeType']='image/png'; done[nm]=(Image.open(p).size[0],len(b.getvalue()))
+    capas={os.path.splitext(im.get('name',''))[0] for im in J.get('images',[])}     # el pelo en capas trae la imagen 'hair'; el pelo como malla opaca ('pelo') se queda OPAQUE
     for m in J.get('materials',[]):
-        if m.get('name') in ALPHA.values(): m['alphaMode']='BLEND'; m.pop('alphaCutoff',None); m['doubleSided']=m['name']=='Lashes'
+        if m.get('name') in ALPHA.values() and (m['name']!='Hair' or 'hair' in capas): m['alphaMode']='BLEND'; m.pop('alphaCutoff',None); m['doubleSided']=m['name']=='Lashes'
     out=bytearray()
     for v,c in zip(views,chunks):
         out+=b'\0'*(-len(out)%4); v['byteOffset']=len(out); v['byteLength']=len(c); out+=c

@@ -63,7 +63,7 @@ const SKIN_MASK = /* glsl */`
   else diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * uSkinTint, gMask.r );
   diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * uClothTint, gMask.g * step( 0.5, uMaskMode ) );      // tinte de la tela (conserva el diseño horneado)
   { float mx = max( diffuseColor.r, max( diffuseColor.g, diffuseColor.b ) ), mn = min( diffuseColor.r, min( diffuseColor.g, diffuseColor.b ) );
-    vec3 tl = diffuseColor.rgb * mix( 0.8, uClothGain, smoothstep( 0.15, 0.6, ( mx - mn ) / max( mx, 1e-3 ) ) ); float lt = dot( tl, vec3( 0.2126, 0.7152, 0.0722 ) ); tl = max( vec3( 0.0 ), mix( vec3( lt ), tl, 1.25 ) );      // la tela bajo los focos: el tono AgX lava lo muy claro (la malla salía del color de la piel)
+    vec3 tl = diffuseColor.rgb * mix( 0.62, uClothGain, smoothstep( 0.15, 0.6, ( mx - mn ) / max( mx, 1e-3 ) ) ); float lt = dot( tl, vec3( 0.2126, 0.7152, 0.0722 ) ); tl = max( vec3( 0.0 ), mix( vec3( lt ), tl, 1.25 ) );      // la tela bajo los focos: el tono AgX lava lo muy claro (la malla salía del color de la piel)
     diffuseColor.rgb = mix( diffuseColor.rgb, tl, gMask.g * step( 0.5, uMaskMode ) ); }
   // tela de color plano (el juego la usa para un pesista que comparte modelo): tapa lo que la textura trae horneado
   diffuseColor.rgb = mix( diffuseColor.rgb, uClothFlat.rgb, uClothFlat.a * smoothstep( 0.3, 0.6, gMask.g ) * step( 0.5, uMaskMode ) );
@@ -249,7 +249,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
       .replace('#include <normal_fragment_maps>', THREE.ShaderChunk.normal_fragment_maps.replaceAll('texture2D( normalMap, vNormalMapUv )', 'texture2D( normalMap, vNormalMapUv, uNormBias * gMask.r )') + '\n' + SKIN_DETAIL)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + SKIN_MATERIAL);
   };
-  m.customProgramCacheKey = () => 'tarima-skin-23';
+  m.customProgramCacheKey = () => 'tarima-skin-24';
   m.userData.skin = uniforms;
   return m;
 }
@@ -339,6 +339,14 @@ function hairColor(tex, out) {
   } catch { /* se queda el color por defecto */ }
   return out;
 }
+/** Pelo y barba como malla opaca con volumen (plantel nuevo, blender/geo.py `hair_cap`): mate, casi sin reflejo del ambiente; la forma la dan los gajos de la malla y la luz de contorno. */
+function capMaterial(src) {
+  src.roughness = Math.max(src.roughness ?? .8, .78); src.metalness = 0; src.envMapIntensity = .1; src.side = THREE.FrontSide;
+  if (src.normalMap) src.normalScale.set(.8, .8);
+  src.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.45; material.specularColorBlended *= 0.45; material.specularF90 *= 0.5;'); };
+  src.customProgramCacheKey = () => 'tarima-pelo-1';
+  return src;
+}
 function hairDepthMaterial(src) {
   const m = new THREE.MeshBasicMaterial({ name: 'HairDepth', map: src.map, alphaTest: .45, colorWrite: false, depthWrite: true, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
   if (src.userData.cuero) { m.onBeforeCompile = sh => conCuero(sh, src.userData.cuero); m.customProgramCacheKey = () => 'tarima-hairdepth-4'; }
@@ -414,7 +422,7 @@ export class Athlete {
         let m = src;
         if (src.name === 'Body') m = bodyMaterial(src, mask, aniso, detail, this.metersPerUv = metersPerUv(o.geometry));
         else if (src.name === 'Eyes') m = eyeMaterial(src);
-        else if (src.name === 'Hair') m = hairMaterial(src, mask, !!o.geometry.attributes.uv1);
+        else if (src.name === 'Hair') m = src.transparent ? hairMaterial(src, mask, !!o.geometry.attributes.uv1) : capMaterial(src);
         else if (src.name === 'Lashes') m = lashMaterial(src);
         else { m.envMapIntensity = .8; if (m.normalMap) m.normalMap.anisotropy = aniso; }
         if (m !== src) src.dispose();
@@ -422,7 +430,7 @@ export class Athlete {
       };
       o.material = Array.isArray(o.material) ? o.material.map(conv) : conv(o.material);
       const nm = o.material.name;
-      if (nm === 'Hair') {
+      if (nm === 'Hair' && o.material.transparent) {
         o.castShadow = false; o.renderOrder = 2;      // la sombra la da la cabeza; las capas no se sombrean entre sí
         const dm = new THREE.SkinnedMesh(o.geometry, hairDepthMaterial(o.material)); dm.name = o.name + '_depth'; dm.bind(o.skeleton, o.bindMatrix);
         dm.frustumCulled = false; dm.castShadow = dm.receiveShadow = false;

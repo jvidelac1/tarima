@@ -19,7 +19,7 @@ tex.ANAT.update(STY.get('anat',{}))   # relieve muscular del pesista: lo usan te
 json.dump({x.name[10:]:[list(x.head_local),list(x.tail_local)] for x in rig.data.bones if x.name.startswith('mixamorig:')},open(OUT+'bones_all.json','w'))
 TEXS=(['bun.png','bun_normal.png'] if STY.get('bun') else [])+['body_color.png','body_orm.png','body_normal.png','body_mask.png','hair_len.png','hair.png','lash.png','eye.png','shoe_color.png','shoe_orm.png','shoe_normal.png']+(['belt_color.png','belt_orm.png','belt_normal.png'] if STY.get('belt') else [])
 if not (os.environ.get('TARIMA_KEEPTEX') and all(os.path.exists(OUT+f) for f in TEXS)):
-    tex.body(NAME,OUT,STY,K,FONT,int(os.environ.get('TARIMA_TEXR','0')) or None); tex.eye(OUT,STY); tex.shoe(OUT,STY); tex.belt(OUT,STY); tex.hair(OUT,STY); tex.lash(OUT,STY); tex.bun(OUT,STY)
+    tex.body(NAME,OUT,STY,K,FONT,int(os.environ.get('TARIMA_TEXR','0')) or None); tex.eye(OUT,STY); tex.shoe(OUT,STY); tex.belt(OUT,STY); tex.hair(OUT,STY); tex.lash(OUT,STY); tex.bun(OUT,STY); tex.pelo(OUT,STY)
 else: print('TEX reutilizadas (TARIMA_KEEPTEX)')
 
 # ---------- materiales ----------
@@ -79,7 +79,11 @@ if not os.environ.get('TARIMA_NOSKIN'): geo.smooth_weights(b,rig,K)
 geo.subdivide(b)
 if not os.environ.get('TARIMA_NOANAT'): geo.anatomy(b,rig,K,STY.get('cut',1.))
 geo.garments(b,rig,BJ,K,K if 'escote' in STY else 1.); geo.simplify(b,rig,BJ,K,OUT,float(os.environ['TARIMA_SIMP']) if os.environ.get('TARIMA_SIMP') else None); me=b.data
-if not os.environ.get('TARIMA_NOHAIR'): parts.append(geo.hair_shells(b,OUT,alphamat('Hair',OUT+'hair.png',.42),STY.get('capas')))
+if not os.environ.get('TARIMA_NOHAIR'):
+    if 'escote' in STY and not os.environ.get('TARIMA_CAPAS'):     # plantel nuevo: pelo y barba como malla opaca con volumen (el material se sigue llamando Hair: el visor lo reconoce por ser opaco)
+        cap=geo.hair_cap(b,OUT,texmat('Hair',OUT+'pelo.png',None,OUT+'pelo_normal.png',rough=.82,nstrength=.7),LM,K)
+        if cap: parts.append(cap)
+    else: parts.append(geo.hair_shells(b,OUT,alphamat('Hair',OUT+'hair.png',.42),STY.get('capas')))
 if STY.get('bun') and not os.environ.get('TARIMA_NOHAIR'): parts.append(geo.bun(b,K,STY,LM,texmat('Bun',OUT+'bun.png',None,OUT+'bun_normal.png',rough=.46)))   # pelo atado: moño
 def newobj(name,bm_,mats,group):
     m=bpy.data.meshes.new(name); bm_.to_mesh(m); bm_.free(); o=bpy.data.objects.new(name,m); bpy.context.scene.collection.objects.link(o)
@@ -100,7 +104,7 @@ bpy.ops.object.select_all(action='DESELECT')
 for o in parts: o.select_set(True)
 b.select_set(True); bpy.context.view_layer.objects.active=b; bpy.ops.object.join()
 me=b.data; print('final verts',len(me.vertices),'tris',sum(len(p.vertices)-2 for p in me.polygons),'mats',[m.name for m in me.materials])
-if not os.environ.get('TARIMA_NOCORR'): geo.correctives(b,rig,K)
+if not os.environ.get('TARIMA_NOCORR'): geo.correctives(b,rig,K,STY.get('genero')=='F')
 bpy.ops.wm.save_as_mainfile(filepath=OUT+'s3b.blend')  # punto de partida de pose_only.py
 if os.environ.get('TARIMA_NOPOSES'): sys.exit(0)   # solo malla (renders de control con blender/ctl.py)
 exec(open(os.path.join(HERE,'poses.py'),encoding='utf-8').read())

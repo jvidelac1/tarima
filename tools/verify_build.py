@@ -16,7 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTR = os.environ.get('TARIMA_OUT') or os.path.join(ROOT, 'out')
 WEB = os.environ.get('TARIMA_WEB') or os.path.join(ROOT, 'web')
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
-MATS = {'Body', 'Eyes', 'Hair', 'Lashes', 'ShoeUpper', 'ShoeSole', 'ShoeHeel', 'ShoeStrap', 'ShoeLace'}
+MATS = {'Body', 'Eyes', 'Lashes', 'ShoeUpper', 'ShoeSole', 'ShoeHeel', 'ShoeStrap', 'ShoeLace'}
 TOL_MM, TOL_DEG = 0.5, 0.2
 FPS = 30.0
 
