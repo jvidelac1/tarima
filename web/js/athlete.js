@@ -287,7 +287,7 @@ function conCuero(sh, U) {
   Object.assign(sh.uniforms, U);
   sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n#ifndef USE_UV1\nattribute vec2 uv1;\n#endif\nvarying vec2 vCuero;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvCuero = uv1;');
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D tCuero; uniform float uCuero; varying vec2 vCuero;')
-    .replace('#include <alphatest_fragment>', 'if ( uCuero > 0.5 ) diffuseColor.a *= smoothstep( 0.3, 0.8, texture2D( tCuero, vCuero ).b );\n#include <alphatest_fragment>');
+    .replace('#include <alphatest_fragment>', 'if ( uCuero > 0.5 ) diffuseColor.a *= smoothstep( 0.06, 0.3, texture2D( tCuero, vCuero, 1.5 ).b );\n#include <alphatest_fragment>');
 }
 function hairMaterial(src, mask, uv1) {
   const U = { tCuero: { value: mask || null }, uCuero: { value: mask && uv1 ? 1 : 0 } }; src.userData.cuero = U;
@@ -301,7 +301,7 @@ function hairMaterial(src, mask, uv1) {
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.2; material.specularColorBlended *= 0.2;')
       .replace('#include <lights_physical_pars_fragment>', '#include <lights_physical_pars_fragment>\n' + HAIR_PARS);
   };
-  src.customProgramCacheKey = () => 'tarima-hair-5';
+  src.customProgramCacheKey = () => 'tarima-hair-6';
   return src;
 }
 /** Color medio (lineal) de las hebras opacas de la textura de pelo. */
@@ -341,7 +341,7 @@ function hairColor(tex, out) {
 }
 function hairDepthMaterial(src) {
   const m = new THREE.MeshBasicMaterial({ name: 'HairDepth', map: src.map, alphaTest: .45, colorWrite: false, depthWrite: true, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
-  if (src.userData.cuero) { m.onBeforeCompile = sh => conCuero(sh, src.userData.cuero); m.customProgramCacheKey = () => 'tarima-hairdepth-2'; }
+  if (src.userData.cuero) { m.onBeforeCompile = sh => conCuero(sh, src.userData.cuero); m.customProgramCacheKey = () => 'tarima-hairdepth-3'; }
   return m;
 }
 function lashMaterial(src) {
@@ -354,9 +354,9 @@ function eyeMaterial(src) {
   // al blanco y la sombra que el párpado y las pestañas de arriba echan sobre el globo (lo que más lo saca de «ojo de muñeco»).
   const m = new THREE.MeshPhysicalMaterial({ name: src.name, map: src.map, color: src.color, roughness: .38, metalness: 0, clearcoat: .7, clearcoatRoughness: .08, envMapIntensity: .45, side: src.side });
   m.onBeforeCompile = sh => {
-    sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n{ float arriba = normalize( vNormal ).y; diffuseColor.rgb *= 0.66 * mix( 0.3, 1.0, smoothstep( 0.5, -0.05, arriba ) ) * mix( 0.8, 1.0, smoothstep( -0.75, -0.2, arriba ) ); }');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n{ float arriba = normalize( vNormal ).y; diffuseColor.rgb *= 0.74 * mix( 0.42, 1.0, smoothstep( 0.55, 0.0, arriba ) ) * mix( 0.8, 1.0, smoothstep( -0.75, -0.2, arriba ) ); }');
   };
-  m.customProgramCacheKey = () => 'tarima-eye-3';
+  m.customProgramCacheKey = () => 'tarima-eye-4';
   return m;
 }
 
