@@ -708,7 +708,7 @@ html.vert :is(#pausa,#sonidob,#ayudab){top:calc(var(--st) + 8px);left:auto;trans
 html.vert #ayudab{right:calc(var(--sr) + 8px)}
 html.vert #pausa{right:calc(var(--sr) + 58px)}
 html.vert #sonidob{right:calc(var(--sr) + 108px)}
-html.vert .relojbox{top:calc(var(--st) + 54px);right:calc(var(--sr) + 8px)}
+html.vert .relojbox{--u:9px;top:calc(var(--st) + 54px);right:calc(var(--sr) + 8px)}
 html.vert #tv .bug{max-width:calc(100% - 170px - var(--sl) - var(--sr))}
 html.vert #tv .bug span{display:none}
 /* el tablero, chico arriba a la izquierda (sin tocar los botones de la derecha); en el levantamiento propio no va */
@@ -790,7 +790,9 @@ html.vert .tabla :is(th,td):last-child{display:none}
 html.vert .tabla td.n{max-width:6.5em;overflow:hidden;text-overflow:ellipsis}
 html.vert .tabla td.n i{width:1.1em;margin-right:.3em}
 /* elegir kilos: −5 −1 kilos +1 +5 en una fila */
-html.vert .kgsel{gap:6px;flex-wrap:nowrap;justify-content:center}
+html.vert .kgsel{gap:6px;justify-content:center}
+html.vert .kgsel>button.ir{flex-basis:100%}
+html.vert .panel.compacto .kgsel>button.ir{flex-basis:auto}
 html.vert .kgsel>span{display:none}
 html.vert .kgsel button.kg{min-width:46px;padding:.5em .55em}
 html.vert .kgsel output{font-size:clamp(30px,10vw,44px);min-width:2.6ch}
