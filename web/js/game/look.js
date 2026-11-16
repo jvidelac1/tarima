@@ -353,7 +353,7 @@ export class Look {
     for (const o of A.group.children) if (o.isInstancedMesh && o.material.isMeshBasicMaterial && o.geometry.type === 'BoxGeometry' && !o.material.map) k(o.material, .6);      // escalones y barandas
     // los focos del fondo: ámbar a la izquierda (acompañan al contraluz), blanco frío a la derecha; nada de rosa y celeste
     (A.beams || []).forEach((b, i) => b.mat.uniforms.uColor.value.set(i < 5 ? (i % 2 ? '#ffb469' : '#ffc890') : (i % 2 ? '#cfe0ff' : '#e9eeff')));
-    this.salaImpostor = 1.7;
+    this.salaImpostor = 1.0;
     // los dos cargadores de pie eran cápsulas azules fuera de escala (lo único que queda en esos lotes en el juego): fuera
     for (const o of A.group.children) if (o.isInstancedMesh && (o.geometry.type === 'CapsuleGeometry' || (o.geometry.type === 'SphereGeometry' && Math.abs(o.geometry.parameters.radius - .105) < 1e-6))) o.visible = false;
     // la bruma de sala (velos aditivos) lavaba los negros: a un tercio
@@ -497,7 +497,10 @@ export class Look {
       // la utilería en el camino directo: solo el mapa de color (sin normales ni rugosidad) y sin las calcomanías del piso
       // (mezcla con luces sobre mucha pantalla): el banco decía que la utilería era el 20 % del cuadro de «Baja»
       for (const m of this.utilMats || []) { const n = d ? null : m.userData.normal, g = d ? null : m.userData.rug; if (m.normalMap !== n || m.roughnessMap !== g) { m.normalMap = n; m.roughnessMap = g; m.roughness = d ? .6 : 1; m.needsUpdate = true; } }
-      for (const o of this.calcos || []) o.visible = !d; }
+      for (const o of this.calcos || []) o.visible = !d;
+      // medido (run 43827293011): ni sin mapas la utilería entraba en la meta de «Baja» (+16 %); el banco dice que es el 22 % del cuadro.
+      // En el camino directo no se dibuja (Media para arriba sí), hasta medir en una placa
+      for (const o of this.utileria()) if (o !== this.props) o.visible = !d; this.props.visible = !d; }
     FINO.value = Q.directo ? 0 : 1;
     // en el camino directo la pared de chapa (material físico en mucha pantalla) no se dibuja: queda el telón, como antes
     this.arena.group.traverse(o => { if (o.material === this.chapaMat) o.visible = sup; });      // la chapa es toda por función: sin superficies sería un paño liso
