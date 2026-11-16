@@ -41,8 +41,8 @@ void main(){
   // Lo que le da vida es el filo de luz en cabezas y hombros (uFilo), el rebote del escenario de frente y algún celular.
   vec4 t = texture2D( map, vUv, uSuave ); if ( t.a < 0.38 ) discard;
   float lr = max( dot( vCloth, vec3( 0.3, 0.6, 0.1 ) ), 0.02 ), h = fract( dot( vCloth, vec3( 12.9, 78.2, 37.7 ) ) );
-  vec3 ropa = mix( vec3( 1.0 ), vCloth / lr, 0.18 ) * ( 0.011 + 0.013 * h );
-  vec3 piel = vec3( 0.03, 0.024, 0.021 ) * ( 0.75 + 0.9 * dot( vSkin, vec3( 0.33 ) ) );
+  vec3 ropa = mix( vec3( 1.0 ), vCloth / lr, 0.18 ) * ( 0.017 + 0.02 * h );
+  vec3 piel = vec3( 0.042, 0.033, 0.028 ) * ( 0.75 + 0.9 * dot( vSkin, vec3( 0.33 ) ) );
   vec3 col = mix( ropa, piel, smoothstep( 0.2, 0.42, t.b ) ); col = mix( col, vec3( 0.008, 0.008, 0.009 ), smoothstep( 0.68, 0.9, t.b ) );
   float esc = t.g * t.g * ( 3.0 - 2.0 * t.g ), filo = pow( t.r, 5.0 );
   vec3 c = col * ( uSala * ( 0.45 + 0.55 * t.r ) * uGain + uRebote * esc ) + uFilo * filo * ( 0.35 + 0.65 * h );
@@ -53,7 +53,7 @@ void main(){
 /** Ganancia con la que se guarda la tribuna horneada (8 bits: el público es oscuro y sin esto se escalona). */
 const HORNEO = 6;
 /** En el camino directo (sin gradación ni viñeta del pase final) el mismo público queda más claro: se baja acá. */
-const DIRECTO = .5;
+const DIRECTO = .7;
 
 export class Publico {
   /** `animo`: el uniform {value} del ánimo del público (ambiente.publico.uAnimo). `chico`: texturas a la mitad (teléfono). */
@@ -72,7 +72,7 @@ export class Publico {
   if ( uFiesta * 0.75 > h && var < ${QUIETAS}.0 ) var = 10.0 + floor( fract( h * 7.3 ) * 6.0 );      // con la ovación, más gente aplaude o festeja
   vUv = vec2( ( uv.x + mod( var, ${COLS}.0 ) ) / ${COLS}.0, ( uv.y + floor( var / ${COLS}.0 ) ) / ${FILAS}.0 ); vBajo = smoothstep( -0.7, 2.4, instanceMatrix[ 3 ].y );`);
     m.fragmentShader = CROWD_FS; m.userData.conTono = false;
-    Object.assign(m.uniforms, { uFiesta: animo, uSala: { value: new THREE.Color(.75, .86, 1.12) }, uFilo: { value: new THREE.Color(.034, .028, .022) }, uHorneo: { value: 0 }, uSuave: { value: 1.7 } });
+    Object.assign(m.uniforms, { uFiesta: animo, uSala: { value: new THREE.Color(.75, .86, 1.12) }, uFilo: { value: new THREE.Color(.05, .041, .032) }, uHorneo: { value: 0 }, uSuave: { value: 1.7 } });
     m.uniforms.map.value = this.atlas.texture; m.uniforms.uGain.value = .8; m.uniforms.uRebote.value.set(.75, .55, .4); m.needsUpdate = true;
     arena.crowdTex?.dispose(); arena.crowdTex = this.atlas.texture;
     // --- tribunas horneadas: se arman la primera vez que una calidad sin profundidad de campo las pide
@@ -104,7 +104,7 @@ export class Publico {
    */
   _hornear() {
     const A = this.arena, crowd = A.crowd, mat = crowd.material, g0 = crowd.geometry, grupo = new THREE.Group(); grupo.name = 'tribunas horneadas';
-    const BH = 1.5, M = new THREE.Matrix4(), r = this.renderer, fondo = new THREE.Color(.27, .3, .36); mat.uniforms.uHorneo.value = HORNEO;      // fondo opaco del tono de la sombra de la tribuna: la masa es continua, sin recortes dentados ni huecos negros
+    const BH = 1.5, M = new THREE.Matrix4(), r = this.renderer, fondo = new THREE.Color(.1, .112, .14), suave = mat.uniforms.uSuave.value; mat.uniforms.uHorneo.value = HORNEO; mat.uniforms.uSuave.value = 0;      /* fondo más oscuro que la gente; sin sesgo de mipmap (la textura ya es chica) */      // fondo opaco del tono de la sombra de la tribuna: la masa es continua, sin recortes dentados ni huecos negros
     A.stands.forEach((st, si) => {
       const ids = []; A.seats.forEach((s, i) => { if (s.si === si) ids.push(i); });
       const g = new THREE.InstancedBufferGeometry(); g.index = g0.index; for (const k of ['position', 'uv']) g.setAttribute(k, g0.attributes[k]);
@@ -131,7 +131,7 @@ export class Publico {
       const q = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ map: rt.texture, side: THREE.DoubleSide, color: new THREE.Color(.95 / HORNEO, 1 / HORNEO, 1.1 / HORNEO).multiplyScalar(DIRECTO) }));
       q.matrixAutoUpdate = false; q.frustumCulled = false; q.userData.rt = rt; grupo.add(q);
     });
-    mat.uniforms.uHorneo.value = 0;
+    mat.uniforms.uHorneo.value = 0; mat.uniforms.uSuave.value = suave;
     A.impostors = grupo; A.group.add(grupo); this.horneado = grupo;
   }
   dispose() { this.atlas?.dispose(); this.horneado?.traverse(o => { o.userData.rt?.dispose(); o.geometry?.dispose(); o.material?.dispose(); }); }

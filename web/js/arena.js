@@ -166,8 +166,8 @@ varying vec3 vCol; varying float vDisc; varying float vZ; varying float vD;
 void main(){
   vec4 mv = modelViewMatrix * vec4( position, 1.0 ); float d = max( - mv.z, 0.01 );
   float coc = clamp( ( abs( d - uFocus ) - uRange ) * ( d < uFocus ? uNearScale : uScale ) / d, 0.0, 1.0 ) * uMaxBlur;
-  float base = max( aSize * uPx / d, 3.4 ), size = max( base, 2.0 * coc );      // nunca un punto duro de un píxel: un brillo blando
-  vCol = aColor * 0.5 * pow( base / size, 1.5 ); vDisc = smoothstep( 1.5, 5.0, coc );
+  float base = max( aSize * uPx / d, 4.6 ), size = max( base, 2.0 * coc );      // nunca un punto duro de un píxel: un brillo blando
+  vCol = aColor * 0.2 * pow( base / size, 1.5 ); vDisc = smoothstep( 1.5, 5.0, coc );
   vD = d; gl_PointSize = size + 1.0; gl_Position = projectionMatrix * mv; vZ = gl_Position.z / gl_Position.w * 0.5 + 0.5;
 }`;
 const BOKEH_FS = /* glsl */`
