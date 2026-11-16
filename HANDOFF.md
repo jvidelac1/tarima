@@ -1688,6 +1688,14 @@ el grabador saltea el cuadro). Pruebas: `servidor_test` (cinco casos nuevos de `
 **Nulo propio y jurado.** `check_game`, corrida «clasico»: en la segunda práctica suelta la barra arriba antes de la señal de
 bajar (NULO «antes») y verifica que la cámara va al jurado al empezar el veredicto y sigue ahí 1,8 s después, con luces rojas.
 
+**Corridas en verde** (sobre `dee23df`, por software): pruebas 43788512947 (el nulo: «nulo:antes · cámara jurado → jurado ·
+luces r,r,r»; `check_carga_fallas` sin vencer), teléfono 43788516583, muro 43788520026, servidor 43788523303 (con el lienzo
+los carteles del jugador dicen LIFTING GAME y se tapan 0 rectángulos; sin el lienzo, su nombre) y gráficos 43788526622.
+Sin navegador, en la Mac: sim, servidor, worker, perf, ritmo, barra_bots, chance y rivales en verde. Capturas miradas: jueces
+y jurado con nulo (paletas rojas y blanca), tablero con «Change C», panel con el estilo de envión fijo y candado, y los cuadros
+grabados del lienzo con «LIFTING GAME» en el tablero del costado y el pesista sin tapar. La primera corrida de servidor
+(43787765416) falló porque `main.js` no importaba `EVENT`; arreglado en `dee23df`.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.
