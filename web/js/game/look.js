@@ -561,7 +561,7 @@ export class Look {
       const o = new THREE.Mesh(new THREE.PlaneGeometry(7.8, 3.0), new THREE.MeshBasicMaterial({ name: 'brillo de la pantalla en el piso', map: t, color: new THREE.Color(.5, .5, .5), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
       o.rotation.x = -Math.PI / 2; o.position.set(0, Y0 + .004, -3.45); o.renderOrder = 2; P.add(o); (this.calcos ||= []).push(o); }
     { const cv = makeCanvas(256, 64, g => { g.fillStyle = '#000'; g.fillRect(0, 0, 256, 64); for (let i = 0; i < 6; i++) { const x = (i + .5) * 256 / 6, rg = g.createRadialGradient(x, 30, 0, x, 30, 40); rg.addColorStop(0, 'rgba(255,226,190,.55)'); rg.addColorStop(1, 'rgba(255,226,190,0)'); g.fillStyle = rg; g.fillRect(x - 40, 0, 80, 64); } }), t = canvasTexture(cv, { aniso: 2 }); this.texturas.push(t);
-      const o = new THREE.Mesh(new THREE.PlaneGeometry(12.6, 2.9), new THREE.MeshBasicMaterial({ name: 'luz del truss del frente en el piso', map: t, color: new THREE.Color(.11, .11, .11), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+      const o = new THREE.Mesh(new THREE.PlaneGeometry(12.6, 2.9), new THREE.MeshBasicMaterial({ name: 'luz del truss del frente en el piso', map: t, color: new THREE.Color(.3, .3, .3), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
       o.rotation.x = -Math.PI / 2; o.position.set(0, Y0 + .004, 3.95); o.renderOrder = 2; P.add(o); (this.calcos ||= []).push(o); }
     // pared de chapa pintada a los lados de la pantalla (materiales.js: toda por función), con columnas, caño y tablero eléctrico
     { const ch = this.chapaMat = chapa('#2a4350'); this.propMats.add(ch);
