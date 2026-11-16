@@ -1696,6 +1696,67 @@ y jurado con nulo (paletas rojas y blanca), tablero con «Change C», panel con 
 grabados del lienzo con «LIFTING GAME» en el tablero del costado y el pesista sin tapar. La primera corrida de servidor
 (43787765416) falló porque `main.js` no importaba `EVENT`; arreglado en `dee23df`.
 
+### Plantel paramétrico (16-nov, rama `plantel`): A MEDIAS, no cumple la meta visual del dueño
+
+**Estado: sin terminar.** El dueño fijó la meta «tienen que parecer personas reales» (nota de 7 o más en el conjunto y
+ninguna parte bajo 6, con director de arte a ciegas puntuando cara, piel, pelo, cuerpo, manos y ropa). **Nunca se midió con
+esa escala** y la única crítica a ciegas hecha (ronda 1, sin nota) dice que ninguno de los cuatro pasa por atleta de
+transmisión. Todo lo visual pasa a otro agente; esto queda como punto de partida. Cómo se usa el sistema: `docs/PLANTEL.md`.
+
+**Qué funciona.**
+- `blender/plantel.py` (género, categoría IWF, estatura, masa, proporciones, piel, pelo, uniforme), masa por volumen
+  (`MASA`), proporciones como metas del esqueleto (`PROP`), cuerpo femenino, pelo atado, barra por género, segunda máscara.
+- `pesistas.yml` construye en Actions (un trabajo por pesista, 16 a 22 min en modo completo). `tools/sumar_pesista.py` y
+  `tools/plantel_web.py` los suman al juego; `?plantel=` y las fichas del visor ya están.
+- Corrida **43827465589** (sobre `fe37d99`): solanet, halvard, ilarraz y jastrev con **0 BAD** en `check()`. Peores valores:
+  barra-malla -0,6 cm en los cuatro, cápsula-rack +0,0 a +0,1 cm, codo-rack 0,0 a -1,6 cm. Ilarraz no alcanza dos metas
+  (tibia y antebrazo, targets al tope).
+
+**Qué NO está hecho.**
+- **Los cuatro modelos nuevos no están en `web/models` ni en `web/data/poses.json`**; `plantel.json` los sigue marcando
+  `listo: false`. No se corrieron `pruebas.yml` ni `graficos.yml` con el plantel.
+- Hubo **una sola** ronda de director de arte (sobre 43827465589). La segunda no se llegó a mirar.
+- Corrida **43875357534** (sobre `b05f1af`, correcciones de la ronda 1): quedó en curso al cerrar. **Nadie miró su
+  resultado**: ni CHK ni imágenes. Los cambios de cuerpo de ese commit pueden haber dado cuadros BAD.
+
+**Ronda 1 del director de arte (a ciegas, sin nota; dos agentes: retratos y hojas).**
+- Bloqueantes de retratos: ojos cerrados o caídos en los cuatro; pezones marcados bajo la malla en las dos mujeres; el brazo
+  se infla al flexionar el codo en el rack (peor en jastrev); los glúteos se inflan como globos en sentadilla y salida (peor
+  en halvard). Propios: barba de jastrev sin bigote y con borde pixelado, y su biotipo en V de culturista en vez de tronco en
+  barril; halvard con cara de bebé, cuero cabelludo visible y masa sedentaria.
+- Importantes: línea del pelo a serrucho y frente enorme, pelo de casco, cejas de bloque, la misma boca en los cuatro,
+  postura de pie abatida, malla que lee como piel pintada, dedos en abanico en el rack, rodilleras de bola, piel uniforme.
+- Hojas de poses (valen también para las reglas, no solo para estos cuerpos; son estimaciones a ojo del revisor, sin medir):
+  la barra del rack queda a la altura del mentón y no sobre deltoides y clavículas; codos del rack convergen al centro;
+  en el Tirón de brazos de la cargada los codos pasan la altura del hombro; agarre de envión angosto para los pesados;
+  recepción del power y del squat jerk con el tronco inclinado; valgo de rodillas en el fondo del squat jerk; las poses
+  son casi iguales entre biotipos. La guía punteada de snatch y clean no coincide con la marca del medio pie: sin verificar.
+- Lo que dijo que está bien: ilarraz es el más creíble; cinturón, paletas, letras, vendas y zapatillas.
+
+**Lo que se cambió por la ronda 1 (`b05f1af`, sin verificar en imágenes).** Ojos: `eye-*-slit` de 0,75 a 0,22 y sin
+`closure`. Busto: alisado con zona más baja y 45 pasadas (8 en el hombre). Glúteos: de 0,65/0,50 a 0,30/0,25 y menos en el
+paquete de volumen (más tronco y panza, menos brazo). El pesado con grasa no ensancha hombros, sin torso en V, más cintura
+y panza. Mujer: más hombro y cuello. Frente más baja (`forehead-scale-vert-decr`), labios más finos, comisuras arriba.
+Bigote: la franja labio-nariz se achica con esa distancia. Sisa del hombre más alta con grasa. No se tocó: piel, pelo y
+línea del pelo, cejas, deformación en flexión (codo, rodilla), manos, postura, ni ninguna regla de poses.
+
+**Cápsula del pecho (`chestU`): PENDIENTE DE APROBACIÓN DEL DUEÑO.** Está aislada en el commit `95bf4fd` (solo
+`blender/poses.py`; `dc5edcc` saca la versión que venía mezclada en `5cf10f8`). Se saca con `git revert 95bf4fd`.
+- Qué toca: `bar_clear()`, el proxy de cápsulas que usan `check()` (barra-cuerpo y cápsula-rack) y el desvío de la barra.
+  La cápsula del pecho pasa de un radio único (`chestF`) a bajar hacia un radio medido en el pecho alto en el 65 % superior.
+  La columna barra-malla de `check()` (malla real) no cambia.
+- Por qué: sin ella, halvard daba 10 BAD barra-cuerpo (corrida 43823507357: Giro de codos 5 a 8 y Envión · Impulso 3 y 4)
+  con la barra a 1,0 a 7,0 cm de la malla real en esos mismos cuadros. Con ella, 0 BAD.
+- Alcance real: no es solo halvard. `chestU` es menor que `chestF` en los cuatro (solanet 11,7 contra 16,0 cm; halvard
+  17,6 contra 23,5; ilarraz 15,0 contra 16,2; jastrev 19,4 contra 21,9). **En ventura y brenner no se midió**: no se
+  reconstruyeron con este commit, y si su `chestU` sale menor, su `check()` también cambia.
+- Alternativa que no toca `check()`: rama `plantel-alt-capsula` (commit «EXPERIMENTO», no fusionar): cápsula vieja
+  (`TARIMA_CHESTU=0`) y la barra desviada hacia adelante por regla en la entrada y la salida del rack (`TARIMA_ALTPUSH=1`).
+  Corrida **43874816087** (halvard, completo): quedó en curso al cerrar, **sin resultado y sin comparar**. Para comparar:
+  líneas `CHK`, `BAD`, `PUSH` y `TRAJ` de su log contra las de 43827465589.
+
+**Límite conocido.** Con el antebrazo más largo que el brazo (más de 0,51) el codo no llega al rack y `check()` lo marca.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.
