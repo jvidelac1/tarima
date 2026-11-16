@@ -252,6 +252,19 @@ function banderasLargas() {
     g.fillStyle = 'rgba(40,36,44,.22)'; g.fillRect(0, 0, N * W, H);      // tela gastada: el color no es pleno
   }), { aniso: 4 });
 }
+/** Ocho banderas de países ficticios en proporción 2:3 (192 × 128 px cada una): franjas, cantón o diagonal y un símbolo (disco, rombo, anillo, triángulo, barras), con pliegues suaves y la luz de abajo. Ninguna copia una real. */
+function banderas23() {
+  const N = 8, W = 192, H = 128, r = rng(321), P = [['#1f5d8a', '#e9e2d0', '#c2452a'], ['#263c2c', '#e3b33a', '#e6dfcc'], ['#6e1f2a', '#d9cfb8', '#16264a'], ['#4f2a78', '#efeadf', '#178f7e'], ['#c9602c', '#101c3c', '#e9e2d0'], ['#0f6a70', '#14161a', '#e3b33a'], ['#b84a78', '#f0ece2', '#2b2d33'], ['#16264a', '#9fc23a', '#e8e4da']];
+  return canvasTexture(makeCanvas(N * W, H, g => {
+    for (let i = 0; i < N; i++) { const [a, b, c] = P[i], x = i * W; g.save(); g.beginPath(); g.rect(x, 0, W, H); g.clip(); g.translate(x, 0); g.fillStyle = a; g.fillRect(0, 0, W, H);
+      switch (i % 4) { case 0: g.fillStyle = b; g.fillRect(0, H / 3, W, H / 3); break; case 1: g.fillStyle = b; g.fillRect(0, 0, W * .36, H); break; case 2: g.fillStyle = b; g.beginPath(); g.moveTo(0, H); g.lineTo(W, 0); g.lineTo(W, H * .3); g.lineTo(W * .3, H); g.fill(); break; default: g.fillStyle = b; g.fillRect(0, 0, W * .45, H * .5); }
+      const cx = [W / 2, W * .18, W * .5, W * .225][i % 4], cy = [H / 2, H / 2, H / 2, H * .25][i % 4], q = H * [.2, .13, .2, .14][i % 4]; g.fillStyle = c; g.strokeStyle = c; g.lineWidth = q * .3;
+      switch (i) { case 5: g.beginPath(); g.arc(cx, cy, q, 0, 7); g.fill(); break; case 0: for (const k of [-1, 1]) { g.beginPath(); g.moveTo(cx + k * q * .9, cy - q); g.lineTo(cx + k * q * .9 + q * .7, cy + q); g.lineTo(cx + k * q * .9 - q * .7, cy + q); g.fill(); } break; case 1: case 6: g.beginPath(); g.moveTo(cx, cy - q); g.lineTo(cx + q * .8, cy); g.lineTo(cx, cy + q); g.lineTo(cx - q * .8, cy); g.fill(); break; case 2: case 7: g.beginPath(); g.arc(cx, cy, q * .8, 0, 7); g.stroke(); break; case 3: g.beginPath(); g.moveTo(cx, cy - q); g.lineTo(cx + q, cy + q * .8); g.lineTo(cx - q, cy + q * .8); g.fill(); break; default: for (const k of [-1, 0, 1]) g.fillRect(cx + k * q * .7 - q * .15, cy - q, q * .3, q * 2); }
+      let xx = 0; while (xx < W) { const fw = 14 + r() * 26, f = g.createLinearGradient(xx, 0, xx + fw, 0); f.addColorStop(0, 'rgba(0,0,0,.26)'); f.addColorStop(.5, 'rgba(255,255,255,.07)'); f.addColorStop(1, 'rgba(0,0,0,.26)'); g.fillStyle = f; g.fillRect(xx, 0, fw, H); xx += fw; }
+      g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(0, 0, 2, H); g.fillRect(W - 2, 0, 2, H); g.fillRect(0, 0, W, 2); g.fillRect(0, H - 2, W, 2); g.restore(); }
+    const luz = g.createLinearGradient(0, 0, 0, H); luz.addColorStop(0, 'rgba(0,0,0,.5)'); luz.addColorStop(1, 'rgba(0,0,0,.05)'); g.fillStyle = luz; g.fillRect(0, 0, N * W, H); g.fillStyle = 'rgba(40,36,44,.2)'; g.fillRect(0, 0, N * W, H);
+  }), { aniso: 4 });
+}
 /** Parrilla del techo (84 × 84 m vista desde abajo): vigas, cerchas con diagonales, conductos y el resplandor cálido de las luces sobre el escenario. Cierra la sala desde cualquier cámara. */
 function techo(S = 1024) {
   return canvasTexture(makeCanvas(S, S, g => {
@@ -454,6 +467,7 @@ export class Look {
     for (const o of A.group.children) if (o.isInstancedMesh && o.material.isMeshBasicMaterial && o.geometry.type === 'BoxGeometry' && !o.material.map) o.material.color.multiply(new THREE.Color(.8, .95, 1.3));      // escalones y barandas
     // los focos del fondo: ámbar a la izquierda (acompañan al contraluz), blanco frío a la derecha; nada de rosa y celeste
     (A.beams || []).forEach((b, i) => b.mat.uniforms.uColor.value.set(i < 5 ? (i % 2 ? '#ffb469' : '#ffc890') : (i % 2 ? '#cfe0ff' : '#e9eeff')));
+    (A.beams || []).forEach((b, i) => { if (i >= 8) { b.base *= .3; if (b.base0) b.base0 *= .3; b.mat.uniforms.uStrength.value *= .3; } });      // los haces de los trusses laterales se sumaban sobre la tribuna de enfrente (quedaba beige): casi apagados
     this.salaImpostor = 1.0;
     // los dos cargadores de pie eran cápsulas azules fuera de escala (lo único que queda en esos lotes en el juego): fuera
     for (const o of A.group.children) if (o.isInstancedMesh && (o.geometry.type === 'CapsuleGeometry' || (o.geometry.type === 'SphereGeometry' && Math.abs(o.geometry.parameters.radius - .105) < 1e-6))) o.visible = false;
@@ -563,10 +577,15 @@ export class Look {
         const anillo = g.createRadialGradient(128, 128, 30, 128, 128, 120); anillo.addColorStop(0, 'rgba(255,214,170,.5)'); anillo.addColorStop(.5, 'rgba(200,190,200,.22)'); anillo.addColorStop(1, 'rgba(120,150,200,0)'); g.fillStyle = anillo; g.fillRect(0, 0, 256, 256);
         for (let i = 0; i < 9; i++) { const a = i / 9 * 6.283 + r(), d = 62 + r() * 40, x = 128 + Math.cos(a) * d * 1.15, y = 128 + Math.sin(a) * d, rad = 22 + r() * 22, rg = g.createRadialGradient(x, y, 0, x, y, rad); rg.addColorStop(0, `rgba(${i % 2 ? '255,200,140' : '190,215,255'},.42)`); rg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = rg; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); } }), t = canvasTexture(cv, { aniso: 2 }); this.texturas.push(t);
       const o = new THREE.Mesh(new THREE.PlaneGeometry(12.8, 10.8), new THREE.MeshBasicMaterial({ name: 'charcos de luz en el piso', map: t, color: new THREE.Color(.085, .085, .085), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
-      o.rotation.x = -Math.PI / 2; o.position.set(0, Y0 + .0035, 0); o.renderOrder = 2; P.add(o); (this.calcos ||= []).push(o);
-      const nt = canvasTexture(makeCanvas(64, 64, g => { const rg = g.createRadialGradient(32, 32, 0, 32, 32, 31); rg.addColorStop(0, 'rgba(255,255,255,.55)'); rg.addColorStop(.5, 'rgba(255,255,255,.18)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = rg; g.fillRect(0, 0, 64, 64); }), { aniso: 1 }); this.texturas.push(nt);
-      const sm2 = new THREE.SpriteMaterial({ name: 'nube de magnesio', map: nt, color: new THREE.Color(.09, .088, .08), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
-      for (const [dx, dy, sc] of [[0, 1.12, .75], [.12, 1.42, 1.05], [-.14, 1.75, 1.3]]) { const sp = new THREE.Sprite(sm2); sp.position.set(-3.15 + dx, Y0 + dy, -1.9); sp.scale.setScalar(sc); sp.renderOrder = 7; this.arena.group.add(sp); } }
+      o.rotation.x = -Math.PI / 2; o.position.set(0, Y0 + .0035, 0); o.renderOrder = 2; this.arena.group.add(o); (this.calcos ||= []).push(o); }
+    // marcación del piso del escenario: zona técnica alrededor de la tarima con cinta, esquineros, flechas de entrada y roces (solo con post)
+    { const S = 1024, cv = makeCanvas(S, S, g => { const r = rng(131), m = S / 13, cx = S / 2, cy = S / 2; g.clearRect(0, 0, S, S); g.lineCap = 'butt';
+        g.strokeStyle = 'rgba(214,208,190,.5)'; g.lineWidth = .05 * m; g.setLineDash([.6 * m, .25 * m]); g.strokeRect(cx - 3.1 * m, cy - 3.1 * m, 6.2 * m, 6.2 * m); g.setLineDash([]);
+        g.strokeStyle = 'rgba(226,180,60,.55)'; g.lineWidth = .07 * m; for (const sx of [-1, 1]) for (const sy of [-1, 1]) { g.beginPath(); g.moveTo(cx + sx * 3.1 * m, cy + sy * 2.6 * m); g.lineTo(cx + sx * 3.1 * m, cy + sy * 3.1 * m); g.lineTo(cx + sx * 2.6 * m, cy + sy * 3.1 * m); g.stroke(); }
+        for (let i = 0; i < 120; i++) { const a = r() * 6.283, d = (2.1 + r() * 1.0) * m, x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d * .95, rad = (.05 + r() * .22) * m, rg = g.createRadialGradient(x, y, 0, x, y, rad); rg.addColorStop(0, `rgba(236,232,222,${.03 + r() * .06})`); rg.addColorStop(1, 'rgba(236,232,222,0)'); g.fillStyle = rg; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); }      // magnesio pisado alrededor de la tarima
+        for (let i = 0; i < 90; i++) { g.strokeStyle = `rgba(${r() < .5 ? '200,200,205' : '0,0,0'},${.05 + r() * .1})`; g.lineWidth = 1 + r() * 3; const x = r() * S, y = r() * S, a = r() * 6.283, L = (.2 + r() * .9) * m; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); g.stroke(); } }), t = canvasTexture(cv, { aniso: 4 }); this.texturas.push(t);
+      const o = new THREE.Mesh(new THREE.PlaneGeometry(13, 13), new THREE.MeshStandardMaterial({ name: 'calco marcación', map: t, transparent: true, depthWrite: false, roughness: .8, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+      o.rotation.x = -Math.PI / 2; o.position.set(0, Y0 + .002, 0); o.receiveShadow = true; o.renderOrder = 1; P.add(o); (this.calcos ||= []).push(o); }
     // la pantalla tiñe el piso delante suyo (aditivo, solo con post: va con las calcomanías)
     { const t = canvasTexture(brilloPiso(), { aniso: 2 }); this.texturas.push(t);
       const o = new THREE.Mesh(new THREE.PlaneGeometry(7.8, 3.0), new THREE.MeshBasicMaterial({ name: 'brillo de la pantalla en el piso', map: t, color: new THREE.Color(.5, .5, .5), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
@@ -608,11 +627,16 @@ export class Look {
     const bt = tx(banderasLargas()), pos = [], uv = [], idx = [], N = 8;
     const colgar = (cx, cz, nx, nz, i, w = 2.6, y0 = 3.3, y1 = 12.4) => { const tx2 = -nz, tz = nx, b = pos.length / 3; pos.push(cx - tx2 * w / 2, y0, cz - tz * w / 2, cx + tx2 * w / 2, y0, cz + tz * w / 2, cx + tx2 * w / 2, y1, cz + tz * w / 2, cx - tx2 * w / 2, y1, cz - tz * w / 2); uv.push(i / N, 0, (i + 1) / N, 0, (i + 1) / N, 1, i / N, 1); idx.push(b, b + 1, b + 2, b, b + 2, b + 3); };
     [-8.0, -2.5, 0, 2.5, 8.0].forEach((x, k) => colgar(x, -5.62, 0, 1, (k * 3 + 1) % N, 2.3, Math.abs(x) < 4 ? 4.3 : 2.7));      // detrás de la pantalla (las del medio terminan arriba del puente de luces)
-    for (const s of [-1, 1]) for (let k = 0; k < 6; k++) colgar(s * 10.9, -7.2 + k * 3.6, -s, 0, (k * 3 + (s > 0 ? 2 : 5)) % N, 2.4, 2.3 + (k % 2) * .45);      // costados, delante de las tribunas
+    // (a los costados van banderas 2:3 con símbolo: más abajo)
     for (let k = 0; k < 7; k++) colgar(-12 + k * 4, 11.5, 0, -1, (k * 3) % N, 2.6, 4.4);
     for (const s of [-1, 1]) colgar(s * 6.3, -4.74, 0, 1, s > 0 ? 6 : 3, 1.7, 2.72, 6.2);      // sobre el tablero y el reloj, colgadas del truss del fondo: a cuadro en 3/4, jurado y frontal      // frente (lo que mira el pesista), por encima de los árbitros
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
     const o = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ name: 'banderas', map: bt, color: new THREE.Color(.85, .85, .85), side: THREE.DoubleSide })); o.frustumCulled = false; G.add(o);
+    { const t2 = tx(banderas23()), p2 = [], u2 = [], i2 = [];      // banderas de países ficticios, 3 × 2 m, enteras a cuadro en la toma lateral
+      for (const s of [-1, 1]) for (let k = 0; k < 6; k++) { const z = -8.4 + k * 3.4, x = s * 10.85, y0 = 1.95, y1 = 3.95, b = p2.length / 3, i = (k * 3 + (s > 0 ? 2 : 5)) % 8;
+        p2.push(x, y0, z - s * 1.5, x, y0, z + s * 1.5, x, y1, z + s * 1.5, x, y1, z - s * 1.5); u2.push(i / 8, 0, (i + 1) / 8, 0, (i + 1) / 8, 1, i / 8, 1); i2.push(b, b + 1, b + 2, b, b + 2, b + 3); }
+      const g2 = new THREE.BufferGeometry(); g2.setAttribute('position', new THREE.Float32BufferAttribute(p2, 3)); g2.setAttribute('uv', new THREE.Float32BufferAttribute(u2, 2)); g2.setIndex(i2);
+      const o2 = new THREE.Mesh(g2, new THREE.MeshBasicMaterial({ name: 'banderas 2:3', map: t2, color: new THREE.Color(.62, .62, .62), side: THREE.DoubleSide })); o2.frustumCulled = false; G.add(o2); }
     this._sombras();
   }
 
@@ -625,7 +649,7 @@ export class Look {
     const cv = makeCanvas(64, 64, g => { const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(0,0,0,.9)'); r.addColorStop(.45, 'rgba(0,0,0,.5)'); r.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); }), t = canvasTexture(cv, { aniso: 1 }); this.texturas.push(t);
     const mat = () => new THREE.MeshBasicMaterial({ name: 'sombra de contacto', map: t, color: 0x000000, transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
     const geo = new THREE.PlaneGeometry(1, 1); geo.rotateX(-Math.PI / 2);
-    const S = this.contacto = [0, 1, 2, 3].map(i => { const m = new THREE.Mesh(geo, mat()); m.renderOrder = 3; m.frustumCulled = false; m.visible = false; m.scale.set(i < 2 ? .2 : .36, 1, i < 2 ? .42 : .62); this.arena.group.add(m); return m; });
+    const S = this.contacto = [0, 1, 2, 3].map(i => { const m = new THREE.Mesh(geo, mat()); m.renderOrder = 3; m.frustumCulled = false; m.visible = false; m.scale.set(i < 2 ? .27 : .42, 1, i < 2 ? .5 : .7); this.arena.group.add(m); return m; });
     const v = new THREE.Vector3(); let pies = null, barra = null, n = 0;
     // el primero se entera en cada dibujo: ubica los cuatro antes de que se dibujen (él mismo va con la posición del cuadro anterior)
     this.halos.onAfterRender = () => {
@@ -634,8 +658,8 @@ export class Look {
         pies = null; barra = esc.getObjectByName('Barbell') || null;
         esc.traverse(o => { if (pies || !o.isSkinnedMesh || !o.visible) return; for (let x = o; x; x = x.parent) if (!x.visible) return; const B = o.skeleton.bones, a = B.find(b => /LeftToeBase$/.test(b.name)) || B.find(b => /LeftFoot$/.test(b.name)), c = B.find(b => /RightToeBase$/.test(b.name)) || B.find(b => /RightFoot$/.test(b.name)); if (a && c) pies = [a, c]; });
       }
-      for (let i = 0; i < 2; i++) { const m = S[i], b = pies?.[i]; if (!b) { m.visible = false; continue; } b.getWorldPosition(v); const k = 1 - Math.min(1, Math.max(0, (v.y - .1) / .22)); m.visible = k > .02 && Math.abs(v.x) < 2.1 && Math.abs(v.z) < 2.1; m.position.set(v.x, .004, v.z - .06); m.material.opacity = .62 * k; }
-      for (let i = 0; i < 2; i++) { const m = S[2 + i]; if (!barra || !barra.visible) { m.visible = false; continue; } const p = barra.position, k = 1 - Math.min(1, Math.max(0, (p.y - .225) / .4)); m.visible = k > .02; m.position.set(p.x + (i ? 1 : -1) * .93, .004, p.z); m.material.opacity = .7 * k; }
+      for (let i = 0; i < 2; i++) { const m = S[i], b = pies?.[i]; if (!b) { m.visible = false; continue; } b.getWorldPosition(v); const k = 1 - Math.min(1, Math.max(0, (v.y - .1) / .22)); m.visible = k > .02 && Math.abs(v.x) < 2.1 && Math.abs(v.z) < 2.1; m.position.set(v.x, .004, v.z - .06); m.material.opacity = .9 * k; }
+      for (let i = 0; i < 2; i++) { const m = S[2 + i]; if (!barra || !barra.visible) { m.visible = false; continue; } const p = barra.position, k = 1 - Math.min(1, Math.max(0, (p.y - .225) / .4)); m.visible = k > .02; m.position.set(p.x + (i ? 1 : -1) * .93, .004, p.z); m.material.opacity = .95 * k; }
     };
   }
 
@@ -647,6 +671,7 @@ export class Look {
     for (const s of [-1, 1]) for (let i = 0; i < 3; i++) luz([s * 7.4, TY - .35 - i * .05, 3.6 - i * 2.8], [0, 1, 0], i === 1 ? '#fff0d8' : (s < 0 ? '#ffc48a' : '#cfe0ff'), 2.0, .9);
     for (const s of [-1, 1]) for (let i = 0; i < 3; i++) luz([s * 7.22, 3.7 + i * .9, -4.4], [s * 1.2, 1.2, 0], i === 1 ? '#ffd9a0' : '#f4f0ff', 1.0, .4);
     for (let i = 0; i < 8; i++) { const x = -4.2 + i * 1.2; luz([x, 3.56, -4.86], [x * .45, 1.3, 2.5], i % 2 ? '#ffd9a0' : '#f2ecff', 1.5, .8); }      // puente de luces sobre la pantalla
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) luz([s * 4.02, 1.55 + i * .72, -4.4], [-s * .4, 1.3, .6], i === 1 ? (s < 0 ? '#ffb877' : '#cfe0ff') : '#fff0d8', 1.3, .75);      // torres de contraluz
     const n = L.length, P = new Float32Array(n * 3), C = new Float32Array(n * 3), D = new Float32Array(n * 3), T = new Float32Array(n), c = new THREE.Color(), a = new THREE.Vector3(), b = new THREE.Vector3();
     L.forEach((l, i) => { a.set(...l.pos); b.set(...l.hacia).sub(a).normalize(); a.addScaledVector(b, .14); a.toArray(P, i * 3); b.toArray(D, i * 3); c.set(l.color).multiplyScalar(l.k); c.toArray(C, i * 3); T[i] = l.tam; });
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('aColor', new THREE.BufferAttribute(C, 3)); g.setAttribute('aDir', new THREE.BufferAttribute(D, 3)); g.setAttribute('aTam', new THREE.BufferAttribute(T, 1));
@@ -665,12 +690,12 @@ export class Look {
       const g = new THREE.Group(); g.position.copy(l.position); g.lookAt(hasta); g.rotateX(-Math.PI / 2);
       const m = new THREE.Mesh(geo, mat); m.scale.set(rad, len, rad); m.renderOrder = 5; m.frustumCulled = false; g.add(m); this.group.add(g); this.rayos.push({ mat, base: fuerza });
     };
-    rayo(L.rimA, .02, .5); rayo(L.rimB, .016, .5); rayo(L.key, .01, .6);
+    rayo(L.rimA, .02, .5); rayo(L.rimB, .016, .5);      // (el cono de la clave y los del truss del frente lavaban de beige las tribunas: fuera)
     // conos anchos y suaves desde el puente de focos y las torres hasta la tarima (focos de mentira: solo el volumen de bruma)
     const foco = (p, t, color, ang) => ({ position: new THREE.Vector3(...p), target: { position: new THREE.Vector3(...t) }, color: new THREE.Color(color), angle: ang });
     for (const x of [-3.0, -1.0, 1.0, 3.0]) rayo(foco([x, 3.56, -4.86], [x * .35, 0, .6], x < 0 ? '#ffd0a0' : '#dfe8ff', .2), .014, 1);
     for (const s2 of [-1, 1]) rayo(foco([s2 * 7.22, 4.6, -4.4], [s2 * .6, 0, 0], s2 < 0 ? '#ffb877' : '#cfe0ff', .17), .013, 1);
-    for (const x of [-3, 3]) rayo(foco([x, 6.8, 6.8], [x * .3, 0, .4], '#ffe6c4', .15), .008, 1);      // haces angostos y definidos: anchos eran un banco de niebla beige sobre la tribuna      // solo los dos contraluces: los conos de la clave y del pelo casi no se veían y eran pantalla entera de mezcla
+    for (const s2 of [-1, 1]) rayo(foco([s2 * 4.02, 3.0, -4.4], [-s2 * .9, 0, .9], s2 < 0 ? '#ffb877' : '#cfe0ff', .16), .02, 1);      // haces de las torres de contraluz, cruzados detrás del pesista      // haces angostos y definidos: anchos eran un banco de niebla beige sobre la tribuna      // solo los dos contraluces: los conos de la clave y del pelo casi no se veían y eran pantalla entera de mezcla
     this.group.visible = false;
   }
 
@@ -682,7 +707,7 @@ export class Look {
       // la utilería en el camino directo: solo el mapa de color (sin normales ni rugosidad) y sin las calcomanías del piso
       // (mezcla con luces sobre mucha pantalla): el banco decía que la utilería era el 20 % del cuadro de «Baja»
       for (const m of this.utilMats || []) { const n = d ? null : m.userData.normal, g = d ? null : m.userData.rug; if (m.normalMap !== n || m.roughnessMap !== g) { m.normalMap = n; m.roughnessMap = g; m.roughness = d ? .6 : 1; m.needsUpdate = true; } }
-      for (const o of this.calcos || []) o.visible = !d;
+      for (const o of this.calcos || []) o.visible = !d || /charcos/.test(o.material.name);
       // medido (run 43827293011): ni sin mapas la utilería entraba en la meta de «Baja» (+16 %); el banco dice que es el 22 % del cuadro.
       // En el camino directo no se dibuja (Media para arriba sí), hasta medir en una placa
       for (const o of this.utileria()) if (o !== this.props) o.visible = !d; this.props.visible = !d; }

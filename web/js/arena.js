@@ -291,6 +291,8 @@ export class Arena {
     };
     const cols = ['#8fdcff', '#ffb08a', '#f2ecff', '#8fdcff', '#ff8a9c', '#f2ecff', '#ffd9a0', '#ff8a9c'];
     cols.forEach((c, i) => { const x = -6.3 + i * 1.8; fixture([x, TB - .3, -4.6], [x * .25, .4, -.2], c, 14, .05); });
+    // dos torres de contraluz bajas detrás de la tarima (entre la pantalla y los estandartes): sus focos se ven encendidos desde las cámaras de juego
+    for (const s of [-1, 1]) { truss([s * 4.02, STAGE_Y, -4.55], [s * 4.02, 3.25, -4.55], .09); for (let i = 0; i < 3; i++) fixture([s * 4.02, 1.55 + i * .72, -4.4], [-s * .4, 1.3, .6], i === 1 ? (s < 0 ? '#ffb877' : '#cfe0ff') : '#fff0d8', 9, 0, .6); }
     for (let i = 0; i < 8; i++) { const x = -4.2 + i * 1.2; fixture([x, 3.56, -4.86], [x * .45, 1.3, 2.5], i % 2 ? '#ffd9a0' : '#f2ecff', 9, 0, .7); }
     for (let i = 0; i < 6; i++) { const x = -5 + i * 2; fixture([x, TY - .3, 6.8], [x * .2, 1, 0], '#ffe6c4', 18, 0); }
     for (const s of [-1, 1]) for (let i = 0; i < 3; i++) fixture([s * 7.4, TY - .35 - i * .05, 3.6 - i * 2.8], [0, 1, 0], i === 1 ? '#fff0d8' : (s < 0 ? '#8fdcff' : '#ffb08a'), 12, i === 1 ? 0 : .035);

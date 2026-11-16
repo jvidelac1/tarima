@@ -65,6 +65,7 @@ const BASE = { canto: col('#7c828f'), zocalo: col('#0c0e14'), esclera: col('#8f8
 /** Colores de la persona k de un grupo con su uniforme (saco y pantalón). */
 const gente = (k, traje, pantalon) => ({ ...BASE, traje: col(traje), ropa: col(traje), solapa: col(traje).multiplyScalar(1.35), pantalon: col(pantalon), piel: PIEL[(k * 5 + 1) % PIEL.length], pelo: PELO[(k * 7 + 2) % PELO.length], corbata: CORBATA[k % CORBATA.length] });
 
+const APAGADA = new THREE.Color(.03, .03, .035), NEGRO = new THREE.Color(0, 0, 0), LUZ_B = new THREE.Color(1.6, 1.55, 1.4), LUZ_R = new THREE.Color(1.7, .1, .06), BR_B = new THREE.Color(.5, .48, .42), BR_R = new THREE.Color(.6, .04, .02);
 const BLANCA = new THREE.Color(1.12, 1.1, 1.02), ROJA = new THREE.Color(.5, .012, .008), GUARDADA = new THREE.Color(.05, .05, .06);
 /** Luz de sala propia de las mesas (fracción del color de cada superficie): las luces del escenario apuntan a la tarima y sin esto quedan en negro. */
 const RELLENO = .5;
@@ -94,6 +95,7 @@ export class Jueces {
     for (let i = 0; i < 3; i++) {
       const C = gente(i, ['#343b50', '#2b334a', '#3a3b45'][i], '#24272f'), M = MA.clone().multiply(correr(-(i - 1) * A.sep, -.5));
       fijos.push(...en(persona(C, { det: 1, paleta: false, pelo: ESTILO[i], k: i, gesto: ['escribe', 'mesa', 'menton'][i], giro: [.22, -.06, -.3][i], inc: [.2, .02, .07][i] }), M));
+      fijos.push(...en([pieza(new THREE.BoxGeometry(.16, .14, .05), col('#101116'), [0, .845, .74])], M));      // caja de la luz de decisión
       // lo que hay en una mesa de árbitros: papeles, botella y micrófono de cuello
       fijos.push(...en([pieza(new THREE.BoxGeometry(.21, .003, .297), col('#cfcdc4'), [-.08 + .05 * i, .787, .5], new THREE.Quaternion().setFromAxisAngle(UP, .2 - .25 * i)), pieza(new THREE.BoxGeometry(.21, .003, .297), col('#b9b7ae'), [-.11, .784, .47], new THREE.Quaternion().setFromAxisAngle(UP, -.1)),
         pieza(new THREE.CylinderGeometry(.03, .032, .2, 10), col('#3d5a78'), [-.33, .885, .52]), pieza(new THREE.CylinderGeometry(.014, .014, .03, 8), col('#d8d8d8'), [-.33, 1.0, .52]),
@@ -104,7 +106,7 @@ export class Jueces {
       for (const [x, j] of p) { junta.fill(j, o, o + x.attributes.position.count); o += x.attributes.position.count; x.dispose(); }
       brazos.push(g); this.arb.push({ M, junta, k: 0, a: 0, hecho: -1 }); this._bp = bp;
     }
-    this.fijos = [malla(fijos, 'árbitros')]; this.fijos[0].material = matArb; this.fijos[0].onBeforeRender = (r, e, cam) => { uAtras.value = cam.position.z > 7.5 ? 1 : 0; };
+    this.fijos = [malla(fijos, 'árbitros')]; this.fijos[0].material = matArb; this.fijos[0].onBeforeRender = (r, e, cam) => { const atras = cam.position.z > 7.5; uAtras.value = atras ? 1 : 0; if (this.luces) this.luces.visible = this.brillos.visible = !atras; };
     // los tres brazos de las paletas: una malla; posiciones y normales en reposo aparte, para recalcularlas al moverse
     const gb = mergeGeometries(brazos); brazos.forEach(g => g.dispose());
     this.P0 = gb.attributes.position.array.slice(); this.N0 = gb.attributes.normal.array.slice(); this.nBrazo = this.P0.length / 9;
@@ -117,6 +119,13 @@ export class Jueces {
     if (typeof document !== 'undefined') { const cvP = document.createElement('canvas'); cvP.width = cvP.height = 64; const g = cvP.getContext('2d'), rg = g.createRadialGradient(28, 26, 2, 32, 32, 32); rg.addColorStop(0, '#ffffff'); rg.addColorStop(.7, '#e9e7e0'); rg.addColorStop(.93, '#cfccc4'); rg.addColorStop(1, '#8f8c86'); g.fillStyle = rg; g.fillRect(0, 0, 64, 64); txP = new THREE.CanvasTexture(cvP); txP.colorSpace = THREE.SRGBColorSpace; }
     this.paletas = new THREE.InstancedMesh(disco, new THREE.MeshBasicMaterial({ color: 0xffffff, map: txP }), 3); this.paletas.name = 'paletas'; this.paletas.matrixAutoUpdate = false;
     this.paletas.visible = false; this.paletas.boundingSphere = gb.boundingSphere.clone(); this.paletas.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.group.add(this.paletas);
+    // luz de decisión de cada árbitro: una caja en el borde de la mesa con su lámpara (blanca o roja) y un resplandor
+    { const lamp = new THREE.CylinderGeometry(.05, .05, .018, 18); lamp.rotateX(Math.PI / 2);
+      this.luces = new THREE.InstancedMesh(lamp, new THREE.MeshBasicMaterial({ color: 0xffffff }), 3); this.luces.name = 'luces de los árbitros'; this.luces.matrixAutoUpdate = false; this.luces.frustumCulled = false; this.group.add(this.luces);
+      let tx = null; if (typeof document !== 'undefined') { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d'), rg = g.createRadialGradient(32, 32, 0, 32, 32, 32); rg.addColorStop(0, 'rgba(255,255,255,1)'); rg.addColorStop(.3, 'rgba(255,255,255,.45)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = rg; g.fillRect(0, 0, 64, 64); tx = new THREE.CanvasTexture(cv); }
+      this.brillos = new THREE.InstancedMesh(new THREE.PlaneGeometry(.5, .5), new THREE.MeshBasicMaterial({ map: tx, color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }), 3); this.brillos.name = 'resplandor de las luces de los árbitros'; this.brillos.matrixAutoUpdate = false; this.brillos.frustumCulled = false; this.brillos.renderOrder = 6; this.group.add(this.brillos);
+      this.arb.forEach((a, i) => { this.luces.setMatrixAt(i, a.M.clone().multiply(new THREE.Matrix4().makeTranslation(0, .845, .77))); this.brillos.setMatrixAt(i, a.M.clone().multiply(new THREE.Matrix4().makeTranslation(0, .845, .785))); this.luces.setColorAt(i, APAGADA); this.brillos.setColorAt(i, NEGRO); });
+      this.luces.instanceColor.needsUpdate = this.brillos.instanceColor.needsUpdate = true; }
     this._r = { S, u0: E.clone().sub(S), f0: f, u1: CODO_ARRIBA(-1).sub(S).normalize(), f1: ANTEBRAZO_ARRIBA(-1) }; this._r.Lu = this._r.u0.length(); this._r.u0.normalize(); this._r.E0 = E;
     for (let i = 0; i < 3; i++) { this.paletas.setColorAt(i, GUARDADA); this._posar(i); }
     this.paletas.instanceColor.needsUpdate = true;
@@ -131,13 +140,6 @@ export class Jueces {
     const tec = [];
     [[5.0, -4.3, -.86], [5.75, -3.3, -1.05]].forEach(([x, z, ry], i) => { const M = asiento(x, STAGE_Y, z, ry); tec.push(...en(mesa(1.1, BASE), M), ...en(persona(gente(i + 8, i ? '#3c2f4a' : '#30384e', '#2a2e38'), { det, pelo: i ? 'cola' : 'entradas', k: i + 8, ropa: i ? 'buzo' : 'saco', gesto: i ? 'menton' : 'mesa' }), M.clone().multiply(correr(0, -.5)))); });
     lejos.push(malla(tec, 'mesa técnica ' + det));
-    // gente de pie en penumbra a los costados del escenario (entrenadores, cargadores, un camarógrafo): siluetas oscuras, sin detalle; la sala está habitada
-    const pie = [];
-    [[-5.95, 4.55, 'atras', 'remera', 'corto', '#22304f'], [-5.3, 4.95, 'cruzados', 'remera', 'cola', '#22304f']].forEach(([x, z, gesto, ropa, pelo, tono], i) => {
-      const C0 = gente(i + 13, tono, '#15171c'), C = {}; for (const k in C0) C[k] = C0[k].clone().multiplyScalar(.42);
-      pie.push(...en(persona(C, { det, pelo, k: i + 13, gesto, ropa, dePie: true }), asiento(x, STAGE_Y, z, Math.atan2(-x, .4 - z))));
-    });
-    lejos.push(malla(pie, 'gente de pie ' + det));
       for (const m of lejos) { m.visible = det === 1; this.fijos.push(m); } LEJOS[det ? 'fino' : 'liviano'] = lejos;
     }
     // cartel iluminado en el frente de la mesa de los árbitros
@@ -171,6 +173,7 @@ export class Jueces {
     for (let i = 0; i < 3; i++) {
       const x = d ? d[i] : null, a = this.arb[i]; a.k = x === null || x === undefined ? 0 : 1;
       if (a.k) { this.paletas.setColorAt(i, x ? BLANCA : ROJA); this.paletas.instanceColor.needsUpdate = true; }
+      if (this.luces) { this.luces.setColorAt(i, a.k ? (x ? LUZ_B : LUZ_R) : APAGADA); this.brillos.setColorAt(i, a.k ? (x ? BR_B : BR_R) : NEGRO); this.luces.instanceColor.needsUpdate = this.brillos.instanceColor.needsUpdate = true; }
     }
   }
   update(dt) {
