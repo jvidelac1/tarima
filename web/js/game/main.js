@@ -674,7 +674,7 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
       if (m.fase !== visto.fase) {
         // sin cortes (pedido del dueño): la cámara general llega con un movimiento suave; un rival que no decide nada se ve
         // entero desde la misma cámara general
-        if (m.fase === 'acomodo') escena.camara(camVista(propio), .6);
+        if (m.fase === 'acomodo') { const cv = camVista(propio); escena.camara(cv, cv === 'pov' ? .3 : .6); }      // a los ojos entra rápido: la barrita ya está a la vista y la imagen tiene que estar quieta
         if (m.fase === 'fijacion' && m.trabaMs < 0 && !camFija && (propio || decisivo) && !escena.pov) { escena.primerPlano('arriba', null, .5); camFija = true; }
         if (m.fase === 'tiron' || m.fase === 'flexion') sonido.despegue();
         visto.fase = m.fase;

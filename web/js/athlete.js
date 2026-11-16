@@ -18,7 +18,7 @@ const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const _v = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
 
 const SKIN_PARS = /* glsl */`
-uniform sampler2D tMask; uniform sampler2D tDetailSkin; uniform sampler2D tDetailCloth; uniform vec2 uTile; uniform float uMaskMode; uniform vec3 uScatter; uniform float uSweat; uniform float uDetail; uniform float uSkinSat; uniform float uSkinRough; uniform vec3 uHairColor; uniform float uHairMix; uniform vec3 uPiel; uniform float uSinCabeza; varying float vCab; uniform vec4 uClothFlat;
+uniform sampler2D tMask; uniform sampler2D tDetailSkin; uniform sampler2D tDetailCloth; uniform vec2 uTile; uniform float uMaskMode; uniform vec3 uScatter; uniform float uSweat; uniform float uDetail; uniform float uSkinSat; uniform float uSkinRough; uniform vec3 uHairColor; uniform float uHairMix; uniform vec3 uPiel; uniform float uSinCabeza; varying float vCab; uniform float uSinTorso; varying float vTor; uniform vec4 uClothFlat;
 vec3 gMask = vec3( 0.0 ); float gGrain = 0.0; float gPatch = 0.5;
 // Subsuperficie barata: difuso envuelto teñido de rojo en el terminador (la luz "dobla" la esquina dentro de la piel),
 // transmisión en contraluz por los bordes finos (orejas, dedos) y nada de eso sobre la tela.
@@ -51,6 +51,8 @@ const SKIN_MASK = /* glsl */`
   // bajo el pelo en capas (canal B) la piel toma el color del pelo: entre hebra y hebra no se ve cuero cabelludo claro
   diffuseColor.rgb = mix( diffuseColor.rgb, uHairColor, uHairMix * smoothstep( 0.25, 0.8, gMask.b ) * step( 0.5, uMaskMode ) );
 #endif
+  // tronco propio sin dibujar (primera persona con la barra abajo: la cámara va por encima de la espalda), con trama para que entre y salga de a poco
+  if ( uSinTorso > 0.0 && fract( sin( dot( floor( gl_FragCoord.xy ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) < uSinTorso * smoothstep( 0.25, 0.85, vTor ) ) discard;
   // cabeza propia oculta (primera persona): lo que queda del cuello y la cabeza, achicado a un punto, se pinta de piel lisa
   diffuseColor.rgb = mix( diffuseColor.rgb, uPiel, uSinCabeza * smoothstep( 0.55, 0.85, vCab ) );
 `;
@@ -189,17 +191,17 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
   if (src.normalMap) m.normalScale.copy(src.normalScale);
   for (const t of [m.map, m.normalMap, m.roughnessMap, m.aoMap]) if (t) t.anisotropy = aniso;
   const uniforms = { tDetailSkin: { value: detail.skin }, tDetailCloth: { value: detail.cloth }, uTile: { value: new THREE.Vector2(mpu / .012, mpu / .008) }, uDetail: { value: 1 }, tMask: { value: mask }, uMaskMode: { value: mask ? 1 : 0 },
-    uScatter: { value: new THREE.Color(.5, .17, .1) }, uSweat: { value: .55 }, uSkinSat: { value: .78 }, uSkinRough: { value: .56 }, uHairColor: { value: new THREE.Color(.03, .025, .02) }, uHairMix: { value: .7 }, uPiel: { value: new THREE.Color(.6, .42, .33) }, uSinCabeza: { value: 0 }, uClothFlat: { value: new THREE.Vector4(0, 0, 0, 0) } };
+    uScatter: { value: new THREE.Color(.5, .17, .1) }, uSweat: { value: .55 }, uSkinSat: { value: .78 }, uSkinRough: { value: .56 }, uHairColor: { value: new THREE.Color(.03, .025, .02) }, uHairMix: { value: .7 }, uPiel: { value: new THREE.Color(.6, .42, .33) }, uSinCabeza: { value: 0 }, uSinTorso: { value: 0 }, uClothFlat: { value: new THREE.Vector4(0, 0, 0, 0) } };
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, uniforms);
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aCabeza; varying float vCab;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvCab = aCabeza;');
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aCabeza; varying float vCab; attribute float aTorso; varying float vTor;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvCab = aCabeza; vTor = aTorso;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <lights_physical_pars_fragment>', '#include <lights_physical_pars_fragment>\n' + SKIN_PARS)
       .replace('#include <map_fragment>', '#include <map_fragment>\n' + SKIN_MASK)
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' + SKIN_DETAIL)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + SKIN_MATERIAL);
   };
-  m.customProgramCacheKey = () => 'tarima-skin-8';
+  m.customProgramCacheKey = () => 'tarima-skin-10';
   m.userData.skin = uniforms;
   return m;
 }
@@ -233,9 +235,13 @@ function hairMaterial(src) {
 function pesoCabeza(mesh, skin) {
   const g = mesh.geometry, si = g.attributes.skinIndex, sw = g.attributes.skinWeight, uv = g.attributes.uv; if (!si || !sw || g.attributes.aCabeza) return;
   const es = mesh.skeleton.bones.map(b => { for (let x = b; x; x = x.parent) if (x.isBone && boneKey(x.name) === 'Neck') return true; return false; });
-  const w = new Float32Array(si.count);
-  for (let i = 0; i < si.count; i++) { let t = 0, c = 0; for (let k = 0; k < 4; k++) { const p = sw.getComponent(i, k); t += p; if (es[si.getComponent(i, k)]) c += p; } w[i] = t > 0 ? c / t : 0; }
-  g.setAttribute('aCabeza', new THREE.BufferAttribute(w, 1));
+  // `aTorso`: lo mismo para el tronco entero (columna, clavículas, cuello y cabeza; no la cadera ni los brazos)
+  // y se va de a poco hacia los brazos y las piernas (el brazo 0,7, la cadera 0,8, el muslo 0,35): el sombreador lo deshace con
+  // una trama que crece con ese peso, así no queda un corte a la vista en el hombro ni en la cintura
+  const tr = mesh.skeleton.bones.map((b, i) => { const k = boneKey(b.name); return es[i] || /^(Spine\d?|LeftShoulder|RightShoulder)$/.test(k) ? 1 : /^(Left|Right)Arm$/.test(k) ? .7 : k === 'Hips' ? .8 : /^(Left|Right)UpLeg$/.test(k) ? .35 : 0; });
+  const w = new Float32Array(si.count), wt = new Float32Array(si.count);
+  for (let i = 0; i < si.count; i++) { let t = 0, c = 0, d = 0; for (let k = 0; k < 4; k++) { const p = sw.getComponent(i, k), h = si.getComponent(i, k); t += p; if (es[h]) c += p; d += p * tr[h]; } w[i] = t > 0 ? c / t : 0; wt[i] = t > 0 ? d / t : 0; }
+  g.setAttribute('aCabeza', new THREE.BufferAttribute(w, 1)); g.setAttribute('aTorso', new THREE.BufferAttribute(wt, 1));
   try {
     const im = mesh.material.map?.image; if (!im || !uv || !skin?.uPiel) return;
     const N = 256, cv = document.createElement('canvas'); cv.width = cv.height = N; const c2 = cv.getContext('2d', { willReadFrequently: true }); c2.drawImage(im, 0, 0, N, N);

@@ -232,7 +232,7 @@ export const PLANOS = {
  * - la cabeza propia no se dibuja en esta vista ni mientras la cámara esté a menos de `sinCabeza` m de los ojos (el hueso del cuello se
  *   achica a un punto entre las clavículas: cuello, cara, pelo, ojos y pestañas van pesados a él o a la cabeza, su hijo). La sombra sale sin cabeza: cae detrás del pesista.
  */
-export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 3.3, giroMax: 2.6, margen: .17, hombros: .38, encima: .45, abajo: -1.53, frente: -.21, tope: .6, bajo: [.12, .42], alto: [-.05, .3], atras: [.12, .26, .1], suelta: [1, -.8, 9], sinCabeza: .6, foco: 1.6,
+export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 3.3, giroMax: 2.6, margen: .4, hombros: .38, encima: .45, abajo: -.86, frente: -.21, tope: .6, bajo: [.12, .42], alto: [-.05, .3], atras: [.12, .26, .3], sube: .08, agarre: .72, atrasMax: .75, fovBajo: 88, fovAnchoBajo: 122, suelta: [1, -.8, 9], sinCabeza: .6, foco: 1.6,
   resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003 }, temblor: .006 };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
@@ -616,7 +616,7 @@ export class Escena {
   _pov(on) {
     if (!!this.pov === on) return; const cam = this.rig.camera;
     this.pov = on ? { p: new THREE.Vector3(), inc: 0, retro: 0, t: 0, nueva: true } : null; this.rig.propia = on ? this._povFn : null;
-    if (!on) { cam.near = .25; cam.updateProjectionMatrix(); }
+    if (!on) { cam.near = .25; cam.updateProjectionMatrix(); this._torso(this._sinTorso, 0); }
   }
   /** Punto de los ojos del pesista (m, mundo), de los huesos: no usa los ejes del hueso de la cabeza. */
   ojos(out) {
@@ -627,6 +627,12 @@ export class Escena {
     const ad = a.boneWorld('LeftArm', _pb).sub(a.boneWorld('RightArm', _pc)).cross(arr).normalize();
     return c.addScaledVector(arr, POV.arriba * k).addScaledVector(ad, POV.adelante * k);
   }
+  /** Cuánto del tronco propio se deja sin dibujar (0 a 1; athlete.js: aTorso). El cinturón sale con él. */
+  _torso(a, k) {
+    if (this._sinTorso && this._sinTorso !== a) { const x = this._sinTorso; this._sinTorso = null; this._torso(x, 0); }
+    if (!a?.skin?.uSinTorso) return; a.skin.uSinTorso.value = k; this._sinTorso = k > 0 ? a : null;
+    for (const m of a.meshes) if (/^Belt/.test(m.material?.name || '')) m.visible = k < .5;
+  }
   /** En primera persona: la barra está suelta y quedó detrás de los ojos (más de 10 cm): desde ahí no se la ve. */
   barraAtras() { return !!this.pov && !!this._suelta && this.barbell.group.position.z < this.pov.p.z - .1; }
   /** La cámara en primera persona de este cuadro (la llama el rig en lugar de su encuadre). */
@@ -636,7 +642,14 @@ export class Escena {
     // cuánto está la barra lejos por debajo (1) o cerca de la cara (0), y cuánto por encima de los ojos (0 a 1); con eso, el retroceso
     const dy0 = b.y - o.y, lejos = paso(-dy0, POV.bajo[0], POV.bajo[1]), arriba = paso(dy0, POV.alto[0], POV.alto[1]);
     // el retroceso llega con su propio retardo: al soltar la barra la cámara vuelve a los ojos de a poco, no de golpe
-    const retro = this._suelta ? 0 : POV.atras[2] * lejos + POV.atras[0] * (1 - lejos) + POV.atras[1] * arriba; S.retro = S.nueva ? retro : S.retro + (retro - S.retro) * (1 - Math.exp(-(this._suelta ? 3 : 12) * dt)); o.z -= S.retro;
+    const retro = this._suelta ? 0 : (POV.atras[2] + Math.max(0, o.z - b.z)) * lejos + POV.atras[0] * (1 - lejos) + POV.atras[1] * arriba; // y lo que haga falta para que las dos manos entren en la imagen (agarre ancho del arranque): la barra a no menos de
+    // medio agarre / (`agarre` × tangente de medio lente a lo ancho) de la cámara, sin pasar de `atrasMax`
+    let retro2 = retro;
+    if (!this._suelta && this.activo) {
+      const medio = Math.abs(this.activo.boneWorld('LeftHand', _pa).x - this.activo.boneWorld('RightHand', _pb).x) / 2, tH = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * cam.aspect;
+      const D = medio / (POV.agarre * Math.max(.3, tH)), dzB = b.z - o.z; if (Math.abs(b.y - this.activo.boneWorld('LeftHand', _pa).y) < .25) retro2 = Math.min(POV.atrasMax, Math.max(retro, Math.sqrt(Math.max(0, D * D - dy0 * dy0)) - dzB));
+    }
+    S.retro = S.nueva ? retro2 : S.retro + (retro2 - S.retro) * (1 - Math.exp(-(this._suelta ? 3 : 12) * dt)); o.z -= S.retro; o.y += POV.sube * (this._suelta ? 0 : lejos);
     if (S.nueva) S.p.copy(o); else S.p.lerp(o, 1 - Math.exp(-POV.sigue * dt));
     // inclinación de la mirada (reglas de POV): a la barra, con el corrimiento que toca según dónde está
     const dy = b.y - S.p.y, dz = b.z - S.p.z, hacia = Math.atan2(dy, dz), corr = POV.margen + (POV.hombros - POV.margen) * (1 - lejos) + (-POV.encima - POV.hombros) * arriba;
@@ -651,7 +664,13 @@ export class Escena {
       bal = POV.resp.balanceo * Math.sin(w * .5 + 1) + T * .6 * (Math.sin(S.t * 39 + .7) * .6 + Math.sin(S.t * 71) * .4);
     }
     cam.position.copy(S.p); cam.position.y += y; cam.rotation.set(inc, Math.PI, bal, 'YXZ');
-    const fov = Math.min(POV.fov, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(POV.fovAncho / 2)) / Math.max(.5, cam.aspect)))) * (1 - (1 - R.zoom) * .5);
+    // con la barra abajo el lente se abre (`fovBajo`, como una cámara de casco): la barra queda a plomo bajo los ojos y solo así
+    // entran a la vez la barra con las manos (abajo) y los jueces (arriba) mirando adelante y abajo, sin mirar el piso en picado
+    S.ancho = S.ancho === undefined ? lejos : S.ancho + (lejos - S.ancho) * (1 - Math.exp(-(quieto ? 60 : 5) * dt)); const kA = this._suelta ? 0 : S.ancho;
+    // y el tronco propio no se dibuja (brazos, cadera y piernas sí): la cámara va detrás de los ojos, por encima de la espalda
+    S.torso = kA; this._torso(this.activo, kA);
+    const fovV = POV.fov + (POV.fovBajo - POV.fov) * kA, fovH = POV.fovAncho + (POV.fovAnchoBajo - POV.fovAncho) * kA;
+    const fov = Math.min(fovV, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(fovH / 2)) / Math.max(.5, cam.aspect)))) * (1 - (1 - R.zoom) * .5);
     cam.fov = fov; cam.near = POV.cerca; cam.updateProjectionMatrix(); cam.updateMatrixWorld();
     R.focusDistance = POV.foco; R.target.set(S.p.x, S.p.y, S.p.z + POV.foco); R.subject.copy(R.target);
   }
