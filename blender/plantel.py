@@ -100,10 +100,10 @@ PESISTAS = {
  # compacto atlético de categoría media: hombros y trapecio anchos, cintura firme, pelo más largo arriba y costados cortos, barba corta
  'kordan': dict(nombre='Stevan Kordan', pais='Dravenia', codigo='DRV', genero='M', categoria='94', estatura=1.71,
    musculo=1.0, grasa=.14, prop=dict(femur=.228),
-   rasgos=(.0, .1, .9), piel='media', ojos='#3f3324',
-   # cara cuadrada de mandíbula marcada, mentón ancho, nariz recta, cejas bajas
-   cara=[('head/head-square',.5),('chin/chin-width-incr',.45),('chin/chin-bones-incr',.4),('chin/chin-jaw-drop-incr',.2),('cheek/l-cheek-bones-incr',.35),('cheek/r-cheek-bones-incr',.35),('nose/nose-greek-incr',.3),('eyebrows/eyebrows-trans-down',.45)],
-   pelo=dict(color='#1c1511', peinado='corto', largo=.021, barba=.5),
+   rasgos=(.0, .4, .6), piel='trigueña', ojos='#33261a',
+   # cara larga de mentón marcado y pómulos altos, nariz angosta con caballete, mejillas secas, cejas bajas (distinta de la del pesado)
+   cara=[('head/head-rectangular',.45),('chin/chin-prominent-incr',.35),('chin/chin-bones-incr',.4),('cheek/l-cheek-bones-incr',.5),('cheek/r-cheek-bones-incr',.5),('cheek/l-cheek-volume-decr',.35),('cheek/r-cheek-volume-decr',.35),('nose/nose-hump-incr',.3),('nose/nose-width2-decr',.25),('eyebrows/eyebrows-trans-down',.45)],
+   pelo=dict(color='#14100d', peinado='corto', largo=.022, barba=.3),
    uniforme=dict(malla='#ece8dd', panel='#0f5a66', vivo='#12181c', rodillera='#14171a', rodillera2='#0f5a66', cinturon='#2a1d15', zapatillas=('#efeee9','#d9d5ca','#0f5a66','#8a5f36')),
    juego=dict(color='#2fb3c4', bandera='linear-gradient(90deg,#0f5a66 0 30%,#ece8dd 30% 70%,#12181c 70%)', dorsal=9, kg=dict(s=178, c=216))),
 }
