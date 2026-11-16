@@ -753,6 +753,9 @@ html.vert #saltar{left:calc(var(--sl) + 8px);transform:none;top:calc(var(--st) +
 html.vert #saltar-rival{right:auto;left:50%;transform:translateX(-50%);bottom:calc(var(--sb) + var(--bm));min-height:60px;padding:0 1.8em;justify-content:center;font-size:20px;border-radius:30px}
 @media (prefers-reduced-motion:no-preference){html.vert .saltar-rival.late{animation:lateV .5s ease-in-out 2}}
 @keyframes lateV{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.1)}}
+/* veredicto de un rival con «Saltar» todavía a la vista (pasa cuando una explicación de primera vez alarga el turno): el
+   veredicto sube por encima del botón (60 px + aire) en vez de quedar debajo */
+html.vert body:has(#saltar-rival:not([hidden])) #tv #veredicto{bottom:calc(var(--sb) + var(--bm) + 68px)}
 /* el cartel grande (y el zócalo de Clásico) sin salirse a lo ancho */
 html.vert #tv #cartel{white-space:normal;text-align:center;width:max-content;max-width:calc(100% - 28px);font-size:calc(var(--u)*2.4);top:calc(var(--techo-v) + 8px)}
 html.vert #tv #zocalo{bottom:calc(var(--sobre-boton) + var(--u)*5)}
