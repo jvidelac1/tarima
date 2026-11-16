@@ -39,6 +39,14 @@ on:
         description: 'Corrida de pesistas.yml de la que tomar los modelos del plantel (vacío: la de PESISTAS_RUN)'
         type: string
         default: ''
+      tomas:
+        description: 'Iteración rápida: solo estas tomas del plantel (ej.: 3-4,medio,cara). Saltea las fotos viejas y el laboratorio'
+        type: string
+        default: ''
+      solo:
+        description: 'Correr solo un trabajo: fotos o pov (vacío: los dos)'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -46,7 +54,7 @@ permissions:
 
 env:
   # corrida de pesistas.yml con los modelos del plantel que se fotografían (no están en el repo mientras se iteran)
-  PESISTAS_RUN: '43875357534'
+  PESISTAS_RUN: '43918976509'
   # plaza del juego y terna que se fotografía: el pesista en escena es el primero de la terna (plaza ventura)
   TERNA: 'ilarraz,jastrev,solanet'
 
@@ -57,6 +65,7 @@ defaults:
 jobs:
   fotos:
     name: Fotos por calidad (dibujo por software)
+    if: ${{ inputs.solo != 'pov' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -90,19 +99,19 @@ jobs:
       - name: Lógica de fluidez sin navegador (perf_test)
         run: node tools/perf_test.mjs 2>&1 | tee out/logs/perf_test.log
       - name: Fotos de cada calidad (banco --fotos --niveles)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && !inputs.tomas }}
         timeout-minutes: 25
         run: node tools/banco.mjs --fotos=out/graficos/fotos --niveles${{ inputs.niveles && format('={0}', inputs.niveles) || (github.event_name == 'push' && '=alta,movil' || '') }} --ancho=1280 --alto=620 2>&1 | tee out/logs/fotos.log
       - name: Fotos del laboratorio de materiales (banco --fotos --lab)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && !inputs.tomas }}
         timeout-minutes: 10
         run: node tools/banco.mjs --fotos=out/graficos/lab --lab=materiales --ancho=1280 --alto=620 2>&1 | tee out/logs/lab.log
       - name: Fotos del plantel (el primero de la terna en todas las tomas; los otros en plano medio, torso y cara)
         if: ${{ !cancelled() && hashFiles('web/models/ilarraz.glb') != '' }}
         timeout-minutes: 30
         run: |
-          node tools/banco.mjs --fotos=out/graficos/plantel/a --niveles=alta,movil --plantel=$TERNA --pesista=ventura --ancho=1280 --alto=620 2>&1 | tee out/logs/fotos_plantel.log || true
-          for plaza in brenner marangi; do
+          node tools/banco.mjs --fotos=out/graficos/plantel/a --niveles=${{ inputs.niveles || 'alta,movil' }} ${{ inputs.tomas && format('--tomas={0}', inputs.tomas) || '' }} --plantel=$TERNA --pesista=ventura --ancho=1280 --alto=620 2>&1 | tee out/logs/fotos_plantel.log || true
+          for plaza in ${{ inputs.tomas && ' ' || 'brenner marangi' }}; do
             node tools/banco.mjs --fotos=out/graficos/plantel/$plaza --niveles=alta --tomas=medio,torso,cara,3-4,medio-salida --plantel=$TERNA --pesista=$plaza --ancho=1280 --alto=620 2>&1 | tee -a out/logs/fotos_plantel.log || true
           done
       - name: Banco de medición con el ambiente (banco)
@@ -124,6 +133,7 @@ jobs:
   # final de cada uno.
   pov:
     name: Primera persona y final del levantamiento (dibujo por software)
+    if: ${{ inputs.solo != 'fotos' }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:

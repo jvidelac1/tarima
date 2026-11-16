@@ -2001,6 +2001,33 @@ nuevo dentro del juego; (4) fluidez. Después de cada tanda, ronda del director 
 artefacto de cada pesista. Con eso `blender/tex.py` corre con numpy en segundos:
 `TARIMA_OUT=<carpeta>/ python3 blender/tex.py <nombre> 1024` (la carpeta tiene `<nombre>/maps.npz`, `lm.json`, `bones.json`,
 `bones_all.json`). Sirve para la línea del pelo, cejas, labios y zonas de color; el detalle fino se mira en el build.
+**Sesión 2 (16-nov a la tarde, otro agente Fable): `pov` fusionada acá y plan de lo que sigue.** `visual` ya trae `pov`
+(`abc1a39`: primera persona con la cámara que acompaña a la barra y final sin movimientos de cámara). Meta medida (DoD):
+director a ciegas con conjunto Alta ≥ 7, pesista ≥ 7, primera persona ≥ 7, final ≥ 7, Móvil ≥ 6 y ninguna parte bajo 6.
+
+Diagnóstico al empezar (fotos de la tanda 3, corrida 43922579093, y retratos de Blender de la 43918976509):
+- El **mismo pesista se ve mejor en el retrato de Blender que en el juego**: la piel del juego tiene un relieve de escamas
+  con vetas blancas de brillo (normales de detalle en mosaico), la ceja y el nacimiento del pelo salen duros, y la malla
+  no tiene espesor ni costura (lee a piel pintada). El problema principal está en el sombreador del visor, no en la malla.
+- **Público**: maniquíes claros, nítidos y parejos; en una transmisión real la tribuna es penumbra con bultos, algún brillo
+  y fuera de foco. **Jueces**: caras lisas. **Focos**: discos blancos sin halo. **Móvil**: fondo plano.
+- **Primera persona**: 5/10 en la última ronda puntuada; la versión rehecha (`abc1a39`) no tiene nota.
+
+Tres frentes en paralelo, cada uno en su rama desde `visual` (se fusionan acá y la ronda del director es sobre `visual`):
+
+| Rama | Archivos | Qué busca |
+|---|---|---|
+| `v-pesista` | `web/js/athlete.js` (sombreadores de piel, pelo, tela, ojos), `blender/tex.py`, `pesistas.yml`, `lab.js` (piel y tela) | Piel sin escamas (poro solo en rugosidad, brillo roto y bajo, dispersión en el terminador), pelo corto con borde difuso y brillo anisótropo, cejas y pestañas por pelos, malla con espesor en el borde, costuras y trama, rodilleras y vendas de tela, manos; que el juego se vea como el retrato de Blender o mejor |
+| `v-sala` | `gente.js`, `publico*.js`, `jueces.js`, `arena.js`, `look.js`, `ambiente.js`, `post.js`, `lighting.js`, `barbell.js`, `materiales.js` | Tribuna en penumbra y fuera de foco con contraluces, jueces y oficiales con cara, focos con halo y destello, fondo con profundidad (estructura, banderas, pantallas), discos y barra con uso y moleteado, y un «Móvil» con ambiente (todo horneado, sin costo por píxel) |
+| `v-pov` | `stage.js`, `cameras.js`, `main.js`, `caida.js`, `check_pov.mjs` (y solo lo de primera persona en `athlete.js`) | La foto del joystick: horizonte derecho, manos y antebrazos grandes y nítidos en el tercio inferior, barra cruzando el cuadro, jueces y público al frente, nunca el piso en picado ni el torso; respiración, temblor y dip sin marear; barrita usable. Final: plano quieto con pesista, luces y puntuación; gesto de festejo o bronca por regla. Fluidez: transiciones, pies y barra que flexiona |
+
+Iteración rápida de fotos: `gh workflow run graficos.yml --ref <rama> -f solo=fotos -f niveles=alta -f tomas=3-4,medio,cara`
+(entradas nuevas `tomas` y `solo`). `PESISTAS_RUN` pasa a la corrida 43918976509 (texturas de `0068995`).
+
+**Cápsula del pecho (`chestU`, `95bf4fd`): sigue PENDIENTE DE APROBACIÓN DEL DUEÑO.** La alternativa por regla
+(`plantel-alt-capsula`) dio 9 BAD en halvard, así que no reemplaza a `chestU`. Los cuatro del plantel dan 0 BAD con `95bf4fd`
+(corridas 43875357534 y 43918976509); queda aislado en ese commit y se saca con `git revert 95bf4fd`.
+
 ### Primera persona y el final del levantamiento (16-nov, rama `pov`, desde `prueba`)
 
 Pedido del dueño después de probar `prueba`: «cuando terminás el levantamiento hacen movimientos medio raros. Yo quiero poder
