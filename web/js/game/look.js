@@ -363,16 +363,16 @@ export class Look {
     const A = this.arena, amb = this.ambiente, m = A.pantalla?.material; if (!m || !amb?.led) return;
     amb.ledFondo = ledFondo(amb.led.width, amb.led.height); amb.sinRejilla = true; amb._led();
     m.color.multiplyScalar(2.4);
-    const antes = m.onBeforeCompile;
+    const antes = m.onBeforeCompile, yo = this;
     m.onBeforeCompile = function (sh, r) {
-      antes.call(this, sh, r);
+      antes.call(this, sh, r); if (yo.ledPlano) return;
       sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
 	{ vec2 ledP = vMapUv * vec2( 500.0, 175.0 ); vec2 ledF = abs( fract( ledP ) - 0.5 );
 	  float ledM = ( 1.0 - smoothstep( 0.3, 0.48, max( ledF.x, ledF.y ) ) ) * ( 1.0 - smoothstep( 0.2, 0.62, length( ledF ) ) );
 	  float ledW = smoothstep( 0.12, 0.4, max( fwidth( ledP.x ), fwidth( ledP.y ) ) );
 	  diffuseColor.rgb *= mix( ledM * 1.75, 0.82, ledW ); }`);
     };
-    m.customProgramCacheKey = () => 'led con grano'; m.needsUpdate = true;
+    m.customProgramCacheKey = () => (yo.ledPlano ? 'led plano' : 'led con grano'); m.needsUpdate = true;
   }
 
   _utileria(aniso, grande) {
@@ -383,6 +383,7 @@ export class Look {
     const ply = new THREE.MeshStandardMaterial({ name: 'terciado', ...tx(terciado(S)), roughness: 1, metalness: 0, envMapIntensity: .4 });
     const negro = new THREE.MeshStandardMaterial({ name: 'goma negra', color: new THREE.Color('#0d0d10'), roughness: .7, envMapIntensity: .4 });
     const tela = new THREE.MeshStandardMaterial({ name: 'tela', color: new THREE.Color('#b9b6ac'), roughness: .95 });
+    this.utilMats = [metal, baul, ply]; for (const m of this.utilMats) m.userData.normal = m.normalMap;
     const caja = new THREE.BoxGeometry(1, 1, 1), cil = new THREE.CylinderGeometry(1, 1, 1, 14);
     /** Caja o cilindro de tamaño (sx, sy, sz) centrado en (x, y, z) dentro de `g`. */
     const pz = (g, geo, mat, sx, sy, sz, x, y, z, rx = 0, ry = 0, rz = 0) => { const o = new THREE.Mesh(geo, mat); o.scale.set(sx, sy, sz); o.position.set(x, y, z); o.rotation.set(rx, ry, rz); o.receiveShadow = true; g.add(o); return o; };
@@ -478,13 +479,17 @@ export class Look {
       const g = new THREE.Group(); g.position.copy(l.position); g.lookAt(hasta); g.rotateX(-Math.PI / 2);
       const m = new THREE.Mesh(geo, mat); m.scale.set(rad, len, rad); m.renderOrder = 5; m.frustumCulled = false; g.add(m); this.group.add(g); this.rayos.push({ mat, base: fuerza });
     };
-    rayo(L.key, .01, .8); rayo(L.rimA, .028, .62); rayo(L.rimB, .014, .6); rayo(L.hair, .008, .7);
+    rayo(L.rimA, .03, .62); rayo(L.rimB, .014, .6);      // solo los dos contraluces: los conos de la clave y del pelo casi no se veían y eran pantalla entera de mezcla
     this.group.visible = false;
   }
 
   /** Lo que depende de la calidad: los rayos solo con post y haces; `A.rayos` escala su fuerza. */
   setNivel(Q) {
-    setSuperficies(!Q.directo); FINO.value = Q.directo ? 0 : 1;
+    setSuperficies(!Q.directo && (Q.amb?.superficies ?? true));
+    // camino directo: la pantalla sin grano por píxel y la utilería sin mapa de normales (se pagaban en «Baja» y «Móvil»)
+    { const d = !!Q.directo; if (this.ledPlano !== d) { this.ledPlano = d; const m = this.arena.pantalla?.material; if (m) m.needsUpdate = true; }
+      for (const m of this.utilMats || []) { const n = d ? null : m.userData.normal; if (m.normalMap !== n) { m.normalMap = n; m.needsUpdate = true; } } }
+    FINO.value = Q.directo ? 0 : 1;
     // en el camino directo la pared de chapa (material físico en mucha pantalla) no se dibuja: queda el telón, como antes
     this.arena.group.traverse(o => { if (o.material === this.chapaMat) o.visible = !Q.directo; });
     BOKEH.uScale.value = Q.directo ? .12 : .18;      // luces de fondo: puntos con halo en el camino directo (eran discos grises), bokeh moderado con post      // superficies por función solo con post
@@ -496,7 +501,7 @@ export class Look {
   post(p) {
     const u = p.finalMat.uniforms, G = GRADO_LOOK;
     u.toneMappingExposure.value = G.exp; u.uSat.value = G.sat; u.uContrast.value = G.con; u.uShadowGamma.value = G.gam; u.uVignette.value = G.vin;
-    u.uFrio.value.set(...G.frio); u.uCalido.value.set(...G.calido); u.uNegro.value = G.negro; u.uGrain.value = .028;
+    u.uFrio.value.set(...G.frio); u.uCalido.value.set(...G.calido); u.uNegro.value = G.negro; u.uGrain.value = .012;
     if (p.bloom) { p.bloom.strength = .08; p.bloom.radius = .3; p.bloom.threshold = 2.6; }
     // menos desenfoque de fondo que la transmisión de antes: la sala (utilería, chapa, público) tiene que leerse
     for (const m of [p.dofPre, p.dofBlur, p.mixMat]) if (m?.uniforms.uScale) m.uniforms.uScale.value = .18;

@@ -31,11 +31,11 @@ export const SUPERFICIES = {
   madera: { k: .9, glsl: /* glsl */`
 float superficie( vec3 P, inout vec3 col, inout float rug, inout float met ){
   vec2 p = P.xz; float v1 = sVer( P, 500.0 ), v2 = sVer( P, 60.0 );
-  float hilo = sN( vec2( p.x * 900.0, p.y * 14.0 ) ) * 0.6 + sN( vec2( p.x * 320.0, p.y * 5.0 ) ) * 0.4;
+  float hilo = sN( vec2( p.x * 700.0, p.y * 11.0 ) );
   float raya = smoothstep( 0.86, 0.97, sN( vec2( p.x * 40.0 + p.y * 9.0, p.y * 420.0 ) ) ) * v1;
   col *= 1.0 + ( hilo - 0.5 ) * 0.22 * v1; rug = clamp( rug + ( hilo - 0.5 ) * 0.12 * v1 + raya * 0.25, 0.05, 1.0 );
   float centro = exp( - dot( p * vec2( 0.85, 1.25 ) - vec2( 0.0, 0.15 ), p * vec2( 0.85, 1.25 ) - vec2( 0.0, 0.15 ) ) ), discos = exp( - pow( ( abs( p.x ) - 0.97 ) / 0.22, 2.0 ) ) * ( 1.0 - smoothstep( 0.5, 1.1, abs( p.y - 0.1 ) ) );
-  float nube = sF( p * 3.1 + 4.0 ), grumo = sF( p * 46.0 ) * v2 + 0.5 * ( 1.0 - v2 );
+  float nube = sN( p * 3.1 + 4.0 ) * 0.65 + sN( p * 7.3 + 1.0 ) * 0.35, grumo = sN( p * 60.0 ) * v2 + 0.5 * ( 1.0 - v2 );
   float tiza = smoothstep( 0.62 - 0.24 * uUso, 0.97 - 0.2 * uUso, nube * ( 0.45 + 0.9 * centro + 0.6 * discos ) ) * ( 0.35 + 0.65 * smoothstep( 0.3, 0.7, grumo ) );
   tiza = clamp( tiza * ( 0.25 + 0.6 * uUso ), 0.0, 0.7 );
   col = mix( col, vec3( 0.86, 0.85, 0.80 ), tiza ); rug = mix( rug, 0.98, min( 1.0, tiza * 1.8 ) );
@@ -45,12 +45,13 @@ float superficie( vec3 P, inout vec3 col, inout float rug, inout float met ){
   goma: { k: 1.0, glsl: /* glsl */`
 float superficie( vec3 P, inout vec3 col, inout float rug, inout float met ){
   vec2 p = P.xz; float v1 = sVer( P, 700.0 ), v2 = sVer( P, 50.0 );
-  float gran = sN( p * 1100.0 ) * 0.6 + sN( p * 420.0 ) * 0.4;
+  float gran = sN( p * 800.0 );
   col *= 1.0 + ( gran - 0.5 ) * 0.5 * v1; rug = clamp( rug + ( gran - 0.5 ) * 0.2 * v1, 0.08, 1.0 );
   float cerca = exp( - pow( max( abs( p.x ), abs( p.y ) ) / 3.4, 4.0 ) );
-  float polvo = smoothstep( 0.7 - 0.3 * uUso, 1.0 - 0.25 * uUso, sF( p * 1.7 + 9.0 ) * ( 0.55 + 0.6 * cerca ) ) * ( 0.5 + 0.5 * sF( p * 30.0 ) * v2 ) * ( 0.2 + 0.8 * uUso );
+  float lento = sN( p * 1.7 + 9.0 ) * 0.65 + sN( p * 4.1 + 2.0 ) * 0.35;
+  float polvo = smoothstep( 0.7 - 0.3 * uUso, 1.0 - 0.25 * uUso, lento * ( 0.55 + 0.6 * cerca ) ) * ( 0.5 + 0.5 * sN( p * 40.0 ) * v2 ) * ( 0.2 + 0.8 * uUso );
   col = mix( col, vec3( 0.55, 0.55, 0.53 ), polvo * 0.5 ); rug = mix( rug, 0.97, polvo );
-  float pulido = smoothstep( 0.55, 0.8, sF( p * 0.9 + 2.0 ) ) * cerca; rug = mix( rug, rug * 0.62, pulido * ( 1.0 - polvo ) );
+  float pulido = smoothstep( 0.55, 0.8, 1.0 - lento ) * cerca; rug = mix( rug, rug * 0.62, pulido * ( 1.0 - polvo ) );
   return gran * 0.00025 * v1 + polvo * 0.0002;
 }` },
   // Chapa trapezoidal pintada (pared del estadio), toda por función: las costillas son un coseno recortado; la pintura va en

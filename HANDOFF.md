@@ -1699,7 +1699,7 @@ humanos reales». Nada fusionado ni publicado. La cámara en primera persona y l
     atrás a la izquierda (`rimA`, el que mira a la cámara general) y frío del otro lado; relleno y luz de sala mínimos.
     `GRADO_LOOK`: una sola gradación (saturación 0,88, sombras frías, altas cálidas, viñeta 0,36, negros firmes) para el pase
     final de `post.js` (uniforms nuevos `uFrio`, `uCalido`, `uNegro`), el tono del camino directo y `tonoJS` de `stage.js`.
-    Menos desenfoque de fondo (`uScale` 0,45: el marcador y la sala se leen), bloom con umbral alto, bruma de sala a un tercio.
+    Casi sin desenfoque de fondo (`uScale` 0,18: el marcador y la sala se leen), bloom con umbral alto, bruma de sala a un tercio.
   - *Texturas por campo* (color + altura→normales + rugosidad de la misma cuenta, ruido de valor en octavas): madera de la
     tarima (tablas, veta, barniz gastado donde se paran, marcas y abolladuras donde caen los discos, magnesio, línea y marca
     estarcidas y gastadas; 2048 px en computadora aunque arranque en «Baja», 1024 en teléfono), goma del escenario (motas,
@@ -1742,15 +1742,20 @@ función, sin rayos, sin pared de chapa y sin el detalle fino del pesista. Media
 | 1 | `scratchpad/look/r2` | 5 | 3,5 | velo lechoso y halo, desenfoque excesivo, discos grises flotando, piel plástica, luz sin dirección, polvo como nieve |
 | 2 | `scratchpad/look/r3` | 5 | 3,5 | piel de cera, cara y pelo de muñeco, marcador ilegible, fondo vacío, jueces y público maniquíes, tela lisa |
 | 3 | `scratchpad/look/r4` | 5 | 3,5 | cara de muñeco (ojos fijos, pelo casquete), público de bolos, jueces sin cara, halo en el contorno, tiza al 100 % lava todo, Móvil sin ambiente |
+| 4 | `scratchpad/look/r5` | 5 | 3,5 | **1 y 2: el pesista** (cara y cuello, pelo casquete, espalda plana, antebrazos finos: «rehacer modelo»); después público y ayudantes de bolo, jurado sin cara, halo y grano sobre la piel, Móvil sin atmósfera |
 
 En las tres dijo que **mejoró claramente contra el antes** («de juego de celular caricaturesco a casi realista con muñeco
 adentro») y que lo mejor es la tarima, los discos y la barra, y la composición del jurado y de la reversa. **El puntaje no
-subió de 5**: lo que lo frena ya no es la sala sino el pesista, los jueces y el público. Después de la ronda 3 se bajó otra
-vez el desenfoque y el bloom, la saturación de la piel y se aclaró la sala de «Móvil» (sin ronda nueva).
+subió de 5 en cuatro rondas** (meta del coordinador: 6,5 y 5; no se alcanzó). Entre la 3 y la 4 se atacó lo repetido: piel
+(rugosidad por zonas, sin halo de contraluz, menos especular), desenfoque casi apagado (`uScale` 0,18) y sala con más
+presencia (tribunas, pabellón y LED más luminosos). La ronda 4 ya pone primero al **modelo del pesista** (para el frente
+`plantel`, ver límites abajo) y dice que la tarima es «el único material que ya está a nivel Saltline». Lo que queda de
+sala y post: público y cargadores (cápsulas azules fuera de escala), jueces sin cara, y ambiente de «Móvil» (fondo negro).
+Después de la ronda 4 solo se bajó el grano a la mitad (sin ronda nueva).
 
 **Antes y después** (rutas en el scratchpad de la sesión, `/private/tmp/claude-501/-Users-juancavidela-Desktop-tarima/65496069-74a9-4729-8e58-e719d10cf3c8/scratchpad/`):
-antes `saltline_ref/tarima_hoy.jpg`; después `look/r4/graficos-out/graficos/fotos/alta_3-4.png`, `alta_frontal.png`,
-`alta_jurado-vale.png`, `movil_3-4.png`; laboratorio `look/r4/graficos-out/graficos/lab/lab_chapa-usado.png`. Las mismas
+antes `saltline_ref/tarima_hoy.jpg`; después `look/r5/graficos-out/graficos/fotos/alta_3-4.png`, `alta_frontal.png`,
+`alta_jurado-vale.png`, `movil_3-4.png`, `movil_frontal.png`; laboratorio `look/r4/graficos-out/graficos/lab/lab_chapa-usado.png`. Las mismas
 fotos salen de cada corrida de `graficos.yml` (artefacto `graficos-out`).
 
 **Costo.** COSTO_PENDIENTE

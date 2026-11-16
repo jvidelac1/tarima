@@ -27,7 +27,7 @@ export const BARATO = Object.freeze({ piso: true, haces: 'no', bordes: 'material
 export const AMBIENTE = Object.freeze({
   movil: Object.freeze({ polvo: 50, conos: 1, reflejo: 0, publico: false }),
   baja: Object.freeze({ polvo: 120, conos: 1, reflejo: 0, publico: false }),
-  media: Object.freeze({ polvo: 260, conos: 1.6, reflejo: 0, publico: true }),
+  media: Object.freeze({ polvo: 260, conos: 1.6, reflejo: 0, publico: true, superficies: false, rayos: 0 }),      // superficies y rayos (look.js, materiales.js): solo Alta y Ultra
   alta: Object.freeze({ polvo: 450, conos: 1.8, reflejo: .5, publico: true }),
   ultra: Object.freeze({ polvo: 800, conos: 2, reflejo: 1, publico: true }),
 });
