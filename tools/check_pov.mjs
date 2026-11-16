@@ -71,7 +71,7 @@ async function recorrer(id, [nombre, lev, seg, fase, mov, res], camara, fotos, c
   const info = await J(o => window.JUEGO.test.final(o), { id, lev, seg, fase, mov, res, camara });
   if (!info) { problemas.push(`${id} · ${nombre}: no armó escena`); return null; }
   await J(() => window.JUEGO.test.medir());
-  let piso = 9; const M = { resbala: 0, vPie: 0, tPie: 0, giro: 0, cual: '', tGiro: 0, manoTronco: 9, tMano: 0, manoAtras: 0, holgura: 9, sube: 0 }, lista = []; let ant = null, prox = 0;
+  let piso = 9; const M = { resbala: 0, vPie: 0, tPie: 0, giro: 0, cual: '', tGiro: 0, manoTronco: 9, tMano: 0, vMano: 0, tVMano: 0, holgura: 9, sube: 0 }, lista = []; let ant = null, prox = 0;
   for (let t = 0; t <= info.dur + .3; t += 1 / 60) {
     const sacar = fotos && t >= prox - 1e-9;
     const m = await J(([t, d]) => { const h = window.JUEGO.test.finalEn(t, d, 1 / 60, 1 / 60); return { ...window.JUEGO.test.medir(), h: h ? h.h : null }; }, [t, sacar]);
@@ -83,6 +83,7 @@ async function recorrer(id, [nombre, lev, seg, fase, mov, res], camara, fotos, c
         piso = Math.min(piso, a[1], b[1]); if (a[1] < piso + .012 && b[1] < piso + .012) { M.resbala += d; if (d * 60 > M.vPie) { M.vPie = d * 60; M.tPie = t; } }
         M.sube = Math.max(M.sube, b[1]);
       }
+      for (const L of ['Left', 'Right']) { const v = Math.hypot(...m[L + 'Hand'].map((x, i) => x - ant[L + 'Hand'][i])) * 60; if (v > M.vMano) { M.vMano = v; M.tVMano = t; } }
       if (m.giro * 60 > M.giro) { M.giro = m.giro * 60; M.cual = m.cual; M.tGiro = t; }
     }
     // manos contra el tronco: distancia de cada mano al eje cadera–cabeza (menos 13 cm de radio del tronco), con la mano entre los dos
@@ -100,7 +101,7 @@ if (!SOLO || SOLO === 'finales') {
   console.log('A. FINALES (60 c/s): pies apoyados que resbalan, hueso que más gira, manos contra el tronco, holgura de la barra');
   for (const id of ['ventura', 'brenner']) for (const caso of FINALES) {
     const r = await recorrer(id, caso, '3/4', true); if (!r) continue; const { M, info } = r;
-    console.log(`${id.padEnd(8)} ${caso[0].padEnd(26)} ${info.tipo.padEnd(8)} ${info.dur.toFixed(2)} s · pies resbalan ${(M.resbala * 100).toFixed(1)} cm (máx ${(M.vPie * 100).toFixed(0)} cm/s a ${M.tPie.toFixed(2)} s; punta hasta ${(M.sube * 100).toFixed(0)} cm) · giro máx ${G(M.giro).toFixed(0)} °/s (${M.cual}, a ${M.tGiro.toFixed(2)} s) · mano–tronco mín ${(M.manoTronco * 100).toFixed(1)} cm a ${M.tMano.toFixed(2)} s · holgura barra ${(M.holgura * 100).toFixed(1)} cm`);
+    console.log(`${id.padEnd(8)} ${caso[0].padEnd(26)} ${info.tipo.padEnd(8)} ${info.dur.toFixed(2)} s · pies resbalan ${(M.resbala * 100).toFixed(1)} cm (máx ${(M.vPie * 100).toFixed(0)} cm/s a ${M.tPie.toFixed(2)} s; punta hasta ${(M.sube * 100).toFixed(0)} cm) · giro máx ${G(M.giro).toFixed(0)} °/s (${M.cual}, a ${M.tGiro.toFixed(2)} s) · mano hasta ${M.vMano.toFixed(1)} m/s (a ${M.tVMano.toFixed(2)} s) · mano–tronco mín ${(M.manoTronco * 100).toFixed(1)} cm a ${M.tMano.toFixed(2)} s · holgura barra ${(M.holgura * 100).toFixed(1)} cm`);
     await hoja(`final_${id}_${slug(caso[0])}_general`, r.lista);
     if (id === 'ventura') { const l = await recorrer(id, caso, 'lado', true); if (l) await hoja(`final_${id}_${slug(caso[0])}_lado`, l.lista); }
   }
@@ -114,7 +115,7 @@ if (!SOLO || SOLO === 'pov') {
     for (const [seg, lev, n] of SEGS) {
       // hoja: una foto cada 5 muestras (medio segundo de clip), con la cámara asentada en cada una
       const lista = [];
-      for (let s = 0; s <= n; s += 5) { await J(o => window.JUEGO.test.posa(o), { id, lev, seg, s, camara: 'pov', dt: .5, dibujar: false }); const m = await J(o => window.JUEGO.test.posa(o), { id, lev, seg, s, camara: 'pov', dt: .5 }); lista.push({ t: `${seg} ${s} · ${G(m.cam.inc).toFixed(0)}°`, b: await toma() }); if (!m.pov || !m.sinCabeza) problemas.push(`${id} ${seg} ${s}: la primera persona no quedó puesta o la cabeza propia se dibuja`); }
+      for (let s = 0; s <= n; s += 5) { await J(o => window.JUEGO.test.posa(o), { id, lev, seg, s, camara: 'pov', dt: .5, dibujar: false }); const m = await J(o => window.JUEGO.test.posa(o), { id, lev, seg, s, camara: 'pov', dt: .5 }); const b = await toma(); lista.push({ t: `${seg} ${s} · ${G(m.cam.inc).toFixed(0)}°`, b }); if (b.length < 9000) problemas.push(`${id} ${seg} ${s}: la imagen en primera persona salió vacía (${b.length} bytes)`); if (!m.pov || !m.sinCabeza) problemas.push(`${id} ${seg} ${s}: la primera persona no quedó puesta o la cabeza propia se dibuja`); }
       await hoja(`pov_${id}_${seg}`, lista, 5, 384);
       // seguido, a 60 c/s y un segundo de clip por fase: cuánto se mueve y gira la cámara
       let ant = null, vMax = 0, wMax = 0, aMax = 0, vAnt = 0, incMin = 9, incMax = -9, lejos = 0;

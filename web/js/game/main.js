@@ -759,9 +759,10 @@ const PARADO = P => { const G = tramo(P, 'clean'); return G.base + G.i('Parado')
  * Reglas del cuerpo en el final (game/caida.js, poseCaida), en muestras globales del clip y por nombre de fase: desde dónde
  * el cuerpo se para siguiendo el clip (`rec`, la recepción) y hasta dónde (`fin`, el final del segmento); y el tramo que
  * desandan los brazos: de la recepción (después ya no se mueven) a la barra colgando con los brazos estirados (arranque y
- * cargada: la triple extensión) o en los hombros (envión: el impulso).
+ * cargada: la triple extensión) o a medio empuje (envión: no hasta los hombros, porque ahí las manos quedan adelante justo
+ * por donde cae la barra: check_escenas daba BAD de antebrazos contra la barra a los 0,37 s de soltar).
  */
-const FASES_FINAL = { snatch: ['Recepción', 'Triple extensión'], clean: ['Recepción', 'Triple extensión'], split: ['Envión · Tijera', 'Envión · Impulso'], power: ['Power jerk · Recepción', 'Envión · Impulso'], squat: ['Squat jerk · Recepción', 'Envión · Impulso'] };
+const FASES_FINAL = { snatch: ['Recepción', 'Triple extensión'], clean: ['Recepción', 'Triple extensión'], split: ['Envión · Tijera', 'Envión · Empuje'], power: ['Power jerk · Recepción', 'Envión · Empuje'], squat: ['Squat jerk · Recepción', 'Envión · Empuje'] };
 function reglasFinal(P, seg) {
   const F = FASES_FINAL[seg]; if (!F) return null; const G = tramo(P, seg), rec = G.base + G.i(F[0]);
   return { sub: P.sub, rec, fin: G.base + G.n - 1, brazosDe: rec, brazosA: G.base + G.i(F[1]) };
@@ -1719,12 +1720,12 @@ window.JUEGO = {
       if (E.camPrueba !== camara + id) { E.camPrueba = camara + id; escena.camara(camara); }
       escena.cuadro(dt, dibujar); return this.medir();
     },
-    /** Dónde están pies, manos, cadera, cabeza, barra y cámara (m), y el hueso que más giró desde la llamada anterior (rad). */
+    /** Dónde están pies, manos, cadera, cabeza, barra y cámara (m), y el hueso (sin contar los dedos) que más giró desde la llamada anterior (rad). */
     medir() {
       const a = escena.activo; if (!a) return null; const V = escena.barbell.group.position.constructor, r = x => Math.round(x * 1e4) / 1e4, o = {};
       for (const k of ['LeftToeBase', 'RightToeBase', 'LeftFoot', 'RightFoot', 'LeftHand', 'RightHand', 'LeftForeArm', 'RightForeArm', 'LeftArm', 'RightArm', 'Hips', 'Head']) { const p = a.boneWorld(k, new V()); o[k] = [r(p.x), r(p.y), r(p.z)]; }
       let giro = 0, cual = ''; const antes = E.medAntes, q = a.bones.map(b => b.quaternion.clone());
-      if (antes && antes.a === a) a.bones.forEach((b, i) => { const g = q[i].angleTo(antes.q[i]); if (g > giro) { giro = g; cual = b.name.replace(/^mixamorig:?/, ''); } });
+      if (antes && antes.a === a) a.bones.forEach((b, i) => { const g = q[i].angleTo(antes.q[i]); if (g > giro && !/Hand(Thumb|Index|Middle|Ring|Pinky)/.test(b.name)) { giro = g; cual = b.name.replace(/^mixamorig:?/, ''); } });
       E.medAntes = { a, q }; const cam = escena.rig.camera, d = cam.getWorldDirection(new V()), b = escena.barbell.group.position;
       return { ...o, giro: r(giro), cual, bar: [r(b.y), r(b.z)], cam: { p: [r(cam.position.x), r(cam.position.y), r(cam.position.z)], inc: r(Math.asin(d.y)), fov: r(cam.fov) }, pov: !!escena.pov, sinCabeza: !!escena._sinCabeza };
     },

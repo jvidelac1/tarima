@@ -89,7 +89,7 @@ export function planCaida(tipo, causa, valido = false) {
  * Con `R` (muestras globales del clip, las arma main.js con los nombres de las fases; nada por personaje):
  * - Los BRAZOS acompañan la barra: desde que se suelta desandan el clip, de la última muestra en que se movieron
  *   (`R.brazosDe`: la recepción) a la de brazos estirados con la barra colgando (`R.brazosA`: la triple extensión; en el
- *   envión, la barra en los hombros), con arranque y llegada suaves; después van a «Parado» con el resto del cuerpo.
+ *   envión, a medio empuje), con arranque y llegada suaves; después van a «Parado» con el resto del cuerpo.
  * - El CUERPO se para por el clip: si el final lo encontró de la recepción en adelante (`R.rec`), sigue el clip hasta el
  *   final del segmento (`R.fin`: la recuperación validada, con los pies donde van) a `PARARSE` s por fase; recién ahí pasa
  *   a «Parado», y lo que les falta a los pies lo hacen en un saltito (`SALTITO`: la raíz sube y la mezcla ocurre en el aire).

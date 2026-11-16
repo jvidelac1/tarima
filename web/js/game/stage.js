@@ -214,7 +214,7 @@ export const PLANOS = {
  *     del centro de la imagen, con las manos (hasta `abajo` rad: casi a plomo, porque en la salida la barra queda debajo de
  *     los ojos). Es el momento de la barrita de timing: las manos y la barra se ven por encima de ella.
  *   · apenas la barra despega (entre `despega[0]` y `despega[1]` m sobre su apoyo) o está cerca de la cara (a menos de
- *     `cerca[1]`..`cerca[0]` m: en los hombros), la mirada va al frente (`frente` rad, un poco hacia abajo: jueces y público, y
+ *     `junto[0]` a `junto[1]` m: en los hombros), la mirada va al frente (`frente` rad, un poco hacia abajo: jueces y público, y
  *     los antebrazos en el borde de abajo). Así en el tirón la cámara ya está quieta y es la barra la que sube por delante.
  *   · con la barra suelta (después del intento: cae, rebota y rueda), también al frente: se la ve caer por delante y
  *     quedan a la vista los árbitros con sus paletas y la tribuna.
@@ -225,7 +225,7 @@ export const PLANOS = {
  * - la cabeza propia no se dibuja mientras la cámara esté a menos de `sinCabeza` m de los ojos (el hueso de la cabeza se
  *   achica a un punto: cara, pelo, ojos y pestañas van pesados a él). La sombra sale sin cabeza: cae detrás del pesista.
  */
-export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 5.5, margen: .17, abajo: -1.43, frente: -.21, tope: .14, despega: [.03, .3], cerca: [.3, .6], sinCabeza: .35, foco: 1.6,
+export const POV = { fov: 76, fovAncho: 112, cerca: .06, arriba: .1, adelante: .085, sigue: 30, giro: 3.2, margen: .17, abajo: -1.3, frente: -.21, tope: .14, despega: [.02, .45], junto: [.3, .6], sinCabeza: .35, foco: 1.6,
   resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003 }, temblor: .006 };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
@@ -624,7 +624,7 @@ export class Escena {
     if (S.nueva) S.p.copy(o); else S.p.lerp(o, 1 - Math.exp(-POV.sigue * dt));
     // inclinación de la mirada (reglas de POV): a la barra apoyada y lejos; al frente si despegó o está cerca; apenas arriba si está por encima
     const b = this.barbell.group.position, dy = b.y - S.p.y, dz = b.z - S.p.z, paso = (x, a, c) => { const t = Math.min(1, Math.max(0, (x - a) / (c - a))); return t * t * (3 - 2 * t); };
-    const mirar = this._suelta ? 0 : paso(Math.hypot(dy, dz), POV.cerca[0], POV.cerca[1]) * (1 - paso(b.y - this.pisoBarra, POV.despega[0], POV.despega[1]));
+    const mirar = this._suelta ? 0 : paso(Math.hypot(dy, dz), POV.junto[0], POV.junto[1]) * (1 - paso(b.y - this.pisoBarra, POV.despega[0], POV.despega[1]));
     const alFrente = dy > 0 ? Math.min(POV.tope, POV.frente + (POV.tope - POV.frente) * paso(dy, 0, .35)) : POV.frente;
     const incT = alFrente + (Math.max(POV.abajo, Math.min(alFrente, Math.atan2(dy, dz) + POV.margen)) - alFrente) * mirar;
     S.inc = S.nueva ? incT : S.inc + (incT - S.inc) * (1 - Math.exp(-(quieto ? 60 : POV.giro) * dt)); S.nueva = false;
