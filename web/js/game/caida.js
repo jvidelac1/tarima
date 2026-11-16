@@ -106,7 +106,8 @@ export const PARARSE = .8, DESANDAR = .24, MANOS = .2, SALTITO = { dur: .3, alto
  * marcan dos veces («¡vamos!»), y los brazos vuelven a colgar; nulo o fallo = la cabeza cae, los hombros se vencen y niega
  * con la cabeza. Tiempos en s desde que terminan de bajar los brazos.
  */
-export const BARRIDO = { dur: .55 }, GESTO = { festejo: { sube: .28, dura: 1.0, baja: .45 }, bronca: { sube: .5 } };
+// BARRIDO.espera: s más que MANOS; la barra ya pasó por debajo de los hombros cuando los brazos bajan por delante (check_escenas)
+export const BARRIDO = { dur: .55, espera: .22 }, GESTO = { festejo: { sube: .28, dura: 1.0, baja: .45 }, bronca: { sube: .5 } };
 /** Lo que tarda en pasar a «Parado» (s): con saltito, medio segundo como mucho (el saltito va en el medio). */
 const mezclaDe = (pl, g0, R) => (R && g0 >= R.rec ? Math.min(pl.mezcla, SALTITO.dur + .2) : pl.mezcla);
 /** Poses (muestras globales) por las que pasan los brazos: la del final y la de cada fase anterior, hasta `R.brazosA`. */
@@ -138,10 +139,10 @@ export function poseCaida(pl, g0, destino, t, R = null) {
   const tBajar = pl.suelta + MANOS + tD, wB = suave((t - tBajar) / Math.min(.8, Math.max(.3, tM + mz - tBajar)));
   if (pl.tipo === 'bajada' || pl.tipo === 'arriba') {
     // barrido: los brazos quedan en la pose del final (stage.js los apunta) y al llegar abajo pasan a «Parado»
-    const x = suave(tb / BARRIDO.dur), wP = suave((tb - BARRIDO.dur * .7) / (BARRIDO.dur * .45)), tG = t - (pl.suelta + MANOS + BARRIDO.dur * 1.1), i = Math.floor(gC), f0 = Math.floor(g0);
+    const tq = tb - BARRIDO.espera, x = suave(tq / BARRIDO.dur), wP = suave((tq - BARRIDO.dur * .7) / (BARRIDO.dur * .45)), tG = t - (pl.suelta + MANOS + BARRIDO.espera + BARRIDO.dur * 1.1), i = Math.floor(gC), f0 = Math.floor(g0);
     let gesto = null;
     if (tG > 0) { if (pl.valido) { const F = GESTO.festejo; gesto = { tipo: 'festejo', w: suave(tG / F.sube) * (1 - suave((tG - F.sube - F.dura) / F.baja)), t: tG, dedos: f0 }; } else gesto = { tipo: 'bronca', w: suave(tG / GESTO.bronca.sube), t: tG }; }
-    return { i, j: i + 1, u: gC - i, k: destino, w, dz, dy, t, brazos: { i: f0, j: f0 + 1, u: g0 - f0, k: destino, w: wP }, barrido: tb > 0 ? { x, w: suave(tb / .1) * (1 - wP) } : null, gesto };
+    return { i, j: i + 1, u: gC - i, k: destino, w, dz, dy, t, brazos: { i: f0, j: f0 + 1, u: g0 - f0, k: destino, w: wP }, barrido: tq > 0 ? { x, w: suave(tq / .1) * (1 - wP) } : null, gesto };
   }
   const i = Math.floor(gC), a0 = K[kB], a1 = K[Math.min(n, kB + 1)], f0 = Math.floor(a0);
   // la primera pose puede ser fraccionaria (g0): se aproxima a su muestra más cercana solo si no es entera

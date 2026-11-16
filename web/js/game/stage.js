@@ -582,7 +582,7 @@ export class Escena {
         a._byName.get(L + 'Arm')?.updateWorldMatrix(true, true);
         const d0 = a.boneWorld(L + 'ForeArm', _pc).sub(a.boneWorld(L + 'Arm', _pd)).normalize().clone(), fr = _pe.set(sx * .22, .0, .975).normalize().clone(), ab = _pf.set(sx * .13, -.985, .1).normalize().clone();
         const en = x => { const y = Math.min(1, Math.max(0, x)); return y < .5 ? slerpDir(d0, fr, y * 2) : slerpDir(fr, ab, y * 2 - 1); };
-        this._apuntarHueso(a, L + 'Arm', L + 'ForeArm', en(B.x), B.w); this._apuntarHueso(a, L + 'ForeArm', L + 'Hand', en(B.x - .1), B.w);
+        this._apuntarHueso(a, L + 'Arm', L + 'ForeArm', en(B.x), B.w); this._apuntarHueso(a, L + 'ForeArm', L + 'Hand', en(B.x - .22), B.w);      // codo doblado en el medio del barrido: la mano pasa más cerca del cuerpo, lejos de la barra que quedó adelante
       }
       if (g?.tipo === 'festejo' && g.w > 0) {
         // dos puños al frente, a la altura de los hombros, que marcan dos veces
