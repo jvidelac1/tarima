@@ -155,10 +155,10 @@ def cfg(k):
     # Reglas por categoría: a más masa, hombros y cintura más anchos; la mujer, hombros más angostos y más cadera y glúteo.
     t = _clip((m - (48 if F else 60)) / 60., 0, 1.3)
     cadera = q['cadera'] if q['cadera'] is not None else (.15 + .15 * t if F else .0 + .15 * t * g)
-    if p.get('fisico') == 'anatomico' and q['cadera'] is None and not F: cadera += .25     # cadera de pesista: el cuerpo de MPFB con 'muscle' alto es de culturista (hombros enormes, cintura y cadera finas)
+    if False: cadera += .25     # cadera de pesista: el cuerpo de MPFB con 'muscle' alto es de culturista (hombros enormes, cintura y cadera finas)
     gluteos = q['gluteos'] if q['gluteos'] is not None else (.30 if F else .25) + .10 * t
     an = p.get('fisico') == 'anatomico'     # físico anatómico: el volumen va a los grupos musculares (muslo, glúteo, gemelo, hombro) y sale de la cintura y del cuello
-    cintura = q['cintura'] if q['cintura'] is not None else ((.15 if F else .60) if an else (.15 if F else .25)) + .65 * g
+    cintura = q['cintura'] if q['cintura'] is not None else ((.15 if F else .20) if an else (.15 if F else .25)) + .65 * g
     if an and q['gluteos'] is None and not F: gluteos += .25
     if F: extra_f = [('breast/breast-point-decr', 1.), ('breast/breast-volume-vert-up', .3), ('breast/nipple-size-decr', 1.), ('breast/nipple-point-decr', 1.)]     # busto contenido por el top deportivo: sin punta
     else: extra_f = []
@@ -174,9 +174,9 @@ def cfg(k):
     if F: musc = dict(pierna=.95 * mu, gemelo=.5 * mu, hombro=.70 * mu * (1 - .4 * g), brazo=.45 * mu, antebrazo=.65 * mu, pectoral=0, dorsal=.75 * mu * (1 - .4 * g), abdomen=.5 * (1 - g), cuello=.25 * mu)
     else: musc = dict(pierna=1.0 * mu, gemelo=.6 * mu, hombro=1.0 * mu * _clip(1 - 1.2 * g, 0, 1), brazo=.85 * mu * _clip(1 - 1.0 * g, 0, 1), antebrazo=1.0 * mu * (1 - .5 * g), pectoral=.6 * mu * (1 - .4 * g), dorsal=1.0 * mu * (1 - .35 * g), abdomen=.5 * (1 - g), cuello=.7 * mu * (1 - .5 * g))
     if an:
-        if not F: musc.update(brazo=.78 * mu * _clip(1 - .5 * g, 0, 1), hombro=.45 * mu * _clip(1 - .6 * g, 0, 1), antebrazo=.7 * mu * (1 - g), gemelo=.3 * mu)     # la forma la ponen los vientres de tex._masas; el target de MPFB solo infla     # el pesado con físico anatómico no pierde el brazo (salía bíceps 0,185 H con antebrazo 0,222 H)
+        if not F: musc.update(brazo=.85 * mu * _clip(1 - .5 * g, 0, 1), hombro=.85 * mu * _clip(1 - .6 * g, 0, 1), antebrazo=.7 * mu * (1 - g), gemelo=.3 * mu)     # la forma la ponen los vientres de tex._masas; el target de MPFB solo infla     # el pesado con físico anatómico no pierde el brazo (salía bíceps 0,185 H con antebrazo 0,222 H)
         musc.update(cuello=.2 * mu * (1 - .5 * g))
-    extra = [('torso/torso-vshape-incr', (0. if an and not F else .10 if F else .45) * _clip(1 - 1.3 * g, 0, 1)),     # anatómico: sin V de culturista (el marco de hombros de MPFB ya es ancho: 0,24 H entre articulaciones) ('buttocks/buttocks-volume-incr', _clip(gluteos, 0, 1)),
+    extra = [('torso/torso-vshape-incr', (.70 if an and not F else .10 if F else .45) * _clip(1 - 1.3 * g, 0, 1)),     # anatómico: V marcada (dorsales y hombros anchos sobre cintura firme), como la referencia del dueño ('buttocks/buttocks-volume-incr', _clip(gluteos, 0, 1)),
              ('hip/hip-scale-horiz-' + ('incr' if cadera >= 0 else 'decr'), _clip(abs(cadera), 0, 1)),
              ('torso/measure-waist-circ-incr', _clip(cintura, 0, 1)), ('arms/measure-upperarm-circ-decr', _clip(1.4 * g, 0, .25 + .5 * g if an else 1)),
              # boca: los labios de MPFB salen muy gruesos con estos macros
@@ -211,7 +211,7 @@ def cfg(k):
                 musc=musc, masa=m, rho=1.07 - .07 * g, volumen=volumen, fisico=p.get('fisico'), cabeza_meta=p.get('cabeza_meta', (7.5 if F else 7.55) if an else None), genero=p['genero'], categoria=p['categoria'])
 
 # ganancia de cada grupo muscular del físico anatómico (tex.GRUPOS). La mujer: piernas, glúteo y espalda de pesista; tren superior más liviano y sin pectoral marcado
-_GRUPOS_M = dict(deltoide=1.15, biceps=1.2, triceps=1.2, antebrazo=.8, pectoral=1.15, trapecio=1., dorsal=1.2, erectores=1., gluteo=1.5, cuadriceps=1.4, isquios=1.2, aductor=1., gemelos=.85, muslo=1.5, codo=1., rodilla=1., cintura=1.)
+_GRUPOS_M = dict(deltoide=2.1, biceps=2.0, triceps=1.9, antebrazo=1.5, pectoral=1.6, trapecio=1.5, dorsal=2.1, erectores=1.4, gluteo=1.5, cuadriceps=1.9, isquios=1.6, aductor=1.3, gemelos=1.6, muslo=1.5, codo=1., rodilla=1., cintura=1.)
 _GRUPOS_F = dict(deltoide=.35, biceps=.2, triceps=.25, antebrazo=.2, pectoral=0., trapecio=.25, dorsal=.3, erectores=.4, gluteo=.55, cuadriceps=.5, isquios=.4, aductor=.2, gemelos=.3, muslo=.45, codo=.4, rodilla=.5, cintura=.0)
 def sty(k):
     """Parámetros de indumentaria, piel y pelo para tex.py, geo.py y finish.py (los mismos nombres de clave que usaban ventura y brenner)."""
@@ -246,7 +246,7 @@ def sty(k):
         # físico anatómico: masas por grupo muscular (tex._masas) en lugar del relieve suave. La malla lleva las masas enteras y parte del surco;
         # el normal map repite poco de la masa (ya está en la silueta) y carga los surcos finos. Las ventanas radiales se abren porque el miembro es más grueso.
         d = _clip(1 - 1.1 * g, .15, 1)     # definición: con grasa los vientres se funden
-        S['fisico'] = 'anatomico'; S['piel2'] = .8 if F else 1.; S['anat'].update(fisico='anatomico', masa=1., geo=(1., .6), normal=.30, fino=1.6, surco=1.25 * d, radios=(1.32, 1.22, 1.22, 1.2),
+        S['fisico'] = 'anatomico'; S['piel2'] = .8 if F else 1.; S['anat'].update(fisico='anatomico', masa=1., geo=(1., .6), normal=.30, fino=1.6, surco=1.25 * d, radios=(1.5, 1.3, 1.3, 1.25),
                                                     grupos=dict({k_: v_ * (1 + .3 * g if k_ in ('muslo', 'gluteo') else 1 - g if k_ in ('cintura', 'rodilla', 'codo') else 1 - .55 * g) for k_, v_ in (_GRUPOS_F if F else _GRUPOS_M).items()}, **p.get('grupos', {})))     # con grasa: vientres más fundidos, más grosor de muslo y glúteo, sin cintura marcada
     if rod:
         # moño: dirección desde el centro de la cabeza (X lateral, +Y atrás, +Z arriba) y radio en m para 1,69 m
