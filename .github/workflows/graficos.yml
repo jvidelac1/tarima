@@ -145,7 +145,7 @@ jobs:
     name: Primera persona y final del levantamiento (dibujo por software)
     if: ${{ inputs.solo != 'fotos' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 110
     env:
       TARIMA_ANGLE: swiftshader
     steps:
@@ -188,6 +188,30 @@ jobs:
         env:
           TAPA_INFORMA: 1
         run: node tools/check_barra.mjs --solo=tel_en --camara=pov --out=out/barra_pov_tel 2>&1 | tee out/logs/check_barra_pov_tel.log
+      - name: Intento jugado en primera persona con calidad ALTA y el plantel nuevo, foto a foto (check_barra --tira)
+        if: ${{ !cancelled() && hashFiles('web/models/ilarraz.glb') != '' }}
+        timeout-minutes: 30
+        env:
+          TAPA_INFORMA: 1
+          TARIMA_Q: alta
+          TARIMA_PLANTEL: ilarraz,jastrev,solanet
+        run: |
+          node tools/check_barra.mjs --solo=pc_es --camara=pov --tira --out=out/barra_pov_alta 2>&1 | tee out/logs/check_barra_pov_alta.log
+          node tools/hojas.mjs out/barra_pov_alta --cols=10 --ancho=480
+      - name: Teléfono acostado jugado en primera persona con calidad ALTA (check_barra --solo=tel_en)
+        if: ${{ !cancelled() && inputs.solo_claves != true && hashFiles('web/models/ilarraz.glb') != '' }}
+        timeout-minutes: 25
+        continue-on-error: true
+        env:
+          TAPA_INFORMA: 1
+          TARIMA_Q: alta
+          TARIMA_PLANTEL: ilarraz,jastrev,solanet
+        run: node tools/check_barra.mjs --solo=tel_en --camara=pov --tira --out=out/barra_pov_tel_alta 2>&1 | tee out/logs/check_barra_pov_tel_alta.log
+      - name: Costo del recuadro en «Móvil» (check_pov --solo=costo --q=movil)
+        if: ${{ !cancelled() && inputs.solo_claves != true }}
+        timeout-minutes: 8
+        continue-on-error: true
+        run: node tools/check_pov.mjs --solo=costo --q=movil --out=out/pov_costo 2>&1 | tee out/logs/check_pov_costo_movil.log
       - name: Teléfono parado con la primera persona elegida (check_barra --solo=vert_es --camara=pov)
         if: ${{ !cancelled() && inputs.solo_claves != true }}
         timeout-minutes: 10

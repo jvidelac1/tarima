@@ -160,12 +160,16 @@ if (!SOLO || SOLO === 'pov' || SOLO === 'claves') {
       // reloj propio del tramo: quieto de pie, hasta la salida, espera en la salida, y el levantamiento
       const pasos = []; for (let t = 0; t < (espera ? .8 : 0); t += 1 / 30) pasos.push(0);
       for (let t = 0; t < tS; t += 1 / 30) pasos.push(enS(t)); for (let t = 0; t < espera; t += 1 / 30) pasos.push(enS(tS)); for (let t = tS; t <= fin + .4; t += 1 / 30) pasos.push(enS(Math.min(fin, t)));
+      const enLev = Math.round(((espera ? .8 : 0) + tS + Math.min(espera, 1.2)) * 30); let malMirada = false;
       for (let k = 0; k < pasos.length; k++) {
         const foto = k % 3 === 0, m = await J(o => window.JUEGO.test.posa(o), { id, lev, seg, s: pasos[k], camara: 'pov', dt: 1 / 30, dibujar: foto });
+        if (foto) { const z = await J(() => window.JUEGO.test.luz()); if (z.media < 6 || z.desvio < 3) problemas.push(`${nombre} ${seg} ${reloj.toFixed(1)} s: la vista de los ojos sale negra o casi (luminancia ${z.media}, desvío ${z.desvio})`); }
+        // tomada la barra (pasada la espera en la salida) la mirada está en el jurado: entre -15° y +10°
+        if (k > enLev && (G(m.cam.inc) < -15 || G(m.cam.inc) > 10) && !malMirada) { malMirada = true; problemas.push(`${nombre} ${seg} ${reloj.toFixed(1)} s: durante el levantamiento la mirada está a ${G(m.cam.inc).toFixed(0)}° (tiene que estar entre -15° y +10°)`); }
         if (foto) lista.push({ t: `${seg} ${reloj.toFixed(1)} s · ${G(m.cam.inc).toFixed(0)}°`, b: await toma() }); reloj += 1 / 30;
       }
     }
-    await hoja(nombre, lista, 6, 426);
+    await hoja(nombre, lista, 5, 480);
   };
   for (const id of SOLO === 'claves' ? [] : ['ventura']) { await tira(id, `tira_${id}_arranque`, [['snatch', 's', 2.2]]); await tira(id, `tira_${id}_dos_tiempos`, [['clean', 'c', 2.2], ['split', 'c', 0]]); }
   await J(() => window.JUEGO.test.real());
@@ -178,6 +182,8 @@ if (!SOLO || SOLO === 'pov' || SOLO === 'claves') {
       // el pesista tiene que estar puesto para leer sus fases: primero se posa en 0
       const s = await J(async ([id, lev, seg, fase]) => { await window.JUEGO.test.posa({ id, lev, seg, s: 0, camara: 'pov', dibujar: false }); const P = window.JUEGO.escena.P; return P.sub * P.segs[seg].poses.findIndex(p => p.n === fase || (fase === 'Giro' && p.n === 'Giro de codos')); }, [id, lev, seg, fase]) + mas;
       await J(o => window.JUEGO.test.posa(o), { id, lev, seg, s, camara: 'pov', dt: .5, dibujar: false }); await J(o => window.JUEGO.test.posa(o), { id, lev, seg, s, camara: 'pov', dt: .5 });
+      { const z = await J(() => window.JUEGO.test.luz()); if (z.media < 6 || z.desvio < 3) problemas.push(`${id} ${seg} ${fase}${sufijo}: la vista de los ojos sale negra o casi (luminancia ${z.media}, desvío ${z.desvio})`);
+        if (z.horizonte < .33 || z.horizonte > .67) problemas.push(`${id} ${seg} ${fase}${sufijo}: el horizonte queda a ${(z.horizonte * 100).toFixed(0)} % del alto (tiene que estar en el tercio central)`); }
       await page.screenshot({ path: path.join(OUT, `clave${sufijo}_${id}_${slug(seg + '_' + fase)}${mas ? '_' + mas : ''}.jpg`), type: 'jpeg', quality: 82 });
     }
   }
@@ -186,6 +192,13 @@ if (!SOLO || SOLO === 'pov' || SOLO === 'claves') {
   for (const caso of SOLO === 'claves' ? [] : [FINALES[0], FINALES[1], FINALES[4], FINALES[7], FINALES[8]]) { const r = await recorrer('ventura', caso, 'pov', true, .1); if (r) await hoja(`pov_final_${slug(caso[0])}`, r.lista, 6, 426); }
 }
 
+// ---------- C. costo del recuadro (por software: vale la relación, no los ms) ----------
+if (SOLO === 'costo' || !SOLO) {
+  await J(o => window.JUEGO.test.posa(o), { id: 'ventura', lev: 's', seg: 'snatch', s: 0, camara: 'pov', dt: .5, dibujar: false });
+  const c = await J(() => { const e = window.JUEGO.escena, R = {}; for (const on of [true, false, true, false]) { e.setRecuadro(on); const x = e.costo({ n: 10, tope: 20000 }); (R[on ? 'con' : 'sin'] ||= []).push(Math.round(x.ms)); } e.setRecuadro(true); return R; });
+  const med = a => a.reduce((x, y) => x + y, 0) / a.length;
+  console.log(`\nC. COSTO DEL RECUADRO (calidad ${Q}, por software): con ${c.con.join(' y ')} ms · sin ${c.sin.join(' y ')} ms por cuadro → +${((med(c.con) / med(c.sin) - 1) * 100).toFixed(0)} %`);
+}
 await browser.close(); server.close();
 if (problemas.length) { console.log('\nPROBLEMAS:\n' + problemas.slice(0, 40).join('\n')); process.exit(1); }
 console.log('\ncheck_pov: bien · hojas en out/pov');

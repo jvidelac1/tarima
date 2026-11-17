@@ -31,7 +31,7 @@ let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ ch
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 // --camara=pov: con esa cámara elegida (?camara=); --out=dir: otra carpeta; --final: 32 fotos cada 150 ms desde que termina cada intento
-const CAMARA = arg('camara'), DENSO = process.argv.includes('--final'), OUT = path.join(ROOT, arg('out') || 'out/barra');
+const CAMARA = arg('camara'), TIRA = process.argv.includes('--tira'), DENSO = process.argv.includes('--final'), OUT = path.join(ROOT, arg('out') || 'out/barra');
 const HEADED = process.argv.includes('--headed'), SOLO = arg('solo'), SEMILLA = 20261113;
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml' };
 const server = http.createServer((req, res) => {
@@ -80,7 +80,17 @@ for (const P of PANTALLAS) try {
   await page.goto(`${base}juego.html?lang=${P.lang}&q=baja&dibujo=0&semilla=${SEMILLA}${CAMARA ? '&camara=' + CAMARA : ''}${process.env.TARIMA_PLANTEL ? '&plantel=' + process.env.TARIMA_PLANTEL : ''}${process.env.TARIMA_Q ? '&q=' + process.env.TARIMA_Q : ''}`.replace('&q=baja&dibujo=0', process.env.TARIMA_Q ? '&dibujo=0' : '&q=baja&dibujo=0'), { waitUntil: 'load' });
   if (!await J(() => window.JUEGO.listo)) { mal('el juego no inició'); await ctx.close(); continue; }
   await J(() => JUEGO.test.manual());
-  const av = ms => J(ms => JUEGO.test.avanzar(ms), ms), ir = t => J(t => JUEGO.test.hasta(t, 8), t);
+  // --tira: una foto cada 0,1 s de juego del primer intento propio entero (de la barrita al veredicto), para la hoja de control
+  let tiraOn = false, tiraK = 0;
+  const fotoTira = async () => { if (tiraK >= 160) return; await J(() => { try { window.JUEGO.escena?.cuadro?.(0, true); } catch { /* sin escena */ } }).catch(() => null); await page.screenshot({ path: path.join(OUT, `${P.id}_tira_${String(tiraK++).padStart(3, '0')}.jpg`), type: 'jpeg', quality: 72 }).catch(() => null); };
+  const av = TIRA ? async ms => { let r = 0; for (let q = ms; q > 0; q -= 100) { r = await J(ms => JUEGO.test.avanzar(ms), Math.min(100, q)); if (tiraOn) await fotoTira(); } return r; } : ms => J(ms => JUEGO.test.avanzar(ms), ms);
+  const ir = TIRA ? async t => { const a = await J(() => JUEGO.test.manual()); return t > a ? av(t - a) : a; } : t => J(t => JUEGO.test.hasta(t, 8), t);
+  // primera persona (--camara=pov): con la barrita en pantalla y en el levantamiento, la mirada en el jurado y la imagen no negra
+  const ojos = async momento => { if (CAMARA !== 'pov' || P.vp.height > P.vp.width) return; const m = await J(() => (window.JUEGO.escena.pov ? { ...window.JUEGO.test.luz(), inc: window.JUEGO.test.medir()?.cam.inc * 180 / Math.PI } : null)); if (!m) return;
+    console.log(`${tag} ojos en «${momento}»: mirada ${m.inc.toFixed(0)}° · horizonte a ${(m.horizonte * 100).toFixed(0)} % del alto · luminancia ${m.media} (desvío ${m.desvio})`);
+    if (m.media < 6 || m.desvio < 3) mal(`primera persona en «${momento}»: la imagen sale negra o casi (luminancia ${m.media}, desvío ${m.desvio})`);
+    if (m.inc < -15 || m.inc > 10) mal(`primera persona en «${momento}»: la mirada está a ${m.inc.toFixed(0)}° (tiene que estar entre -15° y +10°: en el jurado, no en el piso)`);
+    if (m.horizonte < .33 || m.horizonte > .67) mal(`primera persona en «${momento}»: el horizonte queda a ${(m.horizonte * 100).toFixed(0)} % del alto (tercio central)`); };
   const foto = async n => { await J(() => { try { window.JUEGO.escena?.cuadro?.(0, true); } catch (e) { console.error('cuadro forzado: ' + (e.stack || e)); } }).catch(() => null); return page.screenshot({ path: path.join(OUT, `${P.id}_${n}.png`) }).catch(() => null); };
   const punto = async () => { const b = await page.locator('#escena').boundingBox(); return { x: Math.round(b.x + b.width * .45), y: Math.round(b.y + b.height * .4) }; };
   const baja = async () => { if (P.tactil) { const p = await punto(); await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.x, y: p.y, id: 1 }] }); } else await page.keyboard.down('Space'); };
@@ -120,10 +130,11 @@ for (const P of PANTALLAS) try {
     if (s.errores.length) { mal('error en el juego: ' + s.errores[0]); break; }
     if (s.propios >= 3 && !(s.intento && s.intento.propio) && s.pantalla !== 'decision') break;
     const I = s.intento;
+    if (TIRA) { if (!tiraOn && tiraK === 0 && I && I.propio && s.modo !== 'panel') tiraOn = true; else if (tiraOn && s.propios >= 1 && s.pantalla !== 'decision') { tiraOn = false; break; } }
     if (I && I.propio && s.modo !== 'panel') {
       const sg = I.senal;
-      if (sg && sg.tipo === 'espera' && sg.barra && n < 3 && hecho !== 'quieta' + n) { hecho = 'quieta' + n; if (n === 0) { await foto('1_quieta'); await tapa('quieta'); } }
-      if (n >= 1 && !sg && !medidos.has('levanta') && I.fase && ['tiron', 'vuelo', 'pelea'].includes(I.fase)) { await tapa('levanta'); await foto('1_levanta'); }
+      if (sg && sg.tipo === 'espera' && sg.barra && n < 3 && hecho !== 'quieta' + n) { hecho = 'quieta' + n; if (n === 0) { await foto('1_quieta'); await tapa('quieta'); await ojos('quieta'); } }
+      if (n >= 1 && !sg && !medidos.has('levanta') && I.fase && ['tiron', 'vuelo', 'pelea'].includes(I.fase)) { await tapa('levanta'); await foto('1_levanta'); await ojos('levanta'); }
       if (sg && sg.clave === 'esfuerzo' && !medidos.has('esfuerzo')) { await tapa('esfuerzo'); await foto('esfuerzo'); }
       if (sg && sg.tipo === 'barra' && sg.barra.i >= 2 && !medidos.has('barra' + sg.barra.i)) { medidos.add('barra' + sg.barra.i); await ir(sg.objetivo - 200); await foto(`barrita_${sg.barra.i}`); }
       if (sg && sg.tipo === 'barra') {
@@ -138,7 +149,7 @@ for (const P of PANTALLAS) try {
         }
         const z = PEDIR[n] || 'verde', obj = sg.objetivo + (z === 'amarillo' ? Math.round((sg.barra.vMs + sg.barra.aMs) / 2) : z === 'rojo' ? 700 : 0);
         // a mitad de camino hacia el verde: la barrita corriendo (y, la primera vez, el aro de práctica)
-        await ir(sg.objetivo - 260); if (n < 2) await foto(`${n + 1}_corre`); if (n === 0) await tapa('corre');
+        await ir(sg.objetivo - 260); if (n < 2) await foto(`${n + 1}_corre`); if (n === 0) await tapa('corre'); if (n === 0) await ojos('corre');
         if (!revisada) {      // la barrita entra, no tapa el zócalo ni el botón redondo, el texto no se corta, y es ancha
           revisada = true;
           const B = await caja('barrita'), Z = await caja('zocalo'), BOT = await caja('zona'), W = P.vp.width;
@@ -156,7 +167,7 @@ for (const P of PANTALLAS) try {
         await ir(obj - 1); await toque(); hecho = k; pedidas.push(z); await av(320); await foto(`${n + 1}_${z}`); if (n === 0) await tapa('pega'); n++;
         continue;
       }
-      await J(() => JUEGO.test.avanzar(60, 30)); continue;
+      await (TIRA ? av(60) : J(() => JUEGO.test.avanzar(60, 30))); continue;
     }
     if (s.panel && !s.sobre) {
       if (['presentacion', 'apertura'].includes(s.pantalla)) await tapa(s.pantalla);
@@ -199,5 +210,7 @@ await browser.close(); server.close();
 if (TAPA.length) { console.log('\nCuánto tapa la interfaz al pesista (caja proyectada desde three; tools/tapa.mjs):'); for (const id of [...new Set(TAPA.map(x => x.p))]) { console.log(`  [${id}]`); for (const x of TAPA.filter(y => y.p === id)) console.log('    ' + fila(x.momento, x.x)); } }
 fs.writeFileSync(path.join(OUT, 'tapa.json'), JSON.stringify(TAPA, null, 1));
 for (const x of notas) console.log('nota: ' + x);
+// --tira corta después del primer intento: lo que se revisa con la partida entera no vale; solo las reglas de la primera persona
+if (TIRA) { const q = problemas.filter(x => /primera persona|error en el juego/.test(x)); problemas.length = 0; problemas.push(...q); }
 if (problemas.length) { console.log(`\nFALLÓ (${problemas.length}):`); for (const p of problemas.slice(0, 30)) console.log('  ' + p); process.exit(1); }
 console.log(`\nOK: la barrita se ve y se juzga donde se toca en ${PANTALLAS.map(x => x.id).join(', ')} · capturas en out/barra`);

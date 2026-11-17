@@ -10,7 +10,7 @@ let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ ch
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const DIR = path.resolve(process.argv[2] || '.'), COLS = +(arg('cols') || 6), ANCHO = +(arg('ancho') || 320);
 const grupos = new Map();
-for (const f of fs.readdirSync(DIR).sort()) { const m = /^(?!hoja_)(.+)_(\d\d)\.(jpg|png)$/.exec(f); if (m) (grupos.get(m[1]) || grupos.set(m[1], []).get(m[1])).push(f); }
+for (const f of fs.readdirSync(DIR).sort()) { const m = /^(?!hoja_)(.+)_(\d{2,3})\.(jpg|png)$/.exec(f); if (m) (grupos.get(m[1]) || grupos.set(m[1], []).get(m[1])).push(f); }
 const browser = await chromium.launch(launchOptions({})), page = await browser.newPage();
 for (const [nombre, lista] of grupos) {
   if (lista.length < 4) continue;
