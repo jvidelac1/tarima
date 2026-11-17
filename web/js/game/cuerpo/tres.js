@@ -35,8 +35,8 @@ export function disenoMalla(F) {
 const PARS_V = /* glsl */`attribute vec4 aSup; attribute vec4 aSup2; attribute vec3 aGen; varying vec4 vSup; varying vec4 vSup2; varying vec3 vGen;`;
 const PARS_F = /* glsl */`
 varying vec4 vSup; varying vec4 vSup2; varying vec3 vGen;
-uniform vec3 uMalla; uniform vec3 uPanel; uniform vec3 uVivo; uniform vec3 uMedia; uniform vec3 uPelo; uniform sampler2D tDiseno; uniform vec3 uCaja; uniform float uBarba;
-float gRug = 0.6; float gMet = 0.0;
+uniform vec3 uMalla; uniform vec3 uPanel; uniform vec3 uVivo; uniform vec3 uMedia; uniform vec3 uPelo; uniform vec3 uCorrea; uniform sampler2D tDiseno; uniform vec3 uCaja; uniform float uBarba;
+float gRug = 0.6; float gMet = 0.0; float gEsp = 1.0; uniform vec4 uGan;
 float capa( float d ) { float w = fwidth( d ) * 0.75 + 1e-6; return smoothstep( -w, w, d ); }
 float cHash( vec2 p ) { vec3 q = fract( vec3( p.xyx ) * 0.1031 ); q += dot( q, q.yzx + 33.33 ); return fract( ( q.x + q.y ) * q.z ); }
 float cRuido( vec2 p ) { vec2 i = floor( p ), f = fract( p ); f = f * f * ( 3.0 - 2.0 * f ); return mix( mix( cHash( i ), cHash( i + vec2( 1.0, 0.0 ) ), f.x ), mix( cHash( i + vec2( 0.0, 1.0 ) ), cHash( i + vec2( 1.0, 1.0 ) ), f.x ), f.y ); }
@@ -47,9 +47,10 @@ const CAPAS_F = /* glsl */`
   float tipo = vSup2.z;
   if ( tipo < 0.5 ) {
     // piel mate de un tono, con una variación apenas (manchas grandes y suaves)
-    float var = cRuido( vGen.xy * 9.0 + vGen.z * 7.0 ) - 0.5; diffuseColor.rgb *= 1.0 + var * 0.06; gRug = 0.62;
-    diffuseColor.rgb = mix( diffuseColor.rgb, mix( diffuseColor.rgb, uPelo, 0.42 ), capa( vSup.w ) * uBarba );
-    float med = capa( vSup.y ); diffuseColor.rgb = mix( diffuseColor.rgb, uMedia, med ); gRug = mix( gRug, 0.9, med );
+    float var = cRuido( vGen.xy * 9.0 + vGen.z * 7.0 ) - 0.5; diffuseColor.rgb *= ( 1.0 + var * 0.06 ) * ( vSup.x < -2.0 ? uGan.z : uGan.x ); gRug = 0.62; gEsp = 0.5;
+    diffuseColor.rgb = mix( diffuseColor.rgb, mix( diffuseColor.rgb, uPelo, 0.6 ), capa( vSup.w ) );
+    if ( vSup.x < -2.0 ) { diffuseColor.rgb = mix( diffuseColor.rgb, uCorrea, capa( vSup2.w ) ); gRug = 0.6; }      // zapatilla: la correa
+    else { float med = capa( vSup.y ); diffuseColor.rgb = mix( diffuseColor.rgb, uMedia * uGan.z, med ); gRug = mix( gRug, 0.9, med ); }
     float tl = capa( vSup.x );
     if ( tl > 0.0 ) {
       vec3 tela = mix( uMalla, uPanel, capa( vSup2.x ) );
@@ -57,16 +58,16 @@ const CAPAS_F = /* glsl */`
       float fr = step( uCaja.z, vGen.z ); vec2 uv = vec2( ( fr > 0.5 ? vGen.x : - vGen.x ) / 0.5 + 0.5, ( vGen.y - uCaja.y ) / 0.5 );
       if ( uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0 ) { vec4 d = texture2D( tDiseno, vec2( uv.x * 0.5 + ( fr > 0.5 ? 0.0 : 0.5 ), uv.y ) ); tela = mix( tela, d.rgb, d.a ); }
       tela = mix( tela, uVivo, ( 1.0 - capa( abs( vSup.x - 0.004 ) - 0.004 ) ) );      // vivo en el borde (escote, sisas, botamanga)
-      diffuseColor.rgb = mix( diffuseColor.rgb, tela, tl ); gRug = mix( gRug, 0.8, tl );
+      diffuseColor.rgb = mix( diffuseColor.rgb, tela * uGan.y, tl ); gRug = mix( gRug, 0.8, tl ); gEsp = mix( gEsp, 0.6, tl );
     }
-    float pelo = max( capa( vSup.z ), capa( vSup2.y ) ); diffuseColor.rgb = mix( diffuseColor.rgb, uPelo, pelo ); gRug = mix( gRug, 0.85, pelo );
+    float pelo = max( capa( vSup.z ), capa( vSup2.y ) ); diffuseColor.rgb = mix( diffuseColor.rgb, uPelo, pelo ); gRug = mix( gRug, 0.9, pelo ); gEsp = mix( gEsp, 0.12, pelo );
   } else if ( tipo < 2.5 ) { gRug = 0.55; float l = vSup2.x * 6.2832; diffuseColor.rgb *= 0.92 + 0.08 * cRuido( vec2( vSup2.x * 90.0, vGen.y * 60.0 ) ); }      // cuero
-  else if ( tipo < 3.5 ) gRug = 0.92;      // neopreno
+  else if ( tipo < 3.5 ) { gRug = 0.92; gEsp = 0.4; }      // neopreno
   else if ( tipo < 4.5 ) gRug = 0.85;      // goma
   else if ( tipo < 5.5 ) gRug = 0.6;       // zapatilla
   else if ( tipo < 6.5 ) gRug = 0.25;      // ojo
-  else if ( tipo < 7.5 ) { gRug = 0.38; gMet = 1.0; }      // metal
-  else if ( tipo < 8.5 ) gRug = 0.9;       // venda
+  else if ( tipo < 7.5 ) { gRug = 0.42; gMet = 0.7; }      // metal
+  else if ( tipo < 8.5 ) { gRug = 0.9; gEsp = 0.4; }       // venda
   else gRug = 0.5;                         // madera del taco
 }
 `;
@@ -74,16 +75,17 @@ const CAPAS_F = /* glsl */`
 /** Material del cuerpo por código. */
 export function materialCuerpo(M) {
   const F = M.ficha, C = k => new THREE.Color(F.color[k]);
-  const U = { uMalla: { value: C('malla') }, uPanel: { value: C('panel') }, uVivo: { value: C('vivo') }, uMedia: { value: C('media') }, uPelo: { value: C('pelo') }, tDiseno: { value: disenoMalla(F) },
-    uCaja: { value: new THREE.Vector3(0, M.ref.yA - .38, .02) }, uBarba: { value: F.barba ? 1 : 0 } };
+  const U = { uMalla: { value: C('malla') }, uPanel: { value: C('panel') }, uVivo: { value: C('vivo') }, uMedia: { value: C('media') }, uPelo: { value: C('pelo') }, uCorrea: { value: C('correa') }, tDiseno: { value: disenoMalla(F) },
+    uCaja: { value: new THREE.Vector3(0, M.ref.yA - .38, .02) }, uBarba: { value: F.barba ? 1 : 0 }, uGan: { value: new THREE.Vector4(...(F.ganancia || [.7, .55, .62, 1])) } };      // uGan: ganancia de piel, tela y medias/zapatillas bajo los focos de la sala (el tono AgX lava lo claro)
   const m = new THREE.MeshStandardMaterial({ name: 'CuerpoCodigo', vertexColors: true, roughness: .6, metalness: 0, envMapIntensity: .35 });
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + PARS_V).replace('#include <begin_vertex>', '#include <begin_vertex>\nvSup = aSup; vSup2 = aSup2; vGen = aGen;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + PARS_F).replace('#include <color_fragment>', '#include <color_fragment>\n' + CAPAS_F)
-      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nroughnessFactor = gRug; metalnessFactor = gMet;');
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nroughnessFactor = gRug; metalnessFactor = gMet;')
+      .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= gEsp; material.specularColorBlended *= gEsp; material.specularF90 *= gEsp;');
   };
-  m.customProgramCacheKey = () => 'cuerpo-codigo-1'; m.userData.cuerpo = U; return m;
+  m.customProgramCacheKey = () => 'cuerpo-codigo-2'; m.userData.cuerpo = U; return m;
 }
 
 /**

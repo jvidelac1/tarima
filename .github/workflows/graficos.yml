@@ -275,9 +275,13 @@ jobs:
           mkdir -p out/logs out/cuerpo
       - name: Generador sin navegador (medidas y vista previa)
         run: node tools/cuerpo/vista.mjs --calidad=alta --medidas --tabla=out/cuerpo/medidas.txt --out=out/cuerpo/previa.png 2>&1 | tee out/logs/cuerpo_vista.log
+      - name: Laboratorio interactivo (girar, zoom, botones; computadora y teléfono)
+        timeout-minutes: 12
+        run: node tools/cuerpo/check_lab.mjs --out=out/cuerpo/lab 2>&1 | tee out/logs/cuerpo_lab.log
       - name: Fotos del laboratorio del cuerpo (banco --fotos --lab=cuerpo)
-        timeout-minutes: 20
-        run: node tools/banco.mjs --fotos=out/cuerpo/fotos --lab=cuerpo --plantel=kordan --ancho=${{ inputs.niveles == 'ancho' && 1280 || 720 }} --alto=${{ inputs.niveles == 'ancho' && 620 || 860 }} 2>&1 | tee out/logs/cuerpo_fotos.log
+        if: ${{ !cancelled() }}
+        timeout-minutes: 25
+        run: node tools/banco.mjs --fotos=out/cuerpo/fotos --lab=cuerpo --plantel=kordan ${{ inputs.tomas && format('--tomas={0}', inputs.tomas) || '' }} --ancho=${{ inputs.niveles == 'ancho' && 1280 || 720 }} --alto=${{ inputs.niveles == 'ancho' && 620 || 860 }} 2>&1 | tee out/logs/cuerpo_fotos.log
       - name: Resultado como artefacto
         if: ${{ always() }}
         uses: actions/upload-artifact@v6

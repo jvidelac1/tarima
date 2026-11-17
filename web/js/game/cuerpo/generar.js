@@ -8,11 +8,12 @@ import { hacerPiel, AUX } from './piel.js';
 import { anatomia, FICHA, MAT } from './anatomia.js';
 import { mmul, minv, giroEn, mpos, sub, dot, nor, cruz, perp, mad, add, mul, len, lerp, sstep } from './algebra.js';
 
-/** Paso de la grilla (m) de cada bloque. «alta»: ~100 mil triángulos; «movil»: ~35 mil. */
+/** Paso de la grilla (m) de cada bloque. «alta»: ~110 mil triángulos; «media»: ~75 mil; «movil»: ~45 mil; «fina»: ~200 mil (para mirar de cerca). */
 export const CALIDAD = {
-  alta: { h: .0075, cabeza: .0034, mano: .0034, pie: .0048, anillo: 64 },
-  media: { h: .0095, cabeza: .0042, mano: .0045, pie: .006, anillo: 48 },
-  movil: { h: .0125, cabeza: .0055, mano: .006, pie: .008, anillo: 32 },
+  fina: { h: .0075, cabeza: .0034, mano: .0034, pie: .0048, anillo: 64 },
+  alta: { h: .009, cabeza: .0042, mano: .0052, pie: .0062, anillo: 64 },
+  media: { h: .011, cabeza: .005, mano: .0062, pie: .0075, anillo: 48 },
+  movil: { h: .014, cabeza: .0062, mano: .0075, pie: .009, anillo: 32 },
   previa: { h: .012, cabeza: .005, mano: .007, pie: .008, anillo: 32 },
 };
 export const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16) / 255);
@@ -39,11 +40,11 @@ export function generar(esq, ficha = {}, calidad = 'alta') {
   const colMat = { [MAT.piel]: col.piel, [MAT.zapatilla]: col.zapatilla, [MAT.suela]: col.suela, [MAT.taco]: col.taco, [MAT.correa]: col.correa, [MAT.labio]: col.labio };
 
   // ── bloques de mallado: cuerpo grueso; cabeza, manos y pies más finos. Se solapan unos milímetros sobre la misma superficie.
-  const yCab = ref.menton - .018, manoPl = s => { const m = marcos[s].AN; return [m.pt(.84), m.u]; }, yPie = Math.max(J.LeftFoot[1], J.RightFoot[1]) + .075;
+  const yCab = ref.menton - .005, manoPl = s => { const m = marcos[s].AN; return [m.pt(.84), m.u]; }, yPie = Math.max(J.LeftFoot[1], J.RightFoot[1]) + .075;
   const enMano = (s, x, y, z, e) => { const [p, u] = manoPl(s), dx = x - p[0], dy = y - p[1], dz = z - p[2]; return dx * u[0] + dy * u[1] + dz * u[2] > e && dx * dx + dy * dy + dz * dz < .09; };
   const cajaDe = (pts, m) => [[0, 1, 2].map(i => Math.min(...pts.map(p => p[i])) - m), [0, 1, 2].map(i => Math.max(...pts.map(p => p[i])) + m)];
   const dedos = s => Object.keys(J).filter(n => n.startsWith((s === 'L' ? 'Left' : 'Right') + 'Hand')).map(n => J[n]);
-  const e = .004, bloques = [
+  const e = .002, bloques = [
     { n: 'cuerpo', h: Q.h, caja: [C.lo, C.hi], dentro: (x, y, z) => y < yCab + e && y > yPie - e && !enMano('L', x, y, z, e) && !enMano('R', x, y, z, e) },
     { n: 'cabeza', h: Q.cabeza, caja: [[-.13, yCab - .01, C.lo[2]], [.13, C.hi[1], C.hi[2]]], dentro: (x, y, z) => y >= yCab - e },
     ...['L', 'R'].map(s => ({ n: 'mano' + s, h: Q.mano, caja: cajaDe([...dedos(s), manoPl(s)[0]], .06), dentro: (x, y, z) => enMano(s, x, y, z, -e) })),
@@ -61,10 +62,10 @@ export function generar(esq, ficha = {}, calidad = 'alta') {
   const at = { col: [0, 0, 0], sup: [0, 0, 0, 0], sup2: [0, 0, 0, 0], tipo: 0, despl: 0 };
   function atributos(x, y, z) {
     acc.fill(0); const n = C.detalle(x, y, z), ii = C.ii, di = C.di, PP = C.P; let dm = 9; for (let k = 0; k < n; k++) if (di[k] < dm) dm = di[k];
-    let wt = 0, r = 0, g = 0, b = 0, tp = 0, oreja = 0, calz = 0;
+    let wt = 0, r = 0, g = 0, b = 0, tp = 0, oreja = 0, calz = 0, zr = 0, zg = 0, zb = 0;
     for (let k = 0; k < n; k++) { const q = PP[ii[k]], a = Math.exp(-(di[k] - dm) / q.sig); if (a < 1e-4) continue; wt += a; q.piel(x, y, z, acc, a);
-      const c = colMat[q.mat] || col.piel; r += a * c[0]; g += a * c[1]; b += a * c[2]; if (q.mat) { tp += a * (TIPO_MAT[q.mat] || 0); calz += a; } if (q.nombre === 'oreja') oreja += a; }
-    for (let i = 0; i < nb; i++) acc[i] /= wt; at.col[0] = r / wt; at.col[1] = g / wt; at.col[2] = b / wt; calz /= wt; at.tipo = calz > .5 ? Math.round(tp / (calz * wt)) : 0;
+      const c = colMat[q.mat] || col.piel; r += a * c[0]; g += a * c[1]; b += a * c[2]; if (q.mat && q.mat !== MAT.labio) { tp += a * (TIPO_MAT[q.mat] || 0); calz += a; zr += a * c[0]; zg += a * c[1]; zb += a * c[2]; } if (q.nombre === 'oreja') oreja += a; }
+    for (let i = 0; i < nb; i++) acc[i] /= wt; at.col[0] = r / wt; at.col[1] = g / wt; at.col[2] = b / wt; calz /= wt; at.tipo = calz > .5 ? Math.round(tp / (calz * wt)) : 0; if (calz > .5) { at.col[0] = zr / (calz * wt); at.col[1] = zg / (calz * wt); at.col[2] = zb / (calz * wt); }
     const wL = suma(gi.piernaL), wR = suma(gi.piernaR), wP = wL + wR, wC = acc[gi.cabeza[0]], wT = suma(gi.tronco), wB = Math.max(0, 1 - wP - wC - wT);
     // malla de halterofilia: escote, sisas y botamanga
     const fr = sstep(-.03, .03, z - .0), ax = Math.abs(x);
@@ -79,18 +80,22 @@ export function generar(esq, ficha = {}, calidad = 'alta') {
     // emblema del pecho: un rombo
     const emb = .026 - (Math.abs(x - .0) * .9 + Math.abs(y - (ref.yA - .075)) * 1.25) - (z < 0 ? 1 : 0);
     // medias
-    let media = -1; if (wP > .5) media = Math.min(wP - .5, (J.LeftFoot[1] + .175) - y) * (1 - calz) - calz;
+    let media = -1; if (wP > .5) media = Math.min(wP - .5, (J.LeftFoot[1] + .175) - y);
+    if (calz > .5) tela = -5;      // marca de zapatilla para el sombreador
     // pelo: casquete sobre el cráneo con el nacimiento por dirección desde el centro de la cabeza
     let pelo = -1, ceja = -1, barba = -1;
     if (wC > .3) { const dx = x - c0[0], dy = y - c0[1], dz = z - c0[2], l = Math.hypot(dx, dy, dz) || 1, el = dy / l, fz = dz / l, lx = Math.abs(dx) / l;
-      const lim = fz > 0 ? .1 + (.62 - .1) * sstep(.1, .78, fz) - .1 * sstep(.25, .6, lx) * sstep(.3, .7, fz) : .1 - .62 * sstep(0, .75, -fz);
+      const lim = fz > 0 ? .1 + (.76 - .1) * sstep(.1, .78, fz) - .1 * sstep(.25, .6, lx) * sstep(.3, .7, fz) : .1 - .62 * sstep(0, .75, -fz);
       pelo = (el - lim) * .1 - oreja / wt * .08 - (1 - wC) * .05;
       // cejas: un trazo sobre el arco superciliar
       const hs = A.cabeza.hs, ex = Math.abs(x) / hs, ty = A.cabeza.yCeja, t = Math.min(1, Math.max(0, (ex - .013) / .04)), cy = ty + .004 * Math.sin(t * 3.1416) - .003 * t;
-      ceja = z > zc + .04 ? .0042 * (1 - .45 * t) - Math.hypot(ex - (.013 + .04 * t), (y - cy) / hs) : -1;
-      if (F.barba) { const bj = Math.min(ch + .058 + .035 * sstep(.03, .07, ex) - y, y - (ch - .012), z - (zc - .028)); barba = bj - .03 * (1 - F.barba); } }
+      ceja = .0036 * (1 - .45 * t) - Math.hypot(ex - (.013 + .04 * t), (y - cy) / hs) - Math.max(0, zc + .05 - z);
+      { const bx = ex / .024, by = A.cabeza.yBoca - .003 * hs * bx * bx; barba = .0021 * hs * (1.1 - bx * .8) - Math.abs(y - by) - Math.max(0, zc + .05 - z); }      // boca: un trazo serio
+      if (F.barba) { const bj = Math.min(ch + .058 + .035 * sstep(.03, .07, ex) - y, y - (ch - .012), z - (zc - .028)); barba = Math.max(barba, bj - .03 * (1 - F.barba)); } }
     at.sup[0] = tela; at.sup[1] = media; at.sup[2] = pelo; at.sup[3] = barba; at.sup2[0] = panel; at.sup2[1] = ceja; at.sup2[2] = at.tipo; at.sup2[3] = emb;
-    at.despl = at.tipo ? 0 : Math.max(.0016 * sstep(0, .004, tela), .0022 * sstep(0, .004, media), (F.peloAlto ?? .007) * sstep(-.002, .012, pelo));
+    at.despl = at.tipo ? 0 : Math.max(.0016 * sstep(0, .004, tela), .0022 * sstep(0, .004, media), (F.peloAlto ?? .009) * sstep(-.002, .022, pelo) * (1 + .5 * sstep(.2, .9, (y - c0[1]) / .1)));
+    if (calz > .5) { const L = x > 0 ? 'Left' : 'Right', An = J[L + 'Foot'], To = J[L + 'ToeBase'], u = nor(sub(To, An)), t = (x - An[0]) * u[0] + (y - An[1]) * u[1] + (z - An[2]) * u[2], up = nor(sub(J[L + 'Leg'], An)), hgt = (x - An[0]) * up[0] + (y - An[1]) * up[1] + (z - An[2]) * up[2];
+      at.sup2[3] = Math.min(.017 - Math.abs(t - .075), hgt + .058); }
     return at;
   }
 
@@ -110,19 +115,19 @@ export function generar(esq, ficha = {}, calidad = 'alta') {
     for (let j = 0; j + 1 < perfil.length; j++) for (let a = 0; a < nA; a++) { const p = j * nA + a, q = j * nA + (a + 1) % nA; ind.push(p, q, p + nA, q, q + nA, p + nA); }
     extra.push({ nombre, pos: Float32Array.from(pos), base: Float32Array.from(base), ind: Uint32Array.from(ind), col: color, tipo, uv });
   };
-  const yCin = ref.yH + (R.cinturon ?? .165), aCin = R.cinturonAncho ?? .1;
+  const yCin = ref.yH + (R.cinturon ?? .165), aCin = R.cinturonAncho ?? .085;
   banda('cinturon', s => ({ c: [0, s, .028], u: [0, 1, 0], r0: [0, 0, 1] }), yCin - aCin / 2, yCin + aCin / 2, .0065, col.cinturon, TIPO.cuero, 6);
   for (const s of ['L', 'R']) {
     const { MU, PI, AN, mano } = marcos[s], Lt = MU.L + PI.L, k0 = MU.L / Lt;
     // la rodillera sigue el muslo y la pierna: el centro pasa del eje de uno al del otro alrededor de la rodilla
     banda('rodillera' + s, t => { const d = t * Lt, a = d < MU.L ? MU.pm(d, 0, .008) : PI.pm(d - MU.L, 0, .008 * (1 - (d - MU.L) / .12)), w = sstep(MU.L - .07, MU.L + .07, d); return { c: a, u: nor(lerp(MU.u, PI.u, w)), r0: MU.f }; },
       k0 - (R.rodilleraArriba ?? .105) / Lt, k0 + (R.rodilleraAbajo ?? .1) / Lt, .0055, col.rodillera, TIPO.neopreno, 12);
-    banda('muñequera' + s, t => ({ c: AN.pm(t), u: AN.u, r0: AN.f }), AN.L - .058, AN.L + .012, .004, col.venda, TIPO.venda, 6);
+    banda('muñequera' + s, t => ({ c: AN.pm(t), u: AN.u, r0: AN.f }), AN.L - .062, AN.L - .002, .004, col.venda, TIPO.venda, 6);
   }
   // ojos: esferas chicas con iris y pupila por color de vértice
   for (const o of A.ojos) { const nU = 20, nV = 12, pos = [], ind = [], cl = [], base = [], iris = col.iris;
     for (let v = 0; v <= nV; v++) for (let u = 0; u <= nU; u++) { const th = v / nV * Math.PI, ph = u / nU * 2 * Math.PI, d = [Math.sin(th) * Math.cos(ph), Math.sin(th) * Math.sin(ph), Math.cos(th)];      // polo en +z (hacia adelante)
-      pos.push(o.c[0] + d[0] * o.r, o.c[1] + d[1] * o.r, o.c[2] + d[2] * o.r); base.push(o.c[0], o.c[1], o.c[2] + .03); const a = th / Math.PI * 180, k = a < 9 ? [.02, .02, .02] : a < 27 ? iris : a < 30 ? iris.map(c => c * .5) : [.86, .84, .8]; cl.push(...k); }
+      pos.push(o.c[0] + d[0] * o.r, o.c[1] + d[1] * o.r, o.c[2] + d[2] * o.r); base.push(o.c[0], o.c[1], o.c[2] + .03); const a = th / Math.PI * 180, k = a < 10 ? [.02, .02, .02] : a < 29 ? iris : a < 32 ? iris.map(c => c * .5) : [.86, .84, .8]; cl.push(...k); }
     for (let v = 0; v < nV; v++) for (let u = 0; u < nU; u++) { const p = v * (nU + 1) + u; ind.push(p, p + nU + 1, p + 1, p + 1, p + nU + 1, p + nU + 2); }
     extra.push({ nombre: 'ojo', pos: Float32Array.from(pos), base: Float32Array.from(base), ind: Uint32Array.from(ind), cols: cl, tipo: TIPO.ojo, rigido: ix('Head') }); }
   // hebilla del cinturón: un marco con su lengüeta, mallado aparte bien fino
@@ -172,6 +177,6 @@ export function generar(esq, ficha = {}, calidad = 'alta') {
  */
 export function capas(c, b, s, s2, out = [0, 0, 0]) {
   let r = b[0], g = b[1], bl = b[2]; const mix = (k, w) => { r += (k[0] - r) * w; g += (k[1] - g) * w; bl += (k[2] - bl) * w; }, e = x => Math.min(1, Math.max(0, x / .0012 + .5));
-  if (s2[2] < .5) { mix(c.pelo, e(s[3]) * .4); mix(c.media, e(s[1])); const tl = e(s[0]); if (tl > 0) { mix(c.malla, tl); mix(c.panel, tl * e(s2[0])); mix(c.vivo, tl * e(s2[3])); mix(c.vivo, tl * (1 - e(Math.abs(s[0]) - .006)) * .9); } mix(c.pelo, e(s[2])); mix(c.pelo, e(s2[1])); }
+  if (s2[2] < .5) { mix(c.pelo, e(s[3]) * .6); const zap = s[0] < -2; if (!zap) mix(c.media, e(s[1])); else mix(c.correa, e(s2[3])); const tl = e(s[0]); if (tl > 0) { mix(c.malla, tl); mix(c.panel, tl * e(s2[0])); mix(c.vivo, tl * e(s2[3])); mix(c.vivo, tl * (1 - e(Math.abs(s[0]) - .006)) * .9); } mix(c.pelo, e(s[2])); mix(c.pelo, e(s2[1])); }
   out[0] = r; out[1] = g; out[2] = bl; return out;
 }

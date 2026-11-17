@@ -28,7 +28,7 @@ export async function laboratorioCuerpo(B, { escena, params, msg, decir }) {
   // estado: pose, vista (órbita) y comparación
   const cam = escena.rig.camera, E = { pose: 0, giro: 35, alto: 8, dist: 5.2, comparar: false, solo: 'codigo', y: 1.0 }, mira = new THREE.Vector3();
   const posar = () => { const [, seg, fase] = POSES[E.pose], G = tramo(escena.P, seg), lev = seg === 'snatch' ? 's' : 'c'; escena.setCarga(140, lev); escena.posar({ seg: G.nombre, s: G.i(fase), tau: G.t(fase), base: G.base, primero: false }, lev, 0); escena.barbell.settle?.(escena.barY);
-    const top = Math.max(1.8, escena.barY + .3); E.y = top / 2; E.distBase = Math.max(4.6, top * 2.45) * (innerHeight > innerWidth ? 1.25 : 1); };
+    const top = Math.max(1.8, escena.barY + .3); E.y = top / 2; E.distBase = Math.max(4.3, top * 2.3); };
   const modo = () => {
     const c = E.comparar, ver = c || E.solo === 'actual'; for (const o of actuales) o.visible = ver; cuerpo.malla.visible = c || E.solo === 'codigo';
     a.root.position.x = c ? .62 : 0; cuerpo.malla.position.x = c ? -1.24 : 0; a.root.updateMatrixWorld(true);
@@ -79,6 +79,7 @@ export async function laboratorioCuerpo(B, { escena, params, msg, decir }) {
     ...T('pos-salida', 1, 50), ...T('pos-tiron', 2, 90), ...T('pos-sentadilla-frente', 3, 0), ...T('pos-sentadilla-perfil', 3, 90), ...T('pos-rack', 4, 35), ...T('pos-tijera', 5, 90), ...T('pos-envion-fondo', 6, 0), ...T('pos-arriba-frente', 7, 0), ...T('pos-arriba-espalda', 7, 180),
     ...T('cerca-cabeza', 0, 25, { dist: 1.25, y: 1.56, alto: 4 }), ...T('cerca-torso', 0, 20, { dist: 2.6, y: 1.25, alto: 6 }), ...T('cerca-manos', 7, 15, { dist: 1.7, y: 2.0, alto: 0 }), ...T('cerca-piernas', 3, 30, { dist: 2.6, y: .5, alto: 10 }),
     { nombre: 'comparar_pie', pose: 0, giro: 25, comparar: true }, { nombre: 'comparar_arriba', pose: 7, giro: 25, comparar: true }];
+  { const q = (params.get('tomas') || '').split(',').filter(Boolean); if (q.length) for (let i = tomas.length - 1; i >= 0; i--) if (!q.some(k => tomas[i].nombre.includes(k))) tomas.splice(i, 1); }      // ?tomas=pie-34,cerca: solo esas
   const fin = () => { try { escena.renderer.getContext().finish(); } catch { /* sin contexto */ } };
   window.BANCO_FOTOS = { lista: tomas.map(t => ({ nombre: t.nombre })), listo: true, opacidadSombra: null, opacidadCruda: null,
     async poner(i) { const t = tomas[i]; ui.style.display = 'none'; E.pose = t.pose; E.comparar = !!t.comparar; E.solo = t.solo || 'codigo'; E.giro = t.giro; E.alto = t.alto ?? 8; E.dist = t.dist ?? 5.2; posar(); if (t.y) E.y = t.y; if (t.dist) E.distBase = 5.2; modo(); dibujar(); dibujar(); fin(); return t.nombre; } };

@@ -57,7 +57,8 @@ poses.forEach((clave, f) => {
   const { S, W } = pielEn(clave === 'reposo' ? null : instante(clave)), nuevo = posar(M, S), m = { ...nuevo, ind: M.ind, pixel };
   // encuadre: el centro de la caja de la malla en esta pose
   let lo = [9, 9, 9], hi = [-9, -9, -9]; for (let i = 0; i < m.pos.length; i += 3) for (let c = 0; c < 3; c++) { lo[c] = Math.min(lo[c], m.pos[i + c]); hi[c] = Math.max(hi[c], m.pos[i + c]); }
-  const z = ZOOM[zoom], centro = z ? z[0] : [0, (clave === 'reposo' || !tiene('barra') ? (lo[1] + hi[1]) / 2 : .98), (lo[2] + hi[2]) / 2], escala = z ? alto * z[1] : alto / (clave === 'reposo' || !tiene('barra') ? 1.9 : 2.35);
+  let z = ZOOM[zoom]; if (zoom.startsWith('hueso:')) { const [, h, an] = zoom.split(':'), w = W[e.nombres.indexOf(h)]; z = [[w[12], w[13], w[14]], 1 / +(an || .35)]; }
+  const centro = z ? z[0] : [0, (clave === 'reposo' || !tiene('barra') ? (lo[1] + hi[1]) / 2 : .98), (lo[2] + hi[2]) / 2], escala = z ? alto * z[1] : alto / (clave === 'reposo' || !tiene('barra') ? 1.9 : 2.35);
   const bar = clave !== 'reposo' && tiene('barra') ? barra(W) : null;
   vistas.forEach((g, c) => { const cam = { giro: g, alto: +arg('picado', 6), centro, escala }, rect = [c * cw, f * (A ? 2 : 1) * alto, cw, alto]; lz.malla(m, cam, rect); if (bar) lz.malla(bar, cam, rect);
     if (A) { const r2 = [c * cw, (f * 2 + 1) * alto, cw, alto]; for (const p of A.partes) { const q = posar(p, S), gris = p.material === 'Body' ? [.62, .6, .58] : p.material === 'Hair' ? [.2, .18, .17] : [.45, .45, .5]; lz.malla({ ...q, ind: p.ind, color: (i, o) => { o[0] = gris[0]; o[1] = gris[1]; o[2] = gris[2]; } }, cam, r2); } if (bar) lz.malla(bar, cam, r2); } });
