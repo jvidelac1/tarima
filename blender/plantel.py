@@ -174,7 +174,7 @@ def cfg(k):
     if F: musc = dict(pierna=.95 * mu, gemelo=.5 * mu, hombro=.70 * mu * (1 - .4 * g), brazo=.45 * mu, antebrazo=.65 * mu, pectoral=0, dorsal=.75 * mu * (1 - .4 * g), abdomen=.5 * (1 - g), cuello=.25 * mu)
     else: musc = dict(pierna=1.0 * mu, gemelo=.6 * mu, hombro=1.0 * mu * _clip(1 - 1.2 * g, 0, 1), brazo=.85 * mu * _clip(1 - 1.0 * g, 0, 1), antebrazo=1.0 * mu * (1 - .5 * g), pectoral=.6 * mu * (1 - .4 * g), dorsal=1.0 * mu * (1 - .35 * g), abdomen=.5 * (1 - g), cuello=.7 * mu * (1 - .5 * g))
     if an:
-        if not F: musc.update(brazo=.62 * mu * _clip(1 - .5 * g, 0, 1), hombro=.30 * mu * _clip(1 - .6 * g, 0, 1), antebrazo=.7 * mu * (1 - g), gemelo=.3 * mu)     # la forma la ponen los vientres de tex._masas; el target de MPFB solo infla     # el pesado con físico anatómico no pierde el brazo (salía bíceps 0,185 H con antebrazo 0,222 H)
+        if not F: musc.update(brazo=.78 * mu * _clip(1 - .5 * g, 0, 1), hombro=.45 * mu * _clip(1 - .6 * g, 0, 1), antebrazo=.7 * mu * (1 - g), gemelo=.3 * mu)     # la forma la ponen los vientres de tex._masas; el target de MPFB solo infla     # el pesado con físico anatómico no pierde el brazo (salía bíceps 0,185 H con antebrazo 0,222 H)
         musc.update(cuello=.2 * mu * (1 - .5 * g))
     extra = [('torso/torso-vshape-incr', (0. if an and not F else .10 if F else .45) * _clip(1 - 1.3 * g, 0, 1)),     # anatómico: sin V de culturista (el marco de hombros de MPFB ya es ancho: 0,24 H entre articulaciones) ('buttocks/buttocks-volume-incr', _clip(gluteos, 0, 1)),
              ('hip/hip-scale-horiz-' + ('incr' if cadera >= 0 else 'decr'), _clip(abs(cadera), 0, 1)),
@@ -211,7 +211,7 @@ def cfg(k):
                 musc=musc, masa=m, rho=1.07 - .07 * g, volumen=volumen, fisico=p.get('fisico'), cabeza_meta=p.get('cabeza_meta', (7.5 if F else 7.55) if an else None), genero=p['genero'], categoria=p['categoria'])
 
 # ganancia de cada grupo muscular del físico anatómico (tex.GRUPOS). La mujer: piernas, glúteo y espalda de pesista; tren superior más liviano y sin pectoral marcado
-_GRUPOS_M = dict(deltoide=.9, biceps=1., triceps=1., antebrazo=.8, pectoral=1., trapecio=.8, dorsal=1.1, erectores=1., gluteo=1.5, cuadriceps=1.4, isquios=1.2, aductor=1., gemelos=.85, muslo=1.5, codo=1., rodilla=1., cintura=1.)
+_GRUPOS_M = dict(deltoide=1.15, biceps=1.2, triceps=1.2, antebrazo=.8, pectoral=1.15, trapecio=1., dorsal=1.2, erectores=1., gluteo=1.5, cuadriceps=1.4, isquios=1.2, aductor=1., gemelos=.85, muslo=1.5, codo=1., rodilla=1., cintura=1.)
 _GRUPOS_F = dict(deltoide=.35, biceps=.2, triceps=.25, antebrazo=.2, pectoral=0., trapecio=.25, dorsal=.3, erectores=.4, gluteo=.55, cuadriceps=.5, isquios=.4, aductor=.2, gemelos=.3, muslo=.45, codo=.4, rodilla=.5, cintura=.0)
 def sty(k):
     """Parámetros de indumentaria, piel y pelo para tex.py, geo.py y finish.py (los mismos nombres de clave que usaban ventura y brenner)."""

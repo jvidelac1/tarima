@@ -480,7 +480,7 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     # zona de las puntas del pecho (make.py la alisó en la malla y dejó su centro en lm.json): sin relieve muscular propio, sin oclusión ni sombra
     gn=np.zeros((R,R),f32)
     if 'nipL' in LM: gn=np.clip(np.maximum(T.g(LM['nipL'],.04*K),T.g(LM['nipR'],.04*K) if 'nipR' in LM else 0)*1.6,0,1)
-    anatH=anatH*(1-gn)
+    if anatB is None: anatH=anatH*(1-gn)     # anatómico: el relieve del pectoral sigue de largo (cortarlo en un disco dejaba un aro bajo la malla); ahí solo se apagan la oclusión y la cavidad horneadas
     H=skinH*(1-cloth)+lipH+(thick+H)*edge+hairH+chalkH+dp*.00013+anatH*am
     del skinH,lipH,hairH,chalkH
     nrm=normal_from_height(H,T.su,T.sv,T.ok)
