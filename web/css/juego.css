@@ -554,7 +554,7 @@ html.juego-u .seguir{font-size:calc(var(--u)*.95);padding:.3em .65em;background:
    Pedido del dueño: «hay muchos cortes cuando un pesista termina de tirar» y «un mini tablero que me diga cuánto peso eligen
    los otros pesistas». El tablero (ui/tablero.js) reemplaza al marcador, al cartel del turno del rival, a los avisos de
    cambios y al zócalo: una sola cosa dice quién levanta, con cuánto, y qué pidió cada uno. */
-#fundido{position:absolute;inset:0;background:#03050c;opacity:0;pointer-events:none;transition:opacity .3s cubic-bezier(.22,.61,.36,1)}      /* vuelve frenando */
+#fundido{position:absolute;inset:0;background:#03050c;opacity:0;pointer-events:none;transition:opacity .28s cubic-bezier(.22,.61,.36,1)}      /* vuelve frenando */
 #fundido.on{opacity:1;transition-timing-function:cubic-bezier(.55,.06,.68,.19)}      /* se va acelerando */
 /* 17-nov, transiciones suaves: lo que aparece de golpe con cada turno (tablero, zócalo, «Saltar», la barrita, «seguir») y
    los paneles nuevos entran con una disolvencia corta. Solo opacidad: no mueve cajas (el encuadre y las pruebas miden cajas)

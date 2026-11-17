@@ -54,7 +54,7 @@ de jerk y el nivel». Solo cambia el nivel Fácil (`rules.js → FACIL_17`; Medi
 - **El estilo de envión, a la vista en el panel del primer dos tiempos**: los tres como segmentos (Split primero y marcado,
   con su dificultad debajo del nombre), sin desplegable; tocar uno lo marca y cambia el «X de 10» en el momento. En el
   teléfono acostado, donde los tres no entran en el alto del panel, sigue el botón compacto que los abre.
-- **Transiciones**: el fundido entre pesistas pasa de 120 + 200 ms a 180 + 300 ms (se va acelerando, vuelve frenando);
+- **Transiciones**: el fundido entre pesistas pasa de 120 + 200 ms a 150 + 280 ms (se va acelerando, vuelve frenando);
   también al entrar y al salir de la selección de pesista; el tablero, el zócalo, «Saltar», la barrita y los paneles nuevos
   entran con una disolvencia de 0,2 s (solo opacidad). Con movimiento reducido, nada de esto.
 - Medidas de antes y después: HANDOFF.md, «Pulido del 17 de noviembre».

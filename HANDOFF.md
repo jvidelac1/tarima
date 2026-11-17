@@ -2445,6 +2445,45 @@ Pedido del dueño: «quiero evaluar bien el físico; cuando seleccione el pesist
   `plantel.json`: los números no cierran con la categoría. Al salir, detrás de la bienvenida queda el plano de la selección
   (la final pone su cámara). No se probó en un teléfono de verdad. Sin nota del dueño.
 
+## Pulido del 17 de noviembre (rama `v-polish`, desde `visual` f26ca50)
+
+Pedido del dueño: «mejoraría un poco el gameplay para que sea más fácil, más amigable, con algunas transiciones suaves entre
+cambio de pesistas», jugando en vertical; y, mientras jugaba la candidata, «nivel fácil preseleccionado pero no por defecto;
+es poco intuitivo elegir el estilo de jerk y el nivel». Diseño en `docs/JUEGO.md`, G3.F.
+
+- **Fácil más amigable** (`rules.js → FACIL_17`, solo Fácil; huellas de Medio y Difícil iguales). Tres palancas: verde ±200 /
+  ±150 ms al 90 / 95 % (antes ±170 / ±125), amarillo +±260 / +±210 ms (antes ±220 / ±180) y puntero lento a los 4 s sin tocar a
+  1,9 s por pasada (antes a los 8 s, 1,7 s). Desde el 100 %, todo igual. `barra_bots --dif=facil`, novato (±120 ms), válidos
+  (y % de toques en el verde), Compacto / Largo / Potente:
+  - arranque 90 %: 100 (79) / 100 (89) / 100 (65) → 100 (88) / 100 (94) / 100 (72)
+  - arranque 95 %: 98 (67) / 99 (76) / 92 (52) → 99 (75) / 99 (82) / 94 (58) · 97 %: 94 / 98 / 79 → 96 / 98 / 83
+  - dos tiempos 90 %: 100 (81) / 100 (78) / 99 (77) → 100 (86) / 100 (84) / 100 (82)
+  - dos tiempos 95 %: 97 (65) / 96 (66) / 93 (63) → 100 (73) / 98 (74) / 97 (72) · 97 %: 85 / 85 / 80 → 89 / 88 / 84
+  - al 100 % (sin cambio, a propósito): arranque 62 / 67 / 46, dos tiempos 35 / 36 / 52
+  - todo verde (los tres juntos): arranque 90 % 77 → 85, 95 % 65 → 71; dos tiempos 90 % 62 → 70, 95 % 40 → 52
+  - «LEJOS» en el arranque con Potente: 90 % 7 → 4 % de los toques, 95 % 12 → 7 %
+  - finales enteras con lo que trae el panel, rivales amistosos: oro 91 / 89 / 84 → 93 / 92 / 90 % (media 88,0 → 91,7);
+    con rivales normales 10,0 → 14,7 %; cansancio al tercer intento 272 / 280 / 295 → 263 / 244 / 245
+  - `chance_test`: el «X de 10» del panel sigue honesto (error máximo por casilla 4,5 puntos con el bot típico).
+  - Descartado: amarillo a 500 de energía (novato al 100 %: 70,3 y 71,5 % de válidos, fuera de la meta 30 a 70).
+  - Referencias regeneradas (`sim_test --update`): `sim_ref_barra`, `sim_ref_rivales` y `sim_ref_turnos`, que son finales
+    jugadas en Fácil `'b'` (cambian las zonas de los toques guionados y lo que sugiere el entrenador, que lee la chance);
+    `sim_ref`, `sim_ref_facil`, `sim_ref_uno` y `sim_ref_dificultad` quedaron idénticas. La huella de Fácil cambia: un
+    registro de una final de Fácil jugada con la versión anterior ya no se recalcula igual (el Worker no recalcula partidas).
+- **El nivel a la vista** en la bienvenida y **los tres estilos de envión a la vista** en el panel del primer dos tiempos
+  (acostado sigue el botón compacto: abierto ocupa 59 a 61 % del alto). Revisado el camino del nivel: `difInicial()` →
+  `cfg.dif` → `Partida` y `fijarDificultad`; no había desajuste entre lo marcado y lo aplicado, lo que pasaba es que el nivel
+  solo se veía abriendo Opciones. `check_barra` ahora lo controla en cada pantalla (marcado = `E.dificultad` = `p.cfg.dif`).
+- **Transiciones**: fundido 150 + 280 ms (antes 120 + 200), también al entrar y salir de la selección; disolvencia de 0,2 s
+  para tablero, zócalo, «Saltar», barrita, etiqueta y paneles nuevos. `ritmo_test` (Fácil, novato): la final salteando a
+  los rivales pasa de 126,9 a 128,2 s de mediana (+1,3 s, +1 %; meta ≤ 150) y mirándolos enteros de 195,8 a 197,3 s; el
+  turno de rival más largo, de 11,6 a 11,9 s (tope 12; con 180 + 300 ms daba 12,0 y se acortó); el turno saltado, de 2,2 a
+  2,4 s; el intento propio p90 queda en 8,7 y 13,6 s (antes 8,8 y 13,6); barras caídas con lo que trae el panel, 14,8 → 14,2 %.
+- **Vertical**: en el dos tiempos el tablero cortaba la columna «PIDE»; ahora parado se van la del arranque y los cuadraditos.
+- **Sin resolver / a la vista.** El bot «lento» de `ritmo_test` (toca siempre a los 9 s) no espera menos con el puntero que
+  frena antes: su final dura unos segundos más; una persona que espera al puntero lento sí toca antes (a los 4 a 6 s). No se
+  probó en un teléfono de verdad. Sin nota del dueño.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.
