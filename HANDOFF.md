@@ -2205,6 +2205,12 @@ cabeza… un poco más leves»; «el momento de tensión antes»; «una pantalla
   como estaba para no tapar nada), después chico en su lugar.
 - **Cámara congelada desde que termina el intento** (`fijarCamara`): el lente que volvía de la barrita (0,93 → 1) era el
   reencuadre leve que se veía antes de soltar la barra.
+- **Después de la ronda 5 (6,5)**: respiración agitada con hombros, peso que va de un lado al otro (solo el tronco) y manos
+  que se sacuden el magnesio (`RESPIRA`); pararse a 1,05 s por fase con aceleración suave; rebote 0,52 en la bajada (≈ 15 cm
+  desde la cadera); la barra se suelta 32 cm delante de los hombros a 1,1 m/s y el paso atrás es de 24 cm; en el fallo
+  adelante los brazos bajan a los 0,3 s; el veredicto grande va a la izquierda a media altura (no tapa cabeza ni barra).
+  Sin hacer: pasos con despegue al juntar los pies desde la tijera, la pose inicial de `arranque_sin_altura`, y el panel
+  «Terminó el arranque» que tapa al pesista.
 - Sin hacer de esa lista: desfase entre los extremos de la barra al rebotar, juntar los pies desde la tijera por regla (lo
   hace el clip), darse vuelta medio paso, y medir el reencuadre en lo jugado con una prueba.
 
