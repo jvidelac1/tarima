@@ -65,10 +65,10 @@ const BASE = { canto: col('#7c828f'), zocalo: col('#0c0e14'), esclera: col('#8f8
 /** Colores de la persona k de un grupo con su uniforme (saco y pantalón). */
 const gente = (k, traje, pantalon) => ({ ...BASE, traje: col(traje), ropa: col(traje), solapa: col(traje).multiplyScalar(1.35), pantalon: col(pantalon), piel: PIEL[(k * 5 + 1) % PIEL.length], pelo: PELO[(k * 7 + 2) % PELO.length], corbata: CORBATA[k % CORBATA.length] });
 
-const APAGADA = new THREE.Color(.03, .03, .035), NEGRO = new THREE.Color(0, 0, 0), LUZ_B = new THREE.Color(1.6, 1.55, 1.4), LUZ_R = new THREE.Color(1.7, .1, .06), BR_B = new THREE.Color(.5, .48, .42), BR_R = new THREE.Color(.6, .04, .02);
+const APAGADA = new THREE.Color(.03, .03, .035), NEGRO = new THREE.Color(0, 0, 0), LUZ_B = new THREE.Color(1.6, 1.55, 1.4), LUZ_R = new THREE.Color(.95, .02, .012), BR_B = new THREE.Color(.5, .48, .42), BR_R = new THREE.Color(.5, .012, .006);      // rojo saturado sin pasarse de 1: más fuerte, el tono lo lavaba a durazno
 const BLANCA = new THREE.Color(1.12, 1.1, 1.02), ROJA = new THREE.Color(.5, .012, .008), GUARDADA = new THREE.Color(.05, .05, .06);
 /** Luz de sala propia de las mesas (fracción del color de cada superficie): las luces del escenario apuntan a la tarima y sin esto quedan en negro. */
-const RELLENO = .5;
+const RELLENO = .34;
 /** Segundos que tarda en subir y en bajar la paleta. */
 const SUBE = .35, BAJA = .55;
 
@@ -85,7 +85,7 @@ export class Jueces {
     const uAtras = this.uAtras = { value: 0 }, matArb = this.matArb = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }); matArb.name = 'árbitros';
     matArb.onBeforeCompile = sh => { parche(sh); sh.uniforms.uAtras = uAtras;
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uAtras;').replace('#include <begin_vertex>', '#include <begin_vertex>\n\ttransformed.y -= 0.66 * uAtras;');
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uAtras;').replace('#include <dithering_fragment>', '#include <dithering_fragment>\n\tgl_FragColor.rgb *= 1.0 - 0.72 * uAtras;'); };
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uAtras;').replace('#include <dithering_fragment>', '#include <dithering_fragment>\n\tgl_FragColor.rgb *= 0.62 * ( 1.0 - 0.72 * uAtras );      /* los árbitros, en penumbra: lo que se lee son sus luces */'); };
     const malla = (lista, nombre) => { const g = mergeGeometries(lista); lista.forEach(x => x.dispose()); const m = new THREE.Mesh(g, mat); m.name = nombre; m.matrixAutoUpdate = false; this.group.add(m); return m; };
     const en = (lista, M) => lista.map(g => g.applyMatrix4(M));
 
