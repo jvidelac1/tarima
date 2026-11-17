@@ -11,13 +11,15 @@ let nIp = 0;
 const nuevaIp = () => `198.51.${100 + Math.floor(nIp / 250)}.${(nIp++ % 250) + 1}`;
 const uuid = () => crypto.randomUUID();
 // Las pruebas de siempre corren con la regla vieja (2 finales enteras) y con la maquinaria del bono de la encuesta (+2),
-// que se recupera con estas variables. La del arranque gratis (12 al 15 de noviembre) va en «muro en el medio de la
-// final», con A(); la de producción (worker/wrangler.jsonc, LIF-53: 1 final entera, el correo o la encuesta) en
+// que se recupera con estas variables. La de producción (worker/wrangler.jsonc por defecto: el arranque gratis y el
+// correo obligatorio; decisión del dueño del 17 de noviembre) va en «muro en el medio de la final», con A(), que no pisa
+// ninguna variable; la de LIF-53 (1 final entera, el correo o la encuesta), que se pide con variables explícitas, en
 // «primera vez», con P().
 const VIEJA = { GRATIS_ETAPA: 'final', GRATIS: '2', BONO_ENCUESTA: '2', ENCUESTA_LIBRE: '0' };
 const E = (extra = {}) => Object.assign({}, env, VIEJA, extra);
-const A = (extra = {}) => Object.assign({}, env, { GRATIS_ETAPA: 'arranque', ENCUESTA_LIBRE: '0' }, extra);
-const P = (extra = {}) => Object.assign({}, env, extra);
+const LIF53 = { GRATIS_ETAPA: 'final', GRATIS: '1', TOPE_IP: '6', BONO_ENCUESTA: '0', ENCUESTA_LIBRE: '1', ENCUESTAS_POR_IP: '3' };
+const A = (extra = {}) => Object.assign({}, env, extra);
+const P = (extra = {}) => Object.assign({}, env, LIF53, extra);
 
 let salidas; // pedidos que el Worker hizo hacia afuera
 let flagsRespuesta; // lo que contesta el /flags falso de PostHog
@@ -254,7 +256,7 @@ describe('encuesta', () => {
 });
 
 
-describe('muro en el medio de la final (GRATIS_ETAPA=arranque, la regla del 12 al 15 de noviembre)', () => {
+describe('muro en el medio de la final (GRATIS_ETAPA=arranque: la regla de producción, el valor por defecto de worker/wrangler.jsonc)', () => {
   const ENC = { plataforma: 'web', features: ['mujeres_categorias'] };
   const partidaP = (dispositivo, ip, o = {}) => llamar('/api/partida', { dispositivo, idioma: 'es' }, { ip, e: A(), ...o });
   const envion = (dispositivo, pase, ip, o = {}) => llamar('/api/envion', { dispositivo, pase, idioma: 'es' }, { ip, e: A(), ...o });
@@ -329,13 +331,15 @@ describe('muro en el medio de la final (GRATIS_ETAPA=arranque, la regla del 12 a
   });
 });
 
-describe('primera vez (LIF-53, la regla de producción): la final entera gratis y el cartel con el correo o la encuesta', () => {
+describe('primera vez (LIF-53, por variables explícitas): la final entera gratis y el cartel con el correo o la encuesta', () => {
   const ENC = { plataforma: 'app', features: ['pesista_propio'] };
   const partidaP = (dispositivo, ip, o = {}) => llamar('/api/partida', { dispositivo, idioma: 'es' }, { ip, e: P(), ...o });
   const encuestaP = (dispositivo, r, ip, o = {}) => llamar('/api/encuesta', { dispositivo, r, idioma: 'en', sesion: 'ses-1', momento: 'podio' }, { ip, e: P(), ...o });
 
-  it('worker/wrangler.jsonc trae la regla de LIF-53', () => {
-    expect([env.GRATIS_ETAPA, env.GRATIS, env.TOPE_IP, env.BONO_ENCUESTA, env.ENCUESTA_LIBRE, env.ENCUESTAS_POR_IP]).toEqual(['final', '1', '6', '0', '1', '3']);
+  it('worker/wrangler.jsonc trae la regla de producción (el arranque gratis, correo obligatorio); la de LIF-53 se pide con variables', () => {
+    expect([env.GRATIS_ETAPA, env.GRATIS, env.TOPE_IP, env.BONO_ENCUESTA, env.ENCUESTA_LIBRE, env.ENCUESTAS_POR_IP]).toEqual(['arranque', '1', '6', '0', '0', '3']);
+    const e = P();
+    expect([e.GRATIS_ETAPA, e.GRATIS, e.TOPE_IP, e.BONO_ENCUESTA, e.ENCUESTA_LIBRE, e.ENCUESTAS_POR_IP]).toEqual(['final', '1', '6', '0', '1', '3']);
     expect(env.ENCUESTA_ID).toBeUndefined();
   });
   it('una final entera gratis; la segunda, el cartel con las preguntas como camino', async () => {

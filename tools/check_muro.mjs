@@ -1,5 +1,7 @@
-// Prueba de punta a punta del CARTEL con la regla de producción (LIF-53, decisión del dueño del 15 de noviembre;
-// worker/wrangler.jsonc: GRATIS_ETAPA='final', GRATIS=1, ENCUESTA_LIBRE=1), con el Worker de verdad sobre una D1 falsa
+// Prueba de punta a punta del CARTEL con la regla de LIF-53 (decisión del dueño del 15 de noviembre), que NO es el valor
+// por defecto de worker/wrangler.jsonc: se pide con variables explícitas (GRATIS_ETAPA='final', GRATIS=1, ENCUESTA_LIBRE=1)
+// y queda lista para cuando el dueño la quiera. La de producción (el arranque gratis, correo obligatorio) la prueba
+// tools/check_muro_medio.mjs con las variables del archivo. Con el Worker de verdad sobre una D1 falsa
 // (tools/servidor_local.mjs: sin cuenta de Cloudflare, sin red y sin PostHog). La primera final entera es gratis; al
 // terminarla, el cartel con dos caminos: «Leave your email» o «Answer 2 quick questions», cualquiera desbloquea el juego
 // libre. Dos jugadores nuevos, cada uno con su propio servidor (base vacía):
@@ -38,7 +40,7 @@ const CORREO = { en: 'player.one@pruebas-tarima.com', es: 'ana.prueba@pruebas-ta
 
 async function escenario(L) {
   const tactil = L === 'es', D = L === 'es' ? ES : EN, tag = `[${L}]`, dir = path.join(OUT, L); fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
-  const srv = await iniciarServidorLocal({ silencio: true });
+  const srv = await iniciarServidorLocal({ silencio: true, vars: { GRATIS_ETAPA: 'final', GRATIS: '1', TOPE_IP: '6', BONO_ENCUESTA: '0', ENCUESTA_LIBRE: '1', ENCUESTAS_POR_IP: '3' } });
   if (srv.env.GRATIS_ETAPA !== 'final' || srv.env.GRATIS !== '1' || srv.env.ENCUESTA_LIBRE !== '1') problemas.push(`${tag} el servidor local no tiene la regla de LIF-53 (${JSON.stringify(srv.env)})`);
   const base = srv.url.replace(/\/$/, '');
   const ctx = await browser.newContext(tactil

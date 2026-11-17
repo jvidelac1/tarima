@@ -41,7 +41,7 @@ con las 2 preguntas de la encuesta (las dos dan juego libre en el dispositivo; `
 pide elegir pesista (Compacto) y las tarjetas salen después de la primera final; el nombre al anotarse pide 4 letras;
 eventos `muro_resultado`, `siguio_jugando`, `escena_visible`, `carga_fallida`, y `anotar_ok` (solo altas nuevas) desde el
 Worker; si la carga falla, reintentos y un aviso claro (descarga o 3D) en lugar de la interfaz sin el levantador. Variables
-del Worker: `GRATIS_ETAPA "final"`, `GRATIS "1"`, `ENCUESTA_LIBRE "1"`; consentimiento `2026-11-g` (LIF-45: la grabación de sesión puede llevar el 3D, con «LIFTING GAME» en los carteles en vez del nombre del jugador y el tapado como respaldo; bandera `grabacion_lienzo`).
+del Worker de esa regla: `GRATIS_ETAPA "final"`, `GRATIS "1"`, `ENCUESTA_LIBRE "1"` (**desde el 17 de noviembre no es el valor por defecto**: por decisión del dueño el muro sigue como en producción, después del arranque y con correo obligatorio, `GRATIS_ETAPA "arranque"` y `ENCUESTA_LIBRE "0"`; la de LIF-53 se prende con esas dos variables, `docs/MVP.md`, «Regla del muro que se publica el 17 de noviembre»); consentimiento `2026-11-g` (LIF-45: la grabación de sesión puede llevar el 3D, con «LIFTING GAME» en los carteles en vez del nombre del jugador y el tapado como respaldo; bandera `grabacion_lienzo`).
 
 ## Backlog
 
