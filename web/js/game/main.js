@@ -1675,7 +1675,7 @@ async function revisarShaders() {
   if (!E.shaderMal) return;
   const primero = E.shaderMal; E.shaderMal = null;
   if (C.clave !== 'movil') {
-    try { await ponerCalidad('movil'); nombrar(); escena.cuadro(0, true); } catch (e) { E.shaderMal = E.shaderMal || String(e?.message || e); }
+    try { escena.soltarProgramas(); await ponerCalidad('movil'); nombrar(); escena.cuadro(0, true); } catch (e) { E.shaderMal = E.shaderMal || String(e?.message || e); }
     if (!E.shaderMal) { cargaFallida('shader', { message: primero }, { recuperada: true, calidad: C.nombre }); return; }
   }
   await falloGrafico('shader', { message: E.shaderMal || primero });
