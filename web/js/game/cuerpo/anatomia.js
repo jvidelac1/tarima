@@ -25,7 +25,7 @@ export const FICHA = {
 export const FICHAS = {
   kordan: {},
   lamina: {
-    barba: 0, panel: 'franja', cabezas: 6.75, peloAlto: .0075,
+    barba: 0, panel: 'franja', ganancia: [.86, .8, .66, 1], cabezas: 6.75, peloAlto: .0075,
     color: { piel: '#d6a07a', labio: '#b9806a', pelo: '#17171a', iris: '#2a2019', malla: '#b02a2c', panel: '#e3a62b', vivo: '#b02a2c', rodillera: '#2b2b2e', rodillera2: '#b8302c', cinturon: '#2a2a2d', hebilla: '#b4b7bc',
       zapatilla: '#f1f0ee', correa: '#bf2f2b', taco: '#e9e8e6', suela: '#b8302c', media: '#f3f2ef', venda: '#242427', venda2: '#b8302c' },
     ropa: { cinturon: .034, cinturonAncho: .088, rodilleraArriba: .075, rodilleraAbajo: .095, media: .125, botamanga: .6, escote: .16, escoteAncho: .07, escoteP: 3, sisa: .165, sisaX: .045, sisaAncho: .1, sisaAtras: .015, emblema: [-.056, -.07, .033, .023] },
@@ -146,7 +146,7 @@ export function anatomia(C, J, P, F, Sg, Jr) {
   const ojos = [];
   for (const s of [1, -1]) {
     ojos.push({ c: hp(s * .0315, .117, .0735), r: .0125 * hs, s });
-    C.elip(hp(s * .0315, .117, .0915), hr([.0138, .0062, .0085]), { nombre: 'cuenca', resta: true, k: .004 });
+    C.elip(hp(s * .0315, .117, .0915), hr([.0135, .0052, .0085]), { nombre: 'cuenca', resta: true, k: .004 });
     C.elip(hp(s * .0315, .1255, .078), hr([.016, .004, .011]), { nombre: 'parpado de arriba', ejes: ejesXYZ(-18, 0, 0), k: .004 });
     C.elip(hp(s * .085, .108, -.017), hr([.004, .017, .0085]), { nombre: 'concha de la oreja', resta: true, k: .004 });
   }
