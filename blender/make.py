@@ -124,6 +124,12 @@ maps['AO']=u8(bake(kind='AO',samples=int(os.environ.get('TARIMA_AO','64')))[:,:,
 nt.links.new(df.outputs[0],out.inputs['Surface']); sc.cycles.samples=1; sc.render.bake.normal_space='OBJECT'; bpy.ops.object.bake(type='NORMAL')   # normal de objeto (para tex.py: palma/dorso, caras hacia arriba)
 a=np.empty(R*R*4,dtype=np.float32); bimg.pixels.foreach_get(a); maps['NO']=u8(a.reshape(R,R,4)[:,:,:3])
 np.savez(OUT+'maps.npz',**maps); print('MAPS',R,{k:(v.dtype.name,v.shape) for k,v in maps.items()})
+if STY.get('fisico')=='anatomico':
+    # centro de la punta del pecho (racimo de polígonos diminutos de la malla base, por densidad, como geo.chest_smooth): tex.py apaga ahí relieve, oclusión y sombra
+    el_=np.linalg.norm(co[E_[:,0]]-co[E_[:,1]],axis=1); ml_=np.zeros(N); np.add.at(ml_,E_[:,0],el_); np.add.at(ml_,E_[:,1],el_); ml_/=dg_[:,0]
+    for sgn_,k_ in ((1,'nipL'),(-1,'nipR')):
+        c_=(suit>.5)&(no[:,1]<-.15)&(co[:,0]*sgn_>.03*KM)&(co[:,2]<sh.z-.05*KM)&(co[:,2]>sh.z-.30*KM)&(np.abs(co[:,0])<.22*KM)
+        if c_.any(): LM[k_]=co[int(np.argmin(np.where(c_,ml_,9.)))].copy(); print(f'PUNTA {NAME} {k_}: centro para la textura en',np.round(LM[k_],3),flush=True)
 import json; json.dump({k:[float(u) for u in np.ravel(v)] for k,v in LM.items()},open(OUT+'lm.json','w'))
 json.dump(dict(hip=list(hip),knee=list(knee),ank=list(ank),sh=list(sh),neck=list(neck),hemz=hemz,arms={s:[list(P(s+'ForeArm')),list(P(s+'Hand')),list(P(s+'Arm'))] for s in ('Left','Right')}),open(OUT+'bones.json','w'))
 bpy.data.objects.remove(bk); b.hide_render=False; me.materials.clear()
