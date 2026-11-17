@@ -2260,6 +2260,7 @@ Lo que sigue mal, repetido en las rondas 4 y 5:
 - En Clásico las ayudas pegadas a la barra (anillo, línea) no se ven en primera persona cuando la barra queda fuera de cuadro.
 - Después del válido el pesista queda de pie respirando: no hay festejo (haría falta una animación nueva).
 
+<<<<<<< HEAD
 ### Carteles fuera de la cabeza y de la barra, y el vistazo a la barra (17-nov, rama `v-pov`)
 
 Pedido del dueño después de jugar parado en el teléfono: «hay casos donde los carteles le tapan la cabeza al pesista, ojo ahí».
@@ -2321,6 +2322,27 @@ acostado el botón redondo tapa la mano derecha y el recuadro queda pegado al di
 una estimación por las medidas de los márgenes, no una medición.
 
 Capturas de antes y después: `~/tarima-datos/ver_visual/carteles/` (`antes/`, `despues/`, `pov_vistazo/`).
+=======
+## Físico anatómico (17-nov, rama `v-pesista`)
+
+Detalle en `docs/PLANTEL.md`, «Físico anatómico». Estado: kordan, ilarraz, jastrev y solanet con `fisico='anatomico'`; corrida de
+pesistas 44038971821 (0 BAD en los cuatro), fotos 44042349451 y 44042364993, `PESISTAS_RUN` de `graficos.yml` = `44004922615 44038971821`
+(halvard sale de la primera). Hojas de antes y después y de posiciones: `~/tarima-datos/ver_visual/pesista/prueba_fisico/`.
+
+Lo que costó encontrar (no repetir):
+- El alisado del pecho (`make.py` sobre la malla base y `geo.chest_smooth` sobre la final) llegaba hasta la cadera y el muslo alto y
+  encogía todo lo convexo: la sonda mostraba el cuerpo nuevo y el GLB no (muslo 0,41 H contra 0,35 H). En el físico anatómico va solo sobre el pecho.
+- Los «bultitos» del pecho con los brazos arriba eran tres cosas: el plato chato del parche (ahora mínimos cuadrados móviles), un disco de
+  oclusión fija en la textura y la normal mal escalada en el racimo de UV deformado. La «punta» que `make.py` buscaba estaba en la ingle.
+- `measure-thigh-circ`, `measure-calf-circ` y `upperleg-scale-*` de MPFB dan un globo arriba del muslo.
+- `ANTROM` medía mal muslo, hombros y cuello (cortes solo con los vértices que dominaba un hueso). `tools/prever_fisico.py` y un corte
+  del GLB con numpy sirven para verificar sin Blender.
+
+Estimaciones y pendientes: las metas de perímetros son estimadas (no hay medición de referencia); el ancho de hombros medido (0,35 H)
+queda sobre la meta porque el marco de MPFB no baja de 0,24 H entre articulaciones; la proyección del glúteo queda en 0,07 H; el
+superpesado no tiene panza en barril (cintura 0,56 H) y su entrepierna mide 0,375 H; queda un bulto bajo la malla en la extensión
+(los targets `genitals/*-decr` no alcanzan); pieles de MakeHuman sin integrar; el sombreador de piel solo cambió `uNormBias` (1,7 a 1,1).
+>>>>>>> origin/v-pesista
 
 ## Contratos entre Blender y el visor
 

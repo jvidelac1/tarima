@@ -71,7 +71,12 @@ def anatomy(b,rig,K,cut=1.):
     co=coords(b); N=len(co); me=b.data; no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3)
     J={x.name[len(PRE):]:np.array(x.head_local) for x in rig.data.bones if x.name.startswith(PRE)}
     B,F,_=tex.anatomy(co,no,J,K); names,W=wget(b); keep=1-sum(W[:,j] for j,n in enumerate(names) if any(k in n for k in ('Head','Hand','Foot','Toe')))
-    d=(B*ANAT_GEO[0]+F*ANAT_GEO[1]*cut)*np.clip(keep,0,1); me.vertices.foreach_set('co',(co+no*d[:,None]).ravel()); me.update()
+    if tex.ANAT.get('fisico')=='anatomico':
+        # desplazamiento grande: sobre la normal alisada. Con la normal de cada vértice, lo que ya sobresale (la punta del pecho de la malla base, pliegues) se abre en abanico y crece
+        E=np.empty(len(me.edges)*2,int); me.edges.foreach_get('vertices',E); E=E.reshape(-1,2)
+        for _ in range(14):
+            A=np.zeros_like(no); np.add.at(A,E[:,0],no[E[:,1]]); np.add.at(A,E[:,1],no[E[:,0]]); no=no+A; no/=np.maximum(np.linalg.norm(no,axis=1,keepdims=True),1e-9)
+    gg=tex.ANAT.get('geo',ANAT_GEO); d=(B*gg[0]+F*gg[1]*cut)*np.clip(keep,0,1); me.vertices.foreach_set('co',(co+no*d[:,None]).ravel()); me.update()
     print(f'ANAT desplazamiento de malla: máx +{d.max()*1000:.1f} / {d.min()*1000:.1f} mm, {int((np.abs(d)>5e-4).sum())} vértices')
 def chest_smooth(b,rig,K,iters=30):
     """Frente del pecho liso en la malla final (ya subdividida y con el relieve muscular): bajo la malla se marcaban dos puntas (hombres y
@@ -80,6 +85,11 @@ def chest_smooth(b,rig,K,iters=30):
     co=coords(b); me=b.data; N=len(co); no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3); sh=head(rig,'LeftArm')
     E=np.empty(len(me.edges)*2,int); me.edges.foreach_get('vertices',E); E=E.reshape(-1,2); deg=np.maximum(np.bincount(E.ravel(),minlength=N),1)[:,None]
     z=co[:,2]; ax=np.abs(co[:,0]); w=(no[:,1]<-.15)*sm(sh[2]-.76*K,sh[2]-.66*K,z)*sm(sh[2]-.05*K,sh[2]-.10*K,z)*sm(.27*K,.22*K,ax)
+    import tex
+    if tex.ANAT.get('fisico')=='anatomico':
+        # El alisado llegaba hasta la cadera y el frente del muslo (zona hasta 0,76 por debajo del hombro) y 30 pasadas de laplaciano encogen lo convexo: se comía el pectoral,
+        # el abdomen y el cuádriceps alto del físico anatómico (muslo 0,41 H en la sonda y 0,33 H en el GLB). Acá va solo sobre el pecho y con pocas pasadas: la punta la saca el parche.
+        w=(no[:,1]<-.15)*sm(sh[2]-.36*K,sh[2]-.28*K,z)*sm(sh[2]-.05*K,sh[2]-.10*K,z)*sm(.27*K,.22*K,ax); iters=6 if tex.ANAT.get('grupos',{}).get('pectoral',1)>0 else 30     # la mujer (sin pectoral en los grupos) conserva las pasadas: busto liso de top deportivo
     def prom(c):
         A=np.zeros_like(c); np.add.at(A,E[:,0],c[E[:,1]]); np.add.at(A,E[:,1],c[E[:,0]]); return A/deg
     punta=lambda c:float((((c-prom(c))*no).sum(1)*(w>.5)).max())
@@ -99,13 +109,28 @@ def chest_smooth(b,rig,K,iters=30):
         an=fr&(r>RN)&(r<1.8*RN); den=fr&(r<RN)
         if an.sum()<12 or den.sum()<3: print(f'PUNTA {lado}: sin anillo para ajustar ({int(an.sum())} vértices)'); continue
         Aq=np.stack([np.ones(an.sum()),x[an],y[an],x[an]**2,x[an]*y[an],y[an]**2],1); cf=np.linalg.lstsq(Aq,h[an],rcond=None)[0]
-        hf=cf[0]+cf[1]*x+cf[2]*y+cf[3]*x*x+cf[4]*x*y+cf[5]*y*y; wt=sm(RN,RN*.7,r)*den; dz=(hf-h)*wt; c=c+n0[None,:]*dz[:,None]
+        hf=cf[0]+cf[1]*x+cf[2]*y+cf[3]*x*x+cf[4]*x*y+cf[5]*y*y; wt=sm(RN,RN*.7,r)*den; dz=(hf-h)*wt
+        import tex
+        if tex.ANAT.get('fisico')=='anatomico':
+            # Con el pectoral más curvo, la cuádrica única dejaba un plato chato de 3 cm, 2 mm hundido, con el borde marcado (se veía un aro bajo la malla con los brazos arriba).
+            # Mínimos cuadrados móviles: cada vértice del disco toma la cuádrica ajustada al anillo con pesos gaussianos centrados en él, así empalma con la pendiente de su borde.
+            R1=1.3*RN; an2=np.nonzero(fr&(r>R1)&(r<2.4*R1))[0]; dn2=np.nonzero(fr&(r<=R1))[0]
+            if len(an2)>=20:
+                Aq2=np.stack([np.ones(len(an2)),x[an2],y[an2],x[an2]**2,x[an2]*y[an2],y[an2]**2],1); hf2=np.empty(len(dn2))
+                for jj,j in enumerate(dn2):
+                    wg=np.sqrt(np.exp(-((x[an2]-x[j])**2+(y[an2]-y[j])**2)/(.9*RN)**2)+1e-4); c2=np.linalg.lstsq(Aq2*wg[:,None],h[an2]*wg,rcond=None)[0]
+                    hf2[jj]=c2[0]+c2[1]*x[j]+c2[2]*y[j]+c2[3]*x[j]**2+c2[4]*x[j]*y[j]+c2[5]*y[j]**2
+                dz=np.zeros(N); dz[dn2]=(hf2-h[dn2])*sm(R1,R1*.7,r[dn2])
+        c=c+n0[None,:]*dz[:,None]
         print(f'PUNTA {lado}: racimo en ({cn[0]:+.3f},{cn[1]:+.3f},{cn[2]:.3f}), arista media {ml[i]*1000:.2f} mm, {int(den.sum())} vértices en {RN*1000:.0f} mm; sobresalía {(h-hf)[den].max()*1000:.1f} mm, corrección máx {np.abs(dz).max()*1000:.1f} mm')
     me.vertices.foreach_set('co',c.ravel()); me.update()
     # los pesos de piel también: el suavizado de pesos del hombro (smooth_weights) termina en medio del pecho y ese borde deja un vértice «atrasado» que con los brazos arriba se levanta como una carpa (la punta)
     names,W=wget(b); W0=W.copy()
     for _ in range(14):
         A=np.zeros_like(W); np.add.at(A,E[:,0],W[E[:,1]]); np.add.at(A,E[:,1],W[E[:,0]]); W=W+(A/deg-W)*(.6*w)[:,None]
+    import tex
+    if tex.ANAT.get('fisico')=='anatomico':     # y dentro del racimo de la punta, los pesos del anillo que lo rodea (el laplaciano por aristas no lo cruza)
+        for den,an,M,mz in punta_interp(b,rig,K): W[den]=W[den]*(1-mz)[:,None]+(M@W[an])*mz[:,None]
     W/=np.maximum(W.sum(1,keepdims=True),1e-9); rows=np.nonzero((w>.02)&(np.abs(W-W0).max(1)>1e-4))[0]; wset(b,names,W,rows)
     print(f'PECHO pesos suavizados en {len(rows)} vértices (cambio máx {np.abs(W-W0).max():.3f})')
     print(f'PECHO liso: {int((w>.05).sum())} vértices, punta más alta {p0*1000:.2f} mm -> {punta(c)*1000:.2f} mm, desplazamiento máx {np.linalg.norm(c-co,axis=1).max()*1000:.1f} mm')
@@ -261,6 +286,11 @@ def correctives(b,rig,K,fem=False):
     for p in b.data.polygons:
         if p.material_index in mi: body[list(p.vertices)]=True
     for k in keys: keys[k]=keys[k]*body[:,None]
+    import tex
+    if tex.ANAT.get('fisico')=='anatomico':     # el delta del correctivo en el racimo de la punta del pecho: lo que vale alrededor (ver punta_interp)
+        for den,an,M,mz in punta_interp(b,rig,K):
+            for k in keys: keys[k][den]=keys[k][den]*(1-mz)[:,None]+(M@keys[k][an])*mz[:,None]
+        print('CORR punta del pecho: delta interpolado desde el anillo')
     b.shape_key_add(name='Basis')
     for k,dv in keys.items():
         sk=b.shape_key_add(name=k); sk.data.foreach_set('co',(co+dv).ravel()); sk.value=0
@@ -488,3 +518,95 @@ def belt(b,rig,K,mats):
         for i,x in zip(keep,w):
             if x>.01: gs[i].add([vi],float(x),'REPLACE')
     print(f'BELT verts {len(me.vertices)} z={zc:.3f} radio medio {R.mean():.3f}'); return o
+
+def antro_malla(b,rig,K,STY,NAME,chin=None):
+    """Medidas sobre la MALLA en reposo, como fracción de la estatura (línea ANTROM), contra metas de pesista (docs/PLANTEL.md).
+    Perímetros: casco convexo del corte de la piel con un plano perpendicular al hueso (todos los vértices del miembro cerca del eje, no solo
+    los que domina un hueso: con el dominio el corte del muslo salía incompleto y el del hombro tomaba el trapecio). Solo mide y avisa.
+    La llaman finish.py (malla final) y sonda.py (cuerpo con el relieve muscular, sin prendas)."""
+    co=coords(b); me_=b.data; names,W=wget(b); dom=np.array([n[len(PRE):] if n.startswith(PRE) else '' for n in names])[W.argmax(1)]
+    mi=[i for i,m in enumerate(me_.materials) if m.name=='Body']; cuerpo=np.zeros(len(co),bool)
+    if mi:
+        for p in me_.polygons:
+            if p.material_index in mi: cuerpo[list(p.vertices)]=True
+    else:
+        gb=b.vertex_groups['body'].index
+        for v in me_.vertices: cuerpo[v.index]=any(g.group==gb for g in v.groups)
+    Bh=lambda n:np.array(rig.data.bones[PRE+n].head_local); H_=float(STY['H']); F_=STY.get('genero')=='F'; es=lambda *n:np.isin(dom,n); r={}
+    def perim(P2):
+        P2=sorted(set(map(tuple,np.round(P2,5))))
+        if len(P2)<6: return float('nan')
+        def half(pts):
+            h=[]
+            for q in pts:
+                while len(h)>=2 and (h[-1][0]-h[-2][0])*(q[1]-h[-2][1])-(h[-1][1]-h[-2][1])*(q[0]-h[-2][0])<=0: h.pop()
+                h.append(q)
+            return h
+        hull=np.array(half(P2)[:-1]+half(P2[::-1])[:-1]); return float(np.linalg.norm(np.roll(hull,-1,0)-hull,axis=1).sum())
+    def corte(mask,p0,eje,rmax,tol=.007):
+        eje=eje/np.linalg.norm(eje); d=(co-p0)@eje; q=co[mask&cuerpo&(np.abs(d)<tol)]-p0
+        e1=np.cross(eje,[0,1,0]); e1=e1 if np.linalg.norm(e1)>.1 else np.cross(eje,[1,0,0]); e1/=np.linalg.norm(e1); e2=np.cross(eje,e1)
+        q=q[np.linalg.norm(q-np.outer(q@eje,eje),axis=1)<rmax]; return perim(np.stack([q@e1,q@e2],1))
+    izq=co[:,0]>.004
+    if chin is None:     # mentón: lo más bajo de la cara (a menos de 4,5 cm de la punta de la nariz hacia atrás) en la línea media
+        cab_=cuerpo&es('Head'); yn=float(co[cab_][:,1].min()); cm=cab_&(np.abs(co[:,0])<.015)&(co[:,1]<yn+.045); chin=float(co[cm][:,2].min())
+    cab=cuerpo&es('Head'); r['cabeza (H/alto)']=H_/max(float(co[cab][:,2].max()-chin),1e-3)
+    nk,hd_=Bh('Neck'),Bh('Head'); r['cuello perim']=np.nanmin([corte(es('Neck','Head','Spine2','LeftShoulder','RightShoulder'),nk+(hd_-nk)*q_,hd_-nk,.11*K) for q_ in (.3,.45,.6,.75,.9)])/H_
+    a,f,w=Bh('LeftArm'),Bh('LeftForeArm'),Bh('LeftHand'); ax=(f-a)/np.linalg.norm(f-a); brazo=izq&es('LeftArm','LeftShoulder','LeftForeArm')
+    r['biceps perim']=max(corte(brazo,a+(f-a)*q_,f-a,.105*K) for q_ in (.45,.55,.65))/H_
+    r['antebrazo perim']=max(corte(izq&es('LeftForeArm','LeftArm'),f+(w-f)*q_,w-f,.085*K) for q_ in (.15,.22,.3))/H_; r['muñeca perim']=corte(es('LeftForeArm','LeftHand'),f+(w-f)*.93,w-f,.06*K)/H_
+    # ancho biacromial con deltoides (brazos al costado): articulación más el radio del deltoides medido sobre el eje del húmero, del lado de afuera
+    q=co-a; t_=q@ax; pr=q-np.outer(t_,ax); da=np.linalg.norm(pr,axis=1); lat=np.cross(ax,[0,1,0]); lat*=np.sign(lat[0]) or 1; sl=cuerpo&izq&(t_>-.01)&(t_<.30*np.linalg.norm(f-a))&((pr@lat)>.8*da)&(da<.12*K)
+    rdel=float(np.percentile(da[sl],96)) if sl.sum()>5 else float('nan'); r['hombros malla']=(2*a[0]+2*rdel)/H_
+    tr=es('Hips','Spine','Spine1','Spine2','LeftShoulder','RightShoulder','LeftUpLeg','RightUpLeg'); hz=float(Bh('LeftUpLeg')[2]); sz=float(a[2]); up=np.array([0,0,1.])
+    r['pecho perim']=max(corte(tr,np.array([0,0,sz-q_*K]),up,.30*K) for q_ in (.09,.115,.14))/H_
+    cz=[(corte(tr,np.array([0,0,zz]),up,.30*K),zz) for zz in np.linspace(hz+.07*K,hz+.24*K,9)]; cmin,zc=min(cz); r['cintura perim']=cmin/H_
+    anc=co[cuerpo&tr&(np.abs(co[:,2]-zc)<.008)]; r['hombros/cintura']=r['hombros malla']*H_/max(float(2*np.abs(anc[:,0]).max()),1e-3) if len(anc) else float('nan')
+    r['cadera perim']=max(corte(tr,np.array([0,0,hz+q_*K]),up,.32*K) for q_ in (-.03,0.,.03))/H_
+    u,k,t2=Bh('LeftUpLeg'),Bh('LeftLeg'),Bh('LeftFoot'); pierna=izq&es('LeftUpLeg','Hips','LeftLeg')
+    r['muslo perim']=max(corte(pierna,u+(k-u)*q_,k-u,.22*K) for q_ in (.30,.36,.42))/H_; r['muslo bajo perim']=corte(pierna,u+(k-u)*.78,k-u,.16*K)/H_
+    r['pantorrilla perim']=max(corte(izq&es('LeftLeg','LeftUpLeg'),k+(t2-k)*q_,t2-k,.13*K) for q_ in (.22,.28,.34,.4))/H_
+    gl=cuerpo&es('Hips','LeftUpLeg','RightUpLeg')&(co[:,2]>hz-.07*K)&(co[:,2]<hz+.08*K); r['gluteo proyeccion']=float(co[gl][:,1].max()-u[1])/H_
+    en=cuerpo&(np.abs(co[:,0])<.012)&es('Hips','LeftUpLeg','RightUpLeg')&(co[:,2]>float(k[2])); r['entrepierna']=float(co[en][:,2].min())/H_ if en.any() else float('nan')
+    g_=float(STY.get('grasa_',0)); pes=g_>.5
+    meta={'cabeza (H/alto)':(7.3,7.9),'cuello perim':(.225,.275) if not pes else (.25,.31),'hombros malla':(.275,.315) if not F_ else (.25,.29),'biceps perim':(.21,.25) if not F_ else (.16,.21),'antebrazo perim':(.17,.195) if not F_ else (.145,.18),'muñeca perim':(.095,.115),
+          'pecho perim':(.62,.70) if not pes else (.68,.84),'cintura perim':(.46,.53) if not pes else (.58,.72),'hombros/cintura':(1.2 if pes else 1.35,9),'muslo perim':(.37,.42) if not pes else (.40,.50),'pantorrilla perim':(.235,.26) if not pes else (.25,.30),
+          'gluteo proyeccion':(.08,.16),'entrepierna':(.43,.475)}
+    fuera=[k_ for k_,(lo,hi) in meta.items() if not (lo<=r[k_]<=hi)]
+    print('ANTROM '+NAME+': '+' · '.join(f'{k_} {v:.3f}'+('' if k_ not in fuera else f' [meta {meta[k_][0]}-{meta[k_][1]}]') for k_,v in r.items())+(' · FUERA: '+str(len(fuera)) if fuera else ' · todo en meta'),flush=True)
+    return r
+def anat_vol(b,rig,K,cut=1.):
+    """Volumen (m3) que suma el relieve muscular a la malla (desplazamiento por el área de cada vértice): body.py lo descuenta de la masa objetivo."""
+    import tex
+    co=coords(b); N=len(co); me=b.data; no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3)
+    J={x.name[len(PRE):]:np.array(x.head_local) for x in rig.data.bones if x.name.startswith(PRE)}
+    B,F,_=tex.anatomy(co,no,J,K); names,W=wget(b); keep=1-sum(W[:,j] for j,n in enumerate(names) if any(k in n for k in ('Head','Hand','Foot','Toe')))
+    gb=b.vertex_groups['body'].index; body=np.array([any(g.group==gb for g in v.groups) for v in me.vertices])
+    gg=tex.ANAT.get('geo',ANAT_GEO); d=(B*gg[0]+F*gg[1]*cut)*np.clip(keep,0,1)*body; ar=np.zeros(N)
+    for p in me.polygons:
+        if all(body[i] for i in p.vertices):
+            for i in p.vertices: ar[i]+=p.area/len(p.vertices)
+    return float((d*ar).sum())
+
+def punta_interp(b,rig,K):
+    """Racimo de polígonos diminutos del frente del pecho (areola de la malla base), de cada lado: devuelve [(índices del racimo, índices del anillo que lo
+    rodea, matriz de interpolación racimo x anillo, mezcla por vértice)]. Sirve para que una magnitud por vértice (pesos de piel, delta de un correctivo) valga
+    adentro lo que vale alrededor: el suavizado por aristas no cruza el racimo, y con los brazos arriba quedaban dos puntas bajo la malla."""
+    co=coords(b); me=b.data; N=len(co); no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3); sh=head(rig,'LeftArm')
+    E=np.empty(len(me.edges)*2,int); me.edges.foreach_get('vertices',E); E=E.reshape(-1,2); deg=np.maximum(np.bincount(E.ravel(),minlength=N),1)
+    z=co[:,2]; ax=np.abs(co[:,0]); w=(no[:,1]<-.15)*sm(sh[2]-.76*K,sh[2]-.66*K,z)*sm(sh[2]-.05*K,sh[2]-.10*K,z)*sm(.27*K,.22*K,ax)
+    el=np.linalg.norm(co[E[:,0]]-co[E[:,1]],axis=1); ml=np.zeros(N); np.add.at(ml,E[:,0],el); np.add.at(ml,E[:,1],el); ml/=deg; RN=.036*K; out=[]
+    mi=[i for i,m in enumerate(me.materials) if m.name=='Body']; cu=np.ones(N,bool)
+    if mi and len(me.materials)>1:     # ya unido con pelo, zapatillas y cinturón: solo la piel
+        cu[:]=False
+        for p in me.polygons:
+            if p.material_index in mi: cu[list(p.vertices)]=True
+    w=w*cu
+    for sgn in (1,-1):
+        cand=(w>.3)&(co[:,0]*sgn>.03*K)
+        if not cand.any(): continue
+        i=int(np.argmin(np.where(cand,ml,9.))); d=np.linalg.norm(co-co[i],axis=1); fr=(no[:,1]<0)&cu
+        den=np.nonzero(fr&(d<RN))[0]; an=np.nonzero(fr&(d>=RN)&(d<1.7*RN))[0]
+        if len(den)<3 or len(an)<8: continue
+        D=np.linalg.norm(co[den][:,None,:]-co[an][None,:,:],axis=2); M=1/(D**4+1e-12); M/=M.sum(1,keepdims=True); out.append((den,an,M,sm(RN,RN*.75,d[den])))
+    return out

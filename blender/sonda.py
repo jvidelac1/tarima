@@ -8,15 +8,22 @@ HERE=os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0,HERE); from c
 import body, plantel
 from mathutils import Vector
 from PIL import Image, ImageDraw, ImageFont
-names=sys.argv[1:] or plantel.NUEVOS; OUT=out_dir('sonda'); W,Hh=340,560; SPAN=2.1; ZC=1.0
+names=sys.argv[1:] or plantel.NUEVOS; OUT=out_dir('sonda'); W,Hh=520,860; SPAN=2.1; ZC=1.0
 def font(sz):
     for f in ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf','/System/Library/Fonts/Helvetica.ttc'):
         try: return ImageFont.truetype(f,sz)
         except Exception: pass
     return ImageFont.load_default()
 filas=[]
+import tex as _t; ANAT0=dict(_t.ANAT)
 for n in names:
     boot(); b,rig=body.build(n); sc=bpy.context.scene; P=plantel.PESISTAS[n]; S=plantel.STYLES[n]
+    try:
+        import geo,tex; K_=S['H']/1.687; tex.ANAT.clear(); tex.ANAT.update(ANAT0); tex.ANAT.update(S.get('anat',{}))
+        if S.get('fisico')=='anatomico': geo.subdivide(b); geo.anatomy(b,rig,K_,S.get('cut',1.)); print(f"MASA2 {n}: {body.masa_estimada(b,S['H'],plantel.CFGS[n].get('rho',1.05),{})[0]:.1f} kg con el relieve en la malla",flush=True)
+        geo.antro_malla(b,rig,K_,S,n)
+    except Exception as e:
+        import traceback; print('ANTROM error',e); traceback.print_exc()
     m=bpy.data.materials.new('piel'); m.use_nodes=True; bs=m.node_tree.nodes['Principled BSDF']; c=[int(S['skin'][i:i+2],16)/255 for i in (1,3,5)]
     bs.inputs['Base Color'].default_value=(*[u**2.2 for u in c],1); bs.inputs['Roughness'].default_value=.55; b.data.materials.clear(); b.data.materials.append(m)
     for p in b.data.polygons: p.use_smooth=True; p.material_index=0
@@ -27,7 +34,7 @@ for n in names:
     w=bpy.data.worlds.new('w'); w.use_nodes=True; w.node_tree.nodes['Background'].inputs[0].default_value=(.05,.055,.07,1); sc.world=w
     def light(nm,loc,e,size):
         l=bpy.data.lights.new(nm,'AREA'); l.energy=e; l.size=size; o=bpy.data.objects.new(nm,l); sc.collection.objects.link(o); o.location=loc; o.rotation_euler=(Vector((0,0,1))-Vector(loc)).to_track_quat('-Z','Y').to_euler()
-    light('k',(3,-3.5,3.4),900,2.5); light('f',(-3.5,-2.5,1.5),350,3.5); light('r',(-2.5,3.5,2.8),500,2); light('r2',(3.5,2.5,2.2),300,2)
+    light('k',(3.2,-3.2,3.6),1500,1.2); light('f',(-3.5,-2.5,1.5),90,3.5); light('r',(-3.2,3.2,3.6),1500,1.2); light('r2',(3.5,2.5,1.5),90,3.5)     # luz dura y lateral: se lee el relieve
     cam=bpy.data.objects.new('cam',bpy.data.cameras.new('cam')); sc.collection.objects.link(cam); cam.data.type='ORTHO'; cam.data.ortho_scale=SPAN*max(W,Hh)/Hh; sc.camera=cam
     ims=[]
     for vw,loc in (('frente',(0,-9,ZC)),('costado',(9,0,ZC)),('tres4',(6,-6.7,ZC)),('espalda',(0,9,ZC))):

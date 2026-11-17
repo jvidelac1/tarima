@@ -146,3 +146,33 @@ salen de ahí, todas en `plantel.cfg()`/`sty()` y `tex.py` (nada por personaje):
 - **Equipo**: cinturón en todos, malla con paneles, magnesio en manos, muslos, pecho de la malla y rodilleras.
 - **Piel**: mate. El visor no suma relieve de poro; lee el mapa de normales de la piel un nivel más borroso (`uNormBias`).
 - Terna de las fotos (`TERNA` en `graficos.yml`): ilarraz (71, compacto definido), jastrev (+110), kordan (94, compacto atlético).
+
+## Físico anatómico (17-nov): `fisico='anatomico'` en la ficha
+
+Pedido del dueño: «los pesistas son cubos mal hechos»; la vara es el cuerpo de su imagen (`ref_dueno/fisico-objetivo.webp`). Lo llevan
+kordan, ilarraz, jastrev y solanet; halvard y los dos originales se construyen como antes (todo está detrás del parámetro).
+
+- **Masas por grupo muscular** (`tex._masas`, ganancias en `plantel._GRUPOS_M` / `_GRUPOS_F` y `grupos` de la ficha): deltoides en tres
+  cabezas, bíceps, tríceps (cabeza larga y lateral), antebrazo (supinador y flexores), pectoral cuadrado, trapecio superior, dorsal,
+  romboides, erectores, glúteo, recto femoral, vasto lateral, vasto medial, aductores, isquios y gemelos. Cada una es un vientre
+  (`_vientre`: cero en las inserciones, máximo en el centro) por un lóbulo angular alrededor del hueso: entre vientres quedan surcos.
+  El grosor del muslo (`muslo`) va por el mismo campo con perfil a lo largo del fémur. La malla lleva las masas (`geo.anatomy`, sobre la
+  normal alisada) y el normal map los surcos finos; el hueco entre vientres oscurece la oclusión y el color.
+- **Targets de MPFB**: con `muscle` alto MPFB da un culturista (hombros enormes, cintura fina, piernas flacas). Con el físico anatómico
+  bajan hombro, brazo, cuello y la V del torso, y suben cintura, cadera, glúteo y profundidad del tronco. `measure-thigh-circ`,
+  `measure-calf-circ` y `upperleg-scale-horiz/depth` NO sirven para el muslo: dan un globo arriba y la rodilla fina.
+- **La masa sigue mandando**: `body.py` mide el volumen que suma el relieve (`geo.anat_vol`) y lo descuenta del objetivo del macro
+  `weight`. La línea `MASA` lo informa («del cuerpo base + del relieve muscular»). Con los perímetros «de pesista» en todos los
+  segmentos a la vez el volumen no alcanza: lo que se le da al muslo sale del tronco.
+- **Cabeza a escala**: se mide (coronilla a mentón) y se escala pareja alrededor de la articulación hasta estatura / 7,55 (línea `CABEZA`).
+- **Sin puntas ni bultos bajo la malla**: el racimo de polígonos de la punta del pecho se reemplaza por mínimos cuadrados móviles
+  (`geo.chest_smooth`), sus pesos y el delta del correctivo se interpolan desde el anillo (`geo.punta_interp`), su centro va a
+  `lm.json` (`nipL`, `nipR`) para que la textura apague ahí relieve y oclusión, y los targets `genitals/*` van al mínimo.
+- **Piel por zonas** (`piel2` del estilo): sol, sangre en hombros y escote, moteado ancho, lunares escasos; el surco pintado baja
+  (ya está en la malla). En el visor, el normal map de la piel se lee 1,1 niveles más borroso (antes 1,7).
+- **Medidas** (`ANTROM`, ahora en `geo.antro_malla`): los cortes toman todos los vértices del miembro (antes solo los que dominaba un
+  hueso: el muslo salía incompleto y el hombro tomaba el trapecio). La sonda (`modo=sonda`) también aplica el relieve y mide.
+- **Vista previa sin Blender**: `python3 tools/prever_fisico.py <out/<id> del artefacto> salida.jpg <id>` dibuja el cuerpo con el
+  relieve desde `maps_1024.npz` y `bones_all.json` (con `PREV_COLOR=1`, con el color de `tex.py`). Sirve para ajustar `tex._masas` en segundos.
+- **Pieles de MakeHuman (CC0)**: no se integraron. El paquete `makehuman_system_assets` pesa 280 MB por trabajo de CI y sus difusos
+  traen areola, cejas y vello pintados; queda como estimación pendiente comparar su detalle de poro contra la piel por reglas.

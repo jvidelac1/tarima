@@ -127,7 +127,8 @@ def anatomy(P,N,J,K):
     G=lambda x,s_:np.exp(-(x/s_)**2); rg=lambda lo,hi,x,e=.03:sm(lo-e,lo+e,x)*sm(hi+e,hi-e,x); D=np.pi/180
     B=np.zeros(len(P),f32); F=np.zeros(len(P),f32); fib=np.zeros(len(P),f32)
     # ---- brazo ----
-    t,r,th=_limb(Q,S,E); aw=rg(-.30,1.06,t,.04)*sm(.090*K,.074*K,r); dO=_wrap(th+90*D)       # dO: ángulo desde la cara externa
+    AN=ANAT.get('fisico')=='anatomico'; RK=ANAT.get('radios',(1.,1.,1.,1.))     # el cuerpo anatómico es más grueso: las ventanas radiales de brazo, antebrazo, muslo y pantorrilla se abren
+    t,r,th=_limb(Q,S,E); aw=rg(-.30,1.06,t,.04)*sm(.090*K*RK[0],.074*K*RK[0],r); dO=_wrap(th+90*D)       # dO: ángulo desde la cara externa
     delt=G(t-.16,.24)*G(dO,1.25)*sm(-.34,-.1,t); B+=aw*K*(.0065*delt+.0060*G(t-.56,.19)*G(_wrap(th-12*D),.72)+.0050*G(t-.40,.20)*G(_wrap(th-172*D),.80)-.0020*G(t-.93,.10)*(1-G(_wrap(th-180*D),.5)))
     te=.50-.20*(dO/1.5)**2; F+=aw*K*(-.0024*G(t-te,.040)*sm(1.75,1.35,np.abs(dO))                       # borde inferior del deltoides (la V de la inserción)
         -.0010*(G(dO-.72,.11)+G(dO+.72,.11))*rg(.0,.36,t,.05)                                          # separación de las tres cabezas
@@ -136,10 +137,10 @@ def anatomy(P,N,J,K):
         -.0010*G(_wrap(th-150*D),.10)*rg(.22,.60,t,.05))                                               # entre cabeza larga y lateral
     fib=np.maximum(fib,aw*delt*sm(1.6,1.1,np.abs(dO))*sm(te+.02,te-.06,t))
     # ---- antebrazo ----
-    t,r,th=_limb(Q,E,W); fw=rg(-.06,1.0,t,.04)*sm(.072*K,.058*K,r)
+    t,r,th=_limb(Q,E,W); fw=rg(-.06,1.0,t,.04)*sm(.072*K*RK[1],.058*K*RK[1],r)
     B+=fw*K*ANAT['antebrazo']*(.0042*G(t-.20,.20)*G(_wrap(th+75*D),.80)+.0036*G(t-.24,.22)*G(_wrap(th-110*D),.85))
     F+=fw*K*(-.0013*G(_wrap(th-15*D),.16)*rg(.06,.62,t,.05)-.0012*G(_wrap(th+165*D),.16)*rg(.06,.55,t,.05)-.0007*G(_wrap(th+75*D),.10)*rg(.25,.70,t,.05))
-    ta,ra,_=_limb(Q,S,E); wT=(1-sm(.04,.28,ta)*sm(.090*K,.074*K,ra))*(1-fw)*sm(H[2]-.06*K,H[2]+.02*K,Q[:,2]); del ta,ra
+    ta,ra,_=_limb(Q,S,E); wT=(1-sm(.04,.28,ta)*sm(.090*K*RK[0],.074*K*RK[0],ra))*(1-fw)*sm(H[2]-.06*K,H[2]+.02*K,Q[:,2]); del ta,ra
     # ---- torso: u, v en metros de un cuerpo de referencia (ancho de hombros 0,213 m; hombro-cadera 0,483 m) ----
     u=Q[:,0]/(S[0]/.213); v=(Q[:,2]-S[2])/((S[2]-H[2])/.483); fr=sm(.05,.55,-ny)*wT; bk=sm(.05,.55,ny)*wT; sd=sm(.45,.8,nx)*wT; top=sm(.25,.7,nz)
     pec=G(np.hypot((u-.098)/.080,(v+.100)/.068),1.); B+=fr*K*.0060*pec*ANAT['pec']
@@ -156,14 +157,60 @@ def anatomy(P,N,J,K):
     F+=bk*K*min(ANAT['espalda'],1.4)*(-.0040*G(u,.014)*rg(-.46,.03,v,.02)-.0018*G(d4,.010)-.0020*G(v+.012-.10*(u-.10),.011)*rg(.06,.19,u,.015)-.0016*G(u-.062-.10*(v+.085),.010)*rg(-.155,-.02,v,.015))   # + borde medial de la escápula             # canal de la columna, borde del trapecio inferior, espina de la escápula
     fib=np.maximum(fib,fr*pec*.8*ANAT['pec'])
     # ---- muslo ----
-    t,r,th=_limb(Q,H,Kn); lw=rg(.10,1.04,t,.05)*sm(.17*K,.14*K,r)*(Q[:,2]<H[2]+.02*K)
+    t,r,th=_limb(Q,H,Kn); lw=rg(.10,1.04,t,.05)*sm(.17*K*RK[2],.14*K*RK[2],r)*(Q[:,2]<H[2]+.02*K)
     B+=lw*K*(.0034*G(t-.42,.28)*G(th,.42)+.0042*G(t-.55,.25)*G(_wrap(th+62*D),.50)+.0050*G(t-.80,.12)*G(_wrap(th-48*D),.42)+.0028*G(t-.50,.25)*G(_wrap(th-180*D),.75))
     F+=lw*K*(-.0023*G(_wrap(th+29*D),.085)*rg(.25,.86,t,.05)-.0023*G(_wrap(th-26*D),.085)*rg(.48,.90,t,.05)-.0012*G(_wrap(th-178*D),.09)*rg(.50,.97,t,.05)-.0009*G(_wrap(th+105*D),.10)*rg(.30,.90,t,.05))
     # ---- pantorrilla ----
-    t,r,th=_limb(Q,Kn,An); cw=rg(.02,.95,t,.04)*sm(.105*K,.085*K,r)
+    t,r,th=_limb(Q,Kn,An); cw=rg(.02,.95,t,.04)*sm(.105*K*RK[3],.085*K*RK[3],r)
     B+=cw*K*(.0045*G(t-.26,.15)*G(_wrap(th-146*D),.50)+.0036*G(t-.23,.14)*G(_wrap(th+150*D),.50)+.0018*G(t-.30,.2)*G(_wrap(th+35*D),.4))
     F+=cw*K*(-.0011*G(_wrap(th-178*D),.10)*rg(.08,.46,t,.04)-.0009*G(_wrap(th+8*D),.07)*rg(.15,.8,t,.05))
+    if AN: B=_masas(Q,nx,ny,nz,J,K,RK,wT); F=F*ANAT.get('surco',1.)
     return (B,F,fib) if ANAT['masa']==1. else (B*ANAT['masa'],F,fib)
+def _vientre(t,a,p,b):
+    """Perfil de vientre muscular a lo largo del hueso: 0 en las inserciones (a y b), 1 en el pico (p), con tangente nula en los tres."""
+    t=np.asarray(t,f32); u=np.where(t<p,(t-a)/(p-a),(b-t)/(b-p)); return np.sin(np.clip(u,0,1)*(np.pi/2))**2
+# Físico anatómico (ficha del pesista: fisico='anatomico'): masas por grupo muscular con perfil de vientre (máximo en el centro del músculo, cero
+# en inserciones y articulaciones), para que entre vientres queden surcos. Amplitudes en metros para 1,69 m; cada grupo tiene su ganancia en
+# ANAT['grupos'] (plantel.sty). No es un inflado parejo: la suma no es constante ni alrededor del hueso ni a lo largo.
+GRUPOS=dict(deltoide=1.,biceps=1.,triceps=1.,antebrazo=1.,pectoral=1.,trapecio=1.,dorsal=1.,erectores=1.,gluteo=1.,cuadriceps=1.,isquios=1.,aductor=1.,gemelos=1.,codo=1.,rodilla=1.,cintura=1.,muslo=1.)
+def _masas(Q,nx,ny,nz,J,K,RK,wT):
+    S,E,W,H,Kn,An,Nk=[np.asarray(J[k],f32) for k in ('LeftArm','LeftForeArm','LeftHand','LeftUpLeg','LeftLeg','LeftFoot','Neck')]
+    G=lambda x,s_:np.exp(-(x/s_)**2); rg=lambda lo,hi,x,e=.03:sm(lo-e,lo+e,x)*sm(hi+e,hi-e,x); D=np.pi/180; V=_vientre; g=dict(GRUPOS); g.update(ANAT.get('grupos',{}))
+    A=lambda th,c,s_:G(_wrap(th-c*D),s_); B=np.zeros(len(Q),f32)
+    # ---- brazo (0 = hombro, 1 = codo; ángulo 0 = frente, +90 = cara interna, -90 = externa, 180 = atrás) ----
+    t,r,th=_limb(Q,S,E); aw=rg(-.34,1.06,t,.04)*sm(.090*K*RK[0],.074*K*RK[0],r)
+    B+=aw*K*(g['deltoide']*(.0120*V(t,-.36,.06,.50)*A(th,-90,.50)+.0095*V(t,-.30,.10,.46)*A(th,-28,.46)+.0085*V(t,-.30,.08,.46)*A(th,-152,.46))
+        +g['biceps']*(.0105*V(t,.30,.60,.94)*A(th,12,.55)+.0030*V(t,.52,.78,1.0)*A(th,-72,.32))
+        +g['triceps']*(.0095*V(t,.14,.40,.74)*A(th,150,.42)+.0100*V(t,.16,.42,.72)*A(th,-138,.40)+.0030*V(t,.45,.72,.96)*A(th,178,.30))
+        -g['codo']*.0030*V(t,.78,.98,1.10)*(1-.8*A(th,180,.6)))
+    # ---- antebrazo (0 = codo, 1 = muñeca): supinador largo y extensores por fuera, flexores por dentro; se afina hacia la muñeca ----
+    t,r,th=_limb(Q,E,W); fw=rg(-.06,1.0,t,.04)*sm(.072*K*RK[1],.058*K*RK[1],r)
+    B+=fw*K*g['antebrazo']*(.0080*V(t,-.10,.20,.62)*A(th,-75,.62)+.0075*V(t,-.06,.24,.66)*A(th,110,.66)+.0030*V(t,.0,.22,.55)*A(th,180,.4)-.0022*V(t,.55,.86,1.02))
+    # ---- torso (u lateral y v vertical en metros del cuerpo de referencia: articulación del hombro en u = .213, v = 0; cadera en v = -.483) ----
+    u=Q[:,0]/(S[0]/.213); v=(Q[:,2]-S[2])/((S[2]-H[2])/.483); yb=(Q[:,1]-Nk[1])/K
+    fr=sm(.05,.55,-ny)*wT; bk=sm(.05,.55,ny)*wT; sd=sm(.35,.8,nx)*wT; top=sm(.2,.7,nz)*wT
+    # pectoral cuadrado: superelipse con el vientre cargado abajo y afuera, borde inferior neto y hueco en el esternón
+    pe=(np.abs((u-.102)/.092)**3+np.abs((v+.098)/.076)**3)**(1/3.); B+=fr*K*g['pectoral']*.0135*sm(1.12,.50,pe)*(1.-.22*np.clip((v+.098)/.076,-1,1))*sm(.004,.03,u)
+    # trapecio superior: cordón del cuello al acromion, más alto junto al cuello
+    d_,t_=_dseg(u,v,(.040,.150),(.185,.050)); B+=wT*K*g['trapecio']*.0150*G(np.hypot(d_,(yb-.022)*.9),.050)*(1.-.45*t_)*sm(-.05,.02,ny+nz)
+    # espalda: dorsal ancho (el barrido que da la V, se ve también de frente por el costado), redondo mayor e infraespinoso, romboides y trapecio medio, erectores
+    B+=K*g['dorsal']*(np.maximum(bk,sd*sm(-.02,.06,yb))*.0120*G((u-.168)/.050,1.)*V(v,-.36,-.17,-.05)+bk*(.0075*G(np.hypot((u-.118)/.055,(v+.075)/.050),1.)+.0050*G(np.hypot((u-.050)/.035,(v+.035)/.075),1.)))
+    B+=bk*K*g['erectores']*.0075*G((u-.036)/.022,1.)*V(v,-.50,-.33,-.14)
+    B-=K*g['cintura']*.0040*np.maximum(sd,.6*bk)*V(v,-.42,-.335,-.24)*sm(.05,.12,u)      # la cintura entra entre el dorsal y la cresta ilíaca
+    # ---- glúteo: masa redonda atrás de la cadera, con su pliegue abajo ----
+    zg=(Q[:,2]-H[2])/K; B+=K*g['gluteo']*.0230*sm(.10,.60,ny)*G(np.hypot((Q[:,0]/K-.092)/.082,(zg+.012)/.105),1.)*sm(-.20,-.11,zg)
+    # ---- muslo (0 = cadera, 1 = rodilla): recto femoral, vasto lateral (barrido externo), vasto medial (gota sobre la rodilla), aductores, isquios ----
+    t,r,th=_limb(Q,H,Kn); lw=sm(.0,.30,t)*sm(1.22,1.06,t)*sm(.17*K*RK[2],.14*K*RK[2],r)*sm(H[2]+.03*K,H[2]-.02*K,Q[:,2])     # entra en degradé largo desde la ingle: con borde corto quedaba un escalón
+    lw=lw*(1-sm(.0,.5,-nx)*sm(.055*K,.015*K,Q[:,0]))     # la cara interna junto a la línea media no crece: los muslos se cruzaban en la entrepierna (ANTROM entrepierna 0,364)
+    B+=lw*K*(g['cuadriceps']*(.0100*V(t,.06,.42,.84)*A(th,-4,.36)+.0115*V(t,.10,.56,.98)*A(th,-64,.48)+.0160*V(t,.50,.82,1.02)*A(th,44,.38))
+        +g['muslo']*.0180*V(t,-.05,.64,1.30)*(1-.35*A(th,90,.7))     # grosor del muslo entero (menos por dentro), que llega lleno hasta arriba de la rodilla
+        +g['aductor']*.0050*V(t,.04,.26,.62)*A(th,98,.50)
+        +g['isquios']*(.0085*V(t,.12,.48,.90)*A(th,-150,.40)+.0085*V(t,.12,.50,.92)*A(th,150,.40))
+        -g['rodilla']*.0028*V(t,.84,.99,1.10)*(A(th,-90,.5)+A(th,90,.5)))
+    # ---- pantorrilla (0 = rodilla, 1 = tobillo): gemelo interno (más bajo y lleno) y externo, tibial anterior; el tendón afina abajo ----
+    t,r,th=_limb(Q,Kn,An); cw=rg(.02,.95,t,.04)*sm(.105*K*RK[3],.085*K*RK[3],r)
+    B+=cw*K*g['gemelos']*(.0105*V(t,.03,.27,.56)*A(th,142,.44)+.0085*V(t,.03,.23,.50)*A(th,-150,.42)+.0035*V(t,.05,.30,.72)*A(th,-35,.36)-.0018*V(t,.55,.80,.98)*A(th,180,.9))
+    return B
 MEL=np.array([.70,.60,.52],f32); HEM=np.array([1.06,.78,.75],f32); VEIN=np.array([.80,.93,.99],f32)
 def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     ANAT.update(STY.get('anat',{})); T=Geo(OUT,R); R=T.R; x,y,z,cov=T.x,T.y,T.z,T.cov; axo=np.abs(x); F=T.F; S=R/4096.
@@ -183,6 +230,17 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     tint(np.clip(.5+lo*1.8,0,1)*.20,MEL); tint(np.clip(mid*2.4,0,1)*.13,HEM); tint(np.clip(-mid*2.4,0,1)*.08,MEL); col*=1+fine[:,:,None]*.06
     pore=T.n2(2.4,4)+T.n3(950,15)*.8; H+=mid*.00008+fine*.00003+T.n2(1,3)*.00001        # relieve medio, grano fino y poro a escala de texel (el poro por zona se suma más abajo)
     rough+=fine*.12+lo*.08+pore*.05
+    if STY.get('piel2'):
+        # Piel por zonas (plantel con físico anatómico). La base era un tono parejo con moteado: se leía plástico. Capas, todas suaves y por reglas:
+        # sol (lo que mira arriba y afuera, más melanina; cara interna de brazos y muslos, más clara), sangre (hombros, escote, cuello, rodillas),
+        # moteado ancho de la circulación, lunares escasos, y brillo más graso en hombros y trapecio.
+        P2=STY['piel2']; arm=np.maximum(F('farmL'),F('farmR')); out_=sm(.1,.7,nxo*np.sign(x+1e-6)); up=sm(.15,.8,nz)
+        hd0=F('head'); cuerpo_=1-hd0
+        tint(cuerpo_*(up*.09+out_*.06)*P2,MEL); col*=1+(cuerpo_*sm(.1,.7,-nxo*np.sign(x+1e-6))*sm(.06,.14,axo)*.07*P2)[:,:,None]
+        hom=cuerpo_*sm(sh[2]-.10*K,sh[2]+.02*K,z)*sm(neck[2]+.09*K,neck[2]+.03*K,z); tint(hom*(.35+.65*blot)*.16*P2,HEM)
+        liv=np.clip(.5+T.n3(26,71,2)*2.4,0,1)*np.clip(.5+T.n3(9,72,2)*2.,0,1); tint(cuerpo_*liv*.11*P2,HEM); tint(cuerpo_*(1-liv)*.05*P2,(.97,1.0,.985))
+        lun=sm(.80,.86,T.n3(210,73,1))*sm(.58,.7,T.n3(31,74,1))*cuerpo_; mix(lun*.55*P2,SKIN*np.array([.45,.36,.30],f32),.7)
+        rough-=cuerpo_*hom*.07*P2; del arm,out_,up,hom,liv,lun,hd0,cuerpo_
     head=F('head'); ears=F('ears'); eL,nose,lips,chin,ear=LM['eyeL'],LM['nose'],LM['lips'],LM['chin'],LM['ears']; er=float(LM['eyeR_r'][0]); hs=float(eL[0]/.0288)
     cheek=T.g((.048*hs,eL[1]+.012,(nose[2]+lips[2])/2+.008),.030*hs,True)
     tint(head*(cheek*.42+T.g(nose+(0,.012,.004),.022*hs)*.45+T.g(chin+(0,-.012,.012),.022*hs)*.18)+ears*.5+head*.10*blot,HEM)
@@ -266,7 +324,9 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     for i in range(0,len(T.P),C_): aB[i:i+C_],aF[i:i+C_],aS[i:i+C_]=anatomy(T.P[i:i+C_],Nn[i:i+C_],Jh,K)
     aB,aF,aS=T.img(aB),T.img(aF),T.img(aS); del Nn
     aF-=aS*(1-np.abs(2*T.nq(((axo*.67-z*.74)*45,(axo*.74+z*.67)*650,y*650),48)))**2*.00005*STY.get('cut',1.)
-    aZ=sm(chin[2],chin[2]-.02,z); anatH=(aB*ANAT_NORMAL+aF*ANAT_FINE)*aZ*STY.get('cut',1.); anatC=aF*aZ; del aB,aS
+    aZ=sm(chin[2],chin[2]-.02,z); anatH=(aB*ANAT.get('normal',ANAT_NORMAL)+aF*ANAT.get('fino',ANAT_FINE))*aZ*STY.get('cut',1.); anatC=aF*aZ
+    # físico anatómico: el hueco entre vientres (masa menos su promedio en ~2,5 cm) oscurece la oclusión y el color, que el AO horneado no ve (se horneó sin el relieve)
+    anatB=((aB-blur(aB,.025/T.texel))*aZ*STY.get('cut',1.)).astype(f32) if ANAT.get('fisico')=='anatomico' else None; del aB,aS
     skinH=H; H=np.zeros((R,R),f32)                     # a partir de acá, H es el relieve propio de cada prenda
     # ================= MALLA (lycra) =================
     E=.012; front=y<neck[1]
@@ -420,13 +480,18 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     # zona de las puntas del pecho (make.py la alisó en la malla y dejó su centro en lm.json): sin relieve muscular propio, sin oclusión ni sombra
     gn=np.zeros((R,R),f32)
     if 'nipL' in LM: gn=np.clip(np.maximum(T.g(LM['nipL'],.04*K),T.g(LM['nipR'],.04*K) if 'nipR' in LM else 0)*1.6,0,1)
-    anatH=anatH*(1-gn)
+    if anatB is None: anatH=anatH*(1-gn)     # anatómico: el relieve del pectoral sigue de largo (cortarlo en un disco dejaba un aro bajo la malla); ahí solo se apagan la oclusión y la cavidad horneadas
     H=skinH*(1-cloth)+lipH+(thick+H)*edge+hairH+chalkH+dp*.00013+anatH*am
     del skinH,lipH,hairH,chalkH
     nrm=normal_from_height(H,T.su,T.sv,T.ok)
-    cavA=np.clip(1+anatC*am*(115/K),.70,1.05); del anatC                              # los surcos entre grupos musculares oscurecen (son anchos: el pasa-altos de 3 px no los ve)
+    if anatB is not None and 'nipL' in LM:     # racimo de la punta del pecho: su UV está deformado (texeles de décimas de mm) y cualquier pendiente del mapa de alturas sale ahí con otra escala; la normal queda la de la malla
+        gf=np.clip(np.maximum(T.g(LM['nipL'],.034*K),T.g(LM['nipR'],.034*K) if 'nipR' in LM else 0)*1.8,0,1)[:,:,None]; nrm=nrm*(1-gf)+np.array([.5,.5,1.],f32)*gf
+    cavA=np.clip(1+anatC*am*(115/K),.70,1.05) if anatB is None else np.clip(1+anatC*am*(70/K),.84,1.04)     # anatómico: el surco ya está en la malla y en el normal; pintado fuerte se leía como una línea de tinta
+    if anatB is not None: cavA=cavA*np.clip(1+anatB*am*(42/K),.80,1.05)
+    del anatC                              # los surcos entre grupos musculares oscurecen (son anchos: el pasa-altos de 3 px no los ve)
     aoS=T.ao*(1-suit)+blur(T.ao,22*S)*suit
-    aoS=aoS*(1-gn)+np.maximum(aoS,.97)*gn; cavA=cavA*(1-gn)+gn
+    if anatB is None: aoS=aoS*(1-gn)+np.maximum(aoS,.97)*gn; cavA=cavA*(1-gn)+gn
+    else: aoS=aoS*(1-gn)+blur(aoS,40*S)*gn; cavA=cavA*(1-gn)+gn     # anatómico: la oclusión del disco es la de su entorno (con 0,97 fijo quedaba un disco más claro sobre la malla blanca)
     cav=np.clip(1+(H-blur(H,3*S))*900,0.55,1.1); ao=np.clip((.12+.88*aoS)*cav*cavA,0,1)
     tn=np.array([.55,.47,.46],f32); aoc=.62+.38*aoS*np.clip(cav,0,1)*cavA; col=col*(tn[None,None,:]+(1-tn[None,None,:])*aoc[:,:,None])
     col=np.clip(col,0,1); col[~cov]=SKIN; nrm[~cov]=(.5,.5,1); rough[~cov]=.5; ao[~cov]=1

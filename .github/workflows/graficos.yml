@@ -62,7 +62,7 @@ permissions:
 
 env:
   # corrida de pesistas.yml con los modelos del plantel que se fotografían (no están en el repo mientras se iteran)
-  PESISTAS_RUN: '44004922615'
+  PESISTAS_RUN: '44004922615 44038971821'     # halvard de la primera; kordan, ilarraz, jastrev y solanet con el físico anatómico de la segunda (pisa a la primera)
   # plaza del juego y terna que se fotografía: el pesista en escena es el primero de la terna (plaza ventura)
   TERNA: 'ilarraz,jastrev,kordan'
 
