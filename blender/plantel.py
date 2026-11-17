@@ -201,6 +201,7 @@ def cfg(k):
         # el grosor del muslo no va por targets de MPFB: 'measure-thigh-circ' (una franja) y 'upperleg-scale-horiz/depth' dan un globo arriba y la rodilla fina (sondas 44012134794 y 44012809046). Va en tex._masas ('muslo'), con perfil a lo largo del fémur
         # con grasa (el superpesado): tronco en barril y panza firme, cuello y brazos sin la grasa pareja del macro 'weight' (salían antebrazo 0,22 H y cuello 0,32 H)
         extra += [('torso/torso-scale-depth-incr', (0 if F else .25) + .45 * g), ('torso/torso-scale-horiz-incr', (0 if F else .12) + .35 * g), ('stomach/stomach-pregnant-incr', .5 * g * g), ('neck/measure-neck-circ-decr', .5 * g)]
+        if not F: extra += [('genitals/penis-length-decr', 1.), ('genitals/penis-circ-decr', 1.), ('genitals/penis-testicles-decr', 1.)]     # bajo la malla se leía un bulto (hoja de posiciones, extensión)
         extra += [(f'arms/{s_}-lowerarm-fat-decr', .6 * g) for s_ in 'lr'] + [(f'arms/{s_}-upperarm-fat-decr', .3 * g) for s_ in 'lr'] + list(p.get('extra', []))
     # Si con el macro 'weight' al máximo la masa no alcanza (categorías abiertas), body.py suma este paquete de volumen de 0 a 1.
     volumen = [('torso/torso-scale-horiz-incr', .7), ('torso/torso-scale-depth-incr', .55), ('stomach/stomach-pregnant-incr', .15), ('hip/hip-scale-depth-incr', .3), ('buttocks/buttocks-volume-incr', .12), ('hip/hip-scale-horiz-incr', .35),
