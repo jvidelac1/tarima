@@ -67,9 +67,25 @@ if True:
     # Busto bajo la malla: el top deportivo lo contiene y lo alisa. Suavizado laplaciano del frente del pecho cubierto por la tela (quita la punta, baja algo el volumen).
     E_=np.empty(len(me.edges)*2,dtype=np.int64); me.edges.foreach_get('vertices',E_); E_=E_.reshape(-1,2); dg_=np.maximum(np.bincount(E_.ravel(),minlength=N),1)[:,None]
     # Ronda 1 del director de arte: seguían las puntas. La zona baja más (el busto de la pesada queda bajo), más pasadas; en el hombre, pocas pasadas (solo la punta del pectoral).
-    wb=(suit*sm(sh.z-(.44 if FEM else .30)*KM,sh.z-(.34 if FEM else .24)*KM,z)*sm(sh.z-.03*KM,sh.z-.09*KM,z)*(y<neck.y)*(0 if LEG else 1))[:,None]; c2=co.copy()
+    wb=(suit*sm(sh.z-(.44 if FEM else .40)*KM,sh.z-(.34 if FEM else .32)*KM,z)*sm(sh.z-.03*KM,sh.z-.09*KM,z)*(y<neck.y)*(0 if LEG else 1))[:,None]; c2=co.copy()
     for _ in range(45 if FEM else 36):     # PENDIENTE (bloqueante de la ronda 2): con 45 y con 140 pasadas (corrida 43944903931, 47 mm de desplazamiento) sigue un bulto en punta bajo la malla de solanet, que con la luz dura echa una sombra negra redonda; no es textura (la oclusión bajo la malla ya va suavizada en tex.py). Mirar el borde de la zona `wb` y lo que viene después (subdivide, garments)
         A_=np.zeros_like(c2); np.add.at(A_,E_[:,0],c2[E_[:,1]]); np.add.at(A_,E_[:,1],c2[E_[:,0]]); c2=c2*(1-.65*wb)+A_/dg_*(.65*wb)
+    # Puntas del pecho (areola y pezón de la malla base): bajo la malla se leían como dos puntos marcados, en hombres y mujeres (bloqueante de contenido).
+    # Se ubican por geometría (el bulto más angosto del frente del pecho de cada lado: lo que sobresale de una copia muy alisada) y en un radio de
+    # 4,5 cm la superficie se reemplaza por la membrana que interpola el borde (laplaciano con el borde fijo, hasta converger).
+    if not LEG:
+        no_=np.empty(N*3); me.vertices.foreach_get('normal',no_); no_=no_.reshape(N,3); s_=c2.copy()
+        zona=(suit>.5)&(no_[:,1]<-.25)&(z<sh.z-.05*KM)&(z>sh.z-.50*KM)&(axo>.035*KM)&(axo<.22*KM)
+        for _ in range(40):
+            A_=np.zeros_like(s_); np.add.at(A_,E_[:,0],s_[E_[:,1]]); np.add.at(A_,E_[:,1],s_[E_[:,0]]); s_=np.where(zona[:,None],A_/dg_,s_)
+        sale=((c2-s_)*no_).sum(1)*zona; RN=.045*KM
+        for sgn,lado in ((1,'L'),(-1,'R')):
+            m_=zona&(c2[:,0]*sgn>0)
+            if not m_.any(): continue
+            i_=int(np.argmax(np.where(m_,sale,-1))); cn=c2[i_].copy(); LM['nip'+lado]=cn; d_=np.linalg.norm(c2-cn,axis=1); w_=sm(RN,RN*.72,d_)[:,None]; antes_=c2.copy()
+            for _ in range(500):
+                A_=np.zeros_like(c2); np.add.at(A_,E_[:,0],c2[E_[:,1]]); np.add.at(A_,E_[:,1],c2[E_[:,0]]); c2=c2*(1-w_)+A_/dg_*w_
+            print(f'PUNTA {NAME} {lado}: en ({cn[0]:+.3f},{cn[1]:+.3f},{cn[2]:.3f}), sobresalía {sale[i_]*1000:.1f} mm; membrana de {int((w_[:,0]>0).sum())} vértices, desplazamiento máx {np.linalg.norm(c2-antes_,axis=1).max()*1000:.1f} mm')
     print(f'BUSTO {NAME}: alisado bajo la malla, {int((wb[:,0]>.05).sum())} vértices, desplazamiento máx {np.linalg.norm(c2-co,axis=1).max()*1000:.1f} mm'); co=c2; x,y,z=co.T; axo=np.abs(x)
 disp=np.maximum.reduce([suit*.0015,slv*.0045,sock*.003,wrap*.0025,F['scalp']*.003])
 me.vertices.foreach_set('co',(co+no*disp[:,None]).ravel()); me.update()

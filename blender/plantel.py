@@ -66,7 +66,7 @@ PESISTAS = {
 
  # ---- plantel de prueba: dos mujeres y dos hombres, liviano y pesado ----
  'solanet': dict(nombre='Naira Solanet', pais='Coralia', codigo='CRL', genero='F', categoria='48', estatura=1.50,
-   musculo=.82, grasa=.12, prop=dict(femur=.224, brazo=.302),     # compacta: fémur y brazos cortos
+   musculo=.82, grasa=.12, prop=dict(femur=.224, brazo=.302, antebrazo=.482),     # compacta: fémur y brazos cortos; antebrazo algo más corto que la regla (con .495 el codo no llega al rack: codo-rack; con .47 la mano no llega a la barra)
    rasgos=(.15, .35, .50), piel='trigueña', ojos='#3d2a1c',
    # cara ovalada y fina: pómulos altos, nariz corta y angosta, mentón angosto, cejas arqueadas
    cara=[('head/head-oval',.5),('cheek/l-cheek-bones-incr',.4),('cheek/r-cheek-bones-incr',.4),('nose/nose-scale-vert-decr',.25),('nose/nose-width2-decr',.2),('chin/chin-width-decr',.3),('eyebrows/eyebrows-angle-up',.25),('mouth/mouth-scale-horiz-decr',.15)],
