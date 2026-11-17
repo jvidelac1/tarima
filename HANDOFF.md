@@ -2207,6 +2207,22 @@ cabeza… un poco más leves»; «el momento de tensión antes»; «una pantalla
 - Sin hacer de esa lista: desfase entre los extremos de la barra al rebotar, juntar los pies desde la tijera por regla (lo
   hace el clip), darse vuelta medio paso, y medir el reencuadre en lo jugado con una prueba.
 
+**Correcciones después de la revisión del coordinador (17-nov a la noche).**
+- **Cuadro negro en Alta**: con post, el recuadro se copiaba a la pantalla con `autoClear` prendido y el borrado no respeta
+  el viewport: borraba toda la pantalla y dejaba solo el recuadro. Ahora se copia sin borrar. `check_pov` y `check_barra
+  --camara=pov` leen la imagen (`JUEGO.test.luz()`: luminancia media y desvío fuera del recuadro) y fallan con un cuadro negro.
+- **Nunca el piso durante la barrita**: la vista baja a la barra solo mientras las manos van hacia ella (entre el 8 % y el
+  92 % del recorrido, no más de −55°) y con la barrita en pantalla la mirada va al jurado sí o sí. Reglas duras: mirada entre
+  −15° y +10° y horizonte en el tercio central, en lo jugado («quieta», «corre», «levanta») y en la tira.
+- **Al frente = al jurado**: la mirada apunta a la mesa de los árbitros (`POV.mira`), lente de 62° de alto.
+- **Lo que NO entra en la imagen y por qué** (geometría, no un error): con la mirada en el jurado y 62° de lente, el borde
+  de abajo queda a unos −34°; la barra colgando está a −75°/−85° de los ojos y en los hombros a −60°/−65°; arriba de la
+  cabeza, a +85°/+95°. Solo cruza la vista durante el tirón y el empuje (con estela). Para que se sienta: el mundo que baja y
+  sube, el golpe de cámara al recibir, la estela, y el recuadro.
+- `check_carga_fallas [shader compu]`: la espera pasó de 180 a 420 s. **Es una hipótesis de lentitud por software sin
+  confirmar**: falló dos veces con 180 s y pasó dos veces con 420 s; no se vio el aviso tardío en ninguna captura.
+- Tira jugada en Alta: `check_barra --tira` (una foto cada 0,1 s del primer intento propio, de la barrita al veredicto).
+
 Lo de abajo («no tocar» y «sigue mal») es de las cinco rondas anteriores, con la cámara vieja.
 
 Lo que las cinco rondas dejaron bien («no tocar»): barra arriba (recepción y recuperación del arranque, empuje, tijera y
