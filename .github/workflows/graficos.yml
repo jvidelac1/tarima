@@ -122,7 +122,7 @@ jobs:
         run: |
           node tools/banco.mjs --fotos=out/graficos/plantel/a --niveles=${{ inputs.niveles || 'alta,movil' }} ${{ inputs.tomas && format('--tomas={0}', inputs.tomas) || '' }} --plantel=$TERNA --pesista=ventura --ancho=1280 --alto=620 2>&1 | tee out/logs/fotos_plantel.log || true
           for plaza in brenner marangi; do
-            node tools/banco.mjs --fotos=out/graficos/plantel/$plaza --niveles=alta --tomas=${{ inputs.tomas && 'torso,cara' || 'medio,torso,cara,3-4,medio-salida' }} --plantel=$TERNA --pesista=$plaza --ancho=1280 --alto=620 2>&1 | tee -a out/logs/fotos_plantel.log || true
+            node tools/banco.mjs --fotos=out/graficos/plantel/$plaza --niveles=alta --tomas=${{ inputs.tomas || 'medio,torso,cara,3-4,medio-salida' }} --plantel=$TERNA --pesista=$plaza --ancho=1280 --alto=620 2>&1 | tee -a out/logs/fotos_plantel.log || true
           done
       - name: Banco de medición con el ambiente (banco)
         if: ${{ !cancelled() && inputs.banco }}
