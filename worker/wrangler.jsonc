@@ -38,21 +38,22 @@
   "vars": {
     "POSTHOG_HOST": "us.i.posthog.com",
     "POSTHOG_ASSETS": "us-assets.i.posthog.com",
-    // Primera vez (LIF-53, decisión del dueño del 15 de noviembre, docs/MVP.md «Cambio del 15 de noviembre»): la primera
-    // final ENTERA (arranque y dos tiempos) es gratis, una por dispositivo (con el tope de la red, TOPE_IP). Al terminarla
-    // sale el cartel, que se desbloquea con el correo (juego libre) O contestando las dos preguntas de la encuesta
-    // (ENCUESTA_LIBRE "1": juego libre en ese dispositivo, una vez por dispositivo y hasta ENCUESTAS_POR_IP por red en 30
-    // días). BONO_ENCUESTA queda en "0" (la maquinaria vieja del bono de finales no se usa).
-    // Volver atrás sin tocar código:
-    //  - correo obligatorio (la encuesta no desbloquea): ENCUESTA_LIBRE "0".
-    //  - el arranque gratis con el cartel en el intervalo (regla del 12 al 15 de noviembre): GRATIS_ETAPA "arranque" y
-    //    ENCUESTA_LIBRE "0".
-    //  - 2 finales enteras gratis (regla del 12 de noviembre, antes de la noche): GRATIS "2".
-    "GRATIS_ETAPA": "final",
+    // Regla vigente (decisión del dueño del 17 de noviembre: «que por ahora siga así como está el muro, después del
+    // snatch»; es la del 12 y 13 de noviembre, docs/MVP.md 5.5): la final gratis da solo el arranque; al terminarlo sale
+    // el muro, que pide el correo, obligatorio, para seguir con el dos tiempos. La encuesta no desbloquea nada
+    // (ENCUESTA_LIBRE "0" y BONO_ENCUESTA "0": encuesta_disponible es false y /api/envion no acepta la vía de la
+    // encuesta); es opcional, después de anotarse.
+    // La regla de LIF-53 (decisión del 15 de noviembre, docs/MVP.md «Cambio del 15 de noviembre») queda lista y probada,
+    // sin tocar código: GRATIS_ETAPA "final" y ENCUESTA_LIBRE "1" (la primera final entera gratis, una por dispositivo;
+    // al terminarla el cartel, que se desbloquea con el correo O con las dos preguntas de la encuesta, una vez por
+    // dispositivo y hasta ENCUESTAS_POR_IP por red en 30 días).
+    // Otras: 2 finales enteras gratis con correo obligatorio (regla del 12 de noviembre, antes de la noche):
+    // GRATIS_ETAPA "final", GRATIS "2", ENCUESTA_LIBRE "0".
+    "GRATIS_ETAPA": "arranque",
     "GRATIS": "1",
     "TOPE_IP": "6",
     "BONO_ENCUESTA": "0",
-    "ENCUESTA_LIBRE": "1",
+    "ENCUESTA_LIBRE": "0",
     "ENCUESTAS_POR_IP": "3",
     "MAIL_DESDE": "",
     "TURNSTILE": "0",

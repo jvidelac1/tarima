@@ -142,7 +142,10 @@ const VIEJA = { BONO_ENCUESTA: '2' };
   igual(R.config({ GRATIS_ETAPA: 'cualquiera' }).etapa, 'final', 'GRATIS_ETAPA desconocida: la regla vieja');
 }
 
-// ---------- 2b. la regla del arranque gratis (GRATIS_ETAPA='arranque', decisión del dueño del 12 de noviembre) ----------
+// Variables de worker/wrangler.jsonc (sin comentarios): el valor por defecto de lo que se publica.
+const VARS = (() => { const txt = fs.readFileSync(path.join(ROOT, 'worker/wrangler.jsonc'), 'utf8').replace(/("(?:[^"\\]|\\.)*")|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, x) => x || '').replace(/,(\s*[}\]])/g, '$1'); return JSON.parse(txt).vars; })();
+
+// ---------- 2b. la regla del arranque gratis (GRATIS_ETAPA='arranque', decisión del dueño del 12 de noviembre): la de producción ----------
 {
   // Igual que index.js: envion() con datos.js: partidaDe() y pasarAlEnvion().
   class BaseArranque extends Base {
@@ -161,10 +164,13 @@ const VIEJA = { BONO_ENCUESTA: '2' };
       return dec;
     }
   }
-  const PROD = { GRATIS_ETAPA: 'arranque', GRATIS: '1', BONO_ENCUESTA: '0', TOPE_IP: '6', ENCUESTAS_POR_IP: '3' };
+  // La regla de producción es la que trae worker/wrangler.jsonc por defecto (decisión del dueño del 17 de noviembre: el
+  // muro sigue como está, después del arranque): las pruebas de esta sección corren con las variables del archivo.
+  const PROD = { GRATIS_ETAPA: VARS.GRATIS_ETAPA, GRATIS: VARS.GRATIS, TOPE_IP: VARS.TOPE_IP, BONO_ENCUESTA: VARS.BONO_ENCUESTA, ENCUESTA_LIBRE: VARS.ENCUESTA_LIBRE, ENCUESTAS_POR_IP: VARS.ENCUESTAS_POR_IP };
+  igual(PROD, { GRATIS_ETAPA: 'arranque', GRATIS: '1', TOPE_IP: '6', BONO_ENCUESTA: '0', ENCUESTA_LIBRE: '0', ENCUESTAS_POR_IP: '3' }, 'worker/wrangler.jsonc: por defecto, el arranque gratis y el correo obligatorio (la regla de producción)');
   // Con bono 1: la maquinaria del bono en el intervalo (no es producción).
   const BONO1 = { ...PROD, BONO_ENCUESTA: '1' };
-  igual(R.config(PROD), { etapa: 'arranque', gratis: 1, tope_ip: 6, bono: 0, encuestas_por_ip: 3, encuesta_libre: false }, 'config del arranque gratis (12 al 15 de noviembre)');
+  igual(R.config(PROD), { etapa: 'arranque', gratis: 1, tope_ip: 6, bono: 0, encuestas_por_ip: 3, encuesta_libre: false }, 'worker/wrangler.jsonc: la final gratis da solo el arranque y la encuesta no desbloquea');
   igual(R.config(PROD, { 'muro-partidas-gratis': '2' }).gratis, 1, 'con el arranque gratis la bandera muro-partidas-gratis no se usa');
   igual(R.config({ ...PROD, GRATIS_ETAPA: 'final', GRATIS: '2' }, { 'muro-partidas-gratis': '1' }).gratis, 1, 'con la regla vieja la bandera vuelve a valer');
   {
@@ -250,11 +256,11 @@ const VIEJA = { BONO_ENCUESTA: '2' };
   }
 }
 
-// ---------- 2d. LIF-53: la primera final entera gratis y el cartel (correo O encuesta), la regla de producción ----------
+// ---------- 2d. LIF-53: la primera final entera gratis y el cartel (correo O encuesta). No es el valor por defecto: se ----------
+// ---------- pide con variables explícitas (GRATIS_ETAPA "final" y ENCUESTA_LIBRE "1"), lista para cuando el dueño la quiera ----------
 {
-  const vars = (() => { const txt = fs.readFileSync(path.join(ROOT, 'worker/wrangler.jsonc'), 'utf8').replace(/("(?:[^"\\]|\\.)*")|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, x) => x || '').replace(/,(\s*[}\]])/g, '$1'); return JSON.parse(txt).vars; })();
-  const PRIMERA = { GRATIS_ETAPA: vars.GRATIS_ETAPA, GRATIS: vars.GRATIS, TOPE_IP: vars.TOPE_IP, BONO_ENCUESTA: vars.BONO_ENCUESTA, ENCUESTA_LIBRE: vars.ENCUESTA_LIBRE, ENCUESTAS_POR_IP: vars.ENCUESTAS_POR_IP };
-  igual(R.config(PRIMERA), { etapa: 'final', gratis: 1, tope_ip: 6, bono: 0, encuestas_por_ip: 3, encuesta_libre: true }, 'worker/wrangler.jsonc: 1 final entera gratis y la encuesta desbloquea (LIF-53)');
+  const PRIMERA = { ...VARS, GRATIS_ETAPA: 'final', GRATIS: '1', TOPE_IP: '6', BONO_ENCUESTA: '0', ENCUESTA_LIBRE: '1', ENCUESTAS_POR_IP: '3' };
+  igual(R.config(PRIMERA), { etapa: 'final', gratis: 1, tope_ip: 6, bono: 0, encuestas_por_ip: 3, encuesta_libre: true }, 'LIF-53 por variables: 1 final entera gratis y la encuesta desbloquea');
   {
     // Jugador nuevo: una final completa; al terminarla, el cartel con los dos caminos.
     const b = new Base(PRIMERA);

@@ -1,7 +1,8 @@
-// Prueba de punta a punta del muro en el medio de la final (GRATIS_ETAPA='arranque' con ENCUESTA_LIBRE='0': la regla del 12
-// al 15 de noviembre, que se recupera por variables; la de producción, LIF-53, la prueba tools/check_muro.mjs) (docs/MVP.md 5.5),
-// con el Worker de verdad sobre una D1 falsa (tools/servidor_local.mjs: sin cuenta de Cloudflare, sin red, sin PostHog) y
-// las variables de worker/wrangler.jsonc. Correo obligatorio (decisión del dueño del 13 de noviembre): el muro solo pide el
+// Prueba de punta a punta del muro en el medio de la final: la regla de producción, que es el valor por defecto de
+// worker/wrangler.jsonc (GRATIS_ETAPA='arranque' con ENCUESTA_LIBRE='0'; decisión del dueño del 17 de noviembre: el muro
+// sigue como está, después del arranque). La de LIF-53, que se pide por variables, la prueba tools/check_muro.mjs
+// (docs/MVP.md 5.5). Con el Worker de verdad sobre una D1 falsa (tools/servidor_local.mjs: sin cuenta de Cloudflare, sin
+// red, sin PostHog) y las variables de worker/wrangler.jsonc, sin pisar ninguna. Correo obligatorio (decisión del dueño del 13 de noviembre): el muro solo pide el
 // correo, la encuesta no desbloquea nada y es opcional, en el panel de «anotado». Los dos jugadores tienen el navegador en
 // español y el juego tiene que abrir en inglés (inglés por defecto). Cada uno con su servidor (base vacía):
 //  - en: computadora (1280 × 720), todo con teclado. Juega el arranque de su final gratis, ve el muro en el intervalo
@@ -41,8 +42,8 @@ const CORREO = 'jugador.intervalo@pruebas-tarima.com';      // example.com está
 
 async function escenario(L) {
   const tactil = L === 'es', D = EN, tag = `[${L}]`, dir = path.join(OUT, L); fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
-  const srv = await iniciarServidorLocal({ silencio: true, vars: { GRATIS_ETAPA: 'arranque', ENCUESTA_LIBRE: '0' } });
-  if (srv.env.GRATIS_ETAPA !== 'arranque') problemas.push(`${tag} el servidor local no tiene la regla del arranque gratis (GRATIS_ETAPA=${srv.env.GRATIS_ETAPA})`);
+  const srv = await iniciarServidorLocal({ silencio: true });      // sin `vars`: la regla es la de worker/wrangler.jsonc
+  if (srv.env.GRATIS_ETAPA !== 'arranque' || srv.env.GRATIS !== '1' || srv.env.ENCUESTA_LIBRE !== '0' || srv.env.BONO_ENCUESTA !== '0') problemas.push(`${tag} worker/wrangler.jsonc no trae la regla de producción (el arranque gratis, correo obligatorio): GRATIS_ETAPA=${srv.env.GRATIS_ETAPA} GRATIS=${srv.env.GRATIS} ENCUESTA_LIBRE=${srv.env.ENCUESTA_LIBRE} BONO_ENCUESTA=${srv.env.BONO_ENCUESTA}`);
   const base = srv.url.replace(/\/$/, '');
   const ctx = await browser.newContext(tactil
     ? { viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, locale: 'es-AR' }

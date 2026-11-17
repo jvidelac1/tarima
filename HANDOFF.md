@@ -1339,6 +1339,19 @@ suben (llamado 32–39, veredicto 10–30) por el tablero.
 datos (`rival_salteado`) cuántos miran a los rivales enteros. El RM es el de la ficha: la «forma del día» y el cansancio no lo
 cambian (sí la chance y la dificultad). Clásico también usa el tablero y el botón (no tiene el «Toca: seguir» de los rivales).
 
+### Regla del muro que se publica el 17-nov: la de producción (rama `v-integra`)
+
+Decisión del dueño del 17-nov: «Que por ahora siga así como está el muro, después del snatch.» `worker/wrangler.jsonc`
+trae por defecto `GRATIS_ETAPA "arranque"`, `GRATIS "1"`, `TOPE_IP "6"`, `BONO_ENCUESTA "0"`, `ENCUESTA_LIBRE "0"`: el
+arranque gratis, el muro al terminarlo, correo obligatorio, encuesta opcional después de anotarse. La regla de LIF-53 (la
+primera final entera y el cartel con correo o 2 preguntas, sección siguiente) queda en el código y probada, apagada: se
+prende con `GRATIS_ETAPA "final"` y `ENCUESTA_LIBRE "1"` y publicando el Worker; el cliente no cambia. Las pruebas tienen la
+de producción como valor por defecto y la de LIF-53 con variables explícitas (`tools/check_muro_medio.mjs` y
+`tools/check_muro.mjs`; lo mismo en `worker_test`, `servidor_test` y `worker/test/worker.test.js`). Detalle, lo que cambia
+igual para el jugador (bienvenida sin tarjetas la primera vez, nombre de 4 letras, textos «Lifting Game», eventos) y lo
+pendiente (`web/privacidad.html` 2026-11-g describe la encuesta como camino del cartel, que hoy no es cierto) en
+`docs/MVP.md`, «Regla del muro que se publica el 17 de noviembre». Publicar primero el Worker y después el sitio.
+
 ### Primera vez, el cartel con dos caminos y la carga que no se cuelga (15-nov, rama `primera-vez`; LIF-53, LIF-46, LIF-33)
 
 Detalle completo (regla, textos, eventos y el embudo de PostHog) en `docs/MVP.md`, «Cambio del 15 de noviembre».
