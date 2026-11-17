@@ -2039,6 +2039,7 @@ Desde la ronda 2 el director tiene la imagen objetivo; la base se repuntuó con 
 | 2 (sala 1.ª pasada) | e51f4c0 | 4,5 | 5 | 6 | 5 | 3 | 5 | 4 | — | — |
 | 3 (sala 2.ª + pesista 1.ª) | c6bb768 | 4,5 | 5,5 | 6,5 | 5,5 | 3,5 | 5,5 | 4,5 | — | — |
 | 4 (sala 3.ª + pesista 2.ª + final nuevo) | 6ee2ad5 | 5,5 | 6 | 6,5 | 6 | 4,5 | 6 | 5 | — (se rehace) | 5 |
+| 5 (sala 4.ª + pesista 3.ª + final 2.ª) | 5373038 | 5 | 6,5 | 6,5 | 6 | 4 | 6 | 5 | — (se rehace) | 6,5 |
 
 Partes del pesista en la ronda 4: cara 4,5, piel 6, pelo y barba 4, anatomía 5, manos 4, ropa 6,5 (ronda 3: 4 / 5 / 3,5 / 4,5 / 3,5 / 6).
 La primera persona se rehace por pedido del dueño (16-nov a la noche): vista realista desde los ojos (se ve el jurado; los
