@@ -104,7 +104,19 @@ def chest_smooth(b,rig,K,iters=30):
         an=fr&(r>RN)&(r<1.8*RN); den=fr&(r<RN)
         if an.sum()<12 or den.sum()<3: print(f'PUNTA {lado}: sin anillo para ajustar ({int(an.sum())} vértices)'); continue
         Aq=np.stack([np.ones(an.sum()),x[an],y[an],x[an]**2,x[an]*y[an],y[an]**2],1); cf=np.linalg.lstsq(Aq,h[an],rcond=None)[0]
-        hf=cf[0]+cf[1]*x+cf[2]*y+cf[3]*x*x+cf[4]*x*y+cf[5]*y*y; wt=sm(RN,RN*.7,r)*den; dz=(hf-h)*wt; c=c+n0[None,:]*dz[:,None]
+        hf=cf[0]+cf[1]*x+cf[2]*y+cf[3]*x*x+cf[4]*x*y+cf[5]*y*y; wt=sm(RN,RN*.7,r)*den; dz=(hf-h)*wt
+        import tex
+        if tex.ANAT.get('fisico')=='anatomico':
+            # Con el pectoral más curvo, la cuádrica única dejaba un plato chato de 3 cm, 2 mm hundido, con el borde marcado (se veía un aro bajo la malla con los brazos arriba).
+            # Mínimos cuadrados móviles: cada vértice del disco toma la cuádrica ajustada al anillo con pesos gaussianos centrados en él, así empalma con la pendiente de su borde.
+            R1=1.3*RN; an2=np.nonzero(fr&(r>R1)&(r<2.4*R1))[0]; dn2=np.nonzero(fr&(r<=R1))[0]
+            if len(an2)>=20:
+                Aq2=np.stack([np.ones(len(an2)),x[an2],y[an2],x[an2]**2,x[an2]*y[an2],y[an2]**2],1); hf2=np.empty(len(dn2))
+                for jj,j in enumerate(dn2):
+                    wg=np.sqrt(np.exp(-((x[an2]-x[j])**2+(y[an2]-y[j])**2)/(.9*RN)**2)+1e-4); c2=np.linalg.lstsq(Aq2*wg[:,None],h[an2]*wg,rcond=None)[0]
+                    hf2[jj]=c2[0]+c2[1]*x[j]+c2[2]*y[j]+c2[3]*x[j]**2+c2[4]*x[j]*y[j]+c2[5]*y[j]**2
+                dz=np.zeros(N); dz[dn2]=(hf2-h[dn2])*sm(R1,R1*.7,r[dn2])
+        c=c+n0[None,:]*dz[:,None]
         print(f'PUNTA {lado}: racimo en ({cn[0]:+.3f},{cn[1]:+.3f},{cn[2]:.3f}), arista media {ml[i]*1000:.2f} mm, {int(den.sum())} vértices en {RN*1000:.0f} mm; sobresalía {(h-hf)[den].max()*1000:.1f} mm, corrección máx {np.abs(dz).max()*1000:.1f} mm')
     me.vertices.foreach_set('co',c.ravel()); me.update()
     # los pesos de piel también: el suavizado de pesos del hombro (smooth_weights) termina en medio del pecho y ese borde deja un vértice «atrasado» que con los brazos arriba se levanta como una carpa (la punta)
