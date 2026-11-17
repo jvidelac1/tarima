@@ -1107,12 +1107,14 @@ async function elegirPesista(cfg, nombre = '') {
   const encuadrar = (suave = 0) => {
     const gl = $('gl'), W = gl.clientWidth, H = gl.clientHeight, pn = G.pn; G.W = W; G.H = H; if (!W || !H || !escena.P || !escena.activo || !pn) return;
     let x0 = .02, x1 = .98, y1 = .97; const y0 = .03 + (parseFloat(getComputedStyle(html).getPropertyValue('--st')) || 0) / H;
-    const izq = pn.offsetLeft / W, arr = pn.offsetTop / H; if (izq > .28) x1 = izq - .01; else if (arr > .25) y1 = arr - .01;
+    const izq = pn.offsetLeft / W, arr = pn.offsetTop / H; if (izq > .28) x1 = izq - .01; else if (arr > .25) y1 = arr - .03;
     const h = escena.P.h, S = tramo(escena.P, 'snatch'), barra = escena.alturaMuestra(S.base + S.n - 1) || 1.2 * h;
-    const tope = G.arriba ? Math.max(1.08 * h, barra + .3) : 1.08 * h, piso = -.07, alto = (tope - piso) * 1.06, ancho = G.arriba ? 2.5 : Math.max(1.05, .68 * h);
-    const tg = 2 * Math.tan(PLANOS.elegir.fov / 2 * Math.PI / 180), asp = W / H;
-    escena.elegirY = (tope + piso) / 2;
-    escena.primerPlano('elegir', { x: (x0 + x1) / 2, y: (y0 + y1) / 2, dAbs: Math.min(6.4, Math.max(alto / (tg * (y1 - y0)), ancho / (tg * asp * (x1 - x0)))) }, suave);
+    const tope = G.arriba ? Math.max(1.08 * h, barra + .3) : 1.08 * h, piso = -.07, alto = (tope - piso) * 1.1, ancho = G.arriba ? 2.6 : Math.max(1.05, .68 * h);
+    // lente normal (38°); si así la cámara quedara más lejos que la mesa del jurado (teléfono parado con la barra arriba, que
+    // pide 2,6 m de ancho), se queda a 6,2 m y abre el lente lo necesario (hasta 56°)
+    const asp = W / H, X = Math.max(alto / (y1 - y0), ancho / (asp * (x1 - x0))), LEJOS = 6.2, tg0 = 2 * Math.tan(19 * Math.PI / 180), tg = Math.min(2 * Math.tan(28 * Math.PI / 180), Math.max(tg0, X / LEJOS));
+    PLANOS.elegir.fov = 2 * Math.atan(tg / 2) * 180 / Math.PI; escena.elegirY = (tope + piso) / 2;
+    escena.primerPlano('elegir', { x: (x0 + x1) / 2, y: (y0 + y1) / 2, dAbs: X / tg }, suave);
   };
   /** Pone en escena al pesista de la tarjeta `id` (con un fundido corto si ya había otro a la vista). */
   const ver = id => (G.cola = G.cola.then(async () => {
