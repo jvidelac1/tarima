@@ -71,6 +71,11 @@ def anatomy(b,rig,K,cut=1.):
     co=coords(b); N=len(co); me=b.data; no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3)
     J={x.name[len(PRE):]:np.array(x.head_local) for x in rig.data.bones if x.name.startswith(PRE)}
     B,F,_=tex.anatomy(co,no,J,K); names,W=wget(b); keep=1-sum(W[:,j] for j,n in enumerate(names) if any(k in n for k in ('Head','Hand','Foot','Toe')))
+    if tex.ANAT.get('fisico')=='anatomico':
+        # desplazamiento grande: sobre la normal alisada. Con la normal de cada vértice, lo que ya sobresale (la punta del pecho de la malla base, pliegues) se abre en abanico y crece
+        E=np.empty(len(me.edges)*2,int); me.edges.foreach_get('vertices',E); E=E.reshape(-1,2)
+        for _ in range(14):
+            A=np.zeros_like(no); np.add.at(A,E[:,0],no[E[:,1]]); np.add.at(A,E[:,1],no[E[:,0]]); no=no+A; no/=np.maximum(np.linalg.norm(no,axis=1,keepdims=True),1e-9)
     gg=tex.ANAT.get('geo',ANAT_GEO); d=(B*gg[0]+F*gg[1]*cut)*np.clip(keep,0,1); me.vertices.foreach_set('co',(co+no*d[:,None]).ravel()); me.update()
     print(f'ANAT desplazamiento de malla: máx +{d.max()*1000:.1f} / {d.min()*1000:.1f} mm, {int((np.abs(d)>5e-4).sum())} vértices')
 def chest_smooth(b,rig,K,iters=30):

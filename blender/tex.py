@@ -198,11 +198,11 @@ def _masas(Q,nx,ny,nz,J,K,RK,wT):
     B+=bk*K*g['erectores']*.0075*G((u-.036)/.022,1.)*V(v,-.50,-.33,-.14)
     B-=K*g['cintura']*.0040*np.maximum(sd,.6*bk)*V(v,-.42,-.335,-.24)*sm(.05,.12,u)      # la cintura entra entre el dorsal y la cresta ilíaca
     # ---- glúteo: masa redonda atrás de la cadera, con su pliegue abajo ----
-    zg=(Q[:,2]-H[2])/K; B+=K*g['gluteo']*.0170*sm(.10,.60,ny)*G(np.hypot((Q[:,0]/K-.092)/.082,(zg+.012)/.105),1.)*sm(-.20,-.11,zg)
+    zg=(Q[:,2]-H[2])/K; B+=K*g['gluteo']*.0230*sm(.10,.60,ny)*G(np.hypot((Q[:,0]/K-.092)/.082,(zg+.012)/.105),1.)*sm(-.20,-.11,zg)
     # ---- muslo (0 = cadera, 1 = rodilla): recto femoral, vasto lateral (barrido externo), vasto medial (gota sobre la rodilla), aductores, isquios ----
     t,r,th=_limb(Q,H,Kn); lw=sm(.0,.30,t)*sm(1.09,.99,t)*sm(.17*K*RK[2],.14*K*RK[2],r)*sm(H[2]+.03*K,H[2]-.02*K,Q[:,2])     # entra en degradé largo desde la ingle: con borde corto quedaba un escalón
     B+=lw*K*(g['cuadriceps']*(.0100*V(t,.06,.42,.84)*A(th,-4,.36)+.0135*V(t,.10,.52,.92)*A(th,-64,.48)+.0125*V(t,.52,.80,.97)*A(th,44,.36))
-        +g['muslo']*.0110*V(t,-.05,.60,1.14)*(1-.35*A(th,90,.7))     # grosor del muslo entero (menos por dentro), que llega lleno hasta arriba de la rodilla
+        +g['muslo']*.0180*V(t,-.05,.58,1.14)*(1-.35*A(th,90,.7))     # grosor del muslo entero (menos por dentro), que llega lleno hasta arriba de la rodilla
         +g['aductor']*.0050*V(t,.04,.26,.62)*A(th,98,.50)
         +g['isquios']*(.0085*V(t,.12,.48,.90)*A(th,-150,.40)+.0085*V(t,.12,.50,.92)*A(th,150,.40))
         -g['rodilla']*.0028*V(t,.84,.99,1.10)*(A(th,-90,.5)+A(th,90,.5)))

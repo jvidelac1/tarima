@@ -66,7 +66,7 @@ PESISTAS = {
 
  # ---- plantel de prueba: dos mujeres y dos hombres, liviano y pesado ----
  'solanet': dict(nombre='Naira Solanet', pais='Coralia', codigo='CRL', genero='F', categoria='48', estatura=1.50,
-   musculo=.82, grasa=.12, prop=dict(femur=.224, brazo=.302, antebrazo=.482),     # compacta: fémur y brazos cortos; antebrazo algo más corto que la regla (con .495 el codo no llega al rack: codo-rack; con .47 la mano no llega a la barra)
+   musculo=.82, grasa=.12, fisico='anatomico', prop=dict(femur=.224, brazo=.302, antebrazo=.482),     # compacta: fémur y brazos cortos; antebrazo algo más corto que la regla (con .495 el codo no llega al rack: codo-rack; con .47 la mano no llega a la barra)
    rasgos=(.15, .35, .50), piel='trigueña', ojos='#3d2a1c',
    # cara ovalada y fina: pómulos altos, nariz corta y angosta, mentón angosto, cejas arqueadas
    cara=[('head/head-oval',.5),('cheek/l-cheek-bones-incr',.4),('cheek/r-cheek-bones-incr',.4),('nose/nose-scale-vert-decr',.25),('nose/nose-width2-decr',.2),('chin/chin-width-decr',.3),('eyebrows/eyebrows-angle-up',.25),('mouth/mouth-scale-horiz-decr',.15)],
@@ -82,7 +82,7 @@ PESISTAS = {
    uniforme=dict(malla='#6e1423', vivo='#f0c36a', rodillera='#1a1a1f', rodillera2='#6e1423', cinturon='#2a1c14', zapatillas=('#1b1b20','#e6e3da','#f0c36a','#2a2a2e')),
    juego=dict(color='#e0607a', bandera='linear-gradient(90deg,#6e1423 0 28%,#f0c36a 28% 40%,#6e1423 40%)', dorsal=34, kg=dict(s=128, c=166))),
  'ilarraz': dict(nombre='Tadeo Ilarraz', pais='Montelar', codigo='MTL', genero='M', categoria='71', estatura=1.61,
-   musculo=1.0, grasa=.08, prop=dict(femur=.222, tibia=.250),     # compacto: fémur corto y torso largo; la tibia larga viene con sus rasgos base
+   musculo=1.0, grasa=.08, fisico='anatomico', prop=dict(femur=.222, tibia=.250),     # compacto: fémur corto y torso largo; la tibia larga viene con sus rasgos base
    rasgos=(.75, .05, .20), piel='oscura', ojos='#2e1d12',
    # cara de triángulo invertido: pómulos marcados, nariz recta y ancha, orejas algo abiertas, cejas bajas
    cara=[('head/head-invertedtriangular',.8),('head/head-oval',.3),('cheek/l-cheek-bones-incr',.8),('cheek/r-cheek-bones-incr',.8),('nose/nose-width2-incr',.6),('nose/nose-width3-incr',.5),('nose/nose-scale-vert-decr',.3),('eyebrows/eyebrows-trans-down',.4),('chin/chin-width-decr',.4),('chin/chin-jaw-drop-incr',.3),('mouth/mouth-scale-horiz-incr',.3),('ears/l-ear-wing-incr',.4),('ears/r-ear-wing-incr',.4)],
@@ -90,7 +90,7 @@ PESISTAS = {
    uniforme=dict(malla='#1d4f9c', panel='#0d1a30', vivo='#f2c230', rodillera='#15151a', rodillera2='#f2c230', cinturon='#2b1d14', zapatillas=('#efeee9','#d9d5ca','#1d4f9c','#8a5f36')),     # azul con vivo amarillo: la malla naranja se confundía con su piel
    juego=dict(color='#4d8fe0', bandera='linear-gradient(135deg,#0d1a30 0 50%,#1d4f9c 50% 82%,#f2c230 82%)', dorsal=16, kg=dict(s=138, c=170))),
  'jastrev': dict(nombre='Borko Jastrev', pais='Veldania', codigo='VLD', genero='M', categoria='+110', estatura=1.86, masa=146,
-   musculo=1.0, grasa=.72,
+   musculo=1.0, grasa=.72, fisico='anatomico',
    rasgos=(.0, .15, .85), piel='#d3a17e', ojos='#4a3a28',
    # cabeza redonda y cuadrada: mandíbula muy ancha, nariz ancha y corta, mejillas llenas, cejas caídas
    cara=[('head/head-round',.8),('head/head-square',.5),('chin/chin-width-incr',.9),('chin/chin-bones-incr',.5),('nose/nose-width2-incr',.8),('nose/nose-scale-vert-decr',.5),('nose/nose-point-up',.3),('cheek/l-cheek-volume-incr',.8),('cheek/r-cheek-volume-incr',.8),('eyebrows/eyebrows-angle-down',.4),('mouth/mouth-scale-horiz-incr',.4)],
@@ -155,9 +155,10 @@ def cfg(k):
     # Reglas por categoría: a más masa, hombros y cintura más anchos; la mujer, hombros más angostos y más cadera y glúteo.
     t = _clip((m - (48 if F else 60)) / 60., 0, 1.3)
     cadera = q['cadera'] if q['cadera'] is not None else (.15 + .15 * t if F else .0 + .15 * t * g)
+    if p.get('fisico') == 'anatomico' and q['cadera'] is None and not F: cadera += .25     # cadera de pesista: el cuerpo de MPFB con 'muscle' alto es de culturista (hombros enormes, cintura y cadera finas)
     gluteos = q['gluteos'] if q['gluteos'] is not None else (.30 if F else .25) + .10 * t
     an = p.get('fisico') == 'anatomico'     # físico anatómico: el volumen va a los grupos musculares (muslo, glúteo, gemelo, hombro) y sale de la cintura y del cuello
-    cintura = q['cintura'] if q['cintura'] is not None else ((.15 if F else .15) if an else (.15 if F else .25)) + .65 * g
+    cintura = q['cintura'] if q['cintura'] is not None else ((.15 if F else .40) if an else (.15 if F else .25)) + .65 * g
     if an and q['gluteos'] is None: gluteos += .25
     if F: extra_f = [('breast/breast-point-decr', 1.), ('breast/breast-volume-vert-up', .3), ('breast/nipple-size-decr', 1.), ('breast/nipple-point-decr', 1.)]     # busto contenido por el top deportivo: sin punta
     else: extra_f = []
@@ -173,10 +174,11 @@ def cfg(k):
     if F: musc = dict(pierna=.95 * mu, gemelo=.5 * mu, hombro=.70 * mu * (1 - .4 * g), brazo=.45 * mu, antebrazo=.65 * mu, pectoral=0, dorsal=.75 * mu * (1 - .4 * g), abdomen=.5 * (1 - g), cuello=.25 * mu)
     else: musc = dict(pierna=1.0 * mu, gemelo=.6 * mu, hombro=1.0 * mu * _clip(1 - 1.2 * g, 0, 1), brazo=.85 * mu * _clip(1 - 1.0 * g, 0, 1), antebrazo=1.0 * mu * (1 - .5 * g), pectoral=.6 * mu * (1 - .4 * g), dorsal=1.0 * mu * (1 - .35 * g), abdomen=.5 * (1 - g), cuello=.7 * mu * (1 - .5 * g))
     if an:
-        musc.update(cuello=(.2 if F else .45) * mu * (1 - .5 * g))
+        if not F: musc.update(brazo=.62 * mu * _clip(1 - .5 * g, 0, 1), hombro=.55 * mu * _clip(1 - .6 * g, 0, 1), antebrazo=.7 * mu * (1 - .5 * g), gemelo=.3 * mu)     # la forma la ponen los vientres de tex._masas; el target de MPFB solo infla     # el pesado con físico anatómico no pierde el brazo (salía bíceps 0,185 H con antebrazo 0,222 H)
+        musc.update(cuello=.2 * mu * (1 - .5 * g))
     extra = [('torso/torso-vshape-incr', (.10 if F else .45) * _clip(1 - 1.3 * g, 0, 1)), ('buttocks/buttocks-volume-incr', _clip(gluteos, 0, 1)),
              ('hip/hip-scale-horiz-' + ('incr' if cadera >= 0 else 'decr'), _clip(abs(cadera), 0, 1)),
-             ('torso/measure-waist-circ-incr', _clip(cintura, 0, 1)), ('arms/measure-upperarm-circ-decr', _clip(1.4 * g, 0, 1)),
+             ('torso/measure-waist-circ-incr', _clip(cintura, 0, 1)), ('arms/measure-upperarm-circ-decr', _clip(1.4 * g, 0, .25 if an else 1)),
              # boca: los labios de MPFB salen muy gruesos con estos macros
              ('mouth/mouth-upperlip-volume-decr', .7), ('mouth/mouth-lowerlip-volume-decr', .65), ('mouth/mouth-angles-up', .35), ('forehead/forehead-scale-vert-decr', .6 if F else .65),
              # mirada: párpados apenas entornados y cejas apenas bajas (concentración). Con 'slit' en .75 y 'closure' los ojos salían cerrados (ronda 1 del director de arte)
@@ -191,7 +193,7 @@ def cfg(k):
              # cabeza a escala del cuerpo macizo (no se achica al engordar): algo más ancha y profunda
              ('head/head-scale-horiz-incr', 0. if F else .5 * g), ('head/head-scale-depth-incr', 0. if F else .5 * g), ('head/head-scale-vert-incr', 0. if F else .5 * g),     # la cabeza acompaña al cuerpo grande (con grasa): la del superpesado quedaba chica entre los hombros; línea ANTROM, meta estatura / 7,2-7,9     # se midió «cabezón» (ronda 5): sin agrandar; la meta es estatura / 7,4-7,7 (línea ANTROM)     # OJO: el ajuste de metas de body.py es frágil: con .6 + .2 g (corrida 43964929734) kordan salió con antebrazo 0,211 H (línea ANTRO) y falló ('arms/measure-upperarm-circ-incr', (.15 if F else .45) * mu * (1 - g)), ('legs/measure-thigh-circ-incr', (.3 if F else .45) * mu * (1 - .6 * g)),
              # antebrazo grueso de pesista
-             ('arms/l-lowerarm-scale-horiz-incr', (.22 if F else .4) * (1 - .7 * g)), ('arms/r-lowerarm-scale-horiz-incr', (.22 if F else .4) * (1 - .7 * g)), ('arms/l-lowerarm-scale-depth-incr', (.22 if F else .4) * (1 - .7 * g)), ('arms/r-lowerarm-scale-depth-incr', (.22 if F else .4) * (1 - .7 * g)),
+             ] + [(f'arms/{s_}-lowerarm-scale-{e_}-incr', (.22 if F else .3) * (1 - g) if an else (.22 if F else .4) * (1 - .7 * g)) for e_ in ('horiz', 'depth') for s_ in 'lr'] + [
              # la panza del pesado: alta, redonda y firme (no caída), y la cara más llena
              ('stomach/stomach-pregnant-incr', _clip(.45 * g * g, 0, 1)), ('torso/torso-scale-depth-incr', _clip(.5 * g, 0, 1)), ('head/head-fat-incr', _clip((.7 if F else .5) * g, 0, 1)), ('neck/neck-double-incr', _clip((.5 if F else .2) * g * g, 0, 1))]     # el cuello del pesado tiene que existir: con más papada y cabeza llena quedaba hundido entre los hombros
     if an:
@@ -200,13 +202,13 @@ def cfg(k):
         extra += [('torso/torso-vshape-incr', (.1 if F else .22) * _clip(1 - 1.3 * g, 0, 1))] + list(p.get('extra', []))
     # Si con el macro 'weight' al máximo la masa no alcanza (categorías abiertas), body.py suma este paquete de volumen de 0 a 1.
     volumen = [('torso/torso-scale-horiz-incr', .7), ('torso/torso-scale-depth-incr', .55), ('stomach/stomach-pregnant-incr', .15), ('hip/hip-scale-depth-incr', .3), ('buttocks/buttocks-volume-incr', .12), ('hip/hip-scale-horiz-incr', .35),
-               ('torso/measure-waist-circ-incr', .5), ('neck/measure-neck-circ-incr', .12 if F else .22)] + [(f'{a}/{s_}-{b_}', w) for s_ in 'lr' for a, b_, w in (('legs', 'upperleg-fat-incr', .9), ('legs', 'lowerleg-fat-incr', .5))]     # sin brazos en el paquete: al superpesado le inflaba hombros y brazos como globos («deforme», dueño 16-nov); la masa va a tronco, panza, cadera y muslos
+               ('torso/measure-waist-circ-incr', .5), ('neck/measure-neck-circ-incr', .12 if F else .22)] + [(f'{a}/{s_}-{b_}', w) for s_ in 'lr' for a, b_, w in (('legs', 'upperleg-fat-incr', .5 if an else .9), ('legs', 'lowerleg-fat-incr', .3 if an else .5))]     # sin brazos en el paquete: al superpesado le inflaba hombros y brazos como globos («deforme», dueño 16-nov); la masa va a tronco, panza, cadera y muslos
     return dict(height=H, macro=macro, legs=dict(up=0, low=0), arms=dict(up=0, low=0), torso=q['torso'], extra=extra + extra_f, face=list(p.get('cara', [])),
                 metas=dict(femur=q['femur'], tibia=q['tibia'], brazo=q['brazo'], hombros=q['hombros'], antebrazo=q['antebrazo']),
-                musc=musc, masa=m, rho=1.07 - .07 * g, volumen=volumen, fisico=p.get('fisico'), cabeza=p.get('cabeza', (1. if F else .955 + .03 * g) if an else 1.), genero=p['genero'], categoria=p['categoria'])
+                musc=musc, masa=m, rho=1.07 - .07 * g, volumen=volumen, fisico=p.get('fisico'), cabeza=p.get('cabeza', (1. if F else .94 + .04 * g) if an else 1.), genero=p['genero'], categoria=p['categoria'])
 
 # ganancia de cada grupo muscular del físico anatómico (tex.GRUPOS). La mujer: piernas, glúteo y espalda de pesista; tren superior más liviano y sin pectoral marcado
-_GRUPOS_M = dict(deltoide=1.1, biceps=1., triceps=1., antebrazo=.8, pectoral=1., trapecio=.8, dorsal=1.1, erectores=1., gluteo=1.2, cuadriceps=1.45, isquios=1.3, aductor=1., gemelos=1.0, muslo=1., codo=1., rodilla=1., cintura=1.)
+_GRUPOS_M = dict(deltoide=1.1, biceps=1., triceps=1., antebrazo=.8, pectoral=1., trapecio=.8, dorsal=1.1, erectores=1., gluteo=1.3, cuadriceps=1.45, isquios=1.3, aductor=1., gemelos=.85, muslo=1.3, codo=1., rodilla=1., cintura=1.)
 _GRUPOS_F = dict(deltoide=.6, biceps=.45, triceps=.5, antebrazo=.5, pectoral=0., trapecio=.5, dorsal=.6, erectores=.7, gluteo=.9, cuadriceps=.8, isquios=.8, aductor=.6, gemelos=.7, muslo=.6, codo=.6, rodilla=.8, cintura=.6)
 def sty(k):
     """Parámetros de indumentaria, piel y pelo para tex.py, geo.py y finish.py (los mismos nombres de clave que usaban ventura y brenner)."""
@@ -242,7 +244,7 @@ def sty(k):
         # el normal map repite poco de la masa (ya está en la silueta) y carga los surcos finos. Las ventanas radiales se abren porque el miembro es más grueso.
         d = _clip(1 - 1.1 * g, .15, 1)     # definición: con grasa los vientres se funden
         S['fisico'] = 'anatomico'; S['anat'].update(fisico='anatomico', masa=1., geo=(1., .6), normal=.30, fino=1.6, surco=1.25 * d, radios=(1.32, 1.22, 1.22, 1.2),
-                                                    grupos=dict(_GRUPOS_F if F else _GRUPOS_M, **p.get('grupos', {})))
+                                                    grupos=dict({k_: v_ * (1 + .35 * g if k_ in ('muslo', 'gluteo') else 1 - g if k_ in ('cintura', 'rodilla', 'codo') else 1 - .55 * g) for k_, v_ in (_GRUPOS_F if F else _GRUPOS_M).items()}, **p.get('grupos', {})))     # con grasa: vientres más fundidos, más grosor de muslo y glúteo, sin cintura marcada
     if rod:
         # moño: dirección desde el centro de la cabeza (X lateral, +Y atrás, +Z arriba) y radio en m para 1,69 m
         a = math.radians(62 if h['peinado'] == 'rodete_alto' else 18); S['bun'] = dict(dir=(0., math.cos(a), math.sin(a)), r=.043 if h['peinado'] == 'rodete_alto' else .046)
