@@ -8,6 +8,16 @@ Juego web de halterofilia. La prioridad es el equilibrio entre calidad visual y 
 
 Repo: https://github.com/jvidelac1/tarima (rama de trabajo `pasada-visual`).
 
+## Cuerpo del pesista por código (prototipo, rama `v-cuerpo`, 17-nov)
+
+Pregunta del dueño: ¿se puede hacer el pesista todo por código, sin Blender? Prototipo de UN pesista sobre el esqueleto y las poses de Kordan. No está en el juego: solo en el laboratorio.
+
+- `web/js/game/cuerpo/`: `campo.js` (campo implícito: elipsoides, husos, cajas y losas con unión suave), `anatomia.js` (el cuerpo como ~145 primitivas atadas a las articulaciones; `FICHA` y `FICHAS.lamina`/`kordan`: colores, prendas, ganancia por grupo muscular), `mallar.js` (redes de superficie + proyección sobre el campo), `piel.js` (pesos por regla y huesos `aux_codo_*`/`aux_rodilla_*` que giran la mitad), `generar.js` (bloques con distinto paso, capas de tela/medias/pelo como distancias con signo, bandas de cinturón, rodilleras y muñequeras, ojos, hebilla; vuelve a la pose de reposo), `medidas.js` (la línea ANTROM de `blender/geo.py` en JS), `tres.js` (malla de three sobre los huesos de un `Athlete`, material por función, diseño de la malla en canvas 2D, caché en IndexedDB).
+- Laboratorio: `juego.html?banco=1&lab=cuerpo&plantel=,kordan` (`web/js/game/lab_cuerpo.js`): girar arrastrando, zoom con rueda o pellizco, botones de pose y de vista, «Comparar» (al lado, el GLB actual). `&ficha=kordan` cambia colores; `&malla=alta|media|movil`; `&cache=0`.
+- Sin navegador ni Blender (segundos): `node tools/cuerpo/vista.mjs --poses=lamina,final --vistas=0,45,90 --barra --medidas` (rasterizador propio, PNG en `~/tarima-datos/tmp/cuerpo/`); `tools/cuerpo/igual.sh` compara con la lámina del dueño figura contra figura (tabla de anchos por franja).
+- En Actions: `gh workflow run graficos.yml --ref v-cuerpo -f solo=cuerpo [-f tomas=sala,cerca]` (trabajo `cuerpo`: prueba del laboratorio interactivo y fotos); las hojas se arman con `python3 tools/cuerpo/hojas.py <fotos> <salida> [lámina]`.
+- Qué falta para usarlo en el juego: está en el informe de la rama (resumen: `check()` de poses vive en Blender y usa la malla; primera persona oculta cabeza y torso con `aCabeza`/`aTorso` y por nombre de material `Body`; LOD; la cara y las manos son simples; un solo pesista).
+
 ## Cómo correrlo
 
 ```bash
