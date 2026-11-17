@@ -52,7 +52,7 @@ on:
         type: boolean
         default: false
       solo:
-        description: 'Correr solo un trabajo: fotos o pov (vacío: los dos)'
+        description: 'Correr solo un trabajo: fotos, pov o cuerpo (vacío: fotos y pov)'
         type: string
         default: ''
 
@@ -73,7 +73,7 @@ defaults:
 jobs:
   fotos:
     name: Fotos por calidad (dibujo por software)
-    if: ${{ inputs.solo != 'pov' }}
+    if: ${{ inputs.solo != 'pov' && inputs.solo != 'cuerpo' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -143,7 +143,7 @@ jobs:
   # final de cada uno.
   pov:
     name: Primera persona y final del levantamiento (dibujo por software)
-    if: ${{ inputs.solo != 'fotos' }}
+    if: ${{ inputs.solo != 'fotos' && inputs.solo != 'cuerpo' }}
     runs-on: ubuntu-latest
     timeout-minutes: 110
     env:
@@ -242,6 +242,47 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: pov-out
+          path: out/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Cuerpo del pesista por código (rama v-cuerpo): fotos del laboratorio juego.html?banco=1&lab=cuerpo, el cuerpo generado en
+  # el navegador al lado del modelo actual, de pie en cuatro vistas y en las posiciones clave. Solo a pedido (-f solo=cuerpo).
+  cuerpo:
+    name: Cuerpo por código (laboratorio, dibujo por software)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.solo == 'cuerpo' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARIMA_ANGLE: swiftshader
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Dependencias
+        run: npm ci
+      - name: Chrome
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || true)"
+          if [ -z "$CHROME" ]; then
+            wget -q -O "$RUNNER_TEMP/chrome.deb" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+            sudo apt-get update -q && sudo apt-get install -y -q "$RUNNER_TEMP/chrome.deb"
+            CHROME="$(command -v google-chrome)"
+          fi
+          echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
+          mkdir -p out/logs out/cuerpo
+      - name: Generador sin navegador (medidas y vista previa)
+        run: node tools/cuerpo/vista.mjs --calidad=alta --medidas --tabla=out/cuerpo/medidas.txt --out=out/cuerpo/previa.png 2>&1 | tee out/logs/cuerpo_vista.log
+      - name: Fotos del laboratorio del cuerpo (banco --fotos --lab=cuerpo)
+        timeout-minutes: 20
+        run: node tools/banco.mjs --fotos=out/cuerpo/fotos --lab=cuerpo --plantel=kordan --ancho=${{ inputs.niveles == 'ancho' && 1280 || 720 }} --alto=${{ inputs.niveles == 'ancho' && 620 || 860 }} 2>&1 | tee out/logs/cuerpo_fotos.log
+      - name: Resultado como artefacto
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: cuerpo-out
           path: out/
           if-no-files-found: warn
           retention-days: 14

@@ -88,7 +88,7 @@ function conTono(m) {
  * pieza en vez de una por grupo) y lo de la arena que recibe sombra dentro del cono de la clave (la tarima y la alfombra:
  * con VSM three dibuja también lo que recibe, y sin ellos el borde de la sombra se aclara). Nada más.
  */
-const CAPA_SOMBRA = 2, SOMBRA_MAT = new THREE.MeshBasicMaterial(), sinGrupos = new WeakMap();
+export const CAPA_SOMBRA = 2; const SOMBRA_MAT = new THREE.MeshBasicMaterial(), sinGrupos = new WeakMap();
 function copiaDeSombra(g) {
   let p = sinGrupos.get(g);
   if (!p) { p = new THREE.BufferGeometry(); if (g.index) p.setIndex(g.index); p.setAttribute('position', g.attributes.position); sinGrupos.set(g, p); }      // comparte los búferes: la barra que se curva se curva también acá
@@ -175,7 +175,7 @@ const BORDE_FS = `
 		if ( bordeAt > 0.0 ) RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );
 	}`;
 /** Pone el parche de bordes en un material con luces (encadenado al onBeforeCompile que ya tenga). Sin efecto mientras BORDE.on sea false. */
-function conBorde(m) {
+export function conBorde(m) {
   if (!m || !m.isMeshStandardMaterial || BORDE.mats.has(m)) return; BORDE.mats.add(m);
   const antes = m.onBeforeCompile, propia = m.customProgramCacheKey !== THREE.Material.prototype.customProgramCacheKey, clave = m.customProgramCacheKey;
   m.onBeforeCompile = function (sh, r) {

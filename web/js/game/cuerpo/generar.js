@@ -152,7 +152,7 @@ export function generar(esq, ficha = {}, calidad = 'alta') {
   for (const m of mallas) { const n = m.pos.length / 3;
     for (let k = 0; k < n; k++) { const v = v0 + k; let x = m.pos[k * 3], y = m.pos[k * 3 + 1], z = m.pos[k * 3 + 2]; const nx = m.nor[k * 3], ny = m.nor[k * 3 + 1], nz = m.nor[k * 3 + 2], a = atributos(x, y, z);
       gen[v * 3] = x; gen[v * 3 + 1] = y; gen[v * 3 + 2] = z; x += nx * a.despl; y += ny * a.despl; z += nz * a.despl;
-      cl.set(a.col, v * 3); sup.set(a.sup, v * 4); sup2.set(a.sup2, v * 4); pesos(v); aReposo(v, x, y, z, nx, ny, nz); }
+      cl.set(a.col, v * 3); sup.set(a.sup, v * 4); sup2.set(a.sup2, v * 4); sup2[v * 4 + 2] = 0; pesos(v); aReposo(v, x, y, z, nx, ny, nz); }
     for (let k = 0; k < m.ind.length; k++) ind[i0 + k] = m.ind[k] + v0; partes.push({ nombre: m.n, v: [v0, n], i: [i0, m.ind.length] }); v0 += n; i0 += m.ind.length; }
   for (const x of extra) { const n = x.pos.length / 3; let N = x.nor;
     if (!N) { N = new Float32Array(n * 3); for (let t = 0; t < x.ind.length; t += 3) { const a = x.ind[t], b = x.ind[t + 1], c = x.ind[t + 2], p = i => [x.pos[i * 3], x.pos[i * 3 + 1], x.pos[i * 3 + 2]], nn = cruz(sub(p(b), p(a)), sub(p(c), p(a))); for (const i of [a, b, c]) { N[i * 3] += nn[0]; N[i * 3 + 1] += nn[1]; N[i * 3 + 2] += nn[2]; } }
