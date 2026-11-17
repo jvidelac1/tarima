@@ -2372,6 +2372,14 @@ Sin fusionar a `main` ni a `prueba` y sin publicar: lo decide el dueño.
   los modelos pedidos (cortaba en cuatro archivos); `carga.yml` acepta `-f antes=<ref>` y `-f visor=false`;
   `check_analitica` da 120 s al primer clic: con el 3D por software, compilar tres modelos distintos al abrir pasó de 30 s
   (en `visual` la misma prueba pasa con 30 s, corrida 44051486379). Es costo real de arranque; no se midió en una placa.
+- **Shader que no compila** (`revisarShaders`): antes de probar con Móvil se sueltan los programas de la escena
+  (`Escena.soltarProgramas`). three avisa de un programa roto una sola vez; con tres modelos todo llegaba compilado y, si
+  Móvil no creaba un programa nuevo, se anotaba «recuperada» sin estarlo (`check_carga_fallas [shader]` falló dos veces
+  seguidas en la corrida 44050689975). La causa exacta de por qué con dos modelos sí aparecía no se confirmó (estimación:
+  dependía de los tiempos). Solo cambia el camino de falla: quien hoy carga bien no pasa por ahí.
+- **Corridas en verde** (rama `v-integra`): `pruebas.yml` 44060877374 (commit d6d8ce2), `servidor.yml` 44052753896 (eb4bc6d),
+  `telefono.yml` 44050695156, `muro.yml` 44050700519 y `carga.yml` 44050710000 (9b128bc; `carga.yml` sin el trabajo del visor,
+  `-f visor=false`). Acá: `sim_test`, `servidor_test` (364 controles), `rivales_test` y `pesistas_test` bien.
 - **Estimaciones y riesgos**: memoria de video con tres modelos en un teléfono de gama baja, sin medir en un aparato real.
   El color de interfaz de Kordan (`#2fb3c4`) queda cerca del turquesa del jugador (`#35e6d6`) cuando Kordan es rival.
   Solanet casi no se probó jugando; Jastrev es el menos logrado.
