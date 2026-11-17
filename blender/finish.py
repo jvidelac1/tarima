@@ -87,6 +87,7 @@ if lash_o: parts.append(lash_o)
 if not os.environ.get('TARIMA_NOSKIN'): geo.smooth_weights(b,rig,K)
 geo.subdivide(b)
 if not os.environ.get('TARIMA_NOANAT'): geo.anatomy(b,rig,K,STY.get('cut',1.))
+if 'escote' in STY: geo.chest_smooth(b,rig,K)     # plantel nuevo: frente del pecho sin puntas bajo la malla
 geo.garments(b,rig,BJ,K,K if 'escote' in STY else 1.); geo.simplify(b,rig,BJ,K,OUT,float(os.environ['TARIMA_SIMP']) if os.environ.get('TARIMA_SIMP') else None); me=b.data
 if not os.environ.get('TARIMA_NOHAIR'):
     if 'escote' in STY and not os.environ.get('TARIMA_CAPAS'):     # plantel nuevo: pelo y barba como malla opaca con volumen (el material se sigue llamando Hair: el visor lo reconoce por ser opaco)

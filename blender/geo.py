@@ -73,6 +73,20 @@ def anatomy(b,rig,K,cut=1.):
     B,F,_=tex.anatomy(co,no,J,K); names,W=wget(b); keep=1-sum(W[:,j] for j,n in enumerate(names) if any(k in n for k in ('Head','Hand','Foot','Toe')))
     d=(B*ANAT_GEO[0]+F*ANAT_GEO[1]*cut)*np.clip(keep,0,1); me.vertices.foreach_set('co',(co+no*d[:,None]).ravel()); me.update()
     print(f'ANAT desplazamiento de malla: máx +{d.max()*1000:.1f} / {d.min()*1000:.1f} mm, {int((np.abs(d)>5e-4).sum())} vértices')
+def chest_smooth(b,rig,K,iters=30):
+    """Frente del pecho liso en la malla final (ya subdividida y con el relieve muscular): bajo la malla se marcaban dos puntas (hombres y
+    mujeres), que el alisado de make.py sobre la malla gruesa no sacaba. Laplaciano sobre el frente del tronco entre la clavícula y el
+    esternón bajo, con bordes en degradé: borra lo angosto (puntas, surcos finos) y deja la forma ancha. Informa la punta más alta antes y después."""
+    co=coords(b); me=b.data; N=len(co); no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3); sh=head(rig,'LeftArm')
+    E=np.empty(len(me.edges)*2,int); me.edges.foreach_get('vertices',E); E=E.reshape(-1,2); deg=np.maximum(np.bincount(E.ravel(),minlength=N),1)[:,None]
+    z=co[:,2]; ax=np.abs(co[:,0]); w=(no[:,1]<-.15)*sm(sh[2]-.50*K,sh[2]-.42*K,z)*sm(sh[2]-.05*K,sh[2]-.10*K,z)*sm(.21*K,.17*K,ax)
+    def prom(c):
+        A=np.zeros_like(c); np.add.at(A,E[:,0],c[E[:,1]]); np.add.at(A,E[:,1],c[E[:,0]]); return A/deg
+    punta=lambda c:float((((c-prom(c))*no).sum(1)*(w>.5)).max())
+    p0=punta(co); c=co.copy()
+    for _ in range(iters): c=c+(prom(c)-c)*(.6*w)[:,None]
+    me.vertices.foreach_set('co',c.ravel()); me.update()
+    print(f'PECHO liso: {int((w>.05).sum())} vértices, punta más alta {p0*1000:.2f} mm -> {punta(c)*1000:.2f} mm, desplazamiento máx {np.linalg.norm(c-co,axis=1).max()*1000:.1f} mm')
 SIMPLIFY=1.0   # fracción de caras que se conserva en las zonas simplificables. 1 = no simplificar (por defecto; TARIMA_SIMP=0.32 lo activa).
 # Queda apagado: esas zonas son solo el 9 % de las caras del cuerpo (la cabeza es el 37 % y las manos el 28 %), se ahorran ~6 mil triángulos,
 # y al cambiar la densidad de vértices del muslo cambia el radio por percentil que mide poses.py (muslo 10,2 -> 8,9 cm en brenner): afloja check() sin querer.
@@ -205,7 +219,7 @@ def correctives(b,rig,K,fem=False):
     for p in pb: p.matrix_basis=Matrix()
     for n,q in basis.items(): pb[PRE+n].matrix_basis=Quaternion(q).to_matrix().to_4x4()
     bpy.context.view_layer.update(); w0={side:armup_weight(rig,side) for _,side in sides}
-    d=_delta(b,rig,basis,mask,36,.6,sculpt=armup_sculpt(rig,K,co,('pec',) if fem else ()))     # la mujer no lleva el empuje del pectoral (bajo la malla era un bulto en punta)
+    d=_delta(b,rig,basis,mask,36,.6,sculpt=armup_sculpt(rig,K,co,('pec',)))     # la mujer no lleva el empuje del pectoral (bajo la malla era un bulto en punta)
     for sgn,side in sides: keys['corr_armUp_'+side[0]]=d*((co[:,0]*sgn>0)[:,None])/max(w0[side],.5)
     # rodilla en flexión profunda y codo cerrado: peso = smoothstep(lo,hi, flexión), flexión = ángulo entre los dos segmentos
     for nm,ref,(p0,p1,p2),r in (('knee',KNEE,HINGE['knee'][0],.15),('elbow',ELBOW,HINGE['elbow'][0],.10),('wrist',WRIST,HINGE['wrist'][0],.075)):
