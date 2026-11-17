@@ -69,6 +69,7 @@ export default {
   'bienvenida.jugar': 'Play',
   'bienvenida.opciones': 'Options',
   'pesista.titulo': '{nombre}, pick your lifter',
+  'pesista.nuevo': '(new)',      // marca de los modelos nuevos en la selección de pesista (pedido del dueño, 17-nov)
   'pesista.ventura.tipo': 'Compact', 'pesista.ventura.alto': '1.70 m', 'pesista.ventura.txt': "Forgives timing that's a bit off.",
   'pesista.brenner.tipo': 'Long', 'pesista.brenner.alto': '1.83 m', 'pesista.brenner.txt': 'Tires slowly, rises under pressure.',
   'pesista.marangi.tipo': 'Powerful', 'pesista.marangi.alto': '1.83 m', 'pesista.marangi.txt': 'Very strong, but needs precise timing and tires fast.',

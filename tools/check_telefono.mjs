@@ -376,7 +376,7 @@ async function seleccion(C, calidad = 'alta') {
   const J = (fn, a) => page.evaluate(fn, a), av = ms => J(ms => JUEGO.test.avanzar(ms), ms);
   const foto = async nombre => { await J(() => { try { JUEGO.escena.cuadro(0, true); } catch (e) { console.error('cuadro forzado: ' + (e.stack || e)); } }); await page.screenshot({ path: path.join(dir, `${calidad === 'alta' ? '' : calidad + '_'}${nombre}.png`) }).catch(() => null); };
   const pulsa = async sel => { const l = page.locator(sel).first(); if (!(await l.count()) || !(await l.isVisible())) { mal(`no está a la vista ${sel}`); return false; } if (C.pc) await l.click(); else await l.tap(); return true; };
-  const est = () => J(() => { const G = JUEGO.E.elegir, e = JUEGO.escena; return { pantalla: JUEGO.E.pantalla, G: G ? { id: G.id, visto: G.visto, ang: G.ang, meta: G.meta, arriba: G.arriba, u: G.u } : null, giro: e.giro || 0, barra: e.barbell.group.visible, toques: JUEGO.toques.total }; });
+  const est = () => J(() => { const G = JUEGO.E.elegir, e = JUEGO.escena; return { pantalla: JUEGO.E.pantalla, G: G ? { id: G.id, asp: G.asp[G.id], clave: G.id + ':' + G.asp[G.id], visto: G.visto, ang: G.ang, meta: G.meta, arriba: G.arriba, u: G.u } : null, giro: e.giro || 0, barra: e.barbell.group.visible, toques: JUEGO.toques.total }; });
   const hasta = async (cond, que, tope = 240000) => { const t0 = Date.now(); for (;;) { const x = await est(); if (cond(x)) return x; if (Date.now() - t0 > tope) { mal(`no se llegó a: ${que} (${JSON.stringify(x)})`); return x; } await av(100); await page.waitForTimeout(100); } };
   /** Cajas en la página: el panel, el cuerpo del pesista (three) y la pantalla. */
   const medir = donde => J(donde => {
@@ -396,7 +396,7 @@ async function seleccion(C, calidad = 'alta') {
   await page.goto(`${base}juego.html?lang=es&semilla=20261112&dibujo=0&elegir=1&calidad=${calidad}`, { waitUntil: 'load' });
   if (!await J(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
   await J(() => JUEGO.test.manual());
-  let x = await hasta(s => s.pantalla === 'elegir' && s.G && s.G.visto === s.G.id, 'la selección con el pesista a la vista');
+  let x = await hasta(s => s.pantalla === 'elegir' && s.G && s.G.visto === s.G.clave, 'la selección con el pesista a la vista');
   await J(() => JUEGO.E.precal); await av(450);
   const ids = await J(() => [...document.querySelectorAll('#capa .panel.elegir .pesista')].map(b => b.dataset.id));
   if (ids.length !== 3) mal(`la selección muestra ${ids.length} tarjetas`);
@@ -419,35 +419,50 @@ async function seleccion(C, calidad = 'alta') {
     for (const v of ['perfil', 'espalda']) { await pulsa('#el-der'); await av(1000); const g = await est(), q = v === 'perfil' ? Math.PI / 2 : Math.PI; if (Math.abs(g.G.ang - q) > .02 || Math.abs(g.giro - q) > .02) mal(`${id} ${pose}: el botón de girar no dejó al pesista de ${v} (${g.G.ang.toFixed(2)} rad, escena ${g.giro.toFixed(2)})`); await revisar(`${id} ${pose} ${v}`); await foto(`${id}_${pose}_${v}`); }
   };
   const orden = calidad === 'alta' ? [...ids.filter(id => id === x.G?.id), ...ids.filter(id => id !== x.G?.id)] : [x.G?.id];
+  let nVistos = 0, nNuevos = 0;
   for (const id of orden) {
-    if ((await est()).G.id !== id) { await pulsa(`#capa .panel.elegir .pesista[data-id="${id}"]`); await av(500); x = await hasta(s => s.G && s.G.id === id && s.G.visto === id, `el pesista ${id} a la vista`); await av(300); }
-    const pr = await J(() => document.querySelector('#capa .panel.elegir .pesista[aria-pressed=true]')?.dataset.id); if (pr !== id) mal(`la tarjeta marcada es ${pr} y el pesista a la vista ${id}`);
-    console.log(`${tag} ${id}: «${await J(() => document.getElementById('el-ficha')?.innerText.replace(/\s+/g, ' ').trim())}»`);
-    if ((await est()).barra) mal(`${id}: de pie se dibuja la barra`);
-    await vistas(id, 'pie');
-    await pulsa('#el-pose'); await av(2600); { const g = await est(); if (!g.G.arriba || g.G.u !== 1 || !g.barra) mal(`${id}: «barra arriba» no terminó arriba (${JSON.stringify(g.G)})`); }
-    await vistas(id, 'arriba');
-    await pulsa('#el-pose'); await av(2600); { const g = await est(); if (g.G.arriba || g.G.u !== 0 || g.barra) mal(`${id}: no volvió a quedar de pie (${JSON.stringify(g.G)})`); }
+    if ((await est()).G.id !== id) { await pulsa(`#capa .panel.elegir .pesista[data-id="${id}"]`); await av(500); x = await hasta(s => s.G && s.G.id === id && s.G.visto === s.G.clave, `la plaza ${id} a la vista`); await av(300); }
+    const pr = await J(() => document.querySelector('#capa .panel.elegir .pesista[aria-pressed=true]')?.dataset.id); if (pr !== id) mal(`la tarjeta marcada es ${pr} y la plaza a la vista ${id}`);
+    // los aspectos de la plaza: el de siempre y los nuevos, que llevan la marca «(nuevo)»
+    const ops = await J(() => { const A = document.getElementById('el-aspectos'); return A.hidden ? [] : [...A.querySelectorAll('button')].map(b => ({ m: b.dataset.m, txt: b.innerText.trim(), nuevo: !!b.querySelector('.el-nuevo') })); });
+    if (calidad === 'alta' && ops.length < 2) mal(`la plaza ${id} no ofrece modelos nuevos (${JSON.stringify(ops)})`);
+    if (ops.length && (ops[0].nuevo || ops.slice(1).some(o => !o.nuevo || !/\(nuevo\)/.test(o.txt)))) mal(`${id}: la marca «(nuevo)» no está donde corresponde (${JSON.stringify(ops)})`);
+    for (const o of calidad === 'alta' && ops.length ? ops : [{ m: (await est()).G.asp }]) {
+      const k = `${id}:${o.m}`, nom = `${id}_${o.m}`;
+      if ((await est()).G.clave !== k) { await pulsa(`#el-aspectos button[data-m="${o.m}"]`); await av(500); x = await hasta(s => s.G && s.G.clave === k && s.G.visto === k, `el modelo ${o.m} a la vista en la plaza ${id}`); await av(300); }
+      const fi = await J(() => ({ txt: document.getElementById('el-ficha')?.innerText.replace(/\s+/g, ' ').trim(), nuevo: !!document.querySelector('#el-ficha .el-nuevo'), bajando: document.querySelector('#capa .panel.elegir').classList.contains('bajando') }));
+      console.log(`${tag} ${nom}: «${fi.txt}»`); nVistos++; if (o.nuevo) nNuevos++;
+      if (!!o.nuevo !== fi.nuevo) mal(`${nom}: la ficha ${fi.nuevo ? 'lleva' : 'no lleva'} la marca «(nuevo)»`);
+      if (fi.bajando) mal(`${nom}: con el pesista a la vista sigue el aviso de descarga`);
+      if ((await est()).barra) mal(`${nom}: de pie se dibuja la barra`);
+      await vistas(nom, 'pie');
+      await pulsa('#el-pose'); await av(2600); { const g = await est(); if (!g.G.arriba || g.G.u !== 1 || !g.barra) mal(`${nom}: «barra arriba» no terminó arriba (${JSON.stringify(g.G)})`); }
+      await vistas(nom, 'arriba');
+      await pulsa('#el-pose'); await av(2600); { const g = await est(); if (g.G.arriba || g.G.u !== 0 || g.barra) mal(`${nom}: no volvió a quedar de pie (${JSON.stringify(g.G)})`); }
+    }
   }
+  const ultimo = await est();
   if (C.pc && calidad === 'alta') {      // teclado: las flechas cambian de tarjeta y Enter sobre la elegida la confirma
     const a = (await est()).G.id; await J(() => document.querySelector('#capa .panel.elegir .pesista[aria-pressed=true]').focus());
-    await page.keyboard.press(ids.indexOf(a) > 0 ? 'ArrowLeft' : 'ArrowRight'); await av(500); const b = await hasta(s => s.G && s.G.visto === s.G.id, 'el pesista elegido con las flechas', 60000);
+    await page.keyboard.press(ids.indexOf(a) > 0 ? 'ArrowLeft' : 'ArrowRight'); await av(500); const b = await hasta(s => s.G && s.G.visto === s.G.clave, 'el pesista elegido con las flechas', 60000);
     if (b.G.id === a) mal('las flechas no cambiaron de pesista'); await av(500); await page.keyboard.press('Enter'); await av(300);
   } else { await pulsa('#el-listo'); await av(300); }
-  const fin = await J(() => ({ pantalla: JUEGO.E.pantalla, tarjetas: document.querySelectorAll('#capa .panel.bienvenida .pesista').length, marcado: document.querySelector('#capa .panel.bienvenida .pesista[aria-pressed=true]')?.dataset.id, giro: JUEGO.escena.giro || 0, barra: JUEGO.escena.barbell.group.visible, jugar: !!document.getElementById('btn-empezar'), errores: JUEGO.E.errores }));
+  const fin = await J(() => ({ pantalla: JUEGO.E.pantalla, tarjetas: document.querySelectorAll('#capa .panel.bienvenida .pesista').length, marcado: document.querySelector('#capa .panel.bienvenida .pesista[aria-pressed=true]')?.dataset.id, giro: JUEGO.escena.giro || 0, aspecto: JUEGO.E.aspecto, barra: JUEGO.escena.barbell.group.visible, jugar: !!document.getElementById('btn-empezar'), errores: JUEGO.E.errores }));
   if (fin.pantalla !== 'inicio' || fin.tarjetas !== 3 || !fin.jugar) mal(`«Listo» no volvió a la bienvenida con las tarjetas (${JSON.stringify(fin)})`);
   if (fin.giro || !fin.barra) mal(`al salir de la selección la escena no quedó como estaba (giro ${fin.giro}, barra ${fin.barra})`);
+  if (!C.pc && calidad === 'alta' && (fin.aspecto?.modelo !== ultimo.G.asp || fin.aspecto?.plaza !== ultimo.G.id || fin.marcado !== ultimo.G.id)) mal(`«Listo» con ${ultimo.G.clave} a la vista dejó elegido ${JSON.stringify(fin.aspecto)} (tarjeta ${fin.marcado})`);
   if (fin.errores.length) mal(`errores del juego: ${fin.errores.join(' | ').slice(0, 300)}`);
   await foto('bienvenida_despues');
   const alto = k => { const v = MED.filter(m => !m.falta && m.donde.includes(k)).map(m => m.alto); return v.length ? `${Math.round(Math.min(...v) * 100)}–${Math.round(Math.max(...v) * 100)} %` : '—'; };
-  console.log(`${tag} ${orden.length} pesistas, ${MED.length} vistas medidas · alto del pesista en pantalla: de pie ${alto(' pie ')}, barra arriba ${alto(' arriba ')} · el panel tapa como mucho ${Math.round(Math.max(0, ...MED.filter(m => !m.falta).map(m => m.tapa)) * 100)} % · vuelve a la bienvenida con ${fin.marcado} marcado`);
+  console.log(`${tag} ${nVistos} pesistas (${nNuevos} nuevos), ${MED.length} vistas medidas · alto del pesista en pantalla: de pie ${alto(' pie ')}, barra arriba ${alto(' arriba ')} · el panel tapa como mucho ${Math.round(Math.max(0, ...MED.filter(m => !m.falta).map(m => m.tapa)) * 100)} % · vuelve a la bienvenida con ${fin.marcado} marcado`);
   await ctx.close();
 }
 
 try {
   for (const C of CASOS.filter(c => !SOLO.length || SOLO.some(x => c.nombre.startsWith(x)))) await correr(C);
   // la selección de pesista corre aparte (--solo=seleccion): dibuja siempre y no entra en el tiempo de los demás casos
-  for (const C of SELECCION.filter(c => SOLO.some(x => c.nombre.startsWith(x)))) { await seleccion(C); for (const q of C.calidades || []) await seleccion(C, q); }
+  // los tres tamaños a la vez (cada uno en su contexto): por software son 7 pesistas por 6 vistas cada uno
+  await Promise.all(SELECCION.filter(c => SOLO.some(x => c.nombre.startsWith(x))).map(async C => { try { await seleccion(C); for (const q of C.calidades || []) await seleccion(C, q); } catch (e) { problemas.push(`[${C.nombre}] excepción de la prueba: ${e.stack || e.message}`); } }));
 }
 catch (e) { problemas.push('excepción de la prueba: ' + (e.stack || e.message)); }
 await browser.close(); server.close();

@@ -153,7 +153,7 @@ jobs:
       # Selección de pesista (main.js, elegirPesista): el pesista en 3D al elegir tarjeta, en computadora, acostado y parado.
       - name: Selección de pesista en 3D (check_telefono --solo=seleccion)
         if: ${{ !cancelled() && matrix.grupo == 'telefono' }}
-        timeout-minutes: 15
+        timeout-minutes: 35
         run: node tools/check_telefono.mjs --solo=seleccion --capturas=out/seleccion 2>&1 | tee out/logs/check_seleccion.log
 
       # LIF-33: lo que ve la persona cuando la carga falla (three que no baja, GLB que no bajan, sin WebGL, shader que no

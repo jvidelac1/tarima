@@ -68,6 +68,32 @@ export function vestir(lista, fichas, poses) {
   });
   return hechos;
 }
+/**
+ * Aspectos (17-nov, decisión del dueño: «que entren todos, para que los users vayan viendo la evolución; ponelos como (new)»):
+ * los modelos nuevos que el jugador puede elegir para dibujar a SU pesista en cada plaza, además del de siempre. La plaza
+ * deportiva (kilos, fases, cuerpo de la simulación) no cambia: cambia quién se ve. Los rivales quedan con los de siempre.
+ */
+export const ASPECTOS = { ventura: ['ilarraz', 'solanet'], brenner: ['kordan'], marangi: ['jastrev'] };
+let BASE = null;
+/** Guarda el plantel tal como quedó al abrir (el clásico, o el de `?plantel=`): a eso vuelve cada plaza sin aspecto elegido. */
+export function fijarBase() { BASE = { P: JSON.parse(JSON.stringify(PLANTEL)), C: JSON.parse(JSON.stringify(CUERPO)) }; }
+/** La ficha de siempre de una plaza (sin el aspecto que haya elegido el jugador). */
+export const basePlantel = id => (BASE || fijarBase() || BASE).P[id];
+/** Los modelos nuevos que se ofrecen en una plaza: los de ASPECTOS que están construidos y que no dibujan ya a otra plaza. */
+export const aspectosDe = (id, fichas, poses) => (ASPECTOS[id] || []).filter(m => fichas?.[m] && poses?.[m] && !Object.values((BASE || fijarBase() || BASE).P).some(f => f.modelo === m));
+/**
+ * Viste la plaza del jugador con el modelo `modelo` y deja las otras dos (los rivales) como siempre. Sin `modelo` (o con el
+ * de siempre de esa plaza), todo queda como al abrir. Devuelve true si la plaza quedó con un modelo nuevo.
+ */
+export function vestirJugador(plaza, modelo, fichas, poses) {
+  if (!BASE) fijarBase();
+  for (const id of Object.keys(PLANTEL)) { for (const k of Object.keys(PLANTEL[id])) delete PLANTEL[id][k]; Object.assign(PLANTEL[id], JSON.parse(JSON.stringify(BASE.P[id]))); CUERPO[id] = { ...BASE.C[id] }; }
+  const f = fichas?.[modelo], P = poses?.[modelo]; if (!PLANTEL[plaza] || !modelo || modelo === PLANTEL[plaza].modelo || !f || !P) return false;
+  Object.assign(PLANTEL[plaza], { modelo, corto: f.corto, nombre: f.nombre, pais: f.pais, codigo: f.codigo, genero: f.genero, categoria: f.categoria, masa: f.masa, vestido: true,
+    aspecto: f.aspecto || undefined, pelo: f.pelo || undefined, cara: true, tela: undefined, color: f.color || PLANTEL[plaza].color, bandera: f.bandera || PLANTEL[plaza].bandera });
+  CUERPO[plaza] = { estatura: P.h, femur: P.seg.femur / P.h, brazos: P.seg.arm / P.h, movilidad: CUERPO[plaza].movilidad };
+  return true;
+}
 /** Terna que se juega sin `?plantel=`: una de las `ternas` de web/data/plantel.json (tools/plantel_web.py). `clasico` = sin vestuario. */
 export const PLANTEL_DEFECTO = 'clasico';      // 17-nov: el dueño publica el juego nuevo con los pesistas que ya están en producción (Ventura, Brenner, Marangi); la terna nueva queda con `?plantel=hombres`
 /** De `?plantel=` a la lista de tres: el nombre de una terna de plantel.json (`mujeres`, `hombres`...) o ids separados por coma. */

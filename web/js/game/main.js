@@ -6,7 +6,7 @@ import { Escena, PLANOS } from './stage.js';
 import { poseDe, poseParado, marcas, tramo } from './sequence.js';
 import { armarCaida, poseCaida } from './caida.js';
 import { sugerencia, chanceDe } from '../sim/entrenador.js';
-import { PLANTEL, JUGADOR, FICHA, nivelFicha, ENVIONES, LEV, ETIQUETAS, GUIONES, CUERPO, BARRA, vestir, ternaDe, PLANTEL_DEFECTO } from './roster.js';
+import { PLANTEL, JUGADOR, FICHA, nivelFicha, ENVIONES, LEV, ETIQUETAS, GUIONES, CUERPO, BARRA, vestir, ternaDe, PLANTEL_DEFECTO, fijarBase, basePlantel, aspectosDe, vestirJugador } from './roster.js';
 import { Registrador, Gobernador, calidadInicial, medirRefresco, decidirCalidad, pasoDe, metaDe, nombreDe, escalones, pisoDe, PRESET, PISO_MP, MARGEN, TECHO_MP } from './perf.js';
 import { sonido } from './audio.js';
 import { detalleError, analitica, appNavegador } from './analitica.js';
@@ -1006,7 +1006,7 @@ async function inicio() {
   const mostrado = () => (S.editar ? limpiarNombre(S.nombre) : guardadoNombre) || t('bienvenida.nombre_defecto');
   // `?elegir=1` (para probar): abre directo la selección de pesista y deja las tarjetas a la vista aunque sea la primera vez
   const forzarElegir = params.get('elegir') === '1'; let abrirElegir = forzarElegir && !E.elegirVisto;
-  const verPesista = async () => { E.elegirVisto = true; cfg.id = await elegirPesista(cfg, mostrado()); S.tocoPesista = true; visita('inicio'); };
+  const verPesista = async () => { E.elegirVisto = true; const r = await elegirPesista(cfg, mostrado()); cfg.id = r.id; E.aspecto = r.aspecto ? { plaza: r.id, modelo: r.aspecto } : null; S.tocoPesista = true; visita('inicio'); };
   for (;;) {
     if (abrirElegir) { abrirElegir = false; await verPesista(); }
     const T = tactil(), facil = cfg.ctl !== 'c', uno = esU(cfg.ctl), falta = !guardado.get('tarima.tutorial'); E.ctl = cfg.ctl;
@@ -1064,12 +1064,12 @@ async function inicio() {
       const principalBtn = b.id === 'btn-empezar'; cfg.calentar = uno ? false : facil ? principalBtn === falta : principalBtn; cfg.primera = primera; if (facil) guardado.set('tarima.tutorial', '1');
       if (S.editar) guardado.set('tarima.nombre', limpiarNombre(S.nombre));
       ev('nombre_puesto', { vacio: !limpiarNombre(guardado.get('tarima.nombre')), vuelve, cambio: S.cambio });
-      ev('pesista_elegido', { pesista: TIPO[cfg.id], por_defecto: !S.tocoPesista, ofrecido: !primera });
+      ev('pesista_elegido', { pesista: TIPO[cfg.id], por_defecto: !S.tocoPesista, ofrecido: !primera, modelo: PLANTEL[cfg.id].modelo });
       E.tJugar = performance.now();
       break;
     }
   }
-  guardado.set('tarima.pesista', cfg.id); guardado.set('tarima.nivel', cfg.nivel); guardado.set('tarima.ctl', cfg.ctl); guardado.set('tarima.dificultad', cfg.dif); guardado.set('tarima.orden', cfg.orden); fijarDificultad(cfg); capa.quitar(); return cfg;
+  guardado.set('tarima.pesista', cfg.id); guardado.set('tarima.aspecto', E.aspecto?.plaza === cfg.id ? E.aspecto.modelo : ''); guardado.set('tarima.nivel', cfg.nivel); guardado.set('tarima.ctl', cfg.ctl); guardado.set('tarima.dificultad', cfg.dif); guardado.set('tarima.orden', cfg.orden); fijarDificultad(cfg); capa.quitar(); return cfg;
 }
 
 /** Dibujos de los botones de la selección de pesista (sin texto): girar un cuarto de vuelta y barra arriba. */
@@ -1090,14 +1090,23 @@ const EL_SVG = {
  */
 async function elegirPesista(cfg, nombre = '') {
   visita('elegir'); const uno = esU(cfg.ctl), yo0 = escena.yo, kg0 = escena.kg, VUELTA = 12, T_POSE = 1.7, html = document.documentElement;
-  const G = E.elegir = { id: cfg.id, visto: null, ang: 0, meta: null, pausa: 0, drag: null, arriba: false, u: 0, n: 0, cola: Promise.resolve(), fin: false, W: 0, H: 0, pn: null };
+  const G = E.elegir = { id: cfg.id, asp: {}, visto: null, ang: 0, meta: null, pausa: 0, drag: null, arriba: false, u: 0, n: 0, cola: Promise.resolve(), fin: false, W: 0, H: 0, pn: null, bajando: false };
   escena.yo = null;      // cada pesista con su propia malla: la del jugador (JUGADOR) vuelve al salir
+  // Aspectos (roster.js, ASPECTOS): en cada plaza, el modelo de siempre y los nuevos, con la marca «(nuevo)». Las fichas de
+  // los nuevos (plantel.json) y sus modelos se bajan recién acá: quien no abre la selección no baja nada de más.
+  const fichas = (await plantelJSON().catch(e => { console.warn('plantel:', e); return null; }))?.pesistas || null, poses = escena.poses;
+  const opciones = id => [basePlantel(id).modelo, ...aspectosDe(id, fichas, poses)], nuevo = (id, m) => m !== basePlantel(id).modelo;
+  for (const id of IDS) G.asp[id] = id === cfg.id && E.aspecto?.plaza === id && opciones(id).includes(E.aspecto.modelo) ? E.aspecto.modelo : basePlantel(id).modelo;
+  const clave = () => G.id + ':' + G.asp[G.id];
+  /** Lo que se muestra de un pesista: el modelo nuevo con su ficha de plantel.json; el de siempre, con la suya. */
+  const cara = (id, m = G.asp[id]) => { const b = basePlantel(id), x = nuevo(id, m) ? fichas[m] : { ...(b.modelo === id ? fichas?.[id] : null), ...b }; return { ...x, nuevo: nuevo(id, m), alto: nuevo(id, m) || b.vestido ? dec(poses[m].h) + ' m' : t(`pesista.${id}.alto`) }; };
+  const marca = f => (f.nuevo ? ` <span class="el-nuevo">${t('pesista.nuevo')}</span>` : '');
   const dec = (n, d = 2) => n.toFixed(d).replace('.', idiomaActual() === 'es' ? ',' : '.');
   const ficha = id => {
-    const f = PLANTEL[id], at = datos.atletas[id];
-    return `<b class="el-nombre">${esc(f.nombre || f.corto)}</b>
+    const f = cara(id), at = datos.atletas[id];
+    return `<b class="el-nombre">${esc(f.nombre || f.corto)}${marca(f)}</b>
       ${f.pais ? `<span class="el-pais"><i style="background:${f.bandera}"></i>${esc(f.codigo || '')} · ${esc(f.pais)}</span>` : ''}
-      <span class="el-datos">${f.categoria ? `<em>${esc(f.categoria)} kg</em>` : ''}<span>${f.vestido ? dec(CUERPO[id].estatura) + ' m' : t(`pesista.${id}.alto`)}${f.masa ? ` · ${dec(f.masa, f.masa % 1 ? 1 : 0)} kg` : ''}</span></span>
+      <span class="el-datos">${f.categoria ? `<em>${esc(f.categoria)} kg</em>` : ''}<span>${f.alto}${f.masa ? ` · ${dec(f.masa, f.masa % 1 ? 1 : 0)} kg` : ''}</span></span>
       <small class="conviene">${t(cfg.ctl === 'b' ? `pesista.${id}.b` : uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small><small class="rm">${t('rm.tarjeta', { s: at.techo.s, c: at.techo.c })}</small>`;
   };
   /** La pose del arranque en `u` (0 = de pie, 1 = barra arriba): el clip entero, con arranque y frenado suaves. */
@@ -1117,19 +1126,27 @@ async function elegirPesista(cfg, nombre = '') {
     escena.primerPlano('elegir', { x: (x0 + x1) / 2, y: (y0 + y1) / 2, dAbs: X / tg }, suave);
   };
   /** Pone en escena al pesista de la tarjeta `id` (con un fundido corto si ya había otro a la vista). */
-  const ver = id => (G.cola = G.cola.then(async () => {
-    if (G.fin || id !== G.id || id === G.visto) return;
-    try { await escena.cargar(id); } catch (e) { console.warn('elegir:', e); return; }
-    if (G.fin || id !== G.id) return;
-    const cambio = async () => { escena.girar(0); await escena.mostrar(id); escena.setCarga(Math.round(datos.atletas[id].techo.s), 's'); G.u = G.arriba ? 1 : 0; posar(); encuadrar(0); G.visto = id; };
+  const bajando = on => { G.bajando = on; G.pn?.classList.toggle('bajando', on); };
+  const ver = () => (G.cola = G.cola.then(async () => {
+    const id = G.id, k = clave(); if (G.fin || k === G.visto) return;
+    vestirJugador(id, G.asp[id], fichas, poses);      // la plaza elegida con ese modelo; las otras dos, como siempre
+    if (!escena.atletas[PLANTEL[id].modelo]) { bajando(true); E.reprecal = true; }      // un modelo que no estaba: se baja ahora, y antes de jugar se precalienta de nuevo
+    try { await escena.cargar(id); } catch (e) { console.warn('elegir:', e); return; } finally { bajando(false); }
+    if (G.fin || k !== clave()) return;
+    const cambio = async () => { escena.girar(0); await escena.mostrar(id); escena.setCarga(Math.round(datos.atletas[id].techo.s), 's'); G.u = G.arriba ? 1 : 0; posar(); encuadrar(0); G.visto = k; };
     if (G.visto) await fundido(cambio); else await cambio();
   }).catch(e => { console.warn('elegir:', e); }));
-  const marcar = () => { const pn = G.pn; if (!pn) return; pn.querySelectorAll('.pesista').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.id === G.id))); pn.querySelector('#el-ficha').innerHTML = ficha(G.id); pn.querySelector('#el-pose').setAttribute('aria-pressed', String(G.arriba)); };
-  const elegir = id => { if (!IDS.includes(id) || id === G.id) return; G.id = id; marcar(); ver(id); };
+  const marcar = () => { const pn = G.pn; if (!pn) return; pn.querySelectorAll('.pesista').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.id === G.id)); const f = cara(b.dataset.id); b.querySelector('small').innerHTML = esc(f.corto) + marca(f); b.querySelector('.b').style.background = f.bandera; });
+    const ops = opciones(G.id), A = pn.querySelector('#el-aspectos'); A.hidden = ops.length < 2;
+    A.innerHTML = ops.map(m => { const f = cara(G.id, m); return `<button data-m="${m}" aria-pressed="${m === G.asp[G.id]}">${esc(f.corto)}${marca(f)}</button>`; }).join('');
+    pn.classList.toggle('bajando', G.bajando); pn.querySelector('#el-ficha').innerHTML = ficha(G.id); pn.querySelector('#el-pose').setAttribute('aria-pressed', String(G.arriba)); };
+  const elegir = id => { if (!IDS.includes(id) || id === G.id) return; G.id = id; marcar(); ver(); };
+  const aspecto = m => { if (!opciones(G.id).includes(m) || m === G.asp[G.id]) return; G.asp[G.id] = m; marcar(); G.pn?.querySelector(`#el-aspectos [data-m="${m}"]`)?.focus({ preventScroll: true }); ver(); };
   let listo = null; const fin = new Promise(res => { listo = res; });
   const montar = () => {
     const pn = G.pn = capa.poner(`<h2>${esc(t('pesista.titulo', { nombre: nombre || t('bienvenida.nombre_defecto') }))}</h2>
-      <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b><small>${esc(PLANTEL[id].corto)}</small></button>`).join('')}</div>
+      <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b><small></small></button>`).join('')}</div>
+      <div class="el-aspectos" id="el-aspectos"></div><p class="el-bajando">${t('carga.bajando')}…</p>
       <div class="el-ficha" id="el-ficha"></div>
       <div class="el-ver"><button id="el-izq" data-g="-1">${EL_SVG.giro}</button><button id="el-der" data-g="1">${EL_SVG.giro}</button><button id="el-pose" aria-label="${esc(t('cuerpo.tramo.arriba'))}">${EL_SVG.arriba}</button><button class="ir" id="el-listo">${t('campo.listo')}</button></div>`, 'elegir');
     marcar(); if (!tactil() && !E.sobre) pn.querySelector('.pesista[aria-pressed=true]')?.focus({ preventScroll: true });      // con teclado el foco arranca en la tarjeta elegida
@@ -1139,7 +1156,8 @@ async function elegirPesista(cfg, nombre = '') {
     z.addEventListener('pointermove', e => { const d = G.drag; if (d && d.id === e.pointerId) G.ang = d.ang + (e.clientX - d.x) * .012; });
     const suelta = e => { if (G.drag && G.drag.id === e.pointerId) { G.drag = null; G.pausa = 3; } };
     z.addEventListener('pointerup', suelta); z.addEventListener('pointercancel', suelta);
-    pn.querySelectorAll('button').forEach(b => {
+    pn.querySelector('#el-aspectos').addEventListener('click', e => { const b = e.target.closest('button[data-m]'); if (b && activa(pn)) { sonido.activar(); aspecto(b.dataset.m); } });
+    pn.querySelectorAll('button:not([data-m])').forEach(b => {
       b.addEventListener('click', e => {
         if (!activa(pn)) return; sonido.activar();
         if (b.dataset.id) { if (b.dataset.id === G.id && e.detail === 0) listo(); else elegir(b.dataset.id); }      // con teclado: flechas para cambiar y Enter sobre la tarjeta elegida para quedarse con ella
@@ -1161,15 +1179,17 @@ async function elegirPesista(cfg, nombre = '') {
     const uT = G.arriba ? 1 : 0;
     if (G.u !== uT) { G.u = uT > G.u ? Math.min(1, G.u + dt / T_POSE) : Math.max(0, G.u - dt / T_POSE); posar(); } else escena.girar(G.ang);
   };
-  ver(G.id);
+  ver();
   await fin;
   G.fin = true; enCuadro = null; E.repintar = null;
   // todo como estaba: sin giro, de pie, con la barra a la vista y su carga, y la malla del jugador en su pesista. Si un
   // cambio de pesista quedó a medias (un fundido en curso), se vuelve a dejar todo en su lugar cuando termina
   const dejar = () => { escena.barbell.group.visible = true; escena.girar(0); if (kg0) escena.setCarga(kg0); if (escena.activo) escena.posar(poseParado(escena.P, 's'), 's'); E.forzar = true; };
   dejar(); G.cola.then(() => { if (E.pantalla === 'inicio' || E.pantalla === 'elegir') dejar(); });
+  // lo elegido queda puesto en el plantel (la plaza del jugador con su modelo, los rivales con los de siempre)
+  const m = G.asp[G.id], es = vestirJugador(G.id, m, fichas, poses);
   escena.yo = yo0; E.elegir = null; capa.quitar();
-  return G.id;
+  return { id: G.id, aspecto: es ? m : '' };
 }
 
 /**
@@ -1764,6 +1784,9 @@ async function cargarModelos() {
     catch (e) { cargaFallida('modelo', e, { intentos: 3 }); E.reprecal = true; await avisoFalla('descarga'); cargaUI.mostrar('carga.modelos'); }
   }
 }
+/** data/plantel.json (fichas de los modelos del plantel), una sola vez; si falla, el próximo pedido lo intenta de nuevo. */
+let plantelP = null;
+const plantelJSON = () => (plantelP ||= reintentar(() => fetch('data/plantel.json').then(r => { if (!r.ok) throw new Error('data/plantel.json: ' + r.status); return r.json(); })).catch(e => { plantelP = null; throw e; }));
 /** Un JSON de data/, con reintentos y el aviso si no llega. */
 async function bajarDatos(urls) {
   for (;;) {
@@ -1811,7 +1834,12 @@ async function iniciar() {
   // `?plantel=solanet,kordan,jastrev` elige otra; `?plantel=clasico` deja a Ventura, Brenner y Marangi con sus modelos de siempre
   // (y no baja plantel.json). Si plantel.json no llega o a la terna le falta un modelo, esa plaza queda con el modelo clásico.
   { const q = params.get('plantel') || PLANTEL_DEFECTO;
-    if (q !== 'clasico') { try { const pl = await reintentar(() => fetch('data/plantel.json').then(r => { if (!r.ok) throw new Error('data/plantel.json: ' + r.status); return r.json(); })); const v = vestir(ternaDe(q, pl), pl.pesistas, poses); console.info('plantel:', v.map(id => `${id} → ${PLANTEL[id].modelo}`).join(', ') || 'sin cambios'); } catch (e) { console.warn('plantel:', e); } } }
+    if (q !== 'clasico') { try { const pl = await plantelJSON(); const v = vestir(ternaDe(q, pl), pl.pesistas, poses); console.info('plantel:', v.map(id => `${id} → ${PLANTEL[id].modelo}`).join(', ') || 'sin cambios'); } catch (e) { console.warn('plantel:', e); } } }
+  // Aspecto elegido por el jugador para su plaza (selección de pesista; `tarima.aspecto`): solo entonces se baja plantel.json
+  // y el modelo nuevo en lugar del de siempre. Sin elección, todo queda como siempre y no se baja nada de más.
+  fijarBase();
+  { const pz = IDS.includes(guardado.get('tarima.pesista')) ? guardado.get('tarima.pesista') : 'ventura', m = guardado.get('tarima.aspecto');
+    if (m && poses[m]) { try { const pl = await plantelJSON(); if (aspectosDe(pz, pl.pesistas, poses).includes(m) && vestirJugador(pz, m, pl.pesistas, poses)) E.aspecto = { plaza: pz, modelo: m }; } catch (e) { console.warn('aspecto:', e); } } }
   await Promise.all([`800 20px 'Saira Condensed'`, `700 20px 'Saira Condensed'`, `500 20px 'Saira Condensed'`].map(f => document.fonts.load(f).catch(() => null)));
   Object.assign(C, calidadInicial(params.get('calidad') || params.get('q'), tactil())); fijarHz(await refresco);
   if (C.auto) C.Q = { ...C.Q, dpr: 2 };      // en automático el tope de píxeles lo pone la calibración, no la densidad de cada calidad

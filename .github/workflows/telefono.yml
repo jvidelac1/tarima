@@ -76,7 +76,7 @@ jobs:
         run: node tools/check_telefono.mjs ${{ inputs.solo && format('--solo={0}', inputs.solo) || '' }} 2>&1 | tee out/logs/check_telefono.log
       - name: Selección de pesista en 3D (check_telefono --solo=seleccion)
         if: ${{ !cancelled() && !inputs.solo }}
-        timeout-minutes: 15
+        timeout-minutes: 35
         run: node tools/check_telefono.mjs --solo=seleccion --capturas=out/seleccion 2>&1 | tee out/logs/check_seleccion.log
       - name: iPhone acostado, Safari y Chrome de iOS (check_iphone)
         if: ${{ !cancelled() && !inputs.solo }}
