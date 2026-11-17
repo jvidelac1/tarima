@@ -129,7 +129,7 @@ void main(){
 }`;
 
 const FINAL_FS = /* glsl */`
-uniform sampler2D tDiffuse; uniform sampler2D tBloom; uniform vec2 uRes; uniform float uTime, uVignette, uGrain, uCA, uSat, uContrast, uShadowGamma, uBloom;
+uniform sampler2D tDiffuse; uniform sampler2D tBloom; uniform vec2 uRes; uniform float uTime, uVignette, uGrain, uCA, uSat, uContrast, uShadowGamma, uBloom, uNegro; uniform vec3 uFrio, uCalido;
 varying vec2 vUv;
 #include <tonemapping_pars_fragment>
 float hash( vec2 p ){ vec3 p3 = fract( vec3( p.xyx ) * 0.1031 ); p3 += dot( p3, p3.yzx + 33.33 ); return fract( ( p3.x + p3.y ) * p3.z ); }
@@ -150,10 +150,10 @@ void main(){
   col = mix( vec3( l ), col, uSat );
   col = max( ( col - 0.5 ) * uContrast + 0.5, 0.0 );
   col = mix( pow( col, vec3( uShadowGamma ) ), col, smoothstep( 0.0, 0.5, l ) );
-  col *= mix( vec3( 0.985, 0.995, 1.025 ), vec3( 1.03, 1.0, 0.965 ), smoothstep( 0.05, 0.85, l ) );
+  col *= mix( uFrio, uCalido, smoothstep( 0.05, 0.85, l ) );
   col *= 1.0 - uVignette * smoothstep( 0.14, 0.66, r2 );
   col = sRGBTransferOETF( vec4( max( col, 0.0 ), 1.0 ) ).rgb;
-  col = col * 0.98 + vec3( 0.02, 0.02, 0.023 );   // negros levantados, como señal de TV
+  col = col * ( 1.0 - uNegro ) + uNegro * vec3( 1.0, 1.0, 1.15 );   // negros levantados, como señal de TV
   col += ( hash( vUv * uRes + fract( uTime ) * 311.7 ) - 0.5 ) * uGrain;
   gl_FragColor = vec4( col, 1.0 );
 }`;
@@ -161,7 +161,7 @@ void main(){
 export class Post {
   constructor(renderer, scene, camera, quality) {
     this.renderer = renderer; this.scene = scene; this.camera = camera; this.q = quality;
-    this.focus = 9; this.time = 0; this.reduceMotion = false; this.skip = {}; this.prof = null;   // skip: {ao,dof,bloom,smaa} para perfilar por pase; prof: marca de etapa (main.js)
+    this.focus = 9; this.cerca = .35; this.time = 0; this.reduceMotion = false; this.skip = {}; this.prof = null;   // skip: {ao,dof,bloom,smaa} para perfilar por pase; prof: marca de etapa (main.js)
     const depth = new THREE.DepthTexture(1, 1); depth.type = THREE.UnsignedIntType; depth.format = THREE.DepthFormat; this.depth = depth;
     // El color de la escena va en R11F_G11F_B10F: HDR sin alfa a 4 bytes por muestra, la mitad que RGBA16F. Con MSAA 4x es el
     // destino más grande del cuadro; el desenfoque, el halo y el compuesto siguen en 16 bits por canal.
@@ -208,7 +208,7 @@ export class Post {
     }
     this.finalMat = new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: FINAL_FS, depthTest: false, depthWrite: false, defines: { ...(dof ? { USE_CA: 1 } : {}), ...(this.bloom ? { USE_BLOOM: 1 } : {}) }, uniforms: {
       tDiffuse: { value: null }, tBloom: { value: this.bloom ? this.bloom.renderTargetsHorizontal[0].texture : null }, uBloom: { value: 1 }, uRes: { value: new THREE.Vector2() }, uTime: { value: 0 }, toneMappingExposure: { value: 1.12 },
-      uVignette: { value: .26 }, uGrain: { value: .02 }, uCA: { value: .0045 }, uSat: { value: 1.04 }, uContrast: { value: 1.03 }, uShadowGamma: { value: .86 },
+      uVignette: { value: .26 }, uGrain: { value: .02 }, uCA: { value: .0045 }, uSat: { value: 1.04 }, uContrast: { value: 1.03 }, uShadowGamma: { value: .86 }, uFrio: { value: new THREE.Vector3(.985, .995, 1.025) }, uCalido: { value: new THREE.Vector3(1.03, 1, .965) }, uNegro: { value: .02 },
     } });
     if (quality.smaa) { this.smaa = new SMAAPass(); this.rtC = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false }); }
   }
@@ -257,7 +257,7 @@ export class Post {
     let read = this.sceneRT;
     // teleobjetivo = menos profundidad de campo: el desenfoque máximo crece con la focal, con tope en píxeles
     const tanF = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2), maxBlur = Math.min(32, this.H / 34, Math.max(6, this.H / 46 * .2217 / tanF));
-    BOKEH.uNear.value = cam.near; BOKEH.uFar.value = cam.far; BOKEH.uFocus.value = this.focus; BOKEH.uMaxBlur.value = maxBlur; BOKEH.uPx.value = this.H / (2 * tanF); BOKEH.uRes.value.set(this.W, this.H); BOKEH.tDepth.value = this.depth; BOKEH.uUseDepth.value = this.dofBlur ? 1 : 0;
+    BOKEH.uNear.value = cam.near; BOKEH.uFar.value = cam.far; BOKEH.uFocus.value = this.focus; BOKEH.uNearScale.value = this.cerca; BOKEH.uMaxBlur.value = maxBlur; BOKEH.uPx.value = this.H / (2 * tanF); BOKEH.uRes.value.set(this.W, this.H); BOKEH.tDepth.value = this.depth; BOKEH.uUseDepth.value = this.dofBlur ? 1 : 0;
     const ao = this.aoMat && !skip.ao, dof = this.dofBlur && !skip.dof;
     P('ao');
     if (ao) {
@@ -270,7 +270,7 @@ export class Post {
     P('dof');
     if (this.mixMat && (ao || dof)) {
       for (const m of [this.dofPre, this.dofBlur, this.mixMat]) {
-        if (!m) continue; const u = m.uniforms; u.uFocus.value = this.focus; u.uMaxBlur.value = maxBlur; if (!u.tDiffuse) continue;
+        if (!m) continue; const u = m.uniforms; u.uFocus.value = this.focus; u.uMaxBlur.value = maxBlur; if (u.uNearScale) u.uNearScale.value = this.cerca;      // `cerca`: cuánto se desenfoca lo que está delante del foco (0,35; el juego lo baja en la vista del jurado) if (!u.tDiffuse) continue;
         u.tDiffuse.value = read.texture; u.uNear.value = cam.near; u.uFar.value = cam.far; u.uAO.value = ao ? AO_INTENSITY : 0;
       }
       this.maxBlur = maxBlur; this.mixMat.uniforms.uDof.value = dof ? 1 : 0;

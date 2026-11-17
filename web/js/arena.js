@@ -65,7 +65,7 @@ function ledWallCanvas(w, h) {
     for (const sx of [0, 1]) {
       const x = sx ? w * .975 : w * .025; g.textAlign = sx ? 'right' : 'left';
       g.fillStyle = sx ? 'rgba(20,10,8,.55)' : 'rgba(6,10,30,.55)'; g.fillRect(sx ? w * .71 : 0, h * .07, w * .29, h * .38);
-      g.font = `800 ${h * .2}px ${DISPLAY}`; g.fillStyle = '#f6f3ea'; g.fillText(EVENT.title, x, h * .2);
+      g.font = `800 ${h * .2}px ${DISPLAY}`; g.fillStyle = '#f6f3ea'; g.fillText(EVENT.marca, x, h * .2, w * .27);
       g.font = `700 ${h * .075}px ${DISPLAY}`; g.fillStyle = sx ? '#ffd23f' : '#6ff0e2'; g.fillText(sx ? EVENT.session.toUpperCase() : 'HALTEROFILIA', x, h * .37);      // sin año: el evento es ficticio y no lleva fecha
       drawLogo(g, sx ? w * .87 : w * .13, h * .68, h * .15, sx ? 'rgba(255,214,120,.85)' : 'rgba(150,235,255,.85)');
     }
@@ -76,7 +76,9 @@ function ledWallCanvas(w, h) {
 function bannerCanvas(w, h) {
   return makeCanvas(w, h, g => {
     g.fillStyle = '#161a2c'; g.fillRect(0, 0, w, h); g.textBaseline = 'middle'; g.textAlign = 'center';
-    for (let i = 0; i < 4; i++) { const cx = w * (i + .5) / 4; drawLogo(g, cx - w * .085, h / 2, h * .26, '#35e6d6'); g.font = `800 ${h * .56}px ${DISPLAY}`; g.fillStyle = '#fff'; g.fillText(EVENT.title, cx + w * .02, h * .54); }
+    // la marca una sola vez por vuelta; el resto, auspiciantes ficticios y la gráfica del evento (la marca repetida en cada valla abarataba)
+    const T = [[EVENT.marca, '#fff', '#35e6d6'], ['NORDVIK ACERO', '#d9dde6', '#8fa4c8'], ['OPEN · ' + EVENT.session.toUpperCase(), '#ffd23f', '#ffd23f'], ['TALKO MAGNESIO', '#e6dfd0', '#c9a25a']];
+    for (let i = 0; i < 4; i++) { const cx = w * (i + .5) / 4, [t, c1, c2] = T[i]; if (i % 2 === 0) drawLogo(g, cx - w * .1, h / 2, h * .26, c2); else { g.fillStyle = c2; g.beginPath(); g.moveTo(cx - w * .112, h * .72); g.lineTo(cx - w * .098, h * .28); g.lineTo(cx - w * .084, h * .72); g.fill(); } g.font = `800 ${h * (i % 2 ? .44 : .56)}px ${DISPLAY}`; g.fillStyle = c1; g.fillText(t, cx + w * .02, h * .54, w * .17); }
     g.fillStyle = '#ffd23f'; g.fillRect(0, 0, w, h * .06); g.fillRect(0, h * .94, w, h * .06);
   });
 }
@@ -146,13 +148,13 @@ void main(){
   #include <fog_vertex>
 }`;
 const CROWD_FS = /* glsl */`
-uniform sampler2D map; uniform float uGain;
+uniform sampler2D map; uniform float uGain; uniform vec3 uRebote;
 varying vec2 vUv; varying vec3 vCloth; varying vec3 vSkin; varying vec3 vHair;
 #include <fog_pars_fragment>
 void main(){
   vec4 t = texture2D( map, vUv ); if ( t.a < 0.42 ) discard;
   vec3 col = mix( vCloth, vSkin, smoothstep( 0.3, 0.7, t.g ) ); col = mix( col, vHair, smoothstep( 0.3, 0.7, t.b ) );
-  gl_FragColor = vec4( col * t.r * uGain, 1.0 );
+  gl_FragColor = vec4( col * t.r * uGain + uRebote * smoothstep( 0.72, 1.0, t.r ) * ( 0.35 + col ), 1.0 );      // uRebote: luz del escenario en cabeza y hombros (el juego; 0 en el visor)
   #include <fog_fragment>
 }`;
 // Fuentes puntuales (teléfonos, luces de escalón, carteles de salida, luminarias): cada una se dibuja como su propio
@@ -166,8 +168,8 @@ varying vec3 vCol; varying float vDisc; varying float vZ; varying float vD;
 void main(){
   vec4 mv = modelViewMatrix * vec4( position, 1.0 ); float d = max( - mv.z, 0.01 );
   float coc = clamp( ( abs( d - uFocus ) - uRange ) * ( d < uFocus ? uNearScale : uScale ) / d, 0.0, 1.0 ) * uMaxBlur;
-  float base = max( aSize * uPx / d, 1.6 ), size = max( base, 2.0 * coc );
-  vCol = aColor * pow( base / size, 1.5 ); vDisc = smoothstep( 1.5, 5.0, coc );
+  float base = max( aSize * uPx / d, 4.6 ), size = max( base, 2.0 * coc );      // nunca un punto duro de un píxel: un brillo blando
+  vCol = aColor * 0.2 * pow( base / size, 1.5 ); vDisc = smoothstep( 1.5, 5.0, coc );
   vD = d; gl_PointSize = size + 1.0; gl_Position = projectionMatrix * mv; vZ = gl_Position.z / gl_Position.w * 0.5 + 0.5;
 }`;
 const BOKEH_FS = /* glsl */`
@@ -198,9 +200,10 @@ export class Arena {
   /**
    * Se construye una sola vez: nada de la geometría ni de las texturas depende de la calidad. Lo que sí depende
    * (densidad y tipo de público, haces, modo de los discos de bokeh) se cambia con setQuality() en milisegundos.
-   * @param {{tex:number, aniso:number, reduceMotion:boolean}} opt
+   * `oficiales: false` (el juego): sin los oficiales sentados ni sus mesas, que ahí dibuja web/js/game/jueces.js.
+   * @param {{tex:number, aniso:number, reduceMotion:boolean, oficiales?:boolean}} opt
    */
-  constructor({ tex = 2048, aniso, reduceMotion }) {
+  constructor({ tex = 2048, aniso, reduceMotion, oficiales = true }) {
     this.group = new THREE.Group(); this.group.name = 'Arena';
     this.reduceMotion = reduceMotion; this.time = 0; this._bokeh = [];
     const add = (mesh, shadow = 'r') => { mesh.receiveShadow = shadow.includes('r'); mesh.castShadow = shadow.includes('c'); this.group.add(mesh); return mesh; };
@@ -216,7 +219,7 @@ export class Arena {
     const carpetN = normalFromHeight(noiseCanvas(256, 64, 3, 2), 2.5, { aniso: 4 }); carpetN.repeat.set(26, 22);
     const carpet = new THREE.MeshStandardMaterial({ color: new THREE.Color('#262933'), roughness: .93, normalMap: carpetN, envMapIntensity: .3 });
     const skirt = new THREE.MeshStandardMaterial({ color: new THREE.Color('#0c0d12'), roughness: .9 });
-    const stage = add(new THREE.Mesh(new THREE.BoxGeometry(13, STAGE_Y - FLOOR_Y, 11), [skirt, skirt, carpet, skirt, skirt, skirt]), 'rc'); stage.position.set(0, (STAGE_Y + FLOOR_Y) / 2, 0); this.escenario = stage;
+    const stage = add(new THREE.Mesh(new THREE.BoxGeometry(13, STAGE_Y - FLOOR_Y, 11), [skirt, skirt, carpet, skirt, skirt, skirt]), 'rc'); stage.position.set(0, (STAGE_Y + FLOOR_Y) / 2, 0); this.escenario = stage; this.alfombra = carpet; this.madera = top;
     const floorMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#17181d') });   // piso de sala: gris, nunca negro
     const floor = add(new THREE.Mesh(new THREE.PlaneGeometry(90, 90), floorMat)); floor.rotation.x = -Math.PI / 2; floor.position.y = FLOOR_Y;
     // canto iluminado del escenario (escalón)
@@ -225,20 +228,20 @@ export class Arena {
 
     // banda LED al frente y a los lados del escenario
     const banner = canvasTexture(bannerCanvas(2048, 128), { aniso }); banner.wrapS = THREE.RepeatWrapping;
-    const bannerMat = new THREE.MeshBasicMaterial({ map: banner, color: hdr('#ffffff', .6) });
+    const bannerMat = new THREE.MeshBasicMaterial({ map: banner, color: hdr('#ffffff', .6) }); this.cinta = banner;
     const bandH = .62;
     const bf = add(new THREE.Mesh(new THREE.PlaneGeometry(13, bandH), bannerMat), ''); bf.position.set(0, STAGE_Y - .08 - bandH / 2, 5.52);
     for (const s of [-1, 1]) { const b = add(new THREE.Mesh(new THREE.PlaneGeometry(11, bandH), bannerMat), ''); b.position.set(s * 6.52, STAGE_Y - .08 - bandH / 2, 0); b.rotation.y = s * Math.PI / 2; }
 
     // fondo de escenario: pantalla LED con marco, telón con pliegues, torres de luz a los costados y línea de piso
     const wallTex = canvasTexture(ledWallCanvas(2048, 720), { aniso });
-    const wall = add(new THREE.Mesh(new THREE.PlaneGeometry(10, 3.5), new THREE.MeshBasicMaterial({ map: wallTex, color: hdr('#ffffff', .36) })), ''); wall.position.set(0, STAGE_Y + .35 + 1.75, -5.2);
+    const wall = add(new THREE.Mesh(new THREE.PlaneGeometry(7.4, 2.6), new THREE.MeshBasicMaterial({ map: wallTex, color: hdr('#ffffff', .36) })), ''); wall.position.set(0, STAGE_Y + .35 + 1.3, -5.2); /* 7,4 × 2,6 m: deja ver la sala a los lados y arriba (con 10 × 3,5 el fondo de la toma frontal era solo pantalla) */ this.pantalla = wall;
     const frameMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#15161b'), roughness: .5, metalness: .4 });
-    const frame = add(new THREE.Mesh(new THREE.BoxGeometry(10.3, 3.8, .25), frameMat), 'r'); frame.position.set(0, wall.position.y, -5.34);
+    const frame = add(new THREE.Mesh(new THREE.BoxGeometry(7.7, 2.9, .25), frameMat), 'r'); frame.position.set(0, wall.position.y, -5.34);
     const drapeTex = canvasTexture(drapeCanvas(), { aniso: 4 }); drapeTex.wrapS = THREE.RepeatWrapping; drapeTex.repeat.set(3, 1);
     const drape = add(new THREE.Mesh(new THREE.PlaneGeometry(17, 6.4), new THREE.MeshBasicMaterial({ map: drapeTex, color: hdr('#ffffff', .5) })), ''); drape.position.set(0, 2.3, -5.9);
-    const wallBase = add(new THREE.Mesh(new THREE.BoxGeometry(10.3, .35, .5), new THREE.MeshStandardMaterial({ color: new THREE.Color('#3a3d48'), roughness: .7 })), 'rc'); wallBase.position.set(0, STAGE_Y + .175, -5.25);
-    for (let i = 0; i < 8; i++) { const x = -4.55 + i * 1.3; if (Math.abs(x) > 2) glint(x, STAGE_Y + .42, -4.92, '#ffcf9a', .9, .05); }
+    const wallBase = add(new THREE.Mesh(new THREE.BoxGeometry(7.7, .35, .5), new THREE.MeshStandardMaterial({ color: new THREE.Color('#3a3d48'), roughness: .7 })), 'rc'); wallBase.position.set(0, STAGE_Y + .175, -5.25);
+    for (let i = 0; i < 8; i++) { const x = -4.55 + i * 1.3; if (Math.abs(x) > 2 && Math.abs(x) < 3.7) glint(x, STAGE_Y + .42, -4.92, '#ffcf9a', .9, .05); }
 
     // tablero y reloj a los costados de la pantalla (texturas dinámicas)
     this.boardCanvas = makeCanvas(512, 640); this.boardTex = canvasTexture(this.boardCanvas, { aniso: 4, keep: true });
@@ -248,7 +251,7 @@ export class Arena {
     const clock = add(new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.33), new THREE.MeshBasicMaterial({ map: this.clockTex, color: hdr('#ffffff', .9) })), ''); clock.position.set(6.25, 1.75, -4.9); clock.rotation.y = -.32;
     const cf = add(new THREE.Mesh(new THREE.BoxGeometry(1.85, 1.48, .12), frameMat), 'r'); cf.position.set(6.27, 1.75, -4.97); cf.rotation.y = -.32;
     for (const x of [-6.27, 6.27]) add(new THREE.Mesh(new THREE.CylinderGeometry(.05, .07, 1.2, 10), frameMat), 'rc').position.set(x, STAGE_Y + .45, -4.99);
-    this.board = {}; this.decision = null; this.clock = 60; this._drawBoard(); this._drawClock();
+    this.board = {}; this.decision = null; this.clock = 30; this._drawBoard(); this._drawClock();
 
     // truss perimetral con torres, focos y haces
     const tubes = [];
@@ -263,8 +266,10 @@ export class Arena {
     const TY = 7.1, TB = 6.3;
     truss([-7.4, TY, 6.8], [7.4, TY, 6.8]); truss([-7.4, TB, -4.6], [7.4, TB, -4.6]); truss([-7.4, TY, 6.8], [-7.4, TB, -4.6]); truss([7.4, TY, 6.8], [7.4, TB, -4.6]);
     for (const [x, z, y] of [[-7.4, 6.8, TY], [7.4, 6.8, TY], [-7.4, -4.6, TB], [7.4, -4.6, TB]]) truss([x, FLOOR_Y, z], [x, y, z]);
-    for (const s of [-1, 1]) truss([s * 5.75, STAGE_Y, -4.55], [s * 5.75, 3.7, -4.55], .12);    // torres de luz junto a la pantalla
+    // (las torres de luz junto a la pantalla tapaban el tablero y el reloj: sus focos van en las torres de las esquinas)
 
+    // puente de luces sobre la pantalla, colgado del truss del fondo: una parrilla de focos a la vista en las tomas generales
+    truss([-4.7, 3.82, -4.9], [4.7, 3.82, -4.9], .13); for (const s of [-1, 1]) truss([s * 4.7, 3.82, -4.9], [s * 4.7, TB, -4.6], .07);
     const canGeo = new THREE.CylinderGeometry(.13, .16, .36, 14), lensGeo = new THREE.CircleGeometry(.12, 16), canMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#16171b'), roughness: .5, metalness: .5 });
     const beamGeo = new THREE.CylinderGeometry(.09, 1, 1, 28, 1, true); beamGeo.translate(0, -.5, 0);   // vértice en el foco, se abre hacia abajo
     this.beams = []; this.beamMeshes = [];
@@ -286,12 +291,15 @@ export class Arena {
     };
     const cols = ['#8fdcff', '#ffb08a', '#f2ecff', '#8fdcff', '#ff8a9c', '#f2ecff', '#ffd9a0', '#ff8a9c'];
     cols.forEach((c, i) => { const x = -6.3 + i * 1.8; fixture([x, TB - .3, -4.6], [x * .25, .4, -.2], c, 14, .05); });
+    // dos torres de contraluz bajas detrás de la tarima (entre la pantalla y los estandartes): sus focos se ven encendidos desde las cámaras de juego
+    for (const s of [-1, 1]) { truss([s * 4.02, STAGE_Y, -4.55], [s * 4.02, 3.25, -4.55], .09); for (let i = 0; i < 3; i++) fixture([s * 4.02, 1.55 + i * .72, -4.4], [-s * .4, 1.3, .6], i === 1 ? (s < 0 ? '#ffb877' : '#cfe0ff') : '#fff0d8', 9, 0, .6); }
+    for (let i = 0; i < 8; i++) { const x = -4.2 + i * 1.2; fixture([x, 3.56, -4.86], [x * .45, 1.3, 2.5], i % 2 ? '#ffd9a0' : '#f2ecff', 9, 0, .7); }
     for (let i = 0; i < 6; i++) { const x = -5 + i * 2; fixture([x, TY - .3, 6.8], [x * .2, 1, 0], '#ffe6c4', 18, 0); }
     for (const s of [-1, 1]) for (let i = 0; i < 3; i++) fixture([s * 7.4, TY - .35 - i * .05, 3.6 - i * 2.8], [0, 1, 0], i === 1 ? '#fff0d8' : (s < 0 ? '#8fdcff' : '#ffb08a'), 12, i === 1 ? 0 : .035);
-    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) fixture([s * 5.75, 1.5 + i * .95, -4.38], [s * 1.2, 1.2, 0], i === 1 ? '#ffd9a0' : '#f4f0ff', i === 1 ? 7 : 4.5, 0, .62);
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) fixture([s * 7.22, 3.7 + i * .9, -4.4], [s * 1.2, 1.2, 0], i === 1 ? '#ffd9a0' : '#f4f0ff', i === 1 ? 7 : 4.5, 0, .62);
 
     // luces de arbitraje físicas sobre la pantalla
-    const lampBox = add(new THREE.Mesh(new THREE.BoxGeometry(1.5, .46, .16), frameMat), 'r'); lampBox.position.set(0, wall.position.y + 2.18, -5.1);
+    const lampBox = add(new THREE.Mesh(new THREE.BoxGeometry(1.5, .46, .16), frameMat), 'r'); lampBox.position.set(0, wall.position.y + 1.72, -5.1);
     this.lamps = [-1, 0, 1].map(i => { const m = new THREE.Mesh(new THREE.CircleGeometry(.15, 24), new THREE.MeshBasicMaterial({ color: new THREE.Color('#15171c') })); m.position.set(i * .46, lampBox.position.y, -5.015); this.group.add(m); return m; });
 
     // mesas con oficiales sentados (árbitros al frente, jurado al costado, mesa técnica sobre el escenario) y cargadores de pie
@@ -303,8 +311,8 @@ export class Arena {
     let nSeat = 0;
     const seat = (x, z, ry, y0 = FLOOR_Y, lamp = true) => {
       const g = new THREE.Group(); g.position.set(x, y0, z); g.rotation.y = ry;
-      part(g, desks, deskCol, 0, .37, 0); part(g, torsos, suits[nSeat++ % suits.length], 0, .82, -.5, 1.15, 1, .75); part(g, heads, skin, 0, 1.27, -.48);
-      if (!lamp) return; g.updateMatrixWorld(); const p = new THREE.Vector3(.3, .8, .29).applyMatrix4(g.matrixWorld); glint(p.x, p.y, p.z, '#ffd9a0', 1.1, .035);   // lamparita de mesa: punto chico y cálido
+      if (oficiales) { part(g, desks, deskCol, 0, .37, 0); part(g, torsos, suits[nSeat++ % suits.length], 0, .82, -.5, 1.15, 1, .75); part(g, heads, skin, 0, 1.27, -.48); }
+      if (!lamp || (!oficiales && y0 === FLOOR_Y)) return;      // en el juego los árbitros del frente comparten una mesa (jueces.js): sin lamparitas sueltas g.updateMatrixWorld(); const p = new THREE.Vector3(.3, .8, .29).applyMatrix4(g.matrixWorld); glint(p.x, p.y, p.z, '#ffd9a0', 1.1, .035);   // lamparita de mesa: punto chico y cálido
     };
     const loader = (x, z, ry) => {
       const g = new THREE.Group(); g.position.set(x, STAGE_Y, z); g.rotation.y = ry;
@@ -348,7 +356,8 @@ export class Arena {
     const ribbon = new THREE.Mesh(new THREE.CylinderGeometry(32, 32, .22, 64, 1, true), new THREE.MeshBasicMaterial({ color: hdr('#ffc98a', .9), side: THREE.BackSide })); ribbon.position.y = 9.2; this.group.add(ribbon);
     // luminarias de techo y pasarelas, por encima de las tribunas
     const r = rng(77), pal = ['#ffffff', '#ffd9a0', '#ffe9c9', '#bcd0ff', '#ffb070'];
-    for (let i = 0; i < 70; i++) { const a = r() * Math.PI * 2, d = 30 + r() * 10; glint(Math.cos(a) * d, 9.5 + r() * 9, Math.sin(a) * d, pal[i % pal.length], .3 + r() * 1.1, .1 + r() * .12); }
+    // en hileras, como las pasarelas de un pabellón: dos anillos de luminarias parejas (sueltas al azar se leían como puntitos sin sentido)
+    for (const [d, y, n, k, tam] of [[15, 12.6, 16, .9, .14], [23, 12.6, 26, .75, .13], [31, 12.6, 36, .6, .12]]) for (let i = 0; i < n; i++) { if (r() < .12) continue; const a = (i + .5) / n * Math.PI * 2; glint(Math.cos(a) * d, y + (r() - .5) * .15, Math.sin(a) * d, pal[1 + (i % 3 === 0 ? 2 : 0)], k * (.75 + r() * .4), tam); }
 
     this.discTex = canvasTexture(softDisc(), { aniso: 1 });
     this._buildCrowd(banner, glint);
@@ -388,7 +397,7 @@ export class Arena {
     const geo = new THREE.PlaneGeometry(.66, .88); geo.translate(0, .44, 0);
     const n = seats.length, aC = new Float32Array(n * 3), aS = new Float32Array(n * 3), aH = new Float32Array(n * 3), aV = new Float32Array(n);
     this.crowdTex = canvasTexture(crowdAtlas(), { srgb: false, aniso: 1, mip: false });      // sin mipmaps: el recorte alfa no se come las siluetas lejanas
-    const mat = new THREE.ShaderMaterial({ vertexShader: CROWD_VS, fragmentShader: CROWD_FS, fog: true, uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: null }, uGain: { value: .1 } }]) }); mat.uniforms.map.value = this.crowdTex;
+    const mat = new THREE.ShaderMaterial({ vertexShader: CROWD_VS, fragmentShader: CROWD_FS, fog: true, uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: null }, uGain: { value: .1 }, uRebote: { value: new THREE.Vector3() } }]) }); mat.uniforms.map.value = this.crowdTex;
     const mesh = this.crowd = new THREE.InstancedMesh(geo, mat, n);
     seats.forEach((s, i) => {
       o.position.set(s.x, s.y, s.z); o.rotation.set(0, s.ry + (r() - .5) * .3, 0); o.scale.set(s.s, s.s * (.92 + r() * .2), s.s); o.updateMatrix(); mesh.setMatrixAt(i, o.matrix);
@@ -408,9 +417,11 @@ export class Arena {
     railMesh.frustumCulled = false; this.group.add(railMesh);
     // cinta LED en el frente de cada tribuna (da estructura al fondo desenfocado)
     const fasciaTex = banner.clone(); fasciaTex.repeat.set(3, 1); fasciaTex.needsUpdate = true;
-    const fasciaMat = new THREE.MeshBasicMaterial({ map: fasciaTex, color: hdr('#ffffff', .25) });
+    const fasciaMat = new THREE.MeshBasicMaterial({ map: fasciaTex, color: hdr('#ffffff', .25) }), cierreMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#0b0d13') });
     for (const st of stands) {
-      const f = new THREE.Mesh(new THREE.PlaneGeometry(st.w, .5), fasciaMat); f.position.set(st.o[0] - st.back[0] * .62, st.o[1] - .12, st.o[2] - st.back[1] * .62); f.rotation.y = Math.atan2(-st.back[0], -st.back[1]); this.group.add(f);
+      // cerramiento del frente de la tribuna (1,3 m, oscuro): tapa el busto de la primera fila, que de cerca delata al público
+      const frente = st.back[1] > 0, cz = new THREE.Mesh(new THREE.PlaneGeometry(st.w + .6, 1.3), cierreMat); cz.position.set(st.o[0] - st.back[0] * .6, st.o[1] + (frente ? -.42 : .2), st.o[2] - st.back[1] * .6);      /* la tribuna del frente (detrás de los árbitros) lo lleva bajo: alto, llenaba el primer plano de la cámara del jurado */ cz.rotation.y = Math.atan2(-st.back[0], -st.back[1]); this.group.add(cz);
+      const f = new THREE.Mesh(new THREE.PlaneGeometry(st.w, .5), fasciaMat); f.position.set(st.o[0] - st.back[0] * .62, st.o[1] + (frente ? -.12 : .5), st.o[2] - st.back[1] * .62); f.rotation.y = Math.atan2(-st.back[0], -st.back[1]); this.group.add(f);
     }
     // flashes de cámaras: salen de la mano de un espectador, no del aire
     this.flashes = []; const fm = new THREE.MeshBasicMaterial({ map: this.discTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
@@ -471,9 +482,9 @@ export class Arena {
   _drawBoard() {
     const cv = this.boardCanvas, g = cv.getContext('2d'), w = cv.width, h = cv.height, b = this.board;
     g.fillStyle = '#0b0d16'; g.fillRect(0, 0, w, h); g.fillStyle = '#1c2a5c'; g.fillRect(0, 0, w, 96);
-    g.textBaseline = 'middle'; g.textAlign = 'center'; g.fillStyle = '#fff'; g.font = `800 58px ${DISPLAY}`; g.fillText(EVENT.title, w / 2, 50);
+    g.textBaseline = 'middle'; g.textAlign = 'center'; g.fillStyle = '#fff'; g.font = `800 58px ${DISPLAY}`; g.fillText(EVENT.marca, w / 2, 50);
     g.textAlign = 'left'; g.font = `700 44px ${DISPLAY}`; g.fillStyle = '#35e6d6'; g.fillText(b.country || '', 34, 160);
-    g.fillStyle = '#fff'; g.font = `800 64px ${DISPLAY}`; g.fillText((b.name || '').toUpperCase().split(' ').pop(), 34, 228);
+    g.fillStyle = '#fff'; g.font = `800 64px ${DISPLAY}`; g.fillText(b.entero ? String(b.name || '').toUpperCase() : (b.name || '').toUpperCase().split(' ').pop(), 34, 228, w - 68);      // b.entero: «LIFTING GAME» entero (LIF-45)
     g.font = `500 34px ${DISPLAY}`; g.fillStyle = '#c3c9dc'; g.fillText(`${b.lift || ''} · ${b.intento || 'INTENTO ' + (b.attempt || 1)}`.toUpperCase(), 34, 296);      // b.intento: el juego lo pasa en el idioma elegido
     g.textAlign = 'center'; g.fillStyle = '#ffd23f'; g.font = `800 230px ${DISPLAY}`; g.fillText(b.kg ? String(b.kg) : '', w / 2, 452); g.font = `700 54px ${DISPLAY}`; g.fillText('KG', w / 2, 590);
     this.boardTex.needsUpdate = true;
@@ -490,7 +501,7 @@ export class Arena {
   /** Decisión de los tres árbitros: null apaga; [true,true,true] tres blancas. Una luz en null queda apagada (el juego las enciende de a una). */
   setDecision(d) {
     this.decision = d;
-    this.lamps.forEach((l, i) => l.material.color.copy(d && d[i] !== null ? (d[i] ? hdr('#f6f4ea', 7) : hdr('#ff2618', 7)) : new THREE.Color('#15171c')));
+    this.lamps.forEach((l, i) => l.material.color.copy(d && d[i] !== null ? (d[i] ? hdr('#f6f4ea', 7) : new THREE.Color(1.35, .02, .012)) : new THREE.Color('#15171c')));
     this._drawClock();
   }
   setClock(seconds) { this.clock = seconds; if (Math.max(0, Math.ceil(seconds)) !== this._clockShown) this._drawClock(); }

@@ -17,6 +17,10 @@
 // 15. Dificultad de la barrita (rules.js → NIVELES_B): Medio y Difícil con su huella y su referencia
 //     (tools/sim_ref_dificultad.json); en vivo contra recalculadas; un registro con otro nivel u otra huella se rechaza;
 //     cada barrita (atrapar y pararse incluidas) se juzga con las reglas de su nivel; Fácil sigue con la huella de siempre.
+// 17. Orden de turnos (match.js → TURNOS, LIF-3 y LIF-4): por rondas y oficial, con pedidos de la persona antes de su turno;
+//     partidas de referencia (tools/sim_ref_turnos.json); en vivo contra recalculadas; por rondas cada ronda la levantan los
+//     tres una vez y la barra no baja dentro de la ronda; los pedidos solo suben, dos por intento; registros adulterados
+//     (otra huella, otro orden, pedido para abajo, de más o de un rival) se rechazan; las referencias sin `orden` no cambian.
 // 12. Nivel 'u' (docs/JUEGO.md, Gameplay 2): partidas de referencia jugadas por los bots de tools/uno_bots.mjs
 //     (tools/sim_ref_uno.json); 1000 finales en vivo contra recalculadas (meta L); toda caída tiene su tramo y una línea
 //     sin tiempos (meta G); la garra se gasta una vez por levantamiento; la señal en los dos idiomas.
@@ -26,10 +30,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { leerDatos } from '../web/js/sim/data.js';
-import { Partida } from '../web/js/sim/match.js';
+import { Partida, TURNOS, HUELLA_TURNOS } from '../web/js/sim/match.js';
 import { Intento, simular } from '../web/js/sim/attempt.js';
-import { gestos, HUELLA_IA, PERSONALIDADES } from '../web/js/sim/ai.js';
+import { gestos, HUELLA_IA, PERSONALIDADES, envionRival } from '../web/js/sim/ai.js';
 import { recalcular, resumen } from '../web/js/sim/replay.js';
+import { chanceDe } from '../web/js/sim/entrenador.js';
 import { Azar, mezclar } from '../web/js/sim/fixed.js';
 import { RELOJ, CAUSAS, FACIL, exigenciaTabla } from '../web/js/sim/rules.js';
 import { tocar, alDia, senal, GUIADO } from '../web/js/game/controles.js';
@@ -37,15 +42,17 @@ import { explicar, pasos } from '../web/js/game/ui/mensajes.js';
 import { marcadorDe, amenaza, etiquetasRival } from '../web/js/game/ui/marcador.js';
 import { PLANTEL, JUGADOR, FICHA, nivelFicha, CUERPO } from '../web/js/game/roster.js';
 import { tableroHTML, datosTablero, tableroVivoHTML, ordenSalida } from '../web/js/game/ui/tablero.js';
+import { opcionesPedido, pedidoHTML } from '../web/js/game/ui/pedido.js';
 import { dificultadDe, deDiez } from '../web/js/game/ui/mensajes.js';
 import { DICCIONARIOS, tr, fijarIdioma, detectarIdioma } from '../web/js/game/i18n/t.js';
+import { APRENDE, CLAVES as CLAVES_APRENDE, elegir as elegirAprende, textoDe as textoAprende } from '../web/js/game/ui/aprende.js';
 import { toques } from '../web/js/game/input.js';
 import { jugarSenal, jugarFijo, BOTS } from './play_human.mjs';
 import { jugarUno, BOTS_U } from './uno_bots.mjs';
 import { jugarBarra, PERFILES } from './barra_bots.mjs';
 import { posBarra, zonasBarra, zonaBarra, cuerpoBarra, BARRA, reglasB, HUELLAS_B, HUELLA_B, NIVELES_B, chanceBarra } from '../web/js/sim/rules.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SIM = path.join(ROOT, 'web/js/sim'), REF = path.join(ROOT, 'tools/sim_ref.json'), REF_F = path.join(ROOT, 'tools/sim_ref_facil.json'), REF_U = path.join(ROOT, 'tools/sim_ref_uno.json'), REF_B = path.join(ROOT, 'tools/sim_ref_barra.json'), REF_R = path.join(ROOT, 'tools/sim_ref_rivales.json'), REF_D = path.join(ROOT, 'tools/sim_ref_dificultad.json');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SIM = path.join(ROOT, 'web/js/sim'), REF = path.join(ROOT, 'tools/sim_ref.json'), REF_F = path.join(ROOT, 'tools/sim_ref_facil.json'), REF_U = path.join(ROOT, 'tools/sim_ref_uno.json'), REF_B = path.join(ROOT, 'tools/sim_ref_barra.json'), REF_R = path.join(ROOT, 'tools/sim_ref_rivales.json'), REF_D = path.join(ROOT, 'tools/sim_ref_dificultad.json'), REF_T = path.join(ROOT, 'tools/sim_ref_turnos.json');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const N = +(arg('n') || 1000), UPDATE = process.argv.includes('--update');
 const datos = leerDatos(JSON.parse(fs.readFileSync(path.join(ROOT, 'web/data/sim.json'), 'utf8')));
@@ -68,7 +75,7 @@ const IDS = ['ventura', 'brenner', 'marangi'], NIV = ['amistoso', 'normal', 'dif
 // ---------- jugador simulado ----------
 /** Juega una partida entera. `persona`: índice del pesista manejado por un jugador simulado (o -1: los tres son rivales). Devuelve la partida y su bitácora. */
 function jugar(semilla, nivel, persona, estilo = {}) {
-  const r = new Azar(mezclar(semilla, 9)), cfg = { semilla, nivel, cal: estilo.cal || 0, primera: !!estilo.primera, ...(estilo.ctl ? { ctl: estilo.ctl } : {}), ...(estilo.ia ? { ia: estilo.ia } : {}), ...(estilo.dif ? { dif: estilo.dif } : {}), atletas: IDS.map((id, i) => ({ id, ctrl: i === persona ? 'persona' : 'juego' })) };
+  const r = new Azar(mezclar(semilla, 9)), cfg = { semilla, nivel, cal: estilo.cal || 0, primera: !!estilo.primera, ...(estilo.ctl ? { ctl: estilo.ctl } : {}), ...(estilo.ia ? { ia: estilo.ia } : {}), ...(estilo.dif ? { dif: estilo.dif } : {}), ...(estilo.envFijo ? { envFijo: true } : {}), ...(estilo.turnos ? { turnos: estilo.turnos } : {}), atletas: IDS.map((id, i) => ({ id, ctrl: i === persona ? 'persona' : 'juego' })) };
   const p = new Partida(datos, cfg), bit = [];
   const abrir = lev => { if (persona >= 0) { const [lo, hi] = p.rangoApertura(persona, lev); p.abrir(persona, lev, r.entre(lo, hi)); } p.empezar(); };
   abrir('s');
@@ -76,15 +83,22 @@ function jugar(semilla, nivel, persona, estilo = {}) {
     if (g > 60) throw new Error('la partida no termina');
     if (p.fase === 'intervalo') { abrir('c'); continue; }
     const L = p.llamado, a = p.at[L.a], barra = p.barra;
-    // orden de salida: nadie con intentos pendientes declaró menos
-    for (const b of p.at) if (b[L.lev].length < 3) ok(b.decl[L.lev] >= L.kg, `semilla ${semilla}: sale ${a.id} con ${L.kg} y ${b.id} declaró ${b.decl[L.lev]}`);
-    ok(L.kg >= barra, `semilla ${semilla}: la barra baja de ${barra} a ${L.kg}`);
+    // orden de salida: nadie con intentos pendientes declaró menos (por rondas: nadie de los que faltan en esta ronda)
+    for (const b of p.at) if (b[L.lev].length < 3 && (estilo.turnos !== 'rondas' || b[L.lev].length === L.n - 1)) ok(b.decl[L.lev] >= L.kg, `semilla ${semilla}: sale ${a.id} con ${L.kg} y ${b.id} declaró ${b.decl[L.lev]}`);
+    if (estilo.turnos === 'rondas') { ok(p.at.every(b => b[L.lev].length >= L.n - 1), `semilla ${semilla}: ${a.id} hace su intento ${L.n} antes de que termine la ronda anterior`); if (p.rondaBarra === L.n - 1) ok(L.kg >= barra, `semilla ${semilla}: la barra baja dentro de la ronda ${L.n}, de ${barra} a ${L.kg}`); }
+    else ok(L.kg >= barra, `semilla ${semilla}: la barra baja de ${barra} a ${L.kg}`);
     const u = a[L.lev][a[L.lev].length - 1]; if (u) ok(L.kg >= (u.res === 'valido' ? u.kg + 1 : u.kg), `semilla ${semilla}: progresión de ${a.id}`);
-    if (a.ctrl === 'juego') { const x = p.resolverIA(); bit.push({ a: L.a, lev: L.lev, n: L.n, kg: L.kg, res: x.res.res }); continue; }
+    if (a.ctrl === 'juego') {
+      const x = p.resolverIA(); bit.push({ a: L.a, lev: L.lev, n: L.n, kg: L.kg, res: x.res.res });
+      // con turnos, la persona a veces cambia su pedido mientras levanta otro (LIF-4); a veces lo intenta mal (y no pasa nada)
+      if (estilo.turnos && persona >= 0 && p.fase === L.lev && r.ent(3) === 0) { const kg = p.at[persona].decl[p.lev] + r.entre(-1, 3); if (!p.pedidoValido(persona, kg)) { p.pedir(persona, kg); bit.push({ a: persona, lev: p.lev, pide: kg }); } }
+      continue;
+    }
     // persona: a veces cambia kilos (y puede quedar desplazada), a veces deja correr el reloj, a veces toca cualquier cosa
     if (r.ent(4) === 0 && a.cambios < 2) { const kg = Math.max(p.minimo(L.a), L.kg + r.entre(-2, 4)); if (!p.cambioValido(800, kg)) { if (p.cambio(800, kg).desplazado) { bit.push({ a: L.a, lev: L.lev, n: L.n, kg: L.kg, res: 'desplazado' }); continue; } } }
     // en 'u' el juego confirma siempre (no hay reloj en el panel): nunca «se le va el reloj»
-    const env = L.lev === 'c' ? ['split', 'power', 'squat'][r.ent(3)] : undefined, ctx = p.contexto(env), modo = estilo.modo ?? (estilo.ctl === 'u' || estilo.ctl === 'b' ? 1 + r.ent(9) : r.ent(10));
+    // con el estilo fijo (LIF-43), el del primer dos tiempos (el azar se consume igual: las referencias no cambian)
+    const env0 = L.lev === 'c' ? ['split', 'power', 'squat'][r.ent(3)] : undefined, env = L.lev === 'c' ? p.estiloFijo(L.a) ?? env0 : undefined, ctx = p.contexto(env), modo = estilo.modo ?? (estilo.ctl === 'u' || estilo.ctl === 'b' ? 1 + r.ent(9) : r.ent(10));
     let rec;
     if (modo === 0) rec = { conf: null, env, ent: [] };                                                    // se le va el reloj
     else if (modo === 1) { const ent = []; let t = 2000; for (let k = 0; k < 60; k++) { t += r.entre(1, 900); ent.push([t, k % 2 ? 0 : 1]); } rec = { conf: 1500, env, ent }; }   // toca cualquier cosa
@@ -325,7 +339,7 @@ function jugar(semilla, nivel, persona, estilo = {}) {
   for (const [k, v] of Object.entries(es)) { ok(!VOSEO.test(v), `voseo en es.${k}: «${v}»`); ok(!JERGA.test(v), `jerga en es.${k}: «${v}»`); }
   for (const [k, v] of [...Object.entries(es), ...Object.entries(en)]) ok(!/pagar para levantar|pay to lift/i.test(v), `promesa de monetización en ${k}`);
   // con las variables comunes resueltas no queda ninguna llave
-  const vars = { nombre: 'Ana', quien: 'Ana', rival: 'Teo', n: 2, de: 3, kg: 150, lo: 140, hi: 155, min: 150, c: 1, s: 5, b: 2, lev: 'x', pos: '2nd', ms: 30, k: 1, controles: 'x', veredicto: 'x', causa: 'x', a: 'x', medalla: 'x', total: 300, marcas_s: '✅', marcas_c: '❌', link: 'x', envion: 'x', verbo: 'x', cuando: 'x', cuanto: 'x', ajuste: 'x', lado: 'x', grado: 'x', sugerido: 'x', donde: 'x', mayor: 'x', discos: 'x', pct: 97, tramo: 'x', d: '½', tipo: 'x', apuesta: 'x', zona: 'x', toques: 'x', en: 'x' };
+  const vars = { nombre: 'Ana', quien: 'Ana', rival: 'Teo', n: 2, de: 3, kg: 150, lo: 140, hi: 155, min: 150, c: 1, s: 5, b: 2, lev: 'x', pos: '2nd', ms: 30, k: 1, controles: 'x', veredicto: 'x', causa: 'x', a: 'x', medalla: 'x', total: 300, marcas_s: '✅', marcas_c: '❌', link: 'x', envion: 'x', verbo: 'x', cuando: 'x', cuanto: 'x', ajuste: 'x', lado: 'x', grado: 'x', sugerido: 'x', donde: 'x', mayor: 'x', discos: 'x', pct: 97, tramo: 'x', d: '½', tipo: 'x', apuesta: 'x', zona: 'x', toques: 'x', en: 'x', split: 'x', power: 'x', squat: 'x' };
   for (const l of ['es', 'en']) for (const tactil of [false, true]) for (const k of ke) { const v = tr(l, k, { ...vars, tactil }); ok(!/[{}]/.test(v) && v.trim().length > 0, `${l}.${k} queda «${v}»`); }
   // la señal sale en el idioma elegido, y los pasos de «Cómo se juega» también
   { const ctx = { lev: 's', I: 9000, tec: 7, temple: 0, garra: 6, anclas: datos.modelos.ventura, semilla: 5, cal: 0, primera: false, domina: true, jueces: [1000, 1000, 1000], reloj: 30000, ctl: 'f' };
@@ -533,7 +547,7 @@ function lineaNombraToques(res, lev, I) {
     ok(sEn && sEs && sEn.verbo === 'TAP IN THE GREEN' && sEs.verbo === 'TOCA EN EL VERDE' && sEn.tipo === 'barra', `la señal de 'b' no cambia con el idioma: ${sEn?.verbo} / ${sEs?.verbo}`);
     const m1 = simular(ctx, 0, [[600, 1], [650, 0], [1300, 1], [1350, 0]], 1500); ok(m1.fase === 'tension' && m1.U.contactos.every(x => x.que === 'espera'), `un toque en PREPÁRATE o en la gracia disparó la barrita: ${JSON.stringify(m1.U.contactos)}`);
     const tv = 1200 + BARRA.pasada / 2, m2 = simular(ctx, 0, [[tv, 1], [tv + 60, 0], [tv + 100, 1]], tv + 200); ok(m2.U.barras[0].zona === 'verde' && m2.fase === 'tiron' && m2.U.contactos.map(x => x.que).join() === 'verde,doble', `un toque con el puntero en el centro tiene que ser verde y el doble no contar: ${JSON.stringify(m2.U.contactos)}`);
-    const m3 = simular(ctx, 0, [[1200 + 300, 1]]); ok(m3.res && m3.res.uno.barras[0].zona === 'rojo' && m3.res.res === 'valido', `un toque lejos con el 90 % sube igual: ${JSON.stringify(m3.res?.uno)}`);
+    const m3 = simular(ctx, 0, [[1200 + BARRA.pasada, 1]]);      // en la punta (desde el 17-nov el amarillo de Fácil es más ancho: a los 300 ms ya no es rojo)  ok(m3.res && m3.res.uno.barras[0].zona === 'rojo' && m3.res.res === 'valido', `un toque lejos con el 90 % sube igual: ${JSON.stringify(m3.res?.uno)}`);
     const m4 = simular(ctx, 0, []); ok(m4.res && m4.res.res === 'valido' && m4.res.uno.barras[0].sola && m4.res.t > BARRA.soloMs, `sin tocar, tira solo al minuto y regular: ${JSON.stringify(m4.res?.uno?.barras)}`);
     ok(pasos('b', true, 'es').length === 3 && /verde/.test(pasos('b', false, 'es')[1][1]), 'pasos de «Cómo se juega» en \'b\''); }
   console.log(`13. 'b': 9 partidas de referencia · ${n} finales en vivo contra recalculadas · ${intentos} intentos propios, ${(validos * 100 / intentos).toFixed(0)} % válidos · zonas ${JSON.stringify(zonas)} · líneas de caída con tramo y zona · puntero y señal en los dos idiomas`);
@@ -657,6 +671,176 @@ function lineaNombraToques(res, lev, I) {
     ok(dificultadDe(ch(9000)) === 'facil' && dificultadDe(ch(10300)) === 'muy', `${id} ${lev}: al 90 % ${dificultadDe(ch(9000))} y al 103 % ${dificultadDe(ch(10300))}`);
   }
   console.log(`16. tablero: ${n} llamados en ${90 * 3} finales · ${JSON.stringify(vistos)} · dificultad del peso por la chance (Fácil 9-10, Medio 7-8, Difícil 4-6, Muy difícil 0-3)`);
+}
+
+// ---------- 17. el estilo de envión queda fijo toda la competencia (LIF-43) ----------
+{
+  let n = 0, cambian = 0, falsos = 0, rivalesAntes = 0; const estilos = { split: 0, power: 0, squat: 0 };
+  for (let k = 0; k < Math.min(N, 300); k++) {
+    const semilla = mezclar(k, 4343), persona = k % 3, { p } = jugar(semilla, NIV[k % 3], persona, { ctl: 'b', ia: HUELLA_IA, envFijo: true, primera: k % 7 === 0 });
+    const reg = JSON.parse(JSON.stringify(p.reg)), rc = recalcular(reg, datos), t = resumen(p.tabla());
+    ok(reg.envFijo === true, 'el registro no dice envFijo');
+    ok(rc.ok && resumen(rc.tabla) === t, `estilo fijo, semilla ${semilla}: recalcular da ${rc.ok ? resumen(rc.tabla) : rc.error} y en vivo ${t}`);
+    for (const a of p.at) { const es = new Set(a.c.map(x => x.env)); ok(es.size <= 1, `semilla ${semilla}: ${a.id} cambió de estilo: ${[...es].join(', ')}`); if (a.c[0]) estilos[a.c[0].env]++; if (a.ctrl === 'juego' && a.c[0]) ok(a.c[0].env === envionRival(a.id, a.f), `${a.id} no usa el estilo de su personalidad: ${a.c[0].env}`); ok(p.estiloFijo(a.i) === (a.c[0]?.env ?? null), 'estiloFijo no es el del primer intento'); }
+    // el mismo registro con otro estilo en un intento que no es el primero no recalcula
+    const propios = reg.llamados.filter(c => c.a === persona && c.lev === 'c' && c.fin === 'intento');
+    if (propios.length > 1) { const g = JSON.parse(JSON.stringify(reg)), c = g.llamados.filter(x => x.a === persona && x.lev === 'c' && x.fin === 'intento')[1]; c.env = c.env === 'split' ? 'power' : 'split'; const r2 = recalcular(g, datos); falsos++; ok(!r2.ok && /estilo/.test(r2.error), `cambiar el estilo a mitad del dos tiempos recalculó: ${JSON.stringify(r2.ok ? 'ok' : r2.error)}`);
+      // sin la regla (registro sin envFijo) el error ya no es el del estilo (los rivales eligen como antes: puede no cerrar por otra cosa)
+      delete g.envFijo; const r3 = recalcular(g, datos); if (r3.ok || !/estilo/.test(r3.error)) cambian++; }
+    n++;
+  }
+  // los rivales: con las reglas de antes, alguno cambiaba de estilo a mitad (por eso hace falta la regla)
+  for (let k = 0; k < 200; k++) { const { p } = jugar(mezclar(k, 4344), NIV[k % 3], k % 3, { ctl: 'b', ia: HUELLA_IA }); for (const a of p.at) if (a.ctrl === 'juego' && new Set(a.c.map(x => x.env)).size > 1) rivalesAntes++; }
+  ok(falsos > 50 && cambian === falsos, `registros adulterados ${falsos}, sin la regla no los frena el estilo en ${cambian}`);
+  // en vivo: la persona no puede cambiar el estilo después del primer dos tiempos
+  { const p = new Partida(datos, { semilla: 77, nivel: 'normal', cal: 0, primera: false, ctl: 'b', ia: HUELLA_IA, envFijo: true, atletas: IDS.map((id, i) => ({ id, ctrl: i === 0 ? 'persona' : 'juego' })) });
+    let probado = false, coach = true;
+    const abrir = lev => { const [lo] = p.rangoApertura(0, lev); p.abrir(0, lev, lo); p.empezar(); }; abrir('s');
+    for (let g = 0; p.fase !== 'fin' && g < 60; g++) {
+      if (p.fase === 'intervalo') { abrir('c'); continue; }
+      const L = p.llamado; if (p.at[L.a].ctrl === 'juego') { p.resolverIA(); continue; }
+      const fijo = L.lev === 'c' ? p.estiloFijo(0) : null;
+      if (fijo) { try { p.resolver({ conf: 0, env: fijo === 'squat' ? 'split' : 'squat', ent: [] }); ok(false, 'la persona cambió de estilo en el segundo dos tiempos'); } catch (e) { probado = /estilo/.test(e.message); }
+        coach = coach && chanceDe(p, 0, 'c', L.kg, 'squat') === chanceDe(p, 0, 'c', L.kg, fijo) && chanceDe(p, 0, 'c', L.kg, 'split') === chanceDe(p, 0, 'c', L.kg, fijo); }
+      p.resolver({ conf: 0, env: L.lev === 'c' ? fijo ?? 'power' : undefined, ent: [] });
+    }
+    ok(probado, 'no se probó cambiar el estilo a mitad'); ok(coach, 'el entrenador cuenta otro estilo que el fijo'); ok(p.at[0].c.every(x => x.env === 'power'), 'el estilo de la persona no quedó en power'); }
+  { const g = JSON.parse(JSON.stringify(jugar(5, 'normal', 0, { ctl: 'b', envFijo: true }).p.reg)); g.envFijo = 'si'; ok(!recalcular(g, datos).ok, 'un registro con envFijo raro recalculó'); }
+  try { new Partida(datos, { semilla: 1, nivel: 'normal', cal: 0, primera: false, envFijo: 1, atletas: IDS.map(id => ({ id, ctrl: 'juego' })) }); ok(false, 'Partida aceptó envFijo raro'); } catch { /* bien */ }
+  console.log(`17. estilo de envión fijo (LIF-43): ${n} finales en vivo contra recalculadas, nadie cambia de estilo · primeros estilos ${JSON.stringify(estilos)} · ${falsos} registros con el estilo cambiado a mitad rechazados (sin la regla, el estilo no frena ninguno: ${cambian}) · con las reglas de antes, ${rivalesAntes} rivales cambiaban a mitad en 200 finales · el entrenador cuenta el estilo fijo`);
+}
+
+// ---------- 18. orden de turnos: por rondas y oficial, con pedidos antes del turno (LIF-3 y LIF-4) ----------
+{
+  const casos = []; for (let k = 0; k < 12; k++) casos.push({ semilla: 11000027 * (k + 1), nivel: NIV[k % 3], persona: k % 3, ctl: ['b', 'c', 'u'][k % 3], turnos: k % 2 ? 'oficial' : 'rondas' });
+  const hoy = casos.map(c => ({ ...c, tabla: resumen(jugar(c.semilla, c.nivel, c.persona, { ctl: c.ctl, ia: HUELLA_IA, turnos: c.turnos }).p.tabla()) }));
+  if (UPDATE || !fs.existsSync(REF_T)) { fs.writeFileSync(REF_T, JSON.stringify({ datos: datos.huella, ia: HUELLA_IA, turnos: HUELLA_TURNOS, casos: hoy }, null, 1) + '\n'); console.log('18. referencia de los turnos escrita en tools/sim_ref_turnos.json'); }
+  else { const ref = JSON.parse(fs.readFileSync(REF_T, 'utf8')); ok(ref.datos === datos.huella && ref.ia === HUELLA_IA && ref.turnos === HUELLA_TURNOS, `la referencia de los turnos es de otras reglas (${ref.turnos}, hoy ${HUELLA_TURNOS}); si el cambio es intencional: borrarla o --update`); ref.casos.forEach((c, i) => ok(c.tabla === hoy[i]?.tabla, `referencia de turnos ${i} (semilla ${c.semilla}, ${c.turnos}): guardado «${c.tabla}», hoy «${hoy[i]?.tabla}»`)); }
+  const M = Math.min(N, 600), cuenta = { rondas: 0, oficial: 0, pedidos: 0, cambiosRival: 0, bajaEntreRondas: 0 }, registros = [];
+  for (let k = 0; k < M; k++) {
+    const turnos = k % 2 ? 'oficial' : 'rondas', semilla = mezclar(k, 1717), persona = k % 4 - 1, { p, bit } = jugar(semilla, NIV[k % 3], persona, { ctl: ['b', 'c', 'u'][k % 3], ia: HUELLA_IA, turnos });
+    const reg = JSON.parse(JSON.stringify(p.reg)), rc = recalcular(reg, datos), t = resumen(p.tabla()); cuenta[turnos]++;
+    ok(reg.orden === turnos && reg.turnos === HUELLA_TURNOS, `semilla ${semilla}: el registro no guarda el orden de los turnos`);
+    ok(rc.ok && resumen(rc.tabla) === t, `${turnos}, semilla ${semilla}: recalcular da ${rc.ok ? resumen(rc.tabla) : rc.error} y en vivo ${t}`);
+    const hechos = bit.filter(b => b.res && b.res !== 'desplazado'); ok(hechos.length === 18, `${turnos}, semilla ${semilla}: ${hechos.length} intentos`);
+    if (turnos === 'rondas') for (const lev of ['s', 'c']) {
+      // por rondas: los intentos de cada levantamiento salen 1,1,1,2,2,2,3,3,3 y dentro de cada ronda los kilos no bajan
+      const L = hechos.filter(b => b.lev === lev); ok(L.map(b => b.n).join('') === '111222333', `rondas, semilla ${semilla}: intentos ${L.map(b => b.n).join('')}`);
+      for (let x = 1; x < L.length; x++) { if (L[x].n === L[x - 1].n) ok(L[x].kg >= L[x - 1].kg, `rondas, semilla ${semilla}: la barra baja dentro de la ronda ${L[x].n}`); else if (L[x].kg < L[x - 1].kg) cuenta.bajaEntreRondas++; }
+    }
+    // los pedidos antes del turno: solo hacia arriba y, con los cambios del panel, dos por intento
+    const porIntento = {}, hechosDe = {};
+    for (const c of reg.llamados) {
+      const h = c.a + c.lev, key = h + (hechosDe[h] || 0);
+      if (c.pide !== undefined) { cuenta.pedidos++; porIntento[key] = (porIntento[key] || 0) + 1; }
+      else if (c.fin === 'desplazado') porIntento[key] = (porIntento[key] || 0) + c.cambios.length;
+      else { porIntento[key] = (porIntento[key] || 0) + (c.cambios ? c.cambios.length : 0); hechosDe[h] = (hechosDe[h] || 0) + 1; }
+    }
+    ok(Object.values(porIntento).every(v => v <= TURNOS.previos), `semilla ${semilla}: más de dos pedidos en un intento`);
+    if (persona >= 0 && registros.length < 30 && reg.llamados.some(c => c.pide !== undefined)) registros.push(reg);
+  }
+  // los rivales: con turnos sus cambios solo suben; el tablero muestra como «Sigue» a quien levanta después (si nadie cambia)
+  // y la ronda en curso; «Cambiar» (ui/pedido.js) solo ofrece kilos por encima de lo pedido, dentro de lo que acepta la partida
+  for (let k = 0; k < 150; k++) {
+    const turnos = k % 2 ? 'oficial' : 'rondas', yo = k % 3, p = new Partida(datos, { semilla: mezclar(k, 1818), nivel: NIV[k % 3], cal: 0, primera: false, ia: HUELLA_IA, turnos, atletas: IDS.map(id => ({ id, ctrl: 'juego' })) }); p.empezar();
+    for (let g = 0; p.fase !== 'fin' && g < 60; g++) {
+      if (p.fase === 'intervalo') { p.empezar(); continue; }
+      const a0 = p.llamado.a, d = datosTablero(p, yo, p.llamado), sig = d.filas.find(f => f.estado === 'sigue'), lev = p.lev;
+      ok(turnos === 'rondas' ? d.ronda === p.llamado.n : d.ronda === 0, `${turnos}: el tablero dice ronda ${d.ronda} y es el intento ${p.llamado.n}`);
+      const x = p.resolverIA(); for (const c of x.avisos) { cuenta.cambiosRival++; ok(c.a_kg > c.de, `semilla ${mezclar(k, 1818)}: un rival cambia para abajo (${c.de} → ${c.a_kg})`); } ok(p.at.every(a => a.cambios <= TURNOS.previos), 'un rival cambia más de dos veces');
+      if (sig && !x.avisos.length && p.fase === lev && p.llamado.a !== a0) { cuenta.sigue = (cuenta.sigue || 0) + 1; ok(p.llamado.a === sig.a, `${turnos}, semilla ${mezclar(k, 1818)}: el tablero decía que seguía ${IDS[sig.a]} y sale ${IDS[p.llamado.a]}`); }
+      if (x.avisos.length) { const d2 = datosTablero(p, yo, p.llamado, {}, x.avisos); ok(d2.pie.some(f => f.clave === 'tablero.cambia') === x.avisos.some(c => c.a !== yo && d2.filas.find(f => f.a === c.a).pide === c.a_kg), 'el pie del tablero no dice «X cambia a N»'); }
+    }
+  }
+  { const p = new Partida(datos, { semilla: 77, nivel: 'normal', cal: 0, primera: false, ctl: 'b', ia: HUELLA_IA, turnos: 'rondas', atletas: IDS.map((id, i) => ({ id, ctrl: i ? 'juego' : 'persona' })) });
+    ok(opcionesPedido(p, 0) === null, 'el botón «Cambiar» aparece antes de empezar'); p.abrir(0, 's', p.rangoApertura(0, 's')[1]); p.abrir(0, 'c', p.rangoApertura(0, 'c')[0]); p.empezar();
+    let vistos = 0;
+    for (let g = 0; p.fase !== 'fin' && g < 60; g++) {
+      if (p.fase === 'intervalo') { p.empezar(); continue; }
+      const L = p.llamado, op = opcionesPedido(p, 0);
+      if (L.a === 0) { ok(!p.pedidoValido(0, (op?.min ?? p.at[0].decl[p.lev] + 1)) === false, 'en su turno se acepta un pedido'); const env = L.lev === 'c' ? 'split' : undefined; p.resolver({ conf: 1000, env, ent: [] }); continue; }
+      if (op) { vistos++; ok(op.min > op.decl && !p.pedidoValido(0, op.min) && !p.pedidoValido(0, op.max) && !!p.pedidoValido(0, op.decl), `«Cambiar» ofrece ${op.min}-${op.max} con pedido ${op.decl}`); if (g % 2) p.pedir(0, op.min); }
+      else ok(p.at[0].cambios >= TURNOS.previos || p.at[0][p.lev].length >= 3, '«Cambiar» no aparece en el turno de un rival');
+      p.resolverIA();
+    }
+    ok(vistos > 3, `«Cambiar» casi no apareció (${vistos})`);
+    const p2 = new Partida(datos, { semilla: 77, nivel: 'normal', cal: 0, primera: false, ctl: 'b', ia: HUELLA_IA, atletas: IDS.map((id, i) => ({ id, ctrl: i ? 'juego' : 'persona' })) }); p2.abrir(0, 's', p2.rangoApertura(0, 's')[1]); p2.abrir(0, 'c', p2.rangoApertura(0, 'c')[0]); p2.empezar();
+    ok(opcionesPedido(p2, 0) === null, 'sin turnos (registros viejos) aparece «Cambiar»');
+    for (const l of ['es', 'en']) { fijarIdioma(l); const op = { lev: 's', n: 2, decl: 160, min: 161, max: 175, quedan: 1 }; for (const S of [{ abierto: false, kg: 0 }, { abierto: true, kg: 161 }]) { const h = pedidoHTML(op, S, { tecla: true, chance: () => 7 }); ok(h && !/[{}]/.test(h), `«Cambiar» con llaves sin resolver (${l})`); } }
+    fijarIdioma('es'); }
+  const trampas = {
+    'otra huella de los turnos': g => { g.turnos = 'x'; },
+    'otro orden': g => { g.orden = g.orden === 'rondas' ? 'oficial' : 'rondas'; },
+    'orden desconocido': g => { g.orden = 'al_azar'; },
+    'orden sin su huella': g => { delete g.turnos; },
+    'sin orden (registro viejo) con pedidos': g => { delete g.orden; delete g.turnos; },
+    'pedido para abajo': g => { const c = g.llamados.find(c => c.pide !== undefined); c.pide -= 4; },
+    'pedido de un rival': g => { const c = g.llamados.find(c => c.pide !== undefined); c.a = g.atletas.findIndex(a => a.ctrl === 'juego'); },
+    'tres pedidos': g => { const k = g.llamados.findIndex(c => c.pide !== undefined), c = g.llamados[k]; g.llamados.splice(k + 1, 0, { ...c, pide: c.pide + 1 }, { ...c, pide: c.pide + 2 }); },
+    'pedido con datos de más': g => { g.llamados.find(c => c.pide !== undefined).res = 'valido'; },
+  };
+  let probadas = 0;
+  for (const [nombre, fn] of Object.entries(trampas)) { let rech = 0; for (const reg of registros) { const g = JSON.parse(JSON.stringify(reg)); fn(g); if (!recalcular(g, datos).ok) rech++; } ok(registros.length > 0 && rech === registros.length, `adulterado «${nombre}»: ${rech} rechazados de ${registros.length}`); probadas++; }
+  try { new Partida(datos, { semilla: 1, nivel: 'normal', cal: 0, primera: false, turnos: 'x', atletas: IDS.map(id => ({ id, ctrl: 'juego' })) }); ok(false, 'Partida aceptó un orden de turnos desconocido'); } catch { /* bien */ }
+  // sin turnos no hay pedidos antes del turno (los registros viejos siguen iguales)
+  { const p = new Partida(datos, { semilla: 5, nivel: 'normal', cal: 0, primera: false, ia: HUELLA_IA, atletas: IDS.map((id, i) => ({ id, ctrl: i ? 'juego' : 'persona' })) }); p.abrir(0, 's', p.rangoApertura(0, 's')[0]); p.abrir(0, 'c', p.rangoApertura(0, 'c')[0]); p.empezar(); ok(!!p.pedidoValido(0, p.at[0].decl.s + 5), 'sin turnos se acepta un pedido antes del turno'); }
+  ok(cuenta.pedidos > 0 && cuenta.cambiosRival > 0 && cuenta.bajaEntreRondas > 0, `18: no se vieron pedidos, cambios de rivales o rondas que abren más abajo: ${JSON.stringify(cuenta)}`);
+  console.log(`18. turnos (huella ${HUELLA_TURNOS}): 12 partidas de referencia · ${M} finales en vivo contra recalculadas ${JSON.stringify(cuenta)} · ${probadas} adulteraciones rechazadas sobre ${registros.length} registros`);
+}
+
+// ---------- 19. las dos reglas juntas: estilo de envión fijo y orden de turnos en el mismo registro ----------
+{
+  let n = 0, rech = 0; const vistos = { rondas: 0, oficial: 0, pedidos: 0 };
+  for (let k = 0; k < Math.min(N, 300); k++) {
+    const turnos = k % 2 ? 'oficial' : 'rondas', semilla = mezclar(k, 1919), persona = k % 3, { p } = jugar(semilla, NIV[k % 3], persona, { ctl: ['b', 'u', 'c'][k % 3], ia: HUELLA_IA, envFijo: true, turnos });
+    const reg = JSON.parse(JSON.stringify(p.reg)), rc = recalcular(reg, datos), t = resumen(p.tabla()); vistos[turnos]++; vistos.pedidos += reg.llamados.filter(c => c.pide !== undefined).length;
+    ok(reg.envFijo === true && reg.orden === turnos && reg.turnos === HUELLA_TURNOS, `semilla ${semilla}: el registro no lleva las dos marcas`);
+    ok(rc.ok && resumen(rc.tabla) === t, `fijo + ${turnos}, semilla ${semilla}: recalcular da ${rc.ok ? resumen(rc.tabla) : rc.error} y en vivo ${t}`);
+    for (const a of p.at) ok(new Set(a.c.map(x => x.env)).size <= 1, `fijo + ${turnos}, semilla ${semilla}: ${a.id} cambió de estilo`);
+    // adulterar cualquiera de las dos marcas o el estilo a mitad: rechazado
+    const propios = reg.llamados.filter(c => c.a === persona && c.lev === 'c' && c.fin === 'intento');
+    if (propios.length > 1) { const g = JSON.parse(JSON.stringify(reg)); g.llamados.filter(x => x.a === persona && x.lev === 'c' && x.fin === 'intento')[1].env = propios[1].env === 'split' ? 'power' : 'split'; const r = recalcular(g, datos); ok(!r.ok && /estilo/.test(r.error), `fijo + ${turnos}: el estilo cambiado a mitad recalculó (${r.ok ? 'ok' : r.error})`); rech++; }
+    { const g = JSON.parse(JSON.stringify(reg)); g.turnos = 'x'; ok(!recalcular(g, datos).ok, 'con envFijo, otra huella de turnos recalculó'); }
+    { const g = JSON.parse(JSON.stringify(reg)); g.envFijo = 'si'; ok(!recalcular(g, datos).ok, 'con turnos, un envFijo raro recalculó'); }
+    n++;
+  }
+  ok(vistos.rondas > 0 && vistos.oficial > 0 && vistos.pedidos > 0 && rech > 50, `19: pocas finales combinadas ${JSON.stringify(vistos)}, ${rech} estilos adulterados`);
+  console.log(`19. estilo fijo y turnos juntos: ${n} finales en vivo contra recalculadas ${JSON.stringify(vistos)} · ${rech} registros con el estilo cambiado a mitad rechazados`);
+}
+
+// ---------- 20. aprender jugando (LIF-52): las explicaciones de primera vez dicen lo que hace el juego ----------
+{
+  // cada explicación es una línea del glosario, en los dos idiomas, sin llaves sin resolver y corta (una línea en la computadora, dos o tres en el teléfono)
+  for (const l of ['es', 'en']) {
+    fijarIdioma(l);
+    for (const k of CLAVES_APRENDE) { const x = textoAprende(k), largo = (x.titulo + ' ' + x.linea).length; ok(!/[{}]/.test(x.titulo + x.linea) && x.linea.length > 20, `aprende ${l}.${k}: «${x.titulo}» «${x.linea}»`); ok(largo <= 150, `aprende ${l}.${k}: ${largo} caracteres (tope 150)`); }
+  }
+  fijarIdioma('es');
+  // una por momento, en orden de prioridad, y nada cuando ya se vieron todas
+  const nada = () => false, todo = () => true, el = (m, c, v = nada) => elegirAprende(m, c, v)?.clave ?? null;
+  ok(el('llamado', { lev: 's', barra: true, hechos: 0 }) === 'dificultad' && el('llamado', { lev: 's', barra: true, hechos: 1 }, k => k === 'dificultad') === 'kilos' && el('llamado', { lev: 'c', barra: true, hechos: 0, envFijo: null }) === 'estilo'
+    && el('llamado', { lev: 'c', barra: true, hechos: 1, envFijo: 'split' }, k => k !== 'total') === 'total' && el('llamado', { lev: 's', barra: false, hechos: 0 }) === null
+    && el('rival', { lev: 's', cambiar: true }) === 'cambiar' && el('rival', { lev: 's', cambiar: false }) === null && el('rival', { lev: 'c', cambiar: false }) === 'total'
+    && el('decision', { nulo: true }) === 'nulo' && el('decision', { nulo: false }) === 'luces' && el('decision', { nulo: true }, todo) === null, 'aprende: elegir() no respeta el momento o la prioridad');
+  ok(new Set(CLAVES_APRENDE).size === APRENDE.length, 'aprende: claves repetidas');
+  // lo que dicen las explicaciones, contra el núcleo: «2 o 3 blancas, vale; roja, una falta» y «no vale: al menos 2 jueces»
+  let decididos = 0, nulos = 0, sinTotal = 0;
+  for (let k = 0; k < 120; k++) {
+    const semilla = mezclar(k, 5252), pr = new Partida(datos, { semilla, nivel: NIV[k % 3], ia: HUELLA_IA, envFijo: true, turnos: k % 2 ? 'oficial' : 'rondas', atletas: IDS.map(id => ({ id, ctrl: 'juego' })) });
+    pr.empezar();
+    for (let g = 0; pr.fase !== 'fin' && g < 60; g++) {
+      if (pr.fase === 'intervalo') { pr.empezar(); continue; }
+      const x = pr.resolverIA(), r = x.res; if (r.res === 'fallo') continue;
+      const blancas = r.luces.filter(Boolean).length; decididos++; if (r.res === 'nulo') nulos++;
+      ok((r.res === 'valido') === (blancas >= 2), `semilla ${semilla}: ${r.res} con ${blancas} luces blancas`);
+    }
+    // «Necesitas un válido en cada uno»: sin arranque o sin dos tiempos válido, total 0
+    for (const f of pr.tabla()) { const a = pr.at[f.a]; if (!a.mejor.s || !a.mejor.c) { sinTotal++; ok(f.total === 0, `semilla ${semilla}: ${a.id} sin un válido en cada uno y con total ${f.total}`); } }
+  }
+  ok(decididos > 500 && nulos > 0, `aprende: pocos veredictos de jueces (${decididos}, ${nulos} nulos)`);
+  // «2 cambios por intento» y «solo hacia arriba» (Cambiar); la barra que no baja dentro de la ronda y la progresión ya las verifica jugar()
+  ok(TURNOS.previos === 2 && TURNOS.soloSube === true, `aprende: «Cambiar» dice 2 cambios hacia arriba y TURNOS es ${JSON.stringify(TURNOS)}`);
+  console.log(`20. Aprender jugando: ${APRENDE.length} explicaciones en es y en (≤ 150 caracteres), una por momento · ${decididos} veredictos de jueces (${nulos} no vale) con 2 o 3 blancas = vale · ${sinTotal} sin total por falta de un válido`);
 }
 
 console.log(fallas.length ? `\nFALLÓ: ${fallas.length} problemas` : `\nOK en ${((Date.now() - t0) / 1000).toFixed(1)} s`);

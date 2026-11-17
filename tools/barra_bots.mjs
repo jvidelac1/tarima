@@ -49,12 +49,12 @@ export function ctxBarra(id, lev, env, I, sem, extra = {}) {
 const normal = r => { const u = (r.u32() + 1) / 4294967297, v = r.u32() / 4294967296; return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
 
 /** ms desde que arranca la barrita hasta la k-ésima vez que el puntero pasa por el centro (más lento desde BARRA.lentoDesde). */
-export function centro(k, R = BARRA) {
+export function centro(k, R = reglasB()) {
   const P = R.pasada, L = R.lentoDesde, x = (k + .5) * 1000, xL = L * 1000 / P;      // en milésimas de pasada
   return x <= xL ? x * P / 1000 : L + (x - xL) * R.pasadaLenta / 1000;
 }
 /** Instante en que el perfil `B` toca una barrita que arrancó en `t0` (ms del intento). */
-export function cuandoToca(B, t0, r, R = BARRA) {
+export function cuandoToca(B, t0, r, R = reglasB()) {
   const P = R.pasada, reac = Math.max(150, B.reac + Math.round(normal(r) * 250));
   if (r.ent(1000) < (B.despiste || 0)) return t0 + reac + r.ent(2 * P);
   let k = 0; while (centro(k, R) < reac) k++;
@@ -197,7 +197,7 @@ if (principal) {
   for (const nivel of RIV) for (const [pf, est] of [['novato', 'panel'], ['medio', 'panel'], ['bueno', 'panel'], ['medio', 'lector'], ['bueno', 'lector']]) for (const id of ATL) {
     const F = { finales: 0, total: 0, oro: 0, val: [0, 0, 0, 0, 0, 0], int: [0, 0, 0, 0, 0, 0], fat3: 0, n3: 0 }, yo = ATL.indexOf(id);
     for (let k = 0; k < Math.max(60, Math.round(N / 4)); k++) {
-      const p = new Partida(datos, { semilla: mezclar(k, 777, yo, nivel === 'normal' ? 1 : 0), nivel, cal: 0, primera: false, ctl: 'b', tactil: true, ia: HUELLA_IA, ...D, atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
+      const p = new Partida(datos, { semilla: mezclar(k, 777, yo, nivel === 'normal' ? 1 : 0), nivel, cal: 0, primera: false, ctl: 'b', tactil: true, ia: HUELLA_IA, envFijo: true, ...D, atletas: ATL.map((x, i) => ({ id: x, ctrl: i === yo ? 'persona' : 'juego' })) });
       for (const lev of ['s', 'c']) { const [lo, hi] = p.rangoApertura(yo, lev); p.abrir(yo, lev, Math.max(lo, Math.min(hi, Math.round(datos.atletas[id].techo[lev] * R.apertura / 1000)))); }
       p.empezar();
       for (let g = 0; p.fase !== 'fin' && g < 80; g++) {

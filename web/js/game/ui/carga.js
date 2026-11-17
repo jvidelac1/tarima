@@ -6,6 +6,8 @@
 //   cargaUI.progreso(clave, bajado, total)   lo llama Athlete.load (por stage.js) a medida que llegan los bytes
 //   cargaUI.mostrar(clave) / cargaUI.ocultar()   aparece / se va con un fundido (sin fundido con movimiento reducido)
 //   cargaUI.error(clave)          el juego se detuvo: solo el texto
+//   await cargaUI.aviso(tipo, o)  LIF-33: algo no bajó ('descarga'), el 3D no arranca ('webgl') o el navegador no puede con
+//                                 el juego ('viejo'): un aviso claro con qué probar y «Probar de nuevo»; resuelve al tocarlo
 // Mientras la pantalla está oculta y los modelos siguen bajando (detrás de la bienvenida), una barrita fina arriba de todo
 // (#carga-mini) muestra el avance.
 import { t, fijarIdioma, detectarIdioma, fijarTactil, alCambiarIdioma, idiomaActual } from '../i18n/t.js';
@@ -113,8 +115,37 @@ export const cargaUI = {
     clearTimeout(S.fin); S.visible = true; S.error = true; S.titulo = clave; rotar(false);
     el.msg.classList.remove('saliendo'); el.msg.classList.add('error'); el.msg.hidden = false; pintar();
   },
+  /**
+   * El aviso de LIF-33, sobre la pantalla de carga (tapa todo: nunca la interfaz sin el pesista). `tipo`: 'descarga' (no
+   * bajó una parte del juego: revisar la conexión), 'webgl' (el navegador no pudo arrancar el 3D: otro navegador,
+   * actualizar, salir de la app de Facebook o Instagram, la aceleración por hardware) o 'viejo' (el navegador no puede con
+   * el juego). `o.app`: la app en la que se abrió el enlace (analitica.appNavegador), para poner ese consejo primero.
+   * Resuelve cuando se toca «Probar de nuevo» (quien llama decide si reintenta ahí mismo o recarga la página).
+   */
+  aviso(tipo, o = {}) {
+    if (!el.msg && !nodos()) return new Promise(() => {});
+    clearTimeout(S.fin); S.visible = true; S.error = true; S.titulo = `falla.${tipo}.titulo`; S.aviso = { tipo, app: o.app || null }; rotar(false);
+    el.msg.classList.remove('saliendo'); el.msg.classList.add('error', 'aviso'); el.msg.hidden = false;
+    document.documentElement.dataset.falla = tipo;
+    let caja = document.getElementById('carga-aviso');
+    if (!caja) { caja = document.createElement('div'); caja.id = 'carga-aviso'; caja.className = 'carga-aviso'; caja.setAttribute('role', 'alert'); el.msg.appendChild(caja); }
+    const pinta = () => {
+      const a = S.aviso; if (!a) return;
+      const consejos = a.tipo === 'webgl' ? ['falla.webgl.otro', 'falla.webgl.actualizar', 'falla.webgl.app', 'falla.webgl.aceleracion'] : [];
+      if (a.app && consejos.length) consejos.sort((x, y) => (y === 'falla.webgl.app') - (x === 'falla.webgl.app'));      // dentro de una app, ese consejo primero
+      const e = x => String(x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+      caja.innerHTML = `<p class="carga-aviso-texto">${e(t(`falla.${a.tipo}.texto`))}</p>${consejos.length ? `<ul>${consejos.map(k => `<li>${e(t(k))}</li>`).join('')}</ul>` : ''}<button type="button" id="btn-reintentar-carga">${e(t('conexion.reintentar'))}</button>`;
+      pintar();
+    };
+    pinta(); S.repintaAviso = pinta;
+    return new Promise(res => {
+      const b = () => caja.querySelector('#btn-reintentar-carga');
+      caja.addEventListener('click', ev => { if (ev.target?.id !== 'btn-reintentar-carga') return; S.aviso = null; S.repintaAviso = null; caja.remove(); el.msg.classList.remove('aviso'); delete document.documentElement.dataset.falla; res(); });
+      try { b()?.focus({ preventScroll: true }); } catch { /* sin foco */ }
+    });
+  },
 };
 
 // arranca solo: la pantalla ya está a la vista desde el HTML
 if (nodos()) { el.msg.classList.add('activa'); pintar(); dato(false); rotar(true); }
-alCambiarIdioma(() => { pintar(); dato(false); });
+alCambiarIdioma(() => { pintar(); dato(false); S.repintaAviso?.(); });

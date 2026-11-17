@@ -1,11 +1,11 @@
-# Solo el teléfono, para iterar rápido: check_telefono (de costado en dos tamaños, mano izquierda, campos, dos dedos y el
-# aviso de girar en vertical), check_iphone (sonido, Opciones con el dedo y el aviso de pantalla completa) y la partida por toques de check_game. Lo mismo corre dentro de «Pruebas del juego».
+# Solo el teléfono, para iterar rápido: check_telefono (de costado en dos tamaños, mano izquierda, campos, dos dedos, y
+# parado en tres tamaños: LIF-50; con la entrada `solo`, solo esos casos), check_iphone (sonido, Opciones con el dedo y el aviso de pantalla completa) y la partida por toques de check_game. Lo mismo corre dentro de «Pruebas del juego».
 # Por software (SwiftShader): verifica lógica, toques y que nada quede cortado o tapado; no mide cuadros por segundo.
-name: Teléfono (táctil, de costado)
+name: Teléfono (táctil, de costado y parado)
 
 on:
   push:
-    branches: [main, mvp, telefono-pulido, gameplay, tablero]
+    branches: [main, mvp, telefono-pulido, gameplay, tablero, primera-vez, graficos, panel, graficos2, aprender, look, vertical, visual, pov]
     paths:
       - 'web/js/game/telefono.js'
       - 'web/js/game/audio.js'
@@ -31,6 +31,11 @@ on:
       - 'tools/check_toques.mjs'
       - '.github/workflows/telefono.yml'
   workflow_dispatch:
+    inputs:
+      solo:
+        description: 'Solo estos casos de check_telefono (prefijos separados por coma, p. ej. vertical) y nada más'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -65,20 +70,24 @@ jobs:
           "$CHROME" --version
           echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
           mkdir -p out/logs
-      - name: Teléfono de costado y en vertical (check_telefono)
+      - name: Teléfono de costado y parado (check_telefono)
         if: ${{ !cancelled() }}
         timeout-minutes: 25
-        run: node tools/check_telefono.mjs 2>&1 | tee out/logs/check_telefono.log
+        run: node tools/check_telefono.mjs ${{ inputs.solo && format('--solo={0}', inputs.solo) || '' }} 2>&1 | tee out/logs/check_telefono.log
+      - name: Selección de pesista en 3D (check_telefono --solo=seleccion)
+        if: ${{ !cancelled() && !inputs.solo }}
+        timeout-minutes: 35
+        run: node tools/check_telefono.mjs --solo=seleccion --capturas=out/seleccion 2>&1 | tee out/logs/check_seleccion.log
       - name: iPhone acostado, Safari y Chrome de iOS (check_iphone)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && !inputs.solo }}
         timeout-minutes: 15
         run: node tools/check_iphone.mjs 2>&1 | tee out/logs/check_iphone.log
       - name: Toques en tiempo real (check_toques)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && !inputs.solo }}
         timeout-minutes: 10
         run: node tools/check_toques.mjs 2>&1 | tee out/logs/check_toques.log
       - name: Partida por toques de costado (check_game --only=tactil)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && !inputs.solo }}
         timeout-minutes: 20
         run: node tools/check_game.mjs --only=tactil 2>&1 | tee out/logs/check_game_tactil.log
       - name: Resumen
@@ -86,7 +95,7 @@ jobs:
         run: |
           {
             echo "### Teléfono (dibujo por software)"
-            for f in check_telefono check_iphone check_toques check_game_tactil; do
+            for f in check_telefono check_seleccion check_iphone check_toques check_game_tactil; do
               echo; echo "**$f**"; echo '```'
               if [ -f "out/logs/$f.log" ]; then tail -n 40 "out/logs/$f.log"; else echo "(no corrió)"; fi
               echo '```'

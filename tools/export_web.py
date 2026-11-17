@@ -36,8 +36,9 @@ def repack(src,dst,imgdir):
         nm=os.path.splitext(im.get('name',''))[0]; p=os.path.join(imgdir,nm+'.png')
         if nm in ALPHA and 'bufferView' in im and os.path.exists(p):
             b=io.BytesIO(); Image.open(p).convert('RGBA').save(b,'PNG',optimize=True); chunks[im['bufferView']]=b.getvalue(); im['mimeType']='image/png'; done[nm]=(Image.open(p).size[0],len(b.getvalue()))
+    capas={os.path.splitext(im.get('name',''))[0] for im in J.get('images',[])}     # el pelo en capas trae la imagen 'hair'; el pelo como malla opaca ('pelo') se queda OPAQUE
     for m in J.get('materials',[]):
-        if m.get('name') in ALPHA.values(): m['alphaMode']='BLEND'; m.pop('alphaCutoff',None); m['doubleSided']=m['name']=='Lashes'
+        if m.get('name') in ALPHA.values() and (m['name']!='Hair' or 'hair' in capas): m['alphaMode']='BLEND'; m.pop('alphaCutoff',None); m['doubleSided']=m['name']=='Lashes'
     out=bytearray()
     for v,c in zip(views,chunks):
         out+=b'\0'*(-len(out)%4); v['byteOffset']=len(out); v['byteLength']=len(c); out+=c
@@ -135,11 +136,16 @@ if __name__=='__main__':
     for n in names:
         j=json.load(open(os.path.join(OUTR,n,'poses.json'),encoding='utf-8'))
         data[n]=dict(h=j['h'],seg=j['seg'],sub=j['sub'],segs=j['segs'],grip=j['grip'],corr=CORR)
+        if j.get('bar') and j['bar'].get('kg')!=20: data[n]['bar']=j['bar']     # barra de mujeres (15 kg, 25 mm): el visor todavía dibuja la de 20 kg
         g=os.path.join(WEB,'models',n+'.glb'); done=repack(os.path.join(OUTR,n,n+'.glb'),g,os.path.join(OUTR,n))
         sp=done.pop('_split',0); print(f'GLB {n}: {os.path.getsize(g)/1e6:.2f} MB; texturas '+', '.join(f'{k} {s}px {b/1e6:.2f}MB' for k,(s,b) in done.items())+f'; {sp} primitivas sin morphs')
         print(f'MAT {n}: '+summary(g))
         for mk in (os.path.join(OUTR,n,'body_mask.png'),os.path.join(OUTR,n,n+'_mask.png')):   # R=piel, G=tela, B=pelo, mismo UV que Body
             if os.path.exists(mk): shutil.copy(mk,os.path.join(WEB,'models',n+'_mask.png')); data[n]['mask']=f'models/{n}_mask.png'; break
+        m2=os.path.join(OUTR,n,'body_mask2.png')     # R rodilleras, G medias, B vendas de muñeca: lo que la máscara principal junta con la malla en el canal G
+        if os.path.exists(m2):
+            from PIL import Image
+            Image.open(m2).convert('RGB').resize((1024,1024),Image.LANCZOS).save(os.path.join(WEB,'models',n+'_mask2.webp'),lossless=True,method=6); data[n]['mask2']=f'models/{n}_mask2.webp'
     detail_tiles(os.path.join(WEB,'models'))
     json.dump(data,open(dst,'w',encoding='utf-8'),ensure_ascii=False,indent=1)
     print('ok',list(data))

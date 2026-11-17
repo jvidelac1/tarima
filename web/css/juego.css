@@ -18,14 +18,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 #gl,#ayudas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
 #ayudas{pointer-events:none}
 #zona{display:none}
-@media (pointer:coarse) and (orientation:portrait){
-  :where(html:not(.rotado)) #escena{flex:0 0 60%}
-  :where(html:not(.rotado)) #zona{display:flex;flex:1;align-items:center;justify-content:center;padding-bottom:var(--sb);background:radial-gradient(ellipse at 50% 0,#101a44 0,#05081a 75%);border-top:2px solid var(--line);font-family:var(--display);font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);touch-action:none}
-  :where(html:not(.rotado)) #zona.on{background:radial-gradient(ellipse at 50% 0,#17307a 0,#081033 75%);color:var(--ink)}
-  /* los paneles usan toda la pantalla: el botón táctil no hace falta mientras hay un panel abierto */
-  :where(html:not(.rotado)) #capa{position:fixed;inset:0;padding-bottom:calc(8px + var(--sb));z-index:5}
-  :where(html:not(.rotado)) .panel{max-height:100%}
-}
+/* teléfono parado (html.vert): al final, «teléfono parado» */
 #msg{position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:20px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);pointer-events:none;background:radial-gradient(ellipse at center,#0a1030 0,#03050c 70%)}
 #tv{position:absolute;inset:0;z-index:1;pointer-events:none;font-family:var(--display);text-transform:uppercase}
 .bug{position:absolute;top:calc(var(--u)*1.2 + var(--st));left:calc(var(--u)*1.2 + var(--sl));background:rgba(6,14,48,.88);padding:calc(var(--u)*.4) calc(var(--u)*.9);border-left:calc(var(--u)*.28) solid var(--teal)}
@@ -47,6 +40,16 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 .veredicto small{display:block;margin-top:.25em;font-family:var(--body);font-weight:400;font-size:calc(var(--u)*1.2);line-height:1.35;letter-spacing:0;color:var(--ink);text-transform:none}
 .veredicto.mal{border-color:var(--red)}
 .veredicto.arriba{top:11%;font-size:calc(var(--u)*1.5)}
+/* el resultado de un intento, 1,5 s: grande y centrado arriba, con las tres luces (después vuelve a su lugar); en pantallas angostas queda como siempre */
+.veredicto .luces{display:none}
+@media (min-width:900px) and (min-height:480px){
+  /* a un costado, a media altura: arriba al centro tapaba la cabeza y la barra del pesista */
+  html:root .veredicto.grande{left:calc(var(--u)*2 + var(--sl,0px));top:36%;transform:none;text-align:left;font-size:calc(var(--u)*3.4);padding:calc(var(--u)*.8) calc(var(--u)*2);max-width:min(80cqw,calc(var(--u)*60));background:rgba(6,14,48,.9)}
+  html:root .veredicto.grande .luces{display:inline-flex;vertical-align:middle;margin-left:.6em;gap:.28em}
+  html:root .veredicto.grande .luces i{width:.62em;height:.62em}
+  html:root .veredicto.grande .luces i.r::after{font-size:.5em;line-height:1.2}
+  html:root .veredicto.grande small{display:none}
+}
 .rival{position:absolute;right:calc(var(--u)*1.2 + var(--sr));top:calc(var(--u)*5 + var(--st));max-width:46%;background:rgba(6,14,48,.88);padding:calc(var(--u)*.4) calc(var(--u)*.8);font-size:calc(var(--u)*.9);letter-spacing:.06em;display:flex;gap:.6em;align-items:center}
 .rival i{display:inline-block;width:1.6em;height:1.05em;flex:none}
 .zocalo{position:absolute;left:calc(var(--u)*1.2 + var(--sl));bottom:calc(var(--u)*1.2);display:flex;align-items:stretch;background:rgba(6,14,48,.92);max-width:calc(100% - var(--u)*2.4)}
@@ -58,6 +61,13 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 .zocalo .kg{background:var(--gold);color:#111;padding:0 calc(var(--u)*.8);display:flex;align-items:baseline;gap:.2em}
 .zocalo .kg b{font-weight:800;font-size:calc(var(--u)*2.3)}
 #pausa{position:absolute;z-index:6;top:calc(var(--u)*1.2 + var(--st));left:50%;transform:translateX(-50%);font-family:var(--display);min-height:0;min-width:44px;padding:.35em .9em;background:rgba(6,14,48,.88);font-size:calc(var(--u)*1.2)}
+/* Arriba al centro no va nada (17-nov: «los carteles le tapan la cabeza al pesista»): ahí llegan la barra cuando sube y la
+   cabeza en los planos del final. Sonido, pausa y ayuda van arriba a la derecha, en fila debajo del reloj y las luces
+   (parado, html.vert, es al revés: la fila arriba y el reloj debajo). Lo mide tools/tapa.mjs. */
+html:not(.vert) :is(#pausa,#sonidob,#ayudab){top:calc(var(--u)*5.4 + var(--st));left:auto;transform:none;width:46px;min-width:46px;padding-left:0;padding-right:0;display:flex;align-items:center;justify-content:center}
+html:not(.vert) #ayudab{right:calc(var(--u)*1.2 + var(--sr))}
+html:not(.vert) #pausa{right:calc(var(--u)*1.2 + var(--sr) + 50px)}
+html:not(.vert) #sonidob{right:calc(var(--u)*1.2 + var(--sr) + 100px)}
 
 /* La señal: siempre en el mismo lugar. Horizontal: a la derecha del pesista, a media altura. Vertical: al pie del escenario. */
 .tecla{display:inline-block;font:inherit;font-family:var(--display);font-weight:800;font-style:normal;letter-spacing:.12em;text-transform:uppercase;line-height:1;color:#0a1020;background:#f2f4ff;border-radius:.42em;padding:.42em .8em .5em;box-shadow:0 .24em 0 #7c86a8,0 .24em 0 1px #03050c;white-space:nowrap}
@@ -300,7 +310,9 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
   :where(html.horiz.bajo) .panel.podio-panel:has(button) .tabla{display:none}
   /* el panel del llamado va al costado: el pesista queda a la vista */
   /* el llamado va abajo y nunca debajo de los botones de sonido, pausa y ayuda (arriba al centro): si no entra, se desplaza */
-  :where(html.horiz.bajo) .panel.lado{align-self:flex-end;margin-left:auto;margin-right:0;max-width:min(54cqw,440px);max-height:calc(100% - 44px)}
+  :where(html.horiz.bajo) .panel.lado{align-self:flex-end;margin-left:auto;margin-right:0;max-width:min(54cqw,440px);max-height:calc(100% - 44px - var(--u)*4.4)}
+  /* elegir kilos (apertura y fin del arranque) con el teléfono acostado: la tabla y el selector no entran a un costado en 340 a 390 px de alto: a lo ancho, como siempre */
+  :where(html.horiz.bajo) .panel.peso.lado{align-self:center;margin:0;max-width:min(96cqw,760px);max-height:100%}
 /* teléfono en vertical: «Gira el teléfono» con un dibujo, encima de todo */
 /* (el aviso «Gira el teléfono» ya no existe: en vertical el contenido se gira solo, ver html.rotado) */
 @keyframes girar{0%,22%{transform:rotate(0)}48%,82%{transform:rotate(-90deg)}100%{transform:rotate(0)}}
@@ -492,6 +504,10 @@ html.juego-u .senal .s-sub{font-size:calc(var(--v)*1.25)}
 html.juego-u .veredicto{left:calc(var(--u)*1.4 + var(--sl));top:42%;transform:none;text-align:left;font-size:calc(var(--u)*1.75);max-width:min(30cqw,calc(var(--u)*26));padding:calc(var(--u)*.5) calc(var(--u)*1);background:rgba(6,14,48,.8)}
 html.juego-u .veredicto small{font-size:calc(var(--u)*1.02)}
 html.juego-u .veredicto.arriba{top:42%;font-size:calc(var(--u)*1.4)}
+/* un aviso sobre el plano del llamado (el pesista a la izquierda, donde el panel lo dejó): va a la derecha, del lado del panel */
+html.juego-u .veredicto.der{left:auto;right:calc(var(--u)*1.4 + var(--sr))}
+/* mano izquierda con una explicación de primera vez a la vista (va a la izquierda, encima del botón): el veredicto a la derecha, no encima de ella */
+html.juego-u:where(.horiz).zurdo body:has(#aprende[data-donde=esquina]:not([hidden])) .veredicto{left:auto;right:calc(var(--u)*1.4 + var(--sr))}
 @media (prefers-reduced-motion:no-preference){html.juego-u :is(.veredicto,.guia){animation:entraL .18s ease-out}}
 @keyframes entraL{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 /* con el veredicto a la vista, nada más a la izquierda: ni el marcador, ni los cambios de los rivales, ni la etiqueta */
@@ -538,8 +554,17 @@ html.juego-u .seguir{font-size:calc(var(--u)*.95);padding:.3em .65em;background:
    Pedido del dueño: «hay muchos cortes cuando un pesista termina de tirar» y «un mini tablero que me diga cuánto peso eligen
    los otros pesistas». El tablero (ui/tablero.js) reemplaza al marcador, al cartel del turno del rival, a los avisos de
    cambios y al zócalo: una sola cosa dice quién levanta, con cuánto, y qué pidió cada uno. */
-#fundido{position:absolute;inset:0;background:#03050c;opacity:0;pointer-events:none;transition:opacity .14s ease}
-#fundido.on{opacity:1}
+#fundido{position:absolute;inset:0;background:#03050c;opacity:0;pointer-events:none;transition:opacity .28s cubic-bezier(.22,.61,.36,1)}      /* vuelve frenando */
+#fundido.on{opacity:1;transition-timing-function:cubic-bezier(.55,.06,.68,.19)}      /* se va acelerando */
+/* 17-nov, transiciones suaves: lo que aparece de golpe con cada turno (tablero, zócalo, «Saltar», la barrita, «seguir») y
+   los paneles nuevos entran con una disolvencia corta. Solo opacidad: no mueve cajas (el encuadre y las pruebas miden cajas)
+   y no pisa los transform de cada cartel. Un panel que se repinta (un kilo más, otro estilo) no vuelve a entrar: la clase
+   .entra la pone capa.poner solo cuando el panel es otro. Con movimiento reducido, nada. */
+@media (prefers-reduced-motion:no-preference){
+  .tablero:not([hidden]),.zocalo:not([hidden]),.saltar-rival:not([hidden]),.barrita:not([hidden]),.seguir:not([hidden]),.etiqueta:not([hidden]){animation:aparece .22s ease-out}
+  #capa>.panel.entra{animation:aparece .2s ease-out}
+}
+@keyframes aparece{from{opacity:0}to{opacity:1}}
 .tablero{position:absolute;left:calc(var(--u)*1.2 + var(--sl));top:calc(var(--u)*1.2 + var(--st));background:rgba(6,14,48,.86);border-left:calc(var(--u)*.28) solid var(--teal);padding:calc(var(--u)*.35) calc(var(--u)*.55) calc(var(--u)*.45) calc(var(--u)*.4);text-transform:none;max-width:min(40cqw,calc(var(--u)*40))}
 body:has(#tablero:not([hidden])) .bug{display:none}
 .tb{border-collapse:collapse;font-variant-numeric:tabular-nums}
@@ -577,6 +602,24 @@ body:has(#tablero:not([hidden])) .bug{display:none}
 .tb-pie{border-top:1px solid var(--line);margin-top:calc(var(--u)*.3);padding-top:calc(var(--u)*.25)}
 .tb-pie p{margin:0;font-family:var(--body);font-size:calc(var(--u)*.92);line-height:1.3;color:var(--ink);white-space:normal}
 .tb-pie p.est{color:var(--gold);font-weight:600}
+.tb-pie p.cambia{color:var(--gold);font-weight:700}
+/* «Cambiar» el pedido en el turno de un rival (LIF-4): un botón chico debajo del tablero; abierto, una sola fila − kg + Pedir */
+.tablero .tb-pedido{pointer-events:auto;margin-top:calc(var(--u)*.35);font-family:var(--body);text-transform:none}
+.tablero .tb-pedido button{font-family:var(--display);font-weight:800;font-size:calc(var(--u)*.95);letter-spacing:.06em;min-height:max(30px,calc(var(--u)*2.2));padding:.15em .7em;background:rgba(6,14,48,.9);border:1px solid var(--teal);color:#fff;border-radius:.3em}
+.tablero .tb-pedido button:disabled{opacity:.35}
+.tablero .tb-pedido button.ir{background:var(--teal);color:#04121a}
+.tablero .tb-cambiar .tecla{font-size:.8em;margin-left:.3em}
+.tablero .tb-ped{display:flex;flex-wrap:wrap;align-items:center;gap:calc(var(--u)*.35)}
+.tablero .tb-ped b{font-family:var(--display);font-size:calc(var(--u)*1.5);color:var(--gold);min-width:2.2em;text-align:center}
+.tablero .tb-ped small{font-size:calc(var(--u)*.8);color:var(--mute)}
+.tablero .tb-ped .tb-ped-nota{flex-basis:100%}
+@media (pointer:coarse){.tablero .tb-pedido button{min-height:40px;min-width:40px;font-size:15px}}
+/* teléfono acostado: «Cambiar» debajo del tablero, pero no con el veredicto a la vista (va abajo a la izquierda y se taparían;
+   al costado del tablero choca con los botones de arriba) */
+:where(html.horiz.bajo) .tablero .tb-pedido{margin-top:4px}
+:where(html.horiz.bajo) .tablero .tb-pedido button{min-height:36px;padding:0 .8em;font-size:13px}
+:where(html.horiz.bajo) .tablero .tb-ped .tb-ped-nota{display:none}
+:where(html.horiz.bajo) body:has(#veredicto:not([hidden])) #tablero .tb-pedido{display:none}
 @media (prefers-reduced-motion:no-preference){.tb tr.cambio .tb-pide b{animation:tbCambio 1.2s ease-out 2}}
 @keyframes tbCambio{0%{text-shadow:0 0 0 transparent}30%{text-shadow:0 0 12px var(--gold)}100%{text-shadow:0 0 0 transparent}}
 /* lo que el tablero ya dice no se repite: ni marcador, ni cartel del turno, ni avisos sueltos, ni zócalo, ni etiqueta ('b' y 'u') */
@@ -609,3 +652,192 @@ html[data-pantalla=intento] #tablero,body:has(#margen:not([hidden])) #tablero{to
 .rm-linea.dif-muy .dif{background:var(--red);color:#fff}
 .rm-linea .chance{margin-left:auto}
 .pesista small.rm{display:block;margin-top:.25em;font-size:.82em;color:var(--gold);letter-spacing:.02em}
+
+/* ---------- panel del llamado compacto ('b' y 'u', LIF-31) y estilo de envión fijo (LIF-43) ----------
+   A la vista: título corto con «Detalles», kilos ± con levantar, la dificultad y la chance, y en el dos tiempos el estilo de
+   envión en un solo botón. El resto se despliega en .pn-detalle. En el teléfono acostado el panel no pasa del 38 % del alto
+   y todo lo que se toca mide 40 px de alto o más (check_telefono). */
+.panel.compacto .pn-cab{display:flex;align-items:center;gap:.6em}
+.panel.compacto .pn-cab h2{margin:0;flex:1;min-width:0}
+.panel.compacto .pn-mas{flex:none;min-height:34px;padding:.2em .7em;font-size:clamp(11px,1.6cqh,13px);background:transparent}
+.panel.compacto .kgsel{margin:.4em 0}
+.pn-esencial{display:flex;flex-wrap:wrap;align-items:center;gap:.35em .7em;margin:.35em 0;font-size:clamp(12px,1.9cqh,15px);color:var(--ink)}
+.pn-esencial>p{margin:0}
+.pn-esencial .dif{font-family:var(--display);font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:.05em .5em;border-radius:.2em;color:#04121a;background:var(--ok)}
+.pn-esencial.dif-medio .dif{background:var(--teal)}
+.pn-esencial.dif-dificil .dif{background:var(--gold)}
+.pn-esencial.dif-muy .dif{background:var(--red);color:#fff}
+.pn-estilo{display:inline-flex;align-items:center;flex-wrap:wrap;gap:.35em .5em;margin-left:auto}
+.pn-estilo button{font-family:var(--body);text-transform:none;letter-spacing:0;font-weight:400;min-height:36px;padding:.25em .7em;font-size:clamp(12px,1.8cqh,14px)}
+.pn-estilo button b{font-weight:700}
+.pn-estilo .pn-et{color:var(--mute)}
+.pn-estilo button .pn-et{color:inherit;opacity:.75}
+.pn-estilo.abierto{flex-basis:100%;margin-left:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.3em .4em}
+/* los tres estilos a la vista (17-nov): segmentos iguales, el nombre arriba y su dificultad debajo; el elegido, lleno */
+.pn-estilo.abierto>:is(.pn-et,.pn-regla){grid-column:1/-1}
+.pn-estilo.abierto .envion{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.05em;min-height:44px;padding:.2em .3em;line-height:1.15;text-align:center}
+.pn-estilo.abierto .envion .pn-dif{font-size:.85em;color:var(--mute)}
+.pn-estilo.abierto .envion[aria-pressed=true]{background:#1d3a8f;border-color:var(--teal);box-shadow:inset 0 -3px 0 var(--teal)}
+.pn-estilo.abierto .envion[aria-pressed=true] .pn-dif{color:var(--ink)}
+.pn-estilo .pn-regla{flex-basis:100%;font-style:normal;color:var(--mute);font-size:.85em}
+.pn-estilo.fijo{gap:.3em;color:var(--ink)}
+.pn-estilo.fijo em{font-style:normal;font-family:var(--display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:.8em;color:var(--gold)}
+.pn-estilo .candado{color:var(--gold);flex:none}
+.pn-detalle{border-top:1px solid var(--line);margin-top:.35em;padding-top:.15em}
+.pn-detalle[hidden]{display:none}
+.pn-detalle .rm-linea{margin-top:.3em}
+:where(html.horiz.bajo) .panel.compacto{padding:4px 10px}
+:where(html.horiz.bajo) .panel.compacto h2{font-size:clamp(12px,3.6cqh,15px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+:where(html.horiz.bajo) .panel.compacto .pn-mas{min-height:40px;font-size:12px;padding:.15em .7em}
+:where(html.horiz.bajo) .panel.compacto :is(#kg-menos5,#kg-mas5){display:none}      /* ↑ ↓ siguen sumando de a 5 con teclado */
+:where(html.horiz.bajo) .panel.compacto .kgsel{margin:2px 0;gap:6px;flex-wrap:nowrap}
+:where(html.horiz.bajo) .panel.compacto .kgsel>span{display:none}      /* «kg» ya lo dice el botón de levantar */
+:where(html.horiz.bajo) .panel.compacto .kgsel .kg{min-width:44px;min-height:40px;padding:.2em .6em}
+:where(html.horiz.bajo) .panel.compacto .kgsel .ir{margin-left:auto;min-height:40px;padding:.2em .8em;white-space:nowrap}
+:where(html.horiz.bajo) .panel.compacto .kgsel output{font-size:clamp(24px,7.5cqh,32px);line-height:1;min-width:2.6ch}
+:where(html.horiz.bajo) .panel.compacto .pn-esencial{margin:1px 0;font-size:13px;gap:.3em .55em}
+:where(html.horiz.bajo) .panel.compacto .pn-estilo button{min-height:40px;font-size:13px;padding:.15em .7em}
+:where(html.horiz.bajo) .panel.compacto .pn-estilo:not(.abierto) .pn-dif{display:none}      /* la dificultad, en la lista de los tres */
+:where(html.horiz.bajo) .panel.compacto .pn-estilo.fijo .pn-et{display:none}
+/* LIF-52: explicación de primera vez (ui/aprende.js). Abajo a la izquierda (en 'b' y 'u' ahí no hay nada y el pesista no
+   llega), o encima del panel del llamado, alineada a su derecha (aprende.js le pone right, bottom y width). Una línea, con ✕. */
+.aprende{position:absolute;left:calc(var(--u)*1.4 + var(--sl));bottom:calc(var(--u)*1.2 + var(--sb));max-width:min(30cqw,calc(var(--u)*27));display:flex;align-items:flex-start;gap:calc(var(--u)*.3);background:rgba(6,14,48,.9);border-left:calc(var(--u)*.28) solid var(--gold);padding:calc(var(--u)*.45) 0 calc(var(--u)*.45) calc(var(--u)*.8);font-family:var(--body);font-weight:400;text-transform:none;letter-spacing:0;font-size:calc(var(--u)*1.05);line-height:1.3;color:var(--ink)}
+.aprende p{margin:0;flex:1;min-width:0}
+.aprende b{font-family:var(--display);font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);margin-right:.25em}
+.aprende button{pointer-events:auto;flex:none;align-self:stretch;min-width:max(36px,calc(var(--u)*2.6));min-height:max(36px,calc(var(--u)*2.6));padding:0;background:transparent;border:0;color:var(--mute);font-size:calc(var(--u)*1.25);cursor:pointer;display:flex;align-items:flex-start;justify-content:center;padding-top:calc(var(--u)*.1)}
+.aprende button:hover{color:var(--ink)}
+.aprende[data-donde=panel]{left:auto;max-width:none;box-sizing:border-box}
+.aprende.sin-lugar{visibility:hidden}
+/* zurdo: el botón redondo (y «Saltar») ocupan la esquina de abajo a la izquierda: la explicación va justo encima */
+html:where(.horiz).zurdo .aprende[data-donde=esquina]{bottom:calc(var(--sb) + var(--bm)*2 + var(--boton))}
+:where(html.horiz.bajo) .aprende{font-size:max(11.5px,calc(var(--u)*1.05));max-width:min(32cqw,calc(var(--u)*28))}
+@media (prefers-reduced-motion:no-preference){.aprende{animation:entraL .18s ease-out}}
+
+/* ---------- teléfono parado (LIF-50, 16-nov): se juega en vertical sin girar nada (html.vert, telefono.js) ----------
+   La mayoría abre el enlace con el teléfono parado (Instagram, TikTok, WhatsApp): antes se giraba el contenido y había que
+   acostarlo. Ahora el escenario ocupa toda la pantalla y la cámara encuadra al pesista entre el techo (botones chicos y
+   tablero, --techo-v) y el pie (barrita y botón, --pie-v): main.js, margenVertical. Una cosa por zona:
+   - arriba a la derecha, los botones chicos (sonido, pausa, ayuda); arriba a la izquierda, el tablero o la energía;
+   - abajo al centro, el botón redondo bajo el pulgar (sirve igual para la mano izquierda y la derecha);
+   - justo encima del botón, LA indicación del momento: la barrita, la señal o el veredicto (nunca dos a la vez);
+   - los paneles (kilos, inicio, carteles, podio) suben desde abajo y la cámara encuadra al pesista en lo que dejan libre.
+   Las medidas en px (--boton-v, --pie-v, --techo-v) las pone telefono.js. Lo mide tools/check_telefono.mjs (casos vertical_*). */
+:root:where(.vert){--boton:var(--boton-v,104px);--bm:12px;--sobre-boton:calc(var(--sb) + var(--bm) + var(--boton) + 12px)}
+@media (pointer:coarse){html.vert:not(.escribiendo) body{bottom:auto;height:var(--vvh,100%)}}
+html.vert #escena{flex:1 1 auto}
+/* el botón redondo: abajo al centro (el mismo dibujo que de costado) */
+html.vert #zona{display:flex;position:fixed;z-index:4;left:calc(50% - var(--boton)/2);bottom:calc(var(--sb) + var(--bm));width:var(--boton);height:var(--boton);border-radius:50%;align-items:center;justify-content:center;padding:10px;text-align:center;overflow:hidden;
+  font-family:var(--display);font-weight:800;font-size:calc(var(--boton)*.17);line-height:1;letter-spacing:.03em;text-transform:uppercase;color:#fff;text-shadow:0 1px 5px #000;
+  background:radial-gradient(circle at 50% 35%,rgba(53,230,214,.26),rgba(6,14,48,.55) 72%);border:3px solid rgba(242,244,255,.6);box-shadow:0 6px 0 rgba(2,4,12,.55),inset 0 0 18px rgba(53,230,214,.2);
+  touch-action:none;-webkit-user-select:none;user-select:none;transition:transform 50ms,box-shadow 50ms}
+html.vert #zona.on,html.vert #zona.hunde{transform:translateY(5px) scale(.95);border-color:var(--teal);background:radial-gradient(circle at 50% 40%,rgba(53,230,214,.6),rgba(10,40,90,.62) 75%);box-shadow:0 1px 0 rgba(2,4,12,.55),inset 0 0 26px rgba(53,230,214,.5)}
+/* sin botón con un panel con botones, la pausa, la carga, el teclado abierto o el veredicto (ahí cualquier toque sigue) */
+html.vert body:has(#capa > .panel button) #zona,html.vert body:has(#sobre:not([hidden])) #zona,html.vert body:has(#msg:not([hidden])) #zona,html.vert.escribiendo #zona{display:none}
+/* paneles: suben desde abajo, a todo lo ancho; si no entran, se desplaza el panel y nunca la página */
+html.vert #capa{position:fixed;inset:0;z-index:5;align-items:flex-end;padding:calc(8px + var(--st)) calc(8px + var(--sr)) calc(8px + var(--sb)) calc(8px + var(--sl))}
+html.vert .panel{max-width:none;max-height:100%;padding:14px 16px}
+html.vert .panel.chico,html.vert .panel.gana,html.vert .panel.muro,html.vert .panel.encuesta,html.vert .panel.peso:not(.con-tabla){max-width:none}
+html.vert .panel .pie{margin:.5em -16px -14px;padding:8px 16px}
+/* un panel sin botones («Toca para seguir») queda encima del botón redondo */
+html.vert body:has(#capa > .panel):not(:has(#capa > .panel button)) #capa{padding-bottom:calc(var(--sb) + var(--bm)*2 + var(--boton))}
+html.vert.escribiendo #capa{top:var(--vvy,0px);bottom:auto;height:var(--vvh,100%);align-items:flex-start}
+/* arriba a la derecha: sonido, pausa y ayuda en fila (al centro chocaban con el tablero) */
+html.vert :is(#pausa,#sonidob,#ayudab){top:calc(var(--st) + 8px);left:auto;transform:none;width:44px;min-width:44px;height:40px;padding:0;font-size:17px;display:flex;align-items:center;justify-content:center}
+html.vert #ayudab{right:calc(var(--sr) + 8px)}
+html.vert #pausa{right:calc(var(--sr) + 58px)}
+html.vert #sonidob{right:calc(var(--sr) + 108px)}
+html.vert .relojbox{--u:9px;top:calc(var(--st) + 54px);right:calc(var(--sr) + 8px)}
+html.vert #tv .bug{max-width:calc(100% - 170px - var(--sl) - var(--sr))}
+html.vert #tv .bug span{display:none}
+/* el tablero, chico arriba a la izquierda (sin tocar los botones de la derecha); en el levantamiento propio no va */
+html.vert #tv #tablero{--u:10px;top:calc(var(--st) + 8px);left:calc(var(--sl) + 8px);max-width:calc(100% - 172px - var(--sl) - var(--sr));padding:3px 5px;overflow:hidden}
+/* sin la columna de «AHORA / SIGUE» (la fila resaltada ya dice quién sale) ni la personalidad del rival (va en su cartel) */
+html.vert #tablero :is(.tb-est,.tb-n small.tb-estilo){display:none}
+html.vert #tablero .tb td{font-size:12px}
+/* 17-nov: en el dos tiempos las cinco columnas no entraban y «PIDE» (lo que hay que mirar) salía cortada por la derecha:
+   parado se van la del arranque (ya está sumada en el total) y los cuadraditos de los intentos */
+html.vert #tablero.dt .tb :is(th,td):nth-child(3),html.vert #tablero.dt .tb :is(th,td):last-child{display:none}
+html.vert #tablero .tb-n span{max-width:6.5em}
+html.vert #tablero .tb-pie p{font-size:11px}
+html.vert #tablero .tb-pedido{margin-top:4px}
+html.vert #tablero .tb-pedido button{min-height:40px;padding:0 .8em;font-size:14px}
+html.vert #tablero .tb-ped .tb-ped-nota{display:none}
+html.vert[data-pantalla=intento] #tv #tablero,html.vert body:has(#margen:not([hidden])) #tv #tablero{display:none}
+html.vert body:has(#veredicto:not([hidden])) #tablero .tb-pedido{display:none}
+/* la energía, arriba a la izquierda (como siempre en 'b' y 'u') */
+html.vert #tv #margen{--u:11px}
+/* LA indicación del momento, justo encima del botón: la barrita (sin el verbo: el botón dice TOCA) */
+html.vert #tv #barrita{left:calc(var(--sl) + 14px);right:calc(var(--sr) + 14px);width:auto;transform:none;bottom:var(--sobre-boton)}
+html.vert #barrita .b-tecla,html.vert #barrita .b-verbo{display:none}
+html.vert #barrita .b-pista{height:calc(var(--u)*2.7)}
+/* …o la señal (pararse, ¡DA TODO!), en el mismo lugar */
+html.vert #tv #senal{--v:calc(var(--u)*.9);left:50%;top:auto;right:auto;bottom:var(--sobre-boton);transform:translateX(-50%);width:min(calc(100% - 28px),calc(var(--v)*33))}
+/* …o el veredicto, a lo ancho y sin el botón (ahí cualquier toque sigue: lo dice «Toca: seguir») */
+html.vert #tv #veredicto,html.vert #tv #veredicto.arriba{left:calc(var(--sl) + 14px);right:calc(var(--sr) + 14px);top:auto;bottom:calc(var(--sb) + var(--bm) + 44px);transform:none;width:auto;max-width:none;text-align:center;font-size:calc(var(--u)*1.6);padding:calc(var(--u)*.5) calc(var(--u)*.9)}
+html.vert #tv #veredicto small{font-size:max(13px,calc(var(--u)*1.05))}
+html.vert body:has(#veredicto:not([hidden])) #zona{display:none}
+/* «Toca: seguir»: a la derecha del botón (o de «Saltar»); con el veredicto, abajo al centro, donde estaba el botón */
+html.vert #tv #seguir{left:auto;right:calc(var(--sr) + 10px);transform:none;bottom:calc(var(--sb) + var(--bm) + var(--boton)/2 - .9em);white-space:nowrap}
+html.vert body:has(#veredicto:not([hidden])) #tv #seguir{right:auto;left:50%;transform:translateX(-50%);bottom:calc(var(--sb) + var(--bm))}
+/* el acuse: sin la tecla dibujada (el botón mismo se hunde); solo el motivo de un toque que no sirvió, a la izquierda del
+   botón (o de «Saltar»), sin llegar a ellos */
+html.vert #tv #acuse{right:auto;left:calc(var(--sl) + 10px);top:auto;bottom:calc(var(--sb) + var(--bm) + var(--boton)/2 - .8em);flex-direction:row;max-width:calc(50% - 96px)}
+html.vert #acuse kbd{display:none}
+html.vert #acuse b{min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* con la barrita a la vista, la señal no (en 'b' quedaba su caja vacía detrás de la barrita) */
+html.vert body:has(#barrita:not([hidden])) #tv #senal{display:none}
+/* la guía de la práctica y la presentación: arriba, debajo de los botones, a lo ancho */
+html.vert #tv #guia{left:calc(var(--sl) + 12px);right:calc(var(--sr) + 12px);top:calc(var(--st) + 56px);bottom:auto;transform:none;max-width:none;width:auto;text-align:center;font-size:max(14px,calc(var(--u)*1.05))}
+/* «Saltar práctica» arriba a la izquierda (a la derecha están los botones chicos) */
+html.vert #saltar{left:calc(var(--sl) + 8px);transform:none;top:calc(var(--st) + 8px);min-height:40px}
+/* turno de un rival: «Saltar» donde está el botón redondo, grande para el pulgar */
+html.vert #saltar-rival{right:auto;left:50%;transform:translateX(-50%);bottom:calc(var(--sb) + var(--bm));min-height:60px;padding:0 1.8em;justify-content:center;font-size:20px;border-radius:30px}
+@media (prefers-reduced-motion:no-preference){html.vert .saltar-rival.late{animation:lateV .5s ease-in-out 2}}
+@keyframes lateV{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.1)}}
+/* veredicto de un rival con «Saltar» todavía a la vista (pasa cuando una explicación de primera vez alarga el turno): el
+   veredicto sube por encima del botón (60 px + aire) en vez de quedar debajo */
+html.vert body:has(#saltar-rival:not([hidden])) #tv #veredicto{bottom:calc(var(--sb) + var(--bm) + 68px)}
+/* el cartel grande (y el zócalo de Clásico) sin salirse a lo ancho */
+html.vert #tv #cartel{white-space:normal;text-align:center;width:max-content;max-width:calc(100% - 28px);font-size:calc(var(--u)*2.4);top:calc(var(--techo-v) + 8px)}
+html.vert #tv #zocalo{bottom:calc(var(--sobre-boton) + var(--u)*5)}
+/* la explicación de primera vez (LIF-52): encima del panel del llamado (aprende.js) o, en la esquina, encima de lo que haya
+   abajo (aprende.js la apila: veredicto, «Saltar», botón) */
+html.vert #tv #aprende{left:calc(var(--sl) + 12px);right:calc(var(--sr) + 12px);max-width:none;font-size:max(13px,calc(var(--u)*.95))}
+html.vert #tv #aprende[data-donde=panel]{left:auto}
+/* panel del llamado: compacto, abajo a lo ancho (lo mismo que el teléfono acostado: un renglón por cosa) */
+html.vert .panel.compacto{padding:8px 12px}
+html.vert .panel.compacto h2{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.vert .panel.compacto .pn-mas{min-height:40px;font-size:13px;padding:.15em .7em}
+html.vert .panel.compacto :is(#kg-menos5,#kg-mas5){display:none}
+html.vert .panel.compacto .kgsel{margin:4px 0;gap:8px;flex-wrap:nowrap}
+html.vert .panel.compacto .kgsel>span{display:none}
+html.vert .panel.compacto .kgsel .kg{min-width:48px;min-height:48px;padding:.2em .6em}
+html.vert .panel.compacto .kgsel .ir{margin-left:auto;min-height:48px;padding:.2em .9em;white-space:nowrap}
+html.vert .panel.compacto .kgsel output{font-size:34px;line-height:1;min-width:2.6ch}
+html.vert .panel.compacto .pn-esencial{margin:2px 0;font-size:14px;gap:.3em .55em}
+html.vert .panel.compacto .pn-estilo button{min-height:40px;font-size:14px;padding:.15em .7em}
+html.vert .panel.compacto .pn-estilo.abierto .envion{min-height:46px;padding:.15em .2em}
+html.vert .panel.compacto .pn-estilo:not(.abierto){margin-left:0}
+html.vert.angosto .panel.compacto .kgsel .ir{padding:.2em .6em;font-size:15px}
+html.vert .verde-b{gap:.2em .6em;margin:.2em 0}
+html.vert .panel.lado :is(p.frase,p.reloj,p.garra,p.sugiere){display:none}
+/* el podio con sus botones: la tabla completa ya se vio un momento antes */
+html.vert .panel.podio-panel:has(button) .tabla{display:none}
+/* paneles parados: títulos más chicos (el alto sobra y el ancho no) y el selector ES · EN arriba a la derecha sin comerse el título */
+html.vert .panel h1{font-size:clamp(22px,7vw,30px)}
+html.vert .panel h2{font-size:clamp(16px,4.6vw,19px)}
+html.vert .panel:has(>.idiomas.flota)>:is(h1,h2):first-of-type,html.vert .panel .cabeza{padding-right:100px}
+html.vert .panel.muro:has(>.idiomas.flota)>h1:first-of-type+.bajada{padding-right:0}
+/* la tabla de la final a lo ancho: sin la columna de la energía (se ve en el intento) y más junta */
+html.vert table.tabla{font-size:13px}
+html.vert .tabla :is(th,td){padding:.25em .14em}
+html.vert .tabla :is(th,td):last-child{display:none}
+html.vert .tabla td.n{max-width:6.5em;overflow:hidden;text-overflow:ellipsis}
+html.vert .tabla td.n i{width:1.1em;margin-right:.3em}
+/* elegir kilos: −5 −1 kilos +1 +5 en una fila */
+html.vert .kgsel{gap:6px;justify-content:center}
+html.vert .kgsel>button.ir{flex-basis:100%}
+html.vert .panel.compacto .kgsel>button.ir{flex-basis:auto}
+html.vert .kgsel>span{display:none}
+html.vert .kgsel button.kg{min-width:46px;padding:.5em .55em}
+html.vert .kgsel output{font-size:clamp(30px,10vw,44px);min-width:2.6ch}

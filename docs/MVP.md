@@ -1,6 +1,71 @@
 # MVP de Tarima
 
-Estado al 13 de noviembre de 2026. Esto es lo que se construye para la primera versión pública. Quien implemente toma de acá las reglas, los textos y el contrato del servidor. Las tres propuestas de partida (conversión, jugador nuevo y producto) quedaron resueltas en este documento. Donde chocaban, la elección está explicada en una línea en la sección 0.
+Estado al 17 de noviembre de 2026 (ver «Regla del muro que se publica el 17 de noviembre» y «Cambio del 15 de noviembre»). Esto es lo que se construye para la primera versión pública. Quien implemente toma de acá las reglas, los textos y el contrato del servidor. Las tres propuestas de partida (conversión, jugador nuevo y producto) quedaron resueltas en este documento. Donde chocaban, la elección está explicada en una línea en la sección 0.
+
+## Regla del muro que se publica el 17 de noviembre: la de producción (el arranque gratis, correo obligatorio)
+
+**Decisión del dueño** (17 de noviembre, textual): «Que por ahora siga así como está el muro, después del snatch.» La regla del cartel de LIF-53 (sección siguiente) **no se publica todavía**: queda en el código, probada y apagada por variables.
+
+- **Lo que sale** (`worker/wrangler.jsonc`, valor por defecto): `GRATIS_ETAPA "arranque"`, `GRATIS "1"`, `TOPE_IP "6"`, `BONO_ENCUESTA "0"`, `ENCUESTA_LIBRE "0"`, `ENCUESTAS_POR_IP "3"`. Es la regla de la sección 5.5: el arranque de una final es gratis; al terminarlo sale el muro (momento `tras_arranque`), que pide el correo, obligatorio, para seguir con el dos tiempos; «Ahora no» corta la final y la siguiente empieza con el muro (momento `inicio`). La encuesta no desbloquea nada: es opcional, en el panel de «¡Adentro!», después de anotarse. Con estas variables el Worker contesta `encuesta_disponible: false` y `regla.libre: false`, y el juego pinta el muro de siempre, solo con el correo (sin «Responde 2 preguntas rápidas»).
+- **Cómo se prende la regla de LIF-53** (sin tocar código, publicando el Worker): `GRATIS_ETAPA "final"` y `ENCUESTA_LIBRE "1"` (con `GRATIS "1"`, `BONO_ENCUESTA "0"` y `ENCUESTAS_POR_IP "3"`, que ya están). El cliente no cambia: lee la regla de cada respuesta del Worker.
+- **Lo que sí cambia para el jugador aunque la regla sea la misma** (viene del cliente de `primera-vez`, no de las variables): la primera bienvenida no muestra las tarjetas de pesista (juega con Compacto; aparecen desde la primera final, jugada o cortada); el nombre al anotarse pide 4 letras en vez de 5; «Tarima» pasa a «Lifting Game» en los textos; el consentimiento que se manda es `2026-11-g`; eventos nuevos (`muro_resultado`, `siguio_jugando`, `anotar_respuesta`, y `anotar_ok` desde el Worker solo para altas nuevas).
+- **Pendiente de decisión del dueño: `web/privacidad.html`.** La versión `2026-11-g` describe la encuesta como camino del cartel («para seguir jugando puedes dejar tu correo o contestar una encuesta… Cualquiera de las dos te deja jugar sin límite»), que con la regla de producción no es cierto: hoy la encuesta es opcional después del correo y no da nada. No se tocó el texto.
+- **Pruebas.** La regla de producción se prueba como valor por defecto (`tools/worker_test.mjs` 2b, `tools/servidor_test.mjs` 1b, `worker/test/worker.test.js` «muro en el medio de la final», `tools/check_muro_medio.mjs`); la de LIF-53, con variables explícitas (`worker_test` 2d, `servidor_test` 1c, `worker.test.js` «primera vez», `tools/check_muro.mjs`). El Worker simulado del juego en localhost (`?muro=firme`) sigue simulando LIF-53 si no se le dice otra cosa; la de producción es `?muro=firme&etapa=arranque&libre=0`.
+- **Orden de publicación**: primero el Worker (acepta el consentimiento `2026-11-g` y las versiones anteriores), después el sitio. Al revés, el Worker viejo rechaza el alta del juego nuevo.
+
+## Cambio del 15 de noviembre: primera vez, el cartel con dos caminos y la carga que no se cuelga (LIF-53, LIF-46, LIF-33)
+
+**Decisión del dueño** (LIF-53, textual en lo importante): «Se entra directo a jugar, sin onboarding de elegir pesista. Se asigna un pesista por defecto. Recién después de la primera final se ofrece elegir o cambiar pesista. El cartel de la lista de espera aparece solo al terminar la primera final completa (arranque + enviones). Sigue siendo obligatorio para seguir jugando, pero se desbloquea de dos formas: responder 2 o 3 preguntas cortas, o dejar el mail. Cualquiera de las dos alcanza. Si deja el mail, las preguntas aparecen como un segundo paso optativo, con «saltear». Recibir novedades es un tilde aparte, destildado por defecto». Esto pisa lo que las secciones de abajo dicen del arranque gratis, del correo obligatorio y de la encuesta sin premio; donde chocan, manda esta sección.
+
+**Primera vez.** La bienvenida de quien nunca terminó (ni cortó) una final es el nombre (opcional, no frena: vacío vale «Rookie») y «Jugar»: sin tarjetas de pesista; juega con Compacto (`ventura`), el de siempre por defecto. Desde la primera final (jugada o cortada, `tarima.jugadas`), la bienvenida trae las tres tarjetas de siempre (Compacto, Largo, Potente; nada de mujeres) con el pesista actual marcado. Después del cartel del podio el juego va al inicio, que es donde se ofrece elegir o cambiar. La práctica no cambia: en la barrita (`'b'`) no hay tutorial ni tarjeta aparte; la primera final explica «Cómo se gana» y el primer peso (presentación y apertura), y la barrita se explica sobre la marcha.
+
+**La regla del servidor** de LIF-53 (desde el 17 de noviembre no es el valor por defecto de `worker/wrangler.jsonc`: se pide con estas variables, ver la sección de arriba): `GRATIS_ETAPA "final"`, `GRATIS "1"`, `TOPE_IP "6"`, `BONO_ENCUESTA "0"`, `ENCUESTA_LIBRE "1"`, `ENCUESTAS_POR_IP "3"`.
+
+- **Gratis: la primera final entera** (arranque y dos tiempos), una por dispositivo, contada como siempre (dispositivo + HMAC de la IP; la red, 6 finales gratis en 30 días). `/api/envion` responde `via:'ya'`.
+- **Al terminarla, el cartel** (momento `podio`, en lugar de los botones del podio; y antes de la final siguiente, momento `inicio`, al tocar «Jugar» o al cargar). Dos caminos con el mismo peso: «Leave your email» / «Deja tu correo» y «Answer 2 quick questions» / «Responde 2 preguntas rápidas», con «Either one unlocks unlimited play on this device.». Cualquiera da el **juego libre** en ese dispositivo.
+  1. **Correo** (lo de siempre: nombre real de LIF-32, correo, el tilde obligatorio «Email me when early access opens» y el de novedades aparte y destildado). Después, el panel «¡Adentro!» con las mismas dos preguntas como paso optativo y «Skip».
+  2. **Las dos preguntas** (las de la encuesta aprobada: «How would you rather play Lifting Game?» y «What would you like the game to have?», con «Anything else? (optional)»). Hay que contestar las dos (el texto libre sigue opcional); el Worker lo vuelve a exigir. Contestadas: «¡Gracias!», «Desde ahora juegas sin límite en este dispositivo» y «Seguir jugando».
+  3. **«Ahora no»** → «Volver al inicio». La próxima final vuelve a pedir el cartel.
+- **La encuesta que desbloquea** (`ENCUESTA_LIBRE "1"`): una vez por dispositivo (tabla `encuestas`, 409 `ya_respondida`) y hasta `ENCUESTAS_POR_IP` (3) por red en 30 días (409 `ip`; el cartel ya no la ofrece: `encuesta_disponible` false, y queda el correo). Sin las dos preguntas, 400 `incompleta`. Las finales de un dispositivo desbloqueado salen con fuente `encuesta` y, como las de los anotados, no cuentan para la red. Después del correo la encuesta no da nada ni gasta la red (`i` NULL). La respuesta de `/api/encuesta` es `{estado:'ok', bono, libre}`; `/api/estado`, `/api/partida` y `/api/envion` traen `libre` y `regla.libre`.
+- **Volver atrás sin tocar código** (y publicar el Worker): correo obligatorio otra vez → `ENCUESTA_LIBRE "0"`; el arranque gratis con el muro en el intervalo (12 al 15 de noviembre) → `GRATIS_ETAPA "arranque"` y `ENCUESTA_LIBRE "0"`; 2 finales enteras → `GRATIS "2"`. La bandera `muro-partidas-gratis`, si PostHog se la asignó a un dispositivo, sigue pisando `GRATIS` con `GRATIS_ETAPA "final"` (sección 6.5): para que valga 1 para todos, la bandera tiene que estar apagada en PostHog.
+- **Privacidad 2026-11-e**: la encuesta es un camino del cartel, desbloquea el juego libre y para eso se guarda que el dispositivo la contestó (con el código de la IP por 30 días). El juego mandaba `2026-11-e`.
+- **Privacidad 2026-11-f** (15 de noviembre): el juego pasa a llamarse Lifting Game (antes Tarima) en todo lo que ve el jugador; la página lo aclara una vez y no cambian datos, responsable ni usos. El juego mandaba `2026-11-f`.
+- **Privacidad 2026-11-g** (15 de noviembre, LIF-45): la grabación de sesión puede incluir la imagen 3D (por defecto solo en computadoras, pocos cuadros y baja calidad, con «LIFTING GAME» en los carteles del 3D en vez del nombre del jugador; 6.6). El juego manda `2026-11-g`; el Worker acepta de la a a la g y conoce la bandera `grabacion_lienzo`. **Publicar primero el Worker.**
+
+**Eventos (LIF-46).** Un resultado por cartel y si siguió jugando; los toques repetidos no suman.
+
+| Evento | Quién | Cuándo | Propiedades |
+|---|---|---|---|
+| `muro_visto` | juego | cada vez que sale el cartel | `momento` (`podio`, `inicio`, `tras_arranque`), `caminos` (`mail+preguntas`, `mail`), `origen`, `vez` (1, 2… en esta carga) |
+| `muro_camino` | juego | elige un camino (una vez por camino y cartel) | `via` (`mail`, `preguntas`), `momento`, `vez` |
+| `muro_resultado` | juego | **una vez por cartel** | `via` (`mail`, `preguntas`, `cerro`), `momento`, `caminos`, `s` (segundos con el cartel), `vez`; con `mail`, `novedades`; con `cerro`, `salida` (`volver`, `ahora_no`, `pagina`: cerró la pestaña con el cartel abierto, sale por sendBeacon) |
+| `siguio_jugando` | juego | **una vez por resultado** | `siguio` (true al empezar otra final o seguir al dos tiempos; false al irse de la página o si vuelve a ver el cartel sin jugar), `motivo` (`final`, `envion`, `salio`, `muro`), `via`, `momento`, `s` |
+| `muro_ahora_no`, `muro_cerrado` | juego | una vez por cartel (antes, por toque) | `momento`, `vez` |
+| `anotar_envio` | juego | envía el formulario | `novedades`, `sugerencia_usada`, `pantalla`, `momento` |
+| `anotar_respuesta` | juego | 200 de `/api/anotar` (reemplaza al `anotar_ok` del navegador) | `estado` como lo ve el navegador (`nuevo` también para un correo que ya estaba desde otro dispositivo), `pantalla`, `momento`, `novedades` |
+| `anotar_ok` | **Worker** | **solo altas nuevas** (fila nueva en `lista`), persona = `lista_id` | `novedades`, `momento`, `pantalla`, `idioma`, `pais` |
+| `anotar_repetido` | **Worker** | el correo ya estaba | `mismo_dispositivo`, `momento`, `pantalla`, `idioma`, `pais` |
+| `encuesta_vista` / `encuesta_salteada` | juego | | `momento`, `paso` (`cartel`, `anotado`) |
+| `encuesta_enviada` | juego | | `momento`, `paso`, `desbloquea` (true solo en el cartel con 200 del Worker), `plataforma`, `features` (cuántas), `otra` |
+| `encuesta_error` | juego | las preguntas del cartel no desbloquearon | `motivo` (`incompleta`, `ip`, `ya_respondida`, `limite`, `red`), `momento` |
+| `encuesta_respuesta` | Worker | | además: `desbloquea`, `momento` |
+| `escena_visible` | juego | primer cuadro dibujado con el pesista (LIF-33) | `ms` (desde la carga), `ms_jugar` (desde «Jugar»), `calidad`, `pantalla` |
+| `carga_fallida` | juego | algo de la carga falló (una vez por etapa y carga) | `etapa` (`modulo`, `datos`, `modelo`, `webgl`, `shader`), `mensaje` (recortado, sin URL ni correo), `archivo`, `intentos`, `app`; `modulo` lleva `tipo` (`descarga`, `navegador`); `shader`, `recuperada` si la calidad Móvil lo arregló |
+| `juego_abierto` | juego | | además `reintentos_modulo` (recargas solas antes de abrir) |
+| (súper propiedad) | juego | | `app_navegador` (`facebook`, `instagram`, `tiktok`, `line`, `snapchat` o null) |
+
+Los eventos que el Worker manda solo salen si el juego mide (`metricas: true` en el alta: no con la medición desactivada) y nunca llevan el correo.
+
+**Embudo en PostHog: «vio el cartel → mail / preguntas / se fue → siguió jugando».** Insights → Funnel, por persona, ventana 48 h (o 1 día):
+1. `muro_visto` con `vez = 1` (el primer cartel de la carga; filtrar `momento = podio` para los que terminaron la final gratis).
+2. `muro_resultado`, **desglosado por `via`** (Breakdown → Event property → `via`): da las tres ramas mail / preguntas / cerro.
+3. `siguio_jugando` con `siguio = true`.
+
+Para el porcentaje que deja algo: Trends → `muro_resultado` (contar personas únicas) desglosado por `via`, dividido por personas únicas de `muro_visto`. Para las novedades: `muro_resultado` (`via = mail`) desglosado por `novedades`; las altas nuevas de verdad son `anotar_ok` (Worker) y los correos repetidos `anotar_repetido`. Para LIF-33: `escena_visible` / `juego_abierto` (personas únicas) por `$os`, `$browser` y `app_navegador`, y `carga_fallida` por `etapa`.
+
+**Carga (LIF-33).** `juego.html` carga `js/game/arranque.js`, que trae `main.js`: si el módulo no llega (three que no baja: «Failed to fetch», «Load failed»), la página se recarga sola hasta 2 veces (1,5 s y 3 s) y después sale el aviso «We couldn’t download the game» con «Try again». Los datos (`data/*.json`) y los modelos se piden 3 veces (1 s y 2,5 s de espera; una descarga sin datos en 20 s se corta y cuenta como falla) y, si no llegan, el mismo aviso, que reintenta ahí mismo. Si WebGL no arranca (contexto que no se crea, programa que no compila aunque se pruebe la calidad Móvil, o contexto perdido 6 s con la página a la vista), el aviso «This browser can’t show the 3D lifter» con qué probar (otro navegador, actualizar, salir de Facebook o Instagram, la aceleración por hardware) y «Try again», que recarga: nunca la interfaz sin el levantador. «Script error.» sin archivo viene de scripts de otro origen (lo que inyectan las apps de Facebook o Instagram y las extensiones): todos los módulos del juego son del mismo origen y se piden con CORS, así que sus errores llegan con el mensaje; `error_juego` lo marca `ajeno: true`. Las promesas rechazadas con un evento (una imagen o textura que no bajó) ya no llegan «sin mensaje»: `error IMG detail_skin.png`.
+
+**Pruebas.** `worker_test` (2d), `servidor_test` (1c, el Worker de verdad con PostHog falso), `cd worker && npx vitest run` («primera vez»), y con navegador en Actions: `check_muro` (la regla de producción: en inglés con teclado, correo, preguntas optativas, inicio con pesistas; en español en el teléfono, «Ahora no», cartel al empezar y al recargar, preguntas que desbloquean), `check_muro_medio` (la regla del arranque por variables), `check_game` (primera bienvenida sin tarjetas; después de la final, con tarjetas), `check_analitica` (privacidad 2026-11-e) y `check_carga_fallas` (módulo, modelos, sin WebGL, shader y `escena_visible`, en computadora y teléfono).
 
 ## Cambio del 13 de noviembre: correo obligatorio, encuesta opcional después de anotarse e inglés por defecto
 
@@ -12,7 +77,7 @@ Estado al 13 de noviembre de 2026. Esto es lo que se construye para la primera v
 
 | Clave | Inglés (por defecto) | Español |
 |---|---|---|
-| `encuesta.plataforma` (una opción) | How would you rather play Tarima? | ¿Cómo prefieres jugar Tarima? |
+| `encuesta.plataforma` (una opción) | How would you rather play Lifting Game? | ¿Cómo prefieres jugar Lifting Game? |
 | `encuesta.plataforma.app` | Mobile app (App Store / Google Play) | App para el celular (App Store / Google Play) |
 | `encuesta.plataforma.web` | In the browser (web game) | En el navegador (juego web) |
 | `encuesta.features` (varias) | What would you like the game to have? | ¿Qué te gustaría que tenga el juego? |
@@ -932,8 +997,13 @@ posthog.init(m.clave, {
   bootstrap: { featureFlags: estado.flags },
   mask_all_text: true, mask_all_element_attributes: true,
 });
-posthog.register({ idioma, idioma_origen, tactil, version, pais, previas, dias, fuente_trafico, ...propsDeBanderas });
+posthog.register({ idioma, idioma_origen, tactil, version, pais, previas, dias, fuente_trafico,
+  utm_source, utm_medium, utm_campaign, utm_content, ...propsDeBanderas });
 ```
+
+- **UTM (LIF-55, 15 de noviembre).** `utm_source`, `utm_medium`, `utm_campaign` y `utm_content` van como súper propiedades en todos los eventos, con los mismos nombres que usa PostHog (así Web analytics los toma para la entrada de cada sesión). Van limpios (`campania()` en `analitica.js`): minúscula, solo `a-z 0-9 _ . -`, espacios y `+` pasan a `_`, hasta 60 caracteres, `null` si faltan. Un valor con `@` o con 7 dígitos seguidos (un correo o un teléfono pegado en el link) se descarta entero. `utm_term` no se registra (no hay avisos pagos). posthog-js va con `save_campaign_params: false`, para que no mande los valores crudos ni los click-ids como propiedades, y con `mask_personal_data_properties: true`, que tapa los click-ids (`fbclid`, `gclid`, `ttclid`…) en `$current_url`.
+- **Atribución inicial.** Al identificar a un anotado (`identify(lista_id)`, en la carga en que se anota y en cada visita siguiente) se mandan con `$set_once` `$initial_fuente_trafico` y `$initial_utm_source`, `$initial_utm_medium`, `$initial_utm_campaign`, `$initial_utm_content` (null si no había). `$set_once` no pisa, así que queda la de la primera carga en la que se identificó; como el muro sale al terminar el arranque de la primera final, quien se anota en su primera visita queda con el link de esa visita. Con `persistence: 'memory'` no hay forma de recordar en el navegador el primer link de alguien que se anota en otra visita, y no se agrega almacenamiento para eso. Los anotados antes de este cambio reciben como inicial la de su primera visita después del cambio. Los anónimos no tienen persona (`identified_only`): para ellos la atribución es la de cada evento.
+- **Links por canal.** La tabla de links listos para copiar está en `docs/DIFUSION.md`.
 
 - **Banderas como propiedades.** `propsDeBanderas` es `{'$feature/muro-partidas-gratis': '2', …}`, para separar por variante en cualquier gráfico.
 - **Pantalla actual.** `visita()` actualiza la súper propiedad `pantalla`, así `$pageleave` dice dónde se fue la gente.
@@ -970,12 +1040,16 @@ Todos van en minúscula y en español. Ninguno lleva nombre, mail, IP ni disposi
 | `nombre_puesto` | Sale de la bienvenida | `vacio`, `vuelve` (bool), `cambio` (bool, usó «No soy yo») |
 | `pesista_elegido` | Ídem | `pesista` (`compacto`, `largo`, `potente`), `por_defecto` |
 | `opciones_abiertas` | Despliega «Opciones» | — |
+| `camara_elegida` | Elige la cámara en «Opciones» o con la tecla V | `vista` (`general`, `jurado`, `lateral`, `baja`, `pov`: primera persona), `via` (`opciones`, `tecla`), `pantalla` |
 | `tutorial_inicio` / `tutorial_fin` / `tutorial_salteado` | Práctica | `valido`, `s`, `paso` |
 | `partida_pedida` | Respuesta de `/api/partida` | `resultado` (`ok`, `muro`, `sin_servidor`), `fuente`, `motivo` |
-| `final_inicio` | Primer llamado propio | `n`, `fuente`, `pesista`, `nivel`, `ritmo`, `ctl` |
+| `final_inicio` | Primer llamado propio | `n`, `fuente`, `pesista`, `nivel`, `ritmo`, `ctl`; desde el 15-nov `orden` (`rondas`, `oficial`) |
 | `intento_propio` | Veredicto propio | `final_n`, `lev`, `intento`, `kg`, `resultado` (`vale`, `no_vale`, `cayo`), `causa` (clave), `perfecto`, `bien`, `temprano`, `tarde`, `todavia_no` |
 | `intento_propio` en `'u'` (13-nov) | Veredicto propio | además: `ctl`, `margen_ini`, `dia`, `gasto_tiron`, `gasto_arriba`, `gasto_pararse`, `margen_fin` (milésimas de disco), `garra` (`disponible`, `usada`, `guardada`, `gastada`), `tramo_caida`, `tramo_mayor`, `intensidad` (%), `patron_entrada` (`ausente`, `mantiene`, `machaca`, `de_mas`, `uno_por_paso`). `perfecto`, `bien`, `temprano`, `tarde`, `todavia_no` y `guardados` van en `null`. Desde la revisión 2.1: `dia` es la suerte sumada de los tres tramos (milésimas), `garra` ya no toma `guardada` (la garra se usa sola), y en todos los niveles `acuse_p95_ms` y `acuse_n` (del evento al cuadro siguiente, medido en el aparato) |
 | `rival_salteado` | El botón «Saltar» (o la tecla S) saltea el turno de un rival (desde el 13-nov: Espacio y los toques en la escena ya no) | `modo` (`entero`; antes `resumen`, `fila`), `via` (`boton`, `tecla`), `momento` (`intento`, `veredicto`, `repeticion`), `ms`, `decisivo` |
+| `pedido_cambiado` | «Cambiar» el pedido en el turno de un rival (15-nov, LIF-4) | `lev`, `intento`, `de`, `kg`, `via` (`boton`, `tecla`), `pendiente` (entró como cambio de su llamado), `orden` |
+| `explicacion_vista` | Sale una explicación de primera vez (LIF-52, `ui/aprende.js`) | `clave` (`estilo`, `dificultad`, `kilos`, `cambiar`, `nulo`, `luces`, `total`), `momento` (`llamado`, `rival`, `decision`), `pantalla`, `vez` (1, o 2 si la primera se cortó antes de leerla) |
+| `explicacion_cerrada` | Se va la explicación | `clave`, `via` (`boton`: la ✕; `sola`: cambió el momento, salió otra o pasaron 15 s), `ms` a la vista, `leida` (la cerró, estuvo 3,5 s o es la segunda vez: no vuelve a salir) |
 | `veredicto_salteado` | Un toque saltea el veredicto propio (`'u'`) | `ms`, `resultado` |
 | `final_fin` | Podio | `n`, `puesto` (1 a 3 o null), `total`, `duracion_s` |
 | `compartir` | Botón compartir | `via` (`nativo`, `copiar`), `medalla`, `pantalla` |
@@ -997,7 +1071,7 @@ Todos van en minúscula y en español. Ninguno lleva nombre, mail, IP ni disposi
 | `baja` | Lo manda el Worker (sin persona) | `via` (`mail`, `formulario`) |
 | `$pageleave` | Automático | `pantalla` (súper propiedad) |
 
-`fuente_trafico` vale `utm_source` si viene en la URL, `compartido` si llega con `?c=` y `directo` en otro caso. El código `c` es al azar por cada vez que se comparte y no identifica a nadie.
+`fuente_trafico` vale `utm_source` (limpio, igual que la propiedad) si viene en la URL; si no, `compartido` si llega con `?c=`; si no, la red según el click-id del link (`fbclid` → `facebook`) o según el sitio del referente (solo el dominio, en `referente`), `otro_sitio` si es un sitio desconocido, y `directo` si no hay nada. `utm_medium`, `utm_campaign` y `utm_content` van aparte (6.1). El código `c` es al azar por cada vez que se comparte y no identifica a nadie.
 
 ### 6.4 Embudos, cohortes y paneles
 
@@ -1033,18 +1107,24 @@ El hash de `d` no es dato personal directo, pero es seudónimo. Está cubierto p
 | `muro-texto` | `a`, `b` | `a` | El texto del muro (claves `_b`) |
 | `invitacion-podio1` | `on`, `off` | `on` | Si la invitación suave del podio 1 suma o le resta al muro |
 | `grabacion` | `off`, `tercio`, `todas` | `tercio` | Qué parte de las cargas se graba. Ver 6.6 |
+| `grabacion_lienzo` | `off`, `compu`, `todas` | `compu` | En las cargas grabadas, si también va el lienzo 3D: nunca, solo sin pantalla táctil o en todas. Ver 6.6 |
 
 ### 6.6 Grabación de sesión
 
 Decisión del dueño del 12 de noviembre (noche): prendida en una parte de las cargas, solo la página. Reemplaza la propuesta anterior (apagada; 10 % con una pregunta en la pausa).
 
-- **Qué se graba.** El DOM: paneles, botones, textos y toques. Nunca el lienzo 3D (`captureCanvas.recordCanvas: false`, y además los `canvas` van bloqueados): grabarlo le quitaría fluidez al juego y no hace falta para ver dónde se traba la gente.
+- **Qué se graba.** El DOM: paneles, botones, textos y toques. Y el lienzo 3D según `grabacion_lienzo` (abajo).
+- **El lienzo 3D** (LIF-45, para ver qué pasa en el levantamiento, por ejemplo LIF-33). Con `grabacion_lienzo` `compu` (por defecto: sin `pointer: coarse`, la misma regla que la propiedad `tactil`) o `todas`, y si el navegador tiene `OffscreenCanvas` y `createImageBitmap`: `captureCanvas` con `canvasFps` 3 y `canvasQuality` 0,4 (WebP), `canvasCapture.resolutionScale` para 640 px de ancho como mucho (`LIENZO` en `analitica.js`). Se graban `#gl` y `#ayudas` (transparente, encima; bloqueada taparía el 3D con su caja). Con `off` o en un teléfono, como antes: los `canvas` bloqueados. El evento lleva `grabada_lienzo`.
+  - **El nombre en el 3D.** El nombre de quien levanta se dibuja en la pantalla LED (caja derecha, `ambiente.js`) y en el tablero del costado (`arena.js`); cuando levanta el jugador, es su nombre. `canvasCapture.maskRegionsFn` (`regionesLienzo`) proyecta con la cámara la línea del nombre de esos dos carteles (y su reflejo en la tarima si está prendido) y la pinta de negro en cada cuadro; los kilos, el país y el pesista quedan a la vista. Si no encuentra la escena, la cámara o los carteles, tira y el grabador saltea el cuadro (falla cerrada). Con `maskRegionsFn` el grabador tampoco pone la imagen del lienzo en las instantáneas completas.
+  - **Desde la fusión en `prueba` (decisión del orquestador):** en las visitas que graban el lienzo, cuando levanta el jugador los dos carteles dicen «LIFTING GAME» en vez de su nombre, y `regionesLienzo` no tapa nada (el negro tapaba al pesista cuando pasaba por delante). El tapado queda como respaldo: solo si el cartel puede estar mostrando el nombre del jugador (sin datos, o dibujado antes de prenderse la grabación). Un rival en el cartel (ficticio) no se tapa.
+  - **El lienzo sin dibujar.** El grabador fuerza `preserveDrawingBuffer` si arranca antes de que se cree el contexto (lo normal: así salió en Actions). Si arranca después, el lienzo no conserva la imagen y un cuadro leído cuando el juego no dibujó saldría negro: `vigiaCuadros` (un `requestAnimationFrame` propio, entre el bucle del juego y el del grabador) mira `renderer.info.render.frame` y esos cuadros se saltean.
 - **En qué parte.** La bandera `grabacion` dice la proporción: `off` (nada), `tercio` (por defecto) o `todas`. Se sortea una vez por carga de la página, que con `persistence: 'memory'` es una sesión de PostHog. Se cambia en PostHog sin publicar (6.5); los dispositivos que ya tienen banderas del día la ven al refrescarlas (hasta 24 h).
 - **Enmascarado.** `maskAllInputs` (nombre, correo, respuesta libre). Todo texto pasa por `maskTextFn`: se tapa si tiene una «@» o el nombre del jugador (el guardado en `tarima.nombre` o el que está escribiendo en `#nombre` o `#editor-campo`, de 2 letras o más). Los atributos pasan por `maskAttributeFn`: `value` siempre tapado (con el campo vacío rrweb guardaría el `value` del HTML, que en la bienvenida es el nombre) y el resto (`data-v` de la sugerencia de correo, `title`, `aria-*`) con la misma regla que el texto; clase, estilo y CSS en claro. El resto del texto de la interfaz se lee.
-- **Fuera de la grabación** (`BLOQUEO_GRABACION`, se ven como cajas vacías): `canvas`, `#senal` (escala, opacidad y anillos en cada cuadro del intento), `#acuse` y `#depura`.
+- **Fuera de la grabación** (`BLOQUEO_GRABACION`, se ven como cajas vacías): `canvas` (sin el lienzo), `#senal` (escala, opacidad y anillos en cada cuadro del intento), `#acuse` y `#depura`.
 - **Consentimiento.** Va con la medición: sin clave, con `?metricas=0` o con la medición desactivada en la privacidad no se carga PostHog ni el grabador; la privacidad se abre en otra pestaña, así que el juego escucha el evento `storage` y, si ahí se desactiva la medición, deja de medir y corta la grabación. No hay pregunta aparte. Riesgo aceptado: en la UE una grabación de sesión suele pedir consentimiento previo (ver pendientes en HANDOFF).
-- **Cómo se arma sin pedir nada a PostHog.** El grabador de posthog-js (`dist/lazy-recorder.js`, 215 KB, 67 KB con gzip) va vendorizado en `web/vendor/posthog/` y se carga con un `<script>` solo en las cargas sorteadas, antes de `posthog.init`. Como el SDK no pide la configuración del proyecto (`advanced_disable_flags`), `analitica.js` la pone en `window._POSTHOG_REMOTE_CONFIG` (grabación a `/s/`, sin lienzo, consola ni red). Las grabaciones van por `/qx/s/`. Lo del cliente gana sobre lo que diga el proyecto de PostHog.
+- **Cómo se arma sin pedir nada a PostHog.** El grabador de posthog-js (`dist/lazy-recorder.js`, 215 KB, 67 KB con gzip) va vendorizado en `web/vendor/posthog/` y se carga con un `<script>` solo en las cargas sorteadas, antes de `posthog.init`. Como el SDK no pide la configuración del proyecto (`advanced_disable_flags`), `analitica.js` la pone en `window._POSTHOG_REMOTE_CONFIG` (grabación a `/s/`, sin consola ni red; el lienzo solo si va). Las grabaciones van por `/qx/s/`. Lo del cliente gana sobre lo que diga el proyecto de PostHog.
 - **Costo medido** (`tools/check_analitica.mjs`, sección 6, juego con `?dibujo=0` en Actions): durante el primer intento propio el DOM tiene unas 130 mutaciones por segundo (casi todas `#guia` `hidden` puesto igual en cada cuadro, que el grabador descarta, y `#senal`, bloqueada) y al grabador llegan unas 9 por segundo (la clase y el texto de `#zona`, `#reloj` y `#rival`: cambian por señal o por toque, no por cuadro). Cuadros y tareas largas iguales con y sin grabación; una instantánea completa de la página cuesta 2 a 5 ms. La prueba falla si pasan de 20 por segundo, si la instantánea pasa de 50 ms o si el nombre aparece en la grabación.
+- **Costo del lienzo** (`check_analitica.mjs`, sección 7: el juego dibujado por SwiftShader en Actions, con y sin lienzo). Cada captura cuesta en el hilo principal unos 0,2 ms (la parte síncrona de `createImageBitmap` de `#gl`) más 0,01 ms de `regionesLienzo`; el WebP lo arma un worker del grabador. Cuadros de 640 × 360, unos 11 KB cada uno: a 3 por segundo, hasta unos 30 KB/s (el grabador no repite un cuadro igual al anterior). Sin tareas largas en ninguna de las dos corridas. **Lo que no se pudo medir:** por software el juego dibuja menos de un cuadro por segundo, así que los cuadros por segundo con y sin lienzo no dicen nada, y el costo de `preserveDrawingBuffer` (una copia del lienzo por cuadro en la placa) solo se ve con el banco (`juego.html?banco=1`) en una máquina con placa; por eso el valor por defecto es `compu` y no `todas`. Si en computadora se nota, `grabacion_lienzo` a `off` desde PostHog (sin publicar).
 
 ## 7. El bloqueo después de las finales gratis
 

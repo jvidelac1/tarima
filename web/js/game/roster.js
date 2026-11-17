@@ -4,7 +4,9 @@
 import { t } from './i18n/t.js';
 
 export const PLANTEL = {
-  ventura: { modelo: 'ventura', corto: 'Ventura', color: '#e2622b', cara: true,
+  // `aspecto`: parámetros de los materiales del pesista (athlete.js, ASPECTO): tono y sudor de la piel, color del pelo, tela.
+  // Lo que no se pone queda en el valor por defecto. Sirve para que dos pesistas con el mismo modelo no sean idénticos.
+  ventura: { modelo: 'ventura', corto: 'Ventura', color: '#e2622b', cara: true, aspecto: { piel: { tono: '#f4e2d2', variacion: .6 } },
     bandera: 'linear-gradient(115deg,#e2622b 0 38%,#0e1b3d 38% 62%,#e2622b 62%)' },
   // Novakia: en el juego la bandera lleva otra disposición que la del visor (franjas verticales), para que no se lea como la de un país real.
   // Su color de la interfaz es el violeta de la bandera: el turquesa es del jugador.
@@ -12,7 +14,7 @@ export const PLANTEL = {
     bandera: 'linear-gradient(90deg,#5a2a82 0 34%,#f4f1ea 34% 66%,#18a58f 66%)' },
   // Marangi usa el modelo de Brenner con la tela de un color plano (dorado, el de su bandera: no se confunde con el rojo de
   // Ventura, el gris de Brenner ni el turquesa del jugador); comparte la cara, así que no lleva primer plano de cara
-  marangi: { modelo: 'brenner', corto: 'Marangi', color: '#d8b21c', cara: false, tela: '#b8900f',
+  marangi: { modelo: 'brenner', corto: 'Marangi', color: '#d8b21c', cara: false, tela: '#b8900f', aspecto: { piel: { tono: '#c99a78', saturacion: .9, variacion: .35, sudor: .7 }, pelo: { color: '#5a4a40' } },
     bandera: 'linear-gradient(180deg,#0f4c81 0 50%,#d8b21c 50%)' },
 };
 /**
@@ -40,6 +42,69 @@ export const CUERPO = {
  * (cuánto aguanta entre intentos: `fon` de web/data/sim.json) y margen (cuánto perdona un toque a destiempo: `tec`). Se
  * leen de las fichas al pintar la tarjeta; acá, solo cómo se dicen. Escala de 1 a 10.
  */
+/**
+ * Vestuario (rama `plantel`): qué modelo del plantel dibuja a cada uno de los tres pesistas del juego. Las fichas deportivas
+ * (web/data/sim.json: kilos, atributos, plan del rival) NO cambian, así que la partida, su huella y el servidor siguen
+ * igual; cambia a quién se ve: el modelo (web/models/<id>.glb), el nombre y el país del rival, la bandera, el color de la
+ * interfaz y las medidas de la tarjeta. La presentación ya acomoda el clip de cualquier modelo a los tiempos del núcleo
+ * (sequence.js busca las fases por nombre en las poses del modelo dibujado).
+ * @param {string[]} lista   hasta tres ids del plantel, en el orden Compacto, Largo, Potente (los huecos no se tocan)
+ * @param {object} fichas    `pesistas` de web/data/plantel.json (tools/plantel_web.py, desde blender/plantel.py)
+ * @param {object} poses     web/data/poses.json: solo se viste con modelos que ya están construidos
+ * @returns {string[]} los ids del juego que cambiaron de modelo
+ */
+export function vestir(lista, fichas, poses) {
+  const hechos = [], usados = new Set(), TELAS = ['#a3262a', '#3b4a8c', '#b8900f'];
+  Object.keys(PLANTEL).forEach((id, k) => {
+    const m = lista[k], f = fichas?.[m], P = poses?.[m]; if (!m || !f || !P) return;
+    const repetido = usados.has(m); usados.add(m);
+    // un modelo repetido comparte la cara: el segundo lleva la tela de otro color y no tiene primer plano (como Marangi con Brenner)
+    Object.assign(PLANTEL[id], { modelo: m, corto: f.corto, nombre: f.nombre, pais: f.pais, codigo: f.codigo, genero: f.genero, categoria: f.categoria, masa: f.masa, vestido: true,
+      // `aspecto` (rama look: Athlete.setAspecto): el del modelo nuevo si su ficha lo trae (`juego.aspecto` en blender/plantel.py); nunca el del modelo anterior
+      aspecto: f.aspecto || undefined, pelo: f.pelo || undefined,      // `pelo`: color del pelo de la ficha (Athlete.setAspecto, `pelo.base`)
+      cara: !repetido, tela: repetido ? TELAS[k] : undefined, color: (!repetido && f.color) || PLANTEL[id].color, bandera: (!repetido && f.bandera) || PLANTEL[id].bandera });
+    CUERPO[id] = { estatura: P.h, femur: P.seg.femur / P.h, brazos: P.seg.arm / P.h, movilidad: CUERPO[id].movilidad };
+    hechos.push(id);
+  });
+  return hechos;
+}
+/**
+ * Aspectos (17-nov, decisión del dueño: «que entren todos, para que los users vayan viendo la evolución; ponelos como (new)»):
+ * los modelos nuevos que el jugador puede elegir para dibujar a SU pesista en cada plaza, además del de siempre. La plaza
+ * deportiva (kilos, fases, cuerpo de la simulación) no cambia: cambia quién se ve. Los rivales quedan con los de siempre.
+ */
+export const ASPECTOS = { ventura: ['ilarraz', 'solanet'], brenner: ['kordan'], marangi: ['jastrev'] };
+/**
+ * Los aspectos que HOY se ofrecen al jugador (decisión del dueño, 17-nov, para el lanzamiento): solo Ilarraz y Kordan. Jastrev
+ * (+110 kg) y Solanet (mujer, 48 kg) no se ofrecen por ahora: no tiene sentido que compitan en la misma final con pesistas
+ * de 70 a 90 kg; quedan para cuando existan las categorías. Para volver a ofrecerlos alcanza con sumarlos acá. Sus modelos y
+ * fichas siguen en el repo y `?plantel=` los acepta para pruebas. Un aspecto guardado que ya no se ofrece cae al de siempre.
+ */
+export const ASPECTOS_OFRECIDOS = ['ilarraz', 'kordan'];
+let BASE = null;
+/** Guarda el plantel tal como quedó al abrir (el clásico, o el de `?plantel=`): a eso vuelve cada plaza sin aspecto elegido. */
+export function fijarBase() { BASE = { P: JSON.parse(JSON.stringify(PLANTEL)), C: JSON.parse(JSON.stringify(CUERPO)) }; }
+/** La ficha de siempre de una plaza (sin el aspecto que haya elegido el jugador). */
+export const basePlantel = id => (BASE || fijarBase() || BASE).P[id];
+/** Los modelos nuevos que se ofrecen en una plaza: los de ASPECTOS que están en ASPECTOS_OFRECIDOS, construidos y que no dibujan ya a otra plaza. */
+export const aspectosDe = (id, fichas, poses) => (ASPECTOS[id] || []).filter(m => ASPECTOS_OFRECIDOS.includes(m) && fichas?.[m] && poses?.[m] && !Object.values((BASE || fijarBase() || BASE).P).some(f => f.modelo === m));
+/**
+ * Viste la plaza del jugador con el modelo `modelo` y deja las otras dos (los rivales) como siempre. Sin `modelo` (o con el
+ * de siempre de esa plaza), todo queda como al abrir. Devuelve true si la plaza quedó con un modelo nuevo.
+ */
+export function vestirJugador(plaza, modelo, fichas, poses) {
+  if (!BASE) fijarBase();
+  for (const id of Object.keys(PLANTEL)) { for (const k of Object.keys(PLANTEL[id])) delete PLANTEL[id][k]; Object.assign(PLANTEL[id], JSON.parse(JSON.stringify(BASE.P[id]))); CUERPO[id] = { ...BASE.C[id] }; }
+  const f = fichas?.[modelo], P = poses?.[modelo]; if (!PLANTEL[plaza] || !modelo || modelo === PLANTEL[plaza].modelo || !f || !P) return false;
+  Object.assign(PLANTEL[plaza], { modelo, corto: f.corto, nombre: f.nombre, pais: f.pais, codigo: f.codigo, genero: f.genero, categoria: f.categoria, masa: f.masa, vestido: true,
+    aspecto: f.aspecto || undefined, pelo: f.pelo || undefined, cara: true, tela: undefined, color: f.color || PLANTEL[plaza].color, bandera: f.bandera || PLANTEL[plaza].bandera });
+  CUERPO[plaza] = { estatura: P.h, femur: P.seg.femur / P.h, brazos: P.seg.arm / P.h, movilidad: CUERPO[plaza].movilidad };
+  return true;
+}
+/** Terna que se juega sin `?plantel=`: una de las `ternas` de web/data/plantel.json (tools/plantel_web.py). `clasico` = sin vestuario. */
+export const PLANTEL_DEFECTO = 'clasico';      // 17-nov: el dueño publica el juego nuevo con los pesistas que ya están en producción (Ventura, Brenner, Marangi); la terna nueva queda con `?plantel=hombres`
+/** De `?plantel=` a la lista de tres: el nombre de una terna de plantel.json (`mujeres`, `hombres`...) o ids separados por coma. */
+export const ternaDe = (q, plantel) => (!q ? [] : plantel?.ternas?.[q] || q.split(',').map(x => x.trim()));
 export const FICHA = { energia: 'fon', margen: 'tec' };
 export const nivelFicha = v => (v >= 8 ? 'alto' : v >= 6 ? 'medio' : 'bajo');
 /** Fracción 0..1 de cada medida dentro del rango que se dibuja (barras de la tarjeta). */

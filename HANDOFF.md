@@ -1339,6 +1339,1201 @@ suben (llamado 32–39, veredicto 10–30) por el tablero.
 datos (`rival_salteado`) cuántos miran a los rivales enteros. El RM es el de la ficha: la «forma del día» y el cansancio no lo
 cambian (sí la chance y la dificultad). Clásico también usa el tablero y el botón (no tiene el «Toca: seguir» de los rivales).
 
+### Regla del muro que se publica el 17-nov: la de producción (rama `v-integra`)
+
+Decisión del dueño del 17-nov: «Que por ahora siga así como está el muro, después del snatch.» `worker/wrangler.jsonc`
+trae por defecto `GRATIS_ETAPA "arranque"`, `GRATIS "1"`, `TOPE_IP "6"`, `BONO_ENCUESTA "0"`, `ENCUESTA_LIBRE "0"`: el
+arranque gratis, el muro al terminarlo, correo obligatorio, encuesta opcional después de anotarse. La regla de LIF-53 (la
+primera final entera y el cartel con correo o 2 preguntas, sección siguiente) queda en el código y probada, apagada: se
+prende con `GRATIS_ETAPA "final"` y `ENCUESTA_LIBRE "1"` y publicando el Worker; el cliente no cambia. Las pruebas tienen la
+de producción como valor por defecto y la de LIF-53 con variables explícitas (`tools/check_muro_medio.mjs` y
+`tools/check_muro.mjs`; lo mismo en `worker_test`, `servidor_test` y `worker/test/worker.test.js`). Detalle, lo que cambia
+igual para el jugador (bienvenida sin tarjetas la primera vez, nombre de 4 letras, textos «Lifting Game», eventos) y lo
+pendiente (`web/privacidad.html` 2026-11-g describe la encuesta como camino del cartel, que hoy no es cierto) en
+`docs/MVP.md`, «Regla del muro que se publica el 17 de noviembre». Publicar primero el Worker y después el sitio.
+
+### Primera vez, el cartel con dos caminos y la carga que no se cuelga (15-nov, rama `primera-vez`; LIF-53, LIF-46, LIF-33)
+
+Detalle completo (regla, textos, eventos y el embudo de PostHog) en `docs/MVP.md`, «Cambio del 15 de noviembre».
+
+**Decisiones del 15-nov.** Del dueño (LIF-53): entrar directo a jugar con el pesista por defecto; elegir o cambiar pesista
+recién después de la primera final; el cartel al terminar la primera final completa, obligatorio para seguir, que se
+desbloquea con el correo O con las 2 preguntas (cualquiera alcanza); con el correo, las preguntas como paso optativo con
+«Skip»; novedades en un tilde aparte, destildado. Del orquestador (el dueño pidió que se resuelva sin él): **las 2 preguntas
+desbloquean el juego libre igual que el correo, una vez por dispositivo**, y **el nombre al anotarse pide 4 letras como
+mínimo** (antes 5; «Mila», «Erin», «Joon» pasan, «Joe» no; sigue rechazando «AAAA», símbolos, números, tecleo al azar y
+relleno). El tilde «Email me when early access opens» sigue obligatorio en el camino del correo.
+
+**Qué cambió.**
+- Worker: `GRATIS_ETAPA "final"`, `GRATIS "1"`, `ENCUESTA_LIBRE "1"` (variable nueva). La encuesta con premio exige las dos
+  preguntas, una por dispositivo y 3 por red en 30 días (409 `ip`); los dispositivos desbloqueados juegan con fuente
+  `encuesta` y no pesan sobre la red. `anotar_ok` (solo altas nuevas) y `anotar_repetido` los manda el Worker con la persona
+  de la lista. Privacidad y consentimiento `2026-11-e` (publicar primero el Worker).
+- Juego: bienvenida de primera vez sin tarjetas de pesista (Compacto); después de la primera final, las tarjetas en el
+  inicio. El cartel con «Leave your email» / «Answer 2 quick questions». Eventos `muro_resultado` (una vez por cartel) y
+  `siguio_jugando`, `anotar_respuesta` en el navegador, `encuesta_enviada` con `paso` y `desbloquea`.
+- LIF-33: `arranque.js` trae `main.js` y recarga sola 2 veces si el módulo no baja; datos y modelos con 3 intentos y corte
+  si la descarga se cuelga; aviso de descarga y aviso del 3D (sin WebGL, shader que no compila aunque se pruebe la calidad
+  Móvil, contexto perdido) que tapan todo; `escena_visible` y `carga_fallida`. «Script error.» sin archivo viene de scripts
+  de otro origen (apps de Facebook/Instagram, extensiones): todos los módulos del juego son del mismo origen; `error_juego`
+  lo marca `ajeno: true`, y las promesas rechazadas con un evento (imagen que no bajó) ya traen mensaje.
+- Pruebas: `worker_test`, `servidor_test`, vitest, `check_muro` reescrita a la regla de producción, `check_muro_medio` con
+  la regla del arranque por variables, `check_game` (primera bienvenida), `check_analitica` (2026-11-e) y
+  `check_carga_fallas` nueva (grupo «telefono» de pruebas.yml).
+
+**Volver atrás por variable.** Correo obligatorio: `ENCUESTA_LIBRE "0"`. Arranque gratis con el muro en el intervalo:
+`GRATIS_ETAPA "arranque"` y `ENCUESTA_LIBRE "0"`. Dos finales enteras: `GRATIS "2"`.
+
+**Pendiente / estimación.** La práctica no cambió: con la barrita no hay tutorial ni tarjeta; la primera final sigue con
+«Cómo se gana» y el primer peso (dos paneles). Juntar esos dos en uno en el teléfono acostado necesita revisar el alto: queda
+para otra vuelta si los datos muestran caída ahí. Si PostHog todavía tiene la bandera `muro-partidas-gratis` asignando «2»,
+esos dispositivos tienen 2 finales gratis: apagarla. Medir 48 h después de publicar con el embudo de MVP.md
+(`muro_visto` → `muro_resultado` por `via` → `siguio_jugando`). Ramas en paralelo que tocan los mismos archivos:
+`analitica.js` (rama `utm`: acá se agregó `app_navegador` junto a `fuente_trafico`) y `stage.js` (rama `graficos`: acá solo
+`cargar()` deja de guardar la carga que falló).
+
+### Gráficos fase 1: el ambiente (15-nov, rama `graficos`; LIF-36, LIF-25, LIF-38)
+
+Pedido: que se vea «AAA» sin perder cuadros en el celular (2 de cada 3 jugadores), y más cámaras, en especial una desde el
+jurado. Los pesistas no se tocaron. Nada fusionado a `main` ni publicado. Técnicas aprendidas de Saltline (texturas generadas
+al cargar, materiales físicos parchados, reflejo planar, partículas por GPU, cámara con «trauma»); ni una línea copiada.
+
+**Archivos nuevos** (todo lo del juego; el visor solo ve los carteles con la marca nueva):
+- `web/js/game/ambiente.js` — `Ambiente`: se arma apenas existe la arena y antes del primer dibujo.
+  - *Tarima*: sobre la madera que ya dibujaba `arena.js` (vetas, nudos, línea pintada) pinta desgaste en el mismo lienzo:
+    mugre de baja frecuencia (ruido de valor en octavas), la zona gastada donde se paran, las dos franjas machucadas donde
+    caen los discos, pisadas y nubes de magnesio y salpicado fino debajo de la barra.
+  - *Piso de goma*: la alfombra del escenario pasa a baldosas de goma de 1 m (negra con motas, junta, normales por
+    diferencias finitas). En «Baja»/«Móvil» queda horneada con la luz, como antes (512 px: se ven las motas grandes, no la junta).
+  - *Pantalla LED viva* (`CanvasTexture`, 2048×720; 1024×360 en teléfonos): «LIFTING GAME», el levantamiento y el intento a la
+    izquierda; apellido, kilos y país a la derecha; cuando deciden los árbitros, las tres luces en cada panel y un marco blanco
+    o rojo. Recibe lo mismo que el tablero (`arena.setBoard`, `arena.setDecision`: stage.js los envuelve; main.js no cambió).
+    La cinta LED del escenario corre despacio. Carteles de la arena: `EVENT.marca = 'LIFTING GAME'` (config.js).
+  - *Halos* en las tres luces de arbitraje físicas (se ven aunque la calidad no tenga brillo de post).
+  - *Polvo de magnesio*: un solo dibujo instanciado (`InstancedBufferGeometry`); posición, deriva, titilar y luz se calculan
+    en el sombreador de vértices (solo brilla dentro de los conos de la clave y los contraluces); las primeras 48 partículas
+    son el soplo que sale de los discos cuando la barra golpea la tarima. Con profundidad de campo se dibuja después del
+    desenfoque, con los discos de luz de la arena (si no, cada mota era un disco de bokeh: se veía como nieve).
+  - *Conos de luz*: los haces de la arena con otro sombreador (vetas de bruma que bajan) y más fuerza, en las calidades con
+    post. *Público*: las siluetas instanciadas respiran y saltan con la ovación; con un válido, muchos más flashes.
+- `web/js/game/reflejo.js` — `Reflejo`: reflejo planar de la tarima. La escena se dibuja otra vez desde la cámara espejada
+  (plano cercano oblicuo, destino de media precisión con mipmaps) y la cara de arriba de la tarima lo suma con Fresnel y según
+  la rugosidad de cada zona (el magnesio y el desgaste lo apagan y lo desenfocan). Solo con post (color lineal).
+- `web/js/game/camara_viva.js` — `CamaraViva`: temblor por trauma (cuadrado del trauma, se gasta en medio segundo, senos sin
+  azar) cuando la barra golpea la tarima (stage.js lo detecta en `barraSuelta` por el frenazo) y dip con resorte cuando la pose
+  cruza la fase de recepción (`posar`). En fracción del alto de la imagen: máximo 1,4 % y 1,2 %. Se suma después del vigía de
+  cortes: no cuenta como corte ni lo tapa. Con movimiento reducido no hace nada.
+- `stage.js`: plano `jurado` en `PLANOS` (cámara en (0; 0,5; 7,0), sobre la mesa del árbitro central, lente de 26°: del pesista
+  de frente a las tres luces sobre la pantalla); `escena.camara()` acepta también claves de `PLANOS`.
+- `main.js` (lo mínimo): `?calidad=` además de `?q=`; `camPrincipal()` usa la cámara elegida (tecla **V** desde la fusión con `rondas`, antes C: general → jurado →
+  frontal → lateral; `?camara=jurado|baja|lado|3/4`; se recuerda en `tarima.camara`); en un válido propio, mientras se prenden
+  las luces, la cámara va al jurado con un movimiento suave de 1,3 s y después gira al público como antes.
+
+**Calidades** (`perf.js`: `AMBIENTE`, `PRESET.ultra`, `ALIAS_CALIDAD`). `?calidad=ultra|alta|media|baja|movil` (o
+low/medium/high) fija la calidad; sin parámetro, automático como antes (calibración y gobernador sin cambios; «Ultra» nunca
+se elige sola). Para comparar en la Mac: `juego.html?calidad=ultra` contra `?calidad=baja`.
+
+| | Móvil | Baja | Media | Alta | Ultra |
+|---|---|---|---|---|---|
+| texturas nuevas, LED viva, halos, cámara viva, jurado | sí | sí | sí | sí | sí |
+| polvo (partículas) | 90 | 220 | 500 | 900 | 1600 |
+| conos de luz | no | no | ×3,4 | ×3,8 | ×4 |
+| público que se mueve | — (horneado) | — | sí | sí | sí |
+| reflejo de la tarima | no | no | no | ½ resolución | completa |
+| post (ya existía): brillo, viñeta, grano, gradación, DoF | viñeta CSS, gradación en el material | igual | sí | + SMAA | + MSAA 4, sombras 2048, densidad 2 |
+
+**Medición.** En Actions todo se dibuja por software (SwiftShader): sirve para ver que compila y cómo se ve, y para una
+relación de costos en la misma máquina; los milisegundos no dicen nada de una placa.
+- **Contra `main` en la misma máquina** (`graficos.yml` con `comparar`, run 43773716868: banco alternado main, rama, main,
+  rama, main, rama; 960×540; costo de un cuadro a 1 MP, mediana de 4 y 2 vueltas):
+
+  | | main (3 corridas) | graficos (3 corridas) |
+  |---|---|---|
+  | Baja | 987 · 984 · 1023 ms (media 998) | 940 · 995 · 942 ms (media 959) |
+  | Móvil | 974 · 1034 · 1009 ms (media 1006) | 940 · 1008 · 930 ms (media 959) |
+
+  «Baja» y «Móvil» cuestan lo mismo que antes dentro del ruido (−4 % y −5 %). «Sin el ambiente nuevo» (polvo y halos
+  ocultos) ahorra 0,7 · 229 · −108 ms en las tres corridas: no se distingue del ruido.
+- **Entre corridas distintas no se puede comparar**: el banco de base (run 43769800891, main) dio Baja 1163 ms a 1 MP y el
+  de después (run 43772443706) 2027 ms en otra máquina; el alternado de arriba muestra que era el runner. Con esa salvedad,
+  lo medido en esas dos corridas (ms a 1 MP, antes → después): Móvil 812 → 845, Media 1300 → 1322, Alta 1461 → 1737 (el
+  reflejo dibuja la escena otra vez), Ultra — → 3320 (nueva). Media, Alta y Ultra con una o dos vueltas: orientativo.
+- **Cuadros por segundo reales: sin medir.** Ni la calibración ni el gobernador cambiaron (pisos de 70 % en computadora y
+  densidad 1 en el teléfono, intactos); «Alta» con reflejo solo se elige sola si la calibración mide que entra.
+- **Cortes** (`check_recorrido`, run 43772428833, con la cámara del jurado en el válido propio): 0 cortes bruscos y 20
+  fundidos mirando todo, 0 y 32 saltando rivales: igual que la base (run 43769795605). Pruebas del juego y del teléfono en verde.
+
+**Capturas miradas** (artefacto `graficos-out`, `tools/banco.mjs --fotos=dir --niveles`: 6 tomas por calidad): 3/4, frontal,
+lateral, jurado con válido y con nulo, reversa. El jurado en «Móvil» ya muestra al pesista de frente, la pantalla con su
+nombre y kilos, las tres luces en la pantalla y las tres físicas arriba.
+
+**Pendiente / sin medir.**
+- **Nada se midió en una placa real.** Falta correr `juego.html?banco=1` en la Mac del dueño y en un teléfono, antes y después.
+  Si el polvo de «Móvil»/«Baja» costara algo medible, se apaga con `AMBIENTE.movil.polvo = 0` (una línea).
+- (Resuelto en `graficos2`: fila «Cámara» en Opciones, tecla V y evento `camara_elegida`.)
+- (Resuelto en `graficos2`: el cambio de cámara deja `camara_elegida`.)
+- Conos y reflejo solo se ven de Media/Alta para arriba; en el celular no hay conos (en el camino directo cada capa aditiva
+  paga el tono por píxel). Postproceso: no se agregó nada (brillo, viñeta, grano y gradación ya estaban en Media y Alta).
+- Los árbitros siguen siendo muñecos de cápsulas: por eso el jurado es lo que ve el árbitro y no un plano de ellos.
+
+### Panel del llamado liviano y estilo de envión fijo (15-nov, rama `panel`; LIF-31 y LIF-43)
+
+Pedido del dueño (iPhone acostado): el panel ocupaba media pantalla y el envión eran tres botones grandes apilados. Nada
+fusionado a main ni publicado.
+
+- **Panel compacto** ('b' y 'u'; `panelLlamado → uPintar` y `estiloHTML` en main.js, CSS «panel del llamado compacto» al final
+  de `juego.css`, textos `panel.*` y `jerk.*`, aprobados): a la vista solo el título corto («Dos tiempos · intento 1 de 3», sin
+  el nombre: el tablero dice quién levanta) con **Detalles ▾**, los kilos ± con LEVANTAR, la dificultad y «X de 10», y en el dos
+  tiempos **«Estilo de envión: Tijera ▾»** (un botón; al tocarlo, una fila de tres con la dificultad en una palabra: fácil /
+  medio / difícil, y «Queda fijo para los 3 intentos»; al elegir, el foco vuelve a LEVANTAR). En el detalle: % del RM, el verde
+  de cada barrita, el cansancio, cómo ganar, los avisos y el pedido. «Detalles» se recuerda (`tarima.panel.detalle`). En el
+  teléfono acostado no se ven los ±5 (↑ ↓ siguen sumando 5 con teclado) ni «kg» (lo dice el botón), y todo lo que se toca mide
+  40 px de alto o más. El entrenador sigue proponiendo split (`casa`); el último estilo elegido se recuerda para la final
+  siguiente. Ya no hay «Más opciones» en 'b'.
+- **Estilo fijo** (LIF-43; `match.js → estiloFijo`, `cfg.envFijo`, cabecera `envFijo: true`): se elige en el primer intento del
+  dos tiempos y es el de los tres. `resolver` rechaza otro estilo y `recalcular` también; sin `envFijo` (registros viejos) las
+  reglas de antes. Los rivales, con la regla, usan el estilo de su personalidad toda la competencia (`ai.js → envionRival`:
+  Marangi «arriesga» power; Ventura y Brenner tijera), en lugar de power en la apertura y tijera después (antes, en 109 de cada
+  200 finales un rival cambiaba a mitad). `entrenador.js → chanceDe` cuenta el estilo fijo aunque le pasen otro. El panel lo
+  muestra con candado y «fijo»; Clásico deja deshabilitados los otros estilos.
+- **Medido** (check_telefono mide el alto del panel del llamado y el botón más bajo; `out/telefono/panel.json`; exige ≤ 38 % del
+  alto con el detalle plegado en 667×375 y 844×390 y botones de 40 px o más):
+
+| alto del panel del llamado | antes (`3516bfd`) | después (corrida 43774081868) |
+|---|---|---|
+| 667×375 · arranque | 65–75 % | 32 % |
+| 667×375 · primer dos tiempos / con el estilo fijo | 77 % | 37 % / 32 % |
+| 844×390 · arranque | 61–66 % | 31 % |
+| 844×390 · primer dos tiempos / con el estilo fijo | 73 % | 35 % / 31 % |
+| 740×360 · 844×340 (Safari) · 932×430, arranque | 63–74 % · 65–71 % · 57–61 % | 33 % · 35 % · 28 % |
+
+  Con «Detalles» abierto 62–68 %; eligiendo el estilo 59–61 % (momentáneo).
+- **Rivales** (`rivales_test`, `ENV_FIJO=0` juega con las reglas de antes para comparar): los totales medios de cada rival
+  cambian 1 kg o menos y los válidos 1 punto o menos en todas las casillas.
+- **Pruebas**: sim_test 17 (300 finales con la regla contra recalculadas, nadie cambia de estilo, cada rival con el de su
+  personalidad, registros con el estilo cambiado a mitad rechazados, el entrenador cuenta el fijo); ritmo_test, barra_bots y
+  rivales_test juegan con `envFijo`; chance_test y servidor_test en verde. check_game elige power con teclado y tijera con el
+  dedo y verifica el candado y el registro (power ×3, split ×3); check_telefono abre y cierra «Detalles» y elige el estilo con el
+  dedo. Actions sobre `b6a9da1`: pruebas.yml 43774081917 y telefono.yml 43774081868 en verde. Capturas miradas: teléfono
+  667×375 (primer dos tiempos, estilo abierto, fijo con candado, detalle) y computadora 1280×720 (fijo con candado).
+- **Pendiente**: verlo en un teléfono de verdad (los botones de 40 px con el pulgar). El estilo se elige recién en el primer dos
+  tiempos (no en el intervalo), como acordado.
+
+### Orden por rondas y «Cambiar» el pedido (15-nov, rama `rondas`, LIF-3 y LIF-4)
+
+Pedidos del dueño: LIF-3 «ordenar por rondas los intentos de los 3 pesistas» (con el orden oficial el jugador espera muchos
+turnos seguidos y se entiende mal) y LIF-4 «permitir 1 o 2 cambios de kilos por intento» para responder a los rivales.
+Nada fusionado ni publicado.
+
+- **Núcleo** (`match.js → TURNOS`, `HUELLA_TURNOS`). `new Partida(..., { turnos: 'rondas' | 'oficial' })`; el registro lleva
+  `orden` y `turnos` (la huella) y `replay.js` rechaza otra huella u otro orden. Sin `turnos` (registros viejos) todo es como
+  antes: orden oficial y sin pedidos antes del turno. Por rondas: en cada ronda los tres levantan una vez; dentro de la ronda
+  abre quien pidió menos, a igual peso quien lo pidió primero (`a.pidio`) y después el dorsal. `ordenSalida()` y `ronda()`
+  son de la partida (el tablero ya no copia la regla).
+- **Decisión: la barra nunca baja dentro de la ronda** porque el mínimo de quien todavía no levantó en esa ronda incluye lo
+  cargado (`minimo`, con `rondaBarra`) y se sale de menor a mayor: nadie puede quedar por debajo, así que no hace falta «subir
+  el pedido» ni reordenar a nadie. Entre rondas sí baja (la ronda 2 la abre el pedido más bajo): lo que pide quien ya levantó
+  es para la ronda siguiente y no lo limita la barra de esta. En 600 finales de `sim_test` 17 pasó 827 veces.
+- **Pedidos antes del turno** (`Partida.pedidoValido`/`pedir`): con `turnos`, mientras levanta otro, la persona sube su pedido;
+  solo hacia arriba, nunca bajo su mínimo, y dos por intento contando los cambios del panel de su llamado. En el registro va
+  entre los llamados como `{a, lev, pide}` (límite de llamados 40 → 52 con turnos).
+- **Decisión: el panel del llamado propio sigue como estaba** (puede bajar hasta el mínimo; es la declaración final y es zona
+  del agente de `panel`). Lo nuevo es lo de antes del turno, que solo sube como pide el ticket.
+- **Rivales.** Con `turnos` sus cambios al cierre de un intento ajeno son los mismos de antes (la tabla del dos tiempos, por
+  personalidad) pero solo hacia arriba y como mucho dos. Se probó que Brenner y Marangi cambiaran también en el tercer arranque
+  al ir atrás (con «lo justo para pasar» y con su propio número): sus cambios caían en la marca o el pedido del jugador ±1 entre
+  0,16 y 0,29 veces por final (meta de `rivales_test` ≤ 0,15) y **se descartó**. `ai.js` no cambió de huella.
+- **Juego.** Opciones → «Orden»: «Por rondas» (por defecto) u «Oficial», con una nota de una línea (`tarima.orden`). El tablero
+  dice «Arranque · Ronda 2» (computadora), el cambio de un rival al pie («Brenner cambia a 167», en dorado; en el teléfono esa
+  línea reemplaza a la de la estrategia) y, en el turno de un rival, un botón chico **«Cambiar»** debajo del tablero (tecla C; la cámara pasó a la V al fusionar con `graficos`).
+  Abierto: «− 167 +» con «X de 10» (en 'b' y 'u'), «Pedir 167», ✕ y «Te quedan 2 cambios»; flechas, Enter y Esc con teclado.
+  En el teléfono acostado el botón va debajo del tablero compacto y se oculta mientras está el veredicto (abajo a la izquierda:
+  se tapaban en check_telefono; al costado del tablero chocaba con los botones de arriba).
+  Con el tablero quieto (el resultado del rival ya está calculado) solo se pone al día la fila propia («antes 165»). Si en la
+  partida ya le toca a la persona (el rival que se ve ya se resolvió), el pedido queda pendiente y entra como cambio de su
+  llamado al abrirlo (`E.pedidoPend`; si la desplaza, sale otro). Evento `pedido_cambiado` (docs/MVP.md). `ui/pedido.js` es
+  lo puro (qué se puede pedir) y lo prueba `sim_test` 17.
+- **Compatibilidad.** `tools/sim_ref*.json` existentes sin cambios y en verde; `tools/sim_ref_turnos.json` es nuevo (12
+  partidas, rondas y oficial, con pedidos). `ritmo_test`, `rivales_test` y `pesistas_test` aceptan `--orden=rondas|oficial|viejo`
+  y por defecto miden lo que juega el juego (rondas). El muro (conexion.js, servidor.js, worker/) no se tocó; el servidor no
+  recalcula registros.
+
+**Medido** (sin navegador, en la Mac, de a una prueba; antes = `--orden=viejo`, idéntico a `main`):
+
+| ritmo_test, 360 finales por fila | antes | por rondas |
+|---|---|---|
+| turnos de rivales seguidos entre dos propios: mediana · p90 · máximo | 1 · 4 · 6 | 2 · 3 · **4** |
+| Fácil, mirando cada rival: espera mediana · p90 · máxima | 12,2 · 35,8 · 61,3 s | 17,4 · 27,2 · **40,5 s** |
+| Fácil, saltando cada rival: espera mediana · p90 · máxima | 5,5 · 12,2 · 17,1 s | 7,7 · 10,0 · **12,2 s** |
+| Medio / Difícil saltando: espera máxima | 17,1 / 17,1 s | 12,2 / 12,2 s |
+| final mediana, Fácil mirando / saltando | 194,5 / 126,0 s | 195,8 / 126,9 s |
+| final mediana saltando, Medio / Difícil | 136,0 / 137,5 s | 136,1 / 137,6 s |
+
+La mediana de la espera sube porque ya no hay dos levantamientos propios seguidos (antes, muchos «0 rivales en el medio»);
+lo que baja es la espera larga, que era la queja. El orden «Oficial» nuevo da lo mismo que antes (máxima 61,4 s).
+`ritmo_test` ahora juzga las barras caídas con 250 semillas: con 60, Medio daba 19,3 % por rondas y 16,4 % antes según en qué
+orden salían los llamados (la semilla de cada intento depende de su número); con 250, 17,3 % y 16,7 % (meta ≤ 18 %).
+
+| oro del novato con el panel (rivales_test, 'b', 500 finales) | antes | por rondas |
+|---|---|---|
+| rivales amistosos | 88 % | 87 % |
+| rivales normales | 15 % | 19 % |
+
+| pesistas_test ('u', 600 finales, rivales normales, panel) | antes | por rondas |
+|---|---|---|
+| Compacto / Largo / Potente | 51 / 48 / 69 % | 44 / 50 / 62 % |
+| diferencia entre pesistas (meta ≤ 25) | 20 | 18 |
+| panel contra prudente, peor pesista (meta ≥ 15) | 18 | 31 |
+| panel contra codicioso, peor pesista (meta ≥ 15) | 28 | 18 |
+
+El «prudente» (+2 kg siempre) se hunde por rondas (Compacto 31 → 3 %): antes la barra lo obligaba a subir; ahora puede
+pedir poco entre rondas y lo hace. `pesistas_test` pasa a 600 finales por defecto: con 200 el criterio E de Compacto caía a 13
+puntos por ruido (con 600, 18). Rivales: cambios espejo 0,01 a 0,10 por final (antes 0,01 a 0,14), contrafáctica 0 %
+(declarar ±3 kg no cambia ninguna decisión de un rival), variedad igual. Cambios de rivales que ve el jugador tras sus
+intentos: 0,6 por final en amistoso (antes 0,4).
+
+**Pendiente / para el dueño.** Mirarlo jugando: si «Cambiar» se usa (evento `pedido_cambiado`) y si el «Ronda 2» del tablero
+alcanza para entender el orden. Decidir si el panel del llamado propio también debe ser «solo hacia arriba» (hoy deja bajar
+hasta el mínimo). Los rivales siguen sin cambiar en el arranque (con ellos cambiando, espejaban al jugador).
+
+### Rondas y estilo fijo juntos (15-nov, rama `prueba`: fusión de `rondas` sobre `panel`)
+
+Las dos reglas conviven en la misma partida y en el mismo registro: `envFijo: true` (LIF-43) y `orden` + `turnos`
+(`HUELLA_TURNOS`, LIF-3/4). `replay.js` valida cada marca por separado (`envFijo` solo puede ser `true`; `orden` y `turnos`
+van juntos y con la huella de hoy); un registro sin ninguna de las dos se recalcula como antes, y uno con una sola, con esa
+regla sola. El juego crea la partida con las dos (`envFijo: true` y `turnos` según Opciones → Orden).
+- **Teclas** (decisión del orquestador): **C** es «Cambiar» el pedido en el turno de un rival; **la cámara pasa a la V**
+  (general → jurado → frontal → lateral).
+- El panel del llamado propio sigue pudiendo bajar hasta el mínimo; los cambios antes del turno («Cambiar») solo suben.
+- `sim_test`: 17 es el estilo fijo, 18 los turnos y **19 nuevo, las dos juntas** (300 finales, rondas y oficial, con pedidos,
+  contra recalculadas; estilo cambiado a mitad, huella de turnos u `envFijo` adulterados: rechazados). Ninguna `sim_ref*.json`
+  cambió: `sim_ref_turnos.json` juega sin `envFijo` y sigue en verde.
+- `ritmo_test` y `rivales_test` juegan con las dos reglas (`--orden=` y `ENV_FIJO=0` siguen sirviendo para comparar).
+
+### Gráficos fase 2: jueces de verdad, jurado en los nulos y selector de cámara (15-nov, rama `graficos2`; LIF-38, LIF-36)
+
+Rama `graficos2`, desde `prueba` (primera-vez + utm + graficos). Nada fusionado ni publicado.
+
+**Qué cambió.**
+- `web/js/game/jueces.js` (nuevo) — `Jueces`: personas ficticias modeladas por código (sin imágenes ni caras de nadie):
+  silla, piernas, saco por secciones (superelipses), camisa en V, corbata, cuello, cabeza con pelo (corto, melena o calvo),
+  brazos apoyados en la mesa. Los tres árbitros además tienen nariz, ojos y orejas, una consola con dos botones y **una
+  paleta**: cuando se prende su luz la levantan (blanca o roja, 0,35 s) y la bajan cuando las luces se apagan (0,55 s; con
+  movimiento reducido, sin animación). Reciben lo mismo que `arena.setDecision` (stage.js lo envuelve). También son personas
+  el jurado lateral (cinco, mesa larga: es lo que se ve desde la cámara general) y los dos de la mesa técnica, con menos detalle.
+  - *Costo*: cada grupo es una malla con color por vértice (13 600 triángulos en total; se descartan por grupo fuera de
+    cuadro) y un solo material Lambert sin texturas; la luz va pintada en el color (lo que mira abajo más oscuro, lo que mira a
+    la tarima más claro) más un relleno fijo en el sombreador (`RELLENO`: las luces del escenario apuntan a la tarima y las
+    mesas quedaban en negro). Los tres brazos de las paletas son una malla cuyas posiciones se recalculan en JavaScript solo
+    mientras se mueven (594 vértices); las tres paletas, un dibujo instanciado sin luces. Nada por cuadro en reposo.
+  - `arena.js` acepta `oficiales: false` (el juego): no arma los muñecos de cápsulas sentados ni sus mesas. El visor no cambia.
+    Los dos cargadores de pie siguen siendo cápsulas.
+- **Decisiones de diseño (del agente).** Los tres árbitros comparten **una mesa** al frente (x = −0,95; 0; 0,95; antes el
+  central estaba solo y los otros dos a 3,6 m: no entraban en ningún plano juntos). La **vista del jurado** dejó de ser «lo
+  que ve el árbitro»: ahora es por encima de los hombros de los tres (cámara en (0; 0,7; 10,6), lente de 30°): abajo sus
+  cabezas y las paletas, en el medio el pesista de frente, arriba las tres luces. El pesista ocupa un 36 % del alto (antes
+  62 %). Con profundidad de campo, lo cercano se desenfoca menos en ese plano (`post.cerca` 0,1 en lugar de 0,35). Uniforme:
+  saco azul grisáceo, camisa clara, corbata gris, azul o bordó. Plano `jueces` (los tres de frente) solo para las fotos de control.
+- **Jurado en los nulos propios** (`decision()` en main.js): igual que en el válido, movimiento suave de 1,3 s; el nulo se
+  queda ahí hasta el fundido que sigue. Rivales, resúmenes y la barra que se cae (fallo) siguen como antes.
+- **Selector de cámara**: fila «Camera / Cámara» en Opciones (Main · Judges · Side · Low / General · Jurado · Lateral · Baja),
+  recordada en `tarima.camara`; evento `camara_elegida` (`vista`, `via`: `opciones` o `tecla`, `pantalla`; docs/MVP.md 6.3).
+  **La tecla pasó de C a V** (C es «Cambiar» el pedido de kilos, LIF-4); `?camara=` sigue. El orden de la tecla es el de la fila.
+- Banco: tomas `jueces-vale` y `jueces-nulo`, variante `jueces` (los oculta). `graficos.yml`: `comparar` acepta `base` (rama).
+
+**Medido** (Actions, por software: vale la relación, no los ms).
+- Costo contra `prueba` en la misma máquina (run 43776898919, alternado, 960×540, ms de un cuadro a 1 MP):
+
+  | | prueba (3 corridas) | graficos2 (3 corridas) |
+  |---|---|---|
+  | Baja | 1159 · 1157 · 1188 (media 1168) | 1167 · 1165 · 1171 (media 1168) |
+  | Móvil | 503* · 843 · 838 | 829 · 842 · 841 |
+
+  (*una sola vuelta: no vale.) Lo mismo dentro del ruido. Repetido sobre el último código (run 43781091245): Baja 1187 · 1204 ·
+  1179 (media 1190) contra 1181 · 1202 · 1177 (media 1187). La variante «sin los jueces» dice que ahorra 141 a 159 ms, pero «sin
+  el ambiente» en `prueba` dice 149 a 176 con el mismo rango (−16 a 300): es el sesgo de la medición de variantes, no un costo.
+- Cortes (`check_recorrido`, run 43776253714): 0 cortes bruscos y 20 fundidos mirando todo, 0 y 32 saltando rivales: igual
+  que la base. **En ese recorrido no salió ningún nulo propio**: la vista del jurado en el nulo usa la misma llamada que el
+  válido (que sí se midió), pero no quedó ejercitada en el navegador.
+- `check_game` controla la fila de cámara (4 botones, guardado, evento) por teclado y por toques.
+- Capturas miradas (artefacto `graficos-out`): jueces de frente, jurado con válido y con nulo, general (jurado lateral) y
+  reversa (los tres árbitros con las paletas arriba), en Móvil, Baja, Media y Alta.
+
+- **Banco en el teléfono** (`juego.html?banco=1`; bug del dueño: «Copiar el JSON» no respondía al toque): los botones
+  atienden `click` y `pointerup` táctil, la copia va con `navigator.clipboard.writeText` dentro del gesto y, si no hay
+  portapapeles o falla, el JSON queda seleccionado en un cuadro de texto visible para copiarlo a mano; la tabla se desplaza
+  con el dedo (`touch-action: pan-x pan-y`; el cuerpo tiene `none`) y arriba hay un resumen grande («Elige: Alta · 2,94 MP ·
+  15 % de margen» y la línea de `resultado.texto`) con los botones al lado: alcanza una captura. **Sin probar en un teléfono
+  real** (la causa exacta no se pudo reproducir: se cubrieron las tres posibles).
+- **Primera medida en una placa real** (Mac del dueño, M1 Pro, 120 Hz, Chrome, rama graficos): el banco eligió **Alta a
+  2,94 MP con 15 % de margen**; Ultra cuesta 16 % más que Alta; el ambiente nuevo no se distingue del ruido.
+
+**Pendiente / estimación.** Falta medir en un teléfono real y, con los jueces, otra vez en la Mac. Las caras son un maniquí con nariz y ojos (sin boca ni cejas). El
+selector no muestra la vista elegida detrás del panel hasta que empieza el levantamiento. En una ventana más alta que ancha
+la cámara es siempre la lateral, se elija lo que se elija. (La prueba de navegador que fuerza un nulo propio está desde la
+fusión en `prueba`: `check_game`, corrida «clasico».)
+
+### graficos2 y lienzo juntos en `prueba` (15-nov; LIF-38, LIF-45)
+
+`prueba` = main + primera-vez + utm + graficos + nombre + panel + rondas + **graficos2** + **lienzo**. Nada fusionado a main
+ni publicado.
+
+**Conflictos y cómo quedaron.**
+- `main.js`: C abre «Cambiar» (rondas, LIF-4) y V cambia la cámara (graficos2); en Opciones van las filas «Orden» y
+  «Cámara». Solo chocaba el comentario de la cámara (quedó el de graficos2).
+- `analitica.js`: los eventos `pedido_cambiado` y `camara_elegida`; lienzo entró sin conflicto (bandera
+  `grabacion_lienzo`, súper propiedad `grabada_lienzo`). i18n sin conflicto: 751 claves en es y en, las mismas.
+- Privacidad: la versión final es `2026-11-g` (el juego la manda; el Worker acepta de la a a la g).
+- `check_game`: la fila «Cámara» de Opciones (graficos2) con el estilo de envión fijo de rondas (el de graficos2 cambiaba de
+  estilo en cada dos tiempos, que ahora no se puede).
+- Workflows: unión de las ramas de cada lado.
+
+**LIF-45, el nombre en el 3D grabado (decisión del orquestador).** En las visitas que graban el lienzo
+(`analitica.grabandoLienzo()`), cuando levanta el jugador la pantalla LED (`ambiente.js`, `_led`) y el tablero del costado
+(`arena.js`, `_drawBoard`) dicen «LIFTING GAME» (`EVENT.marca`) en vez de su nombre (`main.js`, `zocalo`: el cartel lleva
+`entero` y `jugador`). Con eso `regionesLienzo` no tapa nada (los rectángulos negros tapaban al pesista cuando pasaba por
+delante del cartel, por ejemplo desde el jurado) y queda **solo como respaldo**: tapa la línea del nombre si el cartel puede
+estar mostrando el nombre del jugador (cartel sin datos, o dibujado con el nombre antes de que se prendiera la grabación).
+Los rivales son ficticios: con un rival en el cartel tampoco se tapa. Sigue la falla cerrada (sin escena o cuadro sin dibujar:
+el grabador saltea el cuadro). Pruebas: `servidor_test` (cinco casos nuevos de `regionesLienzo`) y `check_analitica`
+(sección 7: con lienzo los carteles del jugador dicen LIFTING GAME y no se tapa nada; sin lienzo, su nombre).
+
+**Nulo propio y jurado.** `check_game`, corrida «clasico»: en la segunda práctica suelta la barra arriba antes de la señal de
+bajar (NULO «antes») y verifica que la cámara va al jurado al empezar el veredicto y sigue ahí 1,8 s después, con luces rojas.
+
+**Corridas en verde** (sobre `dee23df`, por software): pruebas 43788512947 (el nulo: «nulo:antes · cámara jurado → jurado ·
+luces r,r,r»; `check_carga_fallas` sin vencer), teléfono 43788516583, muro 43788520026, servidor 43788523303 (con el lienzo
+los carteles del jugador dicen LIFTING GAME y se tapan 0 rectángulos; sin el lienzo, su nombre) y gráficos 43788526622.
+Sin navegador, en la Mac: sim, servidor, worker, perf, ritmo, barra_bots, chance y rivales en verde. Capturas miradas: jueces
+y jurado con nulo (paletas rojas y blanca), tablero con «Change C», panel con el estilo de envión fijo y candado, y los cuadros
+grabados del lienzo con «LIFTING GAME» en el tablero del costado y el pesista sin tapar. La primera corrida de servidor
+(43787765416) falló porque `main.js` no importaba `EVENT`; arreglado en `dee23df`.
+
+### Aprender jugando: explicaciones de una línea en su momento (16-nov, rama `aprender`; LIF-52)
+
+Pedido del dueño: que un jugador nuevo aprenda halterofilia jugando, sin pantallas extra ni tutorial: una línea, una vez, en el
+momento justo, que se pueda cerrar. Rama `aprender` desde `prueba`. Nada fusionado ni publicado.
+
+- **`web/js/game/ui/aprende.js`** (nuevo): `APRENDE` (claves, momentos y condición), `elegir()` (puro, lo prueba sim_test 20) y
+  la clase `Aprende` (el cartelito `#aprende` dentro de `#tv`). **Cada explicación es la línea del glosario** de «Cómo se
+  juega» (`glosario.<clave>.t` y `.d`): un solo texto para las dos cosas. Solo en 'b' y 'u'.
+- **Cuándo sale cada una** (en orden de prioridad; una por momento; si hay otra a la vista hace menos de 3,5 s, espera):
+
+  | clave | momento | condición |
+  |---|---|---|
+  | `estilo` | panel del llamado | primer dos tiempos (estilo sin fijar) |
+  | `dificultad` | panel del llamado | 'b'; el título es el del panel («Fácil · 10 de 10») |
+  | `kilos` | panel del llamado | ya hizo un intento en ese levantamiento |
+  | `cambiar` | turno de un rival | hay botón «Cambiar» |
+  | `nulo` | veredicto de un rival | no vale |
+  | `luces` | veredicto de un rival | — |
+  | `total` | panel del llamado o turno de un rival | dos tiempos |
+
+- **Dónde**: con el panel del llamado, encima del panel, de su mismo ancho (el pesista está del otro lado; si con «Detalles»
+  abierto no entra, se oculta mientras tanto); en lo demás, abajo a la izquierda (en 'b' y 'u' ahí no hay zócalo); con mano
+  izquierda, encima del botón redondo. La del panel se va al cerrarse el panel; la de la esquina sigue en el turno y el veredicto
+  de los rivales y en la carga, y se va al llegar el llamado propio. Tope 15 s. Nunca durante el levantamiento propio.
+- **Una vez**: `tarima.visto.a_<clave>` si la persona la cerró (✕), si estuvo 3,5 s a la vista o si es la segunda vez que sale
+  (la primera la cortó un momento corto, por ejemplo un rival salteado). `tarima.aprende.n_<clave>` cuenta las veces.
+- **No frena nada**: no hay esperas nuevas ni toques que la cierren; la ✕ es un botón (input.js no lo cuenta como toque) sin
+  foco (Espacio sigue siendo del juego).
+- **Eventos** (docs/MVP.md 6.3): `explicacion_vista` (`clave`, `momento`, `pantalla`, `vez`) y `explicacion_cerrada` (`clave`,
+  `via` `boton`/`sola`, `ms`, `leida`). Embudo para medir: vista → cerrada con `boton` o `leida`.
+- **Decisiones del agente**: en 'b' y 'u' la presentación de la primera final ya no lleva las tres reglas de «Cómo se gana» (las
+  luces y el total se explican en su momento; quedan los rivales); el aviso «la barra nunca baja» que iba dentro del detalle
+  plegado del panel (se gastaba sin verse) pasa a ser la explicación `kilos`; el glosario de 'b' y 'u' suma las luces, el no vale,
+  la dificultad, «Cambiar» y el estilo de envión (16 palabras en 'b'), y corrige kilos («dentro de la ronda») y total («necesitas
+  un válido en cada uno»).
+- **Textos que coinciden con el juego** (sim_test 20, contra el núcleo): 2 o 3 blancas = vale (1740 veredictos de rivales, 2 no
+  vale); sin un válido en cada levantamiento, total 0; «Cambiar» = 2 cambios por intento y solo hacia arriba (`TURNOS`); la barra
+  que no baja dentro de la ronda y la progresión (+1 tras un válido, lo mismo tras un fallo) ya las verifica `jugar()`. En 'b' y
+  'u' el jugador no puede hacer un no vale (la fijación siempre vale): la explicación `nulo` sale con el de un rival, y son raros.
+
+**Medido.** Ritmo: las explicaciones no agregan esperas; `check_recorrido` (computadora, es y en, mirando y saltando rivales)
+da las mismas esperas que `prueba` (27,6 s máx. mirando; 9,1 s saltando; 3,5 s tras el fallo); `ritmo_test` en verde (no
+cambia: es del núcleo). Tapado (`check_telefono`, `tools/tapa.mjs` cuenta solo el cartelito; tope 5 % del cuerpo): **0 %
+del pesista en todas las explicaciones y todos los tamaños** (844×390, 667×375, zurdo 740×360, Safari 844×340, 932×430 en
+inglés; en vertical no se mide el pesista); el panel del llamado sigue en 31 % del alto. Con mano izquierda la primera versión
+tapaba 17 % del rival y en vertical se encimaba con el panel: corregido. Toque en la ✕: cierra, `leida: true`, 0 toques del
+juego. Corridas en verde sobre `61a373d`: pruebas 43796645404 (los 4 grupos) y teléfono 43796645436. Capturas miradas:
+computadora es y en (llamado, rival, veredicto), teléfono 667×375 y 844×390 (es), 932×430 (en), zurdo y vertical.
+
+**Pendiente / estimación.** Verlo en un teléfono de verdad. Medir en PostHog cuántas se cierran con la ✕ y cuántas se cortan
+(`leida: false`): si muchas se cortan, subir la prioridad de la de la esquina o alargarla. La del nulo depende de que un rival
+haga un no vale (≈ 1 de cada 900 intentos de rivales): casi nadie la va a ver; si se quiere enseñar, hace falta otro momento.
+
+### Gráficos fase 3: el look (16-nov, rama `look`, desde `prueba`)
+
+Pedido del dueño: «temas gráficos, sigue igual… me refiero a las TEXTURAS»; quiere el nivel de Saltline y pesistas «semi
+humanos reales». Nada fusionado ni publicado. La cámara en primera persona y lo de después del levantamiento van en otra rama.
+
+**Qué cambió (archivos).**
+- `web/js/game/look.js` (nuevo) — `Look`, se arma en `stage.js` después de la arena, el ambiente y las luces:
+  - *Luz de competencia* (`_luces`): sala a oscuras; clave alta y lateral (4,4; 9,3; 3,9), contraluz **cálido** ancho desde
+    atrás a la izquierda (`rimA`, el que mira a la cámara general) y frío del otro lado; relleno y luz de sala mínimos.
+    `GRADO_LOOK`: una sola gradación (saturación 0,88, sombras frías, altas cálidas, viñeta 0,36, negros firmes) para el pase
+    final de `post.js` (uniforms nuevos `uFrio`, `uCalido`, `uNegro`), el tono del camino directo y `tonoJS` de `stage.js`.
+    Casi sin desenfoque de fondo (`uScale` 0,18: el marcador y la sala se leen), bloom con umbral alto, bruma de sala a un tercio.
+  - *Texturas por campo* (color + altura→normales + rugosidad de la misma cuenta, ruido de valor en octavas): madera de la
+    tarima (tablas, veta, barniz gastado donde se paran, marcas y abolladuras donde caen los discos, magnesio, línea y marca
+    estarcidas y gastadas; 2048 px en computadora aunque arranque en «Baja», 1024 en teléfono), goma del escenario (motas,
+    juntas, polvo, roces brillantes), metal pintado con saltaduras y óxido, fenólico de baúl, terciado, goma de disco.
+    La madera se calcula a media resolución y la veta fina, las juntas y los rayones se componen a resolución final con el
+    lienzo 2D (por píxel a 2048 eran varios segundos de JavaScript; quedó en ~1,2 s con la Mac ocupada, 0,3 s a 1024).
+  - *Pantalla LED* con fondo oscuro y grano de píxel en el sombreador (un punto por LED, se funde con la distancia).
+  - *Utilería* (fija, se junta por material en `juntarFijos`; los discos son un dibujo instanciado): dos cajones de discos,
+    tres pilas, portabarras con tres barras, tres bancos con toalla y botella, cuatro baúles de gira, dos monitores de piso,
+    cámara de TV con trípode, caja de magnesio de madera, cuatro tendidos de cable y canaleta, calcomanías de cinta y de
+    magnesio derramado, ocho banderines ficticios, y dos paños de **pared de chapa** con columnas, caño y tablero.
+  - *Rayos de luz*: conos de bruma de la clave y de los contraluces (solo con post). Público en penumbra con luz de rebote
+    en cabeza y hombros (`uRebote` en `arena.js`).
+- `web/js/game/materiales.js` (nuevo) — **materiales como funciones GLSL por píxel** (método de Saltline): `conSuperficie(m, tipo)`
+  inyecta `superficie(P, col, rug, met)` en un material físico; de la altura que devuelve sale la normal. Tipos: `madera` y
+  `goma` (encima de sus mapas: veta fina, gránulo, magnesio y polvo por capas), `disco`, y `chapa` (toda por función: costillas
+  con un coseno, pintura en capas → base anticorrosiva → acero → óxido y chorreaduras, vetas lavadas, mugre abajo, tornillos,
+  bañadores de pared). **`USO`** (0 a 1) es el valor compartido: gradúa magnesio, polvo y óxido en todas; sube 0,03 con cada
+  barra que cae. Solo con post (`setSuperficies`); en el camino directo quedan los mapas.
+- `web/js/game/lab.js` (nuevo) — **laboratorio de materiales**: `juego.html?banco=1&lab=materiales` (esferas y paneles de
+  madera, goma, moleteado, cromo, disco, chapa, chapa roja y metal pintado bajo la luz del juego, deslizador de uso, teclas
+  1 a 5 para las vistas; piel y tela sobre el pesista). Fotos: `node tools/banco.mjs --fotos=dir --lab=materiales` (paso nuevo de `graficos.yml`).
+- **Pesistas por parámetros** (`athlete.js`): `ASPECTO` y `Athlete.setAspecto({ piel: {tono, saturacion, variacion, rugosidad,
+  sudor, brillo, dispersion}, pelo: {color}, tela: {tinte, plano, arrugas, brillo} })`: son uniforms, no compila nada, y lo que
+  no se pasa vuelve al valor por defecto (un modelo compartido no arrastra el aspecto del anterior). En el sombreador: tono de
+  piel con parches rojizos y pálidos, segundo lóbulo de transpiración en parches, menos especular de base (F0 a la mitad),
+  más dispersión en el borde de sombra, arrugas de tela en las normales visibles desde el plano general, tinte de tela y de
+  pelo. `PLANTEL[id].aspecto` en `roster.js` (Ventura y Marangi ya tienen el suyo; `JUGADOR.aspecto` si se quiere). `FINO`
+  apaga el detalle fino en «Baja» y «Móvil».
+- `barbell.js`: goma de los discos con mapa de rugosidad y relieve, y caras con roces en arco, golpes y magnesio.
+- `graficos.yml`: rama `look`, entradas `niveles` y `con_alta`, fotos del laboratorio.
+
+**Calidades.** Móvil y Baja: luz, gradación, texturas (1024/512 en teléfono), utilería sin normales y LED sin grano por
+píxel; sin superficies por función, rayos, pared de chapa ni detalle fino del pesista. Media: más el detalle fino del pesista,
+LED con grano y normales. Alta: más los rayos y el reflejo. Ultra: más las superficies por función y la pared de chapa.
+
+**Rondas del director de arte** (un agente que solo ve capturas y las referencias de Saltline; puntaje contra Saltline = 10):
+
+| ronda | capturas | Alta | Móvil | lo peor que marcó |
+|---|---|---|---|---|
+| 1 | `scratchpad/look/r2` | 5 | 3,5 | velo lechoso y halo, desenfoque excesivo, discos grises flotando, piel plástica, luz sin dirección, polvo como nieve |
+| 2 | `scratchpad/look/r3` | 5 | 3,5 | piel de cera, cara y pelo de muñeco, marcador ilegible, fondo vacío, jueces y público maniquíes, tela lisa |
+| 3 | `scratchpad/look/r4` | 5 | 3,5 | cara de muñeco (ojos fijos, pelo casquete), público de bolos, jueces sin cara, halo en el contorno, tiza al 100 % lava todo, Móvil sin ambiente |
+| 4 | `scratchpad/look/r5` | 5 | 3,5 | **1 y 2: el pesista** (cara y cuello, pelo casquete, espalda plana, antebrazos finos: «rehacer modelo»); después público y ayudantes de bolo, jurado sin cara, halo y grano sobre la piel, Móvil sin atmósfera |
+
+En las tres dijo que **mejoró claramente contra el antes** («de juego de celular caricaturesco a casi realista con muñeco
+adentro») y que lo mejor es la tarima, los discos y la barra, y la composición del jurado y de la reversa. **El puntaje no
+subió de 5 en cuatro rondas** (meta del coordinador: 6,5 y 5; no se alcanzó). Entre la 3 y la 4 se atacó lo repetido: piel
+(rugosidad por zonas, sin halo de contraluz, menos especular), desenfoque casi apagado (`uScale` 0,18) y sala con más
+presencia (tribunas, pabellón y LED más luminosos). La ronda 4 ya pone primero al **modelo del pesista** (para el frente
+`plantel`, ver límites abajo) y dice que la tarima es «el único material que ya está a nivel Saltline». Lo que queda de
+sala y post: público y cargadores (cápsulas azules fuera de escala), jueces sin cara, y ambiente de «Móvil» (fondo negro).
+Después de la ronda 4 solo se bajó el grano a la mitad (sin ronda nueva).
+
+**Antes y después** (rutas en el scratchpad de la sesión, `/private/tmp/claude-501/-Users-juancavidela-Desktop-tarima/65496069-74a9-4729-8e58-e719d10cf3c8/scratchpad/`):
+antes `saltline_ref/tarima_hoy.jpg`; después `look/r5/graficos-out/graficos/fotos/alta_3-4.png`, `alta_frontal.png`,
+`alta_jurado-vale.png`, `movil_3-4.png`, `movil_frontal.png`; laboratorio `look/r4/graficos-out/graficos/lab/lab_chapa-usado.png`. Las mismas
+fotos salen de cada corrida de `graficos.yml` (artefacto `graficos-out`).
+
+**Costo: NO quedó dentro de lo pedido; falta medir en una placa.** Todo por software en Actions (`graficos.yml` con
+`comparar` y `con_alta`, banco alternado contra `prueba` en la misma máquina, ms de un cuadro a 1 MP, media de tres corridas):
+
+| corrida (commit) | Baja prueba → look | Móvil prueba → look | Alta prueba → look |
+|---|---|---|---|
+| 43794611899 (96c3745, primera versión completa) | 2022 → 2522 (**+25 %**) | 830 → 979 (+18 %, una vuelta) | — |
+| 43795590519 (a90d1cf) | 2011 → 2484 (+24 %) | 1343 → 1899 (ruidosa) | 2582 → 3346 (**+30 %**) |
+| 43797739944 (9648418: sin detalle fino del pesista ni chapa en el camino directo, discos sin relieve) | 1619 → 1939 (**+20 %**) | 706 → 793 (**+12 %**) | — |
+| 43820928256 (94587d7: superficies más baratas, dos rayos, LED sin grano y utilería sin normales en directo) | 997 → 1188 (**+19 %**) | 974 → 954 (ruidosa: 823 a 1179) | 1141 → 1620 (**+42 %**) |
+
+Después de esa última medición, «Alta» quedó **sin superficies por función ni pared de chapa** (`AMBIENTE.alta.superficies =
+false`: solo «Ultra» las lleva) y eso **no se volvió a medir**. Lectura: por software cada lectura de textura y cada cuenta por
+píxel pesa mucho más que en una placa, así que estos porcentajes son un techo pesimista, pero el pedido era no empeorar el
+piso y **en «Baja» sigue 19 % arriba sin causa aislada** (candidatos: la utilería con materiales físicos, los discos
+instanciados, el mapa de rugosidad de los discos de la barra, el sombreador del pesista). Próximo paso concreto: agregar al
+banco las variantes «sin utilería» y «pesista de antes» para aislarlo, y correr `juego.html?banco=1` en la Mac del dueño
+(antes elegía Alta a 2,94 MP con 15 % de margen) y en un teléfono. Si en la placa «Baja» o «Móvil» pierden margen, lo
+primero a apagar ahí es `look.props` (una línea en `setNivel`). Generar las texturas suma ~1,2 s de carga en computadora
+(madera 2048) y ~0,3 s a 1024, medido en Node con la Mac ocupada; en un teléfono real, sin medir.
+
+**Límites del modelo actual que solo se resuelven en Blender** (no se tocaron mallas, poses ni esqueleto):
+- *Cara*: ojos muy abiertos y fijos, sin párpados que cierren ni ceño de esfuerzo (no hay morphs de expresión); cejas pintadas.
+- *Pelo*: capas concéntricas con alfa que se leen como casquete; hace falta pelo en tarjetas o mechones con su normal.
+- *Máscara*: `*_mask.webp` trae piel, tela y pelo (RGB, sin alfa). Zapatillas y muñequeras caen en «tela»: no se les puede
+  dar cuero, suela o toalla por separado sin un cuarto canal o un ID de material. Tampoco hay zonas (codos, rodillas, manos)
+  para enrojecer donde corresponde: la variación de tono es por ruido.
+- *Malla*: brazos y torso finos para la categoría, mancha oscura en la axila (deformación), manos con poco detalle; costuras
+  y pliegues reales de la malla van en el mapa de normales horneado, no en un mosaico.
+- Jueces y público siguen siendo modelos por código sin cara (`jueces.js`) y siluetas; los dos cargadores son cápsulas.
+
+**Pendiente / sin medir.** Cuadros por segundo reales en una placa (Mac del dueño y un teléfono): `juego.html?banco=1` antes
+y después. El tiempo de generación de texturas en un teléfono real. `USO` todavía no se guarda entre finales ni lo usa el
+juego para nada más que el aspecto. Los discos de la barra no llevan superficie por función (se mueven: haría falta espacio
+de objeto). La chapa elige su eje por derivadas: en una esfera se estira (en la pared no).
+
+### Jugar en vertical (16-nov, rama `vertical`; LIF-50)
+
+Pedido: la mayoría abre el enlace con el teléfono parado (Instagram, TikTok, WhatsApp) y hasta ahora se le giraba el contenido
+90° para jugar acostado. Ahora **se juega parado sin girar nada**; acostado sigue igual. Rama `vertical` desde `prueba`. Nada
+fusionado ni publicado.
+
+- **`telefono.js`**: `html.vert` (táctil y más alto que ancho; también tabletas paradas) y `html.angosto` (≤ 380 px).
+  `telefono.parado` y `telefono.orientacion` ('vertical'/'horizontal'). Mide y pone en px `--boton-v` (botón redondo, 12,5 %
+  del alto entre 84 y 124 px), `--pie-v` (botón + barrita + área segura de abajo) y `--techo-v` (botones chicos + área segura de
+  arriba). El contenido girado (`html.rotado`) queda solo con `?vertical=girado`. Pantalla completa ya no fija la orientación.
+- **Diseño parado** (`juego.css`, sección «teléfono parado»), una cosa por zona: arriba a la derecha sonido, pausa y ayuda en
+  fila; arriba a la izquierda el tablero (sin la columna AHORA/SIGUE ni la personalidad del rival) o la energía; **abajo al
+  centro el botón redondo** (igual para las dos manos); **justo encima, LA indicación del momento**: la barrita (sin verbo: el
+  botón dice TOCA), la señal o el veredicto (con el veredicto se va el botón y abajo queda «Toca: seguir»); «Saltar» del turno
+  de un rival en el lugar del botón. El acuse va sin la tecla dibujada (solo el motivo de un toque que no sirvió). Los paneles
+  suben desde abajo, a lo ancho; títulos, tabla (sin la columna de energía) y selector de kilos ajustados al ancho.
+- **Cámara** (sin tocar `cameras.js`): `main.js → margenVertical()` le pasa a la cámara `setInsets({t: --techo-v, b: --pie-v})`
+  (lo que ya existía para la gráfica), así el encuadre automático pone al pesista y la barra entre el techo y el pie. En
+  `stage.js → primerPlano` (3 líneas): con esos márgenes, los primeros planos sin encuadre propio van al centro de lo libre y
+  los cerrados del visor (torso, cara…) 1,7 veces más lejos. En el llamado (`encuadreLibre`), parado va **el pesista entero**
+  entre el tablero y la explicación de primera vez (o el panel), en lugar del plano americano que el panel cortaba. La cámara
+  del levantamiento parado es la lateral (ya era así: `camPrincipal`). **Para la fusión con `pov`**: si `pov` cambia
+  `CameraRig.update` o los planos, mantener `inset` (lo usa el juego parado) y que `primerPlano` acepte `encuadre.dAbs`.
+- **Explicación de primera vez** (`aprende.js`): parada, la de la esquina va a lo ancho, apilada encima de lo que haya abajo
+  (veredicto, «Saltar», botón), recolocada en cada cuadro.
+- **Analítica**: súper propiedad `orientacion` en todos los eventos, `orientacion` en `juego_abierto` y evento
+  `orientacion_cambio` (`orientacion`, `antes`, `pantalla`) si se gira el teléfono en medio del juego. Para comparar: finales
+  terminadas, `siguio_jugando` y el cartel por `orientacion`.
+- **Pruebas**: `check_telefono` suma `vertical_390x844` (iPhone con muesca: final entera solo con toques, dos dedos, toque en el
+  borde), `vertical_375x667` en inglés hasta el cartel de anotarse (`?muro=firme&etapa=arranque`) y `vertical_430x932`; mide el
+  tapado, el alto del panel del llamado (tope 40 %), que el botón principal de cada panel quede en la mitad de abajo (pulgar),
+  y que al girar a horizontal y volver cada orientación use su diseño y salgan los eventos. `telefono.yml` tiene la entrada
+  `solo` (p. ej. `-f solo=vertical`) para correr solo esos casos.
+
+**Medido** (Actions, por software): tapado del pesista (`tools/tapa.mjs`) en 390×844 (es), 375×667 (en) y 430×932 (es): **0 % del cuerpo en el
+llamado (con la explicación de primera vez encima del panel), con la barrita quieta y corriendo, en el levantamiento y en el
+turno de un rival** (antes de corregir: 35 % en el llamado, 13 % con la barrita, 15–17 % la explicación); veredicto 14 % (el
+cartel tapa los pies un momento; sin tope); explicación «luces» 7–15 % (lo tapa el tablero, no el cartelito: 0 %). Panel del
+llamado 141 px = 15–21 % del alto (tope 40 %); botón principal de cada panel entre 0,80 y 0,93 del alto (pulgar). Final entera en
+390×844 solo con toques: 6 válidos, 17 toques (todos aceptados), podio. Cartel de anotarse parado en inglés (375×667) entra sin
+desplazar. Girar a horizontal y volver: diseño correcto y eventos `orientacion_cambio`. Acostado sin cambios (844×390: llamado
+0 %, barrita ≤ 13 %, como antes). Corridas: teléfono `solo=vertical` 43826541641 en verde. Capturas miradas: 390×844 de punta a
+punta (inicio, presentación, apertura, llamado con la explicación, barrita, levantamiento con la barra arriba, veredicto, turno
+de un rival con «Cambiar», intervalo, ceremonia), 375×667 en inglés (inicio, presentación, cartel), 430×932 y 667×375 acostado
+después de girar.
+
+**Pendiente / estimación.** Verlo en un teléfono de verdad (Safari con la barra de abajo, teclado del editor parado). El reloj y
+las luces quedan arriba a la derecha, chicos: en el veredicto las luces quedan cerca de la barra arriba de la cabeza. La
+ceremonia y los planos cerrados se alejaron a ojo (×1,7): revisar con el arte nuevo de `look`. Medir en PostHog la retención por
+`orientacion` antes de decidir si vale una cámara propia para vertical más cerca.
+
+### look y vertical juntos en `prueba` (16-nov; Gráficos fase 3, LIF-50)
+
+`prueba` = lo anterior + aprender (LIF-52) + **look** + **vertical**, con `git merge` (sin rebase): `39c10a9` (look) y
+`69565cd` (vertical). Nada fusionado a main ni publicado.
+
+**Antes de fusionar `vertical`.** Su corrida de teléfono completa 43827558470 había fallado por una sola línea:
+`[vertical_390x844] en «decision aprende_total» se tapan: saltar-rival/veredicto`. Era de la rama, no intermitente: parado, el
+veredicto va a `--sb + --bm + 44px` y «Saltar» del turno de un rival a `--sb + --bm` con 60 px de alto; cuando una explicación
+de primera vez alarga el turno, el veredicto del rival sale con «Saltar» todavía a la vista y se encimaban 16 px. Arreglo en
+`vertical` (`b20fb62`, `juego.css`): con `#saltar-rival` a la vista, el veredicto parado sube a `--sb + --bm + 68px`.
+
+**Conflictos y cómo quedaron.**
+- `stage.js`: sin conflicto de texto. Quedan las dos cosas: la gradación y la escena de look (`GRADO_LOOK`, `Look`) y las 3
+  líneas de vertical en `primerPlano` (márgenes `rig.inset`, `encuadre.dAbs`, ×1,7 parado).
+- `main.js`, `juego.css`, `aprende.js`, `telefono.js`: solo los tocó vertical (look no), entraron sin conflicto.
+- Workflows: unión de las ramas en los filtros de `pruebas.yml` y `telefono.yml` (… aprender, look, vertical). `graficos.yml`
+  queda con `[graficos, graficos2, look]`.
+- `HANDOFF.md`: las tres secciones (aprender, look, vertical), una detrás de otra.
+
+**Para cuando entre `pov` (primera persona; todavía no fusionada).** Prueba de fusión con `git merge-tree` contra
+`origin/pov` (`a91ca97`): conflictos de texto solo en `graficos.yml` (`look` contra `pov` en el filtro de ramas; unir),
+`pruebas.yml`, `telefono.yml` (unir) y `HANDOFF.md` (dejar las secciones). `stage.js`, `cameras.js`, `main.js` y `athlete.js` se
+fusionan solos, pero hay que mirar a mano:
+- `cameras.js → CameraRig.update`: `pov` agrega `if (this.propia) { … return; }` **antes** del amortiguado de `this.inset`
+  (`I[k] = damp(…)`): en primera persona los márgenes del teléfono parado no se aplican. Mantener `inset` (lo usa el juego
+  parado) y decidir si la vista `pov` parada respeta techo y pie o si parado no se ofrece `pov`.
+- `cameras.js → _mezclar`: `pov` cambia la transición a un arco alrededor del blanco; los planos de vertical (pesista entero en
+  el llamado, ×1,7) pasan por ahí: revisar las capturas paradas.
+- `stage.js → primerPlano`: `pov` agrega planos (`PLANOS`) y la cámara propia; la línea de vertical
+  (`const I = this.rig.inset; … dAbs …`) tiene que seguir antes de `const dAbs = encuadre?.dAbs || base?.dAbs`, y los planos
+  nuevos de `pov` con `dAbs` propio no se alejan ×1,7 (está bien así).
+- `main.js`: `pov` agrega `'pov'` a `CAMARAS_ELEGIBLES` y `camVista`; parado la cámara principal es la lateral (`camPrincipal`):
+  definir qué pasa si se elige `pov` con el teléfono parado y sumar ese caso a `check_telefono`.
+- `athlete.js`: look agrega `setAspecto` y uniforms de piel/tela; `pov` oculta la cabeza propia escalando el cuello: ver que
+  el aspecto no reaparezca la cabeza en primera persona (`check_pov`).
+
+**Corridas en verde** (sobre `69565cd`, por software): pruebas 43874523067 (los 4 grupos), teléfono 43874528418 (con los tres
+casos parados; `decision aprende_total` ya no se tapa), gráficos 43874533806, muro 43874537892 y servidor 43874543024. En
+`vertical`, la corrida completa de teléfono con el arreglo: 43874261461. Servidor falló la primera vez en `check_analitica`
+(sección 7, juego dibujado por software): el primer clic en «Jugar» no terminó en 30 s; relanzado el job, pasó. Los cuadros por
+software tardan lo mismo que antes de look (≈1,5–2,2 s): se anota como **inestable**, a vigilar si se repite con look.
+Sin navegador, en la Mac: sim, servidor, worker, perf, ritmo, barra_bots, chance y rivales en verde.
+
+**Capturas miradas.** Gráficos: Alta 3/4 y frontal (madera de la tarima, gradación, utilería y LED de look). Teléfono parado
+390×844: el llamado con la explicación encima del panel (pesista entero entre el tablero y la explicación) y la barrita encima
+del botón. Teléfono acostado 844×390: llamado y barrita como antes (el cuadro `05_llamado_` sale en negro, igual que en la
+corrida de `aprender` 43796645436: se toma durante el fundido).
+
+**Pendiente.** Lo de cada rama (ver sus secciones): placa real para el costo de look, teléfono de verdad parado; los planos
+cerrados parados (×1,7) mirados con el arte nuevo de look en un teléfono real.
+### Plantel paramétrico (16-nov, rama `plantel`): A MEDIAS, no cumple la meta visual del dueño
+
+**Estado: sin terminar.** El dueño fijó la meta «tienen que parecer personas reales» (nota de 7 o más en el conjunto y
+ninguna parte bajo 6, con director de arte a ciegas puntuando cara, piel, pelo, cuerpo, manos y ropa). **Nunca se midió con
+esa escala** y la única crítica a ciegas hecha (ronda 1, sin nota) dice que ninguno de los cuatro pasa por atleta de
+transmisión. Todo lo visual pasa a otro agente; esto queda como punto de partida. Cómo se usa el sistema: `docs/PLANTEL.md`.
+
+**Qué funciona.**
+- `blender/plantel.py` (género, categoría IWF, estatura, masa, proporciones, piel, pelo, uniforme), masa por volumen
+  (`MASA`), proporciones como metas del esqueleto (`PROP`), cuerpo femenino, pelo atado, barra por género, segunda máscara.
+- `pesistas.yml` construye en Actions (un trabajo por pesista, 16 a 22 min en modo completo). `tools/sumar_pesista.py` y
+  `tools/plantel_web.py` los suman al juego; `?plantel=` y las fichas del visor ya están.
+- Corrida **43827465589** (sobre `fe37d99`): solanet, halvard, ilarraz y jastrev con **0 BAD** en `check()`. Peores valores:
+  barra-malla -0,6 cm en los cuatro, cápsula-rack +0,0 a +0,1 cm, codo-rack 0,0 a -1,6 cm. Ilarraz no alcanza dos metas
+  (tibia y antebrazo, targets al tope).
+
+**Qué NO está hecho.**
+- **Los cuatro modelos nuevos no están en `web/models` ni en `web/data/poses.json`**; `plantel.json` los sigue marcando
+  `listo: false`. No se corrieron `pruebas.yml` ni `graficos.yml` con el plantel.
+- Hubo **una sola** ronda de director de arte (sobre 43827465589). La segunda no se llegó a mirar.
+- Corrida **43875357534** (sobre `b05f1af`, correcciones de la ronda 1), leída del log después del cierre: **0 BAD en los
+  cuatro**, masas en objetivo (48,0 / 111,9 / 65,0 / 145,8 kg), hombros de jastrev de 0,258 a 0,243. **Las imágenes no se
+  miraron**: no se sabe si las correcciones se ven bien. Sus artefactos (retención 14 días) son los que hay que mirar y sumar.
+
+**Ronda 1 del director de arte (a ciegas, sin nota; dos agentes: retratos y hojas).**
+- Bloqueantes de retratos: ojos cerrados o caídos en los cuatro; pezones marcados bajo la malla en las dos mujeres; el brazo
+  se infla al flexionar el codo en el rack (peor en jastrev); los glúteos se inflan como globos en sentadilla y salida (peor
+  en halvard). Propios: barba de jastrev sin bigote y con borde pixelado, y su biotipo en V de culturista en vez de tronco en
+  barril; halvard con cara de bebé, cuero cabelludo visible y masa sedentaria.
+- Importantes: línea del pelo a serrucho y frente enorme, pelo de casco, cejas de bloque, la misma boca en los cuatro,
+  postura de pie abatida, malla que lee como piel pintada, dedos en abanico en el rack, rodilleras de bola, piel uniforme.
+- Hojas de poses (valen también para las reglas, no solo para estos cuerpos; son estimaciones a ojo del revisor, sin medir):
+  la barra del rack queda a la altura del mentón y no sobre deltoides y clavículas; codos del rack convergen al centro;
+  en el Tirón de brazos de la cargada los codos pasan la altura del hombro; agarre de envión angosto para los pesados;
+  recepción del power y del squat jerk con el tronco inclinado; valgo de rodillas en el fondo del squat jerk; las poses
+  son casi iguales entre biotipos. La guía punteada de snatch y clean no coincide con la marca del medio pie: sin verificar.
+- Lo que dijo que está bien: ilarraz es el más creíble; cinturón, paletas, letras, vendas y zapatillas.
+
+**Lo que se cambió por la ronda 1 (`b05f1af`, sin verificar en imágenes).** Ojos: `eye-*-slit` de 0,75 a 0,22 y sin
+`closure`. Busto: alisado con zona más baja y 45 pasadas (8 en el hombre). Glúteos: de 0,65/0,50 a 0,30/0,25 y menos en el
+paquete de volumen (más tronco y panza, menos brazo). El pesado con grasa no ensancha hombros, sin torso en V, más cintura
+y panza. Mujer: más hombro y cuello. Frente más baja (`forehead-scale-vert-decr`), labios más finos, comisuras arriba.
+Bigote: la franja labio-nariz se achica con esa distancia. Sisa del hombre más alta con grasa. No se tocó: piel, pelo y
+línea del pelo, cejas, deformación en flexión (codo, rodilla), manos, postura, ni ninguna regla de poses.
+
+**Cápsula del pecho (`chestU`): PENDIENTE DE APROBACIÓN DEL DUEÑO.** Está aislada en el commit `95bf4fd` (solo
+`blender/poses.py`; `dc5edcc` saca la versión que venía mezclada en `5cf10f8`). Se saca con `git revert 95bf4fd`.
+- Qué toca: `bar_clear()`, el proxy de cápsulas que usan `check()` (barra-cuerpo y cápsula-rack) y el desvío de la barra.
+  La cápsula del pecho pasa de un radio único (`chestF`) a bajar hacia un radio medido en el pecho alto en el 65 % superior.
+  La columna barra-malla de `check()` (malla real) no cambia.
+- Por qué: sin ella, halvard daba 10 BAD barra-cuerpo (corrida 43823507357: Giro de codos 5 a 8 y Envión · Impulso 3 y 4)
+  con la barra a 1,0 a 7,0 cm de la malla real en esos mismos cuadros. Con ella, 0 BAD.
+- Alcance real: no es solo halvard. `chestU` es menor que `chestF` en los cuatro (solanet 11,7 contra 16,0 cm; halvard
+  17,6 contra 23,5; ilarraz 15,0 contra 16,2; jastrev 19,4 contra 21,9). **En ventura y brenner no se midió**: no se
+  reconstruyeron con este commit, y si su `chestU` sale menor, su `check()` también cambia.
+- Alternativa que no toca `check()`: rama `plantel-alt-capsula` (commit «EXPERIMENTO», no fusionar): cápsula vieja
+  (`TARIMA_CHESTU=0`) y la barra desviada hacia adelante por regla en la entrada y la salida del rack (`TARIMA_ALTPUSH=1`).
+  Corrida **43874816087** (halvard, completo), leída del log después del cierre: **no sirve tal como está, 9 BAD** (contra 10
+  sin nada y 0 con `chestU`). Para esquivar la cápsula vieja la barra tiene que irse adelante hasta 8,6 cm al entrar al rack
+  (Giro de codos→Recepción) y 6,1 a 8,2 cm al salir (Impulso→Empuje), y aun así quedan 8 cuadros barra-cuerpo (en ellos la
+  malla real está a 3,2 a 8,3 cm) y aparece un zigzag de barra de 1,09 m/s en el squat jerk. No se miraron sus hojas. Es un
+  solo intento de alternativa, no prueba que no exista otra.
+
+**Límite conocido.** Con el antebrazo más largo que el brazo (más de 0,51) el codo no llega al rack y `check()` lo marca.
+
+### Gráficos fase 4: personas, no muñecos (16-nov, rama `visual`, desde `prueba` + `plantel`)
+
+Meta del dueño: nivel Saltline («detalle fino») y su sensación de respuesta. Meta medible: director de arte a ciegas (solo
+capturas, junto a las de Saltline) con 7/10 o más en el conjunto de Alta y en el pesista, ninguna parte bajo 6 y Móvil 6 o
+más. No se acepta una tanda que puntúe peor que la anterior. Nada fusionado a `main` ni publicado.
+
+**Plan (escrito antes de tocar código).** Diagnóstico mirando las capturas de `prueba` (Alta y Móvil), los retratos del
+plantel (corrida 43875357534) y las de Saltline: la sala, la tarima, la barra y los discos ya tienen material y luz; lo que
+delata «juego de muñecos» son **las personas**, todas:
+
+| Qué se ve hoy | Por qué se lee a muñeco o plástico | Qué cambia |
+|---|---|---|
+| Pesista: cara | línea del pelo recta como un casco pintado, sin patillas ni entradas redondeadas; cejas de bloque; labios pintados y saturados; piel pareja; ojos chicos y fijos | `tex.py`: nacimiento del pelo como curva (pico, entradas, sien, patilla) con borde por densidad; cejas por pelos; labios del tono de la piel con borde difuso; zonas de color (frente, nariz, mejillas, orejas, nudillos, codos, rodillas), lunares y poro por zona |
+| Pesista: pelo | capas con alfa pegadas al cráneo: no hay volumen ni silueta | más largo y capas arriba que a los costados, mechones con largo desparejo; brillo anisótropo en el visor |
+| Pesista: piel en el juego | normales de detalle en ronchas (se lee arcilla mojada), sombra roja saturada bajo el mentón, costura dura en el cuello | sombreador: detalle fino solo como rugosidad y poro, dispersión acotada (sin rojo en sombra propia), especular de dos lóbulos más bajo |
+| Pesista: cuerpo | brazos que se inflan al flexionar, glúteos de globo (corregido en `b05f1af`, sin mirar) | mirar la corrida 43875357534 y corregir por regla lo que quede |
+| Público | bolos: una elipse de cabeza sobre un trapecio, todos iguales y nítidos | personas modeladas por código (hombros, brazos, regazo, pelo, cabeza con cuello), dibujadas una vez a un atlas con luz de sala y contraluz del escenario; variantes y gestos; más oscuras y fuera de foco |
+| Jueces y mesas | maniquíes de cápsulas y esferas | el mismo constructor de personas con más detalle (nuca, orejas, pelo con volumen, cuello de camisa, hombros de saco, manos) |
+| Cargadores | cápsulas azules | personas de pie del mismo constructor |
+| Móvil | fondo negro con manchas (tribuna horneada de elipses), sin atmósfera | tribuna horneada desde el atlas de personas, degradé de bruma y luz de sala horneados en lo que ya se dibuja (sin capas nuevas por píxel) |
+| Movimiento | (a medir) saltos entre fases, pies que deslizan, barra rígida | medir con las hojas cuadro a cuadro y `check_fluidez`; después interpolación, anclaje de pies y flexión de barra |
+
+Orden: (1) personas por código en three.js (público, jueces, cargadores, Móvil) mientras corren los builds de Blender;
+(2) cara, pelo y piel del pesista en Blender (builds en Actions: `pesistas.yml`) y su sombreador en el visor; (3) plantel
+nuevo dentro del juego; (4) fluidez. Después de cada tanda, ronda del director a ciegas con las mismas tomas.
+
+**Iterar texturas del pesista sin Blender.** `pesistas.yml` sube `maps_1024.npz` (los mapas de horneado a un cuarto) en el
+artefacto de cada pesista. Con eso `blender/tex.py` corre con numpy en segundos:
+`TARIMA_OUT=<carpeta>/ python3 blender/tex.py <nombre> 1024` (la carpeta tiene `<nombre>/maps.npz`, `lm.json`, `bones.json`,
+`bones_all.json`). Sirve para la línea del pelo, cejas, labios y zonas de color; el detalle fino se mira en el build.
+**Sesión 2 (16-nov a la tarde, otro agente Fable): `pov` fusionada acá y plan de lo que sigue.** `visual` ya trae `pov`
+(`abc1a39`: primera persona con la cámara que acompaña a la barra y final sin movimientos de cámara). Meta medida (DoD):
+director a ciegas con conjunto Alta ≥ 7, pesista ≥ 7, primera persona ≥ 7, final ≥ 7, Móvil ≥ 6 y ninguna parte bajo 6.
+
+Diagnóstico al empezar (fotos de la tanda 3, corrida 43922579093, y retratos de Blender de la 43918976509):
+- El **mismo pesista se ve mejor en el retrato de Blender que en el juego**: la piel del juego tiene un relieve de escamas
+  con vetas blancas de brillo (normales de detalle en mosaico), la ceja y el nacimiento del pelo salen duros, y la malla
+  no tiene espesor ni costura (lee a piel pintada). El problema principal está en el sombreador del visor, no en la malla.
+- **Público**: maniquíes claros, nítidos y parejos; en una transmisión real la tribuna es penumbra con bultos, algún brillo
+  y fuera de foco. **Jueces**: caras lisas. **Focos**: discos blancos sin halo. **Móvil**: fondo plano.
+- **Primera persona**: 5/10 en la última ronda puntuada; la versión rehecha (`abc1a39`) no tiene nota.
+
+Tres frentes en paralelo, cada uno en su rama desde `visual` (se fusionan acá y la ronda del director es sobre `visual`):
+
+| Rama | Archivos | Qué busca |
+|---|---|---|
+| `v-pesista` | `web/js/athlete.js` (sombreadores de piel, pelo, tela, ojos), `blender/tex.py`, `pesistas.yml`, `lab.js` (piel y tela) | Piel sin escamas (poro solo en rugosidad, brillo roto y bajo, dispersión en el terminador), pelo corto con borde difuso y brillo anisótropo, cejas y pestañas por pelos, malla con espesor en el borde, costuras y trama, rodilleras y vendas de tela, manos; que el juego se vea como el retrato de Blender o mejor |
+| `v-sala` | `gente.js`, `publico*.js`, `jueces.js`, `arena.js`, `look.js`, `ambiente.js`, `post.js`, `lighting.js`, `barbell.js`, `materiales.js` | Tribuna en penumbra y fuera de foco con contraluces, jueces y oficiales con cara, focos con halo y destello, fondo con profundidad (estructura, banderas, pantallas), discos y barra con uso y moleteado, y un «Móvil» con ambiente (todo horneado, sin costo por píxel) |
+| `v-pov` | `stage.js`, `cameras.js`, `main.js`, `caida.js`, `check_pov.mjs` (y solo lo de primera persona en `athlete.js`) | La foto del joystick: horizonte derecho, manos y antebrazos grandes y nítidos en el tercio inferior, barra cruzando el cuadro, jueces y público al frente, nunca el piso en picado ni el torso; respiración, temblor y dip sin marear; barrita usable. Final: plano quieto con pesista, luces y puntuación; gesto de festejo o bronca por regla. Fluidez: transiciones, pies y barra que flexiona |
+
+Iteración rápida de fotos: `gh workflow run graficos.yml --ref <rama> -f solo=fotos -f niveles=alta -f tomas=3-4,medio,cara`
+(entradas nuevas `tomas` y `solo`). `PESISTAS_RUN` pasa a la corrida 43918976509 (texturas de `0068995`).
+
+**Dirección de arte decidida (16-nov, el dueño delegó):** semirrealista heroico, con la imagen del dueño
+(`~/Desktop/tarima/referencias-codex/03-referencia-original/referencia-usuario.png`) como vara del pesista y de la sala, junto
+a Saltline. Los pesistas siguen ficticios. Pedidos del dueño de esa tarde: brazos, hombro y cuello naturales («como un
+humano»), y la barra que se suelta hacia adelante como una caída real.
+
+**Rondas del director a ciegas de la sesión 2** (carpetas y notas completas en `~/tarima-datos/ver_visual/ronda*/NOTAS.md`).
+Desde la ronda 2 el director tiene la imagen objetivo; la base se repuntuó con ese criterio (1b). Ruido del método: ±0,5.
+
+| ronda | commit | pesista | sala | materiales | luz | público y jueces | conjunto Alta | Móvil | 1.ª persona | final |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 (criterio viejo) | 38086eb | 5 | 5 | 6,5 | 5 | 3,5 | 5,5 | 4,5 | 4 | 4,5 |
+| 1b (base, criterio nuevo) | 38086eb | 4 | 5 | 6 | 5 | 3 | 5 | 4,5 | — | — |
+| 2 (sala 1.ª pasada) | e51f4c0 | 4,5 | 5 | 6 | 5 | 3 | 5 | 4 | — | — |
+| 3 (sala 2.ª + pesista 1.ª) | c6bb768 | 4,5 | 5,5 | 6,5 | 5,5 | 3,5 | 5,5 | 4,5 | — | — |
+| 4 (sala 3.ª + pesista 2.ª + final nuevo) | 6ee2ad5 | 5,5 | 6 | 6,5 | 6 | 4,5 | 6 | 5 | — (se rehace) | 5 |
+| 5 (sala 4.ª + pesista 3.ª + final 2.ª) | 5373038 | 5 | 6,5 | 6,5 | 6 | 4 | 6 | 5 | — (se rehace) | 6,5 |
+
+Partes del pesista en la ronda 4: cara 4,5, piel 6, pelo y barba 4, anatomía 5, manos 4, ropa 6,5 (ronda 3: 4 / 5 / 3,5 / 4,5 / 3,5 / 6).
+La primera persona se rehace por pedido del dueño (16-nov a la noche): vista realista desde los ojos (se ve el jurado; los
+brazos solo cuando mira abajo o cuando la barra cruza la vista), cabeza leve, tensión previa y un recuadro chico con el
+levantamiento desde afuera. `pruebas.yml` en verde en `6ee2ad5` (los cuatro grupos).
+Meta: conjunto, pesista, primera persona y final ≥ 7; Móvil ≥ 6; nada bajo 6. **No se llegó; sigue en curso.**
+
+**Actions por software contra la Mac del dueño (M1 Pro, Metal):** misma imagen (diferencia media de 0,4 a 2,1 sobre 255 por
+canal en 12 tomas de `38086eb`); las rondas se siguen puntuando con fotos de Actions. **Costo:** Alta, Ultra y Media sin tope
+(decisión con el dueño: mejor imagen); Móvil y Baja ≤ +10 % contra `prueba`. Medido en la 2.ª pasada de sala: Baja +7 %;
+Móvil sin lectura comparable (hay que repetirla con los mismos MP en las dos ramas).
+
+**Cápsula del pecho (`chestU`, `95bf4fd`): sigue PENDIENTE DE APROBACIÓN DEL DUEÑO.** La alternativa por regla
+(`plantel-alt-capsula`) dio 9 BAD en halvard, así que no reemplaza a `chestU`. Los cuatro del plantel dan 0 BAD con `95bf4fd`
+(corridas 43875357534 y 43918976509); queda aislado en ese commit y se saca con `git revert 95bf4fd`.
+
+### Primera persona y el final del levantamiento (16-nov, rama `pov`, desde `prueba`)
+
+Pedido del dueño después de probar `prueba`: «cuando terminás el levantamiento hacen movimientos medio raros. Yo quiero poder
+cambiar la vista y ser un point of view y hacer el levantamiento como si lo estuviera haciendo yo realmente». Nada fusionado ni
+publicado. El look (luces, materiales, texturas) lo lleva otro agente: acá no se tocó `arena.js`, `ambiente.js` ni `post.js`.
+
+**1. Vista «Primera persona / First person»** (`stage.js`: `POV`, `_povCam`, `ojos`, `_cabeza`; `cameras.js`: `rig.propia`).
+Quinta cámara de la fila de Opciones, de la tecla V y `?camara=pov`; se recuerda en `tarima.camara` y deja `camara_elegida`
+con `vista: 'pov'`. Reglas (todas en `POV`, iguales para los dos biotipos y cualquier fase; nada por personaje):
+- *Posición*: los ojos salen de los huesos (cabeza + 10 cm a lo largo del cuello + 8,5 cm hacia el frente del tronco, por
+  estatura), con un filtro corto. No se copia el giro de la cabeza: la mirada es sintética, siempre al frente, sin guiñada.
+- *La barra y las manos se ven siempre* (pedido del dueño). La mirada apunta a la barra con un corrimiento, con retardo y
+  tope de velocidad (`giroMax`, 150 °/s). Tres casos, por dónde está la barra y cómo está el cuerpo (nada por fase ni personaje):
+  · *De pie con la barra abajo* (parado, segundo tirón): mirada adelante y abajo (hasta −58°), lente abierto a 88° (como una
+    cámara de casco), cuerpo entero; la cámara va 7 cm por delante de los ojos para que el pecho no tape la barra.
+  · *Agachado* (salida y primer tirón: los ojos a más de 30 cm por delante de la cadera, `kT`): la barra queda debajo y detrás
+    de los ojos, así que la mirada baja a −80° y el tronco propio no se dibuja (era el pecho y la entrepierna llenando la
+    imagen). Se ven los antebrazos enteros, las manos en la barra, las rodillas y los pies. No se ven los jueces.
+  · *Barra en los hombros o arriba*: barra y manos abajo o arriba, jueces y público al frente (sin cambios de fondo).
+- *Licencia de la vista*: con la barra en los hombros la cámara retrocede 12 cm y con la barra arriba 38 cm; con el agarre
+  ancho del arranque, lo que haga falta para que entren las dos manos (`agarre`, hasta 75 cm). Desde los ojos de verdad la
+  barra en los hombros queda bajo el mentón y la de arriba detrás de la frente.
+- *Cuerpo propio* (`_cabeza`, `_torso`; `athlete.js`: `pesoCabeza`, atributos `aCabeza` y `aTorso`): la cabeza no se dibuja
+  (el cuello se achica a un punto; pelo, ojos y pestañas se apagan y lo que queda se pinta de piel lisa, `uPiel`) mientras
+  la cámara esté en esta vista o a menos de 60 cm de los ojos. Agachado, tampoco el tronco (columna, clavículas y cuello: el
+  sombreador descarta esos fragmentos, `uSinTorso`, con una trama de 0,1 s al entrar y salir) ni el cinturón. En primera
+  persona el cuerpo se dibuja de los dos lados. La sombra sale entera salvo la cabeza.
+- *Barra suelta*: la mirada la sigue mientras cae y, cuando lleva 0,45 s quieta, sube a los jueces (`jueces`). Si cae
+  detrás no se la ve: la mirada queda al frente (girar la cabeza a buscarla, `vuelta`, se probó y quedó apagado: el hombro
+  propio tapaba media imagen).
+- *Sensación*: lente de 76° de alto (112° de ancho como mucho en pantallas muy anchas), respiración (4 mm y décimas de
+  grado), temblor del esfuerzo, el dip y el temblor de `CamaraViva` al recibir, y la barrita de timing cierra el lente un
+  poco. Con movimiento reducido, nada de eso.
+- *En el juego* (`main.js`): es solo de los levantamientos propios; a un rival se lo mira desde la general (`camVista`).
+  Mientras dura no hay planos de afuera (ni el de los brazos en la fijación, ni jurado, ni caída, ni giro al público): el
+  veredicto se ve desde los ojos. A los ojos se entra en 0,3 s, girando por rumbo e inclinación (horizonte nivelado). Llamado, paneles y repetición siguen en tercera persona.
+  La barrita de timing no cambia (es HTML encima del lienzo): `check_barra --camara=pov` juega tres arranques y pega en
+  el verde, el amarillo y el rojo donde se toca.
+
+**2. Lo raro después del levantamiento: qué era y cómo quedó.** Diagnóstico con `tools/check_pov.mjs` (hojas de fotos cada
+0,15 s y medidas a 60 c/s) y con tres arranques jugados (`check_barra --final`: 32 fotos desde que termina cada intento).
+| Qué se veía | Causa | Arreglo (regla) |
+|---|---|---|
+| Brazos arriba medio segundo sin la barra, después en cruz (pose en T) y hacia adelante | `poseCaida` mezclaba en línea recta de la pose del final a «Parado», empezando 0,5 s después de soltar | Los brazos desandan el clip por fases desde que se suelta la barra (recepción → giro → tirón de brazos → triple extensión) y enseguida bajan; en el envión bajan directo por los costados (las poses del empuje tienen las manos por donde cae la barra). Salen 0,2 s después que la barra: van detrás (`caida.js`: `clavesBrazos`, `DESANDAR`, `MANOS`; `athlete.js`: `setParts`) |
+| Pies que se arrastran (26 a 31 cm en un válido, 100 a 150 cm sumando los dos pies al salir de la sentadilla o la tijera) | La misma mezcla en línea recta desde la tijera o la sentadilla | El cuerpo sigue el clip hasta el final del segmento (la recuperación validada, 0,5 s por fase) y pasa a «Parado» con un saltito de 4 cm y 0,3 s. Medido: 0,3 a 0,6 cm en los válidos |
+| En el válido propio, tres movimientos de cámara encadenados en menos de 3 s; en el giro al público la cámara le pasaba al pesista por al lado | `decision()`: jurado (1,3 s), interrumpido a los 0,7 s por el plano de la caída, y a los 1,8 s el giro; y `_mezclar` iba por la cuerda | Válido propio: un solo movimiento, al jurado, y se queda (como el nulo). `_mezclar` rodea al sujeto en arco |
+| De pie como una estatua mientras se lee el veredicto | No había nada | Respiración agitada del tronco (`RESPIRA`: 0,9° por hueso a 0,55 Hz), nada con movimiento reducido |
+Sin regenerar nada en Blender: todo es reproducción (`caida.js`, `athlete.js`, `stage.js`, `cameras.js`, `main.js`).
+**Un defecto del clip que quedó a la vista**: entre «Giro de codos» y «Recepción» de la cargada el brazo gira 58° entre dos
+muestras vecinas (3500 a 3900 °/s al desandarlo muestra por muestra). En el levantamiento normal es el latigazo de codos y
+no molesta; por eso los brazos del final van de fase en fase y no muestra por muestra.
+
+**Herramientas nuevas.** `tools/check_pov.mjs` (A: finales con medidas; B: primera persona, hojas y reglas: imagen no vacía,
+cabeza oculta, giro de la mirada ≤ 160 °/s, cámara a ≤ 80 cm de la cabeza; la velocidad se mide con el reloj del juego detenido), `tools/hojas.mjs` (hojas de contactos),
+`check_barra --camara= --final --out=`, y en `JUEGO.test`: `posa()` y `medir()`. Job `pov` en `graficos.yml` (artefacto `pov-out`).
+
+**Dirección de arte a ciegas (16-nov, cinco rondas; un agente nuevo por ronda, solo imágenes, sin telemetría ni código).**
+78 imágenes por ronda, sacadas en esta máquina con `check_pov` y `check_barra --final` (armadas con el guion de
+`scratchpad/herr/pov_armar.sh`). Meta del coordinador: 7/10 en primera persona y 6/10 en el final. **No se llegó en primera persona.**
+| Ronda | Commit | Primera persona | Final | Qué se cambió después |
+|---|---|---|---|---|
+| 1 | 2be6076 | no aprobado (sin nota) | aprobado con observaciones | Pelo, ojos y barba propios apagados y cuello pintado de piel (pozo oscuro entre las clavículas); entrada a los ojos con el horizonte nivelado; mirada adelante y abajo |
+| 2 | f7f9b85 | 5,5 | 6 | Fuera la trama de puntos del cuerpo propio; la mirada sube a los jueces después de soltar |
+| 3 | 3f362d5 | 5 | 6 | Fuera los antebrazos cortados: agachado la cámara queda en los ojos, mira casi a plomo y no dibuja el tronco |
+| 4 | d16fc16 | 6 | 6 | Giro de cabeza hacia la barra caída atrás; barra en los hombros más abajo; pararse de la sentadilla en 0,8 s por fase |
+| 5 | ae1259e | 5 | 6 | Se deshicieron los dos cambios que la ronda 5 marcó como graves (giro de cabeza y encuadre de los hombros). El estado final es el de la ronda 4 con la mirada agachado a −80° (era −87°), la cámara 7 cm adelante de pie y el pararse más lento. **Ese estado final no pasó por otra ronda.** |
+| 6 | abc1a39 | 4 (ronda 1 de la sesión 2, director del conjunto) | 4,5 | Primera persona rehecha como un juego en primera persona (abajo) |
+
+**Sesión 2 (rama `v-pov`, 16-nov a la noche): primera persona como un juego en primera persona.** La ronda sobre `abc1a39`
+(4 y 4,5) marcó: brazos que entran desde arriba y se deshacen en punteado, torso propio a la vista, la cámara que sube 35° en
+el envión y pierde a los jueces, picado al piso al soltar, cámara general que se reencuadra después de soltar, hojas sin
+luces ni veredicto, brazos en T y «soldado» igual en válido y nulo. Lo que cambió (reglas, iguales para todo biotipo):
+- **La cámara está siempre en los ojos y la mirada no se inclina nunca** (`POV.barra[2]`, −9°): ni con la barra arriba ni al
+  soltarla. Sube y baja con el cuerpo (agachado en la salida, de pie al final). `check_pov` falla si se inclina más de 3°.
+- **Brazos de primera persona** (`POV.vm`, `_povCam` y `_vm` en `stage.js`): el cuerpo propio y la barra se DIBUJAN girados
+  alrededor de la línea de los hombros hasta que el brazo apunta al frente (`vm.at` con la barra tomada, `vm.libre` con las
+  manos sueltas) o, con la barra arriba, hasta `vm.alto` (35° sobre el horizonte), y corridos al frente (`vm.dz`). Los brazos
+  entran por el borde de abajo, las manos y la barra quedan en el tercio inferior (o la barra en el cuarto de arriba) y al
+  frente siempre están los jueces. Es solo dibujo: se aplica antes del pase de imagen y se deshace después; huesos, barra,
+  física, reflejo y medidas no cambian. Con el cuerpo girado la sombra no se actualiza (saldría la del cuerpo girado).
+- Del cuerpo propio se dibujan **solo los brazos, enteros y sin trama** (`uSinTorso` 1, `uCorte` 0,8; se sacó el punteado
+  contra el borde): el corte del hombro queda fuera de la imagen por regla.
+- La barra acompaña a las manos con `kA` (1 tomada; al soltarla pasa a su lugar real a 4 por segundo: se la ve caer).
+- **Final**: `rig.fijo` congela el encuadre de la cámara general desde que se suelta la barra (antes el borde de arriba seguía
+  a la barra que caía: reencuadre de 0,6 s); `check_pov` mide cuánto se corre y gira la cámara tras soltar y falla con más de
+  2 cm o 0,2°. Brazos: con la barra soltada desde arriba **barren por delante** (`BARRIDO`, `_gesto`), ya no desandan el clip
+  (codos altos y cruz). **Gesto por regla** (`GESTO`): válido = dos puños que marcan dos veces y vuelven a colgar; nulo o
+  fallo = cabeza que cae, hombros vencidos y negación.
+- **Soltar la barra como en una tarima de verdad** (pedido del dueño, 16-nov a la noche; `caida.js`: `GUIA`, `BarraGuiada`;
+  `stage.js`: `_manosEnBarra`). Levantamiento terminado (válido o nulo de los jueces): la barra **baja en las manos** por
+  delante, de arriba de la cabeza al pecho (0,5 s, cada vez más rápido; 30 cm delante de los hombros y 14 cm debajo), los
+  brazos se resuelven con dos huesos para que la muñeca vaya junto a la barra (codo hacia afuera y abajo); ahí se suelta
+  hacia adelante con la velocidad que traía, las manos quedan abiertas al frente 0,16 s y cuelgan en 0,45 s; **paso corto
+  hacia atrás** (11 cm, con un saltito) mientras cae. La barra rebota (coeficiente 0,32: ~10 % de la altura), rueda y
+  flexiona con el golpe (`barbell.step`, ya estaba), con sonido y temblor. Después, el gesto. Fallo con la barra arriba:
+  como antes, sale lejos y el pesista salta atrás (adelante) o sale adelante (atrás); los brazos esperan 0,42 s y barren por
+  delante con el codo doblado (`BARRIDO`). `check_escenas` (holgura barra-cuerpo) en verde: los brazos se miden desde 0,25 s
+  después de que las manos sueltan.
+- Hojas: `finalEn` prende las luces y el veredicto como el juego; `check_pov --solo=claves --q=alta --plantel=…` saca las
+  fases clave con calidad alta y el plantel nuevo (`out/pov_alta`); `check_barra --solo=tel_en --camara=pov` el teléfono.
+Medido en la última corrida (43949153444, `check_pov` en verde): mirada fija en −9° en los cinco segmentos y los dos modelos
+(giro ≤ 1 °/s), cámara a ≤ 19 cm del hueso de la cabeza, cámara general tras soltar ≤ 3,7 cm (el temblor del golpe) y 0,00°.
+Hojas en `~/tarima-datos/ver_visual/pov/` (`claves_alta/`: fases clave con calidad alta y el plantel nuevo; `hojas/`; `final/`;
+`jugado/`: arranques jugados con la barrita, en computadora y en teléfono acostado; `antes/`: lo que miró la ronda 1).
+**Sin nota de director a ciegas todavía** (la pone el coordinador sobre `visual`). Lo que queda a la vista:
+- manos en los hombros con los dedos abiertos (es la pose del clip: se arregla en `poses.py`, no acá);
+- en el giro de codos y el empuje (una o dos décimas) asoma el corte del brazo contra el borde de abajo;
+- en el arranque el agarre es ancho y las manos quedan contra los bordes de la imagen;
+- la barra dibujada con las manos no proyecta sombra propia (la sombra se congela mientras el cuerpo se dibuja movido);
+- en una ventana más alta que ancha la cámara sigue siendo la lateral; sin probar en una placa real ni en un teléfono.
+**Cambio de rumbo del dueño (17-nov), que REEMPLAZA a los «brazos de primera persona» de arriba** (`POV.vm`, `_vm`: se
+sacaron). Sus palabras: «generalmente uno mira para adelante, no se ve los brazos… debería ver más al jurado»; «movimientos de
+cabeza… un poco más leves»; «el momento de tensión antes»; «una pantalla tipo chiquitita de cómo se hace el movimiento».
+- **La cámara son los ojos de verdad** (`_povCam`, reglas en `POV`): el cuerpo propio y la barra se dibujan donde están (sin
+  cabeza ni tronco; lo que queda a menos de 24 cm de la cámara se corta por distancia, sin trama: `uCercaOjo`; las piernas y
+  las zapatillas sí se dibujan). La **mirada es una intención, por fases**, con un resorte con amortiguamiento crítico y tope
+  de 0,9 rad/s (52 °/s): al frente (un punto fijo apenas sobre el jurado); baja a la barra cuando las manos van a tomarla,
+  la sigue mirando 0,55 s y levanta la vista; fija durante el levantamiento (la barra cruza la vista de verdad y queda
+  arriba, fuera de la imagen); al soltar baja 11° detrás del golpe y vuelve al jurado (y mira al costado si la barra se fue
+  atrás). Con movimiento reducido, fija al frente.
+- **Tensión**: mientras corre la barrita (el lente ya se cerraba) la respiración es 3,4 veces más honda, la imagen late (dos
+  golpes por latido en el lente) y se oscurece en los bordes (`velo`).
+- **Recuadro «doble visión»** (`RECUADRO`, `_recuadro`, `_propio`): la vista general fija en una pantalla chica arriba a la
+  derecha (24 % del ancho; 27 % en pantallas angostas), con el pesista entero. Con post: a una textura propia, un cuadro de
+  cada dos, y a la pantalla con el pase final. En el camino directo («Baja», «Móvil»): se dibuja en su rincón en cada cuadro.
+  Sin sombras nuevas. Opciones: «Con recuadro / Sin recuadro» al lado de la cámara (o `?recuadro=no`); se recuerda en
+  `tarima.recuadro`. **Costo sin medir en una placa.**
+- **Paso atrás con los pies** al soltar (`_pasoAtras`: cada pierna se resuelve con dos huesos; un pie y después el otro), el
+  codo ya no pega un latigazo al aflojar (brazo nunca del todo recto y entrada en 0,22 s), cámara del jurado más cerca y más
+  alta, y `renderer.debug.onShaderError` puesto desde antes de armar la escena (el constructor ya compila programas: es la
+  causa probable de que `check_carga_fallas [shader compu]` fallara a veces).
+- `check_pov`: tiras a tiempo real desde los ojos (`tira_*`: preparación completa, levantamiento y final cada 0,1 s, con el
+  recuadro); reglas: mirada ≤ 60 °/s, cámara a ≤ 15 cm de los ojos, cabeza y tronco propios sin dibujar, recuadro presente.
+
+**Final, después de la ronda 4 del director (5/10; meta 7).** Lo que cambió (`caida.js`: `GUIA`, `guiaEn`, `gestoDe`;
+`stage.js`: `_dosHuesos`, `_pies`, `_gesto`; `main.js`: `veredicto`, `fijarCamara`):
+- **Bajada en dos tramos**: de arriba a los hombros pegada al cuerpo (0,44 s, codos que flexionan, rodillas que ceden 4 cm
+  con los pies plantados) y de los hombros a la cadera con los brazos casi estirados (0,27 s); ahí se suelta. Las manos se
+  abren hacia abajo y vuelven al costado en 0,3 s. La barra cae adelante de los pies y rebota más de una vez (rebote 0,42).
+- **Paso atrás con los pies** (16 cm en 0,5 s, un pie y después el otro) mientras cae.
+- **Variación por semilla del intento** (`pl.var`, `pl.ritmo`): ritmo de 0,88 a 1,15 y uno de tres festejos (dos puños que
+  marcan; un puño arriba con el hombro acompañando; palmada de magnesio) o de tres reacciones (cabeza gacha y negación; manos
+  a la cintura; mira arriba y suelta el aire). Ninguno queda fijo: después mira al público despacio, la cabeza vuelve a medias.
+- **Fallos con la barra arriba**: los brazos reaccionan enseguida (atrás: bajan por delante a los 0,04 s; adelante: la
+  empujan lejos 0,3 s y bajan cuando la barra ya pasó).
+- **Veredicto grande** y centrado arriba con las tres luces durante 1,5 s (pantallas de 900 px o más; en teléfono queda
+  como estaba para no tapar nada), después chico en su lugar.
+- **Cámara congelada desde que termina el intento** (`fijarCamara`): el lente que volvía de la barrita (0,93 → 1) era el
+  reencuadre leve que se veía antes de soltar la barra.
+- **Después de la ronda 5 (6,5)**: respiración agitada con hombros, peso que va de un lado al otro (solo el tronco) y manos
+  que se sacuden el magnesio (`RESPIRA`); pararse a 1,05 s por fase con aceleración suave; rebote 0,52 en la bajada (≈ 15 cm
+  desde la cadera); la barra se suelta 32 cm delante de los hombros a 1,1 m/s y el paso atrás es de 24 cm; en el fallo
+  adelante los brazos bajan a los 0,3 s; el veredicto grande va a la izquierda a media altura (no tapa cabeza ni barra).
+  Sin hacer: pasos con despegue al juntar los pies desde la tijera, la pose inicial de `arranque_sin_altura`, y el panel
+  «Terminó el arranque» que tapa al pesista.
+- Sin hacer de esa lista: desfase entre los extremos de la barra al rebotar, juntar los pies desde la tijera por regla (lo
+  hace el clip), darse vuelta medio paso, y medir el reencuadre en lo jugado con una prueba.
+
+**Correcciones después de la revisión del coordinador (17-nov a la noche).**
+- **Cuadro negro en Alta**: con post, el recuadro se copiaba a la pantalla con `autoClear` prendido y el borrado no respeta
+  el viewport: borraba toda la pantalla y dejaba solo el recuadro. Ahora se copia sin borrar. `check_pov` y `check_barra
+  --camara=pov` leen la imagen (`JUEGO.test.luz()`: luminancia media y desvío fuera del recuadro) y fallan con un cuadro negro.
+- **Nunca el piso durante la barrita**: la vista baja a la barra solo mientras las manos van hacia ella (entre el 8 % y el
+  92 % del recorrido, no más de −55°) y con la barrita en pantalla la mirada va al jurado sí o sí. Reglas duras: mirada entre
+  −15° y +10° y horizonte en el tercio central, en lo jugado («quieta», «corre», «levanta») y en la tira.
+- **Al frente = al jurado**: la mirada apunta a la mesa de los árbitros (`POV.mira`), lente de 62° de alto.
+- **Lo que NO entra en la imagen y por qué** (geometría, no un error): con la mirada en el jurado y 62° de lente, el borde
+  de abajo queda a unos −34°; la barra colgando está a −75°/−85° de los ojos y en los hombros a −60°/−65°; arriba de la
+  cabeza, a +85°/+95°. Solo cruza la vista durante el tirón y el empuje (con estela). Para que se sienta: el mundo que baja y
+  sube, el golpe de cámara al recibir, la estela, y el recuadro.
+- `check_carga_fallas [shader compu]`: la espera pasó de 180 a 420 s. **Es una hipótesis de lentitud por software sin
+  confirmar**: falló dos veces con 180 s y pasó dos veces con 420 s; no se vio el aviso tardío en ninguna captura.
+- **Costo del recuadro, medido por software** (`check_pov`, sección C; corrida 43987308856): «Baja» 300 → 810 ms por cuadro
+  (+170 %), «Móvil» 299 → 838 ms (+180 %). Es un segundo dibujo entero de la escena. Por eso en el camino directo va
+  **apagado por defecto** y se prende solo si el jugador elige «Con recuadro» (o `?recuadro=si`, que usan las pruebas); con
+  post («Media» para arriba) va a una textura propia a media frecuencia. **Con post y en una placa real, sin medir.**
+- Tira jugada en Alta: `check_barra --tira` (una foto cada 0,1 s del primer intento propio, de la barrita al veredicto).
+
+Lo de abajo («no tocar» y «sigue mal») es de las cinco rondas anteriores, con la cámara vieja.
+
+Lo que las cinco rondas dejaron bien («no tocar»): barra arriba (recepción y recuperación del arranque, empuje, tijera y
+final del envión), tirón de brazos, horizonte nivelado, la barrita de timing en escritorio, caída y rebote de la barra,
+«devuelve la barra» y el corte a los jueces con las tres luces.
+Lo que sigue mal, repetido en las rondas 4 y 5:
+- *Primera persona*: (1) manos en los hombros (cargada y arranque del envión) enormes, pálidas y con los dedos cortados por
+  los bordes; entre la barra y el pecho se ve el piso (el cuello achicado tira de los vértices del pecho que pesan con él).
+  Arreglarlo de verdad pide un modelo de primera persona (manos y antebrazos aparte) o repesar el cuello en Blender.
+  (2) Salida y primer tirón: mirada casi a plomo, dos tercios de piso, sin jueces, y la barra queda a 90 px de la barrita
+  de timing. Geométricamente la barra está debajo y detrás de los ojos: con la mirada a −60° solo entra retrocediendo la
+  cámara, y entonces se ve el corte del tronco (rondas 2 y 3). (3) Fallo con la barra atrás: no se ve ni barra ni manos.
+  (4) En «PREPÁRATE» no se ven las manos y el pecho asoma abajo. (5) La mirada rebota al recibir (18° → 9° → 16°).
+  (6) Muslos con trama durante 0,1 s al pasar de agachado a de pie. (7) Sin captura de teléfono con interfaz.
+- *Final*: (1) en el válido la barra se suelta desde arriba y los brazos pasan por codos altos («doble bíceps») y por la
+  cruz; en el fallo con barra atrás eso se lee como festejo. (2) Estatua de 1 a 2,4 s igual en válido y nulo, sin paso ni
+  gesto. (3) Barra atrás pegada al pie de atrás en la tijera. Los tres piden animación nueva (manos que acompañan la barra,
+  festejo, bronca, paso): con poses de `poses.json` desandadas no sale.
+
+**Estimaciones y pendientes.**
+- Nada de esto pasó por `check()` de Blender ni se comparó con video: son reglas de reproducción (como ya lo era `caida.js`).
+- Sin probar en una placa real ni en un teléfono: en Actions se dibuja por software. Falta que el dueño lo juegue.
+- En una ventana más alta que ancha la cámara sigue siendo la lateral, se elija lo que se elija (también la primera persona).
+- En Clásico las ayudas pegadas a la barra (anillo, línea) no se ven en primera persona cuando la barra queda fuera de cuadro.
+- Después del válido el pesista queda de pie respirando: no hay festejo (haría falta una animación nueva).
+
+### Carteles fuera de la cabeza y de la barra, y el vistazo a la barra (17-nov, rama `v-pov`)
+
+Pedido del dueño después de jugar parado en el teléfono: «hay casos donde los carteles le tapan la cabeza al pesista, ojo ahí».
+
+**Medición** (`tools/tapa.mjs`, `stage.js → cajas()`): además del cuerpo y el torso, la caja de la **cabeza** (del hueso `Head`
+a 21 cm más arriba, por estatura; los modelos no traen `HeadTop_End`), la **barra** con `alta` (arriba de la cabeza) y, en
+primera persona, el **recuadro**. Se mide contra todo lo que se ve (opacidad > 0,2) en todos los momentos de un intento
+(`seguidor`): preparación, barrita quieta y corriendo, levantamiento, `arriba` y `fija` (barra arriba), veredicto grande y
+chico (válido, caída, de un rival), repetición, carga, «otro sale antes», fin del arranque, explicaciones; con «@c» en dos
+tiempos. **Regla** (`revisar`): cabeza ≤ 5 %; barra ≤ 10 % cuando está arriba; recuadro ≤ 5 %. No se exige en los paneles de
+antes y después de la final (inicio, presentación, cartel, podio) ni al elegir kilos con el teléfono acostado.
+`check_telefono` juega además un intento que no sale (6 kg de más, tocado en el rojo) en 430×932 y 932×430; `check_barra`
+suma la primera persona (`pc_pov_es`, `tel_pov_en`, `vert_pov_es`) y sigue hasta el fin del arranque en la computadora.
+
+| Qué tapaba (antes, corridas 44012336826 y 44012340333) | Cuánto | Cómo quedó |
+|---|---|---|
+| Parado: el tablero sobre la barra y las manos del rival (turno, veredicto, explicación «luces») | barra 75–100 %, cuerpo 19–24 % | 0 % (430×932: 0 %) |
+| Acostado: sonido, pausa y ayuda (arriba al centro) sobre la barra del rival arriba | barra 24–31 % (37–40 % con la explicación) | 0 % |
+| Acostado y computadora: esos botones sobre la cabeza en el plano de la caída (intento que no sale) | cabeza 23–30 % (6 % en la computadora) | 0 % |
+| Acostado: el aviso «otro sale antes» sobre la cabeza y el torso | cabeza 73 %, torso 35–50 % | 0 % |
+| Computadora: «Terminó el arranque» (y elegir la apertura) sobre el pesista | cuerpo 71 % (50 %) | 0 % |
+| Parado: «Terminó el arranque» cortaba al pesista por el pecho | cuerpo 71 % | 0 % (entero, arriba del panel) |
+| Mano izquierda: el veredicto de un rival encima de la explicación de primera vez | se encimaban | separados |
+
+**Reglas de diseño** (no hay casos por pantalla):
+- **El techo de la cámara** (`main.js → margenVertical`, 4 veces por segundo): lo que cuelga del borde de arriba dentro de la
+  franja central (38–62 % del ancho) baja el techo del encuadre automático (`setInsets`) hasta su borde, más 3,5 % de aire.
+  Parado es el tablero (ocupa más de medio ancho): el rival se ve ~25 % más chico durante su turno, entero y con la barra libre.
+- **Arriba al centro no va nada** (acostado y computadora): sonido, pausa y ayuda van arriba a la derecha, en fila debajo del
+  reloj y las luces. Bajar el techo no alcanzaba: con la cámara general la punta de la barra queda más cerca y se ve más grande.
+  El recuadro de la primera persona no sube de 84 px (`RECUADRO.yMin`).
+- **Elegir kilos** (apertura y fin del arranque): el panel va a un costado (computadora, `.lado`) o abajo (parado) y el pesista
+  se encuadra en lo libre (`encuadrarLibre`, lo mismo que el llamado).
+- **Un aviso sobre el plano del llamado** («otro sale antes») va del lado donde estaba el panel (`.veredicto.der`).
+- El veredicto propio ya estaba en una franja libre (a la izquierda a media altura; parado, debajo de los pies): 0 %.
+
+**Sin resolver.** Con el teléfono acostado (340 a 390 px de alto) los paneles de elegir kilos siguen a lo ancho y tapan al
+pesista (la tabla y el selector no entran a un costado): la regla no los exige. Presentación, cartel y podio tampoco.
+Acostado, con el rival de pie y la barra arriba, el borde de la pantalla corta la punta de los discos (es el encuadre de la
+cámara general, no un cartel). Falta verlo en un teléfono de verdad.
+
+**Primera persona: el vistazo a la barra** (decidido con el dueño el 17-nov). En un intento propio desde los ojos, antes de que
+aparezca la barrita, el pesista baja y toma la barra (el clip hasta «Salida»), la vista baja a las dos manos (hasta −95°: la
+barra queda debajo y detrás de los ojos), se queda 0,9 s con el foco en las manos y el lente abierto lo necesario (hasta 92°),
+y vuelve al jurado; recién entonces empieza el reloj del intento y aparece la barrita, con el pesista ya agachado
+(`main.js → vistazo`, `yaAbajo`; `stage.js → POV.vistazo`). Mismo resorte, tope 57 °/s. Nada con movimiento reducido, con la
+barrita en pantalla, con reloj corriendo (Clásico) ni con el teléfono parado. **Agrega unos 4 a 5 s a cada intento propio en
+primera persona.** Pruebas: `check_pov` (tira: ≥ 0,6 s con las dos manos en la imagen y la mirada de vuelta en el jurado
+0,3 s antes de levantar) y `check_barra` con `--camara=pov` (`E.vistazo`: ≥ 600 ms con las manos, termina en el jurado, ≤ 6 s);
+la regla dura de la barrita (mirada entre −15° y +10°) no cambió.
+
+Medido en lo jugado (Alta, por software): 1,7 a 1,9 s con las dos manos en la imagen, mirada más baja −95°, de vuelta en −15°
+al aparecer la barrita, 4,3 s en total. **A la vista:** la barra y las manos salen algo fuera de foco, y con el teléfono
+acostado el botón redondo tapa la mano derecha y el recuadro queda pegado al disco derecho. Sin nota de director ni del dueño.
+
+**Corridas en verde sobre `3835cba`:** teléfono 44035762059, pruebas 44035756974 (los 4 grupos), gráficos `solo=pov`
+44035751517. En `tapa.json` de la última medición de carteles (195 momentos en `check_telefono`, 247 en `check_barra`): cabeza
+0 % y barra arriba 0 % en todos los momentos exigidos; recuadro 1,5 % como mucho. El «~25 % más chico» del rival parado es
+una estimación por las medidas de los márgenes, no una medición.
+
+Capturas de antes y después: `~/tarima-datos/ver_visual/carteles/` (`antes/`, `despues/`, `pov_vistazo/`).
+## Físico anatómico (17-nov, rama `v-pesista`)
+
+Detalle en `docs/PLANTEL.md`, «Físico anatómico». Estado: kordan, ilarraz, jastrev y solanet con `fisico='anatomico'`; corrida de
+pesistas 44038971821 (0 BAD en los cuatro), fotos 44042349451 y 44042364993, `PESISTAS_RUN` de `graficos.yml` = `44004922615 44038971821`
+(halvard sale de la primera). Hojas de antes y después y de posiciones: `~/tarima-datos/ver_visual/pesista/prueba_fisico/`.
+
+Lo que costó encontrar (no repetir):
+- El alisado del pecho (`make.py` sobre la malla base y `geo.chest_smooth` sobre la final) llegaba hasta la cadera y el muslo alto y
+  encogía todo lo convexo: la sonda mostraba el cuerpo nuevo y el GLB no (muslo 0,41 H contra 0,35 H). En el físico anatómico va solo sobre el pecho.
+- Los «bultitos» del pecho con los brazos arriba eran tres cosas: el plato chato del parche (ahora mínimos cuadrados móviles), un disco de
+  oclusión fija en la textura y la normal mal escalada en el racimo de UV deformado. La «punta» que `make.py` buscaba estaba en la ingle.
+- `measure-thigh-circ`, `measure-calf-circ` y `upperleg-scale-*` de MPFB dan un globo arriba del muslo.
+- `ANTROM` medía mal muslo, hombros y cuello (cortes solo con los vértices que dominaba un hueso). `tools/prever_fisico.py` y un corte
+  del GLB con numpy sirven para verificar sin Blender.
+
+Estimaciones y pendientes: las metas de perímetros son estimadas (no hay medición de referencia); el ancho de hombros medido (0,35 H)
+queda sobre la meta porque el marco de MPFB no baja de 0,24 H entre articulaciones; la proyección del glúteo queda en 0,07 H; el
+superpesado no tiene panza en barril (cintura 0,56 H) y su entrepierna mide 0,375 H; queda un bulto bajo la malla en la extensión
+(los targets `genitals/*-decr` no alcanzan); pieles de MakeHuman sin integrar; el sombreador de piel solo cambió `uNormBias` (1,7 a 1,1).
+
+## Plantel nuevo dentro del juego (17-nov, rama `v-integra`, desde `visual`)
+
+Sin fusionar a `main` ni a `prueba` y sin publicar: lo decide el dueño.
+
+- **Modelos en el repo** (`web/models/`, corrida de pesistas 44038971821, `check()` 0 BAD en los cuatro, meshopt como los
+  actuales; el `_1024` lleva además texturas WebP): ilarraz 5,27 / 2,92 MB, kordan 5,48 / 3,01, jastrev 5,38 / 2,96,
+  solanet 5,29 / 2,95 (`.glb` / `_1024.glb`); máscaras 0,19 a 0,24 MB y `_mask2` de 0,02 MB (el juego todavía no la baja).
+  `poses.json` y `plantel.json` regenerados con `tools/sumar_pesista.py` y `tools/plantel_web.py`. Halvard sigue sin modelo
+  en el repo (las ternas `mujeres`, `pesados` y `mixto` no existen hasta que lo tenga).
+- **Plantel por defecto**: sin `?plantel=` el juego viste la terna `hombres` (`PLANTEL_DEFECTO` en `roster.js`; en
+  `tools/plantel_web.py` pasó a ser ilarraz, kordan, jastrev): Ilarraz en la plaza Compacto, Kordan en Largo, Jastrev en
+  Potente. Es lo mismo que daba `?plantel=ilarraz,kordan,jastrev`. `?plantel=clasico` deja a Ventura, Brenner y Marangi.
+  Si `plantel.json` no llega (tres intentos), el juego sigue con los clásicos, que siguen en el repo.
+- **Lo que NO cambió**: los ids de las plazas (`ventura`, `brenner`, `marangi`), `web/data/sim.json` y su huella, los
+  `sim_ref*.json`, las personalidades de los rivales, los textos (ninguno nuevo), la propiedad `pesista` de los eventos
+  (`compacto`, `largo`, `potente`) y `tarima.pesista` guardado en el navegador. El Worker no valida ids de pesista.
+  Los tiempos del núcleo siguen saliendo de `sim.json` (`modelos.ventura` y `modelos.brenner`): la presentación acomoda el
+  clip del modelo nuevo a esos tiempos. Kilos y fichas propias por categoría siguen pendientes (temporada nueva).
+- **Arreglo**: el zócalo del rival mostraba el código de país de la ficha vieja (NVK con Kordan); ahora el del modelo.
+- **Visor** (`config.js`): ficha de Kordan, y categoría, estatura y bandera de Ilarraz al día. Con los modelos en el repo
+  el visor publicado muestra también a Solanet, Ilarraz, Jastrev y Kordan.
+- **Carga medida** (`carga.yml`, corrida 44050710000, teléfono 844 × 390 con los `_1024`; «antes» = `origin/main`):
+  total 7,97 → 10,71 MB (modelos 6,46 → 8,89 MB, máscaras y detalle 0,62 → 0,79, JS 0,77 → 0,91 por lo que ya traía `visual`).
+  Modelos bajados en 4G (9 Mbps) a los 19,1 → 24,6 s; en red lenta (1,6 Mbps) a los 51,0 → 65,6 s. En computadora con calidad
+  alta (cuenta sobre los archivos, sin medir): modelos y máscaras 12,26 → 16,79 MB. La causa es que antes eran dos modelos
+  (Marangi usaba el de Brenner) y ahora son tres distintos; los clásicos no se bajan. **Pendiente** si pesa: bajar primero el
+  modelo del jugador y los rivales después, o que la tercera plaza repita modelo.
+- **Pruebas**: `check_game` y `check_carga_fallas` esperan `ilarraz,jastrev,kordan` en memoria; `check_carga` espera todos
+  los modelos pedidos (cortaba en cuatro archivos); `carga.yml` acepta `-f antes=<ref>` y `-f visor=false`;
+  `check_analitica` da 120 s al primer clic: con el 3D por software, compilar tres modelos distintos al abrir pasó de 30 s
+  (en `visual` la misma prueba pasa con 30 s, corrida 44051486379). Es costo real de arranque; no se midió en una placa.
+- **Shader que no compila** (`revisarShaders`): antes de probar con Móvil se sueltan los programas de la escena
+  (`Escena.soltarProgramas`). three avisa de un programa roto una sola vez; con tres modelos todo llegaba compilado y, si
+  Móvil no creaba un programa nuevo, se anotaba «recuperada» sin estarlo (`check_carga_fallas [shader]` falló dos veces
+  seguidas en la corrida 44050689975). La causa exacta de por qué con dos modelos sí aparecía no se confirmó (estimación:
+  dependía de los tiempos). Solo cambia el camino de falla: quien hoy carga bien no pasa por ahí.
+- **Corridas en verde** (rama `v-integra`): `pruebas.yml` 44060877374 (commit d6d8ce2), `servidor.yml` 44052753896 (eb4bc6d),
+  `telefono.yml` 44050695156, `muro.yml` 44050700519 y `carga.yml` 44050710000 (9b128bc; `carga.yml` sin el trabajo del visor,
+  `-f visor=false`). Acá: `sim_test`, `servidor_test` (364 controles), `rivales_test` y `pesistas_test` bien.
+- **Estimaciones y riesgos**: memoria de video con tres modelos en un teléfono de gama baja, sin medir en un aparato real.
+  El color de interfaz de Kordan (`#2fb3c4`) queda cerca del turquesa del jugador (`#35e6d6`) cuando Kordan es rival.
+  Solanet casi no se probó jugando; Jastrev es el menos logrado.
+
+### Selección de pesista con el pesista en 3D (17-nov, rama `v-pov`)
+
+Pedido del dueño: «quiero evaluar bien el físico; cuando seleccione el pesista quiero ver al pesista, tipo selección de personaje».
+
+- **Cómo se entra.** Tocando una tarjeta de pesista en la bienvenida (las tarjetas siguen saliendo recién después de la primera
+  final) o con **`?elegir=1`**, que abre directo la selección y deja las tarjetas a la vista aunque sea la primera vez (para
+  probar). «Listo» vuelve a la bienvenida con ese pesista marcado. En Opciones no hay entrada: no había un lugar natural.
+- **Qué se ve** (`main.js → elegirPesista`, pantalla `elegir`). Panel a un costado (computadora y teléfono acostado) o abajo a lo
+  ancho (parado) con las tres tarjetas (plaza y apellido) y la ficha del elegido: nombre, bandera, código y país, categoría
+  (recuadro), estatura y kilos del cuerpo (de `plantel.json`; `vestir` ahora copia `masa`), la frase de la tarjeta y el RM. En lo
+  libre, el pesista de pie a cuerpo entero, de frente, lente de 38° (`stage.js → PLANOS.elegir`, encuadre calculado con el
+  rectángulo libre). **Gira el pesista con la barra, no la cámara** (`Escena.girar` / `posarGirado`): así el lado que se mira es
+  siempre el iluminado y la cámara no se mete detrás de la pantalla del fondo. Una vuelta en 12 s; arrastrando sobre la escena
+  (`#el-zona`, no cuenta como toque del juego) gira con el dedo o el ratón y a los 3 s de soltar sigue solo; dos botones lo
+  llevan de a cuarto de vuelta (frente, perfil, espalda; queda quieto 6 s); otro alterna «de pie» y «barra arriba» (la pose
+  final del arranque, con el clip pasado en 1,7 s). De pie no se dibuja la barra. Teclado: las flechas mueven el foco y la
+  tarjeta con foco es la elegida; Enter sobre la elegida confirma. Cada pesista se ve con SU malla (en la final el del jugador
+  lleva la turquesa de `JUGADOR`, como siempre). Al cambiar de tarjeta, fundido corto; se conservan el ángulo y la pose.
+- **Hoy se ofrecen solo Ilarraz y Kordan como «(nuevo)»** (segunda decisión del dueño, 17-nov): `roster.js →
+  ASPECTOS_OFRECIDOS`. Jastrev (+110 kg) y Solanet (mujer, 48 kg) no se ofrecen hasta que existan las categorías; sumarlos a
+  ese arreglo los vuelve a prender. Potente queda solo con Marangi (sin fila de aspectos). Un `tarima.aspecto` guardado que ya
+  no se ofrece cae al de siempre de su plaza. Lo que sigue describe el mecanismo completo (con los cuatro en `ASPECTOS`).
+- **Entran todos los modelos, los nuevos con «(nuevo)»** (decisión del dueño del 17-nov para el lanzamiento: «que entren
+  todos, para que los users vayan viendo la evolución; ponelos como (new)»). Debajo de las tres tarjetas, la plaza elegida
+  ofrece sus **aspectos** (`roster.js → ASPECTOS`): Compacto: Ventura · Ilarraz (nuevo) · Solanet (nuevo); Largo: Brenner ·
+  Kordan (nuevo); Potente: Marangi · Jastrev (nuevo). Elegir un aspecto cambia **quién dibuja** al pesista del jugador
+  (`vestirJugador`: la plaza del jugador con ese modelo y las otras dos como siempre), no la plaza deportiva: kilos, fases y
+  cuerpo de la simulación siguen saliendo de `sim.json` (por eso la frase y el RM de la ficha no cambian con el aspecto). Los
+  rivales quedan con los modelos de siempre, así nunca hay dos iguales. `plantel.json` y el modelo nuevo se bajan recién al
+  abrir la selección y al tocar el aspecto (aviso «Bajando a los pesistas…»; en el teléfono, los `_1024` como siempre); quien
+  no entra a la selección no baja nada de más. Se recuerda en `tarima.aspecto` (junto a `tarima.pesista`): al volver, baja ese
+  modelo en lugar del de siempre de su plaza. `pesista_elegido` lleva la propiedad nueva `modelo`. Texto nuevo, pedido por el
+  dueño: `pesista.nuevo` («(nuevo)» / «(new)»). Si se cargó un modelo en la selección, la final vuelve a precalentar
+  (`E.reprecal`). Con `?plantel=` la base es esa terna y se ofrecen los nuevos que no estén ya en otra plaza.
+- **Sin textos nuevos** (salvo «(nuevo)»): título `pesista.titulo`, «Listo» `campo.listo`, frases y RM de las tarjetas; los botones de girar y de
+  barra arriba son dibujos. **Propuesta pendiente de OK del dueño**: etiquetas «Categoría» y «Peso» (hoy la categoría va en un
+  recuadro y el peso al lado de la estatura, sin rótulo) y «frente / perfil / espalda» con texto.
+- **Costo**: nada cuando la pantalla no está abierta (un `enCuadro` que se quita al salir). Abierta, dibuja en cada cuadro.
+- **Pruebas**: `check_telefono` suma `seleccion_pc_1280x720` (ratón y teclado; además Móvil y Baja con un pesista),
+  `seleccion_acostado_844x390` y `seleccion_vertical_390x844` (`telefono.yml -f solo=seleccion`; en las corridas completas va en un paso aparte, capturas en `out/seleccion`): el panel no tapa al pesista
+  (caja del cuerpo de `cajas()`), nada se sale, gira solo un cuarto de vuelta en 3 s, el arrastre gira y no cuenta como toque,
+  los cuartos de vuelta y «barra arriba» llegan, los 5 pesistas (3 de siempre y 2 nuevos, estos con la marca) se ven en las 6 vistas, y «Listo» deja la escena como estaba y el aspecto elegido. `check_muro` pasa por la selección al
+  elegir Largo. Capturas: `~/tarima-datos/ver_visual/seleccion/`.
+- **Sin resolver / a la vista.** Parado, el pesista ocupa 31–34 % del alto de pie (el panel, con la fila de aspectos, se lleva el 42 %) y con la barra arriba el
+  lente se abre (hasta 56°) para que entre la barra. La ficha de juego (RM 169/211 para un 71 kg) sale de `sim.json`, no de
+  `plantel.json`: los números no cierran con la categoría. Al salir, detrás de la bienvenida queda el plano de la selección
+  (la final pone su cámara). No se probó en un teléfono de verdad. Sin nota del dueño.
+
+## Pulido del 17 de noviembre (rama `v-polish`, desde `visual` f26ca50)
+
+Pedido del dueño: «mejoraría un poco el gameplay para que sea más fácil, más amigable, con algunas transiciones suaves entre
+cambio de pesistas», jugando en vertical; y, mientras jugaba la candidata, «nivel fácil preseleccionado pero no por defecto;
+es poco intuitivo elegir el estilo de jerk y el nivel». Diseño en `docs/JUEGO.md`, G3.F.
+
+- **Fácil más amigable** (`rules.js → FACIL_17`, solo Fácil; huellas de Medio y Difícil iguales). Tres palancas: verde ±200 /
+  ±150 ms al 90 / 95 % (antes ±170 / ±125), amarillo +±260 / +±210 ms (antes ±220 / ±180) y puntero lento a los 4 s sin tocar a
+  1,9 s por pasada (antes a los 8 s, 1,7 s). Desde el 100 %, todo igual. `barra_bots --dif=facil`, novato (±120 ms), válidos
+  (y % de toques en el verde), Compacto / Largo / Potente:
+  - arranque 90 %: 100 (79) / 100 (89) / 100 (65) → 100 (88) / 100 (94) / 100 (72)
+  - arranque 95 %: 98 (67) / 99 (76) / 92 (52) → 99 (75) / 99 (82) / 94 (58) · 97 %: 94 / 98 / 79 → 96 / 98 / 83
+  - dos tiempos 90 %: 100 (81) / 100 (78) / 99 (77) → 100 (86) / 100 (84) / 100 (82)
+  - dos tiempos 95 %: 97 (65) / 96 (66) / 93 (63) → 100 (73) / 98 (74) / 97 (72) · 97 %: 85 / 85 / 80 → 89 / 88 / 84
+  - al 100 % (sin cambio, a propósito): arranque 62 / 67 / 46, dos tiempos 35 / 36 / 52
+  - todo verde (los tres juntos): arranque 90 % 77 → 85, 95 % 65 → 71; dos tiempos 90 % 62 → 70, 95 % 40 → 52
+  - «LEJOS» en el arranque con Potente: 90 % 7 → 4 % de los toques, 95 % 12 → 7 %
+  - finales enteras con lo que trae el panel, rivales amistosos: oro 91 / 89 / 84 → 93 / 92 / 90 % (media 88,0 → 91,7);
+    con rivales normales 10,0 → 14,7 %; cansancio al tercer intento 272 / 280 / 295 → 263 / 244 / 245
+  - `chance_test`: el «X de 10» del panel sigue honesto (error máximo por casilla 4,5 puntos con el bot típico).
+  - Descartado: amarillo a 500 de energía (novato al 100 %: 70,3 y 71,5 % de válidos, fuera de la meta 30 a 70).
+  - Referencias regeneradas (`sim_test --update`): `sim_ref_barra`, `sim_ref_rivales` y `sim_ref_turnos`, que son finales
+    jugadas en Fácil `'b'` (cambian las zonas de los toques guionados y lo que sugiere el entrenador, que lee la chance);
+    `sim_ref`, `sim_ref_facil`, `sim_ref_uno` y `sim_ref_dificultad` quedaron idénticas. La huella de Fácil cambia: un
+    registro de una final de Fácil jugada con la versión anterior ya no se recalcula igual (el Worker no recalcula partidas).
+- **El nivel a la vista** en la bienvenida y **los tres estilos de envión a la vista** en el panel del primer dos tiempos
+  (acostado sigue el botón compacto: abierto ocupa 59 a 61 % del alto). Revisado el camino del nivel: `difInicial()` →
+  `cfg.dif` → `Partida` y `fijarDificultad`; no había desajuste entre lo marcado y lo aplicado, lo que pasaba es que el nivel
+  solo se veía abriendo Opciones. `check_barra` ahora lo controla en cada pantalla (marcado = `E.dificultad` = `p.cfg.dif`).
+- **Transiciones**: fundido 150 + 280 ms (antes 120 + 200), también al entrar y salir de la selección; disolvencia de 0,2 s
+  para tablero, zócalo, «Saltar», barrita, etiqueta y paneles nuevos. `ritmo_test` (Fácil, novato): la final salteando a
+  los rivales pasa de 126,9 a 128,2 s de mediana (+1,3 s, +1 %; meta ≤ 150) y mirándolos enteros de 195,8 a 197,3 s; el
+  turno de rival más largo, de 11,6 a 11,9 s (tope 12; con 180 + 300 ms daba 12,0 y se acortó); el turno saltado, de 2,2 a
+  2,4 s; el intento propio p90 queda en 8,7 y 13,6 s (antes 8,8 y 13,6); barras caídas con lo que trae el panel, 14,8 → 14,2 %.
+- **Vertical**: en el dos tiempos el tablero cortaba la columna «PIDE»; ahora parado se van la del arranque y los cuadraditos.
+- **Sin resolver / a la vista.** El bot «lento» de `ritmo_test` (toca siempre a los 9 s) no espera menos con el puntero que
+  frena antes: su final dura unos segundos más; una persona que espera al puntero lento sí toca antes (a los 4 a 6 s). No se
+  probó en un teléfono de verdad. Sin nota del dueño.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.
@@ -1360,3 +2555,10 @@ Resumen: (0) preparar el Mac alquilado y la sesión cloud, (1) juego mínimo jug
 - Mocap desde video sigue pendiente.
 - Esqueleto único con nombres Mixamo más un hueso `Bar`, así la barra nunca se desfasa de las manos.
 - three.js vendorizado en `web/vendor/` para que el visor funcione sin red.
+
+### Pelo gris en el teléfono (17-nov, rama `v-pesista`)
+
+- No era del camino de «Móvil»/«Baja»: el casco de pelo y la barba de malla opaca salían grises igual en «Alta» (fotos de antes y después de los tres en `~/tarima-datos/ver_visual/pelo/`, corridas 44067370084/44067386678/44067401923 y 44068336109/44068349915/44068366545).
+- Causa 1 (la mayor): el reflejo. `capMaterial` dejaba el lóbulo ancho de GGX (rugosidad 0,82, F0 × 0,45, F90 0,5) frente a los tres contraluces de `look.js` (15 + 14 + 5, sin sombra). Vistos a contraluz daban 0,13 a 0,37 lineal en coronilla y sienes contra 0,03 a 0,07 de la difusa (cuenta de un foco de three con las posiciones de `_luces`; 0,2 lineal ≈ gris 140 después del tono). Ahora F0 × 0,2 (como el pelo en capas) y F90 = 0.
+- Causa 2: el color. `blender/tex.py: pelo` escribe color × (1,7 + 1,2 s) + 0,04 a 0,07: la media de la textura es ~3,8 veces más clara en lineal que el color de la ficha (Ilarraz `#0f0c0a`, textura media 37,32,28). El visor lleva la media al color de la ficha (`ASPECTO.pelo.base`, lo pasa `stage.mostrar` desde `plantel.json`) y usa ese color en el pelo pintado sobre la piel. No se tocó `tex.py` ni los GLB: si se corrige el generador, `pelo.base` sigue valiendo (nunca aclara).
+- Sin resolver: el pelo y la barba quedan casi negros lisos (se pierde la veta entre mechones: con el color de la ficha y esos contraluces no hay rango); el rapado pintado de Jastrev se sigue aclarando de espaldas (va por el material de la piel, 70 % de color de pelo) y tiene una costura clara en la nuca; el borde de la barba sigue en serrucho.

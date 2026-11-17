@@ -28,6 +28,7 @@
 import * as THREE from 'three';
 import { PRESET, MARGEN, ajustar, mpSostenible, perdidos, medirRefresco, metaDe, pasoDe, decidirCalidad } from './perf.js';
 import { PLANTEL } from './roster.js';
+import { tramo } from './sequence.js';
 
 /** Píxeles por metro con que el banco fija el detalle del pesista: malla simplificada y normales de detalle, como en el plano general del juego. */
 const LOD_PLANO = 300;
@@ -86,6 +87,8 @@ export async function correrBanco({ escena, cargas, hz, params, msg }) {
   const B = window.BANCO = { listo: false, version: 3, etapa: 'carga', progreso: '', columnas: COLUMNAS, calidades: [], variantes: [], tandas: [], notas: [], errores: [] };
   const cartel = document.createElement('div'); cartel.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:40;background:rgba(3,5,12,.82);color:#e8ecf8;font:12px/1.3 ui-monospace,Menlo,monospace;padding:6px 10px;pointer-events:none'; document.body.appendChild(cartel);
   const decir = txt => { B.progreso = txt; cartel.textContent = 'Banco de medición · ' + txt; };
+  if (params.get('lab')) { try { const { laboratorio } = await import('./lab.js'); await laboratorio(B, { escena, cargas, params, msg, decir }); } catch (e) { B.errores.push(String(e.stack || e)); console.error(e); } if (params.get('fotos')) cartel.remove(); B.listo = true; return; }      // laboratorio de materiales (lab.js)
+  if (params.get('fotos') === '2') { try { await fotosNiveles(B, { escena, cargas, params, msg, decir }); } catch (e) { B.errores.push(String(e.stack || e)); console.error(e); } cartel.remove(); B.listo = true; return; }
   if (params.get('fotos')) { try { await fotos(B, { escena, cargas, params, msg, decir }); } catch (e) { B.errores.push(String(e.stack || e)); console.error(e); } cartel.remove(); B.listo = true; return; }
   try { await correr(B, { escena, cargas, hz, params, msg, decir }); } catch (e) { B.errores.push(String(e.stack || e)); console.error(e); }
   B.duracionS = num(performance.now() / 1000, 1); B.etapa = 'listo'; cartel.remove();
@@ -115,6 +118,50 @@ async function fotos(B, { escena, cargas, params, msg, decir }) {
       if (f.camara === 'arriba') escena.primerPlano('arriba'); else escena.camara(f.camara);
       escena.setTope(escena.nativoMP * 1e6); escena.bucle(T, 0); escena.sombra = 4;
       for (let k = 0; k < 3; k++) escena.cuadro(k ? 0 : 5, true);      // la cámara llega a su lugar antes del cuadro de la foto
+      return f.nombre;
+    },
+  };
+  B.etapa = 'fotos'; decir(`fotos: ${lista.length}`);
+}
+
+/**
+ * `?fotos=2` (Gráficos fase 1): la misma escena quieta en cada calidad (`?niveles=movil,baja,media,alta,ultra`), con las
+ * cámaras del juego, la vista del jurado con las luces de arbitraje prendidas y los tres árbitros de frente con sus paletas. tools/banco.mjs --fotos=dir --niveles.
+ * Por software sirven para mirar el aspecto de cada nivel, no el costo.
+ */
+async function fotosNiveles(B, { escena, cargas, params, msg, decir }) {
+  decir('cargando los modelos'); await Promise.all(cargas);
+  const id = PLANTEL[params.get('pesista')] ? params.get('pesista') : 'brenner';
+  await escena.mostrar(id); escena.setCarga(140, 's'); msg.hidden = true;
+  escena.arena.setBoard({ name: PLANTEL[id].corto || id, country: PLANTEL[id].codigo || 'NVK', kg: 140, attempt: 2, lift: 'Arranque', intento: 'Intento 2' });
+  const niveles = (params.get('niveles') || 'movil,baja,media,alta,ultra').split(',').map(x => x.trim()).filter(k => PRESET[k]), fin = tramo(escena.P, 'snatch').fin - .05;
+  const tomas = [
+    { n: '3-4', c: '3/4', t: 1.3, luces: null }, { n: 'frontal', c: 'baja', t: 1.3, luces: null }, { n: 'lado', c: 'lado', t: fin, luces: null },
+    { n: 'jurado-vale', c: 'jurado', t: fin, luces: [true, true, true] }, { n: 'jurado-nulo', c: 'jurado', t: fin, luces: [false, true, false] }, { n: 'reversa-vale', c: 'rev', t: fin, luces: [true, true, true] },
+    { n: 'medio', c: 'medio', t: fin, luces: null }, { n: 'torso', c: 'torso', t: fin, luces: null }, { n: 'cara', c: 'cara', t: fin, luces: null }, { n: 'medio-salida', c: 'medio', t: 1.3, luces: null },
+    { n: 'parado', c: '3/4', t: 0, luces: null }, { n: 'parado-frente', c: 'baja', t: 0, luces: null }, { n: 'parado-espalda', c: 'rev', t: 0, luces: null }, { n: 'arriba-frente', c: 'baja', t: fin, luces: null }, { n: 'arriba-espalda', c: 'rev', t: fin, luces: null },      // brazos arriba a cuerpo entero (de perfil ya está «lado»): hombros, cuello y axila
+    { n: 'jueces-vale', c: 'jueces', t: fin, luces: [true, true, true] }, { n: 'jueces-nulo', c: 'jueces', t: fin, luces: [false, true, false] },
+  ];
+  // Hoja de posiciones (?tomas=posiciones): las doce viñetas de las láminas de referencia del dueño, con las mismas vistas, a cuerpo entero:
+  // arranque s1 inicio (perfil), s2 tirón (3/4), s3 extensión (3/4), s4 recepción (frente), s5 recepción (perfil), s6 fijación (espalda 3/4);
+  // dos tiempos c1 inicio (3/4), c2 cargada (perfil), c3 rack (espalda 3/4), c4 dip (3/4), c5 tijera / c5p power / c5q squat jerk (perfil), c6 fijación (espalda 3/4).
+  // `seg` y `fase` posan esa fase de ese segmento del clip (no el bucle del arranque). tools/hoja_posiciones.py arma la hoja junto a la lámina.
+  const P_ = (n, seg, fase, c) => ({ n: 'pos-' + n, c, seg, fase, luces: null, pos: true });
+  const posiciones = [P_('s1', 'snatch', 'Salida', 'lado'), P_('s2', 'snatch', 'Primer tirón', '3/4'), P_('s3', 'snatch', 'Triple extensión', '3/4'), P_('s4', 'snatch', 'Recepción', 'baja'), P_('s5', 'snatch', 'Recepción', 'lado'), P_('s6', 'snatch', 'Recuperación', 'rev'),
+    P_('c1', 'clean', 'Salida', '3/4'), P_('c2', 'clean', 'Amortiguación', 'lado'), P_('c3', 'clean', 'Recuperación', 'rev'), P_('c4', 'split', 'Envión · Dip', '3/4'), P_('c5', 'split', 'Envión · Tijera', 'lado'),
+    P_('c5p', 'power', 'Power jerk · Recepción', 'lado'), P_('c5q', 'squat', 'Squat jerk · Fondo', 'lado'), P_('c6', 'split', 'Envión · Final', 'rev')];
+  const cuales = (params.get('tomas') || '').split(',').filter(Boolean), elegidas = cuales.length ? [...tomas, ...posiciones].filter(x => cuales.includes(x.n) || (x.pos && cuales.includes('posiciones'))) : tomas;      // ?tomas=medio,cara: solo esas
+  const lista = niveles.flatMap(q => elegidas.map(x => ({ ...x, q, nombre: `${q}_${x.n}` }))); let puesta = null;
+  window.BANCO_FOTOS = {
+    lista, listo: true, opacidadSombra: null, opacidadCruda: null,
+    async poner(i) {
+      const f = lista[i];
+      if (puesta !== f.q) { decir(`compilando ${f.q}`); escena.setCalidad(PRESET[f.q]); await escena.precalentar(); puesta = f.q; }
+      escena.arena.setDecision(f.luces); escena.camara(f.c);
+      escena.setTope(escena.nativoMP * 1e6);
+      if (f.seg) { const G = tramo(escena.P, f.seg); escena.posar({ seg: G.nombre, s: G.i(f.fase), tau: G.t(f.fase), base: G.base, primero: false }, f.seg === 'snatch' ? 's' : 'c', 0); } else escena.bucle(f.t, 0);
+      escena.sombra = 4;
+      for (let k = 0; k < 4; k++) escena.cuadro(k ? .016 : 5, true);
       return f.nombre;
     },
   };
@@ -239,10 +286,13 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
   // Las que ya se midieron en la Mac del usuario y dieron cerca de cero (o eran una comprobación) no corren por defecto
   // (`defecto: false`): se piden con ?variantes=publico,velos o ?variantes=todas.
   const MENOS = [
+    { id: 'ambiente', nombre: 'sin el ambiente nuevo (polvo de magnesio y halos de las luces)', poner: () => ocultar([escena.ambiente?.group]) },
+    { id: 'jueces', nombre: 'sin los jueces y oficiales sentados (jueces.js)', defecto: false, poner: () => ocultar([escena.jueces?.group]) },
     { id: 'sombras', nombre: 'sin sombras', poner: () => { escena.setSombras(false); return () => escena.setSombras(true); } },
     { id: 'haces', nombre: 'sin haces de luz', poner: () => ocultar(A.beamMeshes) },
     { id: 'aniso', nombre: 'anisotropía 1 en todas las texturas', poner: v => anisotropia(1, v) },
     { id: 'anisoIgual', nombre: 'anisotropía puesta otra vez en el mismo valor (control de «aniso»)', poner: v => anisotropia(null, v) },
+    { id: 'utileria', nombre: 'sin la utilería del look (cajones, bancos, baúles, cables, discos, chapa)', defecto: false, poner: () => ocultar(escena.look?.utileria() || []) },
     { id: 'arena', nombre: 'sin arena (solo pesista y barra)', poner: () => ocultar([A.group]) },
     { id: 'pesista', nombre: 'sin pesista', poner: () => ocultar([escena.activo.root]) },
     { id: 'lod', nombre: 'pesista con la malla completa (sin nivel de detalle)', poner: () => { escena.lodFijo = 9999; return () => { escena.lodFijo = LOD_PLANO; }; } },
@@ -353,7 +403,7 @@ async function correr(B, { escena, cargas, hz: hzCarga, params, msg, decir }) {
 
   // ---------- 1. calidades: Baja, Móvil, Media, Alta, en vueltas, cada una después de una Baja ----------
   B.etapa = 'calidades';
-  const claves = ['baja', 'movil', 'media', 'alta'].filter(k => k === 'baja' || !SOLO.length || SOLO.includes(k)), med1 = {}, pares = {};
+  const claves = ['baja', 'movil', 'media', 'alta', 'ultra'].filter(k => k === 'baja' || !SOLO.length || SOLO.includes(k)), med1 = {}, pares = {};
   for (const k of claves) { med1[k] = []; pares[k] = []; }
   const poner = async (k, primera) => { escena.setCalidad(PRESET[k]); if (primera) await escena.precalentar(); else { await compilar(); } usar(); const eg = errorGL(); if (eg) B.errores.push(`al poner ${k}: error de WebGL ${eg}`); };
   decir('compilando Baja'); await unCuadro(); await poner('baja', true);
@@ -467,15 +517,18 @@ export async function resultado(B, { periodo, nativoMP }) {
 function tabla(B) {
   const n = (x, d = 2) => (x === null || x === undefined || !Number.isFinite(x) ? '—' : x.toFixed(d).replace('.', ',')), e = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   const el = document.createElement('div'); el.id = 'banco';
-  el.style.cssText = 'position:fixed;inset:0;z-index:60;overflow:auto;background:rgba(3,5,12,.95);color:#e8ecf8;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;padding:14px 18px;text-transform:none;letter-spacing:0';
+  el.style.cssText = 'position:fixed;inset:0;z-index:60;overflow:auto;background:rgba(3,5,12,.95);color:#e8ecf8;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;padding:14px 18px;text-transform:none;letter-spacing:0;touch-action:pan-x pan-y;-webkit-overflow-scrolling:touch;pointer-events:auto';
   const marca = v => (v.ruidosa ? ' <b style="color:#ffb35c">ruidosa</b>' : '') + (v.error ? ' · ERROR' : '') + (v.errorGL ? ` · WebGL ${v.errorGL}` : '');
   const filaC = v => `<tr style="background:#16204a;font-weight:700"><td style="text-align:left">${e(v.nombre)}${marca(v)}</td><td>${v.vueltas}</td><td>${n(v.fijoMs)}</td><td>${n(v.porMPms)}</td><td>${n(v.ms1MP)}</td><td>${n(v.ms1MPmin)} a ${n(v.ms1MPmax)}</td><td>${n(v.msNativo)}</td><td>${n(v.mpModelo)}</td><td>${n(v.mpReal)}</td><td>${n(v.mpFalla)}</td><td>${v.vsBajaMs === undefined ? '—' : n(v.vsBajaMs)}</td><td>${v.llamadas ?? '—'}</td><td>${v.triangulos ? Math.round(v.triangulos / 1000) + ' mil' : '—'}</td></tr>`;
   const filaV = v => `<tr><td style="text-align:left">${e(v.nombre)}${marca(v)}</td><td>${v.vueltas}</td><td>${n(v.ms1MP)}</td><td>${n(v.ahorroMs)}</td><td>${n(v.ahorroMin)} a ${n(v.ahorroMax)}</td><td>${v.ahorroPct === undefined || v.ahorroPct === null ? '—' : n(v.ahorroPct, 1) + ' %'}</td><td>${n(v.ahorroFijoMs)}</td><td>${n(v.ahorroPorMPms)}</td><td>${v.llamadas ?? '—'}</td><td>${v.triangulos ? Math.round(v.triangulos / 1000) + ' mil' : '—'}</td><td>${v.programasSobrantes ?? '—'}</td></tr>`;
   const th = 'style="color:#9fb0e0;text-align:right"';
-  el.innerHTML = `<h1 style="font:700 16px/1.3 inherit;margin:0 0 6px">Banco de medición · Tarima</h1>
+  el.innerHTML = `<h1 style="font:700 16px/1.3 inherit;margin:0 0 6px">Banco de medición · Lifting Game</h1>
 <p style="margin:0 0 4px">${e(B.gl || '?')} · ventana ${(B.ventana || []).join(' × ')} · densidad ${n(B.dpr)} · pantalla a su resolución: ${n(B.nativoMP)} MP</p>
 ${B.resultado && B.resultado.controlPierde ? `<p style="margin:0 0 6px;padding:6px 10px;background:#5a1d14;color:#ffd9cf;font-weight:700;max-width:110ch;white-space:normal">${e(B.resultado.textoControl)}</p>` : ''}
-${B.resultado ? `<p style="margin:0 0 4px;padding:6px 10px;background:#123a2c;color:#e3fff3;font-size:13px;font-weight:700;max-width:110ch;white-space:normal">${e(B.resultado.texto)}</p>` : ''}
+<div id="banco-resumen" style="margin:0 0 8px;padding:10px 12px;background:#123a2c;color:#e3fff3;max-width:110ch;white-space:normal">
+${B.resultado && B.resultado.mediana ? `<div style="font-size:22px;line-height:1.2;font-weight:800">Elige: ${e(B.resultado.mediana.nombre)} · ${n(B.resultado.mediana.mp)} MP · ${B.resultado.mediana.margenPct} % de margen</div>` : ''}
+${B.resultado ? `<div style="font-size:14px;font-weight:700;margin-top:4px">${e(B.resultado.texto)}</div>` : ''}
+<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button id="banco-copiar" style="font:inherit;font-size:14px;padding:10px 16px;min-height:44px;touch-action:manipulation">Copiar el JSON</button><button id="banco-cerrar" style="font:inherit;font-size:14px;padding:10px 16px;min-height:44px;touch-action:manipulation">Cerrar la tabla</button><span id="banco-aviso" style="font-size:14px;font-weight:700"></span></div></div>
 ${B.resultado && B.resultado.textoPantalla ? `<p style="margin:0 0 4px;max-width:110ch;white-space:normal">${e(B.resultado.textoPantalla)}</p>` : ''}
 ${B.resultado && !B.resultado.controlPierde && B.resultado.textoControl ? `<p style="margin:0 0 8px;max-width:110ch;white-space:normal;color:#9fe0c0">${e(B.resultado.textoControl)}</p>` : ''}
 <p style="margin:0 0 10px">Pantalla de <b>${n(B.hz)} Hz</b> (período ${n(B.periodoMs)} ms; un cuadro puede costar hasta ${n(B.periodoMs * B.margen)} ms) · ${n(B.duracionS, 1)} s${B.deriva ? ` · deriva de la completa: ${n(B.deriva.cambioPct, 1)} %` : ''} · programas ${B.programasAlEmpezar ?? '—'} → ${B.programasAlTerminar ?? '—'}${B.errores.length ? ` · <b style="color:#ff8a7a">${B.errores.length} errores (ver BANCO.errores)</b>` : ''}</p>
@@ -487,8 +540,19 @@ ${B.resultado && !B.resultado.controlPierde && B.resultado.textoControl ? `<p st
 <tbody style="text-align:right">${B.variantes.map(filaV).join('')}</tbody></table>
 ${B.notas.length ? `<p style="margin:10px 0 0;color:#ffd23f">${B.notas.map(e).join('<br>')}</p>` : ''}
 <p style="margin:10px 0 0;max-width:110ch;color:#9fb0e0;white-space:normal">Costo de un cuadro (procesador más placa, sin esperar a la pantalla) medido a ${(B.mpMedidas || []).map(x => n(x)).join(' y ')} megapíxeles, mediana de las vueltas. Cada variante se mide entre dos medidas de la escena completa y el ahorro es contra el promedio de esas dos. «Ruidosa»: el número no sirve para decidir. «MP sin perder refrescos» sale de dibujar de verdad con la pantalla (mediana de las tres tandas: principio, medio y final). Todo el detalle está en <b>window.BANCO</b>; las columnas, en HANDOFF.md.</p>
-<p style="margin:10px 0 0"><button id="banco-copiar" style="font:inherit;padding:4px 10px">Copiar el JSON</button> <button id="banco-cerrar" style="font:inherit;padding:4px 10px">Cerrar la tabla</button> <span id="banco-aviso"></span></p>`;
+`;
   document.body.appendChild(el);
-  el.querySelector('#banco-cerrar').onclick = () => el.remove();
-  el.querySelector('#banco-copiar').onclick = () => { const aviso = el.querySelector('#banco-aviso'); navigator.clipboard.writeText(JSON.stringify(B)).then(() => { aviso.textContent = 'copiado'; }, () => { aviso.textContent = 'no se pudo copiar: está en window.BANCO'; }); };
+  // En el teléfono: el cuerpo tiene touch-action none (la tabla se desplaza por su cuenta), un toque llega como pointerup aunque
+  // el clic no salga, y sin portapapeles (navegador de una app, página sin https) el JSON queda seleccionado en un cuadro visible.
+  const aviso = el.querySelector('#banco-aviso'), json = () => JSON.stringify(B);
+  const aMano = () => {
+    let ta = el.querySelector('#banco-json');
+    if (!ta) { ta = document.createElement('textarea'); ta.id = 'banco-json'; ta.readOnly = true; ta.value = json(); ta.style.cssText = 'display:block;width:100%;max-width:110ch;height:110px;margin:8px 0 0;font:11px/1.3 ui-monospace,Menlo,Consolas,monospace;color:#e8ecf8;background:#0b1024;border:1px solid #9fb0e0;-webkit-user-select:text;user-select:text;touch-action:manipulation'; el.querySelector('#banco-resumen').appendChild(ta); }
+    try { ta.focus({ preventScroll: true }); ta.select(); ta.setSelectionRange(0, ta.value.length); } catch { /* sin selección */ }
+    let ok = false; try { ok = document.execCommand('copy'); } catch { /* sin execCommand */ }
+    aviso.textContent = ok ? 'copiado' : 'no se pudo copiar solo: el JSON quedó seleccionado acá abajo, copialo a mano';
+  };
+  const copiar = () => { aviso.textContent = 'copiando…'; try { const pr = navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(json()) : null; if (pr && pr.then) pr.then(() => { aviso.textContent = 'copiado'; }, aMano); else aMano(); } catch { aMano(); } };
+  const tocar = (b, fn) => { let t = -1e9; const f = ev => { ev.preventDefault(); ev.stopPropagation(); const a = performance.now(); if (a - t < 600) return; t = a; fn(); }; if (!b) return; if (!b.addEventListener) { b.onclick = fn; return; } b.addEventListener('click', f); b.addEventListener('pointerup', ev => { if (ev.pointerType !== 'mouse') f(ev); }); };
+  tocar(el.querySelector('#banco-copiar'), copiar); tocar(el.querySelector('#banco-cerrar'), () => el.remove());
 }

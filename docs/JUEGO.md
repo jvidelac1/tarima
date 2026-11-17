@@ -8,10 +8,12 @@ barrita y si tocás muy lejos, falla; más o menos cerca, regular; en el verde, 
 
 - **Una barrita en el arranque (el tirón) y dos en el dos tiempos (la cargada y el envión).** Pararse, quedar firme y la garra
   salen solos según la energía. Ni ¡SALTA! ni ¡PÁRATE! ni ¡ARRIBA! como toques.
-- **El puntero va y vuelve sin reloj** (`rules.js → posBarra`: 1,4 s de punta a punta, 1,7 s desde los 8 s sin tocar). El toque
+- **El puntero va y vuelve sin reloj** (`rules.js → posBarra`: 1,4 s de punta a punta; en Fácil, desde el 17-nov, 1,9 s desde los
+  4 s sin tocar, antes 1,7 s desde los 8 s). El toque
   dispara el tramo en ese instante. Sin ningún toque, al minuto (el reloj de la competencia) tira solo, como REGULAR.
 - **Zonas** (`zonasBarra`): verde = perfecto (nada de más), amarillo = regular (+600 de energía en ese tramo), rojo = lejos
-  (+1500). El ancho depende de los kilos (verde de ±170 ms con la apertura a ±75 ms al 100 %) y del pesista: Largo verde ancho en
+  (+1500). El ancho depende de los kilos (verde de ±200 ms con la apertura a ±75 ms al 100 %; hasta el 17-nov, ±170 con la
+  apertura: ver «Fácil, más amigable») y del pesista: Largo verde ancho en
   el tirón y angosto en el envión, Potente al revés, Compacto parejo (`BARRA.pesistas`). El primer intento de la primera final,
   1,4 veces más ancho. Si la barra sube lo sigue decidiendo la energía de `'u'` (kilos × cuerpo × suerte + el costo del toque),
   con el gasto escalado a 0,925 (`BARRA.escala`).
@@ -35,6 +37,28 @@ barrita y si tocás muy lejos, falla; más o menos cerca, regular; en el verde, 
   probabilidad de todo verde.
 - Medidas, ajustes y lo que falta: HANDOFF.md, «Barrita».
 
+### G3.F Fácil, más amigable, y elecciones a la vista (17-nov, rama `v-polish`)
+
+Pedido del dueño: «mejoraría un poco el gameplay para que sea más fácil, más amigable» y «es poco intuitivo elegir el estilo
+de jerk y el nivel». Solo cambia el nivel Fácil (`rules.js → FACIL_17`; Medio, Difícil y Clásico, igual: sus huellas no cambian).
+
+- **Verde más ancho donde juega un jugador nuevo**: ±200 ms hasta el 90 % y ±150 al 95 % (antes ±170 y ±125). Desde el 100 %,
+  igual que antes: el techo sigue siendo una moneda al aire para el novato (meta de `barra_bots`: 30 a 70 % de válidos).
+- **Menos «LEJOS»**: con esos mismos pesos el amarillo suma ±260 y ±210 ms (antes ±220 y ±180).
+- **El que duda no espera tanto**: el puntero se pone lento a los 4 s sin tocar (antes 8) y va a 1,9 s de punta a punta
+  (antes 1,7). Quien toca en las primeras pasadas no nota nada.
+- Probado y descartado: abaratar el amarillo (600 → 500 de energía): el novato pasaba el 70 % de válidos al 100 %.
+- **El nivel, a la vista en la bienvenida**: Fácil · Medio · Difícil como tres segmentos encima de «Jugar», el elegido marcado
+  (Fácil si nunca se eligió otro) y su línea de siempre debajo. Lo marcado es lo que se juega (`check_barra` lo controla:
+  segmento marcado = `E.dificultad` = `p.cfg.dif`). Clásico sigue en Opciones.
+- **El estilo de envión, a la vista en el panel del primer dos tiempos**: los tres como segmentos (Split primero y marcado,
+  con su dificultad debajo del nombre), sin desplegable; tocar uno lo marca y cambia el «X de 10» en el momento. En el
+  teléfono acostado, donde los tres no entran en el alto del panel, sigue el botón compacto que los abre.
+- **Transiciones**: el fundido entre pesistas pasa de 120 + 200 ms a 150 + 280 ms (se va acelerando, vuelve frenando);
+  también al entrar y al salir de la selección de pesista; el tablero, el zócalo, «Saltar», la barrita y los paneles nuevos
+  entran con una disolvencia de 0,2 s (solo opacidad). Con movimiento reducido, nada de esto.
+- Medidas de antes y después: HANDOFF.md, «Pulido del 17 de noviembre».
+
 ### G3.D Dificultad: Fácil · Medio · Difícil (13-nov, tarde)
 
 Pedido del dueño: «si es fácil así está bien; si es un poco más difícil, que requiera un poco más de interacción a nivel tocar
@@ -46,7 +70,7 @@ de coordinar con el movimiento del pesista ni carreras de toques; lo de más son
 |---|---|---|---|
 | Barritas del arranque | tirón | tirón, atrapar arriba | tirón, atrapar arriba, pararse |
 | Barritas del dos tiempos | cargada, envión | cargada, pararse, envión | cargada, pararse, envión |
-| Puntero de punta a punta | 1,4 s (1,7 desde los 8 s) | 1,2 s (1,5 desde los 8 s) | 1,0 s, nunca lento |
+| Puntero de punta a punta | 1,4 s (1,9 desde los 4 s) | 1,2 s (1,5 desde los 8 s) | 1,0 s, nunca lento |
 | Verde (ancho en la barrita) | el de siempre | 80 % | 65 % (amarillo 90 %) |
 | Costo amarillo / rojo (tirón y envión) | 600 / 1500 | 600 / 1500 | 450 / 1200 |
 | Costo amarillo / rojo (atrapar y pararse) | — | 350 / 900 | 300 / 800 |
@@ -799,10 +823,12 @@ Las reglas siguen las del deporte real, adaptadas de memoria y sin cotejar contr
 | Regla | Decisión |
 |---|---|
 | Intentos | Tres de arranque, intervalo, tres de dos tiempos |
-| Orden de salida | Sale primero quien pidió menos kilos. A igual peso, quien tiene menor número de intento. Después, quien hizo antes su intento anterior. Después, el dorsal más bajo |
+| Orden de salida (por rondas, por defecto desde el 15-nov, LIF-3) | En cada ronda los tres levantan una vez. Dentro de la ronda abre quien pidió menos kilos; a igual peso, quien lo pidió primero, y después el dorsal (número de sorteo). La barra nunca baja dentro de la ronda: todo pedido o cambio de quien todavía no levantó en esa ronda tiene como mínimo lo cargado, y como se sale de menor a mayor nadie queda por debajo. Entre una ronda y otra sí puede bajar. Con 3 pesistas, el jugador nunca espera más de 4 turnos ajenos seguidos |
+| Orden de salida (oficial: opción «Oficial» en Opciones) | Sale primero quien pidió menos kilos. A igual peso, quien tiene menor número de intento. Después, quien hizo antes su intento anterior. Después, el dorsal más bajo |
 | La barra nunca baja | No se puede pedir menos de lo que ya está cargado |
 | Progresión | Tras un válido, al menos 1 kg más. Tras un nulo, el mismo peso o más |
 | Declaración | Automática al terminar cada intento: el plan del entrenador (sección 6.3) |
+| Cambios antes del turno (15-nov, LIF-4) | Mientras levanta otro, el jugador puede cambiar su pedido con «Cambiar» (debajo del tablero; tecla C): solo hacia arriba, hasta dos veces por intento contando los del panel de su llamado. Los rivales cambian al cierre de cada intento ajeno, según su personalidad, también solo hacia arriba; el tablero lo dice («Brenner cambia a 167») |
 | Cambios | Dos por intento, hacia arriba o hacia abajo, nunca por debajo de la barra ni del mínimo propio. El jugador los hace en el panel de su llamado, hasta que su reloj baja de 0:15. Los rivales los hacen al cierre de cada intento ajeno. Si un cambio altera el orden, sale el otro; cuando vuelven a llamar al primero, su reloj arranca de nuevo |
 | Reloj | 0:30 desde el llamado; 0:45 si el pesista se sigue a sí mismo. Aviso a 0:10. Se detiene cuando la barra pasa la rodilla. Si llega a cero antes, intento nulo |
 | Jueces | Tres luces, mayoría simple. Sin revisión por video |
@@ -1225,6 +1251,8 @@ No se tocan en la etapa 1: `blender/`, `web/models/`, `web/data/poses.json`, `we
   "cal": 40,               // corrección de atraso en ms (0 a 100), fija para toda la partida
   "nivel": "normal",
   "ctl": "f",              // nivel de control de la persona: "f" Fácil, "c" Clásico; si falta, Clásico (CONTROLES.md, sección 4)
+  "orden": "rondas",        // 15-nov (LIF-3): "rondas" u "oficial", con "turnos" = huella de sus reglas (match.js → TURNOS);
+  "turnos": "3b08cd58",     //   sin los dos, el orden oficial de siempre y sin pedidos antes del turno
   "atletas": [ { "id": "ventura", "ctrl": "persona", "jugador": "u_123" },
                { "id": "brenner", "ctrl": "juego" },
                { "id": "marangi", "ctrl": "juego" } ],
@@ -1244,6 +1272,7 @@ No se tocan en la etapa 1: `blender/`, `web/models/`, `web/data/poses.json`, `we
 - Resultado, luces, causa del fallo y tabla **nunca viajan**: se recalculan.
 - Los llamados de los rivales figuran solo con pesista, levantamiento y número. Sus kilos, sus cambios y sus gestos los genera el núcleo, y el recálculo verifica que el orden coincida.
 - La declaración automática no se registra: sale del reglamento.
+- Con `orden`, un cambio de pedido de la persona antes de su turno (LIF-4) va entre los llamados como `{ "a": 0, "lev": "s", "pide": 167 }`: solo hacia arriba, nunca por debajo de su mínimo, y con los cambios de su llamado, dos por intento.
 - En Fácil, `ent` es la **salida de la capa de traducción** (lo que recibió el núcleo, incluida la bajada automática), no las teclas. `ctl` entra solo en el contexto de la persona: los rivales juegan siempre con las reglas de Clásico. No se subió la versión de reglas; con servidor hay que subirla y separar la tabla por `ctl`.
 
 **Semillas.** De la semilla salen la forma del día, los umbrales de los jueces, el instante de la chicharra y los gestos de los rivales.

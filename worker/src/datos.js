@@ -10,26 +10,32 @@ export async function asegurarDispositivo(db, d, ahora) {
   return sel.results[0];
 }
 
-// Partidas de la IP en la ventana, sin contar las de dispositivos anotados (un dispositivo borrado cuenta como no anotado).
-const USADAS_I = `SELECT COUNT(*) FROM partidas p WHERE p.i = ?2 AND p.en > ?3
+// Partidas de la IP en la ventana, sin contar las de dispositivos con juego libre: los anotados y, con ENCUESTA_LIBRE
+// (`libre`), los que contestaron la encuesta (un dispositivo borrado cuenta como sin juego libre).
+const USADAS_I_LISTA = `SELECT COUNT(*) FROM partidas p WHERE p.i = ?2 AND p.en > ?3
   AND NOT EXISTS (SELECT 1 FROM dispositivos x WHERE x.d = p.d AND x.lista_id IS NOT NULL)`;
+const USADAS_I_LIBRE = `SELECT COUNT(*) FROM partidas p WHERE p.i = ?2 AND p.en > ?3
+  AND NOT EXISTS (SELECT 1 FROM dispositivos x WHERE x.d = p.d AND (x.lista_id IS NOT NULL OR x.encuesta_en IS NOT NULL))`;
+const usadasI = libre => (libre ? USADAS_I_LIBRE : USADAS_I_LISTA);
 const USADAS_D = `SELECT COUNT(*) FROM partidas WHERE d = ?1 AND fuente != 'lista'`;
 
-export async function contar(db, d, i, ahora) {
+export async function contar(db, d, i, ahora, { libre = false } = {}) {
   return db.prepare(`SELECT (${USADAS_D}) AS usadas_d, (SELECT COUNT(*) FROM partidas WHERE d = ?1) AS total_d,
-      (${USADAS_I}) AS usadas_i, (SELECT COUNT(*) FROM encuestas WHERE i = ?2 AND en > ?3) AS encuestas_i`)
+      (${usadasI(libre)}) AS usadas_i, (SELECT COUNT(*) FROM encuestas WHERE i = ?2 AND en > ?3) AS encuestas_i`)
     .bind(d, i, ahora - VENTANA_IP).first();
 }
 
 /**
  * Inserta la partida solo si las cuentas no cambiaron desde que se leyeron (dos pedidos a la vez no pasan el tope).
- * Devuelve el id de la partida, o null si no se insertó.
+ * Las de juego libre (`sinTope`: la lista, o la encuesta con ENCUESTA_LIBRE) entran siempre. `libre`: ENCUESTA_LIBRE vigente
+ * (la cuenta de la IP no mira a los dispositivos que contestaron la encuesta). Devuelve el id de la partida, o null si no
+ * se insertó.
  */
-export async function insertarPartida(db, { d, i, ahora, fuente, etapa = 'completa', usadas_d, usadas_i }) {
-  const ins = fuente === 'lista'
+export async function insertarPartida(db, { d, i, ahora, fuente, etapa = 'completa', usadas_d, usadas_i, sinTope = fuente === 'lista', libre = false }) {
+  const ins = sinTope
     ? db.prepare('INSERT INTO partidas (d, i, en, fuente, etapa) VALUES (?1, ?2, ?4, ?5, ?6)').bind(d, i, ahora - VENTANA_IP, ahora, fuente, etapa)
     : db.prepare(`INSERT INTO partidas (d, i, en, fuente, etapa) SELECT ?1, ?2, ?4, ?5, ?8
-        WHERE (${USADAS_D}) = ?6 AND (${USADAS_I}) = ?7`).bind(d, i, ahora - VENTANA_IP, ahora, fuente, usadas_d, usadas_i, etapa);
+        WHERE (${USADAS_D}) = ?6 AND (${usadasI(libre)}) = ?7`).bind(d, i, ahora - VENTANA_IP, ahora, fuente, usadas_d, usadas_i, etapa);
   const [r] = await db.batch([ins, db.prepare('UPDATE dispositivos SET ultimo = ?2 WHERE d = ?1').bind(d, ahora)]);
   return r.meta.changes === 1 ? Number(r.meta.last_row_id) : null;
 }
@@ -43,10 +49,10 @@ export const partidaDe = (db, id, d) => db.prepare(`SELECT id, etapa, envion_por
  * Pasa una partida de 'arranque' a 'completa' (permiso para el dos tiempos). Con la encuesta, solo si ninguna otra
  * partida del dispositivo lo usó (una vez por dispositivo, también con dos pedidos a la vez). true si cambió.
  */
-export async function pasarAlEnvion(db, { id, d, via }) {
+export async function pasarAlEnvion(db, { id, d, via, libre = false }) {
   const r = await db.prepare(`UPDATE partidas SET etapa = 'completa', envion_por = ?3
       WHERE id = ?1 AND d = ?2 AND etapa = 'arranque'
-      AND (?3 = 'lista' OR NOT EXISTS (SELECT 1 FROM partidas o WHERE o.d = ?2 AND o.envion_por = 'encuesta'))`).bind(id, d, via).run();
+      AND (?3 = 'lista' OR ?4 = 1 OR NOT EXISTS (SELECT 1 FROM partidas o WHERE o.d = ?2 AND o.envion_por = 'encuesta'))`).bind(id, d, via, libre ? 1 : 0).run();
   return r.meta.changes === 1;
 }
 

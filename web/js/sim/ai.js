@@ -118,6 +118,14 @@ export const PERSONALIDADES = {
 };
 const NEUTRA = PERSONALIDADES.brenner;
 /**
+ * Estilo de envión de cada rival para toda la competencia cuando el estilo queda fijo (LIF-43, match.js → cfg.envFijo): sale de
+ * su personalidad. Marangi («arriesga») va con power; Ventura («seguro») y Brenner («calcula»), con tijera. Si la ficha no
+ * domina ese estilo, el que usaría con su peso más alto. Va aparte de PERSONALIDADES para no cambiar HUELLA_IA: la regla la
+ * versiona `envFijo` en la cabecera del registro.
+ */
+export const ENVION_RIVAL = { seguro: 'split', calcula: 'split', arriesga: 'power' };
+export function envionRival(id, ficha) { const e = ENVION_RIVAL[(PERSONALIDADES[id] || NEUTRA).estilo]; return ficha.enviones.includes(e) ? e : elegirEnvion(ficha, 10000); }
+/**
  * Versión de las reglas de los rivales con personalidad: va en la cabecera del registro (`ia`) y replay.js la exige. La lógica
  * de planRival y decidirPlan no entra en la huella: si cambia, hay que subir `version` (y regenerar tools/sim_ref_rivales.json).
  */
@@ -171,8 +179,12 @@ export function decidirPlan(p, i, propio) {
       else if (pl.estilo === 'arriesga') { let k = null; for (let x = min; x <= al(P.oro) && k === null; x++) if (p.puestoSi(i, 'c', x) === 1) k = x; if (k !== null && k > kg) { kg = k; por = 'tabla'; momento = 'todo'; } }
     }
   }
+  // Con orden de turnos (match.js → TURNOS, LIF-4) los cambios al cierre de un intento ajeno son los mismos de la tabla del
+  // dos tiempos, pero solo hacia arriba (el «asegura» de Brenner, que baja, no se hace). Se probó que el calculador y el que
+  // arriesga cambiaran también en el tercer arranque al ir atrás: con «lo justo para pasar» o con su propio número, sus
+  // cambios caían en la marca o el pedido del jugador ±1 entre 0,16 y 0,29 veces por final (meta ≤ 0,15): se descartó.
   kg = Math.max(kg, min);
-  if (!propio && (por !== 'tabla' || kg === a.decl[lev])) return null;
+  if (!propio && (por !== 'tabla' || kg === a.decl[lev] || (p.cfg.turnos && kg < a.decl[lev]))) return null;      // con turnos, los cambios solo suben
   pl.momento[clave] = momento;
   return kg;
 }

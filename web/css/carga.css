@@ -10,7 +10,7 @@
 #msg .carga-luz{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(255,236,190,.07),rgba(255,236,190,0) 78%);
   clip-path:polygon(43% 0,57% 0,74% 100%,26% 100%);animation:carga-luz 7s ease-in-out infinite alternate}
 @keyframes carga-luz{from{opacity:.55}to{opacity:1}}
-#msg .carga-marca{margin-bottom:clamp(4px,2vh,16px);font-family:var(--display);font-weight:800;font-size:clamp(26px,8vh,56px);letter-spacing:.34em;margin-right:-.34em;text-transform:uppercase;line-height:1}
+#msg .carga-marca{margin-bottom:clamp(4px,2vh,16px);font-family:var(--display);font-weight:800;font-size:clamp(26px,min(8vh,7.4vw),56px);letter-spacing:.24em;margin-right:-.24em;text-transform:uppercase;line-height:1;text-align:center;white-space:nowrap}
 #msg .carga-titulo{margin:0;max-width:min(30em,92%);text-align:center;font-family:var(--display);font-weight:700;font-size:clamp(14px,2.6vh,20px);letter-spacing:.05em;text-transform:uppercase;color:var(--teal);line-height:1.2}
 #msg .carga-titulo:empty{display:none}
 #msg .carga-prog{width:min(340px,82%);display:flex;flex-direction:column;gap:4px}
@@ -28,6 +28,19 @@
 /* el juego se detuvo: solo el texto */
 #msg.carga.error .carga-prog,#msg.carga.error .carga-dato,#msg.carga.error .carga-luz{display:none}
 #msg.carga.error .carga-titulo{color:var(--ink)}
+/* LIF-33: el aviso de que algo no bajó o el 3D no arranca, con qué probar y «Probar de nuevo» */
+#msg.carga.aviso{z-index:80;pointer-events:auto;overflow:auto;justify-content:center}
+#msg .carga-aviso{display:flex;flex-direction:column;align-items:center;gap:clamp(6px,1.6vh,12px);max-width:min(36em,94%);text-align:left}
+#msg .carga-aviso-texto{margin:0;text-align:center;font-size:clamp(14px,2.4vh,17px);line-height:1.4;color:var(--ink)}
+#msg .carga-aviso ul{margin:0;padding-left:1.2em;font-size:clamp(13px,2.2vh,16px);line-height:1.4;color:#c9d0f0}
+#msg .carga-aviso li+li{margin-top:.3em}
+#msg .carga-aviso button{min-height:48px;min-width:12em;padding:.5em 1.4em;font-family:var(--display);font-weight:800;font-size:clamp(15px,2.6vh,19px);letter-spacing:.06em;text-transform:uppercase;color:#03050c;background:var(--gold,#f5c84b);border:none;border-radius:4px;cursor:pointer}
+#msg .carga-aviso button:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+#msg.carga.aviso .carga-titulo{color:var(--ink);font-size:clamp(17px,3.2vh,24px)}
+/* sin JavaScript para pintar el aviso (no bajó ni la pantalla de carga): el texto fijo de juego.html */
+#sin-carga{position:fixed;inset:0;z-index:90;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px;background:#03050c;color:#f2f4ff;font:16px/1.5 system-ui,sans-serif;text-align:center}
+#sin-carga[hidden]{display:none}
+#sin-carga button{min-height:48px;padding:.5em 1.4em;font:700 17px system-ui,sans-serif;color:#03050c;background:#f5c84b;border:none;border-radius:4px}
 /* teléfono acostado (poco alto): todo más junto */
 @media (max-height:430px){
   #msg.carga{gap:6px}

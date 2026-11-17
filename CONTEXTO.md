@@ -9,6 +9,8 @@ Este archivo es la puerta de entrada. Leelo entero antes de tocar nada; después
 ## Qué es
 
 **Tarima** es un juego web de halterofilia (three.js, módulos ES sin build) publicado en **https://liftinggame.pages.dev**.
+Adentro del juego se llama **Lifting Game** (decisión del 15 de noviembre): todo lo que ve el jugador dice Lifting Game y el
+evento ficticio es «Lifting Game Open». «Tarima» sigue como nombre interno (repo, Worker, D1, claves `tarima.*`, cookies, eventos).
 Una final de 3 pesistas ficticios (el jugador y 2 rivales), arranque y dos tiempos, 3 intentos cada uno. Se juega con una
 tecla (Espacio) o un toque. La meta del dueño es llevarlo a un **producto monetizable** en el corto plazo: primero retención y
 comunidad, después monetización. Público real: la mayoría en inglés, 2 de cada 3 desde el celular.
@@ -23,7 +25,7 @@ Publicado (ramas `main` y `mvp`, commit `ed11f4a` más este archivo):
 - 3 pesistas (Compacto, Largo, Potente) con fase fuerte y débil; envión split (más fácil) < power < squat (más difícil).
 - Rivales con personalidad y plan de kilos propio (Ventura «va a lo seguro», Brenner «hace cuentas», Marangi «arriesga»).
 - Dificultad en Opciones: Fácil (por defecto), Medio, Difícil, Clásico.
-- **Muro**: el arranque de una final es gratis; al terminarlo se pide el **mail (obligatorio)** para seguir jugando sin
+- **Muro** (lo publicado hasta el 15-nov; en `primera-vez` cambia, ver abajo): el arranque de una final es gratis; al terminarlo se pide el **mail (obligatorio)** para seguir jugando sin
   límite. Después de anotarse, una **encuesta opcional** de 2 preguntas (app móvil o juego web; qué features querés, con 3
   propuestas y texto libre). El conteo de lo gratis está en el servidor (dispositivo + HMAC de la IP).
 - **Inglés por defecto**; español con el selector o `?lang=es`.
@@ -32,6 +34,14 @@ Publicado (ramas `main` y `mvp`, commit `ed11f4a` más este archivo):
 Publicado también (rama `tablero`, ya fusionada): tablero de competencia (orden de salida, pedido de kilos de cada pesista,
 estrategia), el levantamiento completo del rival con botón **Skip** (tecla S; Espacio ya no saltea), RM y dificultad en el
 panel de kilos («MEDIO · 92 % de tu RM (163 kg) · 8 de 10») y menos cortes de cámara (0 cortes bruscos por final).
+
+En la rama `primera-vez` (15 de noviembre, sin publicar; LIF-53, LIF-46 y LIF-33, detalle en `docs/MVP.md`, «Cambio del 15
+de noviembre»): **la primera final entera es gratis** y al terminarla sale **el cartel**, que se desbloquea con el correo **o**
+con las 2 preguntas de la encuesta (las dos dan juego libre en el dispositivo; `ENCUESTA_LIBRE`); la primera bienvenida no
+pide elegir pesista (Compacto) y las tarjetas salen después de la primera final; el nombre al anotarse pide 4 letras;
+eventos `muro_resultado`, `siguio_jugando`, `escena_visible`, `carga_fallida`, y `anotar_ok` (solo altas nuevas) desde el
+Worker; si la carga falla, reintentos y un aviso claro (descarga o 3D) en lugar de la interfaz sin el levantador. Variables
+del Worker de esa regla: `GRATIS_ETAPA "final"`, `GRATIS "1"`, `ENCUESTA_LIBRE "1"` (**desde el 17 de noviembre no es el valor por defecto**: por decisión del dueño el muro sigue como en producción, después del arranque y con correo obligatorio, `GRATIS_ETAPA "arranque"` y `ENCUESTA_LIBRE "0"`; la de LIF-53 se prende con esas dos variables, `docs/MVP.md`, «Regla del muro que se publica el 17 de noviembre»); consentimiento `2026-11-g` (LIF-45: la grabación de sesión puede llevar el 3D, con «LIFTING GAME» en los carteles en vez del nombre del jugador y el tapado como respaldo; bandera `grabacion_lienzo`).
 
 ## Backlog
 
@@ -71,7 +81,7 @@ en `~/tarima-datos/backlog_tarima.md` en la Mac del dueño.
 - **Cloudflare Pages** proyecto `liftinggame` (web/ + functions/) con service binding al **Worker `tarima`**, que no tiene
   dirección pública (todo pasa por `/api/*` y `/qx/*` de Pages). **D1** `tarima` (dispositivos, partidas, lista, encuestas,
   límites). Variables del Worker en `worker/wrangler.jsonc` (regla del muro: `GRATIS_ETAPA`, `GRATIS`, `TOPE_IP`,
-  `BONO_ENCUESTA`).
+  `BONO_ENCUESTA`, `ENCUESTA_LIBRE`).
 - **Secretos** del Worker (no se regeneran nunca: hacerlo devuelve finales gratis a todos). Copias y claves en
   `~/tarima-datos/` (fuera del repo).
 - **PostHog** (US): proyecto propio del juego; los eventos van por el proxy `/qx` sin la IP del jugador; el país llega en la

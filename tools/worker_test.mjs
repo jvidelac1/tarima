@@ -26,13 +26,14 @@ const igual = (a, b, msg) => ok(JSON.stringify(a) === JSON.stringify(b), `${msg}
 class Base {
   constructor(env = {}) { this.env = env; this.disp = new Map(); this.partidas = []; this.encuestas = []; }
   dev(d, ahora) { if (!this.disp.has(d)) this.disp.set(d, { d, creado: ahora, lista_id: null, encuesta_en: null, flags: {} }); return this.disp.get(d); }
-  // Igual que datos.js: contar()
+  // Igual que datos.js: contar() (con ENCUESTA_LIBRE, la IP tampoco cuenta a los que contestaron la encuesta)
   contar(d, i, ahora) {
-    const desde = ahora - R.VENTANA_IP;
+    const desde = ahora - R.VENTANA_IP, libre = R.config(this.env).encuesta_libre;
+    const sinTope = x => !!x && (!!x.lista_id || (libre && !!x.encuesta_en));
     return {
       usadas_d: this.partidas.filter(p => p.d === d && p.fuente !== 'lista').length,
       total_d: this.partidas.filter(p => p.d === d).length,
-      usadas_i: this.partidas.filter(p => p.i === i && p.en > desde && !this.disp.get(p.d)?.lista_id).length,
+      usadas_i: this.partidas.filter(p => p.i === i && p.en > desde && !sinTope(this.disp.get(p.d))).length,
       encuestas_i: this.encuestas.filter(e => e.i === i && e.en > desde).length,
     };
   }
@@ -45,15 +46,16 @@ class Base {
     if (r.puede) this.partidas.push({ d, i, en: ahora, fuente: r.fuente });
     return r;
   }
-  // Igual que index.js: encuesta()
-  encuesta(d, i, ahora) {
+  // Igual que index.js: encuesta(). `r`: las respuestas (con ENCUESTA_LIBRE, para desbloquear hacen falta las dos)
+  encuesta(d, i, ahora, r = { plataforma: 'web', features: ['pesista_propio'] }) {
     const dev = this.dev(d, ahora), cfg = R.config(this.env, dev.flags);
     if (dev.encuesta_en) return 'ya_respondida';
-    const premio = !dev.lista_id && cfg.bono > 0;
-    if (premio && this.contar(d, i, ahora).encuestas_i >= cfg.encuestas_por_ip) return 'ya_respondida';
+    const premio = !dev.lista_id && (cfg.bono > 0 || cfg.encuesta_libre);
+    if (premio && cfg.encuesta_libre && !R.encuestaCompleta(r)) return 'incompleta';
+    if (premio && this.contar(d, i, ahora).encuestas_i >= cfg.encuestas_por_ip) return cfg.encuesta_libre ? 'ip' : 'ya_respondida';
     this.encuestas.push({ d, i: premio ? i : null, en: ahora });
     dev.encuesta_en = ahora;
-    return premio ? cfg.bono : 0;
+    return cfg.encuesta_libre && premio ? 'libre' : premio ? cfg.bono : 0;
   }
   anotar(d, ahora, id = 'L' + d) { this.dev(d, ahora).lista_id = id; }
   jugarHastaMuro(d, i, ahora, max = 50) { const fuentes = []; for (let k = 0; k < max; k++) { const r = this.partida(d, i, ahora); if (!r.puede) return { fuentes, muro: r }; fuentes.push(r.fuente); } return { fuentes, muro: null }; }
@@ -135,12 +137,15 @@ const VIEJA = { BONO_ENCUESTA: '2' };
   igual(e.jugarHastaMuro('B', 'casa', T0).fuentes.length, 1, 'TOPE_IP=4');
   igual(e.encuesta('B', 'casa', T0), 1, 'BONO_ENCUESTA=1');
   igual(e.encuesta('A', 'casa', T0), 'ya_respondida', 'ENCUESTAS_POR_IP=1');
-  igual(R.config({ GRATIS: 'x', TOPE_IP: '-3' }, { 'muro-partidas-gratis': 'z' }), { etapa: 'final', gratis: 2, tope_ip: 6, bono: 0, encuestas_por_ip: 3 }, 'valores inválidos: por defecto (y la regla vieja, sin bono de encuesta)');
+  igual(R.config({ GRATIS: 'x', TOPE_IP: '-3' }, { 'muro-partidas-gratis': 'z' }), { etapa: 'final', gratis: 2, tope_ip: 6, bono: 0, encuestas_por_ip: 3, encuesta_libre: false }, 'valores inválidos: por defecto (y la regla vieja, sin bono de encuesta)');
   igual(R.config({ BONO_ENCUESTA: 'x' }).bono, 0, 'BONO_ENCUESTA inválido o ausente: 0');
   igual(R.config({ GRATIS_ETAPA: 'cualquiera' }).etapa, 'final', 'GRATIS_ETAPA desconocida: la regla vieja');
 }
 
-// ---------- 2b. la regla del arranque gratis (GRATIS_ETAPA='arranque', decisión del dueño del 12 de noviembre) ----------
+// Variables de worker/wrangler.jsonc (sin comentarios): el valor por defecto de lo que se publica.
+const VARS = (() => { const txt = fs.readFileSync(path.join(ROOT, 'worker/wrangler.jsonc'), 'utf8').replace(/("(?:[^"\\]|\\.)*")|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, x) => x || '').replace(/,(\s*[}\]])/g, '$1'); return JSON.parse(txt).vars; })();
+
+// ---------- 2b. la regla del arranque gratis (GRATIS_ETAPA='arranque', decisión del dueño del 12 de noviembre): la de producción ----------
 {
   // Igual que index.js: envion() con datos.js: partidaDe() y pasarAlEnvion().
   class BaseArranque extends Base {
@@ -159,10 +164,13 @@ const VIEJA = { BONO_ENCUESTA: '2' };
       return dec;
     }
   }
-  const PROD = { GRATIS_ETAPA: 'arranque', GRATIS: '1', BONO_ENCUESTA: '0', TOPE_IP: '6', ENCUESTAS_POR_IP: '3' };
+  // La regla de producción es la que trae worker/wrangler.jsonc por defecto (decisión del dueño del 17 de noviembre: el
+  // muro sigue como está, después del arranque): las pruebas de esta sección corren con las variables del archivo.
+  const PROD = { GRATIS_ETAPA: VARS.GRATIS_ETAPA, GRATIS: VARS.GRATIS, TOPE_IP: VARS.TOPE_IP, BONO_ENCUESTA: VARS.BONO_ENCUESTA, ENCUESTA_LIBRE: VARS.ENCUESTA_LIBRE, ENCUESTAS_POR_IP: VARS.ENCUESTAS_POR_IP };
+  igual(PROD, { GRATIS_ETAPA: 'arranque', GRATIS: '1', TOPE_IP: '6', BONO_ENCUESTA: '0', ENCUESTA_LIBRE: '0', ENCUESTAS_POR_IP: '3' }, 'worker/wrangler.jsonc: por defecto, el arranque gratis y el correo obligatorio (la regla de producción)');
   // Con bono 1: la maquinaria del bono en el intervalo (no es producción).
   const BONO1 = { ...PROD, BONO_ENCUESTA: '1' };
-  igual(R.config(PROD), { etapa: 'arranque', gratis: 1, tope_ip: 6, bono: 0, encuestas_por_ip: 3 }, 'config de producción');
+  igual(R.config(PROD), { etapa: 'arranque', gratis: 1, tope_ip: 6, bono: 0, encuestas_por_ip: 3, encuesta_libre: false }, 'worker/wrangler.jsonc: la final gratis da solo el arranque y la encuesta no desbloquea');
   igual(R.config(PROD, { 'muro-partidas-gratis': '2' }).gratis, 1, 'con el arranque gratis la bandera muro-partidas-gratis no se usa');
   igual(R.config({ ...PROD, GRATIS_ETAPA: 'final', GRATIS: '2' }, { 'muro-partidas-gratis': '1' }).gratis, 1, 'con la regla vieja la bandera vuelve a valer');
   {
@@ -247,6 +255,61 @@ const VIEJA = { BONO_ENCUESTA: '2' };
     igual(b.envion('A', 'casa', r.id, T0), { puede: true, via: 'ya' }, 'de vuelta a la regla vieja: la final en juego termina gratis');
   }
 }
+
+// ---------- 2d. LIF-53: la primera final entera gratis y el cartel (correo O encuesta). No es el valor por defecto: se ----------
+// ---------- pide con variables explícitas (GRATIS_ETAPA "final" y ENCUESTA_LIBRE "1"), lista para cuando el dueño la quiera ----------
+{
+  const PRIMERA = { ...VARS, GRATIS_ETAPA: 'final', GRATIS: '1', TOPE_IP: '6', BONO_ENCUESTA: '0', ENCUESTA_LIBRE: '1', ENCUESTAS_POR_IP: '3' };
+  igual(R.config(PRIMERA), { etapa: 'final', gratis: 1, tope_ip: 6, bono: 0, encuestas_por_ip: 3, encuesta_libre: true }, 'LIF-53 por variables: 1 final entera gratis y la encuesta desbloquea');
+  {
+    // Jugador nuevo: una final completa; al terminarla, el cartel con los dos caminos.
+    const b = new Base(PRIMERA);
+    const r = b.partida('A', 'casa', T0);
+    igual([r.puede, r.fuente, r.etapa, r.quedan, r.libre], [true, 'gratis', 'completa', 1, false], 'la primera final es entera y gratis');
+    const m = b.situacion('A', 'casa', T0);
+    igual([m.puede, m.motivo, m.encuesta_disponible], [false, 'dispositivo', true], 'después, el cartel con las preguntas como camino');
+    // Las preguntas incompletas no desbloquean; completas, sí: juego libre, como el correo.
+    igual(b.encuesta('A', 'casa', T0, { plataforma: 'app' }), 'incompleta', 'una sola pregunta no desbloquea');
+    igual(b.encuesta('A', 'casa', T0), 'libre', 'las dos preguntas: juego libre');
+    igual(b.encuesta('A', 'casa', T0), 'ya_respondida', 'una vez por dispositivo (también por la API a mano)');
+    const l = b.partida('A', 'casa', T0);
+    igual([l.puede, l.fuente, l.etapa, l.quedan, l.libre, l.encuesta_disponible], [true, 'encuesta', 'completa', null, true, false], 'contestada: finales sin límite');
+    igual(b.jugarHastaMuro('A', 'casa', T0, 12).muro, null, 'contestada: nunca más el cartel');
+    // El correo, el otro camino: juego libre.
+    const c = new Base(PRIMERA); c.partida('B', 'casa', T0); c.anotar('B', T0);
+    const x = c.partida('B', 'casa', T0);
+    igual([x.fuente, x.libre, x.quedan], ['lista', true, null], 'con el correo: juego libre');
+    igual(c.encuesta('B', 'casa', T0), 0, 'después del correo la encuesta es optativa: no desbloquea nada');
+    igual(c.contar('Z', 'casa', T0).encuestas_i, 0, 'y no gasta los lugares de la red');
+  }
+  {
+    // La red: 6 finales gratis (de dispositivos distintos) y 3 encuestas con desbloqueo por red en 30 días. Las finales de
+    // los que contestaron no pesan sobre la red (como las de los anotados).
+    const b = new Base(PRIMERA);
+    const fuentes = [];
+    for (let k = 0; k < 7; k++) { const r = b.partida('N' + k, 'casa', T0); fuentes.push(r.puede ? r.fuente : r.motivo); }
+    igual(fuentes, ['gratis', 'gratis', 'gratis', 'gratis', 'gratis', 'gratis', 'ip'], 'misma red: 6 finales gratis');
+    igual([b.encuesta('N0', 'casa', T0), b.encuesta('N1', 'casa', T0), b.encuesta('N2', 'casa', T0)], ['libre', 'libre', 'libre'], 'tres encuestas con desbloqueo en la red');
+    igual([b.situacion('N3', 'casa', T0).encuesta_disponible, b.encuesta('N3', 'casa', T0)], [false, 'ip'], 'la cuarta, no: queda el correo');
+    const n7 = b.partida('N7', 'casa', T0);
+    igual([n7.puede, n7.fuente], [true, 'gratis'], 'las finales de los que contestaron no cuentan para la red: entra otra gratis');
+    igual(b.encuesta('N4', 'otra', T0 + 31 * DIA), 'libre', 'otra red (o 30 días después): vuelve a haber lugar');
+    for (let k = 0; k < 5; k++) b.partida('N0', 'casa', T0 + k);
+    igual(b.situacion('N8', 'casa', T0).puede, true, 'y las que siguen jugando con juego libre tampoco: la red sigue con lugar');
+  }
+  {
+    // Volver atrás por variable: ENCUESTA_LIBRE "0" deja el correo obligatorio (la encuesta no desbloquea ni se ofrece).
+    const b = new Base({ ...PRIMERA, ENCUESTA_LIBRE: '0' });
+    b.partida('A', 'casa', T0);
+    igual(b.situacion('A', 'casa', T0).encuesta_disponible, false, 'ENCUESTA_LIBRE 0: el cartel sin las preguntas');
+    igual(b.encuesta('A', 'casa', T0), 0, 'ENCUESTA_LIBRE 0: contestar no da nada');
+    igual(b.partida('A', 'casa', T0).puede, false, 'ENCUESTA_LIBRE 0: sigue el cartel');
+    // Con el arranque gratis y la encuesta libre (combinación posible por variables): la encuesta da el dos tiempos.
+    igual(R.decidirEnvion({ etapa: 'arranque', anotado: false, encuesta: true, encuesta_usada: true, encuesta_disponible: false, regla: 'arranque', libre: true }), { puede: true, via: 'encuesta' }, 'arranque gratis + ENCUESTA_LIBRE: la encuesta da el dos tiempos');
+    igual(R.decidirEnvion({ etapa: 'arranque', anotado: false, encuesta: false, encuesta_usada: false, encuesta_disponible: true, regla: 'arranque', libre: true }), { puede: false, motivo: 'envion', encuesta_disponible: true }, 'y el muro del intervalo la ofrece');
+  }
+  igual([R.encuestaCompleta({ plataforma: 'web', features: ['pesista_propio'] }), R.encuestaCompleta({ plataforma: 'web' }), R.encuestaCompleta({ features: ['pesista_propio'], otra: 'x' }), R.encuestaCompleta(null)], [true, false, false, false], 'encuestaCompleta: las dos preguntas');
+}
 igual([0, 1, 2, 7, 8, 100].map(d => R.diasDesde(T0, T0 + d * DIA + 5)), ['0', '1', '2-7', '2-7', '8+', '8+'], 'dias');
 
 // ---------- 3. validaciones ----------
@@ -300,9 +363,9 @@ for (const [r, e] of [
 const def = R.banderasPorDefecto();
 igual(R.combinarBanderas(null, null), def, 'banderas por defecto');
 igual(R.combinarBanderas(null, { 'muro-partidas-gratis': { enabled: true, variant: '1' }, 'invitacion-podio1': { enabled: false }, grabacion: { enabled: true, variant: 'todas' } }),
-  { 'muro-partidas-gratis': '1', 'muro-texto': 'a', 'invitacion-podio1': 'off', grabacion: 'todas' }, 'banderas de PostHog');
+  { 'muro-partidas-gratis': '1', 'muro-texto': 'a', 'invitacion-podio1': 'off', grabacion: 'todas', grabacion_lienzo: 'compu' }, 'banderas de PostHog');
 igual(R.combinarBanderas({ 'muro-partidas-gratis': '1', 'muro-texto': 'b', grabacion: 'todas' }, { 'muro-partidas-gratis': { variant: '2' }, 'muro-texto': { variant: 'a' }, grabacion: { variant: 'off' } }),
-  { 'muro-partidas-gratis': '1', 'muro-texto': 'b', 'invitacion-podio1': 'on', grabacion: 'off' }, 'pegajosas fijas, las demás se refrescan');
+  { 'muro-partidas-gratis': '1', 'muro-texto': 'b', 'invitacion-podio1': 'on', grabacion: 'off', grabacion_lienzo: 'compu' }, 'pegajosas fijas, las demás se refrescan');
 igual(R.combinarBanderas(null, { 'muro-texto': { variant: 'zzz' } })['muro-texto'], 'a', 'variante desconocida: por defecto');
 igual(R.combinarBanderas({ grabacion: 'todas' }, null).grabacion, 'todas', 'sin respuesta: queda lo guardado');
 // grabacion (docs/MVP.md 6.6): un tercio por defecto; off o todas desde PostHog; una bandera booleana apagada es «off»;
@@ -311,6 +374,10 @@ igual(def.grabacion, 'tercio', 'grabacion: un tercio por defecto');
 igual(['off', 'tercio', 'todas', 'muestra'].map(v => R.combinarBanderas(null, { grabacion: { enabled: true, variant: v } }).grabacion), ['off', 'tercio', 'todas', 'tercio'], 'grabacion: variantes');
 igual(R.combinarBanderas(null, { grabacion: { enabled: false } }).grabacion, 'off', 'grabacion: bandera booleana apagada');
 igual(R.combinarBanderas({ grabacion: 'muestra' }, null).grabacion, 'tercio', 'grabacion: lo guardado con un valor viejo no vale');
+// grabacion_lienzo (LIF-45): solo en computadora por defecto; off o todas desde PostHog.
+igual(def.grabacion_lienzo, 'compu', 'grabacion_lienzo: computadora por defecto');
+igual(['off', 'compu', 'todas', 'movil'].map(v => R.combinarBanderas(null, { grabacion_lienzo: { enabled: true, variant: v } }).grabacion_lienzo), ['off', 'compu', 'todas', 'compu'], 'grabacion_lienzo: variantes');
+igual(R.combinarBanderas(null, { grabacion_lienzo: { enabled: false } }).grabacion_lienzo, 'off', 'grabacion_lienzo: bandera booleana apagada');
 igual(R.banderasAsignadas(null, { 'muro-texto': { variant: 'b' } }), { 'muro-texto': 'b' }, 'solo se guarda lo que asignó PostHog, nunca un valor por defecto');
 igual(R.combinarBanderas({}, null, { 'muro-partidas-gratis': '1' })['muro-partidas-gratis'], '1', 'el por defecto puede salir de GRATIS');
 igual(R.config({ GRATIS: '1' }, R.banderasAsignadas(null, {})).gratis, 1, 'sin bandera asignada, GRATIS manda');

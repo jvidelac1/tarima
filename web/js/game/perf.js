@@ -14,7 +14,24 @@ import { QUALITY } from '../config.js';
  * los tres contraluces como término del material del pesista y la barra. Solo con el camino directo.
  */
 export const BARATO = Object.freeze({ piso: true, haces: 'no', bordes: 'material' });
-export const MOVIL = { label: 'Móvil', dpr: 1.5, maxPixels: 1280 * 720, msaa: 2, shadow: 512, shadowR: 4.5, shadow2: 0, ao: 0, aoScale: .5, dof: 0, dofSamples: 0, bloom: false, smaa: false, crowd: .3, beams: false, aniso: 2, tex: 1024, directo: true, barato: BARATO };
+/**
+ * Ambiente por calidad (ambiente.js y reflejo.js; Gráficos fase 1). Lo que no está acá es igual en todas: texturas de la
+ * tarima y del piso, pantalla LED viva, halos de las luces de arbitraje y la cámara con sensación (no cuestan por cuadro).
+ * - polvo: partículas de magnesio en el aire (un solo dibujo instanciado; todo el movimiento en el sombreador de vértices).
+ * - conos: fuerza de los conos de luz respecto de los haces de antes (1 = como estaban). «Móvil» y «Baja» no los dibujan
+ *   (Q.barato.haces = 'no'): ahí cada capa que se suma paga el tono por píxel.
+ * - reflejo: fracción de la resolución del reflejo planar de la tarima (0 = sin reflejo; dibuja la escena otra vez).
+ * - publico: las siluetas de la tribuna se mueven (solo existen con profundidad de campo: Media para arriba).
+ * «Móvil» y «Baja» solo suman lo que no cambia el costo del cuadro: pocas partículas y nada por píxel.
+ */
+export const AMBIENTE = Object.freeze({
+  movil: Object.freeze({ polvo: 1, conos: 1, reflejo: 0, publico: false }),
+  baja: Object.freeze({ polvo: 1, conos: 1, reflejo: 0, publico: false }),
+  media: Object.freeze({ polvo: 1, conos: .4, reflejo: 0, publico: true, superficies: false, rayos: 0 }),      // superficies y rayos (look.js, materiales.js): solo Alta y Ultra
+  alta: Object.freeze({ polvo: 1, conos: .45, reflejo: .5, publico: true, superficies: false }),      // superficies por función: solo Ultra hasta medir en una placa (por software, Alta costaba 42 % más)
+  ultra: Object.freeze({ polvo: 1, conos: .5, reflejo: 1, publico: true }),
+});
+export const MOVIL = { amb: AMBIENTE.movil, label: 'Móvil', dpr: 1.5, maxPixels: 1280 * 720, msaa: 2, shadow: 512, shadowR: 4.5, shadow2: 0, ao: 0, aoScale: .5, dof: 0, dofSamples: 0, bloom: false, smaa: false, crowd: .3, beams: false, aniso: 2, tex: 1024, directo: true, barato: BARATO };
 /**
  * Calidades del juego: las del visor (config.js, que no se toca) con estas diferencias.
  * - «Baja» y «Móvil» van por el camino directo (stage.js): una sola pasada al lienzo con el MSAA del lienzo y el tono y el
@@ -23,8 +40,15 @@ export const MOVIL = { label: 'Móvil', dpr: 1.5, maxPixels: 1280 * 720, msaa: 2
  * - En «Baja» la sombra va en un mapa de 512 con la misma penumbra en centímetros (lighting.js la pasa a texeles), y en
  *   todas solo proyectan sombra el pesista y la barra (stage.js).
  * - El juego nunca usa el desenfoque de movimiento de la barra (no reserva sus destinos).
+ * - «Ultra» no la elige nunca el modo automático: es «Alta» a la densidad de la pantalla (hasta 2), con más muestras, todo
+ *   el público, sombras más finas y el reflejo de la tarima a resolución completa. Se pide con `?calidad=ultra`.
  */
-export const PRESET = { movil: MOVIL, baja: { ...QUALITY.baja, shadow: 512, directo: true, barato: BARATO }, media: { ...QUALITY.media, mblur: 0 }, alta: { ...QUALITY.alta, mblur: 0 } };
+export const PRESET = {
+  movil: MOVIL, baja: { ...QUALITY.baja, shadow: 512, directo: true, barato: BARATO, amb: AMBIENTE.baja }, media: { ...QUALITY.media, mblur: 0, amb: AMBIENTE.media }, alta: { ...QUALITY.alta, mblur: 0, amb: AMBIENTE.alta },
+  ultra: { ...QUALITY.alta, label: 'Ultra', dpr: 2, maxPixels: 2560 * 1440, msaa: 4, shadow: 2048, shadow2: 1024, aoSamples: 16, dofSamples: 48, mblur: 0, crowd: 1, amb: AMBIENTE.ultra },
+};
+/** Nombres que acepta `?calidad=` (y `?q=`): los del juego, en inglés y «auto». */
+export const ALIAS_CALIDAD = { movil: 'movil', 'móvil': 'movil', mobile: 'movil', baja: 'baja', low: 'baja', media: 'media', medium: 'media', alta: 'alta', high: 'alta', ultra: 'ultra' };
 /** Fracción del período de la pantalla que puede costar un cuadro: el resto es margen para no perder un refresco. */
 export const MARGEN = .85;
 /** Cada escalón que baja el gobernador deja esta fracción de los píxeles. */
@@ -81,12 +105,13 @@ export function escalones(q, { sube = false, pasos = 1, piso = PISO_MP, tope = T
 }
 export const nombreDe = (Q, mp, sombras = true) => `${Q.label} ${mp.toFixed(2).replace('.', ',')} MP${sombras ? '' : ' sin sombras'}`;
 /**
- * Calidad de arranque. Con `?q=alta|media|baja|movil` queda fija (sin calibración ni gobernador); sin el parámetro es
+ * Calidad de arranque. Con `?calidad=ultra|alta|media|baja|movil` (o `?q=`; también low/medium/high) queda fija (sin calibración ni gobernador); sin el parámetro es
  * automática: arranca en «Baja» («Móvil» con puntero grueso) y la calibración decide calidad y resolución.
  * @returns {{auto:boolean, clave:string, Q:object}}
  */
 export function calidadInicial(pedida, grueso = false) {
-  if (PRESET[pedida]) return { auto: false, clave: pedida, Q: PRESET[pedida] };
+  pedida = ALIAS_CALIDAD[String(pedida || '').toLowerCase()] || null;
+  if (pedida) return { auto: false, clave: pedida, Q: PRESET[pedida] };
   const clave = grueso ? 'movil' : 'baja';
   return { auto: true, clave, Q: PRESET[clave] };
 }

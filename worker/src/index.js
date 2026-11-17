@@ -173,7 +173,7 @@ async function situacion({ request, env, ctx, b, i, ahora }) {
   // Con la final gratis cortada en el arranque la bandera de cuántas finales no se usa: se reporta lo que vale de verdad
   // (lo asignado por PostHog sigue guardado para cuando se vuelva a GRATIS_ETAPA='final').
   if (cfg.etapa === 'arranque') flags = { ...flags, 'muro-partidas-gratis': String(cfg.gratis) };
-  const c = await D.contar(env.DB, d, i, ahora);
+  const c = await D.contar(env.DB, d, i, ahora, { libre: cfg.encuesta_libre });
   const dec = R.decidir({ anotado: !!dev.lista_id, encuesta: !!dev.encuesta_en, usadas_d: c.usadas_d, usadas_i: c.usadas_i, encuestas_i: c.encuestas_i, cfg });
   // `jugador`: el mismo id seudónimo con el que se evalúan las banderas en PostHog (HMAC del dispositivo, nunca el uuid,
   // la IP ni el mail). Permite contar personas por día aunque posthog-js, sin cookies, estrene un id en cada carga.
@@ -181,13 +181,14 @@ async function situacion({ request, env, ctx, b, i, ahora }) {
   return { uuid, d, dev, flags, cfg, c, dec, contexto };
 }
 
-// La regla vigente, para los textos del juego: hasta dónde llega una final gratis, cuántas y cuánto suma la encuesta.
-const reglaDe = cfg => ({ etapa: cfg.etapa, gratis: cfg.gratis, bono: cfg.bono });
+// La regla vigente, para los textos del juego: hasta dónde llega una final gratis, cuántas, cuánto suma la encuesta y si
+// la encuesta desbloquea el juego libre (ENCUESTA_LIBRE).
+const reglaDe = cfg => ({ etapa: cfg.etapa, gratis: cfg.gratis, bono: cfg.bono, libre: cfg.encuesta_libre });
 
 async function estado(a) {
   const s = await situacion(a);
   const r = {
-    dispositivo: s.uuid, puede: s.dec.puede, quedan: s.dec.quedan, lista: !!s.dev.lista_id, etapa: s.dec.etapa,
+    dispositivo: s.uuid, puede: s.dec.puede, quedan: s.dec.quedan, lista: !!s.dev.lista_id, libre: s.dec.libre, etapa: s.dec.etapa,
     encuesta_disponible: s.dec.encuesta_disponible, flags: s.flags, contexto: s.contexto, regla: reglaDe(s.cfg), metricas: metricas(a.env),
   };
   if (s.dev.lista_id) r.lista_id = s.dev.lista_id;
@@ -202,12 +203,12 @@ async function partida(a) {
     if (!s.dec.puede) {
       return json({ estado: 'muro', motivo: s.dec.motivo, encuesta_disponible: s.dec.encuesta_disponible, dispositivo: s.uuid, flags: s.flags, contexto: s.contexto, regla: reglaDe(s.cfg) }, 200, setCookie(s.uuid));
     }
-    const id = await D.insertarPartida(env.DB, { d: s.d, i, ahora, fuente: s.dec.fuente, etapa: s.dec.etapa, usadas_d: s.c.usadas_d, usadas_i: s.c.usadas_i });
+    const id = await D.insertarPartida(env.DB, { d: s.d, i, ahora, fuente: s.dec.fuente, etapa: s.dec.etapa, usadas_d: s.c.usadas_d, usadas_i: s.c.usadas_i, sinTope: s.dec.libre, libre: s.cfg.encuesta_libre });
     if (!id) continue; // otro pedido cambió la cuenta en el medio: se vuelve a decidir
     const n = s.c.total_d + 1;
     return json({
       estado: 'ok', pase: await pase(env, { d: s.d, n, f: s.dec.fuente, e: s.dec.etapa, p: id, ahora }), fuente: s.dec.fuente, etapa: s.dec.etapa,
-      quedan: s.dec.quedan == null ? null : s.dec.quedan - 1, n, encuesta_disponible: s.dec.encuesta_disponible, dispositivo: s.uuid,
+      quedan: s.dec.quedan == null ? null : s.dec.quedan - 1, n, libre: s.dec.libre, encuesta_disponible: s.dec.encuesta_disponible, dispositivo: s.uuid,
       flags: s.flags, contexto: s.contexto, regla: reglaDe(s.cfg),
     }, 200, setCookie(s.uuid));
   }
@@ -229,21 +230,27 @@ async function envion(a) {
     if (!fila) throw new ErrorHttp(400, 'pase');
     const dec = R.decidirEnvion({
       etapa: fila.etapa, anotado: !!s.dev.lista_id, encuesta: !!s.dev.encuesta_en, encuesta_usada: !!fila.encuesta_usada,
-      encuesta_disponible: s.dec.encuesta_disponible, regla: s.cfg.etapa, bono: s.cfg.bono,
+      encuesta_disponible: s.dec.encuesta_disponible, regla: s.cfg.etapa, bono: s.cfg.bono, libre: s.cfg.encuesta_libre,
     });
     if (!dec.puede) {
       log('info', { msg: 'envion', via: 'muro' });
       return json({ estado: 'muro', motivo: dec.motivo, encuesta_disponible: dec.encuesta_disponible, dispositivo: s.uuid, regla: reglaDe(s.cfg) }, 200, setCookie(s.uuid));
     }
-    if (dec.via !== 'ya' && !(await D.pasarAlEnvion(env.DB, { id: fila.id, d: s.d, via: dec.via }))) continue; // otro pedido la cambió: se vuelve a leer
+    if (dec.via !== 'ya' && !(await D.pasarAlEnvion(env.DB, { id: fila.id, d: s.d, via: dec.via, libre: s.cfg.encuesta_libre }))) continue; // otro pedido la cambió: se vuelve a leer
     log('info', { msg: 'envion', via: dec.via });
     return json({
       estado: 'ok', via: dec.via, pase: await pase(env, { d: s.d, n: datos.n, f: datos.f, e: 'completa', p: fila.id, ahora }),
-      quedan: s.dec.quedan, lista: !!s.dev.lista_id, dispositivo: s.uuid, regla: reglaDe(s.cfg),
+      quedan: s.dec.quedan, lista: !!s.dev.lista_id, libre: s.dec.libre, dispositivo: s.uuid, regla: reglaDe(s.cfg),
     }, 200, setCookie(s.uuid));
   }
   throw new ErrorHttp(503, 'servidor');
 }
+
+// Dónde se anotó o contestó (para los eventos de PostHog): solo valores conocidos, nunca texto libre del navegador.
+const MOMENTOS = new Set(['podio', 'inicio', 'tras_arranque']);
+const PANTALLAS = new Set(['muro', 'invitacion']);
+const momentoDe = v => (MOMENTOS.has(v) ? v : null);
+const pantallaDe = v => (PANTALLAS.has(v) ? v : null);
 
 async function anotar({ request, env, ctx, url, b, ahora }) {
   // Trampa para bots: el formulario lleva un campo `web` escondido que una persona nunca completa.
@@ -295,6 +302,14 @@ async function anotar({ request, env, ctx, url, b, ahora }) {
   }
   const estado = yaLigado ? 'ya_estaba' : 'nuevo';
   log('info', { msg: 'anotar', estado, alta: nuevo, confirmar });
+  // LIF-46: el alta la cuenta el Worker, que es el único que sabe si el correo es nuevo (al navegador se le contesta lo
+  // mismo para no revelar quién está en la lista). `anotar_ok` solo para altas nuevas; `anotar_repetido` para un correo
+  // que ya estaba (desde este dispositivo o desde otro). Con el número interno de la lista como persona (el juego hace
+  // identify con el mismo), nunca el correo. Solo si el juego mide (`metricas: true`: no con la medición desactivada).
+  if (b.metricas === true) {
+    const props = { novedades: nuevo ? b.novedades === true : null, momento: momentoDe(b.momento), pantalla: pantallaDe(b.pantalla), idioma: idi, pais: paisDe(request, env), ...(nuevo ? {} : { mismo_dispositivo: yaLigado }) };
+    ctx.waitUntil(capturar(env, { event: nuevo ? 'anotar_ok' : 'anotar_repetido', distinct_id: fila.id, properties: props }).catch(() => null));
+  }
   return json({ estado, lista_id: fila.id, confirmar }, 200, setCookie(uuid));
 }
 
@@ -310,18 +325,24 @@ async function encuesta({ request, env, ctx, b, i, ahora }) {
   const dev = await D.asegurarDispositivo(env.DB, d, ahora);
   if (dev.encuesta_en) throw new ErrorHttp(409, 'ya_respondida');
   const cfg = R.config(env, {});
-  const premio = !dev.lista_id && cfg.bono > 0;
-  if (premio && (await D.encuestasDeIp(env.DB, i, ahora)) >= cfg.encuestas_por_ip) throw new ErrorHttp(409, 'ya_respondida');
+  // premio: la encuesta desbloquea algo (con ENCUESTA_LIBRE, el juego libre; con BONO_ENCUESTA, finales). Nunca para un
+  // anotado (ya juega libre): ahí es la encuesta opcional después del correo.
+  const premio = !dev.lista_id && (cfg.bono > 0 || cfg.encuesta_libre);
+  // Para desbloquear hay que contestar las dos preguntas (el texto libre sigue opcional).
+  if (premio && cfg.encuesta_libre && !R.encuestaCompleta(v.r)) throw new ErrorHttp(400, 'incompleta');
+  if (premio && (await D.encuestasDeIp(env.DB, i, ahora)) >= cfg.encuestas_por_ip) throw new ErrorHttp(409, 'ip');
   if (!(await D.registrarEncuesta(env.DB, { d, i: premio ? i : null, ahora }))) throw new ErrorHttp(409, 'ya_respondida');
 
+  const libre = premio && cfg.encuesta_libre;
   const sesion = typeof b.sesion === 'string' && /^[\w.:-]{1,200}$/.test(b.sesion) ? b.sesion : 'enc_' + crypto.randomUUID();
-  ctx.waitUntil(mandarEncuesta(env, { r: v.r, sesion, idioma: R.idioma(b.idioma), pais: paisDe(request, env) }));
-  return json({ estado: 'ok', bono: premio ? cfg.bono : 0 }, 200, setCookie(uuid));
+  log('info', { msg: 'encuesta', desbloquea: libre });
+  ctx.waitUntil(mandarEncuesta(env, { r: v.r, sesion, idioma: R.idioma(b.idioma), pais: paisDe(request, env), desbloquea: libre, momento: momentoDe(b.momento) }));
+  return json({ estado: 'ok', bono: premio ? cfg.bono : 0, libre }, 200, setCookie(uuid));
 }
 
-async function mandarEncuesta(env, { r, sesion, idioma, pais }) {
+async function mandarEncuesta(env, { r, sesion, idioma, pais, desbloquea = false, momento = null }) {
   if (!env.POSTHOG_KEY) { log('info', { msg: 'encuesta_sin_posthog' }); return; }
-  await capturar(env, { event: 'encuesta_respuesta', distinct_id: sesion, properties: R.propsRespuesta({ r, idioma, pais }) });
+  await capturar(env, { event: 'encuesta_respuesta', distinct_id: sesion, properties: { ...R.propsRespuesta({ r, idioma, pais }), desbloquea, momento } });
 }
 
 // Baja desde la página de privacidad. Responde siempre lo mismo, para no revelar quién está en la lista.
@@ -448,7 +469,7 @@ const puedeMandarMail = env => !!(env.EMAIL?.send && env.MAIL_DESDE);
 async function enviar(env, { to, subject, text, html, baja }) {
   try {
     await env.EMAIL.send({
-      to, from: { email: env.MAIL_DESDE, name: 'Tarima' }, subject, text, html,
+      to, from: { email: env.MAIL_DESDE, name: 'Lifting Game' }, subject, text, html,
       headers: { 'List-Unsubscribe': `<${baja}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
     });
     return true;

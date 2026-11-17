@@ -1,4 +1,4 @@
-// Nombre real para anotarse en la lista (LIF-32, pedido del dueño del 13 de noviembre): mínimo 5 caracteres, solo letras
+// Nombre real para anotarse en la lista (LIF-32, pedido del dueño del 13 de noviembre; desde el 15 de noviembre, mínimo 4): mínimo 4 caracteres, solo letras
 // (de cualquier idioma) con espacios, apóstrofo o guion entre palabras; sin números ni símbolos, sin letras repetidas
 // tipo «AAAA», sin tecleo al azar tipo «2394932fjdksAAA» y sin palabras de relleno («test», «asdf», «nombre»). Los
 // nombres pueden repetirse entre personas. Lo usan el juego (web/js/game/conexion.js y el Worker simulado de
@@ -24,7 +24,7 @@ export function nombreReal(v) {
   const n = v.normalize('NFC').trim().replace(/\s+/gu, ' ');
   if (!n) return { ok: false, motivo: 'vacio' };
   const largo = [...n].length;
-  if (largo < 5 || largo > 40) return { ok: false, motivo: 'largo' };
+  if (largo < 4 || largo > 40) return { ok: false, motivo: 'largo' };
   if (!SEPARADOR.test(n)) return { ok: false, motivo: 'caracteres' };
   const letras = [...n.replace(/[ '’-]/g, '')];
   if (letras.length < 4) return { ok: false, motivo: 'largo' };

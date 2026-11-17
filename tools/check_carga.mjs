@@ -63,6 +63,7 @@ async function abrir({ w = 844, h = 390, dpr = 2, touch = true, perfil = null, r
   page.on('console', m => { if (m.type() === 'error') problemas.push(`${tag} console.error: ${m.text()}`); });
   page.on('pageerror', e => problemas.push(`${tag} pageerror: ${e.message}`));
   page.on('response', r => { if (r.status() >= 400) problemas.push(`${tag} HTTP ${r.status()}: ${r.url()}`); });
+  page.pedidos = new Set(); page.on('request', r => { const u = r.url().split('?')[0]; if (/\/models\/[^/]+\.(glb|png|webp)$/.test(u) && !/detail_/.test(u)) page.pedidos.add(u); });      // modelos y máscaras pedidos: dos o tres modelos según el plantel
   if (perfil) {
     const P = PERFILES[perfil], cdp = await ctx.newCDPSession(page); await cdp.send('Network.enable');
     await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: P.rtt, downloadThroughput: P.mbps * 1e6 / 8, uploadThroughput: 1e6 / 8 });
@@ -72,14 +73,15 @@ async function abrir({ w = 844, h = 390, dpr = 2, touch = true, perfil = null, r
   return { ctx, page, tag };
 }
 const espera = (page, fn, ms, arg) => page.waitForFunction(fn, arg, { timeout: ms, polling: 100 }).then(() => true, () => false);
-const modelosBajados = () => { const r = performance.getEntriesByType('resource').filter(e => /\/models\/[^/?]+\.(glb|png|webp)$/.test(e.name) && !/detail_/.test(e.name)); return r.length >= 4 && r.every(e => e.responseEnd > 0) ? r : null; };
+const modelosBajados = n => { const r = performance.getEntriesByType('resource').filter(e => /\/models\/[^/?]+\.(glb|png|webp)$/.test(e.name) && !/detail_/.test(e.name)); return r.length >= Math.max(4, n || 0) && r.every(e => e.responseEnd > 0) ? r : null; };
 
 // ---------- mediciones ----------
 for (const perfil of USAR) {
   const { ctx, page, tag } = await abrir({ perfil });
   const tope = perfil === 'lenta' ? 400000 : 120000;
   const okPanel = await espera(page, () => window.__carga?.panel !== null && window.__carga?.panel !== undefined, tope);
-  const okMod = await espera(page, modelosBajados, tope);
+  // todos los pedidos de modelos salen juntos al cargar: cuando terminaron cuatro ya se sabe cuántos son (antes se cortaba en cuatro y con tres modelos medía de menos)
+  let okMod = await espera(page, modelosBajados, tope); if (okMod && page.pedidos.size > 4) okMod = await espera(page, modelosBajados, tope, page.pedidos.size);
   const m = await page.evaluate(() => {
     const rs = performance.getEntriesByType('resource'), cat = n => /\/models\/.*\.glb$/.test(n) ? 'modelos_glb' : /\/models\//.test(n) ? 'modelos_img' : /\.js$/.test(n) ? 'js' : /\.css$/.test(n) ? 'css' : /\.woff2$/.test(n) ? 'tipografias' : /\.json$/.test(n) ? 'datos' : 'otros';
     const bytes = {}, archivos = {};

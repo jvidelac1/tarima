@@ -23,14 +23,10 @@ export function tableroHTML(p, o = {}) {
 // datosTablero() es puro (lo prueba tools/sim_test.mjs); tableroVivoHTML() arma el DOM.
 
 /**
- * Orden en que van a levantar en la sesión: el llamado en curso primero y después los que tienen intentos, como los
- * ordena la partida (match.js, _siguiente: kilos pedidos, intentos hechos, quién levantó antes). Los que terminaron, al final.
+ * Orden en que van a levantar en la sesión: el llamado en curso primero y después los que tienen intentos, con la misma regla
+ * de la partida (match.js → ordenSalida: por rondas u oficial). Los que terminaron, al final.
  */
-export function ordenSalida(p, L = p.llamado) {
-  const lev = p.lev, cand = p.at.filter(a => a[lev].length < 3 && (!L || a.i !== L.a));
-  cand.sort((x, y) => (x.decl[lev] - y.decl[lev]) || (x[lev].length - y[lev].length) || (x.ult[lev] - y.ult[lev]) || (x.f.dorsal - y.f.dorsal));
-  return [...(L ? [p.at[L.a]] : []), ...cand, ...p.at.filter(a => a[lev].length >= 3 && (!L || a.i !== L.a))].map(a => a.i);
-}
+export const ordenSalida = (p, L = p.llamado) => p.ordenSalida(L);
 
 /**
  * Lo que muestra el tablero: una fila por pesista en el orden de salida y, al pie, la cuenta (quién va ganando) y la
@@ -38,9 +34,10 @@ export function ordenSalida(p, L = p.llamado) {
  * del jugador, y cuánto necesita para pasarlo (o si con lo que pidió lo pasa).
  * @param {object} p Partida  @param {number} yo  @param {object|null} L llamado en curso (sin resolver)
  * @param {object} cambios {índice: kilos que tenía pedidos antes de su último cambio}
- * @returns {null | {lev, filas: object[], pie: Array<{clave:string, kg?:number, rival?:number}>}}
+ * @param {Array<{a:number, a_kg:number}>} avisos  los cambios de los rivales en el último cierre («Brenner cambia a 167»)
+ * @returns {null | {lev, ronda, filas: object[], pie: Array<{clave:string, kg?:number, rival?:number}>}}
  */
-export function datosTablero(p, yo, L = p?.llamado ?? null, cambios = {}) {
+export function datosTablero(p, yo, L = p?.llamado ?? null, cambios = {}, avisos = []) {
   if (!p || (p.fase !== 's' && p.fase !== 'c')) return null;
   const lev = p.lev, tab = p.tabla(), orden = ordenSalida(p, L), sigue = orden.find(i => i !== L?.a && p.at[i][lev].length < 3);
   const filas = orden.map(i => {
@@ -56,6 +53,8 @@ export function datosTablero(p, yo, L = p?.llamado ?? null, cambios = {}) {
     };
   });
   const pie = [];
+  // los cambios de los rivales en el último cierre, mientras sigan pidiendo eso (LIF-4): «Brenner cambia a 167»
+  for (const c of avisos) if (c.a !== yo && filas.find(f => f.a === c.a)?.pide === c.a_kg) pie.push({ clave: 'tablero.cambia', rival: c.a, kg: c.a_kg });
   // la cuenta: quién va ganando y cuánto le falta al jugador (lo de ui/marcador.js, sin el «te pasa»: lo dice la estrategia)
   const m = marcadorDe(p, yo, null);
   if (m) pie.push({ clave: m.clave, kg: m.kg, rival: m.lider, ...(m.sub ? { sub: { clave: m.sub.clave, kg: m.sub.kg } } : {}) });
@@ -69,7 +68,7 @@ export function datosTablero(p, yo, L = p?.llamado ?? null, cambios = {}) {
     if (need !== null) partes.push(fr.pide >= need ? { clave: 'tablero.te_pasa', kg: fr.pide } : { clave: 'tablero.para_pasarte', kg: need });
     pie.push({ clave: 'tablero.rival', partes });
   }
-  return { lev, filas, pie };
+  return { lev, ronda: p.ronda ? p.ronda() : 0, filas, pie };
 }
 
 /**
@@ -91,8 +90,10 @@ export function tableroVivoHTML(d, o) {
     return `<tr class="${f.yo ? 'yo' : ''} ${f.estado}${f.cambio !== null ? ' cambio' : ''}" style="--c:${P.color}"><td class="tb-p">${f.puesto ?? ''}</td><td class="tb-n"><i style="background:${P.bandera}"></i><span>${nom}${extra}</span></td>${cols}<td class="tb-pide">${pide}</td><td class="tb-e">${C ? '' : puntos(f)}${estado(f)}</td></tr>`;
   }).join('');
   const cab = C ? `<th></th><th></th><th>${T(dt ? 'tabla.total' : 'tablero.mejor')}</th><th>${T('tablero.pide')}</th><th></th>`
-    : `<th></th><th>${esc(t('lev.' + lev))}</th>${dt ? `<th>${T('tablero.col_s')}</th><th>${T('tablero.col_c')}</th><th>${T('tabla.total')}</th>` : `<th>${T('tablero.mejor')}</th>`}<th>${T('tablero.pide')}</th><th></th>`;
+    : `<th></th><th>${esc(t('lev.' + lev))}${d.ronda ? ` · ${T('tablero.ronda', { n: d.ronda })}` : ''}</th>${dt ? `<th>${T('tablero.col_s')}</th><th>${T('tablero.col_c')}</th><th>${T('tabla.total')}</th>` : `<th>${T('tablero.mejor')}</th>`}<th>${T('tablero.pide')}</th><th></th>`;
   const txt = x => { const datos = { ...x, rival: x.rival !== undefined ? o.corto(x.rival) : '' }; return t(x.clave, datos); };
-  const pieTxt = d.pie.filter(x => !C || x.clave === 'tablero.rival').map(x => x.clave === 'tablero.rival' ? x.partes.map(txt).join(' · ') : [txt(x), x.sub ? txt(x.sub) : ''].filter(Boolean).join(' · '));
-  return `<table class="tb"><thead><tr>${cab}</tr></thead><tbody>${filas}</tbody></table>${pieTxt.length ? `<div class="tb-pie">${pieTxt.map((s, k) => `<p class="${k === pieTxt.length - 1 && d.pie.at(-1).clave === 'tablero.rival' ? 'est' : ''}">${esc(s)}</p>`).join('')}</div>` : ''}`;
+  // en el teléfono una sola línea al pie: el cambio de un rival si lo hubo, si no la estrategia del rival que importa
+  const hay = d.pie.some(x => x.clave === 'tablero.cambia'), pie = d.pie.filter(x => !C || x.clave === (hay ? 'tablero.cambia' : 'tablero.rival'));
+  const pieTxt = pie.map(x => ({ cls: x.clave === 'tablero.rival' ? 'est' : x.clave === 'tablero.cambia' ? 'cambia' : '', s: x.clave === 'tablero.rival' ? x.partes.map(txt).join(' · ') : [txt(x), x.sub ? txt(x.sub) : ''].filter(Boolean).join(' · ') }));
+  return `<table class="tb"><thead><tr>${cab}</tr></thead><tbody>${filas}</tbody></table>${pieTxt.length ? `<div class="tb-pie">${pieTxt.map(x => `<p class="${x.cls}">${esc(x.s)}</p>`).join('')}</div>` : ''}`;
 }

@@ -51,12 +51,12 @@ export class CameraRig {
    * El arrastre orbita alrededor del blanco y la rueda acerca o aleja.
    */
   setShot(shot) {
-    this.shot = shot || null; this._shotNew = true; this.manual = false; this.zoom = this.zoomT = 1;
+    this.shot = shot || null; this.fijo = false; this._shotNew = true; this.manual = false; this.zoom = this.zoomT = 1;
     if (shot) { this.az = this.azT = shot.az; this.el = this.elT = shot.el; } else this.cut(this.index);
   }
   /** Corte a una cámara fija. */
   cut(i) {
-    this.shot = null;
+    this.shot = null; this.fijo = false;
     this.index = clamp(i | 0, 0, CAMERAS.length - 1); const c = CAMERAS[this.index]; this.top = 99;
     this.az = this.azT = c.az; this.el = this.elT = c.el; this.zoom = this.zoomT = 1; this.manual = false; this.camera.fov = c.fov; this.time = 0; Object.assign(this._in, this.inset);
   }
@@ -67,13 +67,29 @@ export class CameraRig {
    */
   suave(seg = .7) {
     if (this.reduceMotion || !(seg > 0)) { this.mezcla = null; return; }
-    const c = this.camera; this.mezcla = { p: c.position.clone(), q: c.quaternion.clone(), fov: c.fov, t: 0, dur: seg };
+    const c = this.camera; this.mezcla = { p: c.position.clone(), q: c.quaternion.clone(), fov: c.fov, t: 0, dur: seg, T: this.target.clone() };
   }
   _mezclar(dt) {
     const M = this.mezcla; if (!M) return;
     M.t += dt; const u = Math.min(1, M.t / M.dur), k = u * u * (3 - 2 * u), cam = this.camera;
     const p = (this._mp ||= new THREE.Vector3()).copy(cam.position), q = (this._mq ||= new THREE.Quaternion()).copy(cam.quaternion);
-    cam.position.copy(M.p).lerp(p, k); cam.quaternion.copy(M.q).slerp(q, k); cam.fov = M.fov + (cam.fov - M.fov) * k;
+    // Si las dos cámaras miran más o menos al mismo sujeto, la transición lo rodea (un arco alrededor del blanco, con la
+    // distancia interpolada) en vez de ir por la cuerda: en línea recta, de un costado al otro, la cámara le pasaba al
+    // pesista por al lado y lo dejaba cortado en el borde. Si miran a lugares distintos o quedan enfrentadas, línea recta.
+    const a = (this._ma ||= new THREE.Vector3()).copy(M.p).sub(M.T), b = (this._mb ||= new THREE.Vector3()).copy(p).sub(this.target), la = a.length(), lb = b.length();
+    if (la > .5 && lb > .5 && M.T.distanceTo(this.target) < 3 && a.dot(b) / (la * lb) > -.5) {
+      const g = (this._mg ||= new THREE.Quaternion()).setFromUnitVectors(a.multiplyScalar(1 / la), b.multiplyScalar(1 / lb)), h = (this._mh ||= new THREE.Quaternion()).identity().slerp(g, k);
+      cam.position.copy(M.T).lerp(this.target, k).addScaledVector(a.applyQuaternion(h), la + (lb - la) * k); if (cam.position.y < .08) cam.position.y = .08;
+    } else cam.position.copy(M.p).lerp(p, k);
+    // Hacia una cámara propia (primera persona) el giro va por rumbo e inclinación, con el horizonte nivelado: el camino más
+    // corto entre dos orientaciones tan distintas (de afuera a los ojos, que miran casi a plomo) ladeaba la imagen a mitad de camino.
+    if (this.propia) {
+      const e0 = (this._me0 ||= new THREE.Euler()).setFromQuaternion(M.q, 'YXZ'), e1 = (this._me1 ||= new THREE.Euler()).setFromQuaternion(q, 'YXZ');
+      let dy = e1.y - e0.y; dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI;
+      const kr = 1 - (1 - u) ** 3;      // el giro llega antes que la posición: la mirada ya está en la barra mientras la cámara termina de entrar
+      cam.rotation.set(e0.x + (e1.x - e0.x) * kr, e0.y + dy * kr, e0.z + (e1.z - e0.z) * kr, 'YXZ');
+    } else cam.quaternion.copy(M.q).slerp(q, k);
+    cam.fov = M.fov + (cam.fov - M.fov) * k;
     cam.updateProjectionMatrix(); cam.updateMatrixWorld();
     if (u >= 1) this.mezcla = null;
   }
@@ -85,8 +101,10 @@ export class CameraRig {
   setAspect(a) { this.camera.aspect = a; this.camera.updateProjectionMatrix(); }
 
   update(dt) {
-    const c = CAMERAS[this.index], cam = this.camera; this.time += dt;
-    this.az = damp(this.az, this.azT, 7, dt); this.el = damp(this.el, this.elT, 7, dt); this.zoom = damp(this.zoom, this.zoomT, 7, dt);
+    const c = CAMERAS[this.index], cam = this.camera; if (!this.fijo) this.time += dt;      // `fijo` (el juego, al terminar el intento): ni deriva, ni reencuadre, ni márgenes nuevos
+    if (!this.fijo) { this.az = damp(this.az, this.azT, 7, dt); this.el = damp(this.el, this.elT, 7, dt); this.zoom = damp(this.zoom, this.zoomT, 7, dt); }
+    // cámara propia (el juego: primera persona): `propia(cam, dt)` la arma entera; acá solo se le suma la transición suave
+    if (this.propia) { this.propia(cam, dt); this.top = 99; this._mezclar(dt); return; }
     if (this.shot) {
       const sh = this.shot, d = sh.d * this.height * this.zoom, ce = Math.cos(this.el);
       if (this._shotNew) { this._shotAt.copy(this.shotAt); this._shotNew = false; } else this._shotAt.lerp(this.shotAt, 1 - Math.exp(-(this.reduceMotion ? 60 : 14) * dt));
@@ -99,12 +117,12 @@ export class CameraRig {
     }
     const drift = (this.reduceMotion || this.manual) ? 0 : Math.sin(this.time * .16) * c.drift;
     const az = this.az + drift, el = this.el, I = this._in, snap = this.top > 50;
-    for (const k of ['t', 'b', 'l', 'r']) I[k] = snap ? this.inset[k] : damp(I[k], this.inset[k], 5, dt);
+    if (!this.fijo || snap) for (const k of ['t', 'b', 'l', 'r']) I[k] = snap ? this.inset[k] : damp(I[k], this.inset[k], 5, dt);
     // encuadre: atleta y barra completos dentro del rectángulo libre de gráfica. El borde superior se anticipa a la barra
     // (barAhead = altura máxima en el próximo segundo y medio), como un operador que conoce el levantamiento:
     // radio de disco + flecha del whip + aire.
     const topT = Math.max(this.height * 1.09, this.headY + .2, Math.max(this.barY, this.barAhead) + .225 + .06 + .09);
-    this.top = snap || Math.abs(topT - this.top) > 1.5 ? topT : damp(this.top, topT, this.reduceMotion ? 50 : (topT > this.top ? 4.2 : 1.6), dt);
+    if (!this.fijo || snap) this.top = snap || Math.abs(topT - this.top) > 1.5 ? topT : damp(this.top, topT, this.reduceMotion ? 50 : (topT > this.top ? 4.2 : 1.6), dt);
     const top = this.top, bottom = -.16, H = top - bottom, jib = c.key === 'jib';
     const W = 2.5 * Math.abs(Math.cos(az)) + 1.5 * Math.abs(Math.sin(az)) + .45;
     const fh = Math.max(.4, 1 - I.t - I.b), fw = Math.max(.4, 1 - I.l - I.r);

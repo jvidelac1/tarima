@@ -2,10 +2,11 @@
 // teclado. Este módulo no sabe nada del juego: lo carga juego.html por su cuenta (y main.js lo importa: es el mismo).
 // - De costado: html.horiz (y html.bajo si el alto que queda es de teléfono, 600 px o menos). Las reglas de juego.css y
 //   bienvenida.css cuelgan de esas clases y no de (orientation:landscape), porque…
-// - …en vertical (teléfono con la rotación trabada, o que todavía no giró) el contenido se gira 90° (html.rotado): #app
-//   toma como ancho el alto de la pantalla y se rota, así se juega con el teléfono acostado igual. Si el teléfono rota de
-//   verdad, se usa la orientación real. El lienzo mide su tamaño sin transformar (clientWidth/Height) y los toques no
-//   usan coordenadas, así que el 3D y la entrada no cambian. Antes se bloqueaba con «Gira el teléfono».
+// - En vertical (LIF-50, 16-nov) se juega parado, sin girar nada: html.vert. El escenario ocupa toda la pantalla con el
+//   pesista encuadrado en la parte de arriba (main.js le pasa a la cámara el margen de abajo), y abajo quedan la barrita y
+//   el botón redondo bajo el pulgar, en el centro (sirve para las dos manos). Las reglas están en juego.css («teléfono
+//   parado»). Antes (12 a 15-nov) el contenido se giraba 90° (html.rotado) y había que jugar con el teléfono acostado: queda
+//   con `?vertical=girado` para comparar. Antes de eso se bloqueaba con «Gira el teléfono».
 // - El botón se hunde con cada dedo (varios dedos cuentan como toques: cada puntero es un contacto en input.js).
 // - Pantalla completa y orientación horizontal al tocar un botón con `data-completa` (o con telefono.pantallaCompleta()
 //   desde el manejador de un toque): Android sí. El iPhone no deja (ninguna página, ni en Safari ni en Chrome: todos usan
@@ -22,15 +23,15 @@ import { esCampo } from './input.js';
 const TXT = {
   es: {
     listo: 'Listo', ok: 'Entendido',
-    'instalar.safari': 'Pantalla completa: toca Compartir (o ··· y después Compartir), elige «Agregar a inicio» y abre Tarima desde el ícono.',
-    'instalar.chrome': 'Pantalla completa: toca Compartir en la barra de la dirección, elige «Agregar a la pantalla de inicio» y abre Tarima desde el ícono.',
-    'instalar.otro': 'Pantalla completa: abre Compartir en el menú del navegador, elige «Agregar a inicio» y abre Tarima desde el ícono.',
+    'instalar.safari': 'Pantalla completa: toca Compartir (o ··· y después Compartir), elige «Agregar a inicio» y abre Lifting Game desde el ícono.',
+    'instalar.chrome': 'Pantalla completa: toca Compartir en la barra de la dirección, elige «Agregar a la pantalla de inicio» y abre Lifting Game desde el ícono.',
+    'instalar.otro': 'Pantalla completa: abre Compartir en el menú del navegador, elige «Agregar a inicio» y abre Lifting Game desde el ícono.',
   },
   en: {
     listo: 'Done', ok: 'Got it',
-    'instalar.safari': 'Full screen: tap Share (or ··· then Share), choose “Add to Home Screen” and open Tarima from the icon.',
-    'instalar.chrome': 'Full screen: tap Share in the address bar, choose “Add to Home Screen” and open Tarima from the icon.',
-    'instalar.otro': 'Full screen: open Share in the browser menu, choose “Add to Home Screen” and open Tarima from the icon.',
+    'instalar.safari': 'Full screen: tap Share (or ··· then Share), choose “Add to Home Screen” and open Lifting Game from the icon.',
+    'instalar.chrome': 'Full screen: tap Share in the address bar, choose “Add to Home Screen” and open Lifting Game from the icon.',
+    'instalar.otro': 'Full screen: open Share in the browser menu, choose “Add to Home Screen” and open Lifting Game from the icon.',
   },
 };
 const CLAVES = { listo: 'campo.listo', ok: 'instalar.cerrar', 'instalar.safari': 'instalar.safari', 'instalar.chrome': 'instalar.chrome', 'instalar.otro': 'instalar.otro' };
@@ -42,6 +43,7 @@ const guardado = {
 };
 
 let instalado = false, traducir = null;
+const GIRADO = typeof location !== 'undefined' && new URLSearchParams(location.search).get('vertical') === 'girado';
 const oyentes = new Set();
 function idioma() { return (document.documentElement.lang || 'es').toLowerCase().startsWith('en') ? 'en' : 'es'; }
 function texto(k) {
@@ -56,14 +58,24 @@ const esIPhone = () => /iPhone|iPod/.test(navigator.userAgent);
 const navegadorIOS = () => { const ua = navigator.userAgent; return /CriOS\//.test(ua) ? 'chrome' : /FxiOS|EdgiOS|OPiOS|OPT\/|GSA\/|DuckDuckGo|YaBrowser|Brave/.test(ua) ? 'otro' : 'safari'; };
 const instaladaComoApp = () => navigator.standalone === true || (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches);
 
+/** Áreas seguras de arriba y de abajo (muesca y barra de inicio), en px: una sonda con env() en el relleno. */
+let sonda = null;
+function seguras() {
+  if (!sonda) { sonda = document.createElement('div'); sonda.setAttribute('aria-hidden', 'true'); sonda.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)'; document.body.append(sonda); }
+  const c = getComputedStyle(sonda); return { t: parseFloat(c.paddingTop) || 0, b: parseFloat(c.paddingBottom) || 0 };
+}
 /** Medidas de lo visible (sin las barras del navegador ni el teclado), en píxeles CSS. */
 function visible() { const v = window.visualViewport; return { w: v ? v.width : innerWidth, h: v ? v.height : innerHeight, y: v ? v.offsetTop : 0 }; }
 
 export const telefono = {
   /** Puntero grueso (teléfono o tableta). */
   get tactil() { return mq('tactil').matches; },
-  /** Teléfono en vertical (pantalla de 600 px o menos de ancho): el contenido va girado. */
-  get rotado() { return this.tactil && mq('retrato').matches && Math.min(innerWidth, innerHeight) <= 600; },
+  /** Contenido girado 90° en vertical: ya no por defecto (LIF-50); solo con `?vertical=girado` en un teléfono de 600 px o menos. */
+  get rotado() { return GIRADO && this.tactil && mq('retrato').matches && Math.min(innerWidth, innerHeight) <= 600; },
+  /** Teléfono o tableta parados, jugando en vertical sin girar el contenido (html.vert). */
+  get parado() { const v = visible(); return this.tactil && !this.rotado && v.h > v.w; },
+  /** 'vertical' u 'horizontal': cómo se está jugando (para la analítica; con el contenido girado es 'horizontal'). */
+  get orientacion() { return this.parado ? 'vertical' : 'horizontal'; },
   /** Ya no hay pantalla que bloquee el juego en vertical (se gira el contenido): queda en false para quien lo pregunte. */
   get vertical() { return false; },
   /** Está en pantalla completa. */
@@ -82,7 +94,7 @@ export const telefono = {
   /** Llama a `cb(rotado)` cada vez que el teléfono gira o cambia lo visible. Devuelve cómo dejar de escuchar. */
   alGirar(cb) { const f = () => cb(this.rotado); oyentes.add(f); return () => oyentes.delete(f); },
   /**
-   * Pantalla completa y horizontal fija, donde el navegador deja. Tiene que llamarse dentro del manejador de un toque o un
+   * Pantalla completa (sin fijar la orientación: se juega parado o acostado), donde el navegador deja. Tiene que llamarse dentro del manejador de un toque o un
    * clic (el navegador lo exige). En una computadora no hace nada. Devuelve true si quedó en pantalla completa.
    */
   async pantallaCompleta() {
@@ -98,7 +110,8 @@ export const telefono = {
         await pide.call(el, { navigationUI: 'hide' });
       }
     } catch { this.avisoInstalar(); return false; }
-    try { await screen.orientation?.lock?.('landscape'); } catch { /* no todos dejan fijar la orientación */ }
+    // LIF-50: se juega en la orientación en que está el teléfono; antes se fijaba horizontal
+    try { if (GIRADO) await screen.orientation?.lock?.('landscape'); } catch { /* no todos dejan fijar la orientación */ }
     this.medir(); return !!pantallaActiva();
   },
   /**
@@ -126,6 +139,14 @@ export const telefono = {
     html.style.setProperty('--app-w', w + 'px'); html.style.setProperty('--app-h', h + 'px'); html.style.setProperty('--app-tx', v.w + 'px');
     html.style.setProperty('--vvh', v.h + 'px'); html.style.setProperty('--vvy', v.y + 'px');
     html.classList.toggle('horiz', tac && w > h); html.classList.toggle('bajo', tac && w > h && h <= 600);
+    html.classList.toggle('vert', tac && !rot && h > w); html.classList.toggle('angosto', tac && !rot && h > w && w <= 380);
+    // parado: medidas del pie (botón redondo y barrita encima) y del techo (botones chicos), en px. Las usan juego.css y la
+    // cámara (main.js, margenVertical: encuadra al pesista en lo que queda libre entre los dos)
+    if (tac && !rot && h > w) {
+      const u = Math.min(17, Math.max(9, h * .017)), boton = Math.round(Math.min(124, Math.max(84, h * .125)));
+      const sg = seguras();
+      html.style.setProperty('--boton-v', boton + 'px'); html.style.setProperty('--pie-v', Math.round(sg.b + boton + 26 + u * 5.2) + 'px'); html.style.setProperty('--techo-v', Math.round(sg.t + 56 + u * 1.2) + 'px');
+    }
     for (const f of [...oyentes]) f();
   },
   /**

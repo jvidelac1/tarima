@@ -19,6 +19,13 @@
 //     eventos del grabador, cuadros y tareas largas DURANTE el intento. Falla si el grabador manda más de
 //     MAX_MUT_S mutaciones por segundo en el intento o si el nombre del jugador aparece en la grabación. Los cuadros se
 //     informan (con dibujo por software no dicen mucho) y se comparan las dos corridas.
+//  7. El lienzo 3D en la grabación (LIF-45, bandera `grabacion_lienzo`): en la página de prueba (sin escena del juego)
+//     no sale ningún cuadro del lienzo (los carteles con el nombre no se pueden ubicar: falla cerrada); en el juego
+//     dibujado (por software) hasta el final del primer intento propio, con el lienzo y sin él: cuadros del lienzo que
+//     llegan, KB por segundo, cuadros negros, lo que cuesta cada captura en el hilo principal (createImageBitmap y
+//     regionesLienzo), cuadros y tareas largas. Guarda algunos cuadros en out/analitica/lienzo_*.png para mirarlos.
+//     Grabando el lienzo, los carteles del 3D dicen «LIFTING GAME» cuando levanta el jugador (y entonces no se tapa nada);
+//     sin el lienzo, su nombre.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -44,6 +51,7 @@ const NOMBRE = 'Zoraida', ESCRITO = 'Wilfredo', CORREO = 'secreto@ejemplo.com', 
 
 let conClave = true;
 let flagGrab = 'off';                 // bandera `grabacion` que devuelve /api/estado
+let flagLienzo = 'off';               // bandera `grabacion_lienzo` (las secciones 5 y 6 miden la página sola)
 const llegadas = [];   // lo que recibió /qx
 const bajas = [];
 
@@ -76,6 +84,9 @@ const rrwebDe = desde => llegadas.slice(desde).filter(l => l.ruta.startsWith('/q
 // Nodos serializados de una instantánea completa (para mirar lienzos y bloqueos).
 function nodos(n, out = []) { if (n && typeof n === 'object') { out.push(n); for (const c of n.childNodes || []) nodos(c, out); } return out; }
 const esMutacion = e => e.type === 3 && e.data?.source === 0;
+// Un cuadro del lienzo: mutación de lienzo (source 9) con un drawImage de un Blob (lo que manda el grabador a pocos cuadros por segundo).
+const esCuadroLienzo = e => e.type === 3 && e.data?.source === 9;
+const base64DeCuadro = e => { for (const c of e.data?.commands || []) { const b = c?.args?.[0]?.args?.[0]?.data?.[0]?.base64; if (b) return { b64: b, tipo: c.args[0].args[0].type || 'image/webp' }; } return null; };
 // De qué nodo de la página (el id propio o el del antepasado más cercano con id) es cada nodo de la grabación.
 function mapaNodos(ev) {
   const m = new Map();
@@ -114,7 +125,7 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': 'tdv=aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee; Path=/api; HttpOnly; SameSite=Strict' });
       res.end(JSON.stringify({
         dispositivo: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', puede: true, quedan: null, lista: true, lista_id: LISTA_ID, encuesta_disponible: false,
-        flags: { 'muro-partidas-gratis': '2', 'muro-texto': 'b', 'invitacion-podio1': 'on', grabacion: flagGrab },
+        flags: { 'muro-partidas-gratis': '2', 'muro-texto': 'b', 'invitacion-podio1': 'on', grabacion: flagGrab, grabacion_lienzo: flagLienzo },
         contexto: { pais: 'UY', previas: 1, dias: '0' },
         metricas: conClave ? { clave: CLAVE, host: '/qx', ui: 'https://us.posthog.com' } : null,
       }));
@@ -142,7 +153,7 @@ window.__activa = await a.iniciar({ estado: e, idioma: 'es', idioma_origen: 'url
 a.visita('muro');
 a.ev('muro_visto', { motivo: 'dispositivo', caminos: 'mail', origen: 'podio', variante_texto: a.bandera('muro-texto') });
 a.identificar('${LISTA_ID}');
-a.ev('anotar_ok', { estado: 'nuevo', pantalla: 'muro', finales_previas: 2 });
+a.ev('anotar_respuesta', { estado: 'nuevo', pantalla: 'muro', finales_previas: 2 });
 a.encuestaVista({ momento: 'tras_arranque' });
 a.ev('encuesta_enviada', { momento: 'tras_arranque', plataforma: 'app', features: 2, otra: true });
 window.__sesion = a.idSesion();
@@ -186,6 +197,7 @@ const s = crearServidor(), a = crearAnalitica({ azar: () => Number(q.get('azar')
 const e = await s.estado({ idioma: 'es' });
 window.__activa = await a.iniciar({ estado: e, idioma: 'es', idioma_origen: 'url', version: 'prueba', pantalla: 'bienvenida' });
 window.__grabando = a.grabando();
+window.__lienzo = a.grabandoLienzo();
 setTimeout(tardio, 200);
 window.__listo = true;
 </script>`);
@@ -246,7 +258,7 @@ const pedidos1 = [];
   const eventos = llegadas.flatMap(l => l.eventos);
   const nombres = eventos.map(e => e.event);
   ok(llegadas.length > 0, `llegaron pedidos a /qx (${llegadas.map(l => l.ruta).join(' ')})`);
-  for (const ev of ['juego_abierto', 'muro_visto', 'anotar_ok', 'encuesta_vista', 'encuesta_enviada']) ok(nombres.includes(ev), `llegó ${ev} por /qx`);
+  for (const ev of ['juego_abierto', 'muro_visto', 'anotar_respuesta', 'encuesta_vista', 'encuesta_enviada']) ok(nombres.includes(ev), `llegó ${ev} por /qx`);
   ok(!nombres.some(n => /^survey /.test(n)), 'sin eventos de la API de Surveys de PostHog');
   ok(nombres.includes('$identify') || eventos.some(e => e.props.distinct_id === LISTA_ID || e.props.$user_id === LISTA_ID), 'identify con lista_id');
   const todo = JSON.stringify(eventos);
@@ -302,11 +314,17 @@ const pedidos1 = [];
   ok(!/\bvos\b|tenés|podés|querés|anotate|escribinos/i.test(await page.locator('article[lang=es]').innerText()), 'español sin voseo');
   {
     const es = await page.locator('article[lang=es] [data-grabacion]').innerText(), en = await page.locator('article[lang=en] [data-grabacion]').textContent();
-    ok(/una de cada tres/.test(es) && /3D/.test(es) && /tapados/.test(es) && /correo/.test(es) && /one in three/.test(en) && /3D/.test(en) && /blanked out/.test(en),
-      'la privacidad explica la grabación en los dos idiomas: proporción, sin 3D y campos tapados');
-    ok(/2026-11-d/.test(await page.locator('article[lang=es] .version').innerText()), 'la privacidad está en la versión 2026-11-d');
+    ok(/una de cada tres/.test(es) && /tapados/.test(es) && /correo/.test(es) && /one in three/.test(en) && /blanked out/.test(en),
+      'la privacidad explica la grabación en los dos idiomas: proporción y campos tapados');
+    // LIF-45: el 3D se graba (por defecto en computadoras) con los carteles del nombre tapados; ya no se promete lo contrario
+    ok(/grabamos la imagen 3D/.test(es) && /solo en computadoras/.test(es) && /carteles[^.]*no muestran tu nombre[^.]*LIFTING GAME/.test(es) && !/No grabamos la imagen 3D/.test(es)
+      && /record the 3D picture/.test(en) && /only on computers/.test(en) && /don't show your name[^.]*LIFTING GAME/.test(en) && !/don't record the 3D/i.test(en),
+      'la privacidad dice que se graba el 3D (por defecto en computadoras) con los carteles diciendo LIFTING GAME en vez del nombre');
+    ok(/2026-11-g/.test(await page.locator('article[lang=es] .version').innerText()), 'la privacidad está en la versión 2026-11-g');
     const txt = await page.locator('article[lang=es]').innerText();
-    ok(/dos preguntas/.test(txt) && /opcional/.test(txt) && !/una por mes|al mes/.test(txt) && !/encuesta[^.]*finales/i.test(txt), 'en español: la encuesta opcional de dos preguntas, sin finales de premio, y las novedades sin frecuencia');
+    // el texto de la encuesta sigue a la regla que se publica (worker/wrangler.jsonc): con ENCUESTA_LIBRE "1" (LIF-53) desbloquea el juego libre; con "0" es opcional y no da nada
+    const encuestaLibre = /"ENCUESTA_LIBRE":\s*"1"/.test((await import('node:fs')).readFileSync(new URL('../worker/wrangler.jsonc', import.meta.url), 'utf8'));
+    ok(/dos preguntas/.test(txt) && (encuestaLibre ? /jugar sin límite/.test(txt) : /no da ni quita nada/.test(txt) && !/jugar sin límite/.test(txt)) && !/una por mes|al mes/.test(txt) && !/encuesta[^.]*finales/i.test(txt), encuestaLibre ? 'en español: la encuesta de dos preguntas, que desbloquea el juego libre (LIF-53), sin finales de premio, y las novedades sin frecuencia' : 'en español: la encuesta de dos preguntas, opcional y que no da ni quita nada, sin finales de premio, y las novedades sin frecuencia');
   }
   await page.click('article[lang=es] [data-medicion-boton]');
   ok(await page.evaluate(() => localStorage.getItem('tarima.medicion')) === '0', 'el interruptor apaga la medición');
@@ -354,7 +372,7 @@ async function paginaGrabacion({ flag, azar = 0, medicion = true }) {
   const desde = llegadas.length;
   await page.goto(base + `__grabacion.html?azar=${azar}`);
   await page.waitForFunction(() => window.__listo === true, null, { timeout: 20000 });
-  const r = await page.evaluate(() => ({ activa: window.__activa, grabando: window.__grabando }));
+  const r = await page.evaluate(() => ({ activa: window.__activa, grabando: window.__grabando, lienzo: window.__lienzo }));
   return { ctx, page, pedidos, desde, ...r, grabador: () => pedidos.some(u => /vendor\/posthog\/lazy-recorder\.js/.test(u)) };
 }
 {
@@ -393,6 +411,24 @@ async function paginaGrabacion({ flag, azar = 0, medicion = true }) {
   const mutAnim = ev.filter(e => esMutacion(e) && e.timestamp >= t0 && e.timestamp <= t1);
   ok(mutAnim.length <= 3, `la señal que cambia en cada cuadro no llega al grabador: ${crudas} mutaciones del DOM en ${cuadros} cuadros, ${mutAnim.length} eventos de mutación grabados`);
   ok(!llegadas.slice(g.desde).some(l => /^\/qx\/(static|array|flags|decide)/.test(l.ruta)), `no se pide nada más a PostHog (${[...new Set(llegadas.slice(g.desde).map(l => l.ruta))].join(' ')})`);
+  await g.ctx.close();
+}
+{
+  // Con el lienzo prendido pero sin la escena del juego: regionesLienzo no encuentra los carteles y el grabador no manda
+  // ningún cuadro del lienzo (falla cerrada); el lienzo ya no va bloqueado (se ve su nodo, sin imagen).
+  flagLienzo = 'todas';
+  const g = await paginaGrabacion({ flag: 'todas', azar: 0.99 });
+  flagLienzo = 'off';
+  ok(g.grabando && g.lienzo, `lienzo=todas: graba la página y el lienzo (grabando ${g.grabando}, lienzo ${g.lienzo})`);
+  await g.page.evaluate(ms => window.__animar(ms), 2500);
+  await g.page.waitForTimeout(3000);
+  await g.page.evaluate(() => { document.dispatchEvent(new Event('visibilitychange')); window.dispatchEvent(new Event('pagehide')); });
+  await g.page.waitForTimeout(1500);
+  const ev = rrwebDe(g.desde), todo = JSON.stringify(ev);
+  const n = ev.filter(e => e.type === 2 && !e.ilegible).flatMap(e => nodos(e.data?.node));
+  ok(n.some(x => x.tagName === 'canvas' && x.attributes?.id === 'gl'), 'lienzo=todas: el lienzo ya no va bloqueado');
+  ok(!ev.some(esCuadroLienzo) && !/rr_dataURL|data:image\//.test(todo), `lienzo=todas sin la escena del juego: ningún cuadro del lienzo (${ev.filter(esCuadroLienzo).length})`);
+  ok(!todo.includes(NOMBRE) && !todo.includes('TIRA'), 'lienzo=todas: el nombre sigue tapado y la señal bloqueada');
   await g.ctx.close();
 }
 {
@@ -443,7 +479,7 @@ async function interactuarJuego(page) {
     }
     if (s.panel && !s.sobre) {
       // el primer botón con el ratón (para PostHog es una interacción), después con Enter como la otra prueba
-      if (!clic && await page.locator('#capa .panel button.ir:not(:disabled)').count()) { clic = true; await dormir(400); await page.locator('#capa .panel button.ir:not(:disabled)').first().click(); await dormir(300); continue; }
+      if (!clic && await page.locator('#capa .panel button.ir:not(:disabled)').count()) { clic = true; await dormir(400); await page.locator('#capa .panel button.ir:not(:disabled)').first().click({ timeout: 120000 }); await dormir(300); continue; }      // con el 3D por software y tres modelos distintos (plantel nuevo), compilar al abrir pasa de 30 s
       const P = await J(() => { const ir = document.querySelector('#capa .panel button.ir:not(:disabled)'); return { ir: !!ir, foco: document.activeElement === ir }; });
       if (P.ir) { await dormir(400); if (!P.foco) await J(() => document.querySelector('#capa .panel button.ir:not(:disabled)')?.focus()); await page.keyboard.press('Enter'); await dormir(300); continue; }
     }
@@ -453,8 +489,8 @@ async function interactuarJuego(page) {
   return { tA, tB };
 }
 const pct = (xs, p) => { if (!xs.length) return 0; const o = [...xs].sort((a, b) => a - b); return o[Math.min(o.length - 1, Math.floor(p * o.length))]; };
-async function partida(flag) {
-  flagGrab = flag;
+async function partida(flag, { lienzo = 'off', dibujo = false } = {}) {
+  flagGrab = flag; flagLienzo = lienzo;
   const { ctx, page } = await pagina();
   await ctx.addInitScript(n => {
     try { if (!sessionStorage.getItem('__t')) { localStorage.setItem('tarima.tutorial', '1'); localStorage.setItem('tarima.jugadas', '1'); localStorage.setItem('tarima.visto.tarjeta', '1'); localStorage.setItem('tarima.nombre', n); sessionStorage.setItem('__t', '1'); } } catch { /* nada */ }
@@ -465,9 +501,15 @@ async function partida(flag) {
       .observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
     const f = t => { window.__raf.push(performance.timeOrigin + t); requestAnimationFrame(f); }; requestAnimationFrame(f);
     try { new PerformanceObserver(l => { for (const e of l.getEntries()) window.__lt.push([performance.timeOrigin + e.startTime, e.duration]); }).observe({ type: 'longtask', buffered: true }); } catch { /* sin longtask */ }
+    // lo que cuesta en el hilo principal pedir cada captura del lienzo (la parte síncrona de createImageBitmap)
+    // LIF-45: lo que muestran los carteles del 3D cuando levanta el jugador («LIFTING GAME» si se graba el lienzo)
+    setInterval(() => { const b = window.JUEGO?.escena?.arena?.board; if (b?.jugador) { window.__cartelYo = { name: b.name, entero: !!b.entero }; if (!b.entero) window.__cartelYoNombre = b.name; } }, 150);
+    window.__cib = [];
+    const cib = window.createImageBitmap;
+    window.createImageBitmap = function (...a) { const t = performance.now(); try { return cib.apply(this, a); } finally { window.__cib.push([Date.now(), performance.now() - t, a[0]?.id || a[0]?.constructor?.name || '?']); } };
   }, NOMBRE);
   const desde = llegadas.length;
-  await page.goto(base + 'juego.html?lang=es&dibujo=0&q=baja&semilla=20261112', { waitUntil: 'load' });
+  await page.goto(base + `juego.html?lang=es${dibujo ? '' : '&dibujo=0'}&q=baja&semilla=20261112`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 90000 });
   const { tA, tB } = await interactuarJuego(page);
   // Lo que costaría la instantánea completa que posthog-js vuelve a tomar cada 5 minutos (puede caer en un intento).
@@ -485,7 +527,20 @@ async function partida(flag) {
     mut: window.__mut.filter(x => x[0] >= a && x[0] <= b).map(x => x[1]),
     raf: window.__raf.filter(t => t >= a && t <= b),
     lt: window.__lt.filter(x => x[0] >= a && x[0] <= b).map(x => x[1]),
+    cib: window.__cib.filter(x => x[0] >= a && x[0] <= b).map(x => [x[1], x[2]]),
+    preservar: window.JUEGO?.escena?.renderer?.getContext?.()?.getContextAttributes?.()?.preserveDrawingBuffer ?? null,
+    cartelYo: window.__cartelYo || null, cartelYoNombre: window.__cartelYoNombre || null,
   }), [tA ?? 0, tB ?? 0]);
+  // lo que tarda regionesLienzo (los carteles proyectados) con la escena de este momento
+  const reg = !dibujo ? null : await page.evaluate(async () => {
+    const A = await import('/js/game/analitica.js'), c = document.getElementById('gl'), e = window.JUEGO.escena;
+    // con el cartel como si mostrara el nombre del jugador (el respaldo): se mide y se ubican los carteles
+    const b = e.arena.board; e.arena.board = { ...b, jugador: true, entero: false };
+    let r = null; const t = performance.now();
+    try { for (let i = 0; i < 200; i++) r = A.regionesLienzo(c, e); } finally { e.arena.board = b; }
+    const ahora = A.regionesLienzo(c, e);
+    return { ms: (performance.now() - t) / 200, n: r.length, r, ancho: c.clientWidth, alto: c.clientHeight, ahora: ahora.length, cartel: { name: b?.name, jugador: b?.jugador, entero: b?.entero } };
+  }).catch(e => ({ error: String(e) }));
   const ev = rrwebDe(desde);
   const seg = Math.max(0.001, ((tB ?? 0) - (tA ?? 0)) / 1000);
   const dt = m.raf.slice(1).map((t, i) => t - m.raf[i]);
@@ -496,10 +551,13 @@ async function partida(flag) {
     mutGrab: ev.filter(e => esMutacion(e) && e.timestamp >= tA && e.timestamp <= tB).length,
     topGrab: quienGrabo(ev, ev.filter(e => esMutacion(e) && e.timestamp >= tA && e.timestamp <= tB)),
     cuadros: m.raf.length, p50: pct(dt, 0.5), p95: pct(dt, 0.95), lentos: dt.filter(x => x > 33).length, lt: m.lt.length, ltMs: Math.round(m.lt.reduce((a, b) => a + b, 0)),
+    cib: m.cib, preservar: m.preservar, reg, cartelYo: m.cartelYo, cartelYoNombre: m.cartelYoNombre, dibujo, lienzo, page,
+    lienzoCuadros: ev.filter(esCuadroLienzo), lienzoIntento: ev.filter(e => esCuadroLienzo(e) && e.timestamp >= tA && e.timestamp <= tB),
   };
+  r.lienzoBytes = r.lienzoCuadros.reduce((a, e) => a + (base64DeCuadro(e)?.b64.length || 0) * 0.75, 0);
   console.log(`  juego, grabacion=${flag}: intento de ${seg.toFixed(1)} s · ${r.mutDom} mutaciones del DOM (${(r.mutDom / seg).toFixed(0)}/s; ${r.top.map(([k, v]) => `${k} ${v}`).join(', ')}) · ` +
     `al grabador ${r.mutGrab} (${(r.mutGrab / seg).toFixed(1)}/s; ${r.topGrab.map(([k, v]) => `${k} ${v}`).join(', ') || 'nada'}) · cuadros ${r.cuadros}, p50 ${r.p50.toFixed(1)} ms, p95 ${r.p95.toFixed(1)} ms, >33 ms ${r.lentos} · tareas largas ${r.lt} (${r.ltMs} ms) · instantánea completa ${r.instantanea ? r.instantanea.join(', ') + ' ms' : '—'} · /qx/s/ ${(r.bytes / 1024).toFixed(1)} KB en toda la carga`);
-  await ctx.close();
+  if (!dibujo) await ctx.close(); else r.ctx = ctx;
   return r;
 }
 {
@@ -513,6 +571,60 @@ async function partida(flag) {
   ok(con.mutGrab / con.seg <= MAX_MUT_S, `juego: durante el intento el grabador recibe ${(con.mutGrab / con.seg).toFixed(1)} mutaciones por segundo (tope ${MAX_MUT_S}; el DOM tuvo ${(con.mutDom / con.seg).toFixed(0)}/s)`);
   ok(con.instantanea && Math.max(...con.instantanea) < 50, `juego: una instantánea completa de la página cuesta ${con.instantanea?.join(', ')} ms (menos de 50)`);
   notas.push(`juego: cuadros durante el intento con grabación p95 ${con.p95.toFixed(1)} ms, >33 ms ${con.lentos}, tareas largas ${con.lt}; sin grabación p95 ${sin.p95.toFixed(1)} ms, >33 ms ${sin.lentos}, tareas largas ${sin.lt}`);
+}
+
+// ---- 7. el lienzo 3D en la grabación, con el juego dibujado (por software) ----
+// Los tiempos de SwiftShader no son los de una placa: lo que dice algo es la diferencia entre las dos corridas y el
+// costo de cada captura en el hilo principal.
+{
+  const sin = await partida('todas', { lienzo: 'off', dibujo: true });
+  const con = await partida('todas', { lienzo: 'compu', dibujo: true });
+  const seg = con.seg;
+  const cibGl = con.cib.filter(x => x[1] === 'gl').map(x => x[0]);
+  const fps = con.lienzoIntento.length / seg, kbs = con.lienzoIntento.reduce((a, e) => a + (base64DeCuadro(e)?.b64.length || 0) * 0.75, 0) / 1024 / seg;
+  // los cuadros grabados, abiertos en la página: tamaño, brillo (un cuadro negro sería el lienzo leído sin dibujar) y algunos guardados
+  const muestras = con.lienzoIntento.length ? con.lienzoIntento : con.lienzoCuadros;
+  const elegidos = [0, 0.25, 0.5, 0.75, 1].map(k => muestras[Math.min(muestras.length - 1, Math.floor(k * (muestras.length - 1)))]).filter(Boolean);
+  const vistos = await con.page.evaluate(async cs => {
+    const out = [];
+    for (const { b64, tipo } of cs) {
+      const bin = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
+      const bmp = await createImageBitmap(new Blob([bin], { type: tipo }));
+      const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+      const g = c.getContext('2d'); g.drawImage(bmp, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height).data; let s = 0, neg = 0;
+      for (let i = 0; i < d.length; i += 16) { const l = (d[i] + d[i + 1] + d[i + 2]) / 3; s += l; if (l < 4) neg++; }
+      out.push({ w: bmp.width, h: bmp.height, brillo: s / (d.length / 16), negro: neg / (d.length / 16) });
+    }
+    return out;
+  }, con.lienzoCuadros.map(base64DeCuadro).filter(Boolean)).catch(e => [{ error: String(e) }]);
+  const negros = vistos.filter(v => v.brillo !== undefined && v.negro > 0.97).length;
+  const vistosElegidos = await con.page.evaluate(async cs => Promise.all(cs.map(async ({ b64, tipo }) => {
+    const bmp = await createImageBitmap(new Blob([Uint8Array.from(atob(b64), ch => ch.charCodeAt(0))], { type: tipo }));
+    const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height; c.getContext('2d').drawImage(bmp, 0, 0); return c.toDataURL('image/png');
+  })), elegidos.map(base64DeCuadro).filter(Boolean)).catch(() => []);
+  fs.mkdirSync(path.join(ROOT, 'out', 'analitica'), { recursive: true });
+  vistosElegidos.forEach((png, i) => fs.writeFileSync(path.join(ROOT, 'out', 'analitica', `lienzo_${i}.png`), Buffer.from(png.split(',')[1], 'base64')));
+  try { await con.page.screenshot({ path: path.join(ROOT, 'out', 'analitica', 'lienzo_pagina.png') }); } catch { /* nada */ }
+  const todo = JSON.stringify(con.ev);
+  console.log(`  lienzo: preserveDrawingBuffer ${con.preservar} · ${con.lienzoCuadros.length} cuadros en la carga, ${con.lienzoIntento.length} en el intento de ${seg.toFixed(1)} s (${fps.toFixed(2)} por segundo) · ` +
+    `${vistos[0]?.w ?? '?'}×${vistos[0]?.h ?? '?'} px, ${(con.lienzoBytes / Math.max(1, con.lienzoCuadros.length) / 1024).toFixed(1)} KB por cuadro, ${kbs.toFixed(1)} KB/s en el intento, ${(con.lienzoBytes / 1024).toFixed(0)} KB en la carga · negros ${negros} de ${vistos.length} · ` +
+    `createImageBitmap(#gl) ${cibGl.length} veces, p50 ${pct(cibGl, 0.5).toFixed(2)} ms, máx ${Math.max(0, ...cibGl).toFixed(2)} ms · regionesLienzo ${con.reg?.ms?.toFixed?.(3) ?? con.reg?.error} ms (${con.reg?.n} rectángulos: ${JSON.stringify(con.reg?.r)} en ${con.reg?.ancho}×${con.reg?.alto})`);
+  console.log(`  lienzo: cuadros del juego durante el intento: con lienzo p50 ${con.p50.toFixed(1)} ms, p95 ${con.p95.toFixed(1)} ms, >33 ms ${con.lentos} de ${con.cuadros}, tareas largas ${con.lt} (${con.ltMs} ms en ${con.seg.toFixed(1)} s); ` +
+    `sin lienzo p50 ${sin.p50.toFixed(1)} ms, p95 ${sin.p95.toFixed(1)} ms, >33 ms ${sin.lentos} de ${sin.cuadros}, tareas largas ${sin.lt} (${sin.ltMs} ms en ${sin.seg.toFixed(1)} s)`);
+  ok(!sin.lienzoCuadros.length, `grabacion_lienzo=off: ningún cuadro del lienzo (${sin.lienzoCuadros.length})`);
+  ok(con.lienzoIntento.length >= 1, `grabacion_lienzo=compu en computadora: llegan cuadros del 3D durante el intento (${con.lienzoIntento.length})`);
+  ok(fps <= 3.5, `pocos cuadros del lienzo por segundo: ${fps.toFixed(2)}`);
+  ok(negros <= Math.max(1, vistos.length * 0.1), `cuadros negros (el lienzo leído sin dibujar): ${negros} de ${vistos.length}`);
+  ok(con.reg && con.reg.n >= 1 && !con.reg.error, `los carteles con el nombre se ubican en la pantalla (respaldo; ${JSON.stringify(con.reg)})`);
+  // LIF-45: grabando el lienzo, los carteles dicen LIFTING GAME cuando levanta el jugador y entonces no se tapa nada
+  ok(con.cartelYo?.name === 'LIFTING GAME' && con.cartelYo.entero && !con.cartelYoNombre, `con el lienzo, los carteles del jugador dicen LIFTING GAME (${JSON.stringify(con.cartelYo)}, con nombre: ${con.cartelYoNombre})`);
+  ok(!con.reg?.cartel?.entero || con.reg.ahora === 0, `con LIFTING GAME en los carteles no se tapa nada (${con.reg?.ahora} rectángulos)`);
+  ok(sin.cartelYoNombre && sin.cartelYoNombre !== 'LIFTING GAME', `sin el lienzo, los carteles muestran el nombre del jugador (${sin.cartelYoNombre})`);
+  ok(!todo.includes(NOMBRE), 'con el lienzo: el nombre del jugador no aparece como texto en la grabación');
+  ok(!/rr_dataURL|data:image\//.test(todo), 'con el lienzo: ninguna instantánea completa con la imagen del lienzo sin tapar (rr_dataURL)');
+  notas.push(`lienzo: ${con.lienzoIntento.length} cuadros en ${seg.toFixed(1)} s de intento, ${(con.lienzoBytes / 1024).toFixed(0)} KB en la carga, createImageBitmap p50 ${pct(cibGl, 0.5).toFixed(2)} ms`);
+  await sin.ctx.close(); await con.ctx.close();
 }
 
 await browser.close();
