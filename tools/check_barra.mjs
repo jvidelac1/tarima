@@ -24,7 +24,7 @@ import { createRequire } from 'node:module';
 import { launchOptions } from './browser.mjs';
 import { sinApi } from './sin_api.mjs';
 import { saltarRival } from './saltar_rival.mjs';
-import { medirEnPagina, fila, revisar } from './tapa.mjs';
+import { medirEnPagina, fila, revisar, estadoEnPagina, seguidor } from './tapa.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
@@ -47,7 +47,7 @@ const problemas = [], notas = [], TAPA = [], INFORMA = process.env.TAPA_INFORMA 
 const dormir = ms => new Promise(r => setTimeout(r, ms));
 const browser = await chromium.launch(launchOptions({ headed: HEADED }));
 const PANTALLAS = [
-  { id: 'pc_es', lang: 'es', vp: { width: 1280, height: 720 }, tactil: false, real: true },
+  { id: 'pc_es', lang: 'es', vp: { width: 1280, height: 720 }, tactil: false, real: true, intervalo: true },
   { id: 'pc_en', lang: 'en', vp: { width: 1280, height: 720 }, tactil: false },
   { id: 'tel_es', lang: 'es', vp: { width: 667, height: 375 }, tactil: true, primera: true },
   { id: 'tel_en', lang: 'en', vp: { width: 844, height: 390 }, tactil: true },
@@ -62,12 +62,16 @@ const PANTALLAS = [
   { id: 'bajo_en', lang: 'en', vp: { width: 1800, height: 560 }, tactil: false, soloInicio: true },
   { id: 'pc600_es', lang: 'es', vp: { width: 1280, height: 600 }, tactil: false, soloInicio: true },
   { id: 'pc700_en', lang: 'en', vp: { width: 1440, height: 700 }, tactil: false, soloInicio: true },
+  // 17-nov, carteles que tapan la cabeza: la primera persona en la computadora, en el teléfono acostado y parado
+  { id: 'pc_pov_es', lang: 'es', vp: { width: 1280, height: 720 }, tactil: false, camara: 'pov', intervalo: true },
+  { id: 'tel_pov_en', lang: 'en', vp: { width: 844, height: 390 }, tactil: true, camara: 'pov' },
+  { id: 'vert_pov_es', lang: 'es', vp: { width: 390, height: 844 }, tactil: true, camara: 'pov' },
   // teléfono parado: solo a pedido (--solo=vert_es); ahí la cámara del levantamiento es la lateral, se elija la que se elija
   { id: 'vert_es', lang: 'es', vp: { width: 390, height: 844 }, tactil: true, pedido: true },
 ].filter(x => (SOLO ? x.id === SOLO : !x.pedido));
 
 for (const P of PANTALLAS) try {
-  const tag = `[${P.id}]`, mal = t => problemas.push(`${tag} ${t}`);
+  const tag = `[${P.id}]`, mal = t => problemas.push(`${tag} ${t}`), CAM = P.camara || CAMARA;
   const ctx = await browser.newContext({ viewport: P.vp, deviceScaleFactor: P.tactil ? 2 : 1, ...(P.tactil ? { hasTouch: true, isMobile: true } : {}), locale: P.lang === 'es' ? 'es-AR' : 'en-US' });
   const page = await ctx.newPage(), cdp = P.tactil ? await ctx.newCDPSession(page) : null, J = (fn, a) => page.evaluate(fn, a);
   page.on('console', m => { if (m.type() === 'error') mal(`console.error: ${m.text()}`); });
@@ -77,7 +81,7 @@ for (const P of PANTALLAS) try {
   // dónde se veía el puntero cuando llegó cada Espacio (antes que el juego: este oyente se registra primero)
   await page.addInitScript(() => { window.__P = []; addEventListener('keydown', e => { if (e.code !== 'Space' || e.repeat) return; const p = document.querySelector('#barrita .b-punt'); window.__P.push({ ts: e.timeStamp, izq: p ? parseFloat(p.style.left) : null, visible: !document.getElementById('barrita')?.hidden }); }, true); });
   // sin dibujo continuo (?dibujo=0, como check_game): por software cada cuadro tarda; antes de cada captura se fuerza uno
-  await page.goto(`${base}juego.html?lang=${P.lang}&q=baja&dibujo=0&semilla=${SEMILLA}${CAMARA ? '&camara=' + CAMARA + (CAMARA === 'pov' ? '&recuadro=si' : '') : ''}${process.env.TARIMA_PLANTEL ? '&plantel=' + process.env.TARIMA_PLANTEL : ''}${process.env.TARIMA_Q ? '&q=' + process.env.TARIMA_Q : ''}`.replace('&q=baja&dibujo=0', process.env.TARIMA_Q ? '&dibujo=0' : '&q=baja&dibujo=0'), { waitUntil: 'load' });
+  await page.goto(`${base}juego.html?lang=${P.lang}&q=baja&dibujo=0&semilla=${SEMILLA}${CAM ? '&camara=' + CAM + (CAM === 'pov' ? '&recuadro=si' : '') : ''}${process.env.TARIMA_PLANTEL ? '&plantel=' + process.env.TARIMA_PLANTEL : ''}${process.env.TARIMA_Q ? '&q=' + process.env.TARIMA_Q : ''}`.replace('&q=baja&dibujo=0', process.env.TARIMA_Q ? '&dibujo=0' : '&q=baja&dibujo=0'), { waitUntil: 'load' });
   if (!await J(() => window.JUEGO.listo)) { mal('el juego no inició'); await ctx.close(); continue; }
   await J(() => JUEGO.test.manual());
   // --tira: una foto cada 0,1 s de juego del primer intento propio entero (de la barrita al veredicto), para la hoja de control
@@ -107,6 +111,7 @@ for (const P of PANTALLAS) try {
     const x = await J(medirEnPagina).catch(e => ({ error: String(e) })); if (x && x.error) { notas.push(`${tag} tapa ${momento}: ${x.error}`); return; }
     TAPA.push({ p: P.id, momento, x }); const r = revisar(momento, x); if (r && !INFORMA) mal(r);
   };
+  const sigue = seguidor({ page, tapa, foto: n => foto(n), medidos });
   let n = 0, hecho = '', fotoPanel = 0, lineas = [], revisada = false, medido = null;
   // la bienvenida: en cada tarjeta nada se pisa (nombre, frase y filas), la tarjeta no se corta y no queda debajo de la fila de
   // botones (Jugar, Opciones, Cómo se juega)
@@ -126,10 +131,13 @@ for (const P of PANTALLAS) try {
   await pulsa('#btn-empezar');
   const t0 = Date.now(), densos = new Set();
   for (let g = 0; g < 20000 && Date.now() - t0 < 6 * 60000; g++) {
-    const s = await J(() => { const e = JUEGO.estado(); e.propios = (JUEGO.E.propios || []).length; e.lev = JUEGO.E.p?.lev; return e; });
+    const s = await J(estadoEnPagina);
     if (s.errores.length) { mal('error en el juego: ' + s.errores[0]); break; }
-    if (s.propios >= 3 && !(s.intento && s.intento.propio) && s.pantalla !== 'decision') break;
+    // con `intervalo`, sigue (salteando a los rivales) hasta el panel del fin del arranque y lo mide
+    if (P.intervalo && !TIRA && s.propios >= 3 && s.pantalla === 'intervalo' && s.panel) { await av(450); await tapa('intervalo'); await foto('intervalo'); break; }
+    if (s.propios >= 3 && !(s.intento && s.intento.propio) && s.pantalla !== 'decision' && !(P.intervalo && !TIRA && s.fase !== 'c' && s.lev !== 'c')) break;
     const I = s.intento;
+    if (!TIRA) await sigue(s);
     if (TIRA) { if (!tiraOn && tiraK === 0 && I && I.propio && s.modo !== 'panel') tiraOn = true; else if (tiraOn && s.propios >= 1 && s.pantalla !== 'decision') { tiraOn = false; break; } }
     if (I && I.propio && s.modo !== 'panel') {
       const sg = I.senal;
@@ -180,7 +188,7 @@ for (const P of PANTALLAS) try {
     if (DENSO && s.pantalla === 'decision' && !densos.has(s.propios)) { densos.add(s.propios); for (let i = 0; i < 32; i++) { await J(() => { try { window.JUEGO.escena?.cuadro?.(0, true); } catch { /* sin escena */ } }); await page.screenshot({ path: path.join(OUT, `${P.id}_fin${s.propios}_${String(i).padStart(2, '0')}.jpg`), type: 'jpeg', quality: 62 }); await av(150); } }
     if (s.pantalla === 'decision') {
       const v = await J(() => document.getElementById('veredicto').hidden ? '' : document.getElementById('veredicto').textContent);
-      if (v && !lineas.includes(v)) { lineas.push(v); await tapa('veredicto'); await page.waitForTimeout(250); if (lineas.length <= 3) await foto(`${lineas.length}_veredicto`); }
+      if (v && !lineas.includes(v)) { lineas.push(v); await page.waitForTimeout(250); if (lineas.length <= 3) await foto(`${lineas.length}_veredicto`); }
     }
     if (s.pantalla === 'rival' && !medidos.has('rival')) { await av(900); await tapa('rival'); await foto('rival'); }
     await J(() => JUEGO.test.avanzar(300, 50));

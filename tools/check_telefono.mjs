@@ -27,7 +27,7 @@ import { createRequire } from 'node:module';
 import { launchOptions } from './browser.mjs';
 import { sinApi } from './sin_api.mjs';
 import { saltarRival } from './saltar_rival.mjs';
-import { medirEnPagina, fila, revisar as revisarTapa } from './tapa.mjs';
+import { medirEnPagina, fila, revisar as revisarTapa, estadoEnPagina, seguidor } from './tapa.mjs';
 /** Señales de un toque (la libre de siempre y las de 'u': ¡SALTA!, ¡PÁRATE!, ¡DA TODO!): un toque y la señal se va. */
 const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
@@ -59,11 +59,11 @@ const CASOS = [
   { nombre: 'zurdo_740x360', w: 740, h: 360, dpr: 3, url: '&mano=izq', hastaIntentos: 2 },
   // iPhone en Safari de costado, con la barra de direcciones a la vista: quedan unos 340 px de alto
   { nombre: 'safari_844x340', w: 844, h: 340, dpr: 3, seguras: { top: 0, right: 47, bottom: 21, left: 47 }, hastaIntentos: 2 },
-  { nombre: 'android_932x430', w: 932, h: 430, dpr: 3, hastaIntentos: 2, lang: 'en' },      // en inglés (LIF-52: las explicaciones de primera vez en los dos idiomas)
+  { nombre: 'android_932x430', w: 932, h: 430, dpr: 3, hastaIntentos: 3, falla: 2, lang: 'en' },      // en inglés (LIF-52: las explicaciones de primera vez en los dos idiomas)
   // LIF-50: parado, sin girar el contenido
   { nombre: 'vertical_390x844', w: 390, h: 844, dpr: 3, vertical: true, partida: true, dedos: true, seguras: { top: 47, right: 0, bottom: 34, left: 0 } },
   { nombre: 'vertical_375x667', w: 375, h: 667, dpr: 2, vertical: true, lang: 'en', url: '&muro=firme&etapa=arranque', hastaPantalla: 'muro' },
-  { nombre: 'vertical_430x932', w: 430, h: 932, dpr: 3, vertical: true, hastaIntentos: 3, seguras: { top: 59, right: 0, bottom: 34, left: 0 } },
+  { nombre: 'vertical_430x932', w: 430, h: 932, dpr: 3, vertical: true, hastaIntentos: 4, falla: 2, seguras: { top: 59, right: 0, bottom: 34, left: 0 } },
 ];
 
 async function correr(C) {
@@ -200,14 +200,17 @@ async function correr(C) {
     const x = await J(medirEnPagina).catch(e => ({ error: String(e) })); if (!x) return; if (x.error) { notas.push(`${tag} tapa ${momento}: ${x.error}`); return; }
     TAPA.push({ p: C.nombre, momento, x }); const r = revisarTapa(momento, x); if (r && !INFORMA) mal(r);
   };
+  // 17-nov: los momentos que faltaban (preparación, barra arriba, veredicto grande y chico, de un rival, repetición, carga)
+  const sigue = seguidor({ page, tapa, foto: n => foto(n), medidos });
   const probado = { detalle: false, estilo: false }, aprendes = new Set(); let aprendeCerrada = false;
   const vistas = new Set(), pantallas = new Set(); let firma = '', dedosProbados = false, bordesProbados = false, campoSolo = false, nIntentos = 0, ultToque = 0, hecho = '', revisadas = 0;
   const hasta = s => s.pantalla === 'fin' || (C.hastaIntentos && nIntentos >= C.hastaIntentos) || (C.hastaPantalla && s.pantalla === C.hastaPantalla);
   for (let n = 0; n < 60000; n++) {
-    const s = await J(() => JUEGO.estado());
+    const s = await J(estadoEnPagina);
     if (s.errores.length) throw new Error('error en el juego: ' + s.errores[0]);
     if (hasta(s)) break;
-    const I = s.intento;
+    const I = s.intento, suf = s.lev === 'c' ? '@c' : '';
+    await sigue(s);
     // una captura y una revisión por pantalla nueva, por panel nuevo y por señal nueva
     const clave = `${s.pantalla}|${s.panel ? 'panel' : ''}|${s.sobre || ''}|${I && I.propio && I.senal ? I.senal.clave : ''}|${s.aprende ? 'aprende_' + s.aprende.clave : ''}`;
     if (clave !== firma && !(I && I.propio && !I.senal)) {
@@ -262,13 +265,13 @@ async function correr(C) {
       }
       const sg = I && I.propio ? I.senal : null;
       if (s.panel && ['inicio', 'presentacion', 'apertura', 'intervalo'].includes(s.pantalla)) await tapa(s.pantalla);
-      if (s.panel && s.pantalla === 'llamado') await tapa('llamado'); else if (sg && sg.tipo === 'barra') { await av(500); await tapa('corre'); } else if (sg && sg.tipo === 'espera' && sg.barra) await tapa('quieta');
-      else if (s.pantalla === 'decision') { await av(1200); await tapa('veredicto'); } else if (s.pantalla === 'rival') { await av(900); await tapa('rival'); }
+      if (s.panel && s.pantalla === 'llamado') await tapa('llamado'); else if (sg && sg.tipo === 'barra') { await av(500); await tapa('corre' + suf); } else if (sg && sg.tipo === 'espera' && sg.barra) await tapa('quieta' + suf);
+      else if (s.pantalla === 'decision') await av(1200); else if (s.pantalla === 'rival') { await av(900); await tapa('rival'); }
       if (I && I.propio && !R.zona) mal(`en el intento («${I.senal?.verbo || I.fase}») no se ve el botón táctil`);
       await foto(clave.replace(/\|+/g, '_'));
     }
     if (I && I.propio && s.modo !== 'panel') {
-      const g = I.senal; if (!g) { if (['tiron', 'vuelo', 'pelea', 'empuje', 'flexion'].includes(I.fase) && !medidos.has('levanta')) { await tapa('levanta'); await foto('levanta'); } await av(20); continue; }
+      const g = I.senal; if (!g) { if (['tiron', 'vuelo', 'pelea', 'empuje', 'flexion'].includes(I.fase) && !medidos.has('levanta' + suf)) { await tapa('levanta' + suf); await foto('levanta' + suf); } await av(20); continue; }
       vistas.add(g.verbo);
       if (C.dedos && !dedosProbados && (g.tipo === 'luz' || g.tipo === 'barra')) {
         if (g.tipo === 'barra') await ir(g.objetivo);      // 'b': después de la gracia de la barrita      // dos dedos a la vez en ¡SALTA!: dos toques anotados, un solo contacto («doble»)
@@ -296,6 +299,8 @@ async function correr(C) {
         continue;
       }
       if (I.parado) { await av(80); await toque(); continue; }
+      // un intento tocado en el rojo (lejos del verde): para ver el cartel de un intento que no sale
+      if (g.tipo === 'barra' && C.falla === nIntentos) { await ir(g.objetivo + 699); await toque(); await av(320); continue; }
       if (g.tipo === 'barra') { await ir(g.objetivo); await toque(); continue; }      // 'b': toca cuando el puntero pasa por el centro del verde
       if (UNTOQUE.has(g.tipo)) { await av(150); await toque(); continue; }
       if (g.tipo === 'cierre') { const k = g.clave + g.desde; if (I.seDetiene || hecho === k) { await av(30); continue; } await ir(g.objetivo); await toque(); hecho = k; continue; }
