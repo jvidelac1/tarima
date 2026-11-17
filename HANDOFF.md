@@ -2415,6 +2415,10 @@ Pedido del dueño: «quiero evaluar bien el físico; cuando seleccione el pesist
   final del arranque, con el clip pasado en 1,7 s). De pie no se dibuja la barra. Teclado: las flechas mueven el foco y la
   tarjeta con foco es la elegida; Enter sobre la elegida confirma. Cada pesista se ve con SU malla (en la final el del jugador
   lleva la turquesa de `JUGADOR`, como siempre). Al cambiar de tarjeta, fundido corto; se conservan el ángulo y la pose.
+- **Hoy se ofrecen solo Ilarraz y Kordan como «(nuevo)»** (segunda decisión del dueño, 17-nov): `roster.js →
+  ASPECTOS_OFRECIDOS`. Jastrev (+110 kg) y Solanet (mujer, 48 kg) no se ofrecen hasta que existan las categorías; sumarlos a
+  ese arreglo los vuelve a prender. Potente queda solo con Marangi (sin fila de aspectos). Un `tarima.aspecto` guardado que ya
+  no se ofrece cae al de siempre de su plaza. Lo que sigue describe el mecanismo completo (con los cuatro en `ASPECTOS`).
 - **Entran todos los modelos, los nuevos con «(nuevo)»** (decisión del dueño del 17-nov para el lanzamiento: «que entren
   todos, para que los users vayan viendo la evolución; ponelos como (new)»). Debajo de las tres tarjetas, la plaza elegida
   ofrece sus **aspectos** (`roster.js → ASPECTOS`): Compacto: Ventura · Ilarraz (nuevo) · Solanet (nuevo); Largo: Brenner ·
@@ -2434,7 +2438,7 @@ Pedido del dueño: «quiero evaluar bien el físico; cuando seleccione el pesist
 - **Pruebas**: `check_telefono` suma `seleccion_pc_1280x720` (ratón y teclado; además Móvil y Baja con un pesista),
   `seleccion_acostado_844x390` y `seleccion_vertical_390x844` (`telefono.yml -f solo=seleccion`; en las corridas completas va en un paso aparte, capturas en `out/seleccion`): el panel no tapa al pesista
   (caja del cuerpo de `cajas()`), nada se sale, gira solo un cuarto de vuelta en 3 s, el arrastre gira y no cuenta como toque,
-  los cuartos de vuelta y «barra arriba» llegan, los 7 pesistas (3 de siempre y 4 nuevos, estos con la marca) se ven en las 6 vistas, y «Listo» deja la escena como estaba y el aspecto elegido. `check_muro` pasa por la selección al
+  los cuartos de vuelta y «barra arriba» llegan, los 5 pesistas (3 de siempre y 2 nuevos, estos con la marca) se ven en las 6 vistas, y «Listo» deja la escena como estaba y el aspecto elegido. `check_muro` pasa por la selección al
   elegir Largo. Capturas: `~/tarima-datos/ver_visual/seleccion/`.
 - **Sin resolver / a la vista.** Parado, el pesista ocupa 31–34 % del alto de pie (el panel, con la fila de aspectos, se lleva el 42 %) y con la barra arriba el
   lente se abre (hasta 56°) para que entre la barra. La ficha de juego (RM 169/211 para un 71 kg) sale de `sim.json`, no de

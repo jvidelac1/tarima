@@ -74,13 +74,20 @@ export function vestir(lista, fichas, poses) {
  * deportiva (kilos, fases, cuerpo de la simulación) no cambia: cambia quién se ve. Los rivales quedan con los de siempre.
  */
 export const ASPECTOS = { ventura: ['ilarraz', 'solanet'], brenner: ['kordan'], marangi: ['jastrev'] };
+/**
+ * Los aspectos que HOY se ofrecen al jugador (decisión del dueño, 17-nov, para el lanzamiento): solo Ilarraz y Kordan. Jastrev
+ * (+110 kg) y Solanet (mujer, 48 kg) no se ofrecen por ahora: no tiene sentido que compitan en la misma final con pesistas
+ * de 70 a 90 kg; quedan para cuando existan las categorías. Para volver a ofrecerlos alcanza con sumarlos acá. Sus modelos y
+ * fichas siguen en el repo y `?plantel=` los acepta para pruebas. Un aspecto guardado que ya no se ofrece cae al de siempre.
+ */
+export const ASPECTOS_OFRECIDOS = ['ilarraz', 'kordan'];
 let BASE = null;
 /** Guarda el plantel tal como quedó al abrir (el clásico, o el de `?plantel=`): a eso vuelve cada plaza sin aspecto elegido. */
 export function fijarBase() { BASE = { P: JSON.parse(JSON.stringify(PLANTEL)), C: JSON.parse(JSON.stringify(CUERPO)) }; }
 /** La ficha de siempre de una plaza (sin el aspecto que haya elegido el jugador). */
 export const basePlantel = id => (BASE || fijarBase() || BASE).P[id];
-/** Los modelos nuevos que se ofrecen en una plaza: los de ASPECTOS que están construidos y que no dibujan ya a otra plaza. */
-export const aspectosDe = (id, fichas, poses) => (ASPECTOS[id] || []).filter(m => fichas?.[m] && poses?.[m] && !Object.values((BASE || fijarBase() || BASE).P).some(f => f.modelo === m));
+/** Los modelos nuevos que se ofrecen en una plaza: los de ASPECTOS que están en ASPECTOS_OFRECIDOS, construidos y que no dibujan ya a otra plaza. */
+export const aspectosDe = (id, fichas, poses) => (ASPECTOS[id] || []).filter(m => ASPECTOS_OFRECIDOS.includes(m) && fichas?.[m] && poses?.[m] && !Object.values((BASE || fijarBase() || BASE).P).some(f => f.modelo === m));
 /**
  * Viste la plaza del jugador con el modelo `modelo` y deja las otras dos (los rivales) como siempre. Sin `modelo` (o con el
  * de siempre de esa plaza), todo queda como al abrir. Devuelve true si la plaza quedó con un modelo nuevo.

@@ -425,7 +425,6 @@ async function seleccion(C, calidad = 'alta') {
     const pr = await J(() => document.querySelector('#capa .panel.elegir .pesista[aria-pressed=true]')?.dataset.id); if (pr !== id) mal(`la tarjeta marcada es ${pr} y la plaza a la vista ${id}`);
     // los aspectos de la plaza: el de siempre y los nuevos, que llevan la marca «(nuevo)»
     const ops = await J(() => { const A = document.getElementById('el-aspectos'); return A.hidden ? [] : [...A.querySelectorAll('button')].map(b => ({ m: b.dataset.m, txt: b.innerText.trim(), nuevo: !!b.querySelector('.el-nuevo') })); });
-    if (calidad === 'alta' && ops.length < 2) mal(`la plaza ${id} no ofrece modelos nuevos (${JSON.stringify(ops)})`);
     if (ops.length && (ops[0].nuevo || ops.slice(1).some(o => !o.nuevo || !/\(nuevo\)/.test(o.txt)))) mal(`${id}: la marca «(nuevo)» no está donde corresponde (${JSON.stringify(ops)})`);
     for (const o of calidad === 'alta' && ops.length ? ops : [{ m: (await est()).G.asp }]) {
       const k = `${id}:${o.m}`, nom = `${id}_${o.m}`;
@@ -442,6 +441,8 @@ async function seleccion(C, calidad = 'alta') {
     }
   }
   const ultimo = await est();
+  // hoy se ofrecen dos nuevos (roster.js, ASPECTOS_OFRECIDOS: Ilarraz y Kordan); Potente queda solo con el de siempre
+  if (calidad === 'alta' && (nVistos !== 5 || nNuevos !== 2)) mal(`se vieron ${nVistos} pesistas, ${nNuevos} nuevos (se esperaban 5 y 2)`);
   if (C.pc && calidad === 'alta') {      // teclado: las flechas cambian de tarjeta y Enter sobre la elegida la confirma
     const a = (await est()).G.id; await J(() => document.querySelector('#capa .panel.elegir .pesista[aria-pressed=true]').focus());
     await page.keyboard.press(ids.indexOf(a) > 0 ? 'ArrowLeft' : 'ArrowRight'); await av(500); const b = await hasta(s => s.G && s.G.visto === s.G.clave, 'el pesista elegido con las flechas', 60000);
@@ -450,7 +451,7 @@ async function seleccion(C, calidad = 'alta') {
   const fin = await J(() => ({ pantalla: JUEGO.E.pantalla, tarjetas: document.querySelectorAll('#capa .panel.bienvenida .pesista').length, marcado: document.querySelector('#capa .panel.bienvenida .pesista[aria-pressed=true]')?.dataset.id, giro: JUEGO.escena.giro || 0, aspecto: JUEGO.E.aspecto, barra: JUEGO.escena.barbell.group.visible, jugar: !!document.getElementById('btn-empezar'), errores: JUEGO.E.errores }));
   if (fin.pantalla !== 'inicio' || fin.tarjetas !== 3 || !fin.jugar) mal(`«Listo» no volvió a la bienvenida con las tarjetas (${JSON.stringify(fin)})`);
   if (fin.giro || !fin.barra) mal(`al salir de la selección la escena no quedó como estaba (giro ${fin.giro}, barra ${fin.barra})`);
-  if (!C.pc && calidad === 'alta' && (fin.aspecto?.modelo !== ultimo.G.asp || fin.aspecto?.plaza !== ultimo.G.id || fin.marcado !== ultimo.G.id)) mal(`«Listo» con ${ultimo.G.clave} a la vista dejó elegido ${JSON.stringify(fin.aspecto)} (tarjeta ${fin.marcado})`);
+  if (!C.pc && calidad === 'alta' && (fin.marcado !== ultimo.G.id || (ultimo.G.asp === 'kordan' || ultimo.G.asp === 'ilarraz' ? fin.aspecto?.modelo !== ultimo.G.asp || fin.aspecto?.plaza !== ultimo.G.id : !!fin.aspecto))) mal(`«Listo» con ${ultimo.G.clave} a la vista dejó elegido ${JSON.stringify(fin.aspecto)} (tarjeta ${fin.marcado})`);
   if (fin.errores.length) mal(`errores del juego: ${fin.errores.join(' | ').slice(0, 300)}`);
   await foto('bienvenida_despues');
   const alto = k => { const v = MED.filter(m => !m.falta && m.donde.includes(k)).map(m => m.alto); return v.length ? `${Math.round(Math.min(...v) * 100)}–${Math.round(Math.max(...v) * 100)} %` : '—'; };
@@ -461,7 +462,7 @@ async function seleccion(C, calidad = 'alta') {
 try {
   for (const C of CASOS.filter(c => !SOLO.length || SOLO.some(x => c.nombre.startsWith(x)))) await correr(C);
   // la selección de pesista corre aparte (--solo=seleccion): dibuja siempre y no entra en el tiempo de los demás casos
-  // los tres tamaños a la vez (cada uno en su contexto): por software son 7 pesistas por 6 vistas cada uno
+  // los tres tamaños a la vez (cada uno en su contexto): por software son 5 pesistas por 6 vistas cada uno
   await Promise.all(SELECCION.filter(c => SOLO.some(x => c.nombre.startsWith(x))).map(async C => { try { await seleccion(C); for (const q of C.calidades || []) await seleccion(C, q); } catch (e) { problemas.push(`[${C.nombre}] excepción de la prueba: ${e.stack || e.message}`); } }));
 }
 catch (e) { problemas.push('excepción de la prueba: ' + (e.stack || e.message)); }
