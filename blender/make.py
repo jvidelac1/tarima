@@ -67,7 +67,7 @@ if True:
     # Busto bajo la malla: el top deportivo lo contiene y lo alisa. Suavizado laplaciano del frente del pecho cubierto por la tela (quita la punta, baja algo el volumen).
     E_=np.empty(len(me.edges)*2,dtype=np.int64); me.edges.foreach_get('vertices',E_); E_=E_.reshape(-1,2); dg_=np.maximum(np.bincount(E_.ravel(),minlength=N),1)[:,None]
     # Ronda 1 del director de arte: seguían las puntas. La zona baja más (el busto de la pesada queda bajo), más pasadas; en el hombre, pocas pasadas (solo la punta del pectoral).
-    wb=(suit*sm(sh.z-(.44 if FEM else .40)*KM,sh.z-(.34 if FEM else .32)*KM,z)*sm(sh.z-.03*KM,sh.z-.09*KM,z)*(y<neck.y)*(0 if LEG else 1))[:,None]; c2=co.copy()
+    wb=(suit*sm(sh.z-.72*KM,sh.z-.62*KM,z)*sm(sh.z-.03*KM,sh.z-.09*KM,z)*(y<neck.y)*(0 if LEG else 1))[:,None]; c2=co.copy()
     for _ in range(45 if FEM else 36):     # PENDIENTE (bloqueante de la ronda 2): con 45 y con 140 pasadas (corrida 43944903931, 47 mm de desplazamiento) sigue un bulto en punta bajo la malla de solanet, que con la luz dura echa una sombra negra redonda; no es textura (la oclusión bajo la malla ya va suavizada en tex.py). Mirar el borde de la zona `wb` y lo que viene después (subdivide, garments)
         A_=np.zeros_like(c2); np.add.at(A_,E_[:,0],c2[E_[:,1]]); np.add.at(A_,E_[:,1],c2[E_[:,0]]); c2=c2*(1-.65*wb)+A_/dg_*(.65*wb)
     # Puntas del pecho (areola y pezón de la malla base): bajo la malla se leían como dos puntos marcados, en hombres y mujeres (bloqueante de contenido).
@@ -75,7 +75,7 @@ if True:
     # 4,5 cm la superficie se reemplaza por la membrana que interpola el borde (laplaciano con el borde fijo, hasta converger).
     if not LEG:
         no_=np.empty(N*3); me.vertices.foreach_get('normal',no_); no_=no_.reshape(N,3); s_=c2.copy()
-        zona=(suit>.5)&(no_[:,1]<-.25)&(z<sh.z-.05*KM)&(z>sh.z-.50*KM)&(axo>.035*KM)&(axo<.22*KM)
+        zona=(suit>.5)&(no_[:,1]<-.25)&(z<sh.z-.05*KM)&(z>sh.z-.74*KM)&(axo>.035*KM)&(axo<.26*KM)
         for _ in range(40):
             A_=np.zeros_like(s_); np.add.at(A_,E_[:,0],s_[E_[:,1]]); np.add.at(A_,E_[:,1],s_[E_[:,0]]); s_=np.where(zona[:,None],A_/dg_,s_)
         sale=((c2-s_)*no_).sum(1)*zona; RN=.045*KM

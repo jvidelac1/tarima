@@ -79,7 +79,7 @@ def chest_smooth(b,rig,K,iters=30):
     esternón bajo, con bordes en degradé: borra lo angosto (puntas, surcos finos) y deja la forma ancha. Informa la punta más alta antes y después."""
     co=coords(b); me=b.data; N=len(co); no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3); sh=head(rig,'LeftArm')
     E=np.empty(len(me.edges)*2,int); me.edges.foreach_get('vertices',E); E=E.reshape(-1,2); deg=np.maximum(np.bincount(E.ravel(),minlength=N),1)[:,None]
-    z=co[:,2]; ax=np.abs(co[:,0]); w=(no[:,1]<-.15)*sm(sh[2]-.50*K,sh[2]-.42*K,z)*sm(sh[2]-.05*K,sh[2]-.10*K,z)*sm(.21*K,.17*K,ax)
+    z=co[:,2]; ax=np.abs(co[:,0]); w=(no[:,1]<-.15)*sm(sh[2]-.76*K,sh[2]-.66*K,z)*sm(sh[2]-.05*K,sh[2]-.10*K,z)*sm(.27*K,.22*K,ax)
     def prom(c):
         A=np.zeros_like(c); np.add.at(A,E[:,0],c[E[:,1]]); np.add.at(A,E[:,1],c[E[:,0]]); return A/deg
     punta=lambda c:float((((c-prom(c))*no).sum(1)*(w>.5)).max())
@@ -345,12 +345,12 @@ def chest_check(b,rig,K):
     """Mide la punta más alta del frente del pecho con los brazos arriba (pose de referencia del correctivo), ya con correctivos: línea PECHO posado."""
     co=coords(b); me=b.data; N=len(co); no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3); sh=head(rig,'LeftArm'); pb=rig.pose.bones
     E=np.empty(len(me.edges)*2,int); me.edges.foreach_get('vertices',E); E=E.reshape(-1,2); deg=np.maximum(np.bincount(E.ravel(),minlength=N),1)[:,None]
-    z=co[:,2]; ax=np.abs(co[:,0]); w=(no[:,1]<-.15)*sm(sh[2]-.50*K,sh[2]-.42*K,z)*sm(sh[2]-.05*K,sh[2]-.10*K,z)*sm(.21*K,.17*K,ax)
+    z=co[:,2]; ax=np.abs(co[:,0]); w=(no[:,1]<-.15)*sm(sh[2]-.76*K,sh[2]-.66*K,z)*sm(sh[2]-.05*K,sh[2]-.10*K,z)*sm(.27*K,.22*K,ax)
     for p in pb: p.matrix_basis=Matrix()
     for sgn,side in ((1,'Left'),(-1,'Right')):
         for bn,q in ARMUP.items(): pb[PRE+side+bn].matrix_basis=Quaternion(q if sgn>0 else mir(q)).to_matrix().to_4x4()
     bpy.context.view_layer.update(); P,Nn=_posed(b,True)
-    A=np.zeros_like(P); np.add.at(A,E[:,0],P[E[:,1]]); np.add.at(A,E[:,1],P[E[:,0]]); s=((P-A/deg)*Nn).sum(1)*(w>.5); i=int(np.argmax(s))
+    A=np.zeros_like(P); np.add.at(A,E[:,0],P[E[:,1]]); np.add.at(A,E[:,1],P[E[:,0]]); s=((P-A/deg)*Nn).sum(1)*(w>.5)*(ax>.05*K); i=int(np.argmax(s))
     for p in pb: p.matrix_basis=Matrix()
     bpy.context.view_layer.update(); print(f'PECHO posado (brazos arriba): punta más alta {s[i]*1000:.2f} mm en reposo ({co[i][0]:+.3f},{co[i][1]:+.3f},{co[i][2]:.3f})')
 def rig_of(b): return next(m.object for m in b.modifiers if m.type=='ARMATURE')
