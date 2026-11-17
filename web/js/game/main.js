@@ -134,6 +134,7 @@ function tic(pintar, tRaf = null) {
   const c0 = performance.now(), now = reloj.ahora(), dt = Math.min(.25, Math.max(0, (now - ultimo) / 1000)); ultimo = now;
   for (let i = pend.length - 1; i >= 0; i--) if (pend[i].t <= now) pend.splice(i, 1)[0].res();
   aprendeUI?.tic(now);
+  if (now - margenT > 250 || now < margenT) { margenT = now; margenVertical(); }
   // el botón de pausa (para el dedo; con teclado es Esc) no se muestra encima de un panel grande: taparía su título
   { const ver = puedePausar() && !E.sobre && !$('capa').querySelector('.panel:not(.abajo)'); for (const b of [$('pausa'), $('ayudab'), $('sonidob')]) if (b && b.hidden === ver) b.hidden = !ver; }
   try { enCuadro?.(now, dt); } catch (e) { E.errores.push(String(e.stack || e)); console.error(e); enCuadro = null; }
@@ -578,7 +579,30 @@ const RIVAL_FASES = FASES_RAPIDAS, RIVAL_RAPIDO = RITMO.rapido;
  * `guia`: reloj del intento llevado por la presentación (tutorial); sin ella, el reloj es el del juego.
  * @returns {Promise<{conf:number|null, ent:number[][], res:object, grab:object[]}>}
  */
-function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = reloj.ahora(), panelAbierto = null, guia = null, resumen = false, decisivo = false }) {
+/**
+ * El vistazo a la barra de la primera persona (17-nov, decidido con el dueño): en un intento propio visto desde los ojos, antes
+ * de que aparezca la barrita, el pesista baja a la barra y la toma (el mismo clip, hasta «Salida»), la vista baja a las dos
+ * manos en la barra, se queda un momento y vuelve al jurado (stage.js, POV.vistazo). Recién entonces empieza el intento (la
+ * barrita aparece con la mirada ya en el jurado) y el pesista sigue agachado (`yaAbajo` en correrIntento). Nada con movimiento
+ * reducido, en otra cámara ni con el teléfono parado. Deja en E.vistazo lo medido (ms con las dos manos en la imagen, la
+ * inclinación más baja y la del final). Devuelve true si lo hizo.
+ */
+function vistazo(lev) {
+  if (reduceMotion || camVista(true) !== 'pov' || !escena.activo) return Promise.resolve(false);
+  return new Promise(res => {
+    const G = tramo(escena.P, lev === 's' ? 'snatch' : 'clean'), tS = G.t('Salida'), t0 = reloj.ahora(), M = E.vistazo = { ms: 0, incMin: 0, incFin: 0, dura: 0 };
+    escena.camara('pov', .3); E.modo = 'intento';
+    enCuadro = (ahora, dt) => {
+      const tau = Math.min(tS, (ahora - t0) / 1000);
+      escena.posar({ seg: G.nombre, s: G.inv(tau), tau, base: G.base, primero: true }, lev, dt, 0, ahora / 1000);
+      const inc = escena.pov?.inc ?? 0, v = escena.manosEnVista(); M.incMin = Math.min(M.incMin, inc); M.incFin = inc; M.dura = Math.round(ahora - t0);
+      if (v?.dentro && inc < -.96) M.ms += dt * 1000;
+      // termina cuando ya la tomó y la vista volvió al jurado (o, por las dudas, a los 7 s)
+      if ((tau >= tS && ahora - t0 > tS * 1000 + 400 && !escena.vistazo) || ahora - t0 > 7000) { enCuadro = null; M.ms = Math.round(M.ms); res(true); }
+    };
+  });
+}
+function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = reloj.ahora(), panelAbierto = null, guia = null, resumen = false, decisivo = false, yaAbajo = false }) {
   return new Promise(resolver => {
     const P = escena.P, ent = gestos ? gestos.ent : [], propio = !gestos, grab = [], mk = marcas(P, lev, env), ctl = propio ? ctx.ctl || 'c' : 'c', facil = propio && ctl === 'f', uno = propio && esU(ctl), barra = propio && ctl === 'b', T = tactil();
     // 'u': ayudas de primera vez (una vez cada una en este dispositivo) y la presentación en una línea en el primer intento (G2.8)
@@ -688,7 +712,7 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
       if (ctx.reloj && !uno) setReloj(m.rodilla ? Math.max(0, ctx.reloj - (m.movs[0]?.tk ?? now)) : ctx.reloj - now);
       if (E.modo === 'panel' && conf !== null) E.modo = propio ? 'intento' : 'tv';
       // pose y barra
-      const pose = m.res && m.res.res === 'fallo' ? null : poseDe(m, Math.min(now, m.res ? m.res.t : now), P), p = M?.pelea, Tm = p ? p.T / 1e6 : m.temblor / 1e6;
+      const pose = m.res && m.res.res === 'fallo' ? null : poseDe(m, yaAbajo && !m.res && !m.movs.length ? now + 6e4 : Math.min(now, m.res ? m.res.t : now), P), p = M?.pelea,  Tm = p ? p.T / 1e6 : m.temblor / 1e6;
       if (pose) { escena.posar(pose, lev, dt, m.fase === 'freno' ? .55 : m.fase === 'pelea' || m.fase === 'traba' || m.fase === 'fijacion' ? Tm : 0, ahora / 1000); grab.push({ t: now, pose, y: escena.barY, z: escena.barZ }); }
       if (pose && m.tConf !== undefined && !m.res) { const mon = E.monitor; mon.cuadros++; mon.barraMin = Math.min(mon.barraMin, escena.barY); mon.alto[E.pantalla] = Math.max(mon.alto[E.pantalla] || 0, escena.barY); if (escena.barY > .26) mon.manosMax = Math.max(mon.manosMax, escena.manosBarra()); }
       // cámara: nunca hay corte con una ventana abierta
@@ -935,15 +959,32 @@ function orientacion() {
   if (antes) ev('orientacion_cambio', { orientacion: o, antes, pantalla: E.pantalla });
 }
 /**
- * Teléfono parado (html.vert): el lienzo ocupa toda la pantalla, pero abajo van la barrita y el botón y arriba los botones
- * chicos y el tablero. La cámara (cameras.js, setInsets) encuadra al pesista y la barra en el rectángulo que queda libre.
- * Las medidas salen de las variables de juego.css (--pie-v y --techo-v, en px), así un cambio de diseño no se desfasa.
+ * El techo y el pie de la cámara: el encuadre automático (cameras.js, setInsets) pone al pesista y la barra en el rectángulo
+ * que queda libre, así ningún cartel les pisa la cabeza ni la barra cuando sube (17-nov: «hay casos donde los carteles le
+ * tapan la cabeza al pesista»).
+ *  - Teléfono parado (html.vert): abajo van la barrita y el botón (--pie-v) y arriba los botones chicos (--techo-v); las
+ *    medidas salen de juego.css, así un cambio de diseño no se desfasa.
+ *  - En cualquier pantalla: lo que cuelga del borde de arriba y entra en la franja central (FRANJA: del 38 % al 62 % del
+ *    ancho, donde van el pesista y la barra) baja el techo hasta su borde de abajo: el tablero parado (ocupa más de medio
+ *    ancho) y la energía. Acostado y en la computadora arriba al centro no va nada (juego.css: sonido, pausa y ayuda van
+ *    arriba a la derecha, debajo del reloj): con la cámara general la punta de la barra queda más cerca y no alcanza con el techo.
+ * Se llama al girar y cuatro veces por segundo (tic): los carteles aparecen y se van con cada pantalla. Con la cámara
+ * congelada tras el intento (rig.fijo) los márgenes no cambian: el techo ya viene puesto desde antes del levantamiento.
  */
+const TECHO = ['tablero', 'pausa', 'sonidob', 'ayudab', 'margen', 'saltar'], FRANJA = [.38, .62];
+let margenT = 0;
 function margenVertical() {
-  if (!escena?.rig) return; const gl = $('gl'), H = gl?.clientHeight || 0;
-  if (!document.documentElement.classList.contains('vert') || !H) { escena.rig.setInsets({ t: 0, b: 0, l: 0, r: 0 }); return; }
-  const cs = getComputedStyle(document.documentElement), px = k => parseFloat(cs.getPropertyValue(k)) || 0;
-  escena.rig.setInsets({ t: Math.min(.25, px('--techo-v') / H), b: Math.min(.4, px('--pie-v') / H), l: 0, r: 0 });
+  if (!escena?.rig) return; const gl = $('gl'), H = gl?.clientHeight || 0, W = gl?.clientWidth || 0, h = document.documentElement.classList;
+  if (!H || !W || h.contains('rotado')) { escena.rig.setInsets({ t: 0, b: 0, l: 0, r: 0 }); return; }
+  let t = 0, b = 0;
+  if (h.contains('vert')) { const cs = getComputedStyle(document.documentElement), px = k => parseFloat(cs.getPropertyValue(k)) || 0; t = px('--techo-v') / H; b = Math.min(.4, px('--pie-v') / H); }
+  const R = gl.getBoundingClientRect();
+  for (const id of TECHO) {
+    const el = $(id); if (!el || el.hidden) continue; const r = el.getBoundingClientRect(); if (!r.width || !r.height) continue;
+    if (r.top - R.top > H * .2 || r.right < R.left + W * FRANJA[0] || r.left > R.left + W * FRANJA[1]) continue;      // no cuelga de arriba, o está a un costado
+    t = Math.max(t, (r.bottom - R.top + 6) / H + .035);      // con aire: el disco de la punta de la barra queda más cerca de la cámara y se ve más grande
+  }
+  escena.rig.setInsets({ t: Math.min(.36, t), b, l: 0, r: 0 });
 }
 function fijarDificultad(cfg) { E.dificultad = cfg.ctl === 'c' ? 'clasico' : cfg.ctl === 'b' ? cfg.dif : cfg.ctl; try { analitica?.propiedades({ dificultad: E.dificultad }); } catch { /* métricas */ } }
 function ctlInicial() { const q = params.get('ctl'); if (q === 'c' || q === 'f' || q === 'u' || q === 'b') return q; return guardado.get('tarima.ctl') === 'c' ? 'c' : 'b'; }
@@ -1121,8 +1162,8 @@ async function elegirApertura(p, lev, sugerida, html) {
     const arriba = html();
     const pn = capa.poner(`${idiomasHTML(true)}${arriba}<h2>${t(lev === 's' ? 'peso.titulo_s' : 'peso.titulo_c')}</h2>
       ${kilosHTML(kg, lo, hi, false, `<button class="ir grande" id="btn-confirmar">${t('peso.boton', { kg })}</button>`)}
-      <p>${t('peso.rango', { lo, hi })}${lev === 's' ? ' ' + t('peso.ayuda') : ''}</p>${tactil() ? '' : `<p class="chica">${t('peso.teclas5')}</p>`}`, arriba ? 'peso con-tabla' : 'peso');
-    if (!abierto) { bloquear(pn); abierto = true; }      // el bloqueo es al abrir, no en cada kilo
+      <p>${t('peso.rango', { lo, hi })}${lev === 's' ? ' ' + t('peso.ayuda') : ''}</p>${tactil() ? '' : `<p class="chica">${t('peso.teclas5')}</p>`}`, arriba ? 'peso con-tabla lado' : 'peso lado');
+    if (!abierto) { bloquear(pn); abierto = true; encuadrarLibre(); }      // el bloqueo es al abrir, no en cada kilo; el pesista, a la parte libre
     const b = await Promise.race([clic(pn, '.kg,#btn-confirmar'), new Promise(res => { E.repintar = () => res(null); })]);
     if (!b) continue;
     if (b.dataset.d) kg = masKilos(kg, +b.dataset.d, lo, hi); else break;
@@ -1159,13 +1200,18 @@ async function presentacion(p, cfg, errMedio, primera) {
  * centro de esa parte ({x, y} en fracción del lienzo) y la distancia del plano americano para que entre de las rodillas
  * para arriba (1,6 m de alto y 1 m de ancho) en esa parte.
  */
+/**
+ * El pesista a la parte del lienzo que dejan libre el panel y los carteles (encuadreLibre), con un movimiento suave. Lo usan
+ * el llamado y los paneles de elegir kilos (apertura y fin del arranque).
+ */
+function encuadrarLibre(suave = .7) { if (!escena?.activo) return; escena.primerPlano('medio', encuadreLibre(), suave); E.forzar = true; }
 function encuadreLibre() {
   const pn = $('capa').querySelector('.panel'), gl = $('gl'), c = { width: gl.clientWidth, height: gl.clientHeight }; if (!c.width || !c.height) return null;
   let x0 = 0, x1 = 1, y0 = 0, y1 = 1;
   if (pn) {
     // con offsets y no con getBoundingClientRect: con el contenido girado (teléfono en vertical) las cajas salen rotadas
     const izq = pn.offsetLeft / c.width, arr = pn.offsetTop / c.height;
-    if (izq > .4) x1 = izq; else if (arr > .25) y1 = arr;
+    if (izq > .28) x1 = izq; else if (arr > .25) y1 = arr;
   }
   // el tablero de la final (arriba a la izquierda): el pesista se encuadra debajo, no detrás
   const tb = $('tablero'); if (tb && !tb.hidden && tb.offsetHeight) { const b = (tb.offsetTop + tb.offsetHeight) / c.height + .015; if (b < .45 && tb.offsetLeft / c.width < (x0 + x1) / 2) y0 = Math.max(y0, b); }
@@ -1330,7 +1376,7 @@ async function llamadoPropio(p, L) {
   const corre = p.cfg.ctl === 'c', uno = esU(p.cfg.ctl); let t0 = reloj.ahora(), ctx = null, env, kgFinal = L.kg, desplazado = false, corrida = null;
   E.rivalesSeguidos = 0; E.rivalesEnteros = 0;
   const elegido = new Promise(res => panelLlamado(p, L, t0, res, corre)); if (uno) relojLibre(); else setReloj(L.reloj);
-  escena.primerPlano('medio', encuadreLibre(), .7); E.forzar = true;      // plano americano del pesista en la parte que el panel deja libre, con un movimiento suave
+  encuadrarLibre();      // plano americano del pesista en la parte que el panel deja libre, con un movimiento suave
   const vence = new Promise(res => { if (corre) enCuadro = ahora => { setReloj(L.reloj - (ahora - t0)); if (ahora - t0 >= L.reloj) { enCuadro = null; res(null); } }; });
   const S = await Promise.race([elegido, vence]); enCuadro = null; capa.quitar(); E.antes = null; soltarFoco();
   if (!corre) t0 = reloj.ahora();
@@ -1338,13 +1384,15 @@ async function llamadoPropio(p, L) {
   if (S) {
     env = L.lev === 'c' ? S.env : undefined;
     if (S.kg !== L.kg && !p.cambioValido(ms, S.kg)) { desplazado = p.cambio(ms, S.kg).desplazado; if (!desplazado) kgFinal = S.kg; }
-    if (desplazado) { visita('desplazado'); etiqueta(null); veredicto(t('desplazado.titulo', { quien: quien(a), kg: S.kg }), t(uno ? 'desplazado.texto_u' : 'desplazado.texto')); await saltable(1800); veredicto(''); return; }
+    if (desplazado) { visita('desplazado'); etiqueta(null); veredicto(t('desplazado.titulo', { quien: quien(a), kg: S.kg }), t(uno ? 'desplazado.texto_u' : 'desplazado.texto')); $('veredicto').classList.add('der'); /* el pesista quedó a la izquierda (el panel estaba a la derecha): el aviso va del lado del panel */ await saltable(1800); veredicto(''); return; }
     escena.setCarga(kgFinal, L.lev); zocalo(a, { ...L, kg: kgFinal }); etiqueta(p.llamado.et);
     ctx = p.contexto(env); asegurarCalidad(); visita('intento');
     // el primer dos tiempos en Un toque se explica sobre la marcha: con la barra en los hombros el reloj espera el toque de ¡FLEXIONA!
     const primerDT = ctx.ctl === 'f' && L.lev === 'c' && !guardado.get('tarima.dostiempos');
     E.todavias = 0; E.guardados = 0; E.fotoToques = toques.foto();
-    corrida = await correrIntento(ctx, { a, lev: L.lev, env, conf0: ms, t0, guia: primerDT ? EN_HOMBROS : null });
+    // primera persona: antes de que aparezca la barrita, el pesista va a la barra y la mira (el vistazo); el reloj del intento empieza después
+    const yaAbajo = !corre && !primerDT && await vistazo(L.lev); if (yaAbajo) t0 = reloj.ahora();
+    corrida = await correrIntento(ctx, { a, lev: L.lev, env, conf0: ms, t0, guia: primerDT ? EN_HOMBROS : null, yaAbajo });
     if (primerDT && corrida.m.movs.length > 1) guardado.set('tarima.dostiempos', '1');
   } else { env = L.lev === 'c' ? p.estiloFijo(L.a) ?? a.f.enviones[0] : undefined; ctx = p.contexto(env); corrida = { conf: null, ent: [], res: simular(ctx, null, []).res, grab: [], m: { movs: [] } }; }
   TB.congelado = true; const et = p.llamado.et, x = p.resolver({ conf: corrida.conf, env, ent: corrida.ent });
@@ -1813,7 +1861,7 @@ window.JUEGO = {
       let giro = 0, cual = ''; const antes = E.medAntes, q = a.bones.map(b => b.quaternion.clone());
       if (antes && antes.a === a) a.bones.forEach((b, i) => { const g = q[i].angleTo(antes.q[i]); if (g > giro && !/Hand(Thumb|Index|Middle|Ring|Pinky)/.test(b.name)) { giro = g; cual = b.name.replace(/^mixamorig:?/, ''); } });
       E.medAntes = { a, q }; const cam = escena.rig.camera, d = cam.getWorldDirection(new V()), b = escena.barbell.group.position;
-      return { ...o, giro: r(giro), cual, bar: [r(b.y), r(b.z)], cam: { p: [r(cam.position.x), r(cam.position.y), r(cam.position.z)], inc: r(Math.asin(d.y)), fov: r(cam.fov) }, pov: !!escena.pov, sinCabeza: !!escena._sinCabeza, sinTorso: !!(escena._sinTorso?.skin?.uSinTorso?.value > .5), recuadro: !!escena.recuadro?.el && !escena.recuadro.el.hidden, conBarrita: !!escena.pov?.conBarrita, ojos: (() => { const o = escena.ojos(new V()); return [r(o.x), r(o.y), r(o.z)]; })(), rum: r(Math.atan2(d.x, d.z)) };
+      return { ...o, giro: r(giro), cual, bar: [r(b.y), r(b.z)], cam: { p: [r(cam.position.x), r(cam.position.y), r(cam.position.z)], inc: r(Math.asin(d.y)), fov: r(cam.fov) }, pov: !!escena.pov, sinCabeza: !!escena._sinCabeza, sinTorso: !!(escena._sinTorso?.skin?.uSinTorso?.value > .5), recuadro: !!escena.recuadro?.el && !escena.recuadro.el.hidden, conBarrita: !!escena.pov?.conBarrita, vz: escena.pov?.vz || 0, manos: escena.manosEnVista(), ojos: (() => { const o = escena.ojos(new V()); return [r(o.x), r(o.y), r(o.z)]; })(), rum: r(Math.atan2(d.x, d.z)) };
     },
     /** Lleva la escena de final() al instante t (s), la dibuja si `dibujar`, y mide holguras entre la barra y el cuerpo. */
     finalEn(t, dibujar = false, dt = 1 / 60, dtCam = .5) { const c = E.prueba; dibujarFinal(c, t, dt, false);

@@ -206,7 +206,9 @@ jobs:
           TAPA_INFORMA: 1
           TARIMA_Q: alta
           TARIMA_PLANTEL: ilarraz,jastrev,solanet
-        run: node tools/check_barra.mjs --solo=tel_en --camara=pov --tira --out=out/barra_pov_tel_alta 2>&1 | tee out/logs/check_barra_pov_tel_alta.log
+        run: |
+          node tools/check_barra.mjs --solo=tel_en --camara=pov --tira --out=out/barra_pov_tel_alta 2>&1 | tee out/logs/check_barra_pov_tel_alta.log
+          node tools/hojas.mjs out/barra_pov_tel_alta --cols=10 --ancho=480
       - name: Costo del recuadro en «Móvil» (check_pov --solo=costo --q=movil)
         if: ${{ !cancelled() && inputs.solo_claves != true }}
         timeout-minutes: 8
