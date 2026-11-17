@@ -251,7 +251,7 @@ export class Arena {
     const clock = add(new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.33), new THREE.MeshBasicMaterial({ map: this.clockTex, color: hdr('#ffffff', .9) })), ''); clock.position.set(6.25, 1.75, -4.9); clock.rotation.y = -.32;
     const cf = add(new THREE.Mesh(new THREE.BoxGeometry(1.85, 1.48, .12), frameMat), 'r'); cf.position.set(6.27, 1.75, -4.97); cf.rotation.y = -.32;
     for (const x of [-6.27, 6.27]) add(new THREE.Mesh(new THREE.CylinderGeometry(.05, .07, 1.2, 10), frameMat), 'rc').position.set(x, STAGE_Y + .45, -4.99);
-    this.board = {}; this.decision = null; this.clock = 60; this._drawBoard(); this._drawClock();
+    this.board = {}; this.decision = null; this.clock = 30; this._drawBoard(); this._drawClock();
 
     // truss perimetral con torres, focos y haces
     const tubes = [];
@@ -501,7 +501,7 @@ export class Arena {
   /** Decisión de los tres árbitros: null apaga; [true,true,true] tres blancas. Una luz en null queda apagada (el juego las enciende de a una). */
   setDecision(d) {
     this.decision = d;
-    this.lamps.forEach((l, i) => l.material.color.copy(d && d[i] !== null ? (d[i] ? hdr('#f6f4ea', 7) : hdr('#ff2618', 7)) : new THREE.Color('#15171c')));
+    this.lamps.forEach((l, i) => l.material.color.copy(d && d[i] !== null ? (d[i] ? hdr('#f6f4ea', 7) : new THREE.Color(1.35, .02, .012)) : new THREE.Color('#15171c')));
     this._drawClock();
   }
   setClock(seconds) { this.clock = seconds; if (Math.max(0, Math.ceil(seconds)) !== this._clockShown) this._drawClock(); }

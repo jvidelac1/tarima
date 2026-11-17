@@ -33,7 +33,7 @@ function mallaVariante(v, i) {
 
 const CROWD_FS = /* glsl */`
 uniform sampler2D map; uniform float uGain; uniform vec3 uRebote; uniform vec3 uSala; uniform vec3 uFilo; uniform float uHorneo; uniform float uSuave;
-varying vec2 vUv; varying vec3 vCloth; varying vec3 vSkin; varying vec3 vHair; varying float vBajo;
+varying vec2 vUv; varying vec3 vCloth; varying vec3 vSkin; varying vec3 vHair; varying float vBajo; varying float vLejos;
 #include <fog_pars_fragment>
 void main(){
   // La tribuna es una MASA OSCURA, no gente con detalle: siluetas blandas (uSuave: sesgo de mipmap), ropa llevada a un tono
@@ -42,12 +42,12 @@ void main(){
   vec4 t = texture2D( map, vUv, uSuave ); if ( t.a < 0.38 ) discard;
   float lr = max( dot( vCloth, vec3( 0.3, 0.6, 0.1 ) ), 0.02 ), h = fract( dot( vCloth, vec3( 12.9, 78.2, 37.7 ) ) );
   vec3 ropa = mix( vec3( 1.0 ), vCloth / lr, 0.3 ) * ( 0.017 + 0.02 * h );
-  vec3 piel = vec3( 0.042, 0.033, 0.028 ) * ( 0.75 + 0.9 * dot( vSkin, vec3( 0.33 ) ) );
+  vec3 piel = vec3( 0.03, 0.027, 0.027 ) * ( 0.75 + 0.9 * dot( vSkin, vec3( 0.33 ) ) );
   vec3 col = mix( ropa, piel, smoothstep( 0.2, 0.42, t.b ) ); col = mix( col, vec3( 0.008, 0.008, 0.009 ), smoothstep( 0.68, 0.9, t.b ) );
-  float esc = t.g * t.g * ( 3.0 - 2.0 * t.g ), filo = pow( t.r, 5.0 );
+  float esc = t.g * t.g * ( 3.0 - 2.0 * t.g ), filo = pow( t.r, 9.0 );      // el filo, solo donde la superficie mira bien arriba: coronilla y hombros
   if ( uHorneo > 0.0 ) col = vec3( 0.02, 0.022, 0.027 );      // horneada (Móvil y Baja): siluetas de un solo tono con el filo de luz arriba; con ropa, cara y pelo a tan pocos píxeles salía un mosaico
   vec3 c = col * ( uSala * ( 0.45 + 0.55 * t.r ) * uGain + uRebote * esc ) + uFilo * filo * ( 0.35 + 0.65 * h ) * ( uHorneo > 0.0 ? 1.6 : 1.0 );
-  gl_FragColor = vec4( c * mix( 0.45, 1.0, vBajo ), 1.0 );      // las filas de abajo, las más cercanas a las cámaras, más oscuras todavía
+  gl_FragColor = vec4( c * mix( 0.45, 1.0, vBajo ) * mix( 1.0, 0.3, vLejos ), 1.0 );      // y las del fondo, casi negras      // las filas de abajo, las más cercanas a las cámaras, más oscuras todavía
   #include <fog_fragment>
   if ( uHorneo > 0.0 ) gl_FragColor.rgb = pow( clamp( gl_FragColor.rgb * uHorneo, 0.0, 1.0 ), vec3( 1.0 / 2.2 ) );
 }`;
@@ -68,13 +68,13 @@ export class Publico {
     const r = azar(4242), aV = g.attributes.aVar;
     for (let i = 0; i < aV.count; i++) { const x = r(); aV.setX(i, x < .975 ? Math.floor(r() * QUIETAS) : 10 + Math.floor(r() * 2)); /* quietos: los brazos en alto son de la ovación (uFiesta) */ }
     aV.needsUpdate = true;
-    m.vertexShader = m.vertexShader.replace('varying vec2 vUv;', 'uniform float uFiesta; varying float vBajo; varying vec2 vUv;')
+    m.vertexShader = m.vertexShader.replace('varying vec2 vUv;', 'uniform float uFiesta; varying float vBajo; varying float vLejos; varying vec2 vUv;')
       .replace('vUv = vec2( ( uv.x + aVar ) * 0.25, uv.y );', `float var = aVar; float h = fract( dot( instanceMatrix[ 3 ].xyz, vec3( 0.731, 1.37, 0.413 ) ) );
   if ( uFiesta * 0.75 > h && var < ${QUIETAS}.0 ) var = 10.0 + floor( fract( h * 7.3 ) * 6.0 );      // con la ovación, más gente aplaude o festeja
-  vUv = vec2( ( uv.x + mod( var, ${COLS}.0 ) ) / ${COLS}.0, ( uv.y + floor( var / ${COLS}.0 ) ) / ${FILAS}.0 ); vBajo = smoothstep( -0.7, 2.4, instanceMatrix[ 3 ].y );`);
+  vUv = vec2( ( uv.x + mod( var, ${COLS}.0 ) ) / ${COLS}.0, ( uv.y + floor( var / ${COLS}.0 ) ) / ${FILAS}.0 ); vBajo = smoothstep( -0.7, 2.4, instanceMatrix[ 3 ].y ); vLejos = smoothstep( 12.0, 24.0, length( instanceMatrix[ 3 ].xz ) );`);
     m.fragmentShader = CROWD_FS; m.userData.conTono = false;
-    Object.assign(m.uniforms, { uFiesta: animo, uSala: { value: new THREE.Color(.75, .86, 1.12) }, uFilo: { value: new THREE.Color(.05, .041, .032) }, uHorneo: { value: 0 }, uSuave: { value: 1.7 } });
-    m.uniforms.map.value = this.atlas.texture; m.uniforms.uGain.value = .8; m.uniforms.uRebote.value.set(.42, .34, .28);      /* menos rebote cálido de frente: una tribuna quedaba lavada de beige */ m.needsUpdate = true;
+    Object.assign(m.uniforms, { uFiesta: animo, uSala: { value: new THREE.Color(.5, .62, .95) }, uFilo: { value: new THREE.Color(.026, .03, .04) }, uHorneo: { value: 0 }, uSuave: { value: 1.7 } });
+    m.uniforms.map.value = this.atlas.texture; m.uniforms.uGain.value = .8; m.uniforms.uRebote.value.set(.09, .085, .09);      /* menos rebote cálido de frente: una tribuna quedaba lavada de beige */ m.needsUpdate = true;
     arena.crowdTex?.dispose(); arena.crowdTex = this.atlas.texture;
     // --- tribunas horneadas: se arman la primera vez que una calidad sin profundidad de campo las pide
     if (arena.impostors) { arena.impostors.removeFromParent(); arena.impostors.traverse(o => { o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose(); }); arena.impostors = null; }
