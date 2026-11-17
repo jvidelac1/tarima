@@ -798,9 +798,9 @@ def seqs(g,gs):
     jrise=imp[1]['vk']**2/(2*GRAV*.9)
     squat=[rec,dip,imp,
         ('Envión · Empuje',dict(JB,grip=g,shin=16,thigh=36,ko=10,heel=14,lean=-2,shrug=16,bar=dict(mode='rel',d=(None,.25),zref=(imp[1],jrise),gap=.012,yref=(imp[1],0)),hand='over',phi=112,head=-28,retr=30,arch=7,epole=(.5,-.4,-.7),bal=0,vk=0)),
-        ('Squat jerk · Recepción',{**dict(grip=g,stance=1.2,toe=28,shin=34,thigh=84,ko=24,bar=OVER,head=-6,arch=11,vk=.8),**OH}),
-        ('Squat jerk · Fondo',{**dict(grip=g,stance=1.2,toe=28,shin=42,thigh=116,ko=28,bar=OVER,head=-6,arch=14,hold=True,vk=0,t=.9),**OH}),
-        ('Squat jerk · Recuperación',{**dict(grip=g,stance=1.2,toe=28,shin=26,thigh=40,ko=16,bar=OVER,head=-2,arch=9,t=.5),**OH}),
+        ('Squat jerk · Recepción',{**dict(grip=g,stance=1.2,toe=28,shin=34,thigh=84,ko=24,bar=OVER,head=-6,arch=11,vk=.8),**OH,'shrug':28}),
+        ('Squat jerk · Fondo',{**dict(grip=g,stance=1.2,toe=28,shin=42,thigh=116,ko=28,bar=OVER,head=-6,arch=14,hold=True,vk=0,t=.9),**OH,'shrug':28}),
+        ('Squat jerk · Recuperación',{**dict(grip=g,stance=1.2,toe=28,shin=26,thigh=40,ko=16,bar=OVER,head=-2,arch=9,t=.5),**OH,'shrug':28}),
         fin(stance=1.2,toe=28)]
     ps=pull(gs,True)
     rcs={**dict(SNQ,grip=gs,shin=37,thigh=114,ko=27,bar=OVER,head=-6,arch=9,hold=True,t=1.5),**OHS}
