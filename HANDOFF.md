@@ -2402,16 +2402,28 @@ Pedido del dueño: «quiero evaluar bien el físico; cuando seleccione el pesist
   final del arranque, con el clip pasado en 1,7 s). De pie no se dibuja la barra. Teclado: las flechas mueven el foco y la
   tarjeta con foco es la elegida; Enter sobre la elegida confirma. Cada pesista se ve con SU malla (en la final el del jugador
   lleva la turquesa de `JUGADOR`, como siempre). Al cambiar de tarjeta, fundido corto; se conservan el ángulo y la pose.
-- **Sin textos nuevos**: título `pesista.titulo`, «Listo» `campo.listo`, frases y RM de las tarjetas; los botones de girar y de
+- **Entran todos los modelos, los nuevos con «(nuevo)»** (decisión del dueño del 17-nov para el lanzamiento: «que entren
+  todos, para que los users vayan viendo la evolución; ponelos como (new)»). Debajo de las tres tarjetas, la plaza elegida
+  ofrece sus **aspectos** (`roster.js → ASPECTOS`): Compacto: Ventura · Ilarraz (nuevo) · Solanet (nuevo); Largo: Brenner ·
+  Kordan (nuevo); Potente: Marangi · Jastrev (nuevo). Elegir un aspecto cambia **quién dibuja** al pesista del jugador
+  (`vestirJugador`: la plaza del jugador con ese modelo y las otras dos como siempre), no la plaza deportiva: kilos, fases y
+  cuerpo de la simulación siguen saliendo de `sim.json` (por eso la frase y el RM de la ficha no cambian con el aspecto). Los
+  rivales quedan con los modelos de siempre, así nunca hay dos iguales. `plantel.json` y el modelo nuevo se bajan recién al
+  abrir la selección y al tocar el aspecto (aviso «Bajando a los pesistas…»; en el teléfono, los `_1024` como siempre); quien
+  no entra a la selección no baja nada de más. Se recuerda en `tarima.aspecto` (junto a `tarima.pesista`): al volver, baja ese
+  modelo en lugar del de siempre de su plaza. `pesista_elegido` lleva la propiedad nueva `modelo`. Texto nuevo, pedido por el
+  dueño: `pesista.nuevo` («(nuevo)» / «(new)»). Si se cargó un modelo en la selección, la final vuelve a precalentar
+  (`E.reprecal`). Con `?plantel=` la base es esa terna y se ofrecen los nuevos que no estén ya en otra plaza.
+- **Sin textos nuevos** (salvo «(nuevo)»): título `pesista.titulo`, «Listo» `campo.listo`, frases y RM de las tarjetas; los botones de girar y de
   barra arriba son dibujos. **Propuesta pendiente de OK del dueño**: etiquetas «Categoría» y «Peso» (hoy la categoría va en un
   recuadro y el peso al lado de la estatura, sin rótulo) y «frente / perfil / espalda» con texto.
 - **Costo**: nada cuando la pantalla no está abierta (un `enCuadro` que se quita al salir). Abierta, dibuja en cada cuadro.
 - **Pruebas**: `check_telefono` suma `seleccion_pc_1280x720` (ratón y teclado; además Móvil y Baja con un pesista),
   `seleccion_acostado_844x390` y `seleccion_vertical_390x844` (`telefono.yml -f solo=seleccion`; en las corridas completas va en un paso aparte, capturas en `out/seleccion`): el panel no tapa al pesista
   (caja del cuerpo de `cajas()`), nada se sale, gira solo un cuarto de vuelta en 3 s, el arrastre gira y no cuenta como toque,
-  los cuartos de vuelta y «barra arriba» llegan, y «Listo» deja la escena como estaba. `check_muro` pasa por la selección al
+  los cuartos de vuelta y «barra arriba» llegan, los 7 pesistas (3 de siempre y 4 nuevos, estos con la marca) se ven en las 6 vistas, y «Listo» deja la escena como estaba y el aspecto elegido. `check_muro` pasa por la selección al
   elegir Largo. Capturas: `~/tarima-datos/ver_visual/seleccion/`.
-- **Sin resolver / a la vista.** Parado, el pesista ocupa ~40 % del alto (el panel se lleva el 38 %) y con la barra arriba el
+- **Sin resolver / a la vista.** Parado, el pesista ocupa 31–34 % del alto de pie (el panel, con la fila de aspectos, se lleva el 42 %) y con la barra arriba el
   lente se abre (hasta 56°) para que entre la barra. La ficha de juego (RM 169/211 para un 71 kg) sale de `sim.json`, no de
   `plantel.json`: los números no cierran con la categoría. Al salir, detrás de la bienvenida queda el plano de la selección
   (la final pone su cámara). No se probó en un teléfono de verdad. Sin nota del dueño.
