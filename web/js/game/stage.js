@@ -225,7 +225,7 @@ export const PLANOS = {
  *   `frente[0]` y `frente[1]` rad), así el punto que se mira no cambia mientras el cuerpo baja y sube. Lente de `fov`° de alto.
  * - PREPARACIÓN, EL VISTAZO A LA BARRA (17-nov, decidido con el dueño; `vistazo`): cuando las manos van a la barra del piso
  *   (del `baja[0]` al `baja[1]` del recorrido) la vista baja hacia el punto medio entre las dos manos, `sobre` rad por encima
- *   (las manos quedan en la mitad de abajo de la imagen, con los antebrazos y la barra), entre `min` y `max` rad; con la barra
+ *   (las manos quedan en la mitad de abajo de la imagen, con los antebrazos y la barra), entre `min` y `max` rad (pasa de la vertical: la barra queda debajo y detrás de los ojos); con la barra
  *   tomada se queda `dura` s (se ve el agarre y el magnesio; como mucho `tope` s en total) y vuelve al jurado. Mientras mira
  *   abajo el lente se abre lo que haga falta para que entren las dos manos a `aire` del borde (hasta `fovMax`° de alto: el
  *   agarre del arranque es ancho y queda a medio metro de los ojos). Solo con la barra abajo de `bajo` × estatura/1,70 m y sin la barrita en pantalla: el
@@ -247,7 +247,7 @@ export const PLANOS = {
  * - RECUADRO («doble visión», `RECUADRO`): mientras tanto, una pantalla chica muestra el levantamiento desde afuera (ver _recuadro).
  */
 export const POV = { fov: 62, fovAncho: 104, cerca: .06, arriba: .1, adelante: .085, sigue: 30, mira: [1.15, 7.4], frente: [-.2, .12], abajo: -.96,
-  baja: [.08, .35, .6, .92], toma: [.14, .3], vistazo: { sobre: .17, max: -1.48, min: -1.05, dura: .9, llego: .09, tope: 3.4, fovMax: 92, aire: .82, bajo: .5 }, suelta: [-.2, .9, .35], muelle: 7, vMax: 1, sinCabeza: .6, cercaOjo: .09, foco: 6,
+  baja: [.08, .35, .6, .92], toma: [.14, .3], vistazo: { sobre: .3, max: -1.66, min: -1.05, dura: .9, llego: .09, tope: 3.6, fovMax: 92, aire: .8, bajo: .5 }, suelta: [-.2, .9, .35], muelle: 7, vMax: 1, sinCabeza: .6, cercaOjo: .09, foco: 6,
   resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003, tension: 2.4 }, temblor: .006, latido: { hz: 1.15, fov: .22 }, estela: .6 };
 /**
  * Recuadro de la primera persona: `ancho` del lienzo (`angosto` si mide menos de 900 px), alto = ancho × `alto`, pegado al
@@ -847,7 +847,8 @@ export class Escena {
       abre = kA * Math.max(0, Math.min(POV.vistazo.fovMax, THREE.MathUtils.radToDeg(2 * Math.atan(tg / POV.vistazo.aire))) - fov);
     }
     cam.fov = fov + abre; cam.near = POV.cerca; cam.updateProjectionMatrix(); cam.updateMatrixWorld();
-    R.focusDistance = POV.foco; R.target.set(S.p.x, S.p.y, S.p.z + POV.foco); R.subject.copy(R.target);
+    // en el vistazo el foco va a las manos (con el foco en el jurado, la barra y las manos salían borrosas)
+    R.focusDistance = POV.foco + (Math.max(.4, a ? a.midWorld(['LeftHand', 'RightHand'], _pe).distanceTo(S.p) : POV.foco) - POV.foco) * kA; R.target.set(S.p.x, S.p.y, S.p.z + POV.foco); R.subject.copy(R.target);
   }
   /** El cuerpo propio entero (true) u oculto como en la vista de los ojos (false): para dibujar el recuadro entre un estado y el otro. */
   _propio(entero) {

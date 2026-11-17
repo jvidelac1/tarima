@@ -175,7 +175,7 @@ if (!SOLO || SOLO === 'pov' || SOLO === 'claves') {
     }
     await hoja(nombre, lista, 5, 480);
   };
-  for (const id of SOLO === 'claves' ? [] : ['ventura']) { await tira(id, `tira_${id}_arranque`, [['snatch', 's', 3.8]]); await tira(id, `tira_${id}_dos_tiempos`, [['clean', 'c', 3.8], ['split', 'c', 0]]); }
+  for (const id of SOLO === 'claves' ? [] : ['ventura']) { await tira(id, `tira_${id}_arranque`, [['snatch', 's', 4.4]]); await tira(id, `tira_${id}_dos_tiempos`, [['clean', 'c', 4.4], ['split', 'c', 0]]); }
   await J(() => window.JUEGO.test.real());
   // fotos grandes de las fases clave (Ventura y Brenner) y en un teléfono acostado
   const CLAVE = [['snatch', 's', 'Parado', 0], ['snatch', 's', 'Salida', 0], ['snatch', 's', 'Primer tirón', 5], ['snatch', 's', 'Segundo tirón', 5], ['snatch', 's', 'Tirón de brazos', 0], ['snatch', 's', 'Giro', 5], ['snatch', 's', 'Recepción', 0], ['snatch', 's', 'Recuperación', 0],
