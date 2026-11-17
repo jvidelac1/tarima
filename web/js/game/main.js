@@ -967,7 +967,8 @@ function orientacion() {
  *    medidas salen de juego.css, así un cambio de diseño no se desfasa.
  *  - En cualquier pantalla: lo que cuelga del borde de arriba y entra en la franja central (FRANJA: del 38 % al 62 % del
  *    ancho, donde van el pesista y la barra) baja el techo hasta su borde de abajo: el tablero parado (ocupa más de medio
- *    ancho), los botones de sonido, pausa y ayuda arriba al centro (acostado y en la computadora), la energía.
+ *    ancho) y la energía. Acostado y en la computadora arriba al centro no va nada (juego.css: sonido, pausa y ayuda van
+ *    arriba a la derecha, debajo del reloj): con la cámara general la punta de la barra queda más cerca y no alcanza con el techo.
  * Se llama al girar y cuatro veces por segundo (tic): los carteles aparecen y se van con cada pantalla. Con la cámara
  * congelada tras el intento (rig.fijo) los márgenes no cambian: el techo ya viene puesto desde antes del levantamiento.
  */
@@ -982,7 +983,7 @@ function margenVertical() {
   for (const id of TECHO) {
     const el = $(id); if (!el || el.hidden) continue; const r = el.getBoundingClientRect(); if (!r.width || !r.height) continue;
     if (r.top - R.top > H * .2 || r.right < R.left + W * FRANJA[0] || r.left > R.left + W * FRANJA[1]) continue;      // no cuelga de arriba, o está a un costado
-    t = Math.max(t, (r.bottom - R.top + 6) / H);
+    t = Math.max(t, (r.bottom - R.top + 6) / H + .035);      // con aire: el disco de la punta de la barra queda más cerca de la cámara y se ve más grande
   }
   escena.rig.setInsets({ t: Math.min(.36, t), b, l: 0, r: 0 });
 }
@@ -1202,14 +1203,12 @@ async function presentacion(p, cfg, errMedio, primera) {
  */
 /**
  * El pesista a la parte del lienzo que dejan libre el panel y los carteles (encuadreLibre), con un movimiento suave. Lo usan
- * el llamado, los paneles de elegir kilos (apertura y fin del arranque) y el aviso de que otro sale antes.
+ * el llamado y los paneles de elegir kilos (apertura y fin del arranque).
  */
 function encuadrarLibre(suave = .7) { if (!escena?.activo) return; escena.primerPlano('medio', encuadreLibre(), suave); E.forzar = true; }
 function encuadreLibre() {
   const pn = $('capa').querySelector('.panel'), gl = $('gl'), c = { width: gl.clientWidth, height: gl.clientHeight }; if (!c.width || !c.height) return null;
   let x0 = 0, x1 = 1, y0 = 0, y1 = 1;
-  // sin panel, el cartel del veredicto (a la izquierda, a media altura) cuenta como un panel a ese costado
-  const ve = $('veredicto'); if (!pn && ve && !ve.hidden && ve.offsetWidth && !document.documentElement.classList.contains('vert') && ve.offsetLeft / c.width < .3) x0 = Math.min(.5, (ve.offsetLeft + ve.offsetWidth) / c.width);
   if (pn) {
     // con offsets y no con getBoundingClientRect: con el contenido girado (teléfono en vertical) las cajas salen rotadas
     const izq = pn.offsetLeft / c.width, arr = pn.offsetTop / c.height;
@@ -1386,7 +1385,7 @@ async function llamadoPropio(p, L) {
   if (S) {
     env = L.lev === 'c' ? S.env : undefined;
     if (S.kg !== L.kg && !p.cambioValido(ms, S.kg)) { desplazado = p.cambio(ms, S.kg).desplazado; if (!desplazado) kgFinal = S.kg; }
-    if (desplazado) { visita('desplazado'); etiqueta(null); veredicto(t('desplazado.titulo', { quien: quien(a), kg: S.kg }), t(uno ? 'desplazado.texto_u' : 'desplazado.texto')); encuadrarLibre(); await saltable(1800); veredicto(''); return; }
+    if (desplazado) { visita('desplazado'); etiqueta(null); veredicto(t('desplazado.titulo', { quien: quien(a), kg: S.kg }), t(uno ? 'desplazado.texto_u' : 'desplazado.texto')); $('veredicto').classList.add('der'); /* el pesista quedó a la izquierda (el panel estaba a la derecha): el aviso va del lado del panel */ await saltable(1800); veredicto(''); return; }
     escena.setCarga(kgFinal, L.lev); zocalo(a, { ...L, kg: kgFinal }); etiqueta(p.llamado.et);
     ctx = p.contexto(env); asegurarCalidad(); visita('intento');
     // el primer dos tiempos en Un toque se explica sobre la marcha: con la barra en los hombros el reloj espera el toque de ¡FLEXIONA!

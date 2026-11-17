@@ -61,6 +61,13 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 .zocalo .kg{background:var(--gold);color:#111;padding:0 calc(var(--u)*.8);display:flex;align-items:baseline;gap:.2em}
 .zocalo .kg b{font-weight:800;font-size:calc(var(--u)*2.3)}
 #pausa{position:absolute;z-index:6;top:calc(var(--u)*1.2 + var(--st));left:50%;transform:translateX(-50%);font-family:var(--display);min-height:0;min-width:44px;padding:.35em .9em;background:rgba(6,14,48,.88);font-size:calc(var(--u)*1.2)}
+/* Arriba al centro no va nada (17-nov: «los carteles le tapan la cabeza al pesista»): ahí llegan la barra cuando sube y la
+   cabeza en los planos del final. Sonido, pausa y ayuda van arriba a la derecha, en fila debajo del reloj y las luces
+   (parado, html.vert, es al revés: la fila arriba y el reloj debajo). Lo mide tools/tapa.mjs. */
+html:not(.vert) :is(#pausa,#sonidob,#ayudab){top:calc(var(--u)*5.4 + var(--st));left:auto;transform:none;width:46px;min-width:46px;padding-left:0;padding-right:0;display:flex;align-items:center;justify-content:center}
+html:not(.vert) #ayudab{right:calc(var(--u)*1.2 + var(--sr))}
+html:not(.vert) #pausa{right:calc(var(--u)*1.2 + var(--sr) + 50px)}
+html:not(.vert) #sonidob{right:calc(var(--u)*1.2 + var(--sr) + 100px)}
 
 /* La señal: siempre en el mismo lugar. Horizontal: a la derecha del pesista, a media altura. Vertical: al pie del escenario. */
 .tecla{display:inline-block;font:inherit;font-family:var(--display);font-weight:800;font-style:normal;letter-spacing:.12em;text-transform:uppercase;line-height:1;color:#0a1020;background:#f2f4ff;border-radius:.42em;padding:.42em .8em .5em;box-shadow:0 .24em 0 #7c86a8,0 .24em 0 1px #03050c;white-space:nowrap}
@@ -303,7 +310,7 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
   :where(html.horiz.bajo) .panel.podio-panel:has(button) .tabla{display:none}
   /* el panel del llamado va al costado: el pesista queda a la vista */
   /* el llamado va abajo y nunca debajo de los botones de sonido, pausa y ayuda (arriba al centro): si no entra, se desplaza */
-  :where(html.horiz.bajo) .panel.lado{align-self:flex-end;margin-left:auto;margin-right:0;max-width:min(54cqw,440px);max-height:calc(100% - 44px)}
+  :where(html.horiz.bajo) .panel.lado{align-self:flex-end;margin-left:auto;margin-right:0;max-width:min(54cqw,440px);max-height:calc(100% - 44px - var(--u)*4.4)}
   /* elegir kilos (apertura y fin del arranque) con el teléfono acostado: la tabla y el selector no entran a un costado en 340 a 390 px de alto: a lo ancho, como siempre */
   :where(html.horiz.bajo) .panel.peso.lado{align-self:center;margin:0;max-width:min(96cqw,760px);max-height:100%}
 /* teléfono en vertical: «Gira el teléfono» con un dibujo, encima de todo */
@@ -497,6 +504,8 @@ html.juego-u .senal .s-sub{font-size:calc(var(--v)*1.25)}
 html.juego-u .veredicto{left:calc(var(--u)*1.4 + var(--sl));top:42%;transform:none;text-align:left;font-size:calc(var(--u)*1.75);max-width:min(30cqw,calc(var(--u)*26));padding:calc(var(--u)*.5) calc(var(--u)*1);background:rgba(6,14,48,.8)}
 html.juego-u .veredicto small{font-size:calc(var(--u)*1.02)}
 html.juego-u .veredicto.arriba{top:42%;font-size:calc(var(--u)*1.4)}
+/* un aviso sobre el plano del llamado (el pesista a la izquierda, donde el panel lo dejó): va a la derecha, del lado del panel */
+html.juego-u .veredicto.der{left:auto;right:calc(var(--u)*1.4 + var(--sr))}
 @media (prefers-reduced-motion:no-preference){html.juego-u :is(.veredicto,.guia){animation:entraL .18s ease-out}}
 @keyframes entraL{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 /* con el veredicto a la vista, nada más a la izquierda: ni el marcador, ni los cambios de los rivales, ni la etiqueta */

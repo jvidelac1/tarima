@@ -250,11 +250,11 @@ export const POV = { fov: 62, fovAncho: 104, cerca: .06, arriba: .1, adelante: .
   resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003, tension: 2.4 }, temblor: .006, latido: { hz: 1.15, fov: .22 }, estela: .6 };
 /**
  * Recuadro de la primera persona: `ancho` del lienzo (`angosto` si mide menos de 900 px), alto = ancho × `alto`, pegado al
- * borde derecho (`x` del ancho de margen) a `y` del alto desde arriba (debajo del reloj y las luces; no tapa la barrita ni
- * el tablero). La cámara es la general de siempre, fija: mira a `mira` (× estatura/1,70) desde `d` m, con `fov`°. Se vuelve a
+ * borde derecho (`x` del ancho de margen) a `y` del alto desde arriba y nunca a menos de `yMin` px (debajo del reloj, las
+ * luces y la fila de sonido, pausa y ayuda; no tapa la barrita ni el tablero). La cámara es la general de siempre, fija: mira a `mira` (× estatura/1,70) desde `d` m, con `fov`°. Se vuelve a
  * dibujar un cuadro de cada `cada` (con post; el recuadro guarda su imagen) para que cueste poco.
  */
-export const RECUADRO = { ancho: .24, angosto: .27, alto: .62, x: .014, y: .13, mira: [0, 1.22, .06], d: 6.6, fov: 30, cada: 2 };
+export const RECUADRO = { ancho: .24, angosto: .27, alto: .62, x: .014, y: .13, yMin: 84, mira: [0, 1.22, .06], d: 6.6, fov: 30, cada: 2 };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
 
@@ -863,7 +863,7 @@ export class Escena {
   _recuadro() {
     const X = this.recuadro, r = this.renderer, a = this.activo, on = this._recuadroOn();
     if (!on) return;
-    const W = this.canvas.clientWidth || 1, H = this.canvas.clientHeight || 1, fw = W < 900 ? RECUADRO.angosto : RECUADRO.ancho, fh = Math.min(.42, fw * W / H * RECUADRO.alto), fx = 1 - RECUADRO.x - fw, fyT = RECUADRO.y;
+    const W = this.canvas.clientWidth || 1, H = this.canvas.clientHeight || 1, fw = W < 900 ? RECUADRO.angosto : RECUADRO.ancho, fh = Math.min(.42, fw * W / H * RECUADRO.alto), fx = 1 - RECUADRO.x - fw, fyT = Math.max(RECUADRO.y, RECUADRO.yMin / H);
     if (X.el && (X.fw !== fw || X.fh !== fh)) { X.fw = fw; X.fh = fh; X.el.style.cssText = `position:absolute;left:${(fx * 100).toFixed(2)}%;top:${(fyT * 100).toFixed(2)}%;width:${(fw * 100).toFixed(2)}%;height:${(fh * 100).toFixed(2)}%;box-sizing:border-box;border:1px solid rgba(232,236,248,.55);box-shadow:0 0 0 1px rgba(3,5,12,.6),0 6px 18px rgba(0,0,0,.45);pointer-events:none`; }
     const cam = X.cam, kE = (this.P?.h || 1.7) / 1.7, c = CAMERAS[CAM['3/4']] || CAMERAS[0], ce = Math.cos(c.el);
     cam.fov = RECUADRO.fov; cam.aspect = (fw * W) / (fh * H); cam.near = .25; cam.far = 120; cam.updateProjectionMatrix();
@@ -968,7 +968,7 @@ export class Escena {
     if (hC && !ojos) { const k = (this.P?.h || 1.7) / 1.7, p0 = px(hC.getWorldPosition(v)), p1 = px(v.setFromMatrixColumn(hC.matrixWorld, 1).normalize().multiplyScalar(.21 * k).add(hC.getWorldPosition(v2))); if (caja([p0, p1])) { const h = Math.max(3, Math.hypot(p1.x - p0.x, p1.y - p0.y) * .62), cx = (p0.x + p1.x) / 2, cy = (p0.y + p1.y) / 2; cabeza = { l: cx - h, r: cx + h, t: cy - h, b: cy + h }; } }
     const barra = caja([-1.1, 1.1].flatMap(x => [-.225, .225].map(d => px(v.set(x, yBar + d, zBar)))));
     let recuadro = null;
-    if (ojos && this._recuadroOn?.()) { const fw = W < 900 ? RECUADRO.angosto : RECUADRO.ancho, fh = Math.min(.42, fw * W / H * RECUADRO.alto), fx = 1 - RECUADRO.x - fw; recuadro = { l: R.left + fx * W, r: R.left + (fx + fw) * W, t: R.top + RECUADRO.y * H, b: R.top + (RECUADRO.y + fh) * H }; }
+    if (ojos && this._recuadroOn?.()) { const fw = W < 900 ? RECUADRO.angosto : RECUADRO.ancho, fh = Math.min(.42, fw * W / H * RECUADRO.alto), fx = 1 - RECUADRO.x - fw, fy = Math.max(RECUADRO.y, RECUADRO.yMin / H); recuadro = { l: R.left + fx * W, r: R.left + (fx + fw) * W, t: R.top + fy * H, b: R.top + (fy + fh) * H }; }
     return { cuerpo: cuerpo && !ojos ? { l: cuerpo.l - m, r: cuerpo.r + m, t: cuerpo.t - m, b: cuerpo.b + m * .3 } : null, torso: torso && !ojos ? { l: torso.l - m, r: torso.r + m, t: torso.t - m, b: torso.b } : null, cabeza, barra, alta: yBar > yC, ojos, recuadro };
   }
   /**
