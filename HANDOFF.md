@@ -2405,3 +2405,10 @@ Resumen: (0) preparar el Mac alquilado y la sesión cloud, (1) juego mínimo jug
 - Mocap desde video sigue pendiente.
 - Esqueleto único con nombres Mixamo más un hueso `Bar`, así la barra nunca se desfasa de las manos.
 - three.js vendorizado en `web/vendor/` para que el visor funcione sin red.
+
+### Pelo gris en el teléfono (17-nov, rama `v-pesista`)
+
+- No era del camino de «Móvil»/«Baja»: el casco de pelo y la barba de malla opaca salían grises igual en «Alta» (fotos de antes y después de los tres en `~/tarima-datos/ver_visual/pelo/`, corridas 44067370084/44067386678/44067401923 y 44068336109/44068349915/44068366545).
+- Causa 1 (la mayor): el reflejo. `capMaterial` dejaba el lóbulo ancho de GGX (rugosidad 0,82, F0 × 0,45, F90 0,5) frente a los tres contraluces de `look.js` (15 + 14 + 5, sin sombra). Vistos a contraluz daban 0,13 a 0,37 lineal en coronilla y sienes contra 0,03 a 0,07 de la difusa (cuenta de un foco de three con las posiciones de `_luces`; 0,2 lineal ≈ gris 140 después del tono). Ahora F0 × 0,2 (como el pelo en capas) y F90 = 0.
+- Causa 2: el color. `blender/tex.py: pelo` escribe color × (1,7 + 1,2 s) + 0,04 a 0,07: la media de la textura es ~3,8 veces más clara en lineal que el color de la ficha (Ilarraz `#0f0c0a`, textura media 37,32,28). El visor lleva la media al color de la ficha (`ASPECTO.pelo.base`, lo pasa `stage.mostrar` desde `plantel.json`) y usa ese color en el pelo pintado sobre la piel. No se tocó `tex.py` ni los GLB: si se corrige el generador, `pelo.base` sigue valiendo (nunca aclara).
+- Sin resolver: el pelo y la barba quedan casi negros lisos (se pierde la veta entre mechones: con el color de la ficha y esos contraluces no hay rango); el rapado pintado de Jastrev se sigue aclarando de espaldas (va por el material de la piel, 70 % de color de pelo) y tiene una costura clara en la nuca; el borde de la barba sigue en serrucho.
