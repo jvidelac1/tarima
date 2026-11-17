@@ -428,6 +428,7 @@ const etiqueta = et => { $('etiqueta').hidden = !et?.length; $('etiqueta').textC
 const CAMARAS_ELEGIBLES = ['3/4', 'jurado', 'lado', 'baja', 'pov'], CAMARA_NOMBRE = { '3/4': 'general', jurado: 'jurado', lado: 'lateral', baja: 'baja', pov: 'pov' };
 const camElegida = () => { const q = params.get('camara'), g = guardado.get('tarima.camara'); return CAMARAS_ELEGIBLES.includes(q) ? q : CAMARAS_ELEGIBLES.includes(g) ? g : '3/4'; };
 /** Recuadro de la primera persona (la vista general en una pantalla chica): prendido salvo que se apague en Opciones o con `?recuadro=no`. */
+const recuadroPedido = () => (params.get('recuadro') || guardado.get('tarima.recuadro')) === 'si';
 const recuadroOn = () => (params.get('recuadro') || guardado.get('tarima.recuadro') || 'si') !== 'no';
 const camPrincipal = () => (escena.vertical ? 'lado' : (E.camara ||= camElegida()));
 /** La cámara con que se mira un levantamiento: la elegida si es del jugador; la de un rival nunca es la primera persona. */
@@ -1008,7 +1009,7 @@ async function inicio() {
     else if (b.dataset.d) { cfg.dif = b.dataset.d; if (cfg.ctl === 'c') cfg.ctl = 'b'; if (cfg.dif === 'dificil' && cfg.nivel === 'amistoso') cfg.nivel = 'normal'; fijarDificultad(cfg); }
     else if (b.id === 'btn-opciones') { S.opciones = !S.opciones; S.verOpciones = S.opciones; if (S.opciones) ev('opciones_abiertas'); }
     else if (b.dataset.cam) elegirCamara(b.dataset.cam, 'opciones');
-    else if (b.dataset.rec) { guardado.set('tarima.recuadro', b.dataset.rec); escena?.setRecuadro(recuadroOn()); }
+    else if (b.dataset.rec) { guardado.set('tarima.recuadro', b.dataset.rec); escena?.setRecuadro(recuadroOn(), recuadroPedido()); }
     else if (b.dataset.sonido) sonido.encender(b.dataset.sonido === 'si');      // dentro del toque: en el iPhone así se desbloquea
     else if (b.dataset.instalar) telefono.avisoInstalar(true);
     else if (b.id === 'btn-ayuda') abrirSobre('ayuda');
@@ -1668,7 +1669,7 @@ async function iniciar() {
     E.shaderMal = E.shaderMal || log || 'shader'; console.error('THREE: el programa no compila:', log);
   };
   try { escena = new Escena($('gl'), C.Q, { reduceMotion, alShader }); } catch (e) { cargaUI.ocultar(); return falloGrafico('webgl', e); }
-  escena.setRecuadro(recuadroOn());
+  escena.setRecuadro(recuadroOn(), recuadroPedido());
   escena.poses = poses; nombrar(); orientacion();
   escena.renderer.debug.onShaderError = alShader;
   vigilarContexto($('gl'));
@@ -1790,6 +1791,19 @@ window.JUEGO = {
       if (E.camPrueba !== camara + id) { E.camPrueba = camara + id; escena.camara(camara); }
       escena.cuadro(dt, dibujar); return this.medir();
     },
+    /**
+     * Dibuja un cuadro y lee la imagen del lienzo en una grilla de 24 × 12 puntos, sin la franja derecha donde va el recuadro:
+     * {media, desvio} de la luminancia (0 a 255) y `horizonte` (fracción del alto, desde arriba, de la línea piso/fondo que
+     * la cámara tiene delante: la proyección de un punto lejano a la altura del piso). Para que las pruebas vean un cuadro negro.
+     */
+    luz() {
+      escena.cuadro(0, true); const r = escena.renderer, g = r.getContext(), W = g.drawingBufferWidth, H = g.drawingBufferHeight, px = new Uint8Array(4), L = [];
+      r.setRenderTarget(null); r.state.bindFramebuffer(g.READ_FRAMEBUFFER, null); r.state.bindFramebuffer(g.FRAMEBUFFER, null);
+      for (let j = 0; j < 12; j++) for (let i = 0; i < 24; i++) { g.readPixels(Math.floor((i + .5) / 24 * W * .7), Math.floor((j + .5) / 12 * H), 1, 1, g.RGBA, g.UNSIGNED_BYTE, px); L.push(.2126 * px[0] + .7152 * px[1] + .0722 * px[2]); }
+      const m = L.reduce((a, b) => a + b, 0) / L.length, d = Math.sqrt(L.reduce((a, b) => a + (b - m) ** 2, 0) / L.length);
+      const cam = escena.rig.camera, V = escena.barbell.group.position.constructor, h = new V(0, 0, 30).project(cam);
+      return { media: Math.round(m * 10) / 10, desvio: Math.round(d * 10) / 10, horizonte: Math.round((1 - h.y) / 2 * 1000) / 1000 };
+    },
     /** Tiempos (s) de las muestras del segmento `seg` del pesista puesto y el índice de cada fase (tools/check_pov.mjs: tiras a tiempo real). */
     tiempos(seg) { const G = tramo(escena.P, seg); return { tt: Array.from(G.tt), n: G.n, fases: escena.P.segs[seg].poses.map(p => p.n), sub: escena.P.sub }; },
     /** Dónde están pies, manos, cadera, cabeza, barra y cámara (m), y el hueso (sin contar los dedos) que más giró desde la llamada anterior (rad). */
@@ -1799,7 +1813,7 @@ window.JUEGO = {
       let giro = 0, cual = ''; const antes = E.medAntes, q = a.bones.map(b => b.quaternion.clone());
       if (antes && antes.a === a) a.bones.forEach((b, i) => { const g = q[i].angleTo(antes.q[i]); if (g > giro && !/Hand(Thumb|Index|Middle|Ring|Pinky)/.test(b.name)) { giro = g; cual = b.name.replace(/^mixamorig:?/, ''); } });
       E.medAntes = { a, q }; const cam = escena.rig.camera, d = cam.getWorldDirection(new V()), b = escena.barbell.group.position;
-      return { ...o, giro: r(giro), cual, bar: [r(b.y), r(b.z)], cam: { p: [r(cam.position.x), r(cam.position.y), r(cam.position.z)], inc: r(Math.asin(d.y)), fov: r(cam.fov) }, pov: !!escena.pov, sinCabeza: !!escena._sinCabeza, sinTorso: !!(escena._sinTorso?.skin?.uSinTorso?.value > .5), recuadro: !!escena.recuadro?.el && !escena.recuadro.el.hidden, ojos: (() => { const o = escena.ojos(new V()); return [r(o.x), r(o.y), r(o.z)]; })(), rum: r(Math.atan2(d.x, d.z)) };
+      return { ...o, giro: r(giro), cual, bar: [r(b.y), r(b.z)], cam: { p: [r(cam.position.x), r(cam.position.y), r(cam.position.z)], inc: r(Math.asin(d.y)), fov: r(cam.fov) }, pov: !!escena.pov, sinCabeza: !!escena._sinCabeza, sinTorso: !!(escena._sinTorso?.skin?.uSinTorso?.value > .5), recuadro: !!escena.recuadro?.el && !escena.recuadro.el.hidden, conBarrita: !!escena.pov?.conBarrita, ojos: (() => { const o = escena.ojos(new V()); return [r(o.x), r(o.y), r(o.z)]; })(), rum: r(Math.atan2(d.x, d.z)) };
     },
     /** Lleva la escena de final() al instante t (s), la dibuja si `dibujar`, y mide holguras entre la barra y el cuerpo. */
     finalEn(t, dibujar = false, dt = 1 / 60, dtCam = .5) { const c = E.prueba; dibujarFinal(c, t, dt, false);
