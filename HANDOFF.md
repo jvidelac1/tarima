@@ -2221,6 +2221,10 @@ cabeza… un poco más leves»; «el momento de tensión antes»; «una pantalla
   sube, el golpe de cámara al recibir, la estela, y el recuadro.
 - `check_carga_fallas [shader compu]`: la espera pasó de 180 a 420 s. **Es una hipótesis de lentitud por software sin
   confirmar**: falló dos veces con 180 s y pasó dos veces con 420 s; no se vio el aviso tardío en ninguna captura.
+- **Costo del recuadro, medido por software** (`check_pov`, sección C; corrida 43987308856): «Baja» 300 → 810 ms por cuadro
+  (+170 %), «Móvil» 299 → 838 ms (+180 %). Es un segundo dibujo entero de la escena. Por eso en el camino directo va
+  **apagado por defecto** y se prende solo si el jugador elige «Con recuadro» (o `?recuadro=si`, que usan las pruebas); con
+  post («Media» para arriba) va a una textura propia a media frecuencia. **Con post y en una placa real, sin medir.**
 - Tira jugada en Alta: `check_barra --tira` (una foto cada 0,1 s del primer intento propio, de la barrita al veredicto).
 
 Lo de abajo («no tocar» y «sigue mal») es de las cinco rondas anteriores, con la cámara vieja.

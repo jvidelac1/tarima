@@ -428,6 +428,7 @@ const etiqueta = et => { $('etiqueta').hidden = !et?.length; $('etiqueta').textC
 const CAMARAS_ELEGIBLES = ['3/4', 'jurado', 'lado', 'baja', 'pov'], CAMARA_NOMBRE = { '3/4': 'general', jurado: 'jurado', lado: 'lateral', baja: 'baja', pov: 'pov' };
 const camElegida = () => { const q = params.get('camara'), g = guardado.get('tarima.camara'); return CAMARAS_ELEGIBLES.includes(q) ? q : CAMARAS_ELEGIBLES.includes(g) ? g : '3/4'; };
 /** Recuadro de la primera persona (la vista general en una pantalla chica): prendido salvo que se apague en Opciones o con `?recuadro=no`. */
+const recuadroPedido = () => (params.get('recuadro') || guardado.get('tarima.recuadro')) === 'si';
 const recuadroOn = () => (params.get('recuadro') || guardado.get('tarima.recuadro') || 'si') !== 'no';
 const camPrincipal = () => (escena.vertical ? 'lado' : (E.camara ||= camElegida()));
 /** La cámara con que se mira un levantamiento: la elegida si es del jugador; la de un rival nunca es la primera persona. */
@@ -1008,7 +1009,7 @@ async function inicio() {
     else if (b.dataset.d) { cfg.dif = b.dataset.d; if (cfg.ctl === 'c') cfg.ctl = 'b'; if (cfg.dif === 'dificil' && cfg.nivel === 'amistoso') cfg.nivel = 'normal'; fijarDificultad(cfg); }
     else if (b.id === 'btn-opciones') { S.opciones = !S.opciones; S.verOpciones = S.opciones; if (S.opciones) ev('opciones_abiertas'); }
     else if (b.dataset.cam) elegirCamara(b.dataset.cam, 'opciones');
-    else if (b.dataset.rec) { guardado.set('tarima.recuadro', b.dataset.rec); escena?.setRecuadro(recuadroOn()); }
+    else if (b.dataset.rec) { guardado.set('tarima.recuadro', b.dataset.rec); escena?.setRecuadro(recuadroOn(), recuadroPedido()); }
     else if (b.dataset.sonido) sonido.encender(b.dataset.sonido === 'si');      // dentro del toque: en el iPhone así se desbloquea
     else if (b.dataset.instalar) telefono.avisoInstalar(true);
     else if (b.id === 'btn-ayuda') abrirSobre('ayuda');
@@ -1668,7 +1669,7 @@ async function iniciar() {
     E.shaderMal = E.shaderMal || log || 'shader'; console.error('THREE: el programa no compila:', log);
   };
   try { escena = new Escena($('gl'), C.Q, { reduceMotion, alShader }); } catch (e) { cargaUI.ocultar(); return falloGrafico('webgl', e); }
-  escena.setRecuadro(recuadroOn());
+  escena.setRecuadro(recuadroOn(), recuadroPedido());
   escena.poses = poses; nombrar(); orientacion();
   escena.renderer.debug.onShaderError = alShader;
   vigilarContexto($('gl'));

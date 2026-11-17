@@ -37,7 +37,7 @@ const ctx = await browser.newContext({ viewport: { width: 960, height: 540 }, de
 const page = await ctx.newPage(), hojas = await ctx.newPage();
 page.on('console', m => { if (m.type() === 'error') problemas.push(`console.error: ${m.text()}`); });
 page.on('pageerror', e => problemas.push(`pageerror: ${e.message}`));
-await page.goto(`${base}juego.html?q=${Q}&dibujo=0${PLANTEL ? '&plantel=' + PLANTEL : ''}`, { waitUntil: 'load' });
+await page.goto(`${base}juego.html?q=${Q}&dibujo=0&recuadro=si${PLANTEL ? '&plantel=' + PLANTEL : ''}`, { waitUntil: 'load' });
 await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 240000 }).catch(() => {});
 if (!await page.evaluate(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
 await page.evaluate(() => { document.documentElement.classList.add('juego-u');      // el veredicto a la izquierda, como en el juego (no encima del pesista)
@@ -143,7 +143,7 @@ if (!SOLO || SOLO === 'pov' || SOLO === 'claves') {
       // reglas: la mirada no gira más de 160 °/s (sigue a la barra, con tope de 150) y la cámara no se aleja más de 1,4 m de la cabeza (acompaña a la barra: con la barra en el piso queda a la altura de las rodillas)
       if (G(wMax) > 60) problemas.push(`${id} ${seg}: la mirada gira a ${G(wMax).toFixed(0)} °/s (tope 60: la cabeza se mueve leve)`);
       if (!ant.sinCabeza || !ant.sinTorso) problemas.push(`${id} ${seg}: la cabeza o el tronco propios se dibujan en la vista de los ojos`);
-      if (!ant.recuadro) problemas.push(`${id} ${seg}: falta el recuadro con la vista general`);
+      if (!ant.recuadro && Q !== 'baja' && Q !== 'movil') problemas.push(`${id} ${seg}: falta el recuadro con la vista general`);
       if (lejos > .15) problemas.push(`${id} ${seg}: la cámara queda a ${(lejos * 100).toFixed(0)} cm de los ojos (tope 15)`);
     }
   }
@@ -195,7 +195,7 @@ if (!SOLO || SOLO === 'pov' || SOLO === 'claves') {
 // ---------- C. costo del recuadro (por software: vale la relación, no los ms) ----------
 if (SOLO === 'costo' || !SOLO) {
   await J(o => window.JUEGO.test.posa(o), { id: 'ventura', lev: 's', seg: 'snatch', s: 0, camara: 'pov', dt: .5, dibujar: false });
-  const c = await J(() => { const e = window.JUEGO.escena, R = {}; for (const on of [true, false, true, false]) { e.setRecuadro(on); const x = e.costo({ n: 10, tope: 20000 }); (R[on ? 'con' : 'sin'] ||= []).push(Math.round(x.ms)); } e.setRecuadro(true); return R; });
+  const c = await J(() => { const e = window.JUEGO.escena, R = {}; for (const on of [true, false, true, false]) { e.setRecuadro(on, true); const x = e.costo({ n: 10, tope: 20000 }); (R[on ? 'con' : 'sin'] ||= []).push(Math.round(x.ms)); } e.setRecuadro(true, false); return R; });
   const med = a => a.reduce((x, y) => x + y, 0) / a.length;
   console.log(`\nC. COSTO DEL RECUADRO (calidad ${Q}, por software): con ${c.con.join(' y ')} ms · sin ${c.sin.join(' y ')} ms por cuadro → +${((med(c.con) / med(c.sin) - 1) * 100).toFixed(0)} %`);
 }

@@ -857,14 +857,18 @@ export class Escena {
     r.shadowMap.needsUpdate = su;
   }
   /** Si corresponde el recuadro en este cuadro (primera persona, prendido, con pesista y sin transición de cámara); muestra u oculta su marco. */
-  _recuadroOn() { const X = this.recuadro, a = this.activo, on = !!this.pov && X.on && !!a && a.root.visible && !this.rig.mezcla; if (X.el && X.el.hidden === on) X.el.hidden = !on; return on; }
+  _recuadroOn() { const X = this.recuadro, a = this.activo, on = !!this.pov && X.on && (X.pedido || !this.directo) && !!a && a.root.visible && !this.rig.mezcla; if (X.el && X.el.hidden === on) X.el.hidden = !on; return on; }
   /**
    * Cámara general congelada (el juego, desde que termina el intento hasta que se va el veredicto): ni deriva, ni reencuadre,
    * ni el lente que volvía a abrirse después de la barrita (eso se veía como un reencuadre leve antes de soltar la barra).
    */
   fijarCamara(on) { this._fija = !!on; this.rig.fijo = !!on; if (on) { this.rig.zoom = this.rig.zoomT; this.rig.az = this.rig.azT; this.rig.el = this.rig.elT; } }
   /** Prende o apaga el recuadro de la primera persona (Opciones). */
-  setRecuadro(on) { this.recuadro.on = !!on; }
+  /**
+   * `pedido`: el jugador lo eligió a mano. En el camino directo («Baja» y «Móvil») el recuadro es un segundo dibujo entero de la
+   * escena en cada cuadro (por software, +170 % y +180 % del cuadro): ahí va apagado salvo que se lo pida.
+   */
+  setRecuadro(on, pedido = false) { this.recuadro.on = !!on; this.recuadro.pedido = !!pedido; }
   /** La cabeza propia no se dibuja con la cámara pegada a los ojos (ver POV): entrando o saliendo de la primera persona, tampoco. */
   _cabeza() {
     const a = this.activo, cerca = !!a && a.root.visible && (!!this.pov || this.rig.camera.position.distanceTo(this.ojos(_pd)) < POV.sinCabeza), quien = cerca ? a : null;
