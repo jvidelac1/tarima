@@ -173,7 +173,7 @@ def cfg(k):
     if F: musc = dict(pierna=.95 * mu, gemelo=.5 * mu, hombro=.70 * mu * (1 - .4 * g), brazo=.45 * mu, antebrazo=.65 * mu, pectoral=0, dorsal=.75 * mu * (1 - .4 * g), abdomen=.5 * (1 - g), cuello=.25 * mu)
     else: musc = dict(pierna=1.0 * mu, gemelo=.6 * mu, hombro=1.0 * mu * _clip(1 - 1.2 * g, 0, 1), brazo=.85 * mu * _clip(1 - 1.0 * g, 0, 1), antebrazo=1.0 * mu * (1 - .5 * g), pectoral=.6 * mu * (1 - .4 * g), dorsal=1.0 * mu * (1 - .35 * g), abdomen=.5 * (1 - g), cuello=.7 * mu * (1 - .5 * g))
     if an:
-        musc.update(gemelo=(.75 if F else .95) * mu, cuello=(.2 if F else .45) * mu * (1 - .5 * g))
+        musc.update(cuello=(.2 if F else .45) * mu * (1 - .5 * g))
     extra = [('torso/torso-vshape-incr', (.10 if F else .45) * _clip(1 - 1.3 * g, 0, 1)), ('buttocks/buttocks-volume-incr', _clip(gluteos, 0, 1)),
              ('hip/hip-scale-horiz-' + ('incr' if cadera >= 0 else 'decr'), _clip(abs(cadera), 0, 1)),
              ('torso/measure-waist-circ-incr', _clip(cintura, 0, 1)), ('arms/measure-upperarm-circ-decr', _clip(1.4 * g, 0, 1)),
@@ -196,9 +196,7 @@ def cfg(k):
              ('stomach/stomach-pregnant-incr', _clip(.45 * g * g, 0, 1)), ('torso/torso-scale-depth-incr', _clip(.5 * g, 0, 1)), ('head/head-fat-incr', _clip((.7 if F else .5) * g, 0, 1)), ('neck/neck-double-incr', _clip((.5 if F else .2) * g * g, 0, 1))]     # el cuello del pesado tiene que existir: con más papada y cabeza llena quedaba hundido entre los hombros
     if an:
         d = 1 - .6 * g
-        # muslo y pantorrilla gruesos en todo el largo ('scale' del segmento). Con 'measure-thigh-circ' y 'measure-calf-circ' (una franja) salía un globo arriba y la rodilla fina (sonda 44012134794)
-        sl, sc_ = (.4 if F else .55) * mu * d, (.2 if F else .3) * mu * d
-        extra += [(f'legs/{s_}-upperleg-scale-{e_}-incr', sl) for s_ in 'lr' for e_ in ('horiz', 'depth')] + [(f'legs/{s_}-lowerleg-scale-{e_}-incr', sc_) for s_ in 'lr' for e_ in ('horiz', 'depth')]
+        # el grosor del muslo no va por targets de MPFB: 'measure-thigh-circ' (una franja) y 'upperleg-scale-horiz/depth' dan un globo arriba y la rodilla fina (sondas 44012134794 y 44012809046). Va en tex._masas ('muslo'), con perfil a lo largo del fémur
         extra += [('torso/torso-vshape-incr', (.1 if F else .22) * _clip(1 - 1.3 * g, 0, 1))] + list(p.get('extra', []))
     # Si con el macro 'weight' al máximo la masa no alcanza (categorías abiertas), body.py suma este paquete de volumen de 0 a 1.
     volumen = [('torso/torso-scale-horiz-incr', .7), ('torso/torso-scale-depth-incr', .55), ('stomach/stomach-pregnant-incr', .15), ('hip/hip-scale-depth-incr', .3), ('buttocks/buttocks-volume-incr', .12), ('hip/hip-scale-horiz-incr', .35),
@@ -208,8 +206,8 @@ def cfg(k):
                 musc=musc, masa=m, rho=1.07 - .07 * g, volumen=volumen, fisico=p.get('fisico'), cabeza=p.get('cabeza', (1. if F else .955 + .03 * g) if an else 1.), genero=p['genero'], categoria=p['categoria'])
 
 # ganancia de cada grupo muscular del físico anatómico (tex.GRUPOS). La mujer: piernas, glúteo y espalda de pesista; tren superior más liviano y sin pectoral marcado
-_GRUPOS_M = dict(deltoide=1.1, biceps=1., triceps=1., antebrazo=.8, pectoral=1., trapecio=.8, dorsal=1.1, erectores=1., gluteo=1.2, cuadriceps=1.45, isquios=1.3, aductor=1., gemelos=1.2, codo=1., rodilla=1., cintura=1.)
-_GRUPOS_F = dict(deltoide=.6, biceps=.45, triceps=.5, antebrazo=.5, pectoral=0., trapecio=.5, dorsal=.6, erectores=.7, gluteo=.9, cuadriceps=.8, isquios=.8, aductor=.6, gemelos=.7, codo=.6, rodilla=.8, cintura=.6)
+_GRUPOS_M = dict(deltoide=1.1, biceps=1., triceps=1., antebrazo=.8, pectoral=1., trapecio=.8, dorsal=1.1, erectores=1., gluteo=1.2, cuadriceps=1.45, isquios=1.3, aductor=1., gemelos=1.0, muslo=1., codo=1., rodilla=1., cintura=1.)
+_GRUPOS_F = dict(deltoide=.6, biceps=.45, triceps=.5, antebrazo=.5, pectoral=0., trapecio=.5, dorsal=.6, erectores=.7, gluteo=.9, cuadriceps=.8, isquios=.8, aductor=.6, gemelos=.7, muslo=.6, codo=.6, rodilla=.8, cintura=.6)
 def sty(k):
     """Parámetros de indumentaria, piel y pelo para tex.py, geo.py y finish.py (los mismos nombres de clave que usaban ventura y brenner)."""
     p = PESISTAS[k]

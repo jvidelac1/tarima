@@ -172,7 +172,7 @@ def _vientre(t,a,p,b):
 # Físico anatómico (ficha del pesista: fisico='anatomico'): masas por grupo muscular con perfil de vientre (máximo en el centro del músculo, cero
 # en inserciones y articulaciones), para que entre vientres queden surcos. Amplitudes en metros para 1,69 m; cada grupo tiene su ganancia en
 # ANAT['grupos'] (plantel.sty). No es un inflado parejo: la suma no es constante ni alrededor del hueso ni a lo largo.
-GRUPOS=dict(deltoide=1.,biceps=1.,triceps=1.,antebrazo=1.,pectoral=1.,trapecio=1.,dorsal=1.,erectores=1.,gluteo=1.,cuadriceps=1.,isquios=1.,aductor=1.,gemelos=1.,codo=1.,rodilla=1.,cintura=1.)
+GRUPOS=dict(deltoide=1.,biceps=1.,triceps=1.,antebrazo=1.,pectoral=1.,trapecio=1.,dorsal=1.,erectores=1.,gluteo=1.,cuadriceps=1.,isquios=1.,aductor=1.,gemelos=1.,codo=1.,rodilla=1.,cintura=1.,muslo=1.)
 def _masas(Q,nx,ny,nz,J,K,RK,wT):
     S,E,W,H,Kn,An,Nk=[np.asarray(J[k],f32) for k in ('LeftArm','LeftForeArm','LeftHand','LeftUpLeg','LeftLeg','LeftFoot','Neck')]
     G=lambda x,s_:np.exp(-(x/s_)**2); rg=lambda lo,hi,x,e=.03:sm(lo-e,lo+e,x)*sm(hi+e,hi-e,x); D=np.pi/180; V=_vientre; g=dict(GRUPOS); g.update(ANAT.get('grupos',{}))
@@ -200,8 +200,9 @@ def _masas(Q,nx,ny,nz,J,K,RK,wT):
     # ---- glúteo: masa redonda atrás de la cadera, con su pliegue abajo ----
     zg=(Q[:,2]-H[2])/K; B+=K*g['gluteo']*.0170*sm(.10,.60,ny)*G(np.hypot((Q[:,0]/K-.092)/.082,(zg+.012)/.105),1.)*sm(-.20,-.11,zg)
     # ---- muslo (0 = cadera, 1 = rodilla): recto femoral, vasto lateral (barrido externo), vasto medial (gota sobre la rodilla), aductores, isquios ----
-    t,r,th=_limb(Q,H,Kn); lw=rg(.10,1.04,t,.05)*sm(.17*K*RK[2],.14*K*RK[2],r)*(Q[:,2]<H[2]+.02*K)
+    t,r,th=_limb(Q,H,Kn); lw=sm(.0,.30,t)*sm(1.09,.99,t)*sm(.17*K*RK[2],.14*K*RK[2],r)*sm(H[2]+.03*K,H[2]-.02*K,Q[:,2])     # entra en degradé largo desde la ingle: con borde corto quedaba un escalón
     B+=lw*K*(g['cuadriceps']*(.0100*V(t,.06,.42,.84)*A(th,-4,.36)+.0135*V(t,.10,.52,.92)*A(th,-64,.48)+.0125*V(t,.52,.80,.97)*A(th,44,.36))
+        +g['muslo']*.0110*V(t,-.05,.60,1.14)*(1-.35*A(th,90,.7))     # grosor del muslo entero (menos por dentro), que llega lleno hasta arriba de la rodilla
         +g['aductor']*.0050*V(t,.04,.26,.62)*A(th,98,.50)
         +g['isquios']*(.0085*V(t,.12,.48,.90)*A(th,-150,.40)+.0085*V(t,.12,.50,.92)*A(th,150,.40))
         -g['rodilla']*.0028*V(t,.84,.99,1.10)*(A(th,-90,.5)+A(th,90,.5)))
