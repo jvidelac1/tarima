@@ -238,7 +238,11 @@ async function correr(C) {
           if (await J(() => !document.querySelector('#capa .pn-detalle')?.hidden)) mal('«Detalles» no se volvió a plegar');
         }
         if (!probado.estilo && /Dos tiempos · intento 1/.test(R.panel.titulo)) {
-          if (!await pulsa('#btn-estilo')) mal('en el primer dos tiempos no hay botón del estilo de envión');
+          // 17-nov: parado los tres estilos ya están a la vista (segmentos); acostado se abren con el botón del estilo
+          const aLaVista = await J(() => document.querySelectorAll('#capa .pn-estilo.abierto .envion').length === 3 && !document.querySelector('#capa #btn-estilo'));
+          if (C.vertical && !aLaVista) mal('parado: en el primer dos tiempos los tres estilos de envión no están a la vista');
+          if (aLaVista && await J(() => document.querySelector('#capa .envion[aria-pressed=true]')?.dataset.env) !== 'split') mal('los tres estilos a la vista no traen marcado el split');
+          if (!aLaVista && !await pulsa('#btn-estilo')) mal('en el primer dos tiempos no hay botón del estilo de envión');
           else {
             probado.estilo = true; await av(50); const Re = await revisar('llamado eligiendo el estilo de envión'); await foto('llamado_estilo');
             PANEL.push({ p: C.nombre, titulo: (Re.panel?.titulo || '') + ' (eligiendo estilo)', alto: Re.panel?.alto, pct: (Re.panel?.alto || 0) / C.h, detalle: false });
@@ -446,8 +450,8 @@ async function seleccion(C, calidad = 'alta') {
   if (C.pc && calidad === 'alta') {      // teclado: las flechas cambian de tarjeta y Enter sobre la elegida la confirma
     const a = (await est()).G.id; await J(() => document.querySelector('#capa .panel.elegir .pesista[aria-pressed=true]').focus());
     await page.keyboard.press(ids.indexOf(a) > 0 ? 'ArrowLeft' : 'ArrowRight'); await av(500); const b = await hasta(s => s.G && s.G.visto === s.G.clave, 'el pesista elegido con las flechas', 60000);
-    if (b.G.id === a) mal('las flechas no cambiaron de pesista'); await av(500); await page.keyboard.press('Enter'); await av(300);
-  } else { await pulsa('#el-listo'); await av(300); }
+    if (b.G.id === a) mal('las flechas no cambiaron de pesista'); await av(500); await page.keyboard.press('Enter'); await av(700);
+  } else { await pulsa('#el-listo'); await av(700); }      // la salida va detrás de un fundido corto (RITMO.fundido)
   const fin = await J(() => ({ pantalla: JUEGO.E.pantalla, tarjetas: document.querySelectorAll('#capa .panel.bienvenida .pesista').length, marcado: document.querySelector('#capa .panel.bienvenida .pesista[aria-pressed=true]')?.dataset.id, giro: JUEGO.escena.giro || 0, aspecto: JUEGO.E.aspecto, barra: JUEGO.escena.barbell.group.visible, jugar: !!document.getElementById('btn-empezar'), errores: JUEGO.E.errores }));
   if (fin.pantalla !== 'inicio' || fin.tarjetas !== 3 || !fin.jugar) mal(`«Listo» no volvió a la bienvenida con las tarjetas (${JSON.stringify(fin)})`);
   if (fin.giro || !fin.barra) mal(`al salir de la selección la escena no quedó como estaba (giro ${fin.giro}, barra ${fin.barra})`);

@@ -182,12 +182,15 @@ async function corrida(via) {
               // LIF-31 y LIF-43: el estilo de envión se elige en el primer dos tiempos con un solo botón (sin abrir opciones) y
               // después queda fijo, con candado y sin botones para cambiarlo
               if (o.envion && /Dos tiempos/.test(llamado)) {
-                const E0 = await J(() => ({ fijo: !!document.querySelector('#capa .pn-estilo.fijo'), boton: !!document.querySelector('#capa #btn-estilo'), opciones: document.querySelectorAll('#capa .envion').length, txt: (document.querySelector('#capa .pn-estilo')?.textContent || '').replace(/\s+/g, ' ').trim() }));
+                const E0 = await J(() => ({ fijo: !!document.querySelector('#capa .pn-estilo.fijo'), boton: !!document.querySelector('#capa #btn-estilo'), opciones: document.querySelectorAll('#capa .envion').length, marcado: document.querySelector('#capa .envion[aria-pressed=true]')?.dataset.env || null, txt: (document.querySelector('#capa .pn-estilo')?.textContent || '').replace(/\s+/g, ' ').trim() }));
                 if (/intento 1/.test(llamado)) {
                   const quiere = o.envion(llamado);
-                  if (E0.fijo || !E0.boton || E0.opciones) mal(`primer dos tiempos: el estilo de envión no está en un solo botón para elegir (${JSON.stringify(E0)})`);
-                  if (!E0.txt.includes(`${ES['jerk.titulo']} ${ES['envion.split']}`)) mal(`el botón del estilo no dice «${ES['jerk.titulo']} ${ES['envion.split']}» (lo que propone el entrenador): «${E0.txt}»`);
-                  await pulsa('#btn-estilo'); const n3 = await J(() => document.querySelectorAll('#capa .envion').length); if (n3 !== 3) mal(`al tocar el estilo no aparecieron los tres (${n3})`);
+                  // 17-nov: los tres estilos van a la vista como segmentos (el split, recomendado, primero y marcado); solo en el
+                  // teléfono acostado sigue el botón único que los abre
+                  if (E0.fijo || (E0.boton ? E0.opciones !== 0 : E0.opciones !== 3)) mal(`primer dos tiempos: el estilo de envión no está a la vista para elegir (${JSON.stringify(E0)})`);
+                  if (E0.boton) { if (!E0.txt.includes(`${ES['jerk.titulo']} ${ES['envion.split']}`)) mal(`el botón del estilo no dice «${ES['jerk.titulo']} ${ES['envion.split']}» (lo que propone el entrenador): «${E0.txt}»`); await pulsa('#btn-estilo'); }
+                  else if (E0.marcado !== 'split' || !E0.txt.includes(ES['jerk.titulo'])) mal(`los tres estilos a la vista no traen marcado el split (lo que propone el entrenador): ${JSON.stringify(E0)}`);
+                  const n3 = await J(() => [...document.querySelectorAll('#capa .envion')].map(b => b.dataset.env).join()); if (n3 !== 'split,power,squat') mal(`los tres estilos no están a la vista con el split primero (${n3})`);
                   if (!await pulsa(`.envion[data-env="${quiere}"]`)) mal(`no se pudo elegir el estilo ${quiere}`);
                   const d = await J(() => ({ foco: document.activeElement?.id, txt: (document.querySelector('#capa .pn-estilo')?.textContent || '').replace(/\s+/g, ' ').trim() }));
                   if (d.foco !== 'btn-confirmar') mal(`después de elegir el estilo el foco quedó en «${d.foco}» y no en levantar`);
