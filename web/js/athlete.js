@@ -219,6 +219,9 @@ function metersPerUv(geo) {
  *   sudor: 0 seco a 1 empapado (el esfuerzo lo sube solo, effort.js); brillo: fuerza del brillo de la transpiración;
  *   dispersion: color de la luz que atraviesa la piel (subsuperficie aproximada).
  * - pelo.color: tinte del pelo, barba y cejas (multiplica su textura); null = como viene.
+ *   pelo.base: color del pelo en la ficha del pesista (`pelo` de plantel.json). En el pelo de malla opaca la textura solo
+ *   aporta la variación entre mechones: su color medio se lleva a este (blender/tex.py `pelo` la genera ~3,8 veces más
+ *   clara en lineal: ×1,7 + 0,04), y el pelo pintado en la piel (cejas, degradé, barba) usa el mismo. null = como viene.
  * - tela.tinte: multiplica la tela conservando el diseño; tela.plano: color que reemplaza la tela entera (null = textura);
  *   arrugas: pliegues en las normales; brillo: reflejo satinado de la lycra (sheen).
  */
@@ -226,7 +229,7 @@ function metersPerUv(geo) {
 export const FINO = { value: 1 };
 export const ASPECTO = Object.freeze({
   piel: Object.freeze({ tono: '#f0dfd2', saturacion: .8, variacion: 1, rugosidad: .68, sudor: .55, brillo: .3, dispersion: [.5, .15, .08] }),
-  pelo: Object.freeze({ color: null }),
+  pelo: Object.freeze({ color: null, base: null }),
   tela: Object.freeze({ tinte: '#ffffff', plano: null, arrugas: .12, brillo: .14 }),
 });
 const _color = (c, out) => (Array.isArray(c) ? out.setRGB(c[0], c[1], c[2]) : out.set(c ?? '#ffffff'));
@@ -343,7 +346,14 @@ function hairColor(tex, out) {
   } catch { /* se queda el color por defecto */ }
   return out;
 }
-/** Pelo y barba como malla opaca con volumen (plantel nuevo, blender/geo.py `hair_cap`): mate, casi sin reflejo del ambiente; la forma la dan los gajos de la malla y la luz de contorno. */
+/**
+ * Pelo y barba como malla opaca con volumen (plantel nuevo, blender/geo.py `hair_cap`): mate, casi sin reflejo del ambiente; la
+ * forma la dan los gajos de la malla y la luz de contorno.
+ * Reflejo: una mata de pelo no es una superficie lisa. Con el lóbulo ancho de GGX (rugosidad 0,82) y Fresnel, los tres
+ * contraluces (15 + 14 + 5, sin sombra, detrás del pesista) vistos a contraluz daban de 2 a 6 veces más luz que la difusa:
+ * 0,13 a 0,37 lineal en coronilla y sienes contra 0,03 a 0,07, o sea un casco gris claro sobre un pelo negro. Va con el
+ * mismo 0,2 que el pelo en capas y sin la subida de Fresnel al ras (F90 = 0).
+ */
 function capMaterial(src, mask, uv1) {
   const U = { tCuero: { value: mask || null }, uCuero: { value: mask && uv1 ? 1 : 0 } }; if (U.uCuero.value) src.alphaTest = .5;      // el borde del casco lo corta el nacimiento pintado (máscara, canal B)
   src.roughness = Math.max(src.roughness ?? .8, .78); src.metalness = 0; src.envMapIntensity = .1; src.side = THREE.FrontSide;
@@ -351,8 +361,8 @@ function capMaterial(src, mask, uv1) {
   src.onBeforeCompile = sh => { conCuero(sh, U, '0.1', '0.62');
     // nacimiento en degradé: el borde del casco no es un corte sino una trama que se va raleando (abajo queda el degradé pintado en la piel)
     sh.fragmentShader = sh.fragmentShader.replace('#include <alphatest_fragment>', 'if ( uCuero > 0.5 ) { float rn = fract( sin( dot( floor( gl_FragCoord.xy ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ); diffuseColor.a = diffuseColor.a > rn * 0.85 + 0.08 ? 1.0 : 0.0; }\n#include <alphatest_fragment>');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.45; material.specularColorBlended *= 0.45; material.specularF90 *= 0.5;'); };
-  src.customProgramCacheKey = () => 'tarima-pelo-5';
+    sh.fragmentShader = sh.fragmentShader.replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.2; material.specularColorBlended *= 0.2; material.specularF90 = 0.0;'); };
+  src.customProgramCacheKey = () => 'tarima-pelo-6';
   return src;
 }
 function hairDepthMaterial(src) {
@@ -452,6 +462,8 @@ export class Athlete {
     for (const [o, dm] of extra) o.parent.add(dm);
     const body = [...done.values()].find(m => m.name === 'Body'), hair = [...done.values()].find(m => m.name === 'Hair');
     if (body && hair?.map) hairColor(hair.map, body.userData.skin.uHairColor.value);
+    // color medio de la textura del pelo de malla opaca (para llevarlo al de la ficha, `pelo.base`); null si no se pudo leer
+    { const c = hair?.map && !hair.transparent ? hairColor(hair.map, new THREE.Color(0, 0, 0)) : null; this._peloMedia = c && c.r + c.g + c.b > 0 ? c : null; }
     this.skin = body?.userData.skin || null; this.cuerpo = body || null; this.pelo = hair || null; this._peloBase = this.skin ? this.skin.uHairColor.value.clone() : null;
     for (const o of this.meshes) if (o.material?.name === 'Body') pesoCabeza(o, this.skin);
     this.hasMask = !!mask; this.hasNormalMap = [...done.values()].some(m => m.name === 'Body' && m.normalMap);
@@ -592,14 +604,15 @@ export class Athlete {
    */
   setAspecto(a = {}) {
     const u = this.skin, P = { ...ASPECTO.piel, ...(a.piel || {}) }, H = { ...ASPECTO.pelo, ...(a.pelo || {}) }, T = { ...ASPECTO.tela, ...(a.tela || {}) };
+    const M = this._peloMedia, base = H.base && M ? _color(H.base, new THREE.Color()) : null;      // solo con pelo de malla opaca y textura leída
     if (u) {
       _color(P.tono, u.uSkinTint.value); u.uSkinSat.value = P.saturacion; u.uTone.value = P.variacion; u.uSkinRough.value = P.rugosidad; u.uSweat.value = P.sudor; u.uGloss.value = P.brillo; _color(P.dispersion, u.uScatter.value);
       _color(T.tinte, u.uClothTint.value); u.uWrinkle.value = T.arrugas;
       if (T.plano) { const c = _color(T.plano, new THREE.Color()); u.uClothFlat.value.set(c.r, c.g, c.b, 1); } else u.uClothFlat.value.w = 0;
-      if (this._peloBase) { u.uHairColor.value.copy(this._peloBase); if (H.color) u.uHairColor.value.multiply(_color(H.color, new THREE.Color())); }
+      if (this._peloBase) { u.uHairColor.value.copy(base || this._peloBase); if (H.color) u.uHairColor.value.multiply(_color(H.color, new THREE.Color())); }
     }
     if (this.cuerpo) this.cuerpo.sheen = T.brillo;
-    if (this.pelo) _color(H.color, this.pelo.color);
+    if (this.pelo) { _color(H.color, this.pelo.color); if (base) this.pelo.color.multiply(new THREE.Color(Math.min(1, base.r / Math.max(M.r, 1e-4)), Math.min(1, base.g / Math.max(M.g, 1e-4)), Math.min(1, base.b / Math.max(M.b, 1e-4)))); }      // nunca aclara
     this.aspecto = { piel: P, pelo: H, tela: T };
   }
   /** Tela de color plano sobre la máscara de tela (color de three o null para volver a la textura). Por defecto, apagada. */
