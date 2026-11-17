@@ -371,7 +371,8 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     dnl=max(float(nose[2]-lips[2]),.004)     # con nariz corta o cara llena la franja fija entre labio y nariz quedaba vacía (barba sin bigote): los bordes se achican con esa distancia
     must=sm(lips[2]+min(.005,.2*dnl),lips[2]+min(.009,.4*dnl),z)*sm(nose[2]-min(.003,.1*dnl),nose[2]-min(.008,.3*dnl),z)*sm(.034*max(1.,hs),.024*max(1.,hs),axo)*sm(lips[1]+.03,lips[1]+.02,y)
     burn=sm(ear[1]-.034,ear[1]-.028,y)*sm(ear[1]-.008,ear[1]-.014,y)*sm(eL[2]+.012,eL[2]+.002,z)*sm(lips[2],lips[2]+.01,z)
-    fade=sm(chin[2]-.026+s1*.008,chin[2]+.002+s1*.008,z)*sm(ear[1]-.006,ear[1]-.02,y)
+    zj=chin[2]+np.clip(y-chin[1],0,None)*float((ear[2]-.035-chin[2])/max(ear[1]-.01-chin[1],.02))     # línea de la mandíbula: sube del mentón al ángulo bajo la oreja
+    fade=sm(zj-.030+s1*.010+s3*.02,zj-.004+s1*.010+s3*.02,z)                                      # la barba sigue la mandíbula y se pierde bajo ella (no un corte horizontal en el cuello)*sm(ear[1]-.006,ear[1]-.02,y)
     bz=head*np.maximum.reduce([jaw*fade,must,burn])*(1-np.clip(F('lips')*4,0,1))
     tint(bz*(1-STY['beard'])*.5*STY.get('afeitado',1.),(.80,.82,.86))                                            # sombra de barba afeitada
     beard=np.clip(bz*STY['beard']*st,0,1); mix(beard,HAIR*(1+s3[:,:,None]*.5),.68); hairH+=beard*(.0004+s3*.0004); hairm=np.maximum(hairm,beard)
@@ -386,7 +387,7 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     rough+=lp*.10; lipH=-lp*.00016*(1-np.abs(2*T.nq((x*520,z*60),97)))**2
     skinm=np.clip(skinm-np.maximum(hairm,browm*.5),0,1)
     # largo del pelo para las capas de volumen de finish.py (geo.hair_shells): 255 = 20 mm
-    hlen=np.maximum.reduce([(0. if STY.get('peinado')=='rapado' else 1.)*np.clip(al_,0,1)*sm(.2,.8,hm)*STY.get('hairlen',.010)*dfade(.70)*(1+s1*.5)*(np.clip(1+STY['mechones']*1.6*T.n3(55,98,2),.35,1.9) if STY.get('mechones') else 1.),beard*(.003+.008*STY['beard'])*(STY['beard']>.35)])
+    hlen=np.maximum.reduce([(0. if STY.get('peinado')=='rapado' else 1.)*np.clip(al_,0,1)*sm(.2,.8,hm)*STY.get('hairlen',.010)*dfade(.70)*(1+s1*.5)*(np.clip(1+STY['mechones']*1.6*T.n3(55,98,2),.35,1.9) if STY.get('mechones') else 1.),beard*(.002+.006*STY['beard'])*(STY['beard']>.35)])
     Image.fromarray((np.clip(hlen/.02,0,1)*cov*255+.5).astype(np.uint8)[::-1]).resize((2048,2048),Image.BILINEAR).save(OUT+'hair_len.png')   # con barba rala (<0,35) la barba queda solo en la textura
     # ================= TIZA (magnesio) =================
     cn=np.clip(.5+T.n3(55,100,3)*2.6,0,1); cf=np.clip(.5+T.n3(700,101,2)*3,0,1); chalk=np.zeros((R,R),f32)
@@ -474,7 +475,7 @@ def pelo(OUT,STY,Sx=512,Sy=512):
     def st(n,k,sig):
         a=rng.random((n,k)).astype(f32); a=np.concatenate([a,a[:,:1]],1); a=np.asarray(Image.fromarray(a).resize((Sx+Sx//k,Sy),Image.BICUBIC))[:,:Sx]; return blur(a,sig)-.5
     fino=st(Sy,5,.6); medio=st(Sy//4,3,1.4); gajo=st(Sy//20,2,5.); s=fino*.5+medio*.7+gajo*1.0
-    c=np.clip(hexc(STY['hair'])[None,None,:]*(1.25+1.0*s)[:,:,None]+.028+.03*sm(.15,.45,s)[:,:,None],0,1); h=fino*.00035+medio*.0005+gajo*.0009
+    c=np.clip(hexc(STY['hair'])[None,None,:]*(1.7+1.2*s)[:,:,None]+.04+.03*sm(.15,.45,s)[:,:,None],0,1); h=fino*.00035+medio*.0005+gajo*.0009
     save(c,OUT+'pelo.png'); save(normal_from_height(h,.0003,.0003),OUT+'pelo_normal.png')
 def bun(OUT,STY,Sx=512,Sy=256):
     """Moño (pelo atado): hebras a lo largo de u, que en la malla (geo.bun) da vueltas alrededor del eje del moño. Opaca; u se repite."""

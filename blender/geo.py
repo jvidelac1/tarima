@@ -305,7 +305,7 @@ def hair_cap(b,OUT,mat,LM,K):
     atras=np.array([0,1.,-.15]); pos=co[U]+no[U]*h[:,None]+atras[None,:]*(h*.22*(1-barba))[:,None]
     bm=bmesh.new(); uv=bm.loops.layers.uv.new('UVMap'); uv2=bm.loops.layers.uv.new('UVCuero'); vs=[bm.verts.new(q) for q in pos]
     LU=np.empty(len(me.loops)*2); me.uv_layers.active.data.foreach_get('uv',LU); LU=LU.reshape(-1,2)     # UV del cuerpo: el visor recorta el borde del casco con el nacimiento pintado (curva suave, no el serrucho de los polígonos)
-    uu=np.where(barba>.5,-co[U,2]*8.,(.5*np.pi-el)*.55+.07*np.sin(idl*5.1)); vv=np.where(barba>.5,az*3.,lane/NG*5)     # barba: hebras hacia abajo, sin torcer (torcidas se leían veta de madera)
+    uu=np.where(barba>.5,-co[U,2]*26.,(.5*np.pi-el)*.55+.07*np.sin(idl*5.1)); vv=np.where(barba>.5,az*9.,lane/NG*5)     # barba: hebras hacia abajo, sin torcer (torcidas se leían veta de madera)
     for p in sel:
         fc=bm.faces.new([vs[ix[v_]] for v_ in p.vertices]); fc.smooth=True
         ii=[ix[v_] for v_ in p.vertices]; v0=vv[ii[0]]

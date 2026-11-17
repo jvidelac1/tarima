@@ -225,7 +225,7 @@ function metersPerUv(geo) {
 /** Detalle fino de los materiales del pesista (variación de tono, arrugas de tela, brillo de transpiración): 1 con post, 0 en el camino directo («Baja» y «Móvil»: ahí cada lectura de textura cuenta). Compartido por todos los personajes. */
 export const FINO = { value: 1 };
 export const ASPECTO = Object.freeze({
-  piel: Object.freeze({ tono: '#f0dfd2', saturacion: .9, variacion: 1, rugosidad: .68, sudor: .55, brillo: .3, dispersion: [.5, .15, .08] }),
+  piel: Object.freeze({ tono: '#f0dfd2', saturacion: .8, variacion: 1, rugosidad: .68, sudor: .55, brillo: .3, dispersion: [.5, .15, .08] }),
   pelo: Object.freeze({ color: null }),
   tela: Object.freeze({ tinte: '#ffffff', plano: null, arrugas: .12, brillo: .14 }),
 });
@@ -367,9 +367,9 @@ function eyeMaterial(src) {
   // al blanco y la sombra que el párpado y las pestañas de arriba echan sobre el globo (lo que más lo saca de «ojo de muñeco»).
   const m = new THREE.MeshPhysicalMaterial({ name: src.name, map: src.map, color: src.color, roughness: .38, metalness: 0, clearcoat: .7, clearcoatRoughness: .08, envMapIntensity: .45, side: src.side });
   m.onBeforeCompile = sh => {
-    sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n{ float arriba = normalize( vNormal ).y; diffuseColor.rgb *= 0.74 * mix( 0.42, 1.0, smoothstep( 0.55, 0.0, arriba ) ) * mix( 0.8, 1.0, smoothstep( -0.75, -0.2, arriba ) ); }');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n{ float arriba = normalize( vNormal ).y; diffuseColor.rgb *= 0.86 * mix( 0.5, 1.0, smoothstep( 0.6, 0.1, arriba ) ) * mix( 0.8, 1.0, smoothstep( -0.75, -0.2, arriba ) ); }');
   };
-  m.customProgramCacheKey = () => 'tarima-eye-4';
+  m.customProgramCacheKey = () => 'tarima-eye-5';
   return m;
 }
 
