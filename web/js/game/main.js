@@ -2,7 +2,7 @@
 // El resultado lo calcula el núcleo (web/js/sim/), que es una función pura de lo que el jugador tocó; acá se dibuja.
 // Etapa 1: sin animaciones ni modelos nuevos. Lo que no está animado se resuelve con cortes y con texto (sección 11.2).
 import { reloj, Boton, toques, principal, claveDe, enfocar, navegar, enCampo } from './input.js';
-import { Escena } from './stage.js';
+import { Escena, PLANOS } from './stage.js';
 import { poseDe, poseParado, marcas, tramo } from './sequence.js';
 import { armarCaida, poseCaida } from './caida.js';
 import { sugerencia, chanceDe } from '../sim/entrenador.js';
@@ -1004,7 +1004,11 @@ async function inicio() {
   const guardadoNombre = limpiarNombre(guardado.get('tarima.nombre')), vuelve = !!guardadoNombre;
   const S = { nombre: guardadoNombre, editar: !vuelve, opciones: false, tocoPesista: false, cambio: false, focoNombre: !vuelve };
   const mostrado = () => (S.editar ? limpiarNombre(S.nombre) : guardadoNombre) || t('bienvenida.nombre_defecto');
+  // `?elegir=1` (para probar): abre directo la selección de pesista y deja las tarjetas a la vista aunque sea la primera vez
+  const forzarElegir = params.get('elegir') === '1'; let abrirElegir = forzarElegir && !E.elegirVisto;
+  const verPesista = async () => { E.elegirVisto = true; cfg.id = await elegirPesista(cfg, mostrado()); S.tocoPesista = true; visita('inicio'); };
   for (;;) {
+    if (abrirElegir) { abrirElegir = false; await verPesista(); }
     const T = tactil(), facil = cfg.ctl !== 'c', uno = esU(cfg.ctl), falta = !guardado.get('tarima.tutorial'); E.ctl = cfg.ctl;
     let est = null; try { est = ganchos.estado?.() || null; } catch { /* sin estado */ }
     const q = est && est.anotado ? t('bienvenida.anotado') : est && Number.isFinite(est.quedan) ? (est.quedan === 1 ? t('bienvenida.quedan_1') : t('bienvenida.quedan', { n: est.quedan })) : '';
@@ -1022,7 +1026,7 @@ async function inicio() {
         ${telefono.instalable ? `<div class="fila"><span>${t('opciones.pantalla')}</span><button data-instalar="1">${t('opciones.como_instalar')}</button></div>` : ''}</div>` : '';
     const abrio = S.verOpciones; S.verOpciones = false;
     // la fila de botones (.pie) va fuera de la parte que se desplaza (.bv-cuerpo): nunca tapa las tarjetas
-    const tarjetas = !primera;      // la elección de pesista se ofrece después de la primera final
+    const tarjetas = !primera || forzarElegir;      // la elección de pesista se ofrece después de la primera final
     const pn = capa.poner(`<div class="bv-cuerpo"><div class="cabeza">${idiomasHTML()}<h1>Lifting Game</h1><p class="bajada">${t('bienvenida.bajada')}</p></div>
       ${params.has('c') ? `<p class="desafio">${t('bienvenida.desafio')}</p>` : ''}${q ? `<p class="quedan">${q}</p>` : ''}
       ${nombreHTML}
@@ -1044,7 +1048,7 @@ async function inicio() {
     if (inp) S.nombre = inp.value;
     if (!b) continue;      // cambió el idioma desde la pausa: se vuelve a pintar
     if (b.dataset.lang) { cambiarIdioma(b.dataset.lang); continue; }
-    if (b.dataset.id) { cfg.id = b.dataset.id; S.tocoPesista = true; }
+    if (b.dataset.id) { cfg.id = b.dataset.id; await verPesista(); }      // la tarjeta abre la selección con el pesista en 3D
     else if (b.dataset.n) { cfg.nivel = b.dataset.n; guardado.set('tarima.nivel_elegido', '1'); } else if (b.dataset.r) cfg.ritmo = b.dataset.r; else if (b.dataset.c) cfg.ctl = b.dataset.c; else if (b.dataset.o) cfg.orden = b.dataset.o;
     // dificultad: Fácil, Medio y Difícil son la barrita; Difícil trae rivales parejos si estaban los tranquilos
     else if (b.dataset.d) { cfg.dif = b.dataset.d; if (cfg.ctl === 'c') cfg.ctl = 'b'; if (cfg.dif === 'dificil' && cfg.nivel === 'amistoso') cfg.nivel = 'normal'; fijarDificultad(cfg); }
@@ -1066,6 +1070,104 @@ async function inicio() {
     }
   }
   guardado.set('tarima.pesista', cfg.id); guardado.set('tarima.nivel', cfg.nivel); guardado.set('tarima.ctl', cfg.ctl); guardado.set('tarima.dificultad', cfg.dif); guardado.set('tarima.orden', cfg.orden); fijarDificultad(cfg); capa.quitar(); return cfg;
+}
+
+/** Dibujos de los botones de la selección de pesista (sin texto): girar un cuarto de vuelta y barra arriba. */
+const EL_SVG = {
+  giro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5"/><path d="M4 3.5v4.6h4.6"/></svg>',
+  arriba: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5h20M4.5 2.5v5M19.5 2.5v5"/><circle cx="12" cy="9.2" r="2"/><path d="M7.5 5l4.5 7.5L16.5 5M12 12.5v4.5l-3 5M12 17l3 5"/></svg>',
+};
+/**
+ * Selección de pesista «tipo selección de personaje» (pedido del dueño, 17-nov: «quiero evaluar bien el físico; cuando
+ * seleccione el pesista quiero ver al pesista»). El panel va a un costado (teléfono parado: abajo) con las tres tarjetas y
+ * la ficha del elegido (nombre, país, categoría, estatura y kilos, de plantel.json); en lo que queda libre, el pesista de
+ * pie, a cuerpo entero, de frente y con lente normal (stage.js, PLANOS.elegir). Gira solo sobre su eje (una vuelta en 12 s:
+ * gira él con la barra, no la cámara, así el lado que se mira es el iluminado), se gira arrastrando sobre la escena, y dos
+ * botones lo llevan de a cuarto de vuelta (frente, perfil, espalda). Otro botón alterna «de pie» y «barra arriba» (la pose
+ * final del arranque, con el clip pasado rápido). De pie no se dibuja la barra. Entra por una tarjeta de la bienvenida o
+ * con `?elegir=1`. No se dibuja ni calcula nada cuando la pantalla no está abierta.
+ * @returns {Promise<string>} el pesista elegido
+ */
+async function elegirPesista(cfg, nombre = '') {
+  visita('elegir'); const uno = esU(cfg.ctl), yo0 = escena.yo, kg0 = escena.kg, VUELTA = 12, T_POSE = 1.7, html = document.documentElement;
+  const G = E.elegir = { id: cfg.id, visto: null, ang: 0, meta: null, pausa: 0, drag: null, arriba: false, u: 0, n: 0, cola: Promise.resolve(), fin: false, W: 0, H: 0, pn: null };
+  escena.yo = null;      // cada pesista con su propia malla: la del jugador (JUGADOR) vuelve al salir
+  const dec = (n, d = 2) => n.toFixed(d).replace('.', idiomaActual() === 'es' ? ',' : '.');
+  const ficha = id => {
+    const f = PLANTEL[id], at = datos.atletas[id];
+    return `<b class="el-nombre">${esc(f.nombre || f.corto)}</b>
+      ${f.pais ? `<span class="el-pais"><i style="background:${f.bandera}"></i>${esc(f.codigo || '')} · ${esc(f.pais)}</span>` : ''}
+      <span class="el-datos">${f.categoria ? `<em>${esc(f.categoria)} kg</em>` : ''}<span>${f.vestido ? dec(CUERPO[id].estatura) + ' m' : t(`pesista.${id}.alto`)}${f.masa ? ` · ${dec(f.masa, f.masa % 1 ? 1 : 0)} kg` : ''}</span></span>
+      <small class="conviene">${t(cfg.ctl === 'b' ? `pesista.${id}.b` : uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small><small class="rm">${t('rm.tarjeta', { s: at.techo.s, c: at.techo.c })}</small>`;
+  };
+  /** La pose del arranque en `u` (0 = de pie, 1 = barra arriba): el clip entero, con arranque y frenado suaves. */
+  const pose = u => { const S = tramo(escena.P, 'snatch'), k = u * u * (3 - 2 * u), tau = k * (S.fin - .05); return u <= 0 ? poseParado(escena.P, 's') : { seg: S.nombre, s: S.inv(tau), tau, base: S.base, primero: true }; };
+  const posar = () => { escena.barbell.group.visible = G.u > 0; escena.posarGirado(pose(G.u), 's', G.ang); };
+  /** El pesista entero (con la barra, si está arriba) en la parte del lienzo que deja libre el panel. */
+  const encuadrar = (suave = 0) => {
+    const gl = $('gl'), W = gl.clientWidth, H = gl.clientHeight, pn = G.pn; G.W = W; G.H = H; if (!W || !H || !escena.P || !escena.activo || !pn) return;
+    let x0 = .02, x1 = .98, y1 = .97; const y0 = .03 + (parseFloat(getComputedStyle(html).getPropertyValue('--st')) || 0) / H;
+    const izq = pn.offsetLeft / W, arr = pn.offsetTop / H; if (izq > .28) x1 = izq - .01; else if (arr > .25) y1 = arr - .01;
+    const h = escena.P.h, S = tramo(escena.P, 'snatch'), barra = escena.alturaMuestra(S.base + S.n - 1) || 1.2 * h;
+    const tope = G.arriba ? Math.max(1.08 * h, barra + .3) : 1.08 * h, piso = -.07, alto = (tope - piso) * 1.06, ancho = G.arriba ? 2.5 : Math.max(1.05, .68 * h);
+    const tg = 2 * Math.tan(PLANOS.elegir.fov / 2 * Math.PI / 180), asp = W / H;
+    escena.elegirY = (tope + piso) / 2;
+    escena.primerPlano('elegir', { x: (x0 + x1) / 2, y: (y0 + y1) / 2, dAbs: Math.min(6.4, Math.max(alto / (tg * (y1 - y0)), ancho / (tg * asp * (x1 - x0)))) }, suave);
+  };
+  /** Pone en escena al pesista de la tarjeta `id` (con un fundido corto si ya había otro a la vista). */
+  const ver = id => (G.cola = G.cola.then(async () => {
+    if (G.fin || id !== G.id || id === G.visto) return;
+    try { await escena.cargar(id); } catch (e) { console.warn('elegir:', e); return; }
+    if (G.fin || id !== G.id) return;
+    const cambio = async () => { escena.girar(0); await escena.mostrar(id); escena.setCarga(Math.round(datos.atletas[id].techo.s), 's'); G.u = G.arriba ? 1 : 0; posar(); encuadrar(0); G.visto = id; };
+    if (G.visto) await fundido(cambio); else await cambio();
+  }).catch(e => { console.warn('elegir:', e); }));
+  const marcar = () => { const pn = G.pn; if (!pn) return; pn.querySelectorAll('.pesista').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.id === G.id))); pn.querySelector('#el-ficha').innerHTML = ficha(G.id); pn.querySelector('#el-pose').setAttribute('aria-pressed', String(G.arriba)); };
+  const elegir = id => { if (!IDS.includes(id) || id === G.id) return; G.id = id; marcar(); ver(id); };
+  let listo = null; const fin = new Promise(res => { listo = res; });
+  const montar = () => {
+    const pn = G.pn = capa.poner(`<h2>${esc(t('pesista.titulo', { nombre: nombre || t('bienvenida.nombre_defecto') }))}</h2>
+      <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b><small>${esc(PLANTEL[id].corto)}</small></button>`).join('')}</div>
+      <div class="el-ficha" id="el-ficha"></div>
+      <div class="el-ver"><button id="el-izq" data-g="-1">${EL_SVG.giro}</button><button id="el-der" data-g="1">${EL_SVG.giro}</button><button id="el-pose" aria-label="${esc(t('cuerpo.tramo.arriba'))}">${EL_SVG.arriba}</button><button class="ir" id="el-listo">${t('campo.listo')}</button></div>`, 'elegir');
+    marcar(); if (!tactil() && !E.sobre) pn.querySelector('.pesista[aria-pressed=true]')?.focus({ preventScroll: true });      // con teclado el foco arranca en la tarjeta elegida
+    // la escena libre es para girar al pesista con el dedo o el ratón: no cuenta como toque del juego (input.js)
+    const z = document.createElement('div'); z.id = 'el-zona'; $('capa').append(z);
+    z.addEventListener('pointerdown', e => { e.stopPropagation(); if (e.pointerType === 'mouse' && e.button !== 0) return; e.preventDefault(); G.drag = { id: e.pointerId, x: e.clientX, ang: G.ang }; G.meta = null; try { z.setPointerCapture(e.pointerId); } catch { /* sin captura */ } });
+    z.addEventListener('pointermove', e => { const d = G.drag; if (d && d.id === e.pointerId) G.ang = d.ang + (e.clientX - d.x) * .012; });
+    const suelta = e => { if (G.drag && G.drag.id === e.pointerId) { G.drag = null; G.pausa = 3; } };
+    z.addEventListener('pointerup', suelta); z.addEventListener('pointercancel', suelta);
+    pn.querySelectorAll('button').forEach(b => {
+      b.addEventListener('click', e => {
+        if (!activa(pn)) return; sonido.activar();
+        if (b.dataset.id) { if (b.dataset.id === G.id && e.detail === 0) listo(); else elegir(b.dataset.id); }      // con teclado: flechas para cambiar y Enter sobre la tarjeta elegida para quedarse con ella
+        else if (b.dataset.g) { const q = Math.PI / 2, d = +b.dataset.g, base = G.meta ?? G.ang; G.meta = d > 0 ? Math.floor(base / q + 1.001) * q : Math.ceil(base / q - 1.001) * q; G.pausa = 6; }
+        else if (b.id === 'el-pose') { G.arriba = !G.arriba; marcar(); if (reduceMotion) { G.u = G.arriba ? 1 : 0; if (G.visto) posar(); } encuadrar(.6); }
+        else if (b.id === 'el-listo') listo();
+      });
+      if (b.dataset.id) b.addEventListener('focus', () => elegir(b.dataset.id));      // las flechas mueven el foco entre los botones (teclado de los paneles): la tarjeta con foco es la elegida
+    });
+    return pn;
+  };
+  bloquear(montar()); E.repintar = () => { montar(); encuadrar(0); };
+  enCuadro = (ahora, dt) => {
+    E.forzar = true;      // detrás de un panel la imagen queda quieta: acá se dibuja siempre
+    if (!G.visto || !escena.activo) return;
+    if ($('gl').clientWidth !== G.W || $('gl').clientHeight !== G.H) encuadrar(0);      // giró el teléfono o cambió la ventana
+    if (G.meta !== null) { G.ang += (G.meta - G.ang) * (1 - Math.exp(-9 * dt)); if (Math.abs(G.meta - G.ang) < .004 || reduceMotion) { G.ang = G.meta; G.meta = null; } }
+    else if (!G.drag) { if (G.pausa > 0) G.pausa -= dt; else if (!reduceMotion) G.ang += dt * 2 * Math.PI / VUELTA; }
+    const uT = G.arriba ? 1 : 0;
+    if (G.u !== uT) { G.u = uT > G.u ? Math.min(1, G.u + dt / T_POSE) : Math.max(0, G.u - dt / T_POSE); posar(); } else escena.girar(G.ang);
+  };
+  ver(G.id);
+  await fin;
+  G.fin = true; enCuadro = null; E.repintar = null;
+  // todo como estaba: sin giro, de pie, con la barra a la vista y su carga, y la malla del jugador en su pesista. Si un
+  // cambio de pesista quedó a medias (un fundido en curso), se vuelve a dejar todo en su lugar cuando termina
+  const dejar = () => { escena.barbell.group.visible = true; escena.girar(0); if (kg0) escena.setCarga(kg0); if (escena.activo) escena.posar(poseParado(escena.P, 's'), 's'); E.forzar = true; };
+  dejar(); G.cola.then(() => { if (E.pantalla === 'inicio' || E.pantalla === 'elegir') dejar(); });
+  escena.yo = yo0; E.elegir = null; capa.quitar();
+  return G.id;
 }
 
 /**

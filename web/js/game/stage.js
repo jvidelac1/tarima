@@ -213,6 +213,9 @@ export const PLANOS = {
   jurado: { key: 'jurado', at: [], up: 0, dAbs: 9.2, az: 0, el: .085, fov: 30, punto: 'jurado' },
   // los tres árbitros de frente, desde el borde del escenario (para las fotos de control de banco.js)
   jueces: { key: 'jueces', at: [], up: 0, dAbs: 3.7, az: Math.PI, el: .12, fov: 34, punto: 'jueces' },
+  // selección de pesista (main.js, elegirPesista): de frente, a cuerpo entero, con lente normal. El blanco es un punto fijo
+  // del eje del pesista (`escena.elegirY`, m) y la distancia la pone el encuadre (`dAbs`): el que gira es el pesista (girar)
+  elegir: { key: 'elegir', at: [], up: 0, dAbs: 4, az: 0, el: .04, fov: 38, punto: 'elegir' },
 };
 /**
  * Primera persona (pedido del dueño, 17-nov: «generalmente uno mira para adelante, no se ve los brazos… debería ver más al
@@ -564,6 +567,24 @@ export class Escena {
     this.barbell.setPosition(v); this.barY = v.y; this.barZ = v.z; this.rig.barY = v.y; this.rig.barAhead = v.y; this.rig.headY = a.boneWorld('Head', v2).y + .14;
     if (dt > 0 && dt < .1) { const acc = (v.y - 2 * this._py[0] + this._py[1]) / (dt * dt); this.barbell.step(dt, v.y, acc); } else this.barbell.settle(v.y);
     this._py[1] = dt > 0 ? this._py[0] : v.y; this._py[0] = v.y; this.sombra = 3;
+  }
+  /**
+   * Selección de pesista: el pesista y la barra giran juntos sobre el eje vertical (`ang` rad; 0 = como siempre, de frente al
+   * jurado), como en una plataforma giratoria: la cámara y las luces quedan donde están, así el lado que se mira es siempre
+   * el iluminado. La posición de la barra sin girar se guarda en `posarGirado`. Con 0 queda todo como lo deja `posar`.
+   */
+  girar(ang = 0) {
+    const g = this.barbell.group, B = this._barGiro;
+    for (const a of Object.values(this.atletas)) if (a.root.rotation.y !== (a === this.activo ? ang : 0)) a.root.rotation.y = a === this.activo ? ang : 0;
+    g.rotation.y = ang; if (B) g.position.set(B.x * Math.cos(ang) + B.z * Math.sin(ang), B.y, B.z * Math.cos(ang) - B.x * Math.sin(ang));
+    if (!ang) this._barGiro = null;
+    this.giro = ang; this.sombra = Math.max(this.sombra, 2);
+  }
+  /** `posar` para la selección de pesista: posa sin giro (la barra sale de los huesos en el mundo) y después gira todo `ang`. */
+  posarGirado(pose, lev, ang = 0) {
+    const a = this.activo; if (!a) return;
+    a.root.rotation.y = 0; this.barbell.group.rotation.y = 0; a.root.updateMatrixWorld(true);
+    this.posar(pose, lev, 0); this._barGiro = (this._barGiro || new THREE.Vector3()).copy(this.barbell.group.position); this.girar(ang);
   }
   /**
    * El pesista en una mezcla de poses del clip (caídas y bajadas, game/caida.js): {i, j, u} la pose de partida, `k` la de
@@ -941,6 +962,7 @@ export class Escena {
     if (sh.punto === 'manga') v2.copy(this.barbell.group.position).add(v.set(.92, .02, 0));
     else if (sh.punto === 'jurado') v2.set(0, .75, 0);
     else if (sh.punto === 'jueces') v2.set(0, -.02, 7.3);
+    else if (sh.punto === 'elegir') v2.set(0, this.elegirY ?? 1, 0);
     else if (sh.punto === 'caida') { if (a) a.boneWorld('Hips', v2); else v2.set(0, 1, 0); v2.lerp(this.barbell.group.position, .5); v2.x = 0; v2.y = Math.max(.85, v2.y); }
     else { if (!a) return; const huesos = sh.at.filter(k => k !== 'Bar'), nb = sh.at.length - huesos.length; a.midWorld(huesos, v2).multiplyScalar(huesos.length); if (nb) v2.add(this.barbell.group.position); v2.multiplyScalar(1 / sh.at.length); v2.y += sh.up * this.P.h; }
     const e = this.encuadre;
