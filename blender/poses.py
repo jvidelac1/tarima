@@ -754,7 +754,7 @@ def check(T,bp):
 
 # ---------- secuencias ----------
 FLOOR=dict(mode='floor',z=BARZ); RACK=dict(mode='rack',elb=-.05); OVER=dict(mode='over',back=.035)
-PULL=dict(stance=.66,toe=14); OH=dict(phi=118,shrug=34,epole=(1,.15,0)); OHS=dict(OH,phi=-242,turn=-1)     # ritmo escápulo-humeral: con la barra arriba la escápula pone unos 40-60° de la elevación (antes 28: el brazo salía del torso como un tubo)
+PULL=dict(stance=.66,toe=14); OH=dict(phi=118,shrug=44,epole=(1,.15,0)); OHS=dict(OH,phi=-242,turn=-1)     # ritmo escápulo-humeral: con la barra arriba la escápula pone unos 40-60° de la elevación (antes 28: el brazo salía del torso como un tubo)
 RK=dict(bar=RACK,shrug=20,prot=34,arch=8)     # rack: escápulas elevadas y en protracción para armar el estante de deltoides
 # Tiempos: 'vk' = velocidad de la barra (m/s) al pasar por la fase; entre dos fases con 'vk' la barra acelera de forma constante sobre su recorrido real.
 # Donde no hay 'vk' en los dos extremos vale 't' (segundos hasta la fase siguiente). 'hold' = el cuerpo pasa por la fase con velocidad cero. Todo pensado para 1,69 m; se escala con raíz de K.
