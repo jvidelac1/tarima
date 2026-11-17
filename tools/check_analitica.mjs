@@ -477,7 +477,7 @@ async function interactuarJuego(page) {
     }
     if (s.panel && !s.sobre) {
       // el primer botón con el ratón (para PostHog es una interacción), después con Enter como la otra prueba
-      if (!clic && await page.locator('#capa .panel button.ir:not(:disabled)').count()) { clic = true; await dormir(400); await page.locator('#capa .panel button.ir:not(:disabled)').first().click(); await dormir(300); continue; }
+      if (!clic && await page.locator('#capa .panel button.ir:not(:disabled)').count()) { clic = true; await dormir(400); await page.locator('#capa .panel button.ir:not(:disabled)').first().click({ timeout: 120000 }); await dormir(300); continue; }      // con el 3D por software y tres modelos distintos (plantel nuevo), compilar al abrir pasa de 30 s
       const P = await J(() => { const ir = document.querySelector('#capa .panel button.ir:not(:disabled)'); return { ir: !!ir, foco: document.activeElement === ir }; });
       if (P.ir) { await dormir(400); if (!P.foco) await J(() => document.querySelector('#capa .panel button.ir:not(:disabled)')?.focus()); await page.keyboard.press('Enter'); await dormir(300); continue; }
     }

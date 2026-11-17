@@ -75,7 +75,7 @@ por género desde el 1 de junio de 2025, y el 8 de mayo de 2025 cambió la de 98
    El trabajo queda en rojo si `check()` da cuadros `BAD`. En `<carpeta>/pesista-<id>/out/<id>/` quedan `lineas.txt`
    (`MASA`, `PROP`, `POSE`, `CHK`, `BAD`, `TRAJ`), las hojas `sheet_<seg>_side.png` y `sheet_<seg>_front.png`, los renders de
    control `d_*.png` y los retratos `ctl/ret_*.png`. Hay que mirarlos.
-4. **Sumarlo al juego** (sin Blender):
+4. **Sumarlo al juego** (sin Blender; los `.glb`, `_1024.glb` y máscaras que quedan en `web/models/` se suben al repo):
 
    ```bash
    python3 tools/sumar_pesista.py <carpeta>      # copia web/models/<id>* y suma su entrada a web/data/poses.json
@@ -89,9 +89,13 @@ por género desde el 1 de junio de 2025, y el 8 de mayo de 2025 cambió la de 98
 
 - **Visor** (`web/index.html`): una ficha por pesista de `ATHLETES` que ya tenga modelo en `data/poses.json`.
   `index.html?who=solanet`.
-- **Juego** (`web/juego.html`): `?plantel=` cambia qué modelo dibuja a cada uno de los tres pesistas, en el orden Compacto,
-  Largo, Potente. Vale una terna de `data/plantel.json` (`mujeres`, `hombres`, `livianos`, `pesados`, `mixto`) o tres ids
-  separados por coma. El pesista del jugador es el del tipo que eligió; los otros dos son los rivales y llevan el nombre, el
+- **Juego** (`web/juego.html`): desde el 17-nov el plantel nuevo es el del juego. Sin parámetros se viste la terna `hombres`
+  (`PLANTEL_DEFECTO` en `roster.js`): Ilarraz en la plaza Compacto, Kordan en Largo y Jastrev en Potente. Sus modelos están en
+  el repo (`web/models/`, de la corrida 44038971821), igual que el de Solanet. `?plantel=` elige otra terna, en el orden
+  Compacto, Largo, Potente: una de `data/plantel.json` (`hombres`, `livianos`; `mujeres`, `pesados` y `mixto` aparecen cuando
+  Halvard tenga modelo en el repo) o tres ids separados por coma (`?plantel=solanet,kordan,jastrev`). `?plantel=clasico` deja a
+  Ventura, Brenner y Marangi con sus modelos de siempre. Solo se bajan los modelos de la terna que se juega. Si `plantel.json`
+  no llega, el juego sigue con los clásicos. El pesista del jugador es el del tipo que eligió; los otros dos son los rivales y llevan el nombre, el
   país y la bandera del modelo.
 - Las fichas deportivas (`web/data/sim.json`: kilos, atributos, plan del rival) **no cambian** con el vestuario, así que la
   partida, su huella y la validación del servidor siguen igual. Categorías con kilos propios por género y peso son el paso

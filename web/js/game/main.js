@@ -6,7 +6,7 @@ import { Escena } from './stage.js';
 import { poseDe, poseParado, marcas, tramo } from './sequence.js';
 import { armarCaida, poseCaida } from './caida.js';
 import { sugerencia, chanceDe } from '../sim/entrenador.js';
-import { PLANTEL, JUGADOR, FICHA, nivelFicha, ENVIONES, LEV, ETIQUETAS, GUIONES, CUERPO, BARRA, vestir, ternaDe } from './roster.js';
+import { PLANTEL, JUGADOR, FICHA, nivelFicha, ENVIONES, LEV, ETIQUETAS, GUIONES, CUERPO, BARRA, vestir, ternaDe, PLANTEL_DEFECTO } from './roster.js';
 import { Registrador, Gobernador, calidadInicial, medirRefresco, decidirCalidad, pasoDe, metaDe, nombreDe, escalones, pisoDe, PRESET, PISO_MP, MARGEN, TECHO_MP } from './perf.js';
 import { sonido } from './audio.js';
 import { detalleError, analitica, appNavegador } from './analitica.js';
@@ -391,7 +391,7 @@ const relojLibre = () => { $('reloj').textContent = '–:––'; $('reloj').cla
 function setReloj(ms) { const s = Math.max(0, Math.ceil(ms / 1000)), txt = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; if ($('reloj').textContent !== txt) { $('reloj').textContent = txt; $('reloj').classList.toggle('aviso', s <= 10); escena?.arena.setClock(s); } }
 function setLuces(d) { [...$('luces').children].forEach((el, i) => { el.className = d && d[i] !== null && d[i] !== undefined ? (d[i] ? 'b' : 'r') : ''; }); escena?.arena.setDecision(d ? [0, 1, 2].map(i => d[i] ?? null) : null); }
 function zocalo(a, L) {
-  if (!a) { $('zocalo').hidden = true; return; } const P = ident(a), pais = a.i === E.yo ? '' : a.f.codigo;
+  if (!a) { $('zocalo').hidden = true; return; } const P = ident(a), pais = a.i === E.yo ? '' : PLANTEL[a.id].codigo || a.f.codigo;
   // el nombre del jugador reemplaza al del pesista (textContent: no hace falta escapar), con su bandera y sin el país del
   // modelo; sin dorsal, que es jerga
   $('zocalo').hidden = false; $('z-bandera').style.background = P.bandera; $('z-codigo').textContent = pais; $('z-codigo').hidden = !pais; $('z-dorsal').textContent = ''; $('z-nombre').textContent = quien(a);
@@ -1675,7 +1675,7 @@ async function revisarShaders() {
   if (!E.shaderMal) return;
   const primero = E.shaderMal; E.shaderMal = null;
   if (C.clave !== 'movil') {
-    try { await ponerCalidad('movil'); nombrar(); escena.cuadro(0, true); } catch (e) { E.shaderMal = E.shaderMal || String(e?.message || e); }
+    try { escena.soltarProgramas(); await ponerCalidad('movil'); nombrar(); escena.cuadro(0, true); } catch (e) { E.shaderMal = E.shaderMal || String(e?.message || e); }
     if (!E.shaderMal) { cargaFallida('shader', { message: primero }, { recuperada: true, calidad: C.nombre }); return; }
   }
   await falloGrafico('shader', { message: E.shaderMal || primero });
@@ -1702,9 +1702,12 @@ async function iniciar() {
   const arranque = conexion.arranque({ idioma: idiomaActual(), idioma_origen: origen, version: VERSION_JUEGO, pantalla: () => E.pantalla });
   const [poses, sim] = await bajarDatos(['data/poses.json', 'data/sim.json']);
   datos = leerDatos(sim);
-  // Vestuario (rama plantel): `?plantel=mujeres` (una terna de data/plantel.json) o `?plantel=solanet,halvard,jastrev` cambia qué
-  // modelo dibuja a cada pesista del juego (el jugador y los rivales). Sin el parámetro no se baja nada ni cambia nada.
-  if (params.get('plantel')) { try { const pl = await fetch('data/plantel.json').then(r => r.json()); const v = vestir(ternaDe(params.get('plantel'), pl), pl.pesistas, poses); console.info('plantel:', v.map(id => `${id} → ${PLANTEL[id].modelo}`).join(', ') || 'sin cambios'); } catch (e) { console.warn('plantel:', e); } }
+  // Vestuario: qué modelo del plantel dibuja a cada pesista del juego (el jugador y los rivales). Sin parámetro, la terna por
+  // defecto (PLANTEL_DEFECTO: ilarraz, kordan, jastrev). `?plantel=livianos` (una terna de data/plantel.json) o
+  // `?plantel=solanet,kordan,jastrev` elige otra; `?plantel=clasico` deja a Ventura, Brenner y Marangi con sus modelos de siempre
+  // (y no baja plantel.json). Si plantel.json no llega o a la terna le falta un modelo, esa plaza queda con el modelo clásico.
+  { const q = params.get('plantel') || PLANTEL_DEFECTO;
+    if (q !== 'clasico') { try { const pl = await reintentar(() => fetch('data/plantel.json').then(r => { if (!r.ok) throw new Error('data/plantel.json: ' + r.status); return r.json(); })); const v = vestir(ternaDe(q, pl), pl.pesistas, poses); console.info('plantel:', v.map(id => `${id} → ${PLANTEL[id].modelo}`).join(', ') || 'sin cambios'); } catch (e) { console.warn('plantel:', e); } } }
   await Promise.all([`800 20px 'Saira Condensed'`, `700 20px 'Saira Condensed'`, `500 20px 'Saira Condensed'`].map(f => document.fonts.load(f).catch(() => null)));
   Object.assign(C, calidadInicial(params.get('calidad') || params.get('q'), tactil())); fijarHz(await refresco);
   if (C.auto) C.Q = { ...C.Q, dpr: 2 };      // en automático el tope de píxeles lo pone la calibración, no la densidad de cada calidad

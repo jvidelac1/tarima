@@ -7,8 +7,9 @@ export const ATHLETES = {
   // modelo en data/poses.json. Cómo se agrega uno: docs/PLANTEL.md.
   solanet: { name: 'Naira Solanet', country: 'CRL', countryName: 'Coralia', category: '48 kg', bib: 21, flag: 'linear-gradient(180deg,#0f7a4a 0 33%,#f4f2ec 33% 67%,#e8a33d 67%)', bio: '1,50 m · mujeres 48 kg · compacta', kg: { s: 84, c: 106 } },
   halvard: { name: 'Greta Halvard', country: 'KSD', countryName: 'Karsund', category: '+86 kg', bib: 34, flag: 'linear-gradient(90deg,#6e1423 0 28%,#f0c36a 28% 40%,#6e1423 40%)', bio: '1,74 m · mujeres +86 kg', kg: { s: 128, c: 166 } },
-  ilarraz: { name: 'Tadeo Ilarraz', country: 'MTL', countryName: 'Montelar', category: '65 kg', bib: 16, flag: 'linear-gradient(135deg,#15151a 0 50%,#e26a1b 50%)', bio: '1,62 m · hombres 65 kg · compacto', kg: { s: 138, c: 170 } },
+  ilarraz: { name: 'Tadeo Ilarraz', country: 'MTL', countryName: 'Montelar', category: '71 kg', bib: 16, flag: 'linear-gradient(135deg,#0d1a30 0 50%,#1d4f9c 50% 82%,#f2c230 82%)', bio: '1,61 m · hombres 71 kg · compacto', kg: { s: 138, c: 170 } },
   jastrev: { name: 'Borko Jastrev', country: 'VLD', countryName: 'Veldania', category: '+110 kg', bib: 45, flag: 'linear-gradient(180deg,#17171c 0 40%,#d7263d 40% 60%,#f1efe9 60%)', bio: '1,86 m · hombres +110 kg', kg: { s: 196, c: 240 } },
+  kordan: { name: 'Stevan Kordan', country: 'DRV', countryName: 'Dravenia', category: '94 kg', bib: 9, flag: 'linear-gradient(90deg,#0f5a66 0 30%,#ece8dd 30% 70%,#12181c 70%)', bio: '1,71 m · hombres 94 kg', kg: { s: 178, c: 216 } },
 };
 
 // `marca`: lo que dicen los carteles y pantallas del estadio; `title`: la gráfica del visor. Los dos dicen el nombre del juego.

@@ -463,6 +463,12 @@ export class Escena {
    */
   setSombras(on) { this.sombras = !!on; this._sombras(); this.sombra = 4; }
   /**
+   * Suelta los programas de todos los materiales de la escena: el próximo dibujo los compila de nuevo. Lo usa main.js cuando
+   * un programa no compiló, antes de probar con la calidad Móvil: three avisa de un programa roto una sola vez, y si Móvil
+   * reusaba los mismos programas el fallo no volvía a aparecer y se daba por recuperado sin estarlo.
+   */
+  soltarProgramas() { this.scene.traverse(o => { for (const m of [].concat(o.material || [], o.customDepthMaterial || [], o.customDistanceMaterial || [])) m.dispose(); }); }
+  /**
    * Deja compilado y usado una vez todo lo que la calidad en uso puede dibujar, con sombras y sin ellas, para los dos
    * modelos (estén a la vista o no). Primero compila en paralelo (KHR_parallel_shader_compile, sin trabar la página) con el
    * destino donde se va a dibujar (el lienzo en el camino directo, el de la escena con post), porque el programa de cada

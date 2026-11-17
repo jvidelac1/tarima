@@ -125,7 +125,7 @@ async function modelo(nombre) {
   await page.waitForFunction(() => ['presentacion', 'apertura'].includes(window.JUEGO.estado().pantalla), null, { timeout: 90000 }).catch(() => null);
   const s = await J(() => ({ pantalla: JUEGO.estado().pantalla, modelos: Object.keys(JUEGO.escena.atletas).sort().join(','), aviso: !!document.getElementById('carga-aviso') }));
   await page.screenshot({ path: path.join(OUT, `modelo_${nombre}_de_vuelta.png`) });
-  if (s.pantalla !== 'presentacion' || s.modelos !== 'brenner,ventura' || s.aviso) problemas.push(`${tag} con la red de vuelta no siguió a la presentación: ${JSON.stringify(s)}`);
+  if (s.pantalla !== 'presentacion' || s.modelos !== 'ilarraz,jastrev,kordan' || s.aviso) problemas.push(`${tag} con la red de vuelta no siguió a la presentación: ${JSON.stringify(s)}`);
   if (errores.length) problemas.push(`${tag} errores sin atrapar: ${errores.slice(0, 3).join(' | ')}`);
   console.log(`${tag} ${antes} pedidos de GLB fallidos · «${a?.titulo}» · de vuelta: ${s.pantalla} con ${s.modelos}`);
   await ctx.close();

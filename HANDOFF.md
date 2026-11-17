@@ -2341,6 +2341,49 @@ queda sobre la meta porque el marco de MPFB no baja de 0,24 H entre articulacion
 superpesado no tiene panza en barril (cintura 0,56 H) y su entrepierna mide 0,375 H; queda un bulto bajo la malla en la extensión
 (los targets `genitals/*-decr` no alcanzan); pieles de MakeHuman sin integrar; el sombreador de piel solo cambió `uNormBias` (1,7 a 1,1).
 
+## Plantel nuevo dentro del juego (17-nov, rama `v-integra`, desde `visual`)
+
+Sin fusionar a `main` ni a `prueba` y sin publicar: lo decide el dueño.
+
+- **Modelos en el repo** (`web/models/`, corrida de pesistas 44038971821, `check()` 0 BAD en los cuatro, meshopt como los
+  actuales; el `_1024` lleva además texturas WebP): ilarraz 5,27 / 2,92 MB, kordan 5,48 / 3,01, jastrev 5,38 / 2,96,
+  solanet 5,29 / 2,95 (`.glb` / `_1024.glb`); máscaras 0,19 a 0,24 MB y `_mask2` de 0,02 MB (el juego todavía no la baja).
+  `poses.json` y `plantel.json` regenerados con `tools/sumar_pesista.py` y `tools/plantel_web.py`. Halvard sigue sin modelo
+  en el repo (las ternas `mujeres`, `pesados` y `mixto` no existen hasta que lo tenga).
+- **Plantel por defecto**: sin `?plantel=` el juego viste la terna `hombres` (`PLANTEL_DEFECTO` en `roster.js`; en
+  `tools/plantel_web.py` pasó a ser ilarraz, kordan, jastrev): Ilarraz en la plaza Compacto, Kordan en Largo, Jastrev en
+  Potente. Es lo mismo que daba `?plantel=ilarraz,kordan,jastrev`. `?plantel=clasico` deja a Ventura, Brenner y Marangi.
+  Si `plantel.json` no llega (tres intentos), el juego sigue con los clásicos, que siguen en el repo.
+- **Lo que NO cambió**: los ids de las plazas (`ventura`, `brenner`, `marangi`), `web/data/sim.json` y su huella, los
+  `sim_ref*.json`, las personalidades de los rivales, los textos (ninguno nuevo), la propiedad `pesista` de los eventos
+  (`compacto`, `largo`, `potente`) y `tarima.pesista` guardado en el navegador. El Worker no valida ids de pesista.
+  Los tiempos del núcleo siguen saliendo de `sim.json` (`modelos.ventura` y `modelos.brenner`): la presentación acomoda el
+  clip del modelo nuevo a esos tiempos. Kilos y fichas propias por categoría siguen pendientes (temporada nueva).
+- **Arreglo**: el zócalo del rival mostraba el código de país de la ficha vieja (NVK con Kordan); ahora el del modelo.
+- **Visor** (`config.js`): ficha de Kordan, y categoría, estatura y bandera de Ilarraz al día. Con los modelos en el repo
+  el visor publicado muestra también a Solanet, Ilarraz, Jastrev y Kordan.
+- **Carga medida** (`carga.yml`, corrida 44050710000, teléfono 844 × 390 con los `_1024`; «antes» = `origin/main`):
+  total 7,97 → 10,71 MB (modelos 6,46 → 8,89 MB, máscaras y detalle 0,62 → 0,79, JS 0,77 → 0,91 por lo que ya traía `visual`).
+  Modelos bajados en 4G (9 Mbps) a los 19,1 → 24,6 s; en red lenta (1,6 Mbps) a los 51,0 → 65,6 s. En computadora con calidad
+  alta (cuenta sobre los archivos, sin medir): modelos y máscaras 12,26 → 16,79 MB. La causa es que antes eran dos modelos
+  (Marangi usaba el de Brenner) y ahora son tres distintos; los clásicos no se bajan. **Pendiente** si pesa: bajar primero el
+  modelo del jugador y los rivales después, o que la tercera plaza repita modelo.
+- **Pruebas**: `check_game` y `check_carga_fallas` esperan `ilarraz,jastrev,kordan` en memoria; `check_carga` espera todos
+  los modelos pedidos (cortaba en cuatro archivos); `carga.yml` acepta `-f antes=<ref>` y `-f visor=false`;
+  `check_analitica` da 120 s al primer clic: con el 3D por software, compilar tres modelos distintos al abrir pasó de 30 s
+  (en `visual` la misma prueba pasa con 30 s, corrida 44051486379). Es costo real de arranque; no se midió en una placa.
+- **Shader que no compila** (`revisarShaders`): antes de probar con Móvil se sueltan los programas de la escena
+  (`Escena.soltarProgramas`). three avisa de un programa roto una sola vez; con tres modelos todo llegaba compilado y, si
+  Móvil no creaba un programa nuevo, se anotaba «recuperada» sin estarlo (`check_carga_fallas [shader]` falló dos veces
+  seguidas en la corrida 44050689975). La causa exacta de por qué con dos modelos sí aparecía no se confirmó (estimación:
+  dependía de los tiempos). Solo cambia el camino de falla: quien hoy carga bien no pasa por ahí.
+- **Corridas en verde** (rama `v-integra`): `pruebas.yml` 44060877374 (commit d6d8ce2), `servidor.yml` 44052753896 (eb4bc6d),
+  `telefono.yml` 44050695156, `muro.yml` 44050700519 y `carga.yml` 44050710000 (9b128bc; `carga.yml` sin el trabajo del visor,
+  `-f visor=false`). Acá: `sim_test`, `servidor_test` (364 controles), `rivales_test` y `pesistas_test` bien.
+- **Estimaciones y riesgos**: memoria de video con tres modelos en un teléfono de gama baja, sin medir en un aparato real.
+  El color de interfaz de Kordan (`#2fb3c4`) queda cerca del turquesa del jugador (`#35e6d6`) cuando Kordan es rival.
+  Solanet casi no se probó jugando; Jastrev es el menos logrado.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.
