@@ -2260,6 +2260,68 @@ Lo que sigue mal, repetido en las rondas 4 y 5:
 - En Clásico las ayudas pegadas a la barra (anillo, línea) no se ven en primera persona cuando la barra queda fuera de cuadro.
 - Después del válido el pesista queda de pie respirando: no hay festejo (haría falta una animación nueva).
 
+### Carteles fuera de la cabeza y de la barra, y el vistazo a la barra (17-nov, rama `v-pov`)
+
+Pedido del dueño después de jugar parado en el teléfono: «hay casos donde los carteles le tapan la cabeza al pesista, ojo ahí».
+
+**Medición** (`tools/tapa.mjs`, `stage.js → cajas()`): además del cuerpo y el torso, la caja de la **cabeza** (del hueso `Head`
+a 21 cm más arriba, por estatura; los modelos no traen `HeadTop_End`), la **barra** con `alta` (arriba de la cabeza) y, en
+primera persona, el **recuadro**. Se mide contra todo lo que se ve (opacidad > 0,2) en todos los momentos de un intento
+(`seguidor`): preparación, barrita quieta y corriendo, levantamiento, `arriba` y `fija` (barra arriba), veredicto grande y
+chico (válido, caída, de un rival), repetición, carga, «otro sale antes», fin del arranque, explicaciones; con «@c» en dos
+tiempos. **Regla** (`revisar`): cabeza ≤ 5 %; barra ≤ 10 % cuando está arriba; recuadro ≤ 5 %. No se exige en los paneles de
+antes y después de la final (inicio, presentación, cartel, podio) ni al elegir kilos con el teléfono acostado.
+`check_telefono` juega además un intento que no sale (6 kg de más, tocado en el rojo) en 430×932 y 932×430; `check_barra`
+suma la primera persona (`pc_pov_es`, `tel_pov_en`, `vert_pov_es`) y sigue hasta el fin del arranque en la computadora.
+
+| Qué tapaba (antes, corridas 44012336826 y 44012340333) | Cuánto | Cómo quedó |
+|---|---|---|
+| Parado: el tablero sobre la barra y las manos del rival (turno, veredicto, explicación «luces») | barra 75–100 %, cuerpo 19–24 % | 0 % (430×932: 0 %) |
+| Acostado: sonido, pausa y ayuda (arriba al centro) sobre la barra del rival arriba | barra 24–31 % (37–40 % con la explicación) | 0 % |
+| Acostado y computadora: esos botones sobre la cabeza en el plano de la caída (intento que no sale) | cabeza 23–30 % (6 % en la computadora) | 0 % |
+| Acostado: el aviso «otro sale antes» sobre la cabeza y el torso | cabeza 73 %, torso 35–50 % | 0 % |
+| Computadora: «Terminó el arranque» (y elegir la apertura) sobre el pesista | cuerpo 71 % (50 %) | 0 % |
+| Parado: «Terminó el arranque» cortaba al pesista por el pecho | cuerpo 71 % | 0 % (entero, arriba del panel) |
+| Mano izquierda: el veredicto de un rival encima de la explicación de primera vez | se encimaban | separados |
+
+**Reglas de diseño** (no hay casos por pantalla):
+- **El techo de la cámara** (`main.js → margenVertical`, 4 veces por segundo): lo que cuelga del borde de arriba dentro de la
+  franja central (38–62 % del ancho) baja el techo del encuadre automático (`setInsets`) hasta su borde, más 3,5 % de aire.
+  Parado es el tablero (ocupa más de medio ancho): el rival se ve ~25 % más chico durante su turno, entero y con la barra libre.
+- **Arriba al centro no va nada** (acostado y computadora): sonido, pausa y ayuda van arriba a la derecha, en fila debajo del
+  reloj y las luces. Bajar el techo no alcanzaba: con la cámara general la punta de la barra queda más cerca y se ve más grande.
+  El recuadro de la primera persona no sube de 84 px (`RECUADRO.yMin`).
+- **Elegir kilos** (apertura y fin del arranque): el panel va a un costado (computadora, `.lado`) o abajo (parado) y el pesista
+  se encuadra en lo libre (`encuadrarLibre`, lo mismo que el llamado).
+- **Un aviso sobre el plano del llamado** («otro sale antes») va del lado donde estaba el panel (`.veredicto.der`).
+- El veredicto propio ya estaba en una franja libre (a la izquierda a media altura; parado, debajo de los pies): 0 %.
+
+**Sin resolver.** Con el teléfono acostado (340 a 390 px de alto) los paneles de elegir kilos siguen a lo ancho y tapan al
+pesista (la tabla y el selector no entran a un costado): la regla no los exige. Presentación, cartel y podio tampoco.
+Acostado, con el rival de pie y la barra arriba, el borde de la pantalla corta la punta de los discos (es el encuadre de la
+cámara general, no un cartel). Falta verlo en un teléfono de verdad.
+
+**Primera persona: el vistazo a la barra** (decidido con el dueño el 17-nov). En un intento propio desde los ojos, antes de que
+aparezca la barrita, el pesista baja y toma la barra (el clip hasta «Salida»), la vista baja a las dos manos (hasta −95°: la
+barra queda debajo y detrás de los ojos), se queda 0,9 s con el foco en las manos y el lente abierto lo necesario (hasta 92°),
+y vuelve al jurado; recién entonces empieza el reloj del intento y aparece la barrita, con el pesista ya agachado
+(`main.js → vistazo`, `yaAbajo`; `stage.js → POV.vistazo`). Mismo resorte, tope 57 °/s. Nada con movimiento reducido, con la
+barrita en pantalla, con reloj corriendo (Clásico) ni con el teléfono parado. **Agrega unos 4 a 5 s a cada intento propio en
+primera persona.** Pruebas: `check_pov` (tira: ≥ 0,6 s con las dos manos en la imagen y la mirada de vuelta en el jurado
+0,3 s antes de levantar) y `check_barra` con `--camara=pov` (`E.vistazo`: ≥ 600 ms con las manos, termina en el jurado, ≤ 6 s);
+la regla dura de la barrita (mirada entre −15° y +10°) no cambió.
+
+Medido en lo jugado (Alta, por software): 1,7 a 1,9 s con las dos manos en la imagen, mirada más baja −95°, de vuelta en −15°
+al aparecer la barrita, 4,3 s en total. **A la vista:** la barra y las manos salen algo fuera de foco, y con el teléfono
+acostado el botón redondo tapa la mano derecha y el recuadro queda pegado al disco derecho. Sin nota de director ni del dueño.
+
+**Corridas en verde sobre `3835cba`:** teléfono 44035762059, pruebas 44035756974 (los 4 grupos), gráficos `solo=pov`
+44035751517. En `tapa.json` de la última medición de carteles (195 momentos en `check_telefono`, 247 en `check_barra`): cabeza
+0 % y barra arriba 0 % en todos los momentos exigidos; recuadro 1,5 % como mucho. El «~25 % más chico» del rival parado es
+una estimación por las medidas de los márgenes, no una medición.
+
+Capturas de antes y después: `~/tarima-datos/ver_visual/carteles/` (`antes/`, `despues/`, `pov_vistazo/`).
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.
