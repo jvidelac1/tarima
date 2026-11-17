@@ -59,6 +59,7 @@ def build(name,probe=False):
     err=goal-r; print('\n'.join(lines))
     print(f"PROP {name}: "+' · '.join(f"{k} {r[i]:.3f} (meta {goal[i]:.3f}, target {x[i]:+.2f})" for i,k in enumerate(ks))+f" · {cnt[0]} armados"+(''.join(f" · {k} NO ALCANZA la meta (queda a {err[i]*100:+.1f} % de la estatura)" for i,k in enumerate(ks) if abs(err[i])>=.004)),flush=True)
     return b,rig
+DVOL={}   # por pesista: volumen (m3) del relieve muscular medido en el armado anterior
 def _build(name,cfg,x):
     lines=[]; say=lambda t:lines.append(t)
     HS=di('mpfb.services.humanservice','HumanService'); TS=di('mpfb.services.targetservice','TargetService'); HP=di('mpfb.entities.objectproperties','HumanObjectProperties'); LS=di('mpfb.services.locationservice','LocationService')
@@ -89,7 +90,7 @@ def _build(name,cfg,x):
     if cfg.get('masa'):
         # La categoría manda: se busca el macro 'weight' de MPFB con el que la masa estimada da la del pesista. Si con el máximo no
         # alcanza (categorías abiertas), se suma de a poco el paquete 'volumen' (tronco, cadera, muslos y brazos más gruesos).
-        goal=cfg['masa']; ms=lambda:masa_estimada(b,H,rho)[0]
+        dv=DVOL.get(name,0.)*1000*rho; goal=cfg['masa']-dv; ms=lambda:masa_estimada(b,H,rho)[0]     # dv: masa que después suma el relieve muscular (físico anatómico)
         def setw(w): HP.set_value('weight',float(w),entity_reference=b); TS.reapply_macro_details(b)
         def bis(f,lo,hi,n=7):
             for _ in range(n):
@@ -114,7 +115,7 @@ def _build(name,cfg,x):
             g=bis(lambda x:(setg(x),ms())[1],0.,GMAX) if ms()>goal else GMAX
             setg(g)
         m,v=masa_estimada(b,H,rho)
-        say(f"MASA {name}: {m:.1f} kg estimados (objetivo {goal:.1f} kg, categoría {cfg.get('categoria')} {cfg.get('genero')}) · volumen {v:.1f} l x {rho:.3f} kg/l · IMC {m/H**2:.1f} · macro weight={w:.3f} (rango {mmax:.0f} kg con 1) · paquete de volumen={g:.2f}"+('' if abs(m-goal)<.03*goal else ' · NO ALCANZA el objetivo'))
+        say(f"MASA {name}: {m+dv:.1f} kg estimados"+(f" ({m:.1f} del cuerpo base + {dv:.1f} del relieve muscular)" if dv else '')+f" (objetivo {cfg['masa']:.1f} kg, categoría {cfg.get('categoria')} {cfg.get('genero')}) · volumen {v:.1f} l x {rho:.3f} kg/l · IMC {m/H**2:.1f} · macro weight={w:.3f} (rango {mmax:.0f} kg con 1) · paquete de volumen={g:.2f}"+('' if abs(m-goal)<.03*goal else ' · NO ALCANZA el objetivo'))
     else:
         try: m,v=masa_estimada(b,H,rho); say(f"MASA {name}: {m:.1f} kg estimados (sin objetivo: cuerpo fijado a mano) · volumen {v:.1f} l x {rho:.3f} kg/l · IMC {m/H**2:.1f}")
         except Exception as e: say(f'MASA {name} sin dato: {e}')
@@ -129,6 +130,8 @@ def _build(name,cfg,x):
     BN={x.name[10:]:x for x in rig.data.bones}; P=lambda n:BN[n].head_local
     H=cfg['height']; fem=(P('LeftLeg')-P('LeftUpLeg')).length; tib=(P('LeftFoot')-P('LeftLeg')).length; ua=(P('LeftForeArm')-P('LeftArm')).length; fa=(P('LeftHand')-P('LeftForeArm')).length; tor=P('LeftArm').z-P('LeftUpLeg').z
     say(f'MEASURE {name}: H={H:.2f} femur={fem:.3f} ({fem/H:.3f}) tibia={tib:.3f} ({tib/H:.3f}) torso={tor:.3f} ({tor/H:.3f}) arm={ua+fa:.3f} ({(ua+fa)/H:.3f}) fem/tor={fem/tor:.2f} shW={P("LeftArm").x*2:.3f} ankle_x={P("LeftFoot").x:.3f}')
+    if cfg.get('fisico')=='anatomico':
+        import geo,tex; S_=plantel.STYLES[name]; tex.ANAT.update(S_.get('anat',{})); me.update(); DVOL[name]=geo.anat_vol(b,rig,H/1.687,S_.get('cut',1.))
     return b,rig,dict(femur=fem/H,tibia=tib/H,brazo=(ua+fa)/H,hombros=P('LeftArm').x*2/H,antebrazo=fa/(ua+fa)),lines
 if __name__=='__main__':
     boot()

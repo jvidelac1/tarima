@@ -8,15 +8,22 @@ HERE=os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0,HERE); from c
 import body, plantel
 from mathutils import Vector
 from PIL import Image, ImageDraw, ImageFont
-names=sys.argv[1:] or plantel.NUEVOS; OUT=out_dir('sonda'); W,Hh=340,560; SPAN=2.1; ZC=1.0
+names=sys.argv[1:] or plantel.NUEVOS; OUT=out_dir('sonda'); W,Hh=520,860; SPAN=2.1; ZC=1.0
 def font(sz):
     for f in ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf','/System/Library/Fonts/Helvetica.ttc'):
         try: return ImageFont.truetype(f,sz)
         except Exception: pass
     return ImageFont.load_default()
 filas=[]
+import tex as _t; ANAT0=dict(_t.ANAT)
 for n in names:
     boot(); b,rig=body.build(n); sc=bpy.context.scene; P=plantel.PESISTAS[n]; S=plantel.STYLES[n]
+    try:
+        import geo,tex; K_=S['H']/1.687; tex.ANAT.clear(); tex.ANAT.update(ANAT0); tex.ANAT.update(S.get('anat',{}))
+        if S.get('fisico')=='anatomico': geo.subdivide(b); geo.anatomy(b,rig,K_,S.get('cut',1.)); print(f"MASA2 {n}: {body.masa_estimada(b,S['H'],plantel.CFGS[n].get('rho',1.05),{})[0]:.1f} kg con el relieve en la malla",flush=True)
+        geo.antro_malla(b,rig,K_,S,n)
+    except Exception as e:
+        import traceback; print('ANTROM error',e); traceback.print_exc()
     m=bpy.data.materials.new('piel'); m.use_nodes=True; bs=m.node_tree.nodes['Principled BSDF']; c=[int(S['skin'][i:i+2],16)/255 for i in (1,3,5)]
     bs.inputs['Base Color'].default_value=(*[u**2.2 for u in c],1); bs.inputs['Roughness'].default_value=.55; b.data.materials.clear(); b.data.materials.append(m)
     for p in b.data.polygons: p.use_smooth=True; p.material_index=0
