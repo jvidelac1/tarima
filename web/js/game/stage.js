@@ -191,7 +191,7 @@ const _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _pc = new THREE.Vect
 /** Interpolación esférica entre dos direcciones unitarias (devuelve un vector nuevo). */
 function slerpDir(a, b, t) { const c = Math.min(1, Math.max(-1, a.dot(b))), th = Math.acos(c); if (th < 1e-4) return a.clone(); const s = Math.sin(th); return a.clone().multiplyScalar(Math.sin((1 - t) * th) / s).addScaledVector(b, Math.sin(t * th) / s); }
 /** Respiración del pesista de pie después del intento (posarMezcla): grados de cabeceo por hueso del tronco y ciclos por segundo. */
-export const RESPIRA = { grados: .9, hz: .55 };
+export const RESPIRA = { grados: 2.1, hz: .6, hombros: .05, peso: .022, sacude: [.9, .55] };
 /** Escala del hueso del cuello con la cabeza propia oculta: cuello, cabeza, pelo y ojos quedan en un punto entre las clavículas. */
 const SIN_CABEZA = 1e-3;
 export const CAM = Object.fromEntries(CAMERAS.map((c, i) => [c.key, i]));
@@ -566,8 +566,12 @@ export class Escena {
     // de pie después del intento no queda de estatua: respira agitado (el pecho cabecea alrededor del eje lateral del mundo,
     // RESPIRA.grados en cada hueso del tronco, a RESPIRA.hz), tanto más cuanto más cerca de «Parado». Nada con movimiento reducido.
     if (p.w > 0 && p.t !== undefined && !this.reduceMotion) {
-      const ang = THREE.MathUtils.degToRad(RESPIRA.grados) * p.w * Math.sin(p.t * Math.PI * 2 * RESPIRA.hz);
-      for (const k of ['Spine1', 'Spine2']) { const h = a._byName.get(k); if (!h) continue; h.parent.getWorldQuaternion(_qa); h.quaternion.premultiply(_qb.setFromAxisAngle(_pa.set(1, 0, 0), ang).premultiply(_qc.copy(_qa).invert()).multiply(_qa)); }
+      // nunca de estatua: respira agitado (tórax que cabecea y hombros que suben y bajan), carga el peso un poco hacia un lado y
+      // el otro (solo el tronco: los pies no se mueven) y, al rato de llegar, se sacude el magnesio de las manos
+      const f = Math.sin(p.t * Math.PI * 2 * RESPIRA.hz), ang = THREE.MathUtils.degToRad(RESPIRA.grados) * p.w * f;
+      for (const k of ['Spine1', 'Spine2']) this._girarHueso(a, k, _pa.set(1, 0, 0), ang);
+      for (const [k, sg] of [['LeftShoulder', 1], ['RightShoulder', -1]]) this._girarHueso(a, k, _pa.set(0, 0, 1), sg * RESPIRA.hombros * p.w * Math.max(0, -f));
+      const lado = Math.sin(p.t * Math.PI * 2 * .21) * p.w; for (const k of ['Spine', 'Spine1']) this._girarHueso(a, k, _pa.set(0, 0, 1), RESPIRA.peso * lado);
       a.root.updateMatrixWorld(true);
     }
     if (p.pies && ((p.pies.u > 0 && p.pies.u < 1) || p.pies.dy)) this._pies(a, p.pies);
@@ -662,6 +666,9 @@ export class Escena {
         this._dosHuesos(a, L + 'Arm', L + 'ForeArm', L + 'Hand', T, new THREE.Vector3(sx * .8, -.1, -.6), g.w);
       }
     }
+    // un rato después de llegar se sacude el magnesio: los antebrazos giran rápido y corto (las dos manos)
+    if (g && !quieto) { const t0 = g.tipo === 'festejo' ? g.despues - .6 : g.t - 3.2; if (t0 > 0 && t0 < RESPIRA.sacude[1]) { const k = Math.sin(t0 / RESPIRA.sacude[1] * Math.PI), q = .22 * k * Math.sin(t0 * Math.PI * 2 * 7);
+      for (const L of ['Left', 'Right']) { this._girarHueso(a, L + 'ForeArm', _pa.set(1, 0, 0), -.25 * k); this._girarHueso(a, L + 'Hand', _pa.set(0, 0, 1), q); } } }
     const lento = (t, hz, n) => (quieto ? 0 : Math.sin(Math.max(0, t) * Math.PI * 2 * hz) * Math.max(0, Math.min(1, t / .3)) * Math.max(0, 1 - t / n));
     if (g?.tipo === 'festejo') {
       if (g.w > 0) { for (const k of ['Spine1', 'Spine2']) this._girarHueso(a, k, _pa.set(1, 0, 0), -.035 * g.w); this._girarHueso(a, 'Head', _pa.set(1, 0, 0), -.1 * g.w); }
