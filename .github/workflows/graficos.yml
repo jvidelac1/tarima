@@ -62,7 +62,7 @@ permissions:
 
 env:
   # corrida de pesistas.yml con los modelos del plantel que se fotografían (no están en el repo mientras se iteran)
-  PESISTAS_RUN: '43960909195'
+  PESISTAS_RUN: '43984321846'
   # plaza del juego y terna que se fotografía: el pesista en escena es el primero de la terna (plaza ventura)
   TERNA: 'ilarraz,jastrev,kordan'
 
