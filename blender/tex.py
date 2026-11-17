@@ -484,6 +484,8 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     H=skinH*(1-cloth)+lipH+(thick+H)*edge+hairH+chalkH+dp*.00013+anatH*am
     del skinH,lipH,hairH,chalkH
     nrm=normal_from_height(H,T.su,T.sv,T.ok)
+    if anatB is not None and 'nipL' in LM:     # racimo de la punta del pecho: su UV está deformado (texeles de décimas de mm) y cualquier pendiente del mapa de alturas sale ahí con otra escala; la normal queda la de la malla
+        gf=np.clip(np.maximum(T.g(LM['nipL'],.034*K),T.g(LM['nipR'],.034*K) if 'nipR' in LM else 0)*1.8,0,1)[:,:,None]; nrm=nrm*(1-gf)+np.array([.5,.5,1.],f32)*gf
     cavA=np.clip(1+anatC*am*(115/K),.70,1.05) if anatB is None else np.clip(1+anatC*am*(70/K),.84,1.04)     # anatómico: el surco ya está en la malla y en el normal; pintado fuerte se leía como una línea de tinta
     if anatB is not None: cavA=cavA*np.clip(1+anatB*am*(42/K),.80,1.05)
     del anatC                              # los surcos entre grupos musculares oscurecen (son anchos: el pasa-altos de 3 px no los ve)
