@@ -323,8 +323,22 @@ export const BARRA = {
   esfuerzo: { desdeI: 9500, umbral: 100, toques: 3, ms: 3000, premio: 300 },
   tipico: { sesgo: 30, sd: 105, despiste: 40, esfuerzo: 950 },
 };
-/** Huella de las reglas de 'b' (BARRA, UNO y los cuerpos): va en la cabecera de los registros de 'b' y replay.js la exige. */
-export const HUELLA_B = huella(canonico({ BARRA, UNO, CUERPOS_U, CUERPO_NEUTRO }));
+/**
+ * Fácil, más amigable (17-nov, pedido del dueño: «mejoraría un poco el gameplay para que sea más fácil, más amigable»). Solo
+ * el nivel Fácil; Medio y Difícil no leen nada de esto (reglasB) y sus huellas no cambian. Tres palancas, medidas con
+ * tools/barra_bots.mjs (HANDOFF.md, «Pulido del 17 de noviembre»):
+ *   tVerde       el verde de Fácil, más ancho donde juega un jugador nuevo (aperturas y pesos medios: ±200 ms hasta el 90 %
+ *                y ±150 al 95 %, antes ±170 y ±125); desde el 100 % queda como estaba (el techo lo sigue poniendo el verde)
+ *   lentoDesde, pasadaLenta  el que duda no espera tanto: el puntero se pone lento a los 4 s sin tocar (antes 8) y va
+ *                más despacio (1,9 s de punta a punta, antes 1,7). El que toca en las primeras pasadas no nota nada
+ *   tAmarillo    menos «LEJOS» con esos mismos pesos: el amarillo suma ±260 ms hasta el 90 % y ±210 al 95 % (antes ±220 y
+ *                ±180); desde el 100 %, como estaba
+ * (Probado y descartado: abaratar el amarillo de 600 a 500 de energía. Subía los válidos del novato al 100 % por encima de
+ * la meta de 30 a 70 % de barra_bots: el techo dejaba de ser una moneda al aire.)
+ */
+const FACIL_17 = { version: '1.2', tVerde: [200, 150, 75, 30, 0], tAmarillo: [260, 210, 140, 150, 160], lentoDesde: 4000, pasadaLenta: 1900 };
+/** Huella de las reglas de 'b' (BARRA, lo que cambia Fácil, UNO y los cuerpos): va en la cabecera de los registros de 'b' y replay.js la exige. */
+export const HUELLA_B = huella(canonico({ BARRA, facil: FACIL_17, UNO, CUERPOS_U, CUERPO_NEUTRO }));
 /**
  * Niveles de dificultad de la barrita (pedido del dueño del 13-nov: «si es un poco más difícil, que requiera un poco más de
  * interacción»). Fácil es BARRA tal cual (su huella es HUELLA_B). Medio y Difícil cambian solo esto:
@@ -356,11 +370,13 @@ export const NIVELES_B = {
   },
 };
 const FACIL_B = { barritas: { s: [0], c: [0, 1] }, verde: 1000, amarillo: 1000, costoExtra: BARRA.costo, apertura: 900 };
+// las tablas del ancho de BARRA quedan fijas para Medio y Difícil (FACIL_17 solo entra en Fácil)
+const BASE_B = { tVerde: BARRA.tVerde, tAmarillo: BARRA.tAmarillo };
 const CACHE_B = {};
 /** Reglas de la barrita del nivel `dif` ('facil' si falta): BARRA con lo que cambia el nivel. */
 export function reglasB(dif) {
   const d = NIVELES_B[dif] ? dif : 'facil';
-  return CACHE_B[d] ||= Object.freeze({ ...BARRA, ...FACIL_B, ...(NIVELES_B[d] || {}), dif: d });
+  return CACHE_B[d] ||= Object.freeze({ ...BARRA, ...FACIL_B, ...BASE_B, ...(NIVELES_B[d] || FACIL_17), dif: d });
 }
 /** Huella de las reglas de 'b' de cada nivel: Fácil, la de siempre; Medio y Difícil, con lo que cambian. */
 export const HUELLAS_B = { facil: HUELLA_B, medio: huella(canonico({ BARRA, UNO, CUERPOS_U, CUERPO_NEUTRO, nivel: NIVELES_B.medio, extra: PESISTAS_B2 })), dificil: huella(canonico({ BARRA, UNO, CUERPOS_U, CUERPO_NEUTRO, nivel: NIVELES_B.dificil, extra: PESISTAS_B2 })) };
@@ -394,15 +410,15 @@ export function sumarFatiga(fat, lev, f) {
   return fat;
 }
 /** Posición del puntero (milésimas de la barrita, 0 a 1000) a `e` ms de que arrancó: va y vuelve, empieza a la izquierda. */
-export function posBarra(e, R = BARRA) {
+export function posBarra(e, R = reglasB()) {
   if (e <= 0) return 0;
   const L = R.lentoDesde, x = e <= L ? idiv(e * 1000, R.pasada) : idiv(L * 1000, R.pasada) + idiv((e - L) * 1000, R.pasadaLenta), u = x % 2000;
   return u <= 1000 ? u : 2000 - u;
 }
 /** Medio ancho del verde y del amarillo en ms de puntero de Fácil (antes de pasarlo a la barrita). */
-function anchosMs(I, k, primera) {
+function anchosMs(I, k, primera, R = BARRA) {
   const T = BARRA.tI, n = T.length, tab = col => (I <= T[0] ? col[0] : I >= T[n - 1] ? col[n - 1] : (() => { let j = 0; while (I > T[j + 1]) j++; return lerpi(I, T[j], T[j + 1], col[j], col[j + 1]); })());
-  let v = idiv(tab(BARRA.tVerde) * k, 1000), a = v + idiv(tab(BARRA.tAmarillo) * k, 1000);
+  let v = idiv(tab(R.tVerde || BARRA.tVerde) * k, 1000), a = v + idiv(tab(R.tAmarillo || BARRA.tAmarillo) * k, 1000);
   if (primera) { v = idiv(v * BARRA.primera, 1000); a = idiv(a * BARRA.primera, 1000); }
   return { v, a };
 }
@@ -413,8 +429,8 @@ function factorBarra(b, i, env) { return i === 0 ? b.tiron : i === 1 ? idiv(b.en
  * amarillo en milésimas de la barrita alrededor del centro (500); `vMs` y `aMs`, lo mismo en ms del puntero de las reglas `R`.
  * El ancho en la barrita es el de Fácil por R.verde y R.amarillo: con un puntero más rápido, el mismo ancho dura menos.
  */
-export function zonasBarra(I, cuerpo, i, primera = false, env = 'split', R = BARRA) {
-  const b = (cuerpo && cuerpo.barra) || BARRA.neutro, { v: vMs, a: aMs } = anchosMs(I, factorBarra(b, i, env), primera);
+export function zonasBarra(I, cuerpo, i, primera = false, env = 'split', R = reglasB()) {
+  const b = (cuerpo && cuerpo.barra) || BARRA.neutro, { v: vMs, a: aMs } = anchosMs(I, factorBarra(b, i, env), primera, R);
   let v = Math.min(BARRA.topeVerde, idiv(vMs * 1000, BARRA.pasada)), a = Math.min(BARRA.topeAmarillo, Math.max(v + 10, idiv(aMs * 1000, BARRA.pasada)));
   if (R.verde !== undefined && R.verde !== 1000) v = idiv(v * R.verde, 1000);
   if (R.amarillo !== undefined && R.amarillo !== 1000) a = Math.max(v + 10, idiv(a * R.amarillo, 1000));

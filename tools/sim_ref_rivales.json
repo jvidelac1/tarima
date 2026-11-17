@@ -7,7 +7,7 @@
    "nivel": "amistoso",
    "persona": 0,
    "ctl": "b",
-   "tabla": "marangi:168+196=364#1 ventura:163+196=359#2 brenner:165+187=352#3"
+   "tabla": "marangi:168+196=364#1 brenner:164+193=357#2 ventura:165+189=354#3"
   },
   {
    "semilla": 14000006,
@@ -28,7 +28,7 @@
    "nivel": "amistoso",
    "persona": 0,
    "ctl": "b",
-   "tabla": "marangi:169+195=364#1 ventura:162+199=361#2 brenner:163+190=353#3"
+   "tabla": "ventura:162+206=368#1 marangi:169+195=364#2 brenner:163+190=353#3"
   },
   {
    "semilla": 35000015,
@@ -49,7 +49,7 @@
    "nivel": "amistoso",
    "persona": 0,
    "ctl": "b",
-   "tabla": "marangi:168+206=374#1 ventura:162+204=366#2 brenner:159+193=352#3"
+   "tabla": "marangi:171+207=378#1 ventura:164+206=370#2 brenner:159+193=352#3"
   },
   {
    "semilla": 56000024,
