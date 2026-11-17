@@ -459,7 +459,7 @@ export class Look {
     if (A.crowd) { const u = A.crowd.material.uniforms; u.uGain.value = .095; if (u.uRebote) u.uRebote.value.set(.16, .11, .065); }
     A.group.traverse(o => {
       const m = o.material; if (!m || Array.isArray(m) || !m.isMeshBasicMaterial) return;
-      if (o.geometry?.type === 'CylinderGeometry' && o.geometry.parameters.radiusTop > 30) k(m, o.geometry.parameters.height > 5 ? 1.25 : .6);      // pabellón y cinta de luz
+      if (o.geometry?.type === 'CylinderGeometry' && o.geometry.parameters.radiusTop > 30) k(m, o.geometry.parameters.height > 5 ? .16 : .35);      // pabellón y cinta de luz: casi a oscuras. Los palcos y accesos iluminados del pabellón, vistos entre las cabezas de la tribuna, eran los «maniquíes beige» (bloques claros detrás del público)
       else if (o.geometry?.type === 'PlaneGeometry' && o.geometry.parameters.width === 90) m.color.set('#090a0d');                                 // piso de sala
       else if (o.geometry?.type === 'PlaneGeometry' && o.geometry.parameters.width === 17) { const t = telon(); this.texturas.push(t); m.map?.dispose(); m.map = t; m.color.setRGB(1.15, 1.15, 1.15); m.needsUpdate = true; }                                               // telón
     });
@@ -586,9 +586,6 @@ export class Look {
         for (let i = 0; i < 90; i++) { g.strokeStyle = `rgba(${r() < .5 ? '200,200,205' : '0,0,0'},${.05 + r() * .1})`; g.lineWidth = 1 + r() * 3; const x = r() * S, y = r() * S, a = r() * 6.283, L = (.2 + r() * .9) * m; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); g.stroke(); } }), t = canvasTexture(cv, { aniso: 4 }); this.texturas.push(t);
       const o = new THREE.Mesh(new THREE.PlaneGeometry(13, 13), new THREE.MeshStandardMaterial({ name: 'calco marcación', map: t, transparent: true, depthWrite: false, roughness: .8, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
       o.rotation.x = -Math.PI / 2; o.position.set(0, Y0 + .002, 0); o.receiveShadow = true; o.renderOrder = 1; P.add(o); (this.calcos ||= []).push(o); }
-    { const nt = canvasTexture(makeCanvas(128, 32, g => { const r = rng(404); for (let i = 0; i < 26; i++) { const x = 14 + r() * 100, y = 9 + r() * 14, rad = 8 + r() * 12, rg = g.createRadialGradient(x, y, 0, x, y, rad); rg.addColorStop(0, `rgba(255,255,255,${.1 + r() * .14})`); rg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = rg; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); } }), { aniso: 1 }); this.texturas.push(nt);      // nube baja y ancha de magnesio en suspensión sobre la tarima (dos velos, a contraluz); solo con post
-      const sm2 = new THREE.SpriteMaterial({ name: 'magnesio en suspensión', map: nt, color: new THREE.Color(.1, .095, .085), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
-      for (const [z, y, w] of [[-1.5, .55, 5.2], [-.5, .42, 4.4]]) { const sp = new THREE.Sprite(sm2); sp.position.set(0, y, z); sp.scale.set(w, w * .26, 1); sp.renderOrder = 7; P.add(sp); } }
     // la pantalla tiñe el piso delante suyo (aditivo, solo con post: va con las calcomanías)
     { const t = canvasTexture(brilloPiso(), { aniso: 2 }); this.texturas.push(t);
       const o = new THREE.Mesh(new THREE.PlaneGeometry(7.8, 3.0), new THREE.MeshBasicMaterial({ name: 'brillo de la pantalla en el piso', map: t, color: new THREE.Color(.5, .5, .5), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
@@ -693,12 +690,12 @@ export class Look {
       const g = new THREE.Group(); g.position.copy(l.position); g.lookAt(hasta); g.rotateX(-Math.PI / 2);
       const m = new THREE.Mesh(geo, mat); m.scale.set(rad, len, rad); m.renderOrder = 5; m.frustumCulled = false; g.add(m); this.group.add(g); this.rayos.push({ mat, base: fuerza });
     };
-    rayo(L.rimA, .03, .26); rayo(L.rimB, .026, .26);      // angostos y a la tarima      // (el cono de la clave y los del truss del frente lavaban de beige las tribunas: fuera)
+    rayo(L.rimA, .018, .26); rayo(L.rimB, .016, .26);      // angostos y a la tarima      // (el cono de la clave y los del truss del frente lavaban de beige las tribunas: fuera)
     // conos anchos y suaves desde el puente de focos y las torres hasta la tarima (focos de mentira: solo el volumen de bruma)
     const foco = (p, t, color, ang) => ({ position: new THREE.Vector3(...p), target: { position: new THREE.Vector3(...t) }, color: new THREE.Color(color), angle: ang });
-    for (const x of [-3.0, -1.0, 1.0, 3.0]) rayo(foco([x, 3.56, -4.86], [x * .3, 0, .2], x < 0 ? '#ffd0a0' : '#dfe8ff', .1), .024, 1);
-    for (const s2 of [-1, 1]) rayo(foco([s2 * 7.22, 4.6, -4.4], [s2 * .6, 0, 0], s2 < 0 ? '#ffb877' : '#cfe0ff', .085), .024, 1);
-    for (const s2 of [-1, 1]) rayo(foco([s2 * 4.02, 3.0, -4.4], [-s2 * .9, 0, .9], s2 < 0 ? '#ffb877' : '#cfe0ff', .1), .03, 1);      // haces de las torres de contraluz, cruzados detrás del pesista      // haces angostos y definidos: anchos eran un banco de niebla beige sobre la tribuna      // solo los dos contraluces: los conos de la clave y del pelo casi no se veían y eran pantalla entera de mezcla
+    for (const x of [-3.0, -1.0, 1.0, 3.0]) rayo(foco([x, 3.56, -4.86], [x * .3, 0, .2], x < 0 ? '#ffd0a0' : '#dfe8ff', .1), .014, 1);
+    for (const s2 of [-1, 1]) rayo(foco([s2 * 7.22, 4.6, -4.4], [s2 * .6, 0, 0], s2 < 0 ? '#ffb877' : '#cfe0ff', .085), .014, 1);
+    for (const s2 of [-1, 1]) rayo(foco([s2 * 4.02, 3.0, -4.4], [-s2 * .9, 0, .9], s2 < 0 ? '#ffb877' : '#cfe0ff', .1), .018, 1);      // haces de las torres de contraluz, cruzados detrás del pesista      // haces angostos y definidos: anchos eran un banco de niebla beige sobre la tribuna      // solo los dos contraluces: los conos de la clave y del pelo casi no se veían y eran pantalla entera de mezcla
     this.group.visible = false;
   }
 
