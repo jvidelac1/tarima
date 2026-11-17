@@ -459,7 +459,7 @@ export class Look {
     if (A.crowd) { const u = A.crowd.material.uniforms; u.uGain.value = .095; if (u.uRebote) u.uRebote.value.set(.16, .11, .065); }
     A.group.traverse(o => {
       const m = o.material; if (!m || Array.isArray(m) || !m.isMeshBasicMaterial) return;
-      if (o.geometry?.type === 'CylinderGeometry' && o.geometry.parameters.radiusTop > 30) k(m, o.geometry.parameters.height > 5 ? .16 : .35);      // pabellón y cinta de luz: casi a oscuras. Los palcos y accesos iluminados del pabellón, vistos entre las cabezas de la tribuna, eran los «maniquíes beige» (bloques claros detrás del público)
+      if (o.geometry?.type === 'CylinderGeometry' && o.geometry.parameters.radiusTop > 30) k(m, o.geometry.parameters.height > 5 ? .05 : .2);      // pabellón y cinta de luz: casi a oscuras. Los palcos y accesos iluminados del pabellón, vistos entre las cabezas de la tribuna, eran los «maniquíes beige» (bloques claros detrás del público)
       else if (o.geometry?.type === 'PlaneGeometry' && o.geometry.parameters.width === 90) m.color.set('#090a0d');                                 // piso de sala
       else if (o.geometry?.type === 'PlaneGeometry' && o.geometry.parameters.width === 17) { const t = telon(); this.texturas.push(t); m.map?.dispose(); m.map = t; m.color.setRGB(1.15, 1.15, 1.15); m.needsUpdate = true; }                                               // telón
     });
