@@ -926,7 +926,8 @@ export class Escena {
    * Cajas del pesista y de la barra en la página (px CSS), proyectadas con la cámara de este cuadro. Para las pruebas que
    * miden cuánto tapa la interfaz (check_barra, check_telefono; tools/tapa.mjs). Cuerpo: todos los huesos menos `Bar`, con 6 %
    * de la estatura de más a cada lado (la carne alrededor del hueso); `torso`: de la cabeza a la cadera; `cabeza`: un cuadrado
-   * centrado entre la base del cráneo y la coronilla, 1,24 veces esa distancia de lado (cara, pelo y orejas). Barra: las
+   * centrado entre la base del cráneo (hueso Head) y la coronilla (21 cm más arriba a lo largo del hueso, por estatura), 1,24
+   * veces esa distancia de lado (cara, pelo y orejas). Barra: las
    * puntas y los discos; `alta`: la barra está arriba de la cabeza. Desde los ojos (primera persona: la cámara a menos de
    * 60 cm de la cabeza) no hay cabeza que tapar: `ojos` y, si está prendido, la caja del `recuadro` (la vista de afuera).
    * Lo que queda detrás de la cámara va en null.
@@ -940,12 +941,12 @@ export class Escena {
     a.root.updateMatrixWorld(true); cam.updateMatrixWorld();
     const nombre = b => b.name.replace(/^mixamorig:?/, ''), huesos = a.bones.filter(b => b !== a.barBone && !/_end$/i.test(nombre(b)) || nombre(b) === 'HeadTop_End');
     const hueso = n => huesos.find(b => nombre(b) === n), yBar = this.barY ?? 1, zBar = this.barZ ?? 0;
-    const hC = hueso('Head'), hT = hueso('HeadTop_End'), yC = hC ? hC.getWorldPosition(v).y : 9, ojos = !!hC && cam.getWorldPosition(v2).distanceTo(hC.getWorldPosition(v)) < .6;
+    const hC = hueso('Head'), yC = hC ? hC.getWorldPosition(v).y : 9, ojos = !!hC && cam.getWorldPosition(v2).distanceTo(hC.getWorldPosition(v)) < .6;
     const cuerpo = caja(huesos.map(b => px(b.getWorldPosition(v)))), m = cuerpo ? (cuerpo.b - cuerpo.t) * .06 : 0;
     const T = new Set(['Head', 'HeadTop_End', 'Neck', 'Spine', 'Spine1', 'Spine2', 'Hips', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm']);
     const torso = caja(huesos.filter(b => T.has(nombre(b))).map(b => px(b.getWorldPosition(v))));
     let cabeza = null;
-    if (hC && hT && !ojos) { const p0 = px(hC.getWorldPosition(v)), p1 = px(hT.getWorldPosition(v)); if (caja([p0, p1])) { const h = Math.max(3, Math.hypot(p1.x - p0.x, p1.y - p0.y) * .62), cx = (p0.x + p1.x) / 2, cy = (p0.y + p1.y) / 2; cabeza = { l: cx - h, r: cx + h, t: cy - h, b: cy + h }; } }
+    if (hC && !ojos) { const k = (this.P?.h || 1.7) / 1.7, p0 = px(hC.getWorldPosition(v)), p1 = px(v.setFromMatrixColumn(hC.matrixWorld, 1).normalize().multiplyScalar(.21 * k).add(hC.getWorldPosition(v2))); if (caja([p0, p1])) { const h = Math.max(3, Math.hypot(p1.x - p0.x, p1.y - p0.y) * .62), cx = (p0.x + p1.x) / 2, cy = (p0.y + p1.y) / 2; cabeza = { l: cx - h, r: cx + h, t: cy - h, b: cy + h }; } }
     const barra = caja([-1.1, 1.1].flatMap(x => [-.225, .225].map(d => px(v.set(x, yBar + d, zBar)))));
     let recuadro = null;
     if (ojos && this._recuadroOn?.()) { const fw = W < 900 ? RECUADRO.angosto : RECUADRO.ancho, fh = Math.min(.42, fw * W / H * RECUADRO.alto), fx = 1 - RECUADRO.x - fw; recuadro = { l: R.left + fx * W, r: R.left + (fx + fw) * W, t: R.top + RECUADRO.y * H, b: R.top + (RECUADRO.y + fh) * H }; }

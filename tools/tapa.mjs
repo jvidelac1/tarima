@@ -47,7 +47,7 @@ export function medirEnPagina() {
   const C = cajas.cuerpo || cajas.barra || { l: 0, t: 0, r: 0, b: 0 }, enPantalla = C.r > 0 && C.l < vw && C.b > 0 && C.t < vh, red = c => (c ? { l: Math.round(c.l), t: Math.round(c.t), r: Math.round(c.r), b: Math.round(c.b) } : null);
   const v = document.getElementById('veredicto');
   return { cuerpo: parte(cajas.cuerpo, ui), torso: parte(cajas.torso, ui), barra: parte(cajas.barra, ui), cabeza: parte(cajas.cabeza, tenue), barraT: parte(cajas.barra, tenue), recuadro: cajas.recuadro ? parte(cajas.recuadro, tenue) : null,
-    alta: !!cajas.alta, ojos: !!cajas.ojos, textos, enPantalla, caja: red(C), cajaCabeza: red(cajas.cabeza), cajaBarra: red(cajas.barra), veredicto: v && !v.hidden ? v.className : null };
+    alta: !!cajas.alta, ojos: !!cajas.ojos, bajo: document.documentElement.matches('.horiz.bajo'), textos, enPantalla, caja: red(C), cajaCabeza: red(cajas.cabeza), cajaBarra: red(cajas.barra), veredicto: v && !v.hidden ? v.className : null };
 }
 
 /** Fila de la tabla: «momento: cuerpo 12 % (barrita 9%, zona 3%) · torso 0 % · cabeza 0 % · barra 4 % (arriba) · 7 textos». */
@@ -69,16 +69,18 @@ export function revisar(momento, x) {
   if (!x || x.sinPesista) return null;
   const base = momento.replace(/@.*$/, ''), P = [];
   if (!x.ojos) {
-    if (['quieta', 'corre', 'pega', 'levanta', 'arriba'].includes(base) && x.cuerpo.pct > 15) P.push(`${momento}: la interfaz tapa el ${x.cuerpo.pct} % del pesista (meta ≤ 15 %): ${x.cuerpo.quien.join(', ')}`);
+    if (['quieta', 'corre', 'pega', 'levanta', 'arriba', 'fija'].includes(base) && x.cuerpo.pct > 15) P.push(`${momento}: la interfaz tapa el ${x.cuerpo.pct} % del pesista (meta ≤ 15 %): ${x.cuerpo.quien.join(', ')}`);
     // turno de un rival (13-nov): el tablero y el botón «Saltar» no tapan al rival que levanta
     if (base === 'rival' && x.cuerpo.pct > 15) P.push(`rival: la interfaz tapa el ${x.cuerpo.pct} % del rival (meta ≤ 15 %): ${x.cuerpo.quien.join(', ')}`);
     // LIF-52: la explicación de primera vez no tapa al pesista (meta: nada; tope 5 % del cuerpo, contando solo ese cartel)
     if (base.startsWith('aprende')) { const q = x.cuerpo.quien.find(z => z.startsWith('aprende ')), n = q ? +q.split(' ')[1].replace('%', '') : 0; if (n > 5) P.push(`${momento}: la explicación de primera vez tapa el ${n} % del pesista (tope 5 %)`); }
     if (base === 'llamado' && x.torso.pct > 20) P.push(`llamado: el panel tapa el ${x.torso.pct} % del torso y la cara del pesista (meta ≤ 20 %): ${x.torso.quien.join(', ')}`);
   }
-  if (!FONDO.has(base) && process.env.CABEZA_INFORMA !== '1') {
+  // elegir kilos con el teléfono acostado (340 a 390 px de alto): el panel va a lo ancho, no hay dónde dejar al pesista
+  const sinLugar = x.bajo && ['apertura', 'intervalo'].includes(base);
+  if (!FONDO.has(base) && !sinLugar && process.env.CABEZA_INFORMA !== '1') {
     if (x.cabeza && x.cabeza.pct > TOPE_CABEZA) P.push(`${momento}: un cartel tapa el ${x.cabeza.pct} % de la CABEZA del pesista (tope ${TOPE_CABEZA} %): ${x.cabeza.quien.join(', ')}`);
-    if (x.alta && x.barraT && x.barraT.pct > TOPE_BARRA) P.push(`${momento}: un cartel tapa el ${x.barraT.pct} % de la BARRA arriba (tope ${TOPE_BARRA} %): ${x.barraT.quien.join(', ')}`);
+    if (x.alta && !x.ojos && x.barraT && x.barraT.pct > TOPE_BARRA) P.push(`${momento}: un cartel tapa el ${x.barraT.pct} % de la BARRA arriba (tope ${TOPE_BARRA} %): ${x.barraT.quien.join(', ')}`);
     if (x.recuadro && x.recuadro.pct > TOPE_CABEZA) P.push(`${momento}: un cartel tapa el ${x.recuadro.pct} % del recuadro de la primera persona (tope ${TOPE_CABEZA} %): ${x.recuadro.quien.join(', ')}`);
   }
   return P.length ? P.join(' | ') : null;
@@ -96,7 +98,8 @@ const SUBIENDO = ['tiron', 'vuelo', 'pelea', 'traba', 'empuje', 'flexion', 'fija
 /**
  * Los momentos de un intento que las pruebas no medían (17-nov). Devuelve una función para llamar en cada vuelta con el
  * estado (`estadoEnPagina`); mide cada momento una vez (`tapa(momento)` anota en `medidos` y revisa) y saca una captura:
- *  - `prepara`: intento propio antes de la barrita (sin señal) · `arriba`: intento propio con la barra arriba de la cabeza;
+ *  - `prepara`: intento propio antes de la barrita (sin señal) · `arriba`: intento propio con la barra arriba de la cabeza
+ *    (la primera vez: en la sentadilla) · `fija`: de pie con la barra arriba (la fijación);
  *  - `veredicto` (el cartel grande del resultado), `veredicto_chico` (cuando vuelve a su lugar), con `_mal` si no vale o
  *    cayó y `_rival` si es de un rival · `rival_arriba`: un rival con la barra arriba;
  *  - `repeticion`, `repeticion_rival`, `carga`, `desplazado`: los otros carteles que usan el veredicto.
@@ -111,6 +114,7 @@ export function seguidor({ page, tapa, foto, medidos }) {
     if (I && I.propio && s.modo !== 'panel') {
       if (!I.senal && !s.alta && !SUBIENDO.includes(I.fase) && s.pantalla !== 'decision') await una('prepara' + suf);
       if (s.alta) await una('arriba' + suf);
+      if (s.alta && (I.fase === 'fijacion' || I.senal?.clave === 'aguanta')) await una('fija' + suf);      // de pie con la barra arriba
     }
     if (s.pantalla === 'rival' && s.alta) await una('rival_arriba');
     if (s.ver && s.pantalla === 'decision') {

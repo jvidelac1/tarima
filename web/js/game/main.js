@@ -134,6 +134,7 @@ function tic(pintar, tRaf = null) {
   const c0 = performance.now(), now = reloj.ahora(), dt = Math.min(.25, Math.max(0, (now - ultimo) / 1000)); ultimo = now;
   for (let i = pend.length - 1; i >= 0; i--) if (pend[i].t <= now) pend.splice(i, 1)[0].res();
   aprendeUI?.tic(now);
+  if (now - margenT > 250 || now < margenT) { margenT = now; margenVertical(); }
   // el botón de pausa (para el dedo; con teclado es Esc) no se muestra encima de un panel grande: taparía su título
   { const ver = puedePausar() && !E.sobre && !$('capa').querySelector('.panel:not(.abajo)'); for (const b of [$('pausa'), $('ayudab'), $('sonidob')]) if (b && b.hidden === ver) b.hidden = !ver; }
   try { enCuadro?.(now, dt); } catch (e) { E.errores.push(String(e.stack || e)); console.error(e); enCuadro = null; }
@@ -935,15 +936,31 @@ function orientacion() {
   if (antes) ev('orientacion_cambio', { orientacion: o, antes, pantalla: E.pantalla });
 }
 /**
- * Teléfono parado (html.vert): el lienzo ocupa toda la pantalla, pero abajo van la barrita y el botón y arriba los botones
- * chicos y el tablero. La cámara (cameras.js, setInsets) encuadra al pesista y la barra en el rectángulo que queda libre.
- * Las medidas salen de las variables de juego.css (--pie-v y --techo-v, en px), así un cambio de diseño no se desfasa.
+ * El techo y el pie de la cámara: el encuadre automático (cameras.js, setInsets) pone al pesista y la barra en el rectángulo
+ * que queda libre, así ningún cartel les pisa la cabeza ni la barra cuando sube (17-nov: «hay casos donde los carteles le
+ * tapan la cabeza al pesista»).
+ *  - Teléfono parado (html.vert): abajo van la barrita y el botón (--pie-v) y arriba los botones chicos (--techo-v); las
+ *    medidas salen de juego.css, así un cambio de diseño no se desfasa.
+ *  - En cualquier pantalla: lo que cuelga del borde de arriba y entra en la franja central (FRANJA: del 38 % al 62 % del
+ *    ancho, donde van el pesista y la barra) baja el techo hasta su borde de abajo: el tablero parado (ocupa más de medio
+ *    ancho), los botones de sonido, pausa y ayuda arriba al centro (acostado y en la computadora), la energía.
+ * Se llama al girar y cuatro veces por segundo (tic): los carteles aparecen y se van con cada pantalla. Con la cámara
+ * congelada tras el intento (rig.fijo) los márgenes no cambian: el techo ya viene puesto desde antes del levantamiento.
  */
+const TECHO = ['tablero', 'pausa', 'sonidob', 'ayudab', 'margen', 'saltar'], FRANJA = [.38, .62];
+let margenT = 0;
 function margenVertical() {
-  if (!escena?.rig) return; const gl = $('gl'), H = gl?.clientHeight || 0;
-  if (!document.documentElement.classList.contains('vert') || !H) { escena.rig.setInsets({ t: 0, b: 0, l: 0, r: 0 }); return; }
-  const cs = getComputedStyle(document.documentElement), px = k => parseFloat(cs.getPropertyValue(k)) || 0;
-  escena.rig.setInsets({ t: Math.min(.25, px('--techo-v') / H), b: Math.min(.4, px('--pie-v') / H), l: 0, r: 0 });
+  if (!escena?.rig) return; const gl = $('gl'), H = gl?.clientHeight || 0, W = gl?.clientWidth || 0, h = document.documentElement.classList;
+  if (!H || !W || h.contains('rotado')) { escena.rig.setInsets({ t: 0, b: 0, l: 0, r: 0 }); return; }
+  let t = 0, b = 0;
+  if (h.contains('vert')) { const cs = getComputedStyle(document.documentElement), px = k => parseFloat(cs.getPropertyValue(k)) || 0; t = px('--techo-v') / H; b = Math.min(.4, px('--pie-v') / H); }
+  const R = gl.getBoundingClientRect();
+  for (const id of TECHO) {
+    const el = $(id); if (!el || el.hidden) continue; const r = el.getBoundingClientRect(); if (!r.width || !r.height) continue;
+    if (r.top - R.top > H * .2 || r.right < R.left + W * FRANJA[0] || r.left > R.left + W * FRANJA[1]) continue;      // no cuelga de arriba, o está a un costado
+    t = Math.max(t, (r.bottom - R.top + 6) / H);
+  }
+  escena.rig.setInsets({ t: Math.min(.36, t), b, l: 0, r: 0 });
 }
 function fijarDificultad(cfg) { E.dificultad = cfg.ctl === 'c' ? 'clasico' : cfg.ctl === 'b' ? cfg.dif : cfg.ctl; try { analitica?.propiedades({ dificultad: E.dificultad }); } catch { /* métricas */ } }
 function ctlInicial() { const q = params.get('ctl'); if (q === 'c' || q === 'f' || q === 'u' || q === 'b') return q; return guardado.get('tarima.ctl') === 'c' ? 'c' : 'b'; }
@@ -1121,8 +1138,8 @@ async function elegirApertura(p, lev, sugerida, html) {
     const arriba = html();
     const pn = capa.poner(`${idiomasHTML(true)}${arriba}<h2>${t(lev === 's' ? 'peso.titulo_s' : 'peso.titulo_c')}</h2>
       ${kilosHTML(kg, lo, hi, false, `<button class="ir grande" id="btn-confirmar">${t('peso.boton', { kg })}</button>`)}
-      <p>${t('peso.rango', { lo, hi })}${lev === 's' ? ' ' + t('peso.ayuda') : ''}</p>${tactil() ? '' : `<p class="chica">${t('peso.teclas5')}</p>`}`, arriba ? 'peso con-tabla' : 'peso');
-    if (!abierto) { bloquear(pn); abierto = true; }      // el bloqueo es al abrir, no en cada kilo
+      <p>${t('peso.rango', { lo, hi })}${lev === 's' ? ' ' + t('peso.ayuda') : ''}</p>${tactil() ? '' : `<p class="chica">${t('peso.teclas5')}</p>`}`, arriba ? 'peso con-tabla lado' : 'peso lado');
+    if (!abierto) { bloquear(pn); abierto = true; encuadrarLibre(); }      // el bloqueo es al abrir, no en cada kilo; el pesista, a la parte libre
     const b = await Promise.race([clic(pn, '.kg,#btn-confirmar'), new Promise(res => { E.repintar = () => res(null); })]);
     if (!b) continue;
     if (b.dataset.d) kg = masKilos(kg, +b.dataset.d, lo, hi); else break;
@@ -1159,13 +1176,20 @@ async function presentacion(p, cfg, errMedio, primera) {
  * centro de esa parte ({x, y} en fracción del lienzo) y la distancia del plano americano para que entre de las rodillas
  * para arriba (1,6 m de alto y 1 m de ancho) en esa parte.
  */
+/**
+ * El pesista a la parte del lienzo que dejan libre el panel y los carteles (encuadreLibre), con un movimiento suave. Lo usan
+ * el llamado, los paneles de elegir kilos (apertura y fin del arranque) y el aviso de que otro sale antes.
+ */
+function encuadrarLibre(suave = .7) { if (!escena?.activo) return; escena.primerPlano('medio', encuadreLibre(), suave); E.forzar = true; }
 function encuadreLibre() {
   const pn = $('capa').querySelector('.panel'), gl = $('gl'), c = { width: gl.clientWidth, height: gl.clientHeight }; if (!c.width || !c.height) return null;
   let x0 = 0, x1 = 1, y0 = 0, y1 = 1;
+  // sin panel, el cartel del veredicto (a la izquierda, a media altura) cuenta como un panel a ese costado
+  const ve = $('veredicto'); if (!pn && ve && !ve.hidden && ve.offsetWidth && !document.documentElement.classList.contains('vert') && ve.offsetLeft / c.width < .3) x0 = Math.min(.5, (ve.offsetLeft + ve.offsetWidth) / c.width);
   if (pn) {
     // con offsets y no con getBoundingClientRect: con el contenido girado (teléfono en vertical) las cajas salen rotadas
     const izq = pn.offsetLeft / c.width, arr = pn.offsetTop / c.height;
-    if (izq > .4) x1 = izq; else if (arr > .25) y1 = arr;
+    if (izq > .28) x1 = izq; else if (arr > .25) y1 = arr;
   }
   // el tablero de la final (arriba a la izquierda): el pesista se encuadra debajo, no detrás
   const tb = $('tablero'); if (tb && !tb.hidden && tb.offsetHeight) { const b = (tb.offsetTop + tb.offsetHeight) / c.height + .015; if (b < .45 && tb.offsetLeft / c.width < (x0 + x1) / 2) y0 = Math.max(y0, b); }
@@ -1330,7 +1354,7 @@ async function llamadoPropio(p, L) {
   const corre = p.cfg.ctl === 'c', uno = esU(p.cfg.ctl); let t0 = reloj.ahora(), ctx = null, env, kgFinal = L.kg, desplazado = false, corrida = null;
   E.rivalesSeguidos = 0; E.rivalesEnteros = 0;
   const elegido = new Promise(res => panelLlamado(p, L, t0, res, corre)); if (uno) relojLibre(); else setReloj(L.reloj);
-  escena.primerPlano('medio', encuadreLibre(), .7); E.forzar = true;      // plano americano del pesista en la parte que el panel deja libre, con un movimiento suave
+  encuadrarLibre();      // plano americano del pesista en la parte que el panel deja libre, con un movimiento suave
   const vence = new Promise(res => { if (corre) enCuadro = ahora => { setReloj(L.reloj - (ahora - t0)); if (ahora - t0 >= L.reloj) { enCuadro = null; res(null); } }; });
   const S = await Promise.race([elegido, vence]); enCuadro = null; capa.quitar(); E.antes = null; soltarFoco();
   if (!corre) t0 = reloj.ahora();
@@ -1338,7 +1362,7 @@ async function llamadoPropio(p, L) {
   if (S) {
     env = L.lev === 'c' ? S.env : undefined;
     if (S.kg !== L.kg && !p.cambioValido(ms, S.kg)) { desplazado = p.cambio(ms, S.kg).desplazado; if (!desplazado) kgFinal = S.kg; }
-    if (desplazado) { visita('desplazado'); etiqueta(null); veredicto(t('desplazado.titulo', { quien: quien(a), kg: S.kg }), t(uno ? 'desplazado.texto_u' : 'desplazado.texto')); await saltable(1800); veredicto(''); return; }
+    if (desplazado) { visita('desplazado'); etiqueta(null); veredicto(t('desplazado.titulo', { quien: quien(a), kg: S.kg }), t(uno ? 'desplazado.texto_u' : 'desplazado.texto')); encuadrarLibre(); await saltable(1800); veredicto(''); return; }
     escena.setCarga(kgFinal, L.lev); zocalo(a, { ...L, kg: kgFinal }); etiqueta(p.llamado.et);
     ctx = p.contexto(env); asegurarCalidad(); visita('intento');
     // el primer dos tiempos en Un toque se explica sobre la marcha: con la barra en los hombros el reloj espera el toque de ¡FLEXIONA!

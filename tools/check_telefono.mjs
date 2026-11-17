@@ -266,7 +266,7 @@ async function correr(C) {
       const sg = I && I.propio ? I.senal : null;
       if (s.panel && ['inicio', 'presentacion', 'apertura', 'intervalo'].includes(s.pantalla)) await tapa(s.pantalla);
       if (s.panel && s.pantalla === 'llamado') await tapa('llamado'); else if (sg && sg.tipo === 'barra') { await av(500); await tapa('corre' + suf); } else if (sg && sg.tipo === 'espera' && sg.barra) await tapa('quieta' + suf);
-      else if (s.pantalla === 'decision') await av(1200); else if (s.pantalla === 'rival') { await av(900); await tapa('rival'); }
+      else if (s.pantalla === 'decision') { await av(1200); await sigue(await J(estadoEnPagina)); } else if (s.pantalla === 'rival') { await av(900); await tapa('rival'); }
       if (I && I.propio && !R.zona) mal(`en el intento («${I.senal?.verbo || I.fase}») no se ve el botón táctil`);
       await foto(clave.replace(/\|+/g, '_'));
     }
@@ -309,6 +309,7 @@ async function correr(C) {
     }
     if (s.panel && !s.sobre) {
       const hay = await J(() => !!document.querySelector('#capa .panel button.ir:not(:disabled)'));
+      if (hay && s.pantalla === 'llamado' && C.falla === nIntentos + 1) for (let i = 0; i < 6; i++) await pulsa('#kg-mas');      // el intento que no sale: 6 kg de más y tocado en el rojo
       if (hay) { const ok = await pulsa('#capa .panel button.ir'); if (s.pantalla === 'llamado' && ok) nIntentos++; await av(ok ? 50 : 200); continue; }
     }
     await av(['rival', 'decision', 'repeticion', 'repeticion_rival'].includes(s.pantalla) ? 450 : 200);

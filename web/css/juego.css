@@ -304,6 +304,8 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
   /* el panel del llamado va al costado: el pesista queda a la vista */
   /* el llamado va abajo y nunca debajo de los botones de sonido, pausa y ayuda (arriba al centro): si no entra, se desplaza */
   :where(html.horiz.bajo) .panel.lado{align-self:flex-end;margin-left:auto;margin-right:0;max-width:min(54cqw,440px);max-height:calc(100% - 44px)}
+  /* elegir kilos (apertura y fin del arranque) con el teléfono acostado: la tabla y el selector no entran a un costado en 340 a 390 px de alto: a lo ancho, como siempre */
+  :where(html.horiz.bajo) .panel.peso.lado{align-self:center;margin:0;max-width:min(96cqw,760px);max-height:100%}
 /* teléfono en vertical: «Gira el teléfono» con un dibujo, encima de todo */
 /* (el aviso «Gira el teléfono» ya no existe: en vertical el contenido se gira solo, ver html.rotado) */
 @keyframes girar{0%,22%{transform:rotate(0)}48%,82%{transform:rotate(-90deg)}100%{transform:rotate(0)}}
