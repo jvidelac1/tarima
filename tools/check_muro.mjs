@@ -198,6 +198,11 @@ async function escenario(L) {
     { const e = await ultimo('encuesta_enviada'); if (!e || e.paso !== 'anotado' || e.desbloquea !== false || e.features !== 2) mal(`encuesta_enviada: ${JSON.stringify(e)}`); }
     // elige otro pesista y juega: la final sale por la lista, y el cartel queda con «siguió jugando»
     await pulsa('.pesista[data-id="brenner"]');
+    // la tarjeta abre la selección de pesista (el pesista en 3D): «Listo» vuelve a la bienvenida con ese pesista elegido
+    await esperar(() => JUEGO.estado().pantalla === 'elegir' && !!document.getElementById('el-listo'), 'la selección de pesista'); await av(500); await foto('seleccion_pesista');
+    await pulsa('#el-listo');
+    await esperar(() => JUEGO.estado().pantalla === 'inicio' && !!document.getElementById('btn-empezar'), 'la bienvenida después de elegir pesista');
+    if (await J(() => document.querySelector('#capa .pesista[aria-pressed=true]')?.dataset.id) !== 'brenner') mal('después de la selección la bienvenida no marca el pesista elegido');
     await pulsa('#btn-empezar');
     s = await jugar(x => x.visitados.includes('llamado') && x.pantalla === 'llamado', 'la final después de anotarse', 6);
     { const p = await ultimo('partida_pedida'); if (p?.fuente !== 'lista') mal(`la final después de anotarse no salió con fuente «lista»: ${JSON.stringify(p)}`); }

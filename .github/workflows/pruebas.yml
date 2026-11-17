@@ -150,6 +150,12 @@ jobs:
         timeout-minutes: 25
         run: node tools/check_telefono.mjs 2>&1 | tee out/logs/check_telefono.log
 
+      # Selección de pesista (main.js, elegirPesista): el pesista en 3D al elegir tarjeta, en computadora, acostado y parado.
+      - name: Selección de pesista en 3D (check_telefono --solo=seleccion)
+        if: ${{ !cancelled() && matrix.grupo == 'telefono' }}
+        timeout-minutes: 35
+        run: node tools/check_telefono.mjs --solo=seleccion --capturas=out/seleccion 2>&1 | tee out/logs/check_seleccion.log
+
       # LIF-33: lo que ve la persona cuando la carga falla (three que no baja, GLB que no bajan, sin WebGL, shader que no
       # compila) en la computadora y en el teléfono, con los reintentos, y escena_visible con el 3D. Capturas en out/carga_fallas.
       - name: Fallas de la carga y avisos (check_carga_fallas)
