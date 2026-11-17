@@ -2260,7 +2260,6 @@ Lo que sigue mal, repetido en las rondas 4 y 5:
 - En Clásico las ayudas pegadas a la barra (anillo, línea) no se ven en primera persona cuando la barra queda fuera de cuadro.
 - Después del válido el pesista queda de pie respirando: no hay festejo (haría falta una animación nueva).
 
-<<<<<<< HEAD
 ### Carteles fuera de la cabeza y de la barra, y el vistazo a la barra (17-nov, rama `v-pov`)
 
 Pedido del dueño después de jugar parado en el teléfono: «hay casos donde los carteles le tapan la cabeza al pesista, ojo ahí».
@@ -2322,7 +2321,6 @@ acostado el botón redondo tapa la mano derecha y el recuadro queda pegado al di
 una estimación por las medidas de los márgenes, no una medición.
 
 Capturas de antes y después: `~/tarima-datos/ver_visual/carteles/` (`antes/`, `despues/`, `pov_vistazo/`).
-=======
 ## Físico anatómico (17-nov, rama `v-pesista`)
 
 Detalle en `docs/PLANTEL.md`, «Físico anatómico». Estado: kordan, ilarraz, jastrev y solanet con `fisico='anatomico'`; corrida de
@@ -2342,7 +2340,6 @@ Estimaciones y pendientes: las metas de perímetros son estimadas (no hay medici
 queda sobre la meta porque el marco de MPFB no baja de 0,24 H entre articulaciones; la proyección del glúteo queda en 0,07 H; el
 superpesado no tiene panza en barril (cintura 0,56 H) y su entrepierna mide 0,375 H; queda un bulto bajo la malla en la extensión
 (los targets `genitals/*-decr` no alcanzan); pieles de MakeHuman sin integrar; el sombreador de piel solo cambió `uNormBias` (1,7 a 1,1).
->>>>>>> origin/v-pesista
 
 ## Contratos entre Blender y el visor
 
