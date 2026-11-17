@@ -89,7 +89,7 @@ def chest_smooth(b,rig,K,iters=30):
     if tex.ANAT.get('fisico')=='anatomico':
         # El alisado llegaba hasta la cadera y el frente del muslo (zona hasta 0,76 por debajo del hombro) y 30 pasadas de laplaciano encogen lo convexo: se comía el pectoral,
         # el abdomen y el cuádriceps alto del físico anatómico (muslo 0,41 H en la sonda y 0,33 H en el GLB). Acá va solo sobre el pecho y con pocas pasadas: la punta la saca el parche.
-        w=(no[:,1]<-.15)*sm(sh[2]-.36*K,sh[2]-.28*K,z)*sm(sh[2]-.05*K,sh[2]-.10*K,z)*sm(.27*K,.22*K,ax); iters=6
+        w=(no[:,1]<-.15)*sm(sh[2]-.36*K,sh[2]-.28*K,z)*sm(sh[2]-.05*K,sh[2]-.10*K,z)*sm(.27*K,.22*K,ax); iters=6 if tex.ANAT.get('grupos',{}).get('pectoral',1)>0 else 30     # la mujer (sin pectoral en los grupos) conserva las pasadas: busto liso de top deportivo
     def prom(c):
         A=np.zeros_like(c); np.add.at(A,E[:,0],c[E[:,1]]); np.add.at(A,E[:,1],c[E[:,0]]); return A/deg
     punta=lambda c:float((((c-prom(c))*no).sum(1)*(w>.5)).max())

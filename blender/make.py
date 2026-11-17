@@ -67,13 +67,14 @@ if True:
     # Busto bajo la malla: el top deportivo lo contiene y lo alisa. Suavizado laplaciano del frente del pecho cubierto por la tela (quita la punta, baja algo el volumen).
     E_=np.empty(len(me.edges)*2,dtype=np.int64); me.edges.foreach_get('vertices',E_); E_=E_.reshape(-1,2); dg_=np.maximum(np.bincount(E_.ravel(),minlength=N),1)[:,None]
     # Ronda 1 del director de arte: seguían las puntas. La zona baja más (el busto de la pesada queda bajo), más pasadas; en el hombre, pocas pasadas (solo la punta del pectoral).
-    wb=(suit*sm(sh.z-.72*KM,sh.z-.62*KM,z)*sm(sh.z-.03*KM,sh.z-.09*KM,z)*(y<neck.y)*(0 if LEG else 1))[:,None]; c2=co.copy()
-    for _ in range(45 if FEM else 36):     # PENDIENTE (bloqueante de la ronda 2): con 45 y con 140 pasadas (corrida 43944903931, 47 mm de desplazamiento) sigue un bulto en punta bajo la malla de solanet, que con la luz dura echa una sombra negra redonda; no es textura (la oclusión bajo la malla ya va suavizada en tex.py). Mirar el borde de la zona `wb` y lo que viene después (subdivide, garments)
+    AN_=STY.get('fisico')=='anatomico'     # físico anatómico: el alisado va solo sobre el pecho. Hasta la cadera (0,72 bajo el hombro) y con 36 pasadas encogía el frente del tronco, la cadera y el muslo alto de la malla base (la sonda, que no pasa por acá, medía muslo 0,41 H y el GLB 0,35 H)
+    wb=(suit*sm(sh.z-(.40 if AN_ else .72)*KM,sh.z-(.30 if AN_ else .62)*KM,z)*sm(sh.z-.03*KM,sh.z-.09*KM,z)*(y<neck.y)*(0 if LEG else 1))[:,None]; c2=co.copy()
+    for _ in range((45 if FEM else 8) if AN_ else 45 if FEM else 36):     # PENDIENTE (bloqueante de la ronda 2): con 45 y con 140 pasadas (corrida 43944903931, 47 mm de desplazamiento) sigue un bulto en punta bajo la malla de solanet, que con la luz dura echa una sombra negra redonda; no es textura (la oclusión bajo la malla ya va suavizada en tex.py). Mirar el borde de la zona `wb` y lo que viene después (subdivide, garments)
         A_=np.zeros_like(c2); np.add.at(A_,E_[:,0],c2[E_[:,1]]); np.add.at(A_,E_[:,1],c2[E_[:,0]]); c2=c2*(1-.65*wb)+A_/dg_*(.65*wb)
     # Puntas del pecho (areola y pezón de la malla base): bajo la malla se leían como dos puntos marcados, en hombres y mujeres (bloqueante de contenido).
     # Se ubican por geometría (el bulto más angosto del frente del pecho de cada lado: lo que sobresale de una copia muy alisada) y en un radio de
     # 4,5 cm la superficie se reemplaza por la membrana que interpola el borde (laplaciano con el borde fijo, hasta converger).
-    if not LEG:
+    if not LEG and not AN_:     # (en el anatómico la «punta» que encontraba esta búsqueda estaba en la ingle; la del pecho la saca geo.chest_smooth)
         no_=np.empty(N*3); me.vertices.foreach_get('normal',no_); no_=no_.reshape(N,3); s_=c2.copy()
         zona=(suit>.5)&(no_[:,1]<-.25)&(z<sh.z-.05*KM)&(z>sh.z-.74*KM)&(axo>.035*KM)&(axo<.26*KM)
         for _ in range(40):
