@@ -85,6 +85,22 @@ def chest_smooth(b,rig,K,iters=30):
     punta=lambda c:float((((c-prom(c))*no).sum(1)*(w>.5)).max())
     p0=punta(co); c=co.copy()
     for _ in range(iters): c=c+(prom(c)-c)*(.6*w)[:,None]
+    # La punta (areola y pezón de la malla base) es un racimo de polígonos diminutos: cientos de vértices en 3 cm, decenas en 2 mm. El laplaciano
+    # difunde por aristas, no por milímetros, y ahí casi no avanza: por eso el bulto sobrevivía a todas las pasadas (medido en el GLB). Se ubica por
+    # densidad (el vértice del frente del pecho con las aristas más cortas, de cada lado) y en 3,2 cm la altura sobre el plano local se reemplaza por
+    # la cuádrica ajustada al anillo que la rodea.
+    el=np.linalg.norm(c[E[:,0]]-c[E[:,1]],axis=1); ml=np.zeros(N); np.add.at(ml,E[:,0],el); np.add.at(ml,E[:,1],el); ml/=deg[:,0]; RN=.032*K
+    for sgn,lado in ((1,'L'),(-1,'R')):
+        cand=(w>.3)&(c[:,0]*sgn>.03*K)
+        if not cand.any(): continue
+        i=int(np.argmin(np.where(cand,ml,9.))); cn=c[i].copy(); q=c-cn; cerca=np.linalg.norm(q,axis=1)<2.2*RN
+        n0=no[cerca&(no[:,1]<0)].mean(0); n0/=np.linalg.norm(n0); e1=np.cross(n0,[0,0,1.]); e1/=np.linalg.norm(e1); e2=np.cross(n0,e1)
+        h=q@n0; x=q@e1; y=q@e2; r=np.hypot(x,y); fr=(no@n0>.3)&(np.abs(h)<.06*K)
+        an=fr&(r>RN)&(r<1.8*RN); den=fr&(r<RN)
+        if an.sum()<12 or den.sum()<3: print(f'PUNTA {lado}: sin anillo para ajustar ({int(an.sum())} vértices)'); continue
+        Aq=np.stack([np.ones(an.sum()),x[an],y[an],x[an]**2,x[an]*y[an],y[an]**2],1); cf=np.linalg.lstsq(Aq,h[an],rcond=None)[0]
+        hf=cf[0]+cf[1]*x+cf[2]*y+cf[3]*x*x+cf[4]*x*y+cf[5]*y*y; wt=sm(RN,RN*.7,r)*den; dz=(hf-h)*wt; c=c+n0[None,:]*dz[:,None]
+        print(f'PUNTA {lado}: racimo en ({cn[0]:+.3f},{cn[1]:+.3f},{cn[2]:.3f}), arista media {ml[i]*1000:.2f} mm, {int(den.sum())} vértices en {RN*1000:.0f} mm; sobresalía {(h-hf)[den].max()*1000:.1f} mm, corrección máx {np.abs(dz).max()*1000:.1f} mm')
     me.vertices.foreach_set('co',c.ravel()); me.update()
     # los pesos de piel también: el suavizado de pesos del hombro (smooth_weights) termina en medio del pecho y ese borde deja un vértice «atrasado» que con los brazos arriba se levanta como una carpa (la punta)
     names,W=wget(b); W0=W.copy()

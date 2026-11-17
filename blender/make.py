@@ -82,7 +82,7 @@ if True:
         for sgn,lado in ((1,'L'),(-1,'R')):
             m_=zona&(c2[:,0]*sgn>0)
             if not m_.any(): continue
-            i_=int(np.argmax(np.where(m_,sale,-1))); cn=c2[i_].copy(); LM['nip'+lado]=cn; d_=np.linalg.norm(c2-cn,axis=1); w_=sm(RN,RN*.72,d_)[:,None]; antes_=c2.copy()
+            i_=int(np.argmax(np.where(m_,sale,-1))); cn=c2[i_].copy(); d_=np.linalg.norm(c2-cn,axis=1); w_=sm(RN,RN*.72,d_)[:,None]; antes_=c2.copy()
             for _ in range(500):
                 A_=np.zeros_like(c2); np.add.at(A_,E_[:,0],c2[E_[:,1]]); np.add.at(A_,E_[:,1],c2[E_[:,0]]); c2=c2*(1-w_)+A_/dg_*w_
             print(f'PUNTA {NAME} {lado}: en ({cn[0]:+.3f},{cn[1]:+.3f},{cn[2]:.3f}), sobresalía {sale[i_]*1000:.1f} mm; membrana de {int((w_[:,0]>0).sum())} vértices, desplazamiento máx {np.linalg.norm(c2-antes_,axis=1).max()*1000:.1f} mm')
