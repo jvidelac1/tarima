@@ -2384,6 +2384,38 @@ Sin fusionar a `main` ni a `prueba` y sin publicar: lo decide el dueño.
   El color de interfaz de Kordan (`#2fb3c4`) queda cerca del turquesa del jugador (`#35e6d6`) cuando Kordan es rival.
   Solanet casi no se probó jugando; Jastrev es el menos logrado.
 
+### Selección de pesista con el pesista en 3D (17-nov, rama `v-pov`)
+
+Pedido del dueño: «quiero evaluar bien el físico; cuando seleccione el pesista quiero ver al pesista, tipo selección de personaje».
+
+- **Cómo se entra.** Tocando una tarjeta de pesista en la bienvenida (las tarjetas siguen saliendo recién después de la primera
+  final) o con **`?elegir=1`**, que abre directo la selección y deja las tarjetas a la vista aunque sea la primera vez (para
+  probar). «Listo» vuelve a la bienvenida con ese pesista marcado. En Opciones no hay entrada: no había un lugar natural.
+- **Qué se ve** (`main.js → elegirPesista`, pantalla `elegir`). Panel a un costado (computadora y teléfono acostado) o abajo a lo
+  ancho (parado) con las tres tarjetas (plaza y apellido) y la ficha del elegido: nombre, bandera, código y país, categoría
+  (recuadro), estatura y kilos del cuerpo (de `plantel.json`; `vestir` ahora copia `masa`), la frase de la tarjeta y el RM. En lo
+  libre, el pesista de pie a cuerpo entero, de frente, lente de 38° (`stage.js → PLANOS.elegir`, encuadre calculado con el
+  rectángulo libre). **Gira el pesista con la barra, no la cámara** (`Escena.girar` / `posarGirado`): así el lado que se mira es
+  siempre el iluminado y la cámara no se mete detrás de la pantalla del fondo. Una vuelta en 12 s; arrastrando sobre la escena
+  (`#el-zona`, no cuenta como toque del juego) gira con el dedo o el ratón y a los 3 s de soltar sigue solo; dos botones lo
+  llevan de a cuarto de vuelta (frente, perfil, espalda; queda quieto 6 s); otro alterna «de pie» y «barra arriba» (la pose
+  final del arranque, con el clip pasado en 1,7 s). De pie no se dibuja la barra. Teclado: las flechas mueven el foco y la
+  tarjeta con foco es la elegida; Enter sobre la elegida confirma. Cada pesista se ve con SU malla (en la final el del jugador
+  lleva la turquesa de `JUGADOR`, como siempre). Al cambiar de tarjeta, fundido corto; se conservan el ángulo y la pose.
+- **Sin textos nuevos**: título `pesista.titulo`, «Listo» `campo.listo`, frases y RM de las tarjetas; los botones de girar y de
+  barra arriba son dibujos. **Propuesta pendiente de OK del dueño**: etiquetas «Categoría» y «Peso» (hoy la categoría va en un
+  recuadro y el peso al lado de la estatura, sin rótulo) y «frente / perfil / espalda» con texto.
+- **Costo**: nada cuando la pantalla no está abierta (un `enCuadro` que se quita al salir). Abierta, dibuja en cada cuadro.
+- **Pruebas**: `check_telefono` suma `seleccion_pc_1280x720` (ratón y teclado; además Móvil y Baja con un pesista),
+  `seleccion_acostado_844x390` y `seleccion_vertical_390x844` (`telefono.yml -f solo=seleccion`; en las corridas completas va en un paso aparte, capturas en `out/seleccion`): el panel no tapa al pesista
+  (caja del cuerpo de `cajas()`), nada se sale, gira solo un cuarto de vuelta en 3 s, el arrastre gira y no cuenta como toque,
+  los cuartos de vuelta y «barra arriba» llegan, y «Listo» deja la escena como estaba. `check_muro` pasa por la selección al
+  elegir Largo. Capturas: `~/tarima-datos/ver_visual/seleccion/`.
+- **Sin resolver / a la vista.** Parado, el pesista ocupa ~40 % del alto (el panel se lleva el 38 %) y con la barra arriba el
+  lente se abre (hasta 56°) para que entre la barra. La ficha de juego (RM 169/211 para un 71 kg) sale de `sim.json`, no de
+  `plantel.json`: los números no cierran con la categoría. Al salir, detrás de la bienvenida queda el plano de la selección
+  (la final pone su cámara). No se probó en un teléfono de verdad. Sin nota del dueño.
+
 ## Contratos entre Blender y el visor
 
 1. Esqueleto único: 52 huesos con nombres Mixamo más `Bar`. Una sola acción, `Poses`.

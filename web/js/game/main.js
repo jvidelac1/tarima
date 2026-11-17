@@ -1109,7 +1109,7 @@ async function elegirPesista(cfg, nombre = '') {
     let x0 = .02, x1 = .98, y1 = .97; const y0 = .03 + (parseFloat(getComputedStyle(html).getPropertyValue('--st')) || 0) / H;
     const izq = pn.offsetLeft / W, arr = pn.offsetTop / H; if (izq > .28) x1 = izq - .01; else if (arr > .25) y1 = arr - .03;
     const h = escena.P.h, S = tramo(escena.P, 'snatch'), barra = escena.alturaMuestra(S.base + S.n - 1) || 1.2 * h;
-    const tope = G.arriba ? Math.max(1.08 * h, barra + .3) : 1.08 * h, piso = -.07, alto = (tope - piso) * 1.1, ancho = G.arriba ? 2.6 : Math.max(1.05, .68 * h);
+    const tope = G.arriba ? Math.max(1.08 * h, barra + .3) : 1.08 * h, piso = -.07, alto = (tope - piso) * 1.07, ancho = G.arriba ? 2.6 : Math.max(1.05, .68 * h);
     // lente normal (38°); si así la cámara quedara más lejos que la mesa del jurado (teléfono parado con la barra arriba, que
     // pide 2,6 m de ancho), se queda a 6,2 m y abre el lente lo necesario (hasta 56°)
     const asp = W / H, X = Math.max(alto / (y1 - y0), ancho / (asp * (x1 - x0))), LEJOS = 6.2, tg0 = 2 * Math.tan(19 * Math.PI / 180), tg = Math.min(2 * Math.tan(28 * Math.PI / 180), Math.max(tg0, X / LEJOS));

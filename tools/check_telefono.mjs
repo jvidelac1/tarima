@@ -446,7 +446,8 @@ async function seleccion(C, calidad = 'alta') {
 
 try {
   for (const C of CASOS.filter(c => !SOLO.length || SOLO.some(x => c.nombre.startsWith(x)))) await correr(C);
-  for (const C of SELECCION.filter(c => !SOLO.length || SOLO.some(x => c.nombre.startsWith(x)))) { await seleccion(C); for (const q of C.calidades || []) await seleccion(C, q); }
+  // la selección de pesista corre aparte (--solo=seleccion): dibuja siempre y no entra en el tiempo de los demás casos
+  for (const C of SELECCION.filter(c => SOLO.some(x => c.nombre.startsWith(x)))) { await seleccion(C); for (const q of C.calidades || []) await seleccion(C, q); }
 }
 catch (e) { problemas.push('excepción de la prueba: ' + (e.stack || e.message)); }
 await browser.close(); server.close();
@@ -455,4 +456,5 @@ if (PANEL.length) { console.log('\nAlto del panel del llamado (con el detalle pl
 if (PULGAR.length) { console.log('\nParado: altura del botón principal de cada panel (0 = arriba, 1 = abajo; pulgar ≥ 0,5):'); for (const x of PULGAR) console.log(`  [${x.p}] ${x.donde}: «${x.txt}» a ${x.y.toFixed(2)}`); }
 for (const n of notas) console.log('nota: ' + n);
 if (problemas.length) { console.log(`\nFALLÓ (${problemas.length}):`); for (const p of problemas.slice(0, 40)) console.log('  ' + p); process.exit(1); }
+if (SOLO.length && SOLO.every(x => x.startsWith('seleccion'))) { console.log('\nOK: selección de pesista en computadora, teléfono acostado y parado: el panel no tapa al pesista, gira solo y arrastrando, cuartos de vuelta, barra arriba y «Listo»'); process.exit(0); }
 console.log('\nOK: teléfono de costado (dos tamaños y mano izquierda) y parado (tres tamaños, sin girar el contenido), jugado con toques, campos de texto con el editor de arriba y dos dedos, sin cortes ni superposiciones');
