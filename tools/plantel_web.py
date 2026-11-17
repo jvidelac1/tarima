@@ -13,8 +13,9 @@ for k in plantel.PESISTAS:
     f=plantel.ficha(k); f['listo']=k in poses
     if f['listo']: f['medidas']=dict(estatura=poses[k]['h'],femur=round(poses[k]['seg']['femur']/poses[k]['h'],3),brazos=round(poses[k]['seg']['arm']/poses[k]['h'],3))
     P[k]=f
-# Ternas de prueba. Con dos mujeres en el plantel, la tercera plaza repite modelo (el juego le pone la tela de otro color, como a Marangi).
-TERNAS=dict(mujeres=['solanet','halvard','halvard'],hombres=['ilarraz','brenner','jastrev'],livianos=['solanet','ilarraz','ventura'],pesados=['halvard','jastrev','brenner'],mixto=['solanet','jastrev','halvard'])
+# `hombres` es la terna que el juego usa sin `?plantel=` (PLANTEL_DEFECTO en web/js/game/roster.js): no sacarla ni dejarla sin modelos.
+# Las demás son de prueba. Con dos mujeres en el plantel, la tercera plaza repite modelo (el juego le pone la tela de otro color, como a Marangi).
+TERNAS=dict(mujeres=['solanet','halvard','halvard'],hombres=['ilarraz','kordan','jastrev'],livianos=['solanet','ilarraz','ventura'],pesados=['halvard','jastrev','brenner'],mixto=['solanet','jastrev','halvard'])
 out=dict(v=1,iwf=plantel.IWF,pesistas=P,ternas={k:v for k,v in TERNAS.items() if all(P.get(x,{}).get('listo') for x in v)})
 json.dump(out,open(os.path.join(WEB,'data','plantel.json'),'w',encoding='utf-8'),ensure_ascii=False,indent=1)
 print('plantel.json:',', '.join(f"{k}{'' if v['listo'] else ' (sin modelo)'}" for k,v in P.items()),'· ternas',list(out['ternas']))

@@ -12,6 +12,15 @@ on:
   push:
     branches: [carga]
   workflow_dispatch:
+    inputs:
+      antes:
+        description: 'Rama o commit que se mide como «antes» (vacío: donde esta rama sale de gameplay). Ej.: origin/main'
+        required: false
+        default: ''
+      visor:
+        description: 'Correr también el visor con los modelos de antes y de después (unos 45 minutos)'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -46,8 +55,10 @@ jobs:
           fi
           echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
       - name: web/ de antes
+        env:
+          ANTES: ${{ inputs.antes }}
         run: |
-          BASE="$(git merge-base HEAD origin/gameplay)"; echo "antes: $BASE"
+          BASE="$( { [ -n "$ANTES" ] && git rev-parse --verify -q "$ANTES^{commit}"; } || git merge-base HEAD origin/gameplay)"; echo "antes: $BASE"
           mkdir -p "$RUNNER_TEMP/antes" && git archive "$BASE" web | tar -x -C "$RUNNER_TEMP/antes"
           mkdir -p out/logs; echo "$BASE" > out/logs/base.txt
       - name: Después (con capturas)
@@ -73,7 +84,7 @@ jobs:
   visor:
     name: Visor con los modelos de ${{ matrix.lado }} (dibujo por software)
     # tarda unos 45 minutos: a pedido, o en un push cuyo mensaje diga [visor]
-    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[visor]') }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.visor) || contains(github.event.head_commit.message, '[visor]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 75
     strategy:
@@ -102,8 +113,10 @@ jobs:
           echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
       - name: web/ de antes
         if: ${{ matrix.lado == 'antes' }}
+        env:
+          ANTES: ${{ inputs.antes }}
         run: |
-          BASE="$(git merge-base HEAD origin/gameplay)"; echo "antes: $BASE"
+          BASE="$( { [ -n "$ANTES" ] && git rev-parse --verify -q "$ANTES^{commit}"; } || git merge-base HEAD origin/gameplay)"; echo "antes: $BASE"
           rm -rf web && git checkout "$BASE" -- web
       - name: check_viewer
         timeout-minutes: 60

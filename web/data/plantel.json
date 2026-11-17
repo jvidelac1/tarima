@@ -110,7 +110,7 @@
    "vivo": "#f4f2ec",
    "rodillera": "#141418",
    "zapatilla": "#f4f3ee",
-   "cinturon": null,
+   "cinturon": "#241a14",
    "color": "#35c487",
    "bandera": "linear-gradient(180deg,#0f7a4a 0 33%,#f4f2ec 33% 67%,#e8a33d 67%)",
    "dorsal": 21,
@@ -118,7 +118,12 @@
     "s": 84,
     "c": 106
    },
-   "listo": false
+   "listo": true,
+   "medidas": {
+    "estatura": 1.5,
+    "femur": 0.224,
+    "brazos": 0.301
+   }
   },
   "halvard": {
    "id": "halvard",
@@ -134,7 +139,7 @@
    "pelo": "#a8865a",
    "peinado": "rodete",
    "barba": 0.0,
-   "iris": "#5f7d8c",
+   "iris": "#4f6470",
    "malla": "#6e1423",
    "vivo": "#f0c36a",
    "rodillera": "#1a1a1f",
@@ -156,27 +161,32 @@
    "pais": "Montelar",
    "codigo": "MTL",
    "genero": "M",
-   "categoria": "65",
-   "estatura": 1.62,
-   "masa": 65.0,
+   "categoria": "71",
+   "estatura": 1.61,
+   "masa": 71.0,
    "piel": "#74482f",
    "pelo": "#0f0c0a",
    "peinado": "corto",
-   "barba": 0.12,
+   "barba": 0.0,
    "iris": "#2e1d12",
-   "malla": "#e26a1b",
-   "vivo": "#15151a",
+   "malla": "#1d4f9c",
+   "vivo": "#f2c230",
    "rodillera": "#15151a",
-   "zapatilla": "#17171c",
-   "cinturon": null,
-   "color": "#f29a4a",
-   "bandera": "linear-gradient(135deg,#15151a 0 50%,#e26a1b 50%)",
+   "zapatilla": "#efeee9",
+   "cinturon": "#2b1d14",
+   "color": "#4d8fe0",
+   "bandera": "linear-gradient(135deg,#0d1a30 0 50%,#1d4f9c 50% 82%,#f2c230 82%)",
    "dorsal": 16,
    "kg": {
     "s": 138,
     "c": 170
    },
-   "listo": false
+   "listo": true,
+   "medidas": {
+    "estatura": 1.61,
+    "femur": 0.222,
+    "brazos": 0.301
+   }
   },
   "jastrev": {
    "id": "jastrev",
@@ -189,12 +199,12 @@
    "estatura": 1.86,
    "masa": 146.0,
    "piel": "#d3a17e",
-   "pelo": "#3b2a1c",
+   "pelo": "#1f1711",
    "peinado": "rapado",
-   "barba": 0.85,
-   "iris": "#6b5a3a",
+   "barba": 0.9,
+   "iris": "#4a3a28",
    "malla": "#17171c",
-   "vivo": "#d7263d",
+   "vivo": "#efece4",
    "rodillera": "#d7263d",
    "zapatilla": "#eeede8",
    "cinturon": "#1a1a1e",
@@ -205,8 +215,58 @@
     "s": 196,
     "c": 240
    },
-   "listo": false
+   "listo": true,
+   "medidas": {
+    "estatura": 1.86,
+    "femur": 0.246,
+    "brazos": 0.311
+   }
+  },
+  "kordan": {
+   "id": "kordan",
+   "nombre": "Stevan Kordan",
+   "corto": "Kordan",
+   "pais": "Dravenia",
+   "codigo": "DRV",
+   "genero": "M",
+   "categoria": "94",
+   "estatura": 1.71,
+   "masa": 94.0,
+   "piel": "#b07a55",
+   "pelo": "#14100d",
+   "peinado": "corto",
+   "barba": 0.62,
+   "iris": "#33261a",
+   "malla": "#ece8dd",
+   "vivo": "#12181c",
+   "rodillera": "#14171a",
+   "zapatilla": "#efeee9",
+   "cinturon": "#2a1d15",
+   "color": "#2fb3c4",
+   "bandera": "linear-gradient(90deg,#0f5a66 0 30%,#ece8dd 30% 70%,#12181c 70%)",
+   "dorsal": 9,
+   "kg": {
+    "s": 178,
+    "c": 216
+   },
+   "listo": true,
+   "medidas": {
+    "estatura": 1.71,
+    "femur": 0.228,
+    "brazos": 0.304
+   }
   }
  },
- "ternas": {}
+ "ternas": {
+  "hombres": [
+   "ilarraz",
+   "kordan",
+   "jastrev"
+  ],
+  "livianos": [
+   "solanet",
+   "ilarraz",
+   "ventura"
+  ]
+ }
 }
