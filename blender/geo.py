@@ -85,6 +85,11 @@ def chest_smooth(b,rig,K,iters=30):
     co=coords(b); me=b.data; N=len(co); no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3); sh=head(rig,'LeftArm')
     E=np.empty(len(me.edges)*2,int); me.edges.foreach_get('vertices',E); E=E.reshape(-1,2); deg=np.maximum(np.bincount(E.ravel(),minlength=N),1)[:,None]
     z=co[:,2]; ax=np.abs(co[:,0]); w=(no[:,1]<-.15)*sm(sh[2]-.76*K,sh[2]-.66*K,z)*sm(sh[2]-.05*K,sh[2]-.10*K,z)*sm(.27*K,.22*K,ax)
+    import tex
+    if tex.ANAT.get('fisico')=='anatomico':
+        # El alisado llegaba hasta la cadera y el frente del muslo (zona hasta 0,76 por debajo del hombro) y 30 pasadas de laplaciano encogen lo convexo: se comía el pectoral,
+        # el abdomen y el cuádriceps alto del físico anatómico (muslo 0,41 H en la sonda y 0,33 H en el GLB). Acá va solo sobre el pecho y con pocas pasadas: la punta la saca el parche.
+        w=(no[:,1]<-.15)*sm(sh[2]-.36*K,sh[2]-.28*K,z)*sm(sh[2]-.05*K,sh[2]-.10*K,z)*sm(.27*K,.22*K,ax); iters=6
     def prom(c):
         A=np.zeros_like(c); np.add.at(A,E[:,0],c[E[:,1]]); np.add.at(A,E[:,1],c[E[:,0]]); return A/deg
     punta=lambda c:float((((c-prom(c))*no).sum(1)*(w>.5)).max())
