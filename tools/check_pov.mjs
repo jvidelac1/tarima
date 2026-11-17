@@ -160,18 +160,22 @@ if (!SOLO || SOLO === 'pov' || SOLO === 'claves') {
       // reloj propio del tramo: quieto de pie, hasta la salida, espera en la salida, y el levantamiento
       const pasos = []; for (let t = 0; t < (espera ? .8 : 0); t += 1 / 30) pasos.push(0);
       for (let t = 0; t < tS; t += 1 / 30) pasos.push(enS(t)); for (let t = 0; t < espera; t += 1 / 30) pasos.push(enS(tS)); for (let t = tS; t <= fin + .4; t += 1 / 30) pasos.push(enS(Math.min(fin, t)));
-      const enLev = Math.round(((espera ? .8 : 0) + tS + Math.min(espera, 1.2)) * 30); let malMirada = false;
+      // el vistazo a la barra (POV.vistazo) pasa en la espera de la salida: la mirada tiene que haber vuelto al jurado 0,3 s antes de levantar
+      const enLev = Math.round(((espera ? .8 : 0) + tS + Math.max(0, espera - .3)) * 30); let malMirada = false, conManos = 0, incBajo = 0;
       for (let k = 0; k < pasos.length; k++) {
         const foto = k % 3 === 0, m = await J(o => window.JUEGO.test.posa(o), { id, lev, seg, s: pasos[k], camara: 'pov', dt: 1 / 30, dibujar: foto });
         if (foto) { const z = await J(() => window.JUEGO.test.luz()); if (z.media < 6 || z.desvio < 3) problemas.push(`${nombre} ${seg} ${reloj.toFixed(1)} s: la vista de los ojos sale negra o casi (luminancia ${z.media}, desvío ${z.desvio})`); }
         // tomada la barra (pasada la espera en la salida) la mirada está en el jurado: entre -15° y +10°
         if (k > enLev && (G(m.cam.inc) < -15 || G(m.cam.inc) > 10) && !malMirada) { malMirada = true; problemas.push(`${nombre} ${seg} ${reloj.toFixed(1)} s: durante el levantamiento la mirada está a ${G(m.cam.inc).toFixed(0)}° (tiene que estar entre -15° y +10°)`); }
-        if (foto) lista.push({ t: `${seg} ${reloj.toFixed(1)} s · ${G(m.cam.inc).toFixed(0)}°`, b: await toma() }); reloj += 1 / 30;
+        if (k <= enLev && m.manos?.dentro && G(m.cam.inc) < -55) conManos++; incBajo = Math.min(incBajo, G(m.cam.inc));
+        if (foto) lista.push({ t: `${seg} ${reloj.toFixed(1)} s · ${G(m.cam.inc).toFixed(0)}°${m.manos?.dentro ? ' · manos' : ''}`, b: await toma() }); reloj += 1 / 30;
       }
+      // el vistazo: en la preparación, al menos 0,6 s con las dos manos en la imagen y la vista abajo (≤ -55°)
+      if (espera) { console.log(`${nombre} ${seg}: vistazo a la barra · ${(conManos / 30).toFixed(2)} s con las dos manos en la imagen · mirada más baja ${incBajo.toFixed(0)}°`); if (conManos < 18) problemas.push(`${nombre} ${seg}: en la preparación las dos manos se ven solo ${(conManos / 30).toFixed(2)} s (el vistazo a la barra pide 0,6 s o más con la vista abajo)`); }
     }
     await hoja(nombre, lista, 5, 480);
   };
-  for (const id of SOLO === 'claves' ? [] : ['ventura']) { await tira(id, `tira_${id}_arranque`, [['snatch', 's', 2.2]]); await tira(id, `tira_${id}_dos_tiempos`, [['clean', 'c', 2.2], ['split', 'c', 0]]); }
+  for (const id of SOLO === 'claves' ? [] : ['ventura']) { await tira(id, `tira_${id}_arranque`, [['snatch', 's', 3.8]]); await tira(id, `tira_${id}_dos_tiempos`, [['clean', 'c', 3.8], ['split', 'c', 0]]); }
   await J(() => window.JUEGO.test.real());
   // fotos grandes de las fases clave (Ventura y Brenner) y en un teléfono acostado
   const CLAVE = [['snatch', 's', 'Parado', 0], ['snatch', 's', 'Salida', 0], ['snatch', 's', 'Primer tirón', 5], ['snatch', 's', 'Segundo tirón', 5], ['snatch', 's', 'Tirón de brazos', 0], ['snatch', 's', 'Giro', 5], ['snatch', 's', 'Recepción', 0], ['snatch', 's', 'Recuperación', 0],

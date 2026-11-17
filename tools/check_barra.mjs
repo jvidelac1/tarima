@@ -138,7 +138,7 @@ for (const P of PANTALLAS) try {
     if (s.propios >= 3 && !(s.intento && s.intento.propio) && s.pantalla !== 'decision' && !(P.intervalo && !TIRA && s.fase !== 'c' && s.lev !== 'c')) break;
     const I = s.intento;
     if (!TIRA) await sigue(s);
-    if (TIRA) { if (!tiraOn && tiraK === 0 && I && I.propio && s.modo !== 'panel') tiraOn = true; else if (tiraOn && s.propios >= 1 && s.pantalla !== 'decision') { tiraOn = false; break; } }
+    if (TIRA) { if (!tiraOn && tiraK === 0 && ((I && I.propio) || (s.pantalla === 'intento' && !s.panel)) && s.modo !== 'panel') tiraOn = true; /* desde el vistazo a la barra de la primera persona */ else if (tiraOn && s.propios >= 1 && s.pantalla !== 'decision') { tiraOn = false; break; } }
     if (I && I.propio && s.modo !== 'panel') {
       const sg = I.senal;
       if (sg && sg.tipo === 'espera' && sg.barra && n < 3 && hecho !== 'quieta' + n) { hecho = 'quieta' + n; if (n === 0) { await foto('1_quieta'); await tapa('quieta'); await ojos('quieta'); } }
@@ -191,9 +191,14 @@ for (const P of PANTALLAS) try {
       if (v && !lineas.includes(v)) { lineas.push(v); await page.waitForTimeout(250); if (lineas.length <= 3) await foto(`${lineas.length}_veredicto`); }
     }
     if (s.pantalla === 'rival' && !medidos.has('rival')) { await av(900); await tapa('rival'); await foto('rival'); }
-    await J(() => JUEGO.test.avanzar(300, 50));
+    await (TIRA && tiraOn ? av(300) : J(() => JUEGO.test.avanzar(300, 50)));      // --tira: también el vistazo a la barra, foto a foto
     if (['rival', 'decision', 'carga', 'desplazado'].includes(s.pantalla) && g % 3 === 0 && !await saltarRival(page, P.tactil)) await toque();
   }
+  // primera persona acostada: antes de la barrita, el vistazo a la barra con las dos manos en la imagen, y la vista de vuelta en el jurado
+  if (CAM === 'pov' && P.vp.width > P.vp.height) { const vz = await J(() => JUEGO.E.vistazo || null);
+    console.log(`${tag} vistazo a la barra: ${vz ? `${vz.ms} ms con las dos manos en la imagen · mirada más baja ${(vz.incMin * 180 / Math.PI).toFixed(0)}° · al terminar ${(vz.incFin * 180 / Math.PI).toFixed(0)}° · duró ${vz.dura} ms` : 'no hubo'}`);
+    if (!vz) mal('primera persona: no hubo vistazo a la barra en la preparación');
+    else { if (vz.ms < 600) mal(`primera persona: en el vistazo las dos manos se ven ${vz.ms} ms (mínimo 600)`); if (vz.incFin < -.26) mal(`primera persona: el vistazo termina con la mirada a ${(vz.incFin * 180 / Math.PI).toFixed(0)}° (tiene que haber vuelto al jurado)`); if (vz.dura > 6000) mal(`primera persona: el vistazo duró ${vz.dura} ms (tope 6000)`); } }
   const R = await J(() => (JUEGO.E.propios || []).map(x => ({ res: x.res, linea: x.linea, barras: (x.uno?.barras || []).map(b => b.zona + (b.sola ? '*' : '')) })));
   for (const x of R) vistas.push(...x.barras);
   console.log(`${tag} pedidas ${pedidas.join(' ')} · salieron ${vistas.join(' ')} · ${R.map(x => `${x.res}${x.linea ? ` «${x.linea}»` : ''}`).join(' · ')}`);

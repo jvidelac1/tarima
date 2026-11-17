@@ -579,7 +579,30 @@ const RIVAL_FASES = FASES_RAPIDAS, RIVAL_RAPIDO = RITMO.rapido;
  * `guia`: reloj del intento llevado por la presentación (tutorial); sin ella, el reloj es el del juego.
  * @returns {Promise<{conf:number|null, ent:number[][], res:object, grab:object[]}>}
  */
-function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = reloj.ahora(), panelAbierto = null, guia = null, resumen = false, decisivo = false }) {
+/**
+ * El vistazo a la barra de la primera persona (17-nov, decidido con el dueño): en un intento propio visto desde los ojos, antes
+ * de que aparezca la barrita, el pesista baja a la barra y la toma (el mismo clip, hasta «Salida»), la vista baja a las dos
+ * manos en la barra, se queda un momento y vuelve al jurado (stage.js, POV.vistazo). Recién entonces empieza el intento (la
+ * barrita aparece con la mirada ya en el jurado) y el pesista sigue agachado (`abajo` en correrIntento). Nada con movimiento
+ * reducido, en otra cámara ni con el teléfono parado. Deja en E.vistazo lo medido (ms con las dos manos en la imagen, la
+ * inclinación más baja y la del final). Devuelve true si lo hizo.
+ */
+function vistazo(lev) {
+  if (reduceMotion || camVista(true) !== 'pov' || !escena.activo) return Promise.resolve(false);
+  return new Promise(res => {
+    const G = tramo(escena.P, lev === 's' ? 'snatch' : 'clean'), tS = G.t('Salida'), t0 = reloj.ahora(), M = E.vistazo = { ms: 0, incMin: 0, incFin: 0, dura: 0 };
+    escena.camara('pov', .3); E.modo = 'intento';
+    enCuadro = (ahora, dt) => {
+      const tau = Math.min(tS, (ahora - t0) / 1000);
+      escena.posar({ seg: G.nombre, s: G.inv(tau), tau, base: G.base, primero: true }, lev, dt, 0, ahora / 1000);
+      const inc = escena.pov?.inc ?? 0, v = escena.manosEnVista(); M.incMin = Math.min(M.incMin, inc); M.incFin = inc; M.dura = Math.round(ahora - t0);
+      if (v?.dentro && inc < -.96) M.ms += dt * 1000;
+      // termina cuando ya la tomó y la vista volvió al jurado (o, por las dudas, a los 7 s)
+      if ((tau >= tS && ahora - t0 > tS * 1000 + 400 && !escena.vistazo) || ahora - t0 > 7000) { enCuadro = null; M.ms = Math.round(M.ms); res(true); }
+    };
+  });
+}
+function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = reloj.ahora(), panelAbierto = null, guia = null, resumen = false, decisivo = false, abajo = false }) {
   return new Promise(resolver => {
     const P = escena.P, ent = gestos ? gestos.ent : [], propio = !gestos, grab = [], mk = marcas(P, lev, env), ctl = propio ? ctx.ctl || 'c' : 'c', facil = propio && ctl === 'f', uno = propio && esU(ctl), barra = propio && ctl === 'b', T = tactil();
     // 'u': ayudas de primera vez (una vez cada una en este dispositivo) y la presentación en una línea en el primer intento (G2.8)
@@ -689,7 +712,8 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
       if (ctx.reloj && !uno) setReloj(m.rodilla ? Math.max(0, ctx.reloj - (m.movs[0]?.tk ?? now)) : ctx.reloj - now);
       if (E.modo === 'panel' && conf !== null) E.modo = propio ? 'intento' : 'tv';
       // pose y barra
-      const pose = m.res && m.res.res === 'fallo' ? null : poseDe(m, Math.min(now, m.res ? m.res.t : now), P), p = M?.pelea, Tm = p ? p.T / 1e6 : m.temblor / 1e6;
+      const pose = m.res && m.res.res === 'fallo' ? null : poseDe(m, abajo && !m.res && !m.movs.length ? now + 6e4 : Math.min(now, m.res ? m.res.t : now), P), p = M?.pelea,      // `abajo`: ya tomó la barra en el vistazo
+       Tm = p ? p.T / 1e6 : m.temblor / 1e6;
       if (pose) { escena.posar(pose, lev, dt, m.fase === 'freno' ? .55 : m.fase === 'pelea' || m.fase === 'traba' || m.fase === 'fijacion' ? Tm : 0, ahora / 1000); grab.push({ t: now, pose, y: escena.barY, z: escena.barZ }); }
       if (pose && m.tConf !== undefined && !m.res) { const mon = E.monitor; mon.cuadros++; mon.barraMin = Math.min(mon.barraMin, escena.barY); mon.alto[E.pantalla] = Math.max(mon.alto[E.pantalla] || 0, escena.barY); if (escena.barY > .26) mon.manosMax = Math.max(mon.manosMax, escena.manosBarra()); }
       // cámara: nunca hay corte con una ventana abierta
@@ -1368,7 +1392,9 @@ async function llamadoPropio(p, L) {
     // el primer dos tiempos en Un toque se explica sobre la marcha: con la barra en los hombros el reloj espera el toque de ¡FLEXIONA!
     const primerDT = ctx.ctl === 'f' && L.lev === 'c' && !guardado.get('tarima.dostiempos');
     E.todavias = 0; E.guardados = 0; E.fotoToques = toques.foto();
-    corrida = await correrIntento(ctx, { a, lev: L.lev, env, conf0: ms, t0, guia: primerDT ? EN_HOMBROS : null });
+    // primera persona: antes de que aparezca la barrita, el pesista va a la barra y la mira (el vistazo); el reloj del intento empieza después
+    const abajo = !corre && !primerDT && await vistazo(L.lev); if (abajo) t0 = reloj.ahora();
+    corrida = await correrIntento(ctx, { a, lev: L.lev, env, conf0: ms, t0, guia: primerDT ? EN_HOMBROS : null, abajo });
     if (primerDT && corrida.m.movs.length > 1) guardado.set('tarima.dostiempos', '1');
   } else { env = L.lev === 'c' ? p.estiloFijo(L.a) ?? a.f.enviones[0] : undefined; ctx = p.contexto(env); corrida = { conf: null, ent: [], res: simular(ctx, null, []).res, grab: [], m: { movs: [] } }; }
   TB.congelado = true; const et = p.llamado.et, x = p.resolver({ conf: corrida.conf, env, ent: corrida.ent });
@@ -1837,7 +1863,7 @@ window.JUEGO = {
       let giro = 0, cual = ''; const antes = E.medAntes, q = a.bones.map(b => b.quaternion.clone());
       if (antes && antes.a === a) a.bones.forEach((b, i) => { const g = q[i].angleTo(antes.q[i]); if (g > giro && !/Hand(Thumb|Index|Middle|Ring|Pinky)/.test(b.name)) { giro = g; cual = b.name.replace(/^mixamorig:?/, ''); } });
       E.medAntes = { a, q }; const cam = escena.rig.camera, d = cam.getWorldDirection(new V()), b = escena.barbell.group.position;
-      return { ...o, giro: r(giro), cual, bar: [r(b.y), r(b.z)], cam: { p: [r(cam.position.x), r(cam.position.y), r(cam.position.z)], inc: r(Math.asin(d.y)), fov: r(cam.fov) }, pov: !!escena.pov, sinCabeza: !!escena._sinCabeza, sinTorso: !!(escena._sinTorso?.skin?.uSinTorso?.value > .5), recuadro: !!escena.recuadro?.el && !escena.recuadro.el.hidden, conBarrita: !!escena.pov?.conBarrita, ojos: (() => { const o = escena.ojos(new V()); return [r(o.x), r(o.y), r(o.z)]; })(), rum: r(Math.atan2(d.x, d.z)) };
+      return { ...o, giro: r(giro), cual, bar: [r(b.y), r(b.z)], cam: { p: [r(cam.position.x), r(cam.position.y), r(cam.position.z)], inc: r(Math.asin(d.y)), fov: r(cam.fov) }, pov: !!escena.pov, sinCabeza: !!escena._sinCabeza, sinTorso: !!(escena._sinTorso?.skin?.uSinTorso?.value > .5), recuadro: !!escena.recuadro?.el && !escena.recuadro.el.hidden, conBarrita: !!escena.pov?.conBarrita, vz: escena.pov?.vz || 0, manos: escena.manosEnVista(), ojos: (() => { const o = escena.ojos(new V()); return [r(o.x), r(o.y), r(o.z)]; })(), rum: r(Math.atan2(d.x, d.z)) };
     },
     /** Lleva la escena de final() al instante t (s), la dibuja si `dibujar`, y mide holguras entre la barra y el cuerpo. */
     finalEn(t, dibujar = false, dt = 1 / 60, dtCam = .5) { const c = E.prueba; dibujarFinal(c, t, dt, false);

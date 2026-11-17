@@ -223,10 +223,14 @@ export const PLANOS = {
  *   filtro corto (`sigue`). No se copia el giro del hueso de la cabeza: la mirada es una intención, por fases.
  * - AL FRENTE quiere decir AL JURADO: la mirada apunta a la mesa de los árbitros (`mira`: [alto, z] en m; inclinación entre
  *   `frente[0]` y `frente[1]` rad), así el punto que se mira no cambia mientras el cuerpo baja y sube. Lente de `fov`° de alto.
- * - PREPARACIÓN: mientras las manos van a la barra (del `baja[0]` al `baja[1]` del recorrido) baja la vista hacia ella, no más
- *   de `abajo` rad: se ven antebrazos y manos yendo a la barra. Antes de llegar (del `baja[2]` al `baja[3]`) ya la está
- *   levantando: con la barra tomada mira al jurado. CON LA BARRITA EN PANTALLA Y DURANTE TODO EL LEVANTAMIENTO LA MIRADA ESTÁ
- *   EN EL JURADO (nunca el piso en picado): la barrita se juega con respiración honda, el lente que late y los bordes oscuros.
+ * - PREPARACIÓN, EL VISTAZO A LA BARRA (17-nov, decidido con el dueño; `vistazo`): cuando las manos van a la barra del piso
+ *   (del `baja[0]` al `baja[1]` del recorrido) la vista baja hacia el punto medio entre las dos manos, `sobre` rad por encima
+ *   (las manos quedan en la mitad de abajo de la imagen, con los antebrazos y la barra), entre `min` y `max` rad; con la barra
+ *   tomada se queda `dura` s (se ve el agarre y el magnesio; como mucho `tope` s en total) y vuelve al jurado. El lente se abre
+ *   hasta `fov`° mientras mira abajo. Solo con la barra abajo de `bajo` × estatura/1,70 m y sin la barrita en pantalla: el
+ *   juego (main.js, `vistazo`) hace el gesto ANTES de que aparezca la barrita. Con movimiento reducido, sin vistazo.
+ *   CON LA BARRITA EN PANTALLA Y DURANTE TODO EL LEVANTAMIENTO LA MIRADA ESTÁ EN EL JURADO (nunca el piso en picado): la
+ *   barrita se juega con respiración honda, el lente que late y los bordes oscuros.
  * - LEVANTAMIENTO: el mundo baja y sube con el cuerpo; la barra cruza la vista de verdad, de abajo hacia arriba (con una
  *   estela corta: `estela` del desplazamiento en pantalla), y queda arriba, fuera de la imagen. Lo que pasa se sigue en el recuadro.
  * - BARRA SUELTA: la barra cae por delante cruzando la vista; la mirada baja `suelta[0]` rad detrás del golpe durante
@@ -242,7 +246,7 @@ export const PLANOS = {
  * - RECUADRO («doble visión», `RECUADRO`): mientras tanto, una pantalla chica muestra el levantamiento desde afuera (ver _recuadro).
  */
 export const POV = { fov: 62, fovAncho: 104, cerca: .06, arriba: .1, adelante: .085, sigue: 30, mira: [1.15, 7.4], frente: [-.2, .12], abajo: -.96,
-  baja: [.08, .35, .6, .92], toma: [.14, .3], suelta: [-.2, .9, .35], muelle: 7, vMax: 1, sinCabeza: .6, cercaOjo: .09, foco: 6,
+  baja: [.08, .35, .6, .92], toma: [.14, .3], vistazo: { sobre: .17, max: -1.31, min: -1.05, dura: .9, llego: .09, tope: 3.2, fov: 8, bajo: .5 }, suelta: [-.2, .9, .35], muelle: 7, vMax: 1, sinCabeza: .6, cercaOjo: .09, foco: 6,
   resp: { hz: .27, y: .004, cabeceo: .005, balanceo: .003, tension: 2.4 }, temblor: .006, latido: { hz: 1.15, fov: .22 }, estela: .6 };
 /**
  * Recuadro de la primera persona: `ancho` del lienzo (`angosto` si mide menos de 900 px), alto = ancho × `alto`, pegado al
@@ -759,6 +763,14 @@ export class Escena {
     this.pov = on ? { p: new THREE.Vector3(), inc: 0, vInc: 0, rum: 0, vRum: 0, t: 0, nueva: true } : null; this.rig.propia = on ? this._povFn : null;
     if (!on) { cam.near = .25; cam.updateProjectionMatrix(); const x = this._sinTorso; this._torso(x, 0); if (x?.skin?.uCercaOjo) x.skin.uCercaOjo.value = 0; if (this.velo) { this.velo.style.boxShadow = ''; this._veloT = 0; } if (this.recuadro.el) this.recuadro.el.hidden = true; }
   }
+  /** El vistazo a la barra de la preparación está en curso (la vista baja, mira el agarre o todavía no volvió al jurado). */
+  get vistazo() { const S = this.pov; return !!S && !this.reduceMotion && (S.vz > 0 || S.inc < -.26); }
+  /** Las dos manos en la imagen de este cuadro: posición en la pantalla (-1 a 1) y si entran las dos (con 4 % de aire). */
+  manosEnVista() {
+    const a = this.activo, cam = this.rig.camera; if (!a) return null;
+    const m = ['LeftHand', 'RightHand'].map(k => { const p = a.boneWorld(k, new THREE.Vector3()).project(cam); return [Math.round(p.x * 1e3) / 1e3, Math.round(p.y * 1e3) / 1e3, p.z < 1 && p.z > -1]; });
+    return { manos: m, dentro: m.every(p => p[2] && Math.abs(p[0]) < .96 && Math.abs(p[1]) < .96) };
+  }
   /** Punto de los ojos del pesista (m, mundo), de los huesos: no usa los ejes del hueso de la cabeza. */
   ojos(out) {
     const a = this.activo; if (!a) return out.set(0, 1.6, .1);
@@ -796,9 +808,16 @@ export class Escena {
         incT = alJurado + POV.suelta[0] * k; if (b.z < S.p.z - .15) rumT = POV.suelta[2] * k;
       } else {
         // cuánto del camino de las manos a la barra va hecho (desde lo más lejos que estuvieron): baja la vista a mitad de camino y la levanta antes de llegar
-        S.tS = 0; S.lejos = Math.max(S.lejos || 0, dist); const p = S.lejos > .25 ? 1 - dist / S.lejos : 1, baja = paso(p, POV.baja[0], POV.baja[1]) * (1 - paso(p, POV.baja[2], POV.baja[3]));
-        if (dist < POV.toma[0]) S.lejos = 0;      // ya la tiene: el próximo recorrido empieza de cero
-        if (!conBarrita) incT += (aBarra - incT) * baja;
+        S.tS = 0; S.lejos = Math.max(S.lejos || 0, dist); const p = S.lejos > .25 ? 1 - dist / S.lejos : 1, V = POV.vistazo, tomada = dist < POV.toma[0];
+        if (tomada) S.lejos = 0;      // ya la tiene: el próximo recorrido empieza de cero
+        // el vistazo (ver POV): 1 = las manos van a la barra del piso; 2 = la tiene y la mira `dura` s; 0 = al jurado
+        if (conBarrita || b.y > V.bajo * (this.P?.h || 1.7) / 1.7) S.vz = 0;
+        else if (!tomada && S.lejos > .25 && p > POV.baja[0]) { S.vz = 1; S.vzT = 0; S.vzE = 0; }
+        else if (tomada && S.vz === 1) S.vz = 2;
+        if (S.vz === 2) { S.vzE += dt; if (S.llego) S.vzT += dt; if (S.vzT >= V.dura || S.vzE >= V.tope) S.vz = 0; }
+        const kv = S.vz === 1 ? paso(p, POV.baja[0], POV.baja[1]) : S.vz === 2 ? 1 : 0; S.llego = false;
+        if (kv > 0) { const obj = Math.max(V.max, Math.min(V.min, Math.atan2(hm.y - S.p.y, Math.max(.05, hm.z - S.p.z)) + V.sobre)); incT += (obj - incT) * kv; S.llego = kv === 1 && Math.abs((S.inc || 0) - obj) < V.llego; }
+        void aBarra;
       }
     }
     // resorte con amortiguamiento crítico y tope de velocidad: la cabeza se mueve leve, sin rebotes
@@ -818,7 +837,7 @@ export class Escena {
     S.torso = 1; this._torso(a, S.torso);
     if (a?.skin?.uCorte) a.skin.uCorte.value = .8; if (a?.skin?.uCercaOjo) a.skin.uCercaOjo.value = POV.cercaOjo;
     if (this.velo && Math.abs((this._veloT || 0) - tension) > .02) { this._veloT = tension; this.velo.style.boxShadow = tension > .02 ? `inset 0 0 ${(tension * 22).toFixed(1)}vmin ${(tension * 6).toFixed(1)}vmin rgba(0,0,0,${(.5 * tension).toFixed(2)})` : ''; }
-    const fov = Math.min(POV.fov, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(POV.fovAncho / 2)) / Math.max(.5, cam.aspect)))) * (1 - (1 - R.zoom) * .5) - fovK;
+    const fov = Math.min(POV.fov, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(POV.fovAncho / 2)) / Math.max(.5, cam.aspect)))) * (1 - (1 - R.zoom) * .5) - fovK + (quieto ? 0 : POV.vistazo.fov * paso(alJurado - S.inc, .35, .9));
     cam.fov = fov; cam.near = POV.cerca; cam.updateProjectionMatrix(); cam.updateMatrixWorld();
     R.focusDistance = POV.foco; R.target.set(S.p.x, S.p.y, S.p.z + POV.foco); R.subject.copy(R.target);
   }
