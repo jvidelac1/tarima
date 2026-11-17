@@ -201,6 +201,7 @@ def _masas(Q,nx,ny,nz,J,K,RK,wT):
     zg=(Q[:,2]-H[2])/K; B+=K*g['gluteo']*.0230*sm(.10,.60,ny)*G(np.hypot((Q[:,0]/K-.092)/.082,(zg+.012)/.105),1.)*sm(-.20,-.11,zg)
     # ---- muslo (0 = cadera, 1 = rodilla): recto femoral, vasto lateral (barrido externo), vasto medial (gota sobre la rodilla), aductores, isquios ----
     t,r,th=_limb(Q,H,Kn); lw=sm(.0,.30,t)*sm(1.09,.99,t)*sm(.17*K*RK[2],.14*K*RK[2],r)*sm(H[2]+.03*K,H[2]-.02*K,Q[:,2])     # entra en degradé largo desde la ingle: con borde corto quedaba un escalón
+    lw=lw*(1-sm(.0,.5,-nx)*sm(.055*K,.015*K,Q[:,0]))     # la cara interna junto a la línea media no crece: los muslos se cruzaban en la entrepierna (ANTROM entrepierna 0,364)
     B+=lw*K*(g['cuadriceps']*(.0100*V(t,.06,.42,.84)*A(th,-4,.36)+.0135*V(t,.10,.52,.92)*A(th,-64,.48)+.0125*V(t,.52,.80,.97)*A(th,44,.36))
         +g['muslo']*.0180*V(t,-.05,.58,1.14)*(1-.35*A(th,90,.7))     # grosor del muslo entero (menos por dentro), que llega lleno hasta arriba de la rodilla
         +g['aductor']*.0050*V(t,.04,.26,.62)*A(th,98,.50)
@@ -229,6 +230,17 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     tint(np.clip(.5+lo*1.8,0,1)*.20,MEL); tint(np.clip(mid*2.4,0,1)*.13,HEM); tint(np.clip(-mid*2.4,0,1)*.08,MEL); col*=1+fine[:,:,None]*.06
     pore=T.n2(2.4,4)+T.n3(950,15)*.8; H+=mid*.00008+fine*.00003+T.n2(1,3)*.00001        # relieve medio, grano fino y poro a escala de texel (el poro por zona se suma más abajo)
     rough+=fine*.12+lo*.08+pore*.05
+    if STY.get('piel2'):
+        # Piel por zonas (plantel con físico anatómico). La base era un tono parejo con moteado: se leía plástico. Capas, todas suaves y por reglas:
+        # sol (lo que mira arriba y afuera, más melanina; cara interna de brazos y muslos, más clara), sangre (hombros, escote, cuello, rodillas),
+        # moteado ancho de la circulación, lunares escasos, y brillo más graso en hombros y trapecio.
+        P2=STY['piel2']; arm=np.maximum(F('farmL'),F('farmR')); out_=sm(.1,.7,nxo*np.sign(x+1e-6)); up=sm(.15,.8,nz)
+        hd0=F('head'); cuerpo_=1-hd0
+        tint(cuerpo_*(up*.09+out_*.06)*P2,MEL); col*=1+(cuerpo_*sm(.1,.7,-nxo*np.sign(x+1e-6))*sm(.06,.14,axo)*.07*P2)[:,:,None]
+        hom=cuerpo_*sm(sh[2]-.10*K,sh[2]+.02*K,z)*sm(neck[2]+.09*K,neck[2]+.03*K,z); tint(hom*(.35+.65*blot)*.16*P2,HEM)
+        liv=np.clip(.5+T.n3(26,71,2)*2.4,0,1)*np.clip(.5+T.n3(9,72,2)*2.,0,1); tint(cuerpo_*liv*.11*P2,HEM); tint(cuerpo_*(1-liv)*.05*P2,(.97,1.0,.985))
+        lun=sm(.80,.86,T.n3(210,73,1))*sm(.58,.7,T.n3(31,74,1))*cuerpo_; mix(lun*.55*P2,SKIN*np.array([.45,.36,.30],f32),.7)
+        rough-=cuerpo_*hom*.07*P2; del arm,out_,up,hom,liv,lun,hd0,cuerpo_
     head=F('head'); ears=F('ears'); eL,nose,lips,chin,ear=LM['eyeL'],LM['nose'],LM['lips'],LM['chin'],LM['ears']; er=float(LM['eyeR_r'][0]); hs=float(eL[0]/.0288)
     cheek=T.g((.048*hs,eL[1]+.012,(nose[2]+lips[2])/2+.008),.030*hs,True)
     tint(head*(cheek*.42+T.g(nose+(0,.012,.004),.022*hs)*.45+T.g(chin+(0,-.012,.012),.022*hs)*.18)+ears*.5+head*.10*blot,HEM)
@@ -312,7 +324,9 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     for i in range(0,len(T.P),C_): aB[i:i+C_],aF[i:i+C_],aS[i:i+C_]=anatomy(T.P[i:i+C_],Nn[i:i+C_],Jh,K)
     aB,aF,aS=T.img(aB),T.img(aF),T.img(aS); del Nn
     aF-=aS*(1-np.abs(2*T.nq(((axo*.67-z*.74)*45,(axo*.74+z*.67)*650,y*650),48)))**2*.00005*STY.get('cut',1.)
-    aZ=sm(chin[2],chin[2]-.02,z); anatH=(aB*ANAT.get('normal',ANAT_NORMAL)+aF*ANAT.get('fino',ANAT_FINE))*aZ*STY.get('cut',1.); anatC=aF*aZ; del aB,aS
+    aZ=sm(chin[2],chin[2]-.02,z); anatH=(aB*ANAT.get('normal',ANAT_NORMAL)+aF*ANAT.get('fino',ANAT_FINE))*aZ*STY.get('cut',1.); anatC=aF*aZ
+    # físico anatómico: el hueco entre vientres (masa menos su promedio en ~2,5 cm) oscurece la oclusión y el color, que el AO horneado no ve (se horneó sin el relieve)
+    anatB=((aB-blur(aB,.025/T.texel))*aZ*STY.get('cut',1.)).astype(f32) if ANAT.get('fisico')=='anatomico' else None; del aB,aS
     skinH=H; H=np.zeros((R,R),f32)                     # a partir de acá, H es el relieve propio de cada prenda
     # ================= MALLA (lycra) =================
     E=.012; front=y<neck[1]
@@ -470,7 +484,9 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     H=skinH*(1-cloth)+lipH+(thick+H)*edge+hairH+chalkH+dp*.00013+anatH*am
     del skinH,lipH,hairH,chalkH
     nrm=normal_from_height(H,T.su,T.sv,T.ok)
-    cavA=np.clip(1+anatC*am*(115/K),.70,1.05); del anatC                              # los surcos entre grupos musculares oscurecen (son anchos: el pasa-altos de 3 px no los ve)
+    cavA=np.clip(1+anatC*am*(115/K),.70,1.05) if anatB is None else np.clip(1+anatC*am*(70/K),.84,1.04)     # anatómico: el surco ya está en la malla y en el normal; pintado fuerte se leía como una línea de tinta
+    if anatB is not None: cavA=cavA*np.clip(1+anatB*am*(42/K),.80,1.05)
+    del anatC                              # los surcos entre grupos musculares oscurecen (son anchos: el pasa-altos de 3 px no los ve)
     aoS=T.ao*(1-suit)+blur(T.ao,22*S)*suit
     aoS=aoS*(1-gn)+np.maximum(aoS,.97)*gn; cavA=cavA*(1-gn)+gn
     cav=np.clip(1+(H-blur(H,3*S))*900,0.55,1.1); ao=np.clip((.12+.88*aoS)*cav*cavA,0,1)
