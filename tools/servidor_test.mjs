@@ -84,8 +84,15 @@ ok(['2026-11-a', '2026-11-b', '2026-11-c', '2026-11-d', '2026-11-e'].every(v => 
   ok(!/once a month|a month|monthly|una por mes|al mes|por mes|mensual/i.test(priv), 'la privacidad no dice la frecuencia de las novedades');
   ok(/dos preguntas/.test(priv) && /two-question survey/.test(priv), 'la privacidad describe la encuesta de dos preguntas');
   // LIF-53: la encuesta ahora es un camino del cartel (desbloquea el juego libre) y lo dice
-  ok(/Cualquiera de las dos te deja jugar sin límite/.test(priv) && /Either one lets you play with no limit/.test(priv), 'la privacidad dice que la encuesta desbloquea el juego libre');
-  ok(!/no da ni quita nada|doesn't unlock or change anything/.test(priv), 'la privacidad ya no dice que la encuesta no da nada');
+  // el texto de la encuesta tiene que decir lo que hace la regla que se publica (worker/wrangler.jsonc): con ENCUESTA_LIBRE "1"
+  // (LIF-53) la encuesta desbloquea el juego libre; con "0" (producción al 17-nov) es opcional y no da ni quita nada
+  if (varsDelWorker().ENCUESTA_LIBRE === '1') {
+    ok(/Cualquiera de las dos te deja jugar sin límite/.test(priv) && /Either one lets you play with no limit/.test(priv), 'la privacidad dice que la encuesta desbloquea el juego libre');
+    ok(!/no da ni quita nada|doesn't unlock or change anything/.test(priv), 'la privacidad ya no dice que la encuesta no da nada');
+  } else {
+    ok(/no da ni quita nada/.test(priv) && /doesn't unlock or change anything/.test(priv), 'la privacidad dice que la encuesta es opcional y no da ni quita nada');
+    ok(!/Cualquiera de las dos te deja jugar sin límite|Either one lets you play with no limit/.test(priv), 'la privacidad no promete que la encuesta desbloquea el juego libre');
+  }
 }
 {
   // Textos del muro y de la encuesta (docs/MVP.md 4.5): el muro solo pide el correo; la encuesta nueva, exacta.
