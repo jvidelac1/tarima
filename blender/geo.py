@@ -111,6 +111,9 @@ def chest_smooth(b,rig,K,iters=30):
     names,W=wget(b); W0=W.copy()
     for _ in range(14):
         A=np.zeros_like(W); np.add.at(A,E[:,0],W[E[:,1]]); np.add.at(A,E[:,1],W[E[:,0]]); W=W+(A/deg-W)*(.6*w)[:,None]
+    import tex
+    if tex.ANAT.get('fisico')=='anatomico':     # y dentro del racimo de la punta, los pesos del anillo que lo rodea (el laplaciano por aristas no lo cruza)
+        for den,an,M,mz in punta_interp(b,rig,K): W[den]=W[den]*(1-mz)[:,None]+(M@W[an])*mz[:,None]
     W/=np.maximum(W.sum(1,keepdims=True),1e-9); rows=np.nonzero((w>.02)&(np.abs(W-W0).max(1)>1e-4))[0]; wset(b,names,W,rows)
     print(f'PECHO pesos suavizados en {len(rows)} vértices (cambio máx {np.abs(W-W0).max():.3f})')
     print(f'PECHO liso: {int((w>.05).sum())} vértices, punta más alta {p0*1000:.2f} mm -> {punta(c)*1000:.2f} mm, desplazamiento máx {np.linalg.norm(c-co,axis=1).max()*1000:.1f} mm')
@@ -266,6 +269,11 @@ def correctives(b,rig,K,fem=False):
     for p in b.data.polygons:
         if p.material_index in mi: body[list(p.vertices)]=True
     for k in keys: keys[k]=keys[k]*body[:,None]
+    import tex
+    if tex.ANAT.get('fisico')=='anatomico':     # el delta del correctivo en el racimo de la punta del pecho: lo que vale alrededor (ver punta_interp)
+        for den,an,M,mz in punta_interp(b,rig,K):
+            for k in keys: keys[k][den]=keys[k][den]*(1-mz)[:,None]+(M@keys[k][an])*mz[:,None]
+        print('CORR punta del pecho: delta interpolado desde el anillo')
     b.shape_key_add(name='Basis')
     for k,dv in keys.items():
         sk=b.shape_key_add(name=k); sk.data.foreach_set('co',(co+dv).ravel()); sk.value=0
@@ -562,3 +570,26 @@ def anat_vol(b,rig,K,cut=1.):
         if all(body[i] for i in p.vertices):
             for i in p.vertices: ar[i]+=p.area/len(p.vertices)
     return float((d*ar).sum())
+
+def punta_interp(b,rig,K):
+    """Racimo de polígonos diminutos del frente del pecho (areola de la malla base), de cada lado: devuelve [(índices del racimo, índices del anillo que lo
+    rodea, matriz de interpolación racimo x anillo, mezcla por vértice)]. Sirve para que una magnitud por vértice (pesos de piel, delta de un correctivo) valga
+    adentro lo que vale alrededor: el suavizado por aristas no cruza el racimo, y con los brazos arriba quedaban dos puntas bajo la malla."""
+    co=coords(b); me=b.data; N=len(co); no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3); sh=head(rig,'LeftArm')
+    E=np.empty(len(me.edges)*2,int); me.edges.foreach_get('vertices',E); E=E.reshape(-1,2); deg=np.maximum(np.bincount(E.ravel(),minlength=N),1)
+    z=co[:,2]; ax=np.abs(co[:,0]); w=(no[:,1]<-.15)*sm(sh[2]-.76*K,sh[2]-.66*K,z)*sm(sh[2]-.05*K,sh[2]-.10*K,z)*sm(.27*K,.22*K,ax)
+    el=np.linalg.norm(co[E[:,0]]-co[E[:,1]],axis=1); ml=np.zeros(N); np.add.at(ml,E[:,0],el); np.add.at(ml,E[:,1],el); ml/=deg; RN=.036*K; out=[]
+    mi=[i for i,m in enumerate(me.materials) if m.name=='Body']; cu=np.ones(N,bool)
+    if mi and len(me.materials)>1:     # ya unido con pelo, zapatillas y cinturón: solo la piel
+        cu[:]=False
+        for p in me.polygons:
+            if p.material_index in mi: cu[list(p.vertices)]=True
+    w=w*cu
+    for sgn in (1,-1):
+        cand=(w>.3)&(co[:,0]*sgn>.03*K)
+        if not cand.any(): continue
+        i=int(np.argmin(np.where(cand,ml,9.))); d=np.linalg.norm(co-co[i],axis=1); fr=(no[:,1]<0)&cu
+        den=np.nonzero(fr&(d<RN))[0]; an=np.nonzero(fr&(d>=RN)&(d<1.7*RN))[0]
+        if len(den)<3 or len(an)<8: continue
+        D=np.linalg.norm(co[den][:,None,:]-co[an][None,:,:],axis=2); M=1/(D**4+1e-12); M/=M.sum(1,keepdims=True); out.append((den,an,M,sm(RN,RN*.75,d[den])))
+    return out

@@ -130,15 +130,21 @@ def _build(name,cfg,x):
     BN={x.name[10:]:x for x in rig.data.bones}; P=lambda n:BN[n].head_local
     H=cfg['height']; fem=(P('LeftLeg')-P('LeftUpLeg')).length; tib=(P('LeftFoot')-P('LeftLeg')).length; ua=(P('LeftForeArm')-P('LeftArm')).length; fa=(P('LeftHand')-P('LeftForeArm')).length; tor=P('LeftArm').z-P('LeftUpLeg').z
     say(f'MEASURE {name}: H={H:.2f} femur={fem:.3f} ({fem/H:.3f}) tibia={tib:.3f} ({tib/H:.3f}) torso={tor:.3f} ({tor/H:.3f}) arm={ua+fa:.3f} ({(ua+fa)/H:.3f}) fem/tor={fem/tor:.2f} shW={P("LeftArm").x*2:.3f} ankle_x={P("LeftFoot").x:.3f}')
-    kc=cfg.get('cabeza',1.)
-    if abs(kc-1)>1e-4:
-        # cabeza a escala del cuerpo: se escala pareja alrededor de la articulación de la cabeza, con el peso del hueso Head (el cuello acompaña en degradé).
-        # Los targets head-scale-* de MPFB la deforman (aplastan la coronilla); así conserva la cara de la ficha.
-        gh=b.vertex_groups['mixamorig:Head'].index; pv=BN['Head'].head_local.copy()
+    cm_=cfg.get('cabeza_meta')
+    if cm_:
+        # cabeza a escala del cuerpo: se mide (coronilla a mentón) y se escala pareja alrededor de la articulación de la cabeza hasta estatura / cabeza_meta,
+        # con el peso del hueso Head (el cuello acompaña en degradé). Los targets head-scale-* de MPFB la deforman (aplastan la coronilla); así conserva la cara de la ficha.
+        gh=b.vertex_groups['mixamorig:Head'].index; gb_=b.vertex_groups['body'].index; pv=BN['Head'].head_local.copy(); wh={}
         for v in me.vertices:
-            w=next((g.weight for g in v.groups if g.group==gh),0.)
-            if w>0: v.co=pv+(v.co-pv)*(1+(kc-1)*w)
-        me.update(); say(f'CABEZA {name}: escala {kc:.3f} alrededor de la articulación')
+            w=0.; inb=False
+            for g in v.groups:
+                if g.group==gh: w=g.weight
+                elif g.group==gb_: inb=True
+            if w>0: wh[v.index]=(w,inb)
+        hv=[me.vertices[i].co for i,(w,inb) in wh.items() if inb and w>.6]; top=max(c.z for c in hv); yn=min(c.y for c in hv); chin=min(c.z for c in hv if abs(c.x)<.015 and c.y<yn+.045)
+        kc=max(.88,min(1.10,(cfg['height']/cm_)/(top-chin)))
+        for i,(w,inb) in wh.items(): v=me.vertices[i]; v.co=pv+(v.co-pv)*(1+(kc-1)*w)
+        me.update(); say(f"CABEZA {name}: alto {(top-chin)*100:.1f} cm (estatura / {cfg['height']/(top-chin):.2f}) -> escala {kc:.3f} alrededor de la articulación (meta estatura / {cm_})")
     if cfg.get('fisico')=='anatomico':
         import geo,tex; S_=plantel.STYLES[name]; tex.ANAT.update(S_.get('anat',{})); me.update(); DVOL[name]=geo.anat_vol(b,rig,H/1.687,S_.get('cut',1.))
     return b,rig,dict(femur=fem/H,tibia=tib/H,brazo=(ua+fa)/H,hombros=P('LeftArm').x*2/H,antebrazo=fa/(ua+fa)),lines
