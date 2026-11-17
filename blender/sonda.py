@@ -34,7 +34,7 @@ for n in names:
     w=bpy.data.worlds.new('w'); w.use_nodes=True; w.node_tree.nodes['Background'].inputs[0].default_value=(.05,.055,.07,1); sc.world=w
     def light(nm,loc,e,size):
         l=bpy.data.lights.new(nm,'AREA'); l.energy=e; l.size=size; o=bpy.data.objects.new(nm,l); sc.collection.objects.link(o); o.location=loc; o.rotation_euler=(Vector((0,0,1))-Vector(loc)).to_track_quat('-Z','Y').to_euler()
-    light('k',(3,-3.5,3.4),900,2.5); light('f',(-3.5,-2.5,1.5),350,3.5); light('r',(-2.5,3.5,2.8),500,2); light('r2',(3.5,2.5,2.2),300,2)
+    light('k',(3.2,-3.2,3.6),1500,1.2); light('f',(-3.5,-2.5,1.5),90,3.5); light('r',(-3.2,3.2,3.6),1500,1.2); light('r2',(3.5,2.5,1.5),90,3.5)     # luz dura y lateral: se lee el relieve
     cam=bpy.data.objects.new('cam',bpy.data.cameras.new('cam')); sc.collection.objects.link(cam); cam.data.type='ORTHO'; cam.data.ortho_scale=SPAN*max(W,Hh)/Hh; sc.camera=cam
     ims=[]
     for vw,loc in (('frente',(0,-9,ZC)),('costado',(9,0,ZC)),('tres4',(6,-6.7,ZC)),('espalda',(0,9,ZC))):

@@ -130,6 +130,15 @@ def _build(name,cfg,x):
     BN={x.name[10:]:x for x in rig.data.bones}; P=lambda n:BN[n].head_local
     H=cfg['height']; fem=(P('LeftLeg')-P('LeftUpLeg')).length; tib=(P('LeftFoot')-P('LeftLeg')).length; ua=(P('LeftForeArm')-P('LeftArm')).length; fa=(P('LeftHand')-P('LeftForeArm')).length; tor=P('LeftArm').z-P('LeftUpLeg').z
     say(f'MEASURE {name}: H={H:.2f} femur={fem:.3f} ({fem/H:.3f}) tibia={tib:.3f} ({tib/H:.3f}) torso={tor:.3f} ({tor/H:.3f}) arm={ua+fa:.3f} ({(ua+fa)/H:.3f}) fem/tor={fem/tor:.2f} shW={P("LeftArm").x*2:.3f} ankle_x={P("LeftFoot").x:.3f}')
+    kc=cfg.get('cabeza',1.)
+    if abs(kc-1)>1e-4:
+        # cabeza a escala del cuerpo: se escala pareja alrededor de la articulación de la cabeza, con el peso del hueso Head (el cuello acompaña en degradé).
+        # Los targets head-scale-* de MPFB la deforman (aplastan la coronilla); así conserva la cara de la ficha.
+        gh=b.vertex_groups['mixamorig:Head'].index; pv=BN['Head'].head_local.copy()
+        for v in me.vertices:
+            w=next((g.weight for g in v.groups if g.group==gh),0.)
+            if w>0: v.co=pv+(v.co-pv)*(1+(kc-1)*w)
+        me.update(); say(f'CABEZA {name}: escala {kc:.3f} alrededor de la articulación')
     if cfg.get('fisico')=='anatomico':
         import geo,tex; S_=plantel.STYLES[name]; tex.ANAT.update(S_.get('anat',{})); me.update(); DVOL[name]=geo.anat_vol(b,rig,H/1.687,S_.get('cut',1.))
     return b,rig,dict(femur=fem/H,tibia=tib/H,brazo=(ua+fa)/H,hombros=P('LeftArm').x*2/H,antebrazo=fa/(ua+fa)),lines

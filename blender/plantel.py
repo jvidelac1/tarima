@@ -157,7 +157,7 @@ def cfg(k):
     cadera = q['cadera'] if q['cadera'] is not None else (.15 + .15 * t if F else .0 + .15 * t * g)
     gluteos = q['gluteos'] if q['gluteos'] is not None else (.30 if F else .25) + .10 * t
     an = p.get('fisico') == 'anatomico'     # físico anatómico: el volumen va a los grupos musculares (muslo, glúteo, gemelo, hombro) y sale de la cintura y del cuello
-    cintura = q['cintura'] if q['cintura'] is not None else ((.10 if F else .0) if an else (.15 if F else .25)) + .65 * g
+    cintura = q['cintura'] if q['cintura'] is not None else ((.15 if F else .15) if an else (.15 if F else .25)) + .65 * g
     if an and q['gluteos'] is None: gluteos += .25
     if F: extra_f = [('breast/breast-point-decr', 1.), ('breast/breast-volume-vert-up', .3), ('breast/nipple-size-decr', 1.), ('breast/nipple-point-decr', 1.)]     # busto contenido por el top deportivo: sin punta
     else: extra_f = []
@@ -196,18 +196,19 @@ def cfg(k):
              ('stomach/stomach-pregnant-incr', _clip(.45 * g * g, 0, 1)), ('torso/torso-scale-depth-incr', _clip(.5 * g, 0, 1)), ('head/head-fat-incr', _clip((.7 if F else .5) * g, 0, 1)), ('neck/neck-double-incr', _clip((.5 if F else .2) * g * g, 0, 1))]     # el cuello del pesado tiene que existir: con más papada y cabeza llena quedaba hundido entre los hombros
     if an:
         d = 1 - .6 * g
-        extra += [('legs/measure-thigh-circ-incr', (.55 if F else .8) * mu * d), ('legs/measure-calf-circ-incr', (.3 if F else .45) * mu * d), ('torso/torso-vshape-incr', (.1 if F else .22) * _clip(1 - 1.3 * g, 0, 1)),
-                  # cabeza a escala del cuerpo macizo: la base de MPFB la deja en estatura / 7,2 (meta 7,4 a 7,7)
-                  ('head/head-scale-vert-decr', .35 * (1 - g)), ('head/head-scale-horiz-decr', .30 * (1 - g)), ('head/head-scale-depth-decr', .30 * (1 - g))] + list(p.get('extra', []))
+        # muslo y pantorrilla gruesos en todo el largo ('scale' del segmento). Con 'measure-thigh-circ' y 'measure-calf-circ' (una franja) salía un globo arriba y la rodilla fina (sonda 44012134794)
+        sl, sc_ = (.4 if F else .55) * mu * d, (.2 if F else .3) * mu * d
+        extra += [(f'legs/{s_}-upperleg-scale-{e_}-incr', sl) for s_ in 'lr' for e_ in ('horiz', 'depth')] + [(f'legs/{s_}-lowerleg-scale-{e_}-incr', sc_) for s_ in 'lr' for e_ in ('horiz', 'depth')]
+        extra += [('torso/torso-vshape-incr', (.1 if F else .22) * _clip(1 - 1.3 * g, 0, 1))] + list(p.get('extra', []))
     # Si con el macro 'weight' al máximo la masa no alcanza (categorías abiertas), body.py suma este paquete de volumen de 0 a 1.
     volumen = [('torso/torso-scale-horiz-incr', .7), ('torso/torso-scale-depth-incr', .55), ('stomach/stomach-pregnant-incr', .15), ('hip/hip-scale-depth-incr', .3), ('buttocks/buttocks-volume-incr', .12), ('hip/hip-scale-horiz-incr', .35),
                ('torso/measure-waist-circ-incr', .5), ('neck/measure-neck-circ-incr', .12 if F else .22)] + [(f'{a}/{s_}-{b_}', w) for s_ in 'lr' for a, b_, w in (('legs', 'upperleg-fat-incr', .9), ('legs', 'lowerleg-fat-incr', .5))]     # sin brazos en el paquete: al superpesado le inflaba hombros y brazos como globos («deforme», dueño 16-nov); la masa va a tronco, panza, cadera y muslos
     return dict(height=H, macro=macro, legs=dict(up=0, low=0), arms=dict(up=0, low=0), torso=q['torso'], extra=extra + extra_f, face=list(p.get('cara', [])),
                 metas=dict(femur=q['femur'], tibia=q['tibia'], brazo=q['brazo'], hombros=q['hombros'], antebrazo=q['antebrazo']),
-                musc=musc, masa=m, rho=1.07 - .07 * g, volumen=volumen, fisico=p.get('fisico'), genero=p['genero'], categoria=p['categoria'])
+                musc=musc, masa=m, rho=1.07 - .07 * g, volumen=volumen, fisico=p.get('fisico'), cabeza=p.get('cabeza', (1. if F else .955 + .03 * g) if an else 1.), genero=p['genero'], categoria=p['categoria'])
 
 # ganancia de cada grupo muscular del físico anatómico (tex.GRUPOS). La mujer: piernas, glúteo y espalda de pesista; tren superior más liviano y sin pectoral marcado
-_GRUPOS_M = dict(deltoide=1., biceps=1., triceps=1., antebrazo=1., pectoral=1., trapecio=1., dorsal=1., erectores=1., gluteo=1., cuadriceps=1., isquios=1., aductor=1., gemelos=1., codo=1., rodilla=1., cintura=1.)
+_GRUPOS_M = dict(deltoide=1.1, biceps=1., triceps=1., antebrazo=.8, pectoral=1., trapecio=.8, dorsal=1.1, erectores=1., gluteo=1.2, cuadriceps=1.45, isquios=1.3, aductor=1., gemelos=1.2, codo=1., rodilla=1., cintura=1.)
 _GRUPOS_F = dict(deltoide=.6, biceps=.45, triceps=.5, antebrazo=.5, pectoral=0., trapecio=.5, dorsal=.6, erectores=.7, gluteo=.9, cuadriceps=.8, isquios=.8, aductor=.6, gemelos=.7, codo=.6, rodilla=.8, cintura=.6)
 def sty(k):
     """Parámetros de indumentaria, piel y pelo para tex.py, geo.py y finish.py (los mismos nombres de clave que usaban ventura y brenner)."""

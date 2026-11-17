@@ -86,7 +86,7 @@ jobs:
         run: |
           mkdir -p out/sonda
           set -o pipefail
-          .venv/bin/python blender/sonda.py ${{ needs.lista.outputs.nombres }} 2>&1 | tee out/sonda/sonda.log | grep --line-buffered -E 'MEASURE|MASA|PROP|SONDA|ANTROM|ANAT|Error|ERROR|Traceback|^ +File "|Exception'
+          .venv/bin/python blender/sonda.py ${{ needs.lista.outputs.nombres }} 2>&1 | tee out/sonda/sonda.log | grep --line-buffered -E 'MEASURE|MASA|PROP|SONDA|ANTROM|ANAT|CABEZA|Error|ERROR|Traceback|^ +File "|Exception'
       - uses: actions/upload-artifact@v6
         if: ${{ always() }}
         with:
@@ -128,7 +128,7 @@ jobs:
           mkdir -p web_ci/models web_ci/data
           set +e -o pipefail     # con cuadros BAD build.sh sale con error: igual hay que juntar las líneas y subir todo
           EXPORT_BAD=1 TARIMA_WEB="$PWD/web_ci" TARIMA_THREADS="$(nproc)" ./build.sh "$N" 2>&1 | tee "out/$N/build.txt"; RC=${PIPESTATUS[0]}
-          grep -ahE '^(POSE|CHK|CHKX|TRAJ|TRAJV|TIMING|PROP|MEASURE|MASA|RADII|SKEL|GRIP|GRIPFIT|UNION|PUSH|HAIR|PELO|ANTRO|ANTROM|BUSTO|PUNTA|PECHO|ANAT|CORR|BUN|GLB|TEX) |^ +(BAD|rack) ' "out/$N/make.log" "out/$N/finish.log" > "out/$N/lineas.txt" || true
+          grep -ahE '^(CABEZA|POSE|CHK|CHKX|TRAJ|TRAJV|TIMING|PROP|MEASURE|MASA|RADII|SKEL|GRIP|GRIPFIT|UNION|PUSH|HAIR|PELO|ANTRO|ANTROM|BUSTO|PUNTA|PECHO|ANAT|CORR|BUN|GLB|TEX) |^ +(BAD|rack) ' "out/$N/make.log" "out/$N/finish.log" > "out/$N/lineas.txt" || true
           echo "== CHK y BAD =="; grep -aE '^CHK|^ +BAD' "out/$N/lineas.txt" || true
           exit "$RC"
       - name: Retratos (blender/ctl3.py sobre el build)
