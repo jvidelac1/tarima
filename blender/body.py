@@ -146,7 +146,7 @@ def _build(name,cfg,x):
         for i,(w,inb) in wh.items(): v=me.vertices[i]; v.co=pv+(v.co-pv)*(1+(kc-1)*w)
         me.update(); say(f"CABEZA {name}: alto {(top-chin)*100:.1f} cm (estatura / {cfg['height']/(top-chin):.2f}) -> escala {kc:.3f} alrededor de la articulación (meta estatura / {cm_})")
     if cfg.get('fisico')=='anatomico':
-        import geo,tex; S_=plantel.STYLES[name]; tex.ANAT.update(S_.get('anat',{})); me.update(); DVOL[name]=geo.anat_vol(b,rig,H/1.687,S_.get('cut',1.))
+        import geo,tex; S_=plantel.STYLES[name]; tex.ANAT.update(S_.get('anat',{})); me.update(); DVOL[name]=1.09*geo.anat_vol(b,rig,H/1.687,S_.get('cut',1.))     # 1,09: en la malla subdividida y con la normal alisada el relieve suma algo más que en la malla base (medido en la sonda: MASA2)
     return b,rig,dict(femur=fem/H,tibia=tib/H,brazo=(ua+fa)/H,hombros=P('LeftArm').x*2/H,antebrazo=fa/(ua+fa)),lines
 if __name__=='__main__':
     boot()

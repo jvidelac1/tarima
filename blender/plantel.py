@@ -201,6 +201,7 @@ def cfg(k):
         # el grosor del muslo no va por targets de MPFB: 'measure-thigh-circ' (una franja) y 'upperleg-scale-horiz/depth' dan un globo arriba y la rodilla fina (sondas 44012134794 y 44012809046). Va en tex._masas ('muslo'), con perfil a lo largo del fémur
         # con grasa (el superpesado): tronco en barril y panza firme, cuello y brazos sin la grasa pareja del macro 'weight' (salían antebrazo 0,22 H y cuello 0,32 H)
         extra += [('torso/torso-scale-depth-incr', (0 if F else .25) + .45 * g), ('torso/torso-scale-horiz-incr', .35 * g), ('stomach/stomach-pregnant-incr', .5 * g * g), ('neck/measure-neck-circ-decr', _clip(1.1 * g, 0, 1))] + [(f'legs/{s_}-upperleg-fat-decr', .6 * g) for s_ in 'lr']     # sin la grasa de la cara interna del muslo (la entrepierna del superpesado bajaba a 0,35 H)
+        if not F: extra += [('legs/measure-knee-circ-incr', .5 * mu * (1 - .5 * g))]     # rodilla y muslo bajo con cuerpo: con el muslo grande arriba quedaba una pera
         if not F: extra += [('genitals/penis-length-decr', 1.), ('genitals/penis-circ-decr', 1.), ('genitals/penis-testicles-decr', 1.)]     # bajo la malla se leía un bulto (hoja de posiciones, extensión)
         extra += [(f'arms/{s_}-lowerarm-fat-decr', _clip(1.2 * g, 0, 1)) for s_ in 'lr'] + [(f'arms/{s_}-upperarm-fat-decr', .3 * g) for s_ in 'lr'] + list(p.get('extra', []))
     # Si con el macro 'weight' al máximo la masa no alcanza (categorías abiertas), body.py suma este paquete de volumen de 0 a 1.
@@ -211,7 +212,7 @@ def cfg(k):
                 musc=musc, masa=m, rho=1.07 - .07 * g, volumen=volumen, fisico=p.get('fisico'), cabeza_meta=p.get('cabeza_meta', (7.5 if F else 7.55) if an else None), genero=p['genero'], categoria=p['categoria'])
 
 # ganancia de cada grupo muscular del físico anatómico (tex.GRUPOS). La mujer: piernas, glúteo y espalda de pesista; tren superior más liviano y sin pectoral marcado
-_GRUPOS_M = dict(deltoide=2.1, biceps=2.0, triceps=1.9, antebrazo=1.5, pectoral=1.6, trapecio=1.5, dorsal=2.1, erectores=1.4, gluteo=1.5, cuadriceps=1.9, isquios=1.6, aductor=1.3, gemelos=1.6, muslo=1.5, codo=1., rodilla=1., cintura=1.)
+_GRUPOS_M = dict(deltoide=2.1, biceps=2.0, triceps=1.9, antebrazo=1.5, pectoral=1.6, trapecio=1.5, dorsal=2.1, erectores=1.4, gluteo=1.6, cuadriceps=1.5, isquios=1.5, aductor=1.3, gemelos=1.6, muslo=1.25, codo=1., rodilla=1., cintura=1.)
 _GRUPOS_F = dict(deltoide=.35, biceps=.2, triceps=.25, antebrazo=.2, pectoral=0., trapecio=.25, dorsal=.3, erectores=.4, gluteo=.55, cuadriceps=.5, isquios=.4, aductor=.2, gemelos=.3, muslo=.45, codo=.4, rodilla=.5, cintura=.0)
 def sty(k):
     """Parámetros de indumentaria, piel y pelo para tex.py, geo.py y finish.py (los mismos nombres de clave que usaban ventura y brenner)."""
@@ -247,7 +248,7 @@ def sty(k):
         # el normal map repite poco de la masa (ya está en la silueta) y carga los surcos finos. Las ventanas radiales se abren porque el miembro es más grueso.
         d = _clip(1 - 1.1 * g, .15, 1)     # definición: con grasa los vientres se funden
         S['fisico'] = 'anatomico'; S['piel2'] = .8 if F else 1.; S['anat'].update(fisico='anatomico', masa=1., geo=(1., .6), normal=.30, fino=1.6, surco=1.25 * d, radios=(1.5, 1.3, 1.3, 1.25),
-                                                    grupos=dict({k_: v_ * (1 + .3 * g if k_ in ('muslo', 'gluteo') else 1 - g if k_ in ('cintura', 'rodilla', 'codo') else 1 - .55 * g) for k_, v_ in (_GRUPOS_F if F else _GRUPOS_M).items()}, **p.get('grupos', {})))     # con grasa: vientres más fundidos, más grosor de muslo y glúteo, sin cintura marcada
+                                                    grupos=dict({k_: v_ * (1. if F else _clip(.55 + .45 * (masa(p) / p['estatura'] ** 2 - 22) / 10, .5, 1.1)) * (1 + .3 * g if k_ in ('muslo', 'gluteo') else 1 - g if k_ in ('cintura', 'rodilla', 'codo') else 1 - .55 * g) for k_, v_ in (_GRUPOS_F if F else _GRUPOS_M).items()}, **p.get('grupos', {})))     # con grasa: vientres más fundidos, más grosor de muslo y glúteo, sin cintura marcada
     if rod:
         # moño: dirección desde el centro de la cabeza (X lateral, +Y atrás, +Z arriba) y radio en m para 1,69 m
         a = math.radians(62 if h['peinado'] == 'rodete_alto' else 18); S['bun'] = dict(dir=(0., math.cos(a), math.sin(a)), r=.043 if h['peinado'] == 'rodete_alto' else .046)

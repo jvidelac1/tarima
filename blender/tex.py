@@ -200,10 +200,10 @@ def _masas(Q,nx,ny,nz,J,K,RK,wT):
     # ---- glúteo: masa redonda atrás de la cadera, con su pliegue abajo ----
     zg=(Q[:,2]-H[2])/K; B+=K*g['gluteo']*.0230*sm(.10,.60,ny)*G(np.hypot((Q[:,0]/K-.092)/.082,(zg+.012)/.105),1.)*sm(-.20,-.11,zg)
     # ---- muslo (0 = cadera, 1 = rodilla): recto femoral, vasto lateral (barrido externo), vasto medial (gota sobre la rodilla), aductores, isquios ----
-    t,r,th=_limb(Q,H,Kn); lw=sm(.0,.30,t)*sm(1.09,.99,t)*sm(.17*K*RK[2],.14*K*RK[2],r)*sm(H[2]+.03*K,H[2]-.02*K,Q[:,2])     # entra en degradé largo desde la ingle: con borde corto quedaba un escalón
+    t,r,th=_limb(Q,H,Kn); lw=sm(.0,.30,t)*sm(1.22,1.06,t)*sm(.17*K*RK[2],.14*K*RK[2],r)*sm(H[2]+.03*K,H[2]-.02*K,Q[:,2])     # entra en degradé largo desde la ingle: con borde corto quedaba un escalón
     lw=lw*(1-sm(.0,.5,-nx)*sm(.055*K,.015*K,Q[:,0]))     # la cara interna junto a la línea media no crece: los muslos se cruzaban en la entrepierna (ANTROM entrepierna 0,364)
-    B+=lw*K*(g['cuadriceps']*(.0100*V(t,.06,.42,.84)*A(th,-4,.36)+.0135*V(t,.10,.52,.92)*A(th,-64,.48)+.0125*V(t,.52,.80,.97)*A(th,44,.36))
-        +g['muslo']*.0180*V(t,-.05,.58,1.14)*(1-.35*A(th,90,.7))     # grosor del muslo entero (menos por dentro), que llega lleno hasta arriba de la rodilla
+    B+=lw*K*(g['cuadriceps']*(.0100*V(t,.06,.42,.84)*A(th,-4,.36)+.0115*V(t,.10,.56,.98)*A(th,-64,.48)+.0160*V(t,.50,.82,1.02)*A(th,44,.38))
+        +g['muslo']*.0180*V(t,-.05,.64,1.30)*(1-.35*A(th,90,.7))     # grosor del muslo entero (menos por dentro), que llega lleno hasta arriba de la rodilla
         +g['aductor']*.0050*V(t,.04,.26,.62)*A(th,98,.50)
         +g['isquios']*(.0085*V(t,.12,.48,.90)*A(th,-150,.40)+.0085*V(t,.12,.50,.92)*A(th,150,.40))
         -g['rodilla']*.0028*V(t,.84,.99,1.10)*(A(th,-90,.5)+A(th,90,.5)))
