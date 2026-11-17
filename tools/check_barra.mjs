@@ -134,7 +134,7 @@ for (const P of PANTALLAS) try {
     const s = await J(estadoEnPagina);
     if (s.errores.length) { mal('error en el juego: ' + s.errores[0]); break; }
     // con `intervalo`, sigue (salteando a los rivales) hasta el panel del fin del arranque y lo mide
-    if (P.intervalo && !TIRA && s.propios >= 3 && s.pantalla === 'intervalo' && s.panel) { await av(450); await tapa('intervalo'); await foto('intervalo'); break; }
+    if (P.intervalo && !TIRA && s.propios >= 3 && s.pantalla === 'intervalo' && s.panel) { await av(1500); await tapa('intervalo'); await foto('intervalo'); break; }
     if (s.propios >= 3 && !(s.intento && s.intento.propio) && s.pantalla !== 'decision' && !(P.intervalo && !TIRA && s.fase !== 'c' && s.lev !== 'c')) break;
     const I = s.intento;
     if (!TIRA) await sigue(s);

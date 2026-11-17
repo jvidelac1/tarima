@@ -59,11 +59,11 @@ const CASOS = [
   { nombre: 'zurdo_740x360', w: 740, h: 360, dpr: 3, url: '&mano=izq', hastaIntentos: 2 },
   // iPhone en Safari de costado, con la barra de direcciones a la vista: quedan unos 340 px de alto
   { nombre: 'safari_844x340', w: 844, h: 340, dpr: 3, seguras: { top: 0, right: 47, bottom: 21, left: 47 }, hastaIntentos: 2 },
-  { nombre: 'android_932x430', w: 932, h: 430, dpr: 3, hastaIntentos: 3, falla: 2, lang: 'en' },      // en inglés (LIF-52: las explicaciones de primera vez en los dos idiomas)
+  { nombre: 'android_932x430', w: 932, h: 430, dpr: 3, hastaPropios: 2, falla: 2, lang: 'en' },      // en inglés (LIF-52: las explicaciones de primera vez en los dos idiomas)
   // LIF-50: parado, sin girar el contenido
   { nombre: 'vertical_390x844', w: 390, h: 844, dpr: 3, vertical: true, partida: true, dedos: true, seguras: { top: 47, right: 0, bottom: 34, left: 0 } },
   { nombre: 'vertical_375x667', w: 375, h: 667, dpr: 2, vertical: true, lang: 'en', url: '&muro=firme&etapa=arranque', hastaPantalla: 'muro' },
-  { nombre: 'vertical_430x932', w: 430, h: 932, dpr: 3, vertical: true, hastaIntentos: 4, falla: 2, seguras: { top: 59, right: 0, bottom: 34, left: 0 } },
+  { nombre: 'vertical_430x932', w: 430, h: 932, dpr: 3, vertical: true, hastaPropios: 2, falla: 2, seguras: { top: 59, right: 0, bottom: 34, left: 0 } },
 ];
 
 async function correr(C) {
@@ -204,7 +204,9 @@ async function correr(C) {
   const sigue = seguidor({ page, tapa, foto: n => foto(n), medidos });
   const probado = { detalle: false, estilo: false }, aprendes = new Set(); let aprendeCerrada = false;
   const vistas = new Set(), pantallas = new Set(); let firma = '', dedosProbados = false, bordesProbados = false, campoSolo = false, nIntentos = 0, ultToque = 0, hecho = '', revisadas = 0;
-  const hasta = s => s.pantalla === 'fin' || (C.hastaIntentos && nIntentos >= C.hastaIntentos) || (C.hastaPantalla && s.pantalla === C.hastaPantalla);
+  // hastaPropios: hasta el llamado que sigue a ese intento propio (su veredicto ya pasó)
+  let masKilos = false;
+  const hasta = s => s.pantalla === 'fin' || (C.hastaIntentos && nIntentos >= C.hastaIntentos) || (C.hastaPropios && s.propios >= C.hastaPropios && s.pantalla === 'llamado') || (C.hastaPantalla && s.pantalla === C.hastaPantalla);
   for (let n = 0; n < 60000; n++) {
     const s = await J(estadoEnPagina);
     if (s.errores.length) throw new Error('error en el juego: ' + s.errores[0]);
@@ -300,7 +302,7 @@ async function correr(C) {
       }
       if (I.parado) { await av(80); await toque(); continue; }
       // un intento tocado en el rojo (lejos del verde): para ver el cartel de un intento que no sale
-      if (g.tipo === 'barra' && C.falla === nIntentos) { await ir(g.objetivo + 699); await toque(); await av(320); continue; }
+      if (g.tipo === 'barra' && C.falla === s.propios + 1) { await ir(g.objetivo + 699); await toque(); await av(320); continue; }
       if (g.tipo === 'barra') { await ir(g.objetivo); await toque(); continue; }      // 'b': toca cuando el puntero pasa por el centro del verde
       if (UNTOQUE.has(g.tipo)) { await av(150); await toque(); continue; }
       if (g.tipo === 'cierre') { const k = g.clave + g.desde; if (I.seDetiene || hecho === k) { await av(30); continue; } await ir(g.objetivo); await toque(); hecho = k; continue; }
@@ -309,7 +311,8 @@ async function correr(C) {
     }
     if (s.panel && !s.sobre) {
       const hay = await J(() => !!document.querySelector('#capa .panel button.ir:not(:disabled)'));
-      if (hay && s.pantalla === 'llamado' && C.falla === nIntentos + 1) for (let i = 0; i < 6; i++) await pulsa('#kg-mas');      // el intento que no sale: 6 kg de más y tocado en el rojo
+      // el intento que no sale: 6 kg de más (una vez: con más kilos sale después de un rival y el llamado vuelve) y tocado en el rojo
+      if (hay && s.pantalla === 'llamado' && C.falla === s.propios + 1 && !masKilos) { masKilos = true; for (let i = 0; i < 6; i++) await pulsa('#kg-mas'); }
       if (hay) { const ok = await pulsa('#capa .panel button.ir'); if (s.pantalla === 'llamado' && ok) nIntentos++; await av(ok ? 50 : 200); continue; }
     }
     await av(['rival', 'decision', 'repeticion', 'repeticion_rival'].includes(s.pantalla) ? 450 : 200);
