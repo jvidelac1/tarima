@@ -86,6 +86,12 @@ def chest_smooth(b,rig,K,iters=30):
     p0=punta(co); c=co.copy()
     for _ in range(iters): c=c+(prom(c)-c)*(.6*w)[:,None]
     me.vertices.foreach_set('co',c.ravel()); me.update()
+    # los pesos de piel también: el suavizado de pesos del hombro (smooth_weights) termina en medio del pecho y ese borde deja un vértice «atrasado» que con los brazos arriba se levanta como una carpa (la punta)
+    names,W=wget(b); W0=W.copy()
+    for _ in range(14):
+        A=np.zeros_like(W); np.add.at(A,E[:,0],W[E[:,1]]); np.add.at(A,E[:,1],W[E[:,0]]); W=W+(A/deg-W)*(.6*w)[:,None]
+    W/=np.maximum(W.sum(1,keepdims=True),1e-9); rows=np.nonzero((w>.02)&(np.abs(W-W0).max(1)>1e-4))[0]; wset(b,names,W,rows)
+    print(f'PECHO pesos suavizados en {len(rows)} vértices (cambio máx {np.abs(W-W0).max():.3f})')
     print(f'PECHO liso: {int((w>.05).sum())} vértices, punta más alta {p0*1000:.2f} mm -> {punta(c)*1000:.2f} mm, desplazamiento máx {np.linalg.norm(c-co,axis=1).max()*1000:.1f} mm')
 SIMPLIFY=1.0   # fracción de caras que se conserva en las zonas simplificables. 1 = no simplificar (por defecto; TARIMA_SIMP=0.32 lo activa).
 # Queda apagado: esas zonas son solo el 9 % de las caras del cuerpo (la cabeza es el 37 % y las manos el 28 %), se ahorran ~6 mil triángulos,
@@ -335,6 +341,18 @@ def hair_cap(b,OUT,mat,LM,K):
         vg=o.vertex_groups.new(name=n)
         for i in nz: vg.add([int(i)],float(w[i]),'REPLACE')
     print(f'PELO malla: {len(sel)} caras, alto máx {h.max()*1000:.1f} mm, barba {int((barba>.5).sum())} vértices'); return o
+def chest_check(b,rig,K):
+    """Mide la punta más alta del frente del pecho con los brazos arriba (pose de referencia del correctivo), ya con correctivos: línea PECHO posado."""
+    co=coords(b); me=b.data; N=len(co); no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3); sh=head(rig,'LeftArm'); pb=rig.pose.bones
+    E=np.empty(len(me.edges)*2,int); me.edges.foreach_get('vertices',E); E=E.reshape(-1,2); deg=np.maximum(np.bincount(E.ravel(),minlength=N),1)[:,None]
+    z=co[:,2]; ax=np.abs(co[:,0]); w=(no[:,1]<-.15)*sm(sh[2]-.50*K,sh[2]-.42*K,z)*sm(sh[2]-.05*K,sh[2]-.10*K,z)*sm(.21*K,.17*K,ax)
+    for p in pb: p.matrix_basis=Matrix()
+    for sgn,side in ((1,'Left'),(-1,'Right')):
+        for bn,q in ARMUP.items(): pb[PRE+side+bn].matrix_basis=Quaternion(q if sgn>0 else mir(q)).to_matrix().to_4x4()
+    bpy.context.view_layer.update(); P,Nn=_posed(b,True)
+    A=np.zeros_like(P); np.add.at(A,E[:,0],P[E[:,1]]); np.add.at(A,E[:,1],P[E[:,0]]); s=((P-A/deg)*Nn).sum(1)*(w>.5); i=int(np.argmax(s))
+    for p in pb: p.matrix_basis=Matrix()
+    bpy.context.view_layer.update(); print(f'PECHO posado (brazos arriba): punta más alta {s[i]*1000:.2f} mm en reposo ({co[i][0]:+.3f},{co[i][1]:+.3f},{co[i][2]:.3f})')
 def rig_of(b): return next(m.object for m in b.modifiers if m.type=='ARMATURE')
 def bun(b,K,STY,LM,mat):
     """Moño del pelo atado: un ovillo achatado apoyado en el cráneo, en la dirección STY['bun']['dir'] desde el centro de la cabeza.
