@@ -86,7 +86,7 @@ const SKIN_DETAIL = /* glsl */`
   // con la máscara (R piel, G tela). uTile = mosaicos por unidad de UV, medido sobre la malla al cargar. Cada una va en dos
   // escalas: la real (poros, trama de punto: solo se ve en primer plano) y una más gruesa que sobrevive a distancia de torso.
   // Se apagan cuando un mosaico ocupa pocos píxeles, para no centellear en plano general.
-  gPatch = mix( 0.5, smoothstep( 0.3, 0.7, pielRuido( vMapUv * 47.0 + 1.3 ) * 0.7 + pielRuido( vMapUv * 113.0 ) * 0.3 ), 0.3 );      // zonas más y menos húmedas, apenas (con contraste se leía arcilla mojada)
+  if ( uFino > 0.5 ) gPatch = mix( 0.5, smoothstep( 0.3, 0.7, pielRuido( vMapUv * 47.0 + 1.3 ) * 0.7 + pielRuido( vMapUv * 113.0 ) * 0.3 ), 0.3 );      // solo con detalle fino: en el camino directo (Baja y Móvil) no se hace la cuenta      // zonas más y menos húmedas, apenas (con contraste se leía arcilla mojada)
   // arrugas de la tela: pliegues alargados de baja frecuencia (el mosaico de piel estirado), se ven desde el plano general
   vec2 d = vec2( 0.0 ); if ( uFino > 0.5 ) d = ( texture2D( tDetailSkin, vMapUv * vec2( 3.1, 10.0 ) + 0.27 ).xy * 2.0 - 1.0 ) * uWrinkle * gMask.g;
   if ( uDetail > 0.0 ) {      // en plano general ningún mosaico se resuelve (athlete.js lo apaga): se ahorran las cuatro lecturas
