@@ -490,7 +490,8 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     if anatB is not None: cavA=cavA*np.clip(1+anatB*am*(42/K),.80,1.05)
     del anatC                              # los surcos entre grupos musculares oscurecen (son anchos: el pasa-altos de 3 px no los ve)
     aoS=T.ao*(1-suit)+blur(T.ao,22*S)*suit
-    aoS=aoS*(1-gn)+np.maximum(aoS,.97)*gn; cavA=cavA*(1-gn)+gn
+    if anatB is None: aoS=aoS*(1-gn)+np.maximum(aoS,.97)*gn; cavA=cavA*(1-gn)+gn
+    else: aoS=aoS*(1-gn)+blur(aoS,40*S)*gn; cavA=cavA*(1-gn)+gn     # anatómico: la oclusión del disco es la de su entorno (con 0,97 fijo quedaba un disco más claro sobre la malla blanca)
     cav=np.clip(1+(H-blur(H,3*S))*900,0.55,1.1); ao=np.clip((.12+.88*aoS)*cav*cavA,0,1)
     tn=np.array([.55,.47,.46],f32); aoc=.62+.38*aoS*np.clip(cav,0,1)*cavA; col=col*(tn[None,None,:]+(1-tn[None,None,:])*aoc[:,:,None])
     col=np.clip(col,0,1); col[~cov]=SKIN; nrm[~cov]=(.5,.5,1); rough[~cov]=.5; ao[~cov]=1
