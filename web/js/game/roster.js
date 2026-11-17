@@ -69,7 +69,7 @@ export function vestir(lista, fichas, poses) {
   return hechos;
 }
 /** Terna que se juega sin `?plantel=`: una de las `ternas` de web/data/plantel.json (tools/plantel_web.py). `clasico` = sin vestuario. */
-export const PLANTEL_DEFECTO = 'hombres';
+export const PLANTEL_DEFECTO = 'clasico';      // 17-nov: el dueño publica el juego nuevo con los pesistas que ya están en producción (Ventura, Brenner, Marangi); la terna nueva queda con `?plantel=hombres`
 /** De `?plantel=` a la lista de tres: el nombre de una terna de plantel.json (`mujeres`, `hombres`...) o ids separados por coma. */
 export const ternaDe = (q, plantel) => (!q ? [] : plantel?.ternas?.[q] || q.split(',').map(x => x.trim()));
 export const FICHA = { energia: 'fon', margen: 'tec' };
