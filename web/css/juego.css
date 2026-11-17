@@ -64,10 +64,11 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 /* Arriba al centro no va nada (17-nov: «los carteles le tapan la cabeza al pesista»): ahí llegan la barra cuando sube y la
    cabeza en los planos del final. Sonido, pausa y ayuda van arriba a la derecha, en fila debajo del reloj y las luces
    (parado, html.vert, es al revés: la fila arriba y el reloj debajo). Lo mide tools/tapa.mjs. */
-html:not(.vert) :is(#pausa,#sonidob,#ayudab){top:calc(var(--u)*5.4 + var(--st));left:auto;transform:none;width:46px;min-width:46px;padding-left:0;padding-right:0;display:flex;align-items:center;justify-content:center}
+html:not(.vert) :is(#pausa,#sonidob,#ayudab,#camb){top:calc(var(--u)*5.4 + var(--st));left:auto;transform:none;width:46px;min-width:46px;padding-left:0;padding-right:0;display:flex;align-items:center;justify-content:center}
 html:not(.vert) #ayudab{right:calc(var(--u)*1.2 + var(--sr))}
 html:not(.vert) #pausa{right:calc(var(--u)*1.2 + var(--sr) + 50px)}
 html:not(.vert) #sonidob{right:calc(var(--u)*1.2 + var(--sr) + 100px)}
+html:not(.vert) #camb{right:calc(var(--u)*1.2 + var(--sr) + 150px)}
 
 /* La señal: siempre en el mismo lugar. Horizontal: a la derecha del pesista, a media altura. Vertical: al pie del escenario. */
 .tecla{display:inline-block;font:inherit;font-family:var(--display);font-weight:800;font-style:normal;letter-spacing:.12em;text-transform:uppercase;line-height:1;color:#0a1020;background:#f2f4ff;border-radius:.42em;padding:.42em .8em .5em;box-shadow:0 .24em 0 #7c86a8,0 .24em 0 1px #03050c;white-space:nowrap}
@@ -742,10 +743,11 @@ html.vert .panel .pie{margin:.5em -16px -14px;padding:8px 16px}
 html.vert body:has(#capa > .panel):not(:has(#capa > .panel button)) #capa{padding-bottom:calc(var(--sb) + var(--bm)*2 + var(--boton))}
 html.vert.escribiendo #capa{top:var(--vvy,0px);bottom:auto;height:var(--vvh,100%);align-items:flex-start}
 /* arriba a la derecha: sonido, pausa y ayuda en fila (al centro chocaban con el tablero) */
-html.vert :is(#pausa,#sonidob,#ayudab){top:calc(var(--st) + 8px);left:auto;transform:none;width:44px;min-width:44px;height:40px;padding:0;font-size:17px;display:flex;align-items:center;justify-content:center}
+html.vert :is(#pausa,#sonidob,#ayudab,#camb){top:calc(var(--st) + 8px);left:auto;transform:none;width:44px;min-width:44px;height:40px;padding:0;font-size:17px;display:flex;align-items:center;justify-content:center}
 html.vert #ayudab{right:calc(var(--sr) + 8px)}
 html.vert #pausa{right:calc(var(--sr) + 58px)}
 html.vert #sonidob{right:calc(var(--sr) + 108px)}
+html.vert #camb{right:calc(var(--sr) + 158px)}
 html.vert .relojbox{--u:9px;top:calc(var(--st) + 54px);right:calc(var(--sr) + 8px)}
 html.vert #tv .bug{max-width:calc(100% - 170px - var(--sl) - var(--sr))}
 html.vert #tv .bug span{display:none}

@@ -103,6 +103,7 @@ export default {
   'opciones.cam.lateral': 'Side',
   'opciones.cam.baja': 'Low',
   'opciones.cam.pov': 'First person',
+  'camara.afuera': 'Outside view',
   'opciones.recuadro_si': 'Inset view',
   'opciones.recuadro_no': 'No inset',
   'opciones.sonido': 'Sound',

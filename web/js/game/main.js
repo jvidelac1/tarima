@@ -136,7 +136,7 @@ function tic(pintar, tRaf = null) {
   aprendeUI?.tic(now);
   if (now - margenT > 250 || now < margenT) { margenT = now; margenVertical(); }
   // el botón de pausa (para el dedo; con teclado es Esc) no se muestra encima de un panel grande: taparía su título
-  { const ver = puedePausar() && !E.sobre && !$('capa').querySelector('.panel:not(.abajo)'); for (const b of [$('pausa'), $('ayudab'), $('sonidob')]) if (b && b.hidden === ver) b.hidden = !ver; }
+  { const ver = puedePausar() && !E.sobre && !$('capa').querySelector('.panel:not(.abajo)'); for (const b of [$('pausa'), $('ayudab'), $('sonidob'), $('camb')]) if (b && b.hidden === ver) b.hidden = !ver; pintarCamb(); }
   try { enCuadro?.(now, dt); } catch (e) { E.errores.push(String(e.stack || e)); console.error(e); enCuadro = null; }
   if (!escena) return;
   // se dibuja en cada cuadro que ofrece el navegador; detrás de un panel la imagen queda congelada (un cuadro al abrirlo o repintarlo)
@@ -429,18 +429,23 @@ const etiqueta = et => { $('etiqueta').hidden = !et?.length; $('etiqueta').textC
  * al público): todo se ve desde los ojos, hasta el fundido que sigue.
  */
 const CAMARAS_ELEGIBLES = ['3/4', 'jurado', 'lado', 'baja', 'pov'], CAMARA_NOMBRE = { '3/4': 'general', jurado: 'jurado', lado: 'lateral', baja: 'baja', pov: 'pov' };
-const camElegida = () => { const q = params.get('camara'), g = guardado.get('tarima.camara'); return CAMARAS_ELEGIBLES.includes(q) ? q : CAMARAS_ELEGIBLES.includes(g) ? g : '3/4'; };
+const camElegida = () => { const q = params.get('camara'), g = guardado.get('tarima.camara'); return CAMARAS_ELEGIBLES.includes(q) ? q : CAMARAS_ELEGIBLES.includes(g) ? g : 'pov'; };      // 17-nov, pedido del dueño: por defecto, primera persona
 /** Recuadro de la primera persona (la vista general en una pantalla chica): prendido salvo que se apague en Opciones o con `?recuadro=no`. */
 const recuadroPedido = () => (params.get('recuadro') || guardado.get('tarima.recuadro')) === 'si';
 const recuadroOn = () => (params.get('recuadro') || guardado.get('tarima.recuadro') || 'si') !== 'no';
-const camPrincipal = () => (escena.vertical ? 'lado' : (E.camara ||= camElegida()));
+const camPrincipal = () => { const c = (E.camara ||= camElegida()); return escena.vertical && c !== 'pov' ? 'lado' : c; };
 /** La cámara con que se mira un levantamiento: la elegida si es del jugador; la de un rival nunca es la primera persona. */
 const camVista = propio => { const c = camPrincipal(); return c === 'pov' && !propio ? '3/4' : c; };
 function elegirCamara(a, via) {
   if (!CAMARAS_ELEGIBLES.includes(a)) return; E.camara = a; guardado.set('tarima.camara', a); ev('camara_elegida', { vista: CAMARA_NOMBRE[a], via, pantalla: E.pantalla });
   // si se está viendo la cámara del levantamiento, cambia ya (con un movimiento suave); en un primer plano, la próxima vez
-  if (escena && !escena.vertical && (!escena.plano || escena.plano.key === 'jurado') && (E.modo === 'intento' || E.intento)) { escena.camara(camVista(E.intento ? !!E.intento.propio : true), .8); E.forzar = true; }
+  if (escena && (!escena.plano || escena.plano.key === 'jurado') && (E.modo === 'intento' || E.intento)) { escena.camara(camVista(E.intento ? !!E.intento.propio : true), .8); E.forzar = true; }
 }
+/** Botón de cámara de la partida (17-nov, pedido del dueño: «que sea fácil en la partida cambiar la cámara»): un toque alterna la primera persona y la vista de afuera. */
+const alternarCamara = () => { const c = E.camara || camElegida(); if (c !== 'pov') guardado.set('tarima.camara_afuera', c); const af = guardado.get('tarima.camara_afuera'); elegirCamara(c === 'pov' ? (CAMARAS_ELEGIBLES.includes(af) && af !== 'pov' ? af : '3/4') : 'pov', 'boton'); pintarCamb(); };
+const ICONO_CAM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h9A1.5 1.5 0 0 1 15 8.5v7a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 3 15.5z"/><path d="M15 10.5l6-3v9l-6-3z"/></svg>';
+const ICONO_OJO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>';
+function pintarCamb() { const b = $('camb'); if (!b) return; const pov = (E.camara || camElegida()) === 'pov', k = pov ? 'pov' : 'afuera'; if (b.dataset.k === k + idiomaActual()) return; b.dataset.k = k + idiomaActual(); b.innerHTML = pov ? ICONO_OJO : ICONO_CAM; b.setAttribute('aria-pressed', String(pov)); const txt = `${t('opciones.camara')}: ${t(pov ? 'opciones.cam.pov' : 'camara.afuera')} (V)`; b.setAttribute('aria-label', txt); b.title = txt; }
 const cambiarCamara = () => elegirCamara(CAMARAS_ELEGIBLES[(CAMARAS_ELEGIBLES.indexOf(E.camara || camElegida()) + 1) % CAMARAS_ELEGIBLES.length], 'tecla');
 /** Recuadro fijo «ESPACIO: seguir» / «Toca: seguir» de las pantallas pasivas (turno de un rival, veredicto, repetición). */
 function seguir(on) {
@@ -973,7 +978,7 @@ function orientacion() {
  * Se llama al girar y cuatro veces por segundo (tic): los carteles aparecen y se van con cada pantalla. Con la cámara
  * congelada tras el intento (rig.fijo) los márgenes no cambian: el techo ya viene puesto desde antes del levantamiento.
  */
-const TECHO = ['tablero', 'pausa', 'sonidob', 'ayudab', 'margen', 'saltar'], FRANJA = [.38, .62];
+const TECHO = ['tablero', 'pausa', 'sonidob', 'camb', 'ayudab', 'margen', 'saltar'], FRANJA = [.38, .62];
 let margenT = 0;
 function margenVertical() {
   if (!escena?.rig) return; const gl = $('gl'), H = gl?.clientHeight || 0, W = gl?.clientWidth || 0, h = document.documentElement.classList;
@@ -1040,7 +1045,7 @@ async function inicio() {
       ${nombreHTML}
       ${tarjetas ? `<h2 id="pesista-t">${esc(t('pesista.titulo', { nombre: mostrado() }))}</h2>
       <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b>${cfg.ctl === 'b' ? `<small class="conviene">${t(`pesista.${id}.b`)}</small><small class="rm">${t('rm.tarjeta', { s: datos.atletas[id].techo.s, c: datos.atletas[id].techo.c })}</small>` : `${cuerpoHTML(id, uno)}<small class="conviene">${t(uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small>`}</button>`).join('')}</div>` : ''}
-      ${nivelHTML}${opciones}</div><div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button class="link" id="btn-opciones" aria-expanded="${S.opciones}">${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button><button class="link" id="btn-ayuda">${t('boton.ayuda')}</button><a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
+      ${nivelHTML}${opciones}</div><div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button id="btn-opciones" aria-expanded="${S.opciones}"><span aria-hidden="true">⚙</span> ${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button><button class="link" id="btn-ayuda">${t('boton.ayuda')}</button><a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
       `, 'bienvenida');
     pn.querySelector('a.legal')?.addEventListener('click', () => ev('privacidad_abierta', { pantalla: E.pantalla }));
     if (abrio) { const bc = pn.querySelector('.bv-cuerpo') || pn; bc.scrollTop = bc.scrollHeight; }      // Opciones se abre arriba de la fila de botones: se lleva a la vista
@@ -1883,6 +1888,7 @@ async function iniciar() {
   aprendeUI = new Aprende($('tv'), { ahora: () => reloj.ahora(), guardado, ev, pantalla: () => E.pantalla, panel: () => $('capa').querySelector('.panel.llamado') }); $('escena').tabIndex = -1;
   // «?» junto a la pausa: «Cómo se juega» con el dedo (con teclado es H)
   if (!$('ayudab')) { const ay = document.createElement('button'); ay.id = 'ayudab'; ay.hidden = true; ay.textContent = '?'; $('pausa').after(ay); ay.onclick = () => abrirSobre('ayuda'); pintarFijos(); }
+  if (!$('camb')) { const cb = document.createElement('button'); cb.id = 'camb'; cb.type = 'button'; cb.hidden = true; $('sonidob').after(cb); cb.onclick = () => { alternarCamara(); cb.blur(); }; pintarCamb(); }
   // el selector ES · EN de cualquier panel (bienvenida, cómo se gana, kilos, llamado, intervalo, podio, muro, encuesta)
   $('capa').addEventListener('click', e => { const b = e.target.closest?.('.idi'); if (b && b.dataset.lang) { cambiarIdioma(b.dataset.lang); $('capa').querySelector(`.idi[data-lang="${idiomaActual()}"]`)?.focus({ preventScroll: true }); } });
   addEventListener('keydown', alTeclado, true); $('pausa').onclick = () => abrirSobre('pausa'); $('saltar').onclick = () => E.saltar?.();

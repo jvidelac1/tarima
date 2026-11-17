@@ -240,3 +240,12 @@ html.vert .el-ficha .el-datos{font-size:15px}
 html.vert .el-aspectos button{font-size:14px}
 :where(html.horiz.bajo) .el-aspectos{gap:5px;margin:0 0 .25em}
 :where(html.horiz.bajo) .el-aspectos button{min-height:36px;font-size:12.5px}
+
+/* Botón de cámara de la partida (17-nov): a la izquierda del parlante; un toque alterna primera persona y vista de afuera */
+#camb{position:absolute;z-index:6;top:calc(var(--u)*1.2 + var(--st));right:calc(50% + 84px);font-family:var(--display);min-height:0;min-width:44px;padding:.35em .7em;background:rgba(6,14,48,.88);font-size:calc(var(--u)*1.2);line-height:1;display:flex;align-items:center;justify-content:center}
+#camb[hidden]{display:none}
+#camb svg{width:1.3em;height:1.3em;flex:none}
+#camb[aria-pressed=true]{color:var(--teal);border-color:var(--teal)}
+/* «Opciones» a la vista en la bienvenida (17-nov: «que no esté tan escondido»): botón con borde, no un enlace chico */
+.panel .pie .secundarios #btn-opciones{font-family:var(--display);font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:clamp(13px,2cqh,16px);min-height:40px;padding:.35em .9em;color:var(--teal);border:1.5px solid var(--teal);background:rgba(6,14,48,.6)}
+.panel .pie .secundarios #btn-opciones[aria-expanded=true]{background:var(--teal);color:#06102e}
