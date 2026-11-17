@@ -322,7 +322,9 @@ const pedidos1 = [];
       'la privacidad dice que se graba el 3D (por defecto en computadoras) con los carteles diciendo LIFTING GAME en vez del nombre');
     ok(/2026-11-g/.test(await page.locator('article[lang=es] .version').innerText()), 'la privacidad está en la versión 2026-11-g');
     const txt = await page.locator('article[lang=es]').innerText();
-    ok(/dos preguntas/.test(txt) && /jugar sin límite/.test(txt) && !/una por mes|al mes/.test(txt) && !/encuesta[^.]*finales/i.test(txt), 'en español: la encuesta de dos preguntas, que desbloquea el juego libre (LIF-53), sin finales de premio, y las novedades sin frecuencia');
+    // el texto de la encuesta sigue a la regla que se publica (worker/wrangler.jsonc): con ENCUESTA_LIBRE "1" (LIF-53) desbloquea el juego libre; con "0" es opcional y no da nada
+    const encuestaLibre = /"ENCUESTA_LIBRE":\s*"1"/.test((await import('node:fs')).readFileSync(new URL('../worker/wrangler.jsonc', import.meta.url), 'utf8'));
+    ok(/dos preguntas/.test(txt) && (encuestaLibre ? /jugar sin límite/.test(txt) : /no da ni quita nada/.test(txt) && !/jugar sin límite/.test(txt)) && !/una por mes|al mes/.test(txt) && !/encuesta[^.]*finales/i.test(txt), encuestaLibre ? 'en español: la encuesta de dos preguntas, que desbloquea el juego libre (LIF-53), sin finales de premio, y las novedades sin frecuencia' : 'en español: la encuesta de dos preguntas, opcional y que no da ni quita nada, sin finales de premio, y las novedades sin frecuencia');
   }
   await page.click('article[lang=es] [data-medicion-boton]');
   ok(await page.evaluate(() => localStorage.getItem('tarima.medicion')) === '0', 'el interruptor apaga la medición');
