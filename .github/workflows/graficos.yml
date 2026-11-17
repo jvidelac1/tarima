@@ -281,7 +281,7 @@ jobs:
       - name: Fotos del laboratorio del cuerpo (banco --fotos --lab=cuerpo)
         if: ${{ !cancelled() }}
         timeout-minutes: 25
-        run: node tools/banco.mjs --fotos=out/cuerpo/fotos --lab=cuerpo --plantel=kordan ${{ inputs.tomas && format('--tomas={0}', inputs.tomas) || '' }} --ancho=${{ inputs.niveles == 'ancho' && 1280 || 720 }} --alto=${{ inputs.niveles == 'ancho' && 620 || 860 }} 2>&1 | tee out/logs/cuerpo_fotos.log
+        run: node tools/banco.mjs --fotos=out/cuerpo/fotos --lab=cuerpo --plantel=,kordan ${{ inputs.tomas && format('--tomas={0}', inputs.tomas) || '' }} --ancho=${{ inputs.niveles == 'ancho' && 1280 || 720 }} --alto=${{ inputs.niveles == 'ancho' && 620 || 860 }} 2>&1 | tee out/logs/cuerpo_fotos.log
       - name: Resultado como artefacto
         if: ${{ always() }}
         uses: actions/upload-artifact@v6

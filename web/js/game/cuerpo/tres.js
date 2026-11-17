@@ -3,7 +3,7 @@
 // cortan nítidas porque viajan como distancias con signo interpoladas; el diseño del pecho y la espalda es un canvas 2D
 // (emblema, sigla, nombre y dorsal) proyectado de frente y de espalda. Nada de imágenes ni modelos.
 import * as THREE from 'three';
-import { generar, hex, TIPO } from './generar.js';
+import { generar, firma } from './generar.js';
 
 const boneKey = n => n.replace(/^mixamorig:?/, '');
 const lin = c => (c <= .04045 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4));
@@ -21,21 +21,22 @@ export function esqueletoDe(atleta) {
 export function disenoMalla(F) {
   const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 512; const g = cv.getContext('2d'), c = F.color, D = F.diseno || {};
   g.clearRect(0, 0, 1024, 512); g.textAlign = 'center'; g.textBaseline = 'middle';
-  // pecho: emblema (un sol naciente sobre una barra, ficticio) y la sigla del país
-  const ex = 256 + 62, ey = 150;      // sobre el pectoral izquierdo del pesista (derecha de la imagen)
-  g.fillStyle = c.panel; g.beginPath(); g.roundRect(ex - 34, ey - 24, 68, 48, 5); g.fill();
-  g.fillStyle = c.malla; g.beginPath(); g.arc(ex, ey + 8, 15, Math.PI, 0); g.fill(); g.fillRect(ex - 24, ey + 10, 48, 5);
-  g.fillStyle = c.vivo; g.font = '800 46px "Saira Condensed", "Arial Narrow", system-ui, sans-serif'; g.fillText(D.sigla || 'DRV', 256, 236);
+  // pecho: emblema ficticio (un sol naciente sobre una barra, en un rectángulo) y, si la ficha la trae, la sigla del país
+  const em = (F.ropa && F.ropa.emblema) || [.062, -.075, .033, .023], yA0 = .38, px = 1024;      // la mitad del canvas cubre x ±0,25 m; y desde yA − 0,38 hasta yA + 0,12
+  const ex = 256 + em[0] * px, ey = 512 - (yA0 + em[1]) * px, ew = em[2] * px, eh = em[3] * px;
+  g.fillStyle = c.panel; g.beginPath(); g.roundRect(ex - ew, ey - eh, ew * 2, eh * 2, 4); g.fill();
+  g.fillStyle = c.malla; g.beginPath(); g.arc(ex, ey + eh * .3, eh * .62, Math.PI, 0); g.fill(); g.fillRect(ex - ew * .7, ey + eh * .42, ew * 1.4, eh * .2);
+  g.fillStyle = c.vivo; g.font = '800 46px "Saira Condensed", "Arial Narrow", system-ui, sans-serif'; if (D.sigla ?? 'DRV') g.fillText(D.sigla ?? 'DRV', 256, 236);
   // espalda: nombre y dorsal
-  g.fillStyle = c.vivo; g.font = '800 40px "Saira Condensed", "Arial Narrow", system-ui, sans-serif'; g.fillText((D.nombre || 'KORDAN').toUpperCase(), 768, 205);
-  g.font = '800 104px "Saira Condensed", "Arial Narrow", system-ui, sans-serif'; g.fillStyle = c.panel; g.fillText(String(D.dorsal ?? 9), 768, 285);
+  g.font = '800 40px "Saira Condensed", "Arial Narrow", system-ui, sans-serif'; if (D.nombre ?? 'KORDAN') g.fillText((D.nombre ?? 'KORDAN').toUpperCase(), 768, 205);
+  g.font = '800 104px "Saira Condensed", "Arial Narrow", system-ui, sans-serif'; g.fillStyle = c.panel; if (D.dorsal ?? 9) g.fillText(String(D.dorsal ?? 9), 768, 285);
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; return t;
 }
 
 const PARS_V = /* glsl */`attribute vec4 aSup; attribute vec4 aSup2; attribute vec3 aGen; varying vec4 vSup; varying vec4 vSup2; varying vec3 vGen;`;
 const PARS_F = /* glsl */`
 varying vec4 vSup; varying vec4 vSup2; varying vec3 vGen;
-uniform vec3 uMalla; uniform vec3 uPanel; uniform vec3 uVivo; uniform vec3 uMedia; uniform vec3 uPelo; uniform vec3 uCorrea; uniform sampler2D tDiseno; uniform vec3 uCaja; uniform float uBarba;
+uniform vec3 uMalla; uniform vec3 uPanel; uniform vec3 uVivo; uniform vec3 uMedia; uniform vec3 uPelo; uniform vec3 uCorrea; uniform vec3 uVenda2; uniform vec3 uRod2; uniform sampler2D tDiseno; uniform vec3 uCaja; uniform float uBarba;
 float gRug = 0.6; float gMet = 0.0; float gEsp = 1.0; uniform vec4 uGan;
 float capa( float d ) { float w = fwidth( d ) * 0.75 + 1e-6; return smoothstep( -w, w, d ); }
 float cHash( vec2 p ) { vec3 q = fract( vec3( p.xyx ) * 0.1031 ); q += dot( q, q.yzx + 33.33 ); return fract( ( q.x + q.y ) * q.z ); }
@@ -62,12 +63,12 @@ const CAPAS_F = /* glsl */`
     }
     float pelo = max( capa( vSup.z ), capa( vSup2.y ) ); diffuseColor.rgb = mix( diffuseColor.rgb, uPelo, pelo ); gRug = mix( gRug, 0.9, pelo ); gEsp = mix( gEsp, 0.12, pelo );
   } else if ( tipo < 2.5 ) { gRug = 0.55; float l = vSup2.x * 6.2832; diffuseColor.rgb *= 0.92 + 0.08 * cRuido( vec2( vSup2.x * 90.0, vGen.y * 60.0 ) ); }      // cuero
-  else if ( tipo < 3.5 ) { gRug = 0.92; gEsp = 0.4; }      // neopreno
+  else if ( tipo < 3.5 ) { gRug = 0.92; gEsp = 0.4; float a = vSup2.x, t = vSup2.y; diffuseColor.rgb = mix( diffuseColor.rgb, uRod2, ( 1.0 - capa( abs( a - ( 0.1 + 0.1 * sin( t * 3.1416 ) ) ) - 0.012 ) ) * step( 0.12, t ) * step( t, 0.88 ) ); }      // neopreno
   else if ( tipo < 4.5 ) gRug = 0.85;      // goma
   else if ( tipo < 5.5 ) gRug = 0.6;       // zapatilla
   else if ( tipo < 6.5 ) gRug = 0.25;      // ojo
   else if ( tipo < 7.5 ) { gRug = 0.42; gMet = 0.7; }      // metal
-  else if ( tipo < 8.5 ) { gRug = 0.9; gEsp = 0.4; }       // venda
+  else if ( tipo < 8.5 ) { gRug = 0.9; gEsp = 0.4; float t = vSup2.y; diffuseColor.rgb = mix( diffuseColor.rgb, uVenda2, max( 1.0 - capa( abs( t - 0.33 ) - 0.07 ), 1.0 - capa( abs( t - 0.63 ) - 0.07 ) ) ); }       // venda
   else gRug = 0.5;                         // madera del taco
 }
 `;
@@ -75,7 +76,7 @@ const CAPAS_F = /* glsl */`
 /** Material del cuerpo por código. */
 export function materialCuerpo(M) {
   const F = M.ficha, C = k => new THREE.Color(F.color[k]);
-  const U = { uMalla: { value: C('malla') }, uPanel: { value: C('panel') }, uVivo: { value: C('vivo') }, uMedia: { value: C('media') }, uPelo: { value: C('pelo') }, uCorrea: { value: C('correa') }, tDiseno: { value: disenoMalla(F) },
+  const U = { uMalla: { value: C('malla') }, uPanel: { value: C('panel') }, uVivo: { value: C('vivo') }, uMedia: { value: C('media') }, uPelo: { value: C('pelo') }, uCorrea: { value: C('correa') }, uVenda2: { value: C('venda2') }, uRod2: { value: C('rodillera2') }, tDiseno: { value: disenoMalla(F) },
     uCaja: { value: new THREE.Vector3(0, M.ref.yA - .38, .02) }, uBarba: { value: F.barba ? 1 : 0 }, uGan: { value: new THREE.Vector4(...(F.ganancia || [.7, .55, .62, 1])) } };      // uGan: ganancia de piel, tela y medias/zapatillas bajo los focos de la sala (el tono AgX lava lo claro)
   const m = new THREE.MeshStandardMaterial({ name: 'CuerpoCodigo', vertexColors: true, roughness: .6, metalness: 0, envMapIntensity: .35 });
   m.onBeforeCompile = sh => {
@@ -88,13 +89,22 @@ export function materialCuerpo(M) {
   m.customProgramCacheKey = () => 'cuerpo-codigo-2'; m.userData.cuerpo = U; return m;
 }
 
+// La malla generada se guarda en IndexedDB con la firma de sus entradas: la segunda carga no la rehace (en un teléfono generar tarda varios segundos).
+const BD = () => new Promise((ok, mal) => { const r = indexedDB.open('tarima-cuerpo', 1); r.onupgradeneeded = () => r.result.createObjectStore('mallas'); r.onsuccess = () => ok(r.result); r.onerror = () => mal(r.error); });
+const guardado = async clave => { const bd = await BD(); return new Promise(ok => { const r = bd.transaction('mallas').objectStore('mallas').get(clave); r.onsuccess = () => ok(r.result || null); r.onerror = () => ok(null); }); };
+const guardar = async (clave, M) => { const bd = await BD(), t = bd.transaction('mallas', 'readwrite'), s = t.objectStore('mallas'); s.clear(); s.put(M, clave); return new Promise((ok, mal) => { t.oncomplete = ok; t.onerror = () => mal(t.error); }); };
+
 /**
  * Crea el cuerpo por código sobre los huesos de `atleta` y lo agrega a `escena` (un Object3D). Devuelve
  * { malla, info, M, quitar() }. La malla comparte los huesos del Athlete (más los auxiliares, que se mueven solos antes de
  * cada cuadro), así cualquier pose que se le ponga al pesista la sigue; va «suelta» (detached): `malla.position` la corre.
  */
-export function crearCuerpo(atleta, escena, { calidad = 'alta', ficha = {} } = {}) {
-  const E = esqueletoDe(atleta), M = generar(E, ficha, calidad), B = E.sk.bones, n = M.pos.length / 3;
+export async function crearCuerpo(atleta, escena, { calidad = 'alta', ficha = {}, cache = true } = {}) {
+  const E = esqueletoDe(atleta), esq = { nombres: E.nombres, padre: E.padre, reposo: E.reposo }; let M = null, clave = null, deCache = false;
+  if (cache) { try { clave = firma(esq, ficha, calidad); M = await guardado(clave); deCache = !!M; } catch { M = null; } }
+  if (!M) { M = generar(esq, ficha, calidad); if (cache && clave) guardar(clave, M).catch(() => null); }
+  M.info.deCache = deCache;
+  const B = E.sk.bones, n = M.pos.length / 3;
   const geo = new THREE.BufferGeometry(), col = new Float32Array(n * 3); for (let i = 0; i < col.length; i++) col[i] = lin(M.col[i]);
   geo.setAttribute('position', new THREE.BufferAttribute(M.pos, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(M.nor, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   geo.setAttribute('skinIndex', new THREE.BufferAttribute(M.ji, 4)); geo.setAttribute('skinWeight', new THREE.BufferAttribute(M.jw, 4));

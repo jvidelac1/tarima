@@ -1,4 +1,5 @@
-// Laboratorio del cuerpo por código: juego.html?banco=1&lab=cuerpo&plantel=kordan
+// Laboratorio del cuerpo por código: juego.html?banco=1&lab=cuerpo&plantel=,kordan  (la coma deja a Ventura, el de producción, en su plaza)
+// `&ficha=lamina|kordan`: colores y prendas del cuerpo por código (game/cuerpo/anatomia.js, FICHAS).
 // El pesista generado por código (game/cuerpo/) sobre la tarima, con la luz de la sala, en el esqueleto y las poses del
 // pesista actual. Se gira arrastrando (ratón o dedo), zoom con rueda o pellizco; botones de vista y de pose, y «Comparar»
 // pone al lado el modelo actual (el GLB de Blender). `&calidad=alta|media|movil` (la del juego), `&malla=alta|media|movil`
@@ -8,17 +9,20 @@ import { PRESET } from './perf.js';
 import { tramo } from './sequence.js';
 import { CAPA_SOMBRA, conBorde } from './stage.js';
 import { crearCuerpo } from './cuerpo/tres.js';
+import { FICHAS } from './cuerpo/anatomia.js';
+import { PLANTEL } from './roster.js';
 
 const POSES = [['De pie', 'clean', 'Parado'], ['Salida', 'clean', 'Salida'], ['Tirón', 'clean', 'Segundo tirón'], ['Sentadilla', 'snatch', 'Recepción'], ['Rack', 'clean', 'Recuperación'], ['Tijera', 'split', 'Envión · Tijera'], ['Sentadilla envión', 'squat', 'Squat jerk · Fondo'], ['Barra arriba', 'split', 'Envión · Final']];
 const VISTAS = [['Frente', 0], ['3/4', 35], ['Perfil', 90], ['Espalda', 180]];
 
 export async function laboratorioCuerpo(B, { escena, params, msg, decir }) {
   const tel = Math.min(innerWidth, innerHeight) < 600, clave = PRESET[params.get('calidad')] ? params.get('calidad') : (tel ? 'media' : 'alta');
-  decir('cargando el esqueleto'); await escena.mostrar('ventura'); escena.setCarga(140, 'c'); msg.hidden = true;
+  const K = Object.keys(PLANTEL).find(id => PLANTEL[id].modelo === 'kordan') || 'ventura', V = Object.keys(PLANTEL).find(id => PLANTEL[id].modelo === 'ventura' && id !== K) || null;
+  decir('cargando el esqueleto'); await escena.mostrar(K); escena.setCarga(140, 'c'); msg.hidden = true;
   decir('compilando ' + clave); escena.setCalidad(PRESET[clave]); await escena.precalentar();
   const a = escena.activo, t0 = performance.now(); decir('generando el cuerpo');
   await new Promise(r => setTimeout(r, 30));
-  const cuerpo = crearCuerpo(a, escena.scene, { calidad: params.get('malla') || (tel ? 'media' : 'alta') }), ms = Math.round(performance.now() - t0);
+  const cuerpo = await crearCuerpo(a, escena.scene, { calidad: params.get('malla') || (tel ? 'media' : 'alta'), cache: params.get('cache') !== '0', ficha: FICHAS[params.get('ficha') || 'lamina'] || {} }), ms = Math.round(performance.now() - t0);
   cuerpo.malla.layers.enable(CAPA_SOMBRA); conBorde(cuerpo.malla.material);
   B.cuerpo = { ms, ...cuerpo.info }; console.log('cuerpo por código:', JSON.stringify(B.cuerpo));
   const actuales = [...a.meshes, a.hairDepth].filter(Boolean);
@@ -30,13 +34,14 @@ export async function laboratorioCuerpo(B, { escena, params, msg, decir }) {
   const posar = () => { const [, seg, fase] = POSES[E.pose], G = tramo(escena.P, seg), lev = seg === 'snatch' ? 's' : 'c'; escena.setCarga(140, lev); escena.posar({ seg: G.nombre, s: G.i(fase), tau: G.t(fase), base: G.base, primero: false }, lev, 0); escena.barbell.settle?.(escena.barY);
     const top = Math.max(1.8, escena.barY + .3); E.y = top / 2; E.distBase = Math.max(4.3, top * 2.3); };
   const modo = () => {
-    const c = E.comparar, ver = c || E.solo === 'actual'; for (const o of actuales) o.visible = ver; cuerpo.malla.visible = c || E.solo === 'codigo';
+    const c = E.comparar, ver = c || E.solo !== 'codigo'; for (const o of actuales) o.visible = ver; cuerpo.malla.visible = c || E.solo === 'codigo';
     a.root.position.x = c ? .62 : 0; cuerpo.malla.position.x = c ? -1.24 : 0; a.root.updateMatrixWorld(true);
     const v = new THREE.Vector3(); a.barWorld(v); escena.barbell.setPosition(v); escena.barbell.group.visible = !(c && false);
   };
   let sucio = 3;
   const dibujar = () => {
-    const g = E.giro * Math.PI / 180, al = E.alto * Math.PI / 180, d = (E.distBase || 5) * E.dist / 5.2 * (E.comparar ? 1.25 : 1);
+    const g = E.giro * Math.PI / 180, al = E.alto * Math.PI / 180; let d = (E.distBase || 5) * E.dist / 5.2 * (E.comparar ? 1.25 : 1);
+    { const cz = Math.cos(g) * Math.cos(al); if (cz < 0) d = Math.min(d, 5.6 / -cz); }      // detrás del pesista está el telón: la cámara no lo cruza
     mira.set(0, E.y, 0); cam.position.set(mira.x + Math.sin(g) * Math.cos(al) * d, mira.y + Math.sin(al) * d, mira.z + Math.cos(g) * Math.cos(al) * d); cam.fov = 26; cam.updateProjectionMatrix(); cam.lookAt(mira); cam.updateMatrixWorld();
     if (escena.post) { escena.post.focus = d; escena.post.cerca = .35; }
     escena.arena.update?.(.016, cam); escena.renderer.shadowMap.needsUpdate = true; escena._dibujar(.016);
@@ -48,6 +53,7 @@ export async function laboratorioCuerpo(B, { escena, params, msg, decir }) {
   ui.innerHTML = `<style>
 #labcuerpo{position:fixed;left:0;right:0;bottom:0;z-index:60;padding:8px 8px calc(8px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:6px;font:600 14px/1 system-ui,sans-serif;pointer-events:none}
 #labcuerpo .f{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;pointer-events:none}
+@media (max-width:700px){#labcuerpo{font-size:12px}#labcuerpo .f{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;pointer-events:auto;scrollbar-width:none}#labcuerpo button{flex:0 0 auto;min-height:38px;padding:0 10px}}
 #labcuerpo button{pointer-events:auto;min-height:40px;padding:0 13px;border-radius:10px;border:1px solid rgba(255,255,255,.22);background:rgba(8,12,24,.72);color:#eef1fb;font:inherit;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 #labcuerpo button.on{background:#e8ecf8;color:#0a0e1a;border-color:#e8ecf8}
 #labcuerpo .nota{position:fixed;left:10px;top:calc(8px + env(safe-area-inset-top));color:#cfd5e8;font:500 12px/1.35 system-ui,sans-serif;background:rgba(8,12,24,.6);padding:6px 9px;border-radius:8px;pointer-events:none;max-width:70vw}
@@ -58,7 +64,7 @@ export async function laboratorioCuerpo(B, { escena, params, msg, decir }) {
   const bp = POSES.map(([n], i) => boton(fp, n, () => { E.pose = i; posar(); modo(); })), bv = VISTAS.map(([n, g]) => boton(fv, n, () => { E.giro = g; E.alto = 8; E.dist = 5.2; }));
   const bc = boton(fv, 'Comparar', () => { E.comparar = !E.comparar; modo(); }), bs = boton(fv, 'Ver el actual', () => { E.comparar = false; E.solo = E.solo === 'codigo' ? 'actual' : 'codigo'; modo(); });
   const pintar = () => { bp.forEach((b, i) => b.classList.toggle('on', i === E.pose)); bc.classList.toggle('on', E.comparar); bs.textContent = E.solo === 'codigo' ? 'Ver el actual' : 'Ver el nuevo'; bs.style.display = E.comparar ? 'none' : '';
-    nota.textContent = (E.comparar ? 'Izquierda: por código · derecha: actual (Blender)' : E.solo === 'codigo' ? 'Cuerpo por código' : 'Modelo actual (Blender)') + ` · ${Math.round(cuerpo.info.triangulos / 1000)} mil triángulos, generado en ${ms} ms · arrastrar: girar · rueda o pellizco: zoom`; };
+    nota.textContent = (E.comparar ? 'Izquierda: por código · derecha: actual (Blender)' : E.solo === 'codigo' ? 'Cuerpo por código' : 'Modelo actual (Blender)') + ` · ${Math.round(cuerpo.info.triangulos / 1000)} mil triángulos, ${cuerpo.info.deCache ? 'guardado, listo' : 'generado'} en ${ms} ms · arrastrar: girar · rueda o pellizco: zoom`; };
 
   // órbita con ratón o dedo; pellizco y rueda para el zoom
   const pts = new Map(); let pin = 0;
@@ -78,11 +84,13 @@ export async function laboratorioCuerpo(B, { escena, params, msg, decir }) {
   const tomas = [...T('pie-frente', 0, 0), ...T('pie-34', 0, 35), ...T('pie-perfil', 0, 90), ...T('pie-espalda', 0, 180),
     ...T('pos-salida', 1, 50), ...T('pos-tiron', 2, 90), ...T('pos-sentadilla-frente', 3, 0), ...T('pos-sentadilla-perfil', 3, 90), ...T('pos-rack', 4, 35), ...T('pos-tijera', 5, 90), ...T('pos-envion-fondo', 6, 0), ...T('pos-arriba-frente', 7, 0), ...T('pos-arriba-espalda', 7, 180),
     ...T('cerca-cabeza', 0, 25, { dist: 1.25, y: 1.56, alto: 4 }), ...T('cerca-torso', 0, 20, { dist: 2.6, y: 1.25, alto: 6 }), ...T('cerca-manos', 7, 15, { dist: 1.7, y: 2.0, alto: 0 }), ...T('cerca-piernas', 3, 30, { dist: 2.6, y: .5, alto: 10 }),
-    { nombre: 'comparar_pie', pose: 0, giro: 25, comparar: true }, { nombre: 'comparar_arriba', pose: 7, giro: 25, comparar: true }];
+    { nombre: 'comparar_pie', pose: 0, giro: 25, comparar: true }, { nombre: 'comparar_arriba', pose: 7, giro: 25, comparar: true },
+    // hoja «sala»: el de código, el nuevo de Blender (Kordan) y el de producción (Ventura), misma cámara
+    ...[['34', 0, 35], ['frente', 0, 0], ['espalda', 0, 180], ['arriba', 7, 20]].flatMap(([n, pose, giro]) => ['codigo', 'actual', ...(V ? ['ventura'] : [])].map(q => ({ nombre: `sala-${n}_${q === 'actual' ? 'kordan' : q}`, pose, giro, solo: q, dist: 4.4, fijo: true })))];
   { const q = (params.get('tomas') || '').split(',').filter(Boolean); if (q.length) for (let i = tomas.length - 1; i >= 0; i--) if (!q.some(k => tomas[i].nombre.includes(k))) tomas.splice(i, 1); }      // ?tomas=pie-34,cerca: solo esas
   const fin = () => { try { escena.renderer.getContext().finish(); } catch { /* sin contexto */ } };
   window.BANCO_FOTOS = { lista: tomas.map(t => ({ nombre: t.nombre })), listo: true, opacidadSombra: null, opacidadCruda: null,
-    async poner(i) { const t = tomas[i]; ui.style.display = 'none'; E.pose = t.pose; E.comparar = !!t.comparar; E.solo = t.solo || 'codigo'; E.giro = t.giro; E.alto = t.alto ?? 8; E.dist = t.dist ?? 5.2; posar(); if (t.y) E.y = t.y; if (t.dist) E.distBase = 5.2; modo(); dibujar(); dibujar(); fin(); return t.nombre; } };
+    async poner(i) { const t = tomas[i]; ui.style.display = 'none'; { const id = t.solo === 'ventura' ? V : K; if (escena.id !== id) { await escena.mostrar(id); escena.setCarga(140, 'c'); } } E.pose = t.pose; E.comparar = !!t.comparar; E.solo = t.solo || 'codigo'; E.giro = t.giro; E.alto = t.alto ?? 8; E.dist = t.dist ?? 5.2; posar(); if (t.y) E.y = t.y; if (t.dist && !t.fijo) E.distBase = 5.2; if (t.fijo) E.dist = 5.2; modo(); if (t.solo === 'ventura') { cuerpo.malla.visible = false; const v = new THREE.Vector3(); escena.activo.barWorld(v); escena.barbell.setPosition(v); } dibujar(); dibujar(); fin(); return t.nombre; } };
   if (!params.get('fotos')) { const lazo = () => { if (sucio > 0) { sucio--; dibujar(); } requestAnimationFrame(lazo); }; requestAnimationFrame(lazo); }
   else { dibujar(); fin(); }
   B.etapa = 'laboratorio'; decir(''); document.querySelectorAll('body > div').forEach(d => { if (d.textContent.startsWith('Banco de medición')) d.style.display = 'none'; });

@@ -1,4 +1,4 @@
-// Prueba del laboratorio interactivo del cuerpo por código (juego.html?banco=1&lab=cuerpo&plantel=kordan) en un Chrome sin
+// Prueba del laboratorio interactivo del cuerpo por código (juego.html?banco=1&lab=cuerpo&plantel=,kordan) en un Chrome sin
 // pantalla: carga, arrastra para girar, rueda para el zoom, toca los botones de pose, de vista y «Comparar», en ventana de
 // computadora y de teléfono, y guarda una captura de cada paso. Falla si la página tira un error.
 //   node tools/cuerpo/check_lab.mjs [--out=out/cuerpo/lab] [--calidad=media]
@@ -23,7 +23,7 @@ fs.mkdirSync(OUT, { recursive: true });
 for (const [nombre, vp, tactil] of [['pc', { width: 1280, height: 720 }, false], ['tel', { width: 390, height: 780 }, true]]) {
   const ctx = await browser.newContext({ viewport: vp, deviceScaleFactor: 1, hasTouch: tactil, isMobile: tactil }), page = await ctx.newPage();
   page.on('console', m => { if (m.type() === 'error') problemas.push(`${nombre} console.error: ${m.text().split('\n')[0]}`); }); page.on('pageerror', e => problemas.push(`${nombre} pageerror: ${e.message}`));
-  const t0 = Date.now(); await page.goto(`${base}juego.html?banco=1&lab=cuerpo&plantel=kordan&calidad=${arg('calidad', 'media')}`, { waitUntil: 'load' });
+  const t0 = Date.now(); await page.goto(`${base}juego.html?banco=1&lab=cuerpo&plantel=,kordan&calidad=${arg('calidad', 'media')}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.BANCO && window.BANCO.listo, null, { timeout: 300000 });
   const info = await page.evaluate(() => ({ cuerpo: window.BANCO.cuerpo, errores: window.BANCO.errores })); for (const e of info.errores) problemas.push(`${nombre}: ${e.split('\n')[0]}`);
   console.log(`${nombre}: listo en ${((Date.now() - t0) / 1000).toFixed(1)} s · cuerpo ${JSON.stringify(info.cuerpo)}`);

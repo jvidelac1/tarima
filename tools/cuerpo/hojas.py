@@ -25,11 +25,14 @@ lado = None
 if ref:
     r = Image.open(ref).convert('RGB'); r = r.crop((120, 90, 880, 530)); h2 = 2 * foto('pie-frente_codigo').height; r = r.resize((round(r.width * (h2 // 2) / r.height), h2 // 2), Image.LANCZOS)
     lado = Image.new('RGB', (r.width, h2), (214, 212, 218)); lado.paste(r, (0, h2 // 4))
-hoja([[('POR CÓDIGO · ' + t, n + '_codigo') for t, n in V], [('ACTUAL · ' + t, n + '_actual') for t, n in V]], os.path.join(out, 'comparacion.jpg'), lado)
+if os.path.exists(os.path.join(src, 'pie-frente_codigo.png')): hoja([[('POR CÓDIGO · ' + t, n + '_codigo') for t, n in V], [('ACTUAL · ' + t, n + '_actual') for t, n in V]], os.path.join(out, 'comparacion.jpg'), lado)
 P = [('salida', 'pos-salida'), ('tirón', 'pos-tiron'), ('sentadilla frente', 'pos-sentadilla-frente'), ('sentadilla perfil', 'pos-sentadilla-perfil'), ('rack', 'pos-rack'), ('tijera', 'pos-tijera'), ('sentadilla envión', 'pos-envion-fondo'), ('arriba frente', 'pos-arriba-frente'), ('arriba espalda', 'pos-arriba-espalda')]
 filas = []
 for k in (P[:5], P[5:]):
     filas.append([('CÓDIGO · ' + t, n + '_codigo') for t, n in k]); filas.append([('ACTUAL · ' + t, n + '_actual') for t, n in k])
-hoja(filas, os.path.join(out, 'posiciones.jpg'))
+if os.path.exists(os.path.join(src, 'pos-salida_codigo.png')): hoja(filas, os.path.join(out, 'posiciones.jpg'))
+if os.path.exists(os.path.join(src, 'sala-34_codigo.png')):
+    S = [('3/4', 'sala-34'), ('frente', 'sala-frente'), ('espalda', 'sala-espalda'), ('barra arriba', 'sala-arriba')]; quien = [('POR CÓDIGO', 'codigo'), ('KORDAN (Blender, nuevo)', 'kordan')] + ([('VENTURA (producción)', 'ventura')] if os.path.exists(os.path.join(src, 'sala-34_ventura.png')) else [])
+    hoja([[(q + ' · ' + t, n + '_' + k) for t, n in S] for q, k in quien], os.path.join(out, 'sala.jpg'))
 C = [('cabeza', 'cerca-cabeza'), ('torso', 'cerca-torso'), ('manos', 'cerca-manos'), ('piernas', 'cerca-piernas')]
-hoja([[('CÓDIGO · ' + t, n + '_codigo') for t, n in C], [('ACTUAL · ' + t, n + '_actual') for t, n in C]], os.path.join(out, 'detalles.jpg'))
+if os.path.exists(os.path.join(src, 'cerca-cabeza_codigo.png')): hoja([[('CÓDIGO · ' + t, n + '_codigo') for t, n in C], [('ACTUAL · ' + t, n + '_actual') for t, n in C]], os.path.join(out, 'detalles.jpg'))
