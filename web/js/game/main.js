@@ -431,7 +431,8 @@ const etiqueta = et => { $('etiqueta').hidden = !et?.length; $('etiqueta').textC
 const CAMARAS_ELEGIBLES = ['3/4', 'jurado', 'lado', 'baja', 'pov'], CAMARA_NOMBRE = { '3/4': 'general', jurado: 'jurado', lado: 'lateral', baja: 'baja', pov: 'pov' };
 const camElegida = () => { const q = params.get('camara'), g = guardado.get('tarima.camara'); return CAMARAS_ELEGIBLES.includes(q) ? q : CAMARAS_ELEGIBLES.includes(g) ? g : 'pov'; };      // 17-nov, pedido del dueño: por defecto, primera persona
 /** Recuadro de la primera persona (la vista general en una pantalla chica): prendido salvo que se apague en Opciones o con `?recuadro=no`. */
-const recuadroPedido = () => (params.get('recuadro') || guardado.get('tarima.recuadro')) === 'si';
+// 17-nov, pedido del dueño («falta la cámara del pesista haciendo el movimiento»): el recuadro va siempre que esté prendido, también en «Móvil» y «Baja» (antes ahí había que pedirlo a mano)
+const recuadroPedido = () => recuadroOn();
 const recuadroOn = () => (params.get('recuadro') || guardado.get('tarima.recuadro') || 'si') !== 'no';
 const camPrincipal = () => { const c = (E.camara ||= camElegida()); return escena.vertical && c !== 'pov' ? 'lado' : c; };
 /** La cámara con que se mira un levantamiento: la elegida si es del jugador; la de un rival nunca es la primera persona. */
