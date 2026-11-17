@@ -348,8 +348,11 @@ function capMaterial(src, mask, uv1) {
   const U = { tCuero: { value: mask || null }, uCuero: { value: mask && uv1 ? 1 : 0 } }; if (U.uCuero.value) src.alphaTest = .5;      // el borde del casco lo corta el nacimiento pintado (máscara, canal B)
   src.roughness = Math.max(src.roughness ?? .8, .78); src.metalness = 0; src.envMapIntensity = .1; src.side = THREE.FrontSide;
   src.normalMap = null;      // sin mapa de normales: en el borde fino del casco el UV de las hebras degenera y las normales salían disparadas (púas gris claro en el nacimiento); la forma la dan los gajos de la malla
-  src.onBeforeCompile = sh => { conCuero(sh, U, '0.2', '0.44'); sh.fragmentShader = sh.fragmentShader.replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.45; material.specularColorBlended *= 0.45; material.specularF90 *= 0.5;'); };
-  src.customProgramCacheKey = () => 'tarima-pelo-4';
+  src.onBeforeCompile = sh => { conCuero(sh, U, '0.1', '0.62');
+    // nacimiento en degradé: el borde del casco no es un corte sino una trama que se va raleando (abajo queda el degradé pintado en la piel)
+    sh.fragmentShader = sh.fragmentShader.replace('#include <alphatest_fragment>', 'if ( uCuero > 0.5 ) { float rn = fract( sin( dot( floor( gl_FragCoord.xy ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ); diffuseColor.a = diffuseColor.a > rn * 0.85 + 0.08 ? 1.0 : 0.0; }\n#include <alphatest_fragment>');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.45; material.specularColorBlended *= 0.45; material.specularF90 *= 0.5;'); };
+  src.customProgramCacheKey = () => 'tarima-pelo-5';
   return src;
 }
 function hairDepthMaterial(src) {
