@@ -250,7 +250,9 @@ const capa = {
     // el desplazamiento se conserva al repintar, también el de la parte de arriba de la bienvenida (.bv-cuerpo)
     const c = $('capa'), prev = c.firstElementChild, act = document.activeElement, clave = prev && prev.contains(act) ? claveDe(act) : null, sc = prev ? prev.scrollTop : 0, sc2 = prev?.querySelector('.bv-cuerpo')?.scrollTop || 0;
     c.innerHTML = `<div class="panel ${clase}">${html}</div>`; E.modo = 'panel'; E.forzar = true;
-    const pn = c.firstElementChild; pn.t0 = prev ? prev.t0 : -1e9; if (prev) { pn.scrollTop = sc; const bc = pn.querySelector('.bv-cuerpo'); if (bc) bc.scrollTop = sc2; }
+    const pn = c.firstElementChild; pn.t0 = prev ? prev.t0 : -1e9;
+    // un panel que es otro (no el mismo repintado) entra con una disolvencia corta (juego.css, .panel.entra)
+    pn.dataset.clase = clase; if (!reduceMotion && (!prev || prev.dataset.clase !== clase)) pn.classList.add('entra'); if (prev) { pn.scrollTop = sc; const bc = pn.querySelector('.bv-cuerpo'); if (bc) bc.scrollTop = sc2; }
     // `foco: false`: panel donde Espacio es del juego (el metrónomo): nadie queda con foco, y a los botones se llega con Tab
     if (!foco) { pn.dataset.libre = '1'; document.activeElement?.blur?.(); } else if (!E.sobre) enfocar(pn, clave); else E.sobre.foco = null;
     return pn;
@@ -1016,8 +1018,14 @@ async function inicio() {
       ? `<label class="nombre" for="nombre"><span>${t('bienvenida.nombre')}</span><input id="nombre" type="text" value="${esc(S.nombre)}" maxlength="20" placeholder="${esc(t('bienvenida.nombre_ph'))}" title="${esc(t('bienvenida.nombre_nota'))}" autocomplete="nickname" autocapitalize="words" spellcheck="false" enterkeyhint="go"></label>`
       : `<p class="vuelve">${t('bienvenida.vuelve', { nombre: `<b>${esc(guardadoNombre)}</b>` })} <button class="link" id="btn-nosoy">${t('bienvenida.no_soy')}</button></p>`;
     const opt = (cls, dato, v, actual, clave) => `<button class="${cls}" data-${dato}="${v}" aria-pressed="${v === actual}">${t(clave)}</button>`;
+    // El nivel va A LA VISTA donde se entra a jugar (17-nov, pedido del dueño: «es poco intuitivo elegir el estilo de jerk y
+    // el nivel»): Fácil · Medio · Difícil como segmentos encima de «Jugar», con el elegido marcado (Fácil, si nunca se eligió
+    // otro) y su línea de siempre debajo. Lo marcado es lo que se juega: sale de cfg.dif, lo mismo que va a la partida.
+    // Clásico (otro control) sigue en Opciones; con Clásico puesto no queda ninguno de los tres marcado y la línea lo dice.
+    const conNivel = cfg.ctl === 'b' || cfg.ctl === 'c';
+    const nivelHTML = conNivel ? `<div class="fila bv-nivel" role="group" aria-label="${esc(t('opciones.dificultad'))}"><span>${t('opciones.dificultad')}</span>${DIFICULTADES.map(d => opt('dif', 'd', d, cfg.ctl === 'c' ? null : cfg.dif, 'opciones.dif.' + d)).join('')}<small class="nota">${t('opciones.dif_nota.' + (cfg.ctl === 'c' ? 'clasico' : cfg.dif))}</small></div>` : '';
     const opciones = S.opciones ? `<div class="opciones">
-        <div class="fila"><span>${t('opciones.dificultad')}</span>${DIFICULTADES.map(d => opt('dif', 'd', d, cfg.ctl === 'c' ? null : cfg.dif, 'opciones.dif.' + d)).join('')}${opt('ctl', 'c', 'c', cfg.ctl, 'opciones.pro')}<small class="nota">${t('opciones.dif_nota.' + (cfg.ctl === 'c' ? 'clasico' : cfg.dif))}</small></div>
+        <div class="fila"><span>${t('opciones.dificultad')}</span>${conNivel ? '' : DIFICULTADES.map(d => opt('dif', 'd', d, cfg.ctl === 'c' ? null : cfg.dif, 'opciones.dif.' + d)).join('')}${opt('ctl', 'c', 'c', cfg.ctl, 'opciones.pro')}${conNivel ? '' : `<small class="nota">${t('opciones.dif_nota.' + (cfg.ctl === 'c' ? 'clasico' : cfg.dif))}</small>`}</div>
         <div class="fila"><span>${t('opciones.rivales')}</span>${opt('nivel', 'n', 'amistoso', cfg.nivel, 'opciones.tranquilos')}${opt('nivel', 'n', 'normal', cfg.nivel, 'opciones.parejos')}${opt('nivel', 'n', 'dificil', cfg.nivel, 'opciones.duros')}</div>
         <div class="fila"><span>${t('opciones.orden')}</span>${opt('orden', 'o', 'rondas', cfg.orden, 'opciones.orden_rondas')}${opt('orden', 'o', 'oficial', cfg.orden, 'opciones.orden_oficial')}<small class="nota">${t('opciones.orden_nota.' + cfg.orden)}</small></div>
         <div class="fila"><span>${t('opciones.final')}</span>${opt('ritmo', 'r', 'expres', cfg.ritmo, 'opciones.rapida')}${opt('ritmo', 'r', 'completa', cfg.ritmo, 'opciones.completa')}</div>
@@ -1032,7 +1040,7 @@ async function inicio() {
       ${nombreHTML}
       ${tarjetas ? `<h2 id="pesista-t">${esc(t('pesista.titulo', { nombre: mostrado() }))}</h2>
       <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b>${cfg.ctl === 'b' ? `<small class="conviene">${t(`pesista.${id}.b`)}</small><small class="rm">${t('rm.tarjeta', { s: datos.atletas[id].techo.s, c: datos.atletas[id].techo.c })}</small>` : `${cuerpoHTML(id, uno)}<small class="conviene">${t(uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small>`}</button>`).join('')}</div>` : ''}
-      ${opciones}</div><div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button class="link" id="btn-opciones" aria-expanded="${S.opciones}">${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button><button class="link" id="btn-ayuda">${t('boton.ayuda')}</button><a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
+      ${nivelHTML}${opciones}</div><div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button class="link" id="btn-opciones" aria-expanded="${S.opciones}">${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button><button class="link" id="btn-ayuda">${t('boton.ayuda')}</button><a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
       `, 'bienvenida');
     pn.querySelector('a.legal')?.addEventListener('click', () => ev('privacidad_abierta', { pantalla: E.pantalla }));
     if (abrio) { const bc = pn.querySelector('.bv-cuerpo') || pn; bc.scrollTop = bc.scrollHeight; }      // Opciones se abre arriba de la fila de botones: se lleva a la vista
@@ -1134,7 +1142,8 @@ async function elegirPesista(cfg, nombre = '') {
     try { await escena.cargar(id); } catch (e) { console.warn('elegir:', e); return; } finally { bajando(false); }
     if (G.fin || k !== clave()) return;
     const cambio = async () => { escena.girar(0); await escena.mostrar(id); escena.setCarga(Math.round(datos.atletas[id].techo.s), 's'); G.u = G.arriba ? 1 : 0; posar(); encuadrar(0); G.visto = k; };
-    if (G.visto) await fundido(cambio); else await cambio();
+    // también al entrar (17-nov): de la bienvenida a la selección la cámara cambia de plano, y eso va detrás de un fundido
+    if (G.visto || escena.activo) await fundido(cambio); else await cambio();
   }).catch(e => { console.warn('elegir:', e); }));
   const marcar = () => { const pn = G.pn; if (!pn) return; pn.querySelectorAll('.pesista').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.id === G.id)); const f = cara(b.dataset.id); b.querySelector('small').innerHTML = esc(f.corto) + marca(f); b.querySelector('.b').style.background = f.bandera; });
     const ops = opciones(G.id), A = pn.querySelector('#el-aspectos'); A.hidden = ops.length < 2;
@@ -1185,7 +1194,9 @@ async function elegirPesista(cfg, nombre = '') {
   // todo como estaba: sin giro, de pie, con la barra a la vista y su carga, y la malla del jugador en su pesista. Si un
   // cambio de pesista quedó a medias (un fundido en curso), se vuelve a dejar todo en su lugar cuando termina
   const dejar = () => { escena.barbell.group.visible = true; escena.girar(0); if (kg0) escena.setCarga(kg0); if (escena.activo) escena.posar(poseParado(escena.P, 's'), 's'); E.forzar = true; };
-  dejar(); G.cola.then(() => { if (E.pantalla === 'inicio' || E.pantalla === 'elegir') dejar(); });
+  // al salir (17-nov), lo mismo: el giro y la pose vuelven a su lugar detrás de un fundido corto, no de golpe
+  if (escena.activo && G.visto) await fundido(async () => dejar()); else dejar();
+  G.cola.then(() => { if (E.pantalla === 'inicio' || E.pantalla === 'elegir') dejar(); });
   // lo elegido queda puesto en el plantel (la plaza del jugador con su modelo, los rivales con los de siempre)
   const m = G.asp[G.id], es = vestirJugador(G.id, m, fichas, poses);
   escena.yo = yo0; E.elegir = null; capa.quitar();
@@ -1413,14 +1424,18 @@ function panelLlamado(p, L, t0, alConfirmar, corre = true) {
     return `${kilos}<div class="pn-esencial dif-${barra ? dif : 'u'}">${esencial}${estiloHTML(e => barra ? '' : ` ${discosHTML(llegas(S.kg, e))}`)}</div>${teclas}
       <div class="pn-detalle"${S.detalle ? '' : ' hidden'}>${detalle}</div>`;
   };
-  // LIF-31 y LIF-43: el estilo de envión en un control compacto («Estilo de envión: Split · fácil ▾») que se abre en una fila
-  // de tres; desde el primer dos tiempos queda fijo, con candado
-  const nomEstilo = e => `${ENVIONES[e]} · ${t('jerk.dif.' + e)}`;
+  // LIF-31 y LIF-43: el estilo de envión; desde el primer dos tiempos queda fijo, con candado. Desde el 17-nov (pedido del
+  // dueño: «es poco intuitivo elegir el estilo de jerk y el nivel») los tres estilos van A LA VISTA como segmentos grandes
+  // (el recomendado, split, primero y marcado; debajo de cada nombre, su dificultad), sin desplegable: tocar uno lo marca y
+  // la chance «X de 10» cambia en el momento. Solo en el teléfono acostado (html.horiz.bajo), donde los tres no entran en el
+  // alto del panel, sigue el control compacto («Estilo de envión: Split ▾») que se abre en una fila de tres.
+  const estiloALaVista = () => !document.documentElement.matches('.horiz.bajo');
+  const nomEstilo = e => `<b>${esc(ENVIONES[e])}</b><small class="pn-dif">${esc(t('jerk.dif.' + e))}</small>`;
   const estiloHTML = (extra = () => '') => {
     if (L.lev !== 'c') return '';
     const partes = e => `<span class="pn-et">${esc(t('jerk.titulo'))}</span> <b>${esc(ENVIONES[e])}</b><span class="pn-dif"> · ${esc(t('jerk.dif.' + e))}</span>`;
     if (envFijo) return `<span class="pn-estilo fijo" title="${esc(t('jerk.fijo_nota'))}">${CANDADO}${partes(envFijo)} <em>${esc(t('jerk.fijo'))}</em></span>`;
-    if (S.elige) return `<span class="pn-estilo abierto" role="group" aria-label="${esc(t('jerk.titulo'))}"><span class="pn-et">${esc(t('jerk.titulo'))}</span>${Object.keys(ENVIONES).map(e => `<button class="envion" data-env="${e}" aria-pressed="${e === S.env}">${esc(nomEstilo(e))}${extra(e)}</button>`).join('')}<em class="pn-regla">${esc(t('jerk.regla'))}</em></span>`;
+    if (S.elige || estiloALaVista()) return `<span class="pn-estilo abierto" role="group" aria-label="${esc(t('jerk.titulo'))}"><span class="pn-et">${esc(t('jerk.titulo'))}</span>${Object.keys(ENVIONES).map(e => `<button class="envion" data-env="${e}" aria-pressed="${e === S.env}">${nomEstilo(e)}${extra(e)}</button>`).join('')}<em class="pn-regla">${esc(t('jerk.regla'))}</em></span>`;
     return `<span class="pn-estilo"><button id="btn-estilo" aria-expanded="false" title="${esc(t('jerk.regla'))}">${partes(S.env)} <i aria-hidden="true">▾</i></button></span>`;
   };
   const pinta = () => {
@@ -1454,7 +1469,7 @@ function panelLlamado(p, L, t0, alConfirmar, corre = true) {
     pn.querySelectorAll('.kg').forEach(b => al(b, () => { S.kg = masKilos(S.kg, +b.dataset.d, min, KG_MAX); S.seguro = false; pinta(); }));
     pn.querySelectorAll('.ficha').forEach(b => al(b, () => { S.kg = +b.dataset.kg; pinta(); }));
     // al elegir un estilo, el foco vuelve a «levantar» (Espacio levanta)
-    pn.querySelectorAll('.envion').forEach(b => al(b, () => { if (envFijo) return; S.env = b.dataset.env; const cerro = S.elige; S.elige = false; const q = pinta(); if (cerro) q.querySelector('#btn-confirmar')?.focus({ preventScroll: true }); }));
+    pn.querySelectorAll('.envion').forEach(b => al(b, () => { if (envFijo) return; S.env = b.dataset.env; S.elige = false; const q = pinta(); if (uno) q.querySelector('#btn-confirmar')?.focus({ preventScroll: true }); }));
     const est = pn.querySelector('#btn-estilo'); if (est) al(est, () => { S.elige = true; pinta().querySelector('.envion[aria-pressed=true]')?.focus({ preventScroll: true }); });
     const det = pn.querySelector('#btn-detalle'); if (det) al(det, () => { S.detalle = !S.detalle; guardado.set('tarima.panel.detalle', S.detalle ? '1' : '0'); pinta(); });
     const mas = pn.querySelector('#btn-mas'); if (mas) al(mas, () => { S.mas = !S.mas; pinta(); });

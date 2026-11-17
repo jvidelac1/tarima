@@ -9,7 +9,7 @@
 //     el puntero pasa por el verde.
 // Sin animaciones si la persona pidió movimiento reducido (el puntero se mueve igual: es el juego).
 import { t } from '../i18n/t.js';
-import { posBarra, BARRA } from '../../sim/rules.js';
+import { posBarra, reglasB } from '../../sim/rules.js';
 
 const HTML = `<div class="b-cab"><span class="b-nombre"></span><b class="b-verbo"></b><kbd class="tecla b-tecla"></kbd></div>
 <div class="b-pista"><i class="b-am"></i><i class="b-ve"></i><i class="b-marca"></i><i class="b-punt"></i><div class="b-fant"><i></i><kbd class="tecla"></kbd></div></div>
@@ -18,7 +18,7 @@ const HTML = `<div class="b-cab"><span class="b-nombre"></span><b class="b-verbo
 export class Barrita {
   /** @param {HTMLElement} el  contenedor (#barrita) @param {{reduce?:boolean}} o */
   constructor(el, o = {}) {
-    this.el = el; this.reduce = !!o.reduce; this.tactil = false; this.clave = null; this.hasta = 0; this.zonaPintada = null; this.vistas = new Set(); this.R = BARRA;
+    this.el = el; this.reduce = !!o.reduce; this.tactil = false; this.clave = null; this.hasta = 0; this.zonaPintada = null; this.vistas = new Set(); this.R = reglasB();
     if (!el) return;
     el.innerHTML = HTML; const q = s => el.querySelector(s);
     this.nombre = q('.b-nombre'); this.verbo = q('.b-verbo'); this.tecla = q('.b-tecla'); this.pista = q('.b-pista'); this.am = q('.b-am'); this.ve = q('.b-ve'); this.marca = q('.b-marca'); this.punt = q('.b-punt'); this.pal = q('.b-pal'); this.fant = q('.b-fant');

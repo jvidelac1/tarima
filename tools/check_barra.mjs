@@ -127,6 +127,13 @@ for (const P of PANTALLAS) try {
     for (const x of T) if (x.cruces || x.fuera || x.tapa) mal(`la tarjeta de ${x.id} no se lee entera: ${JSON.stringify(x)}`); }
   // la dificultad elegida se ve en Opciones (Fácil · Medio · Difícil · Clásico)
   if (P.dif) { await pulsa('#btn-opciones'); await av(250); await foto('0_opciones'); const d = await J(() => document.querySelector('#capa .dif[aria-pressed=true]')?.dataset.d); if (d !== P.dif) mal(`Opciones no muestra la dificultad elegida (${d})`); await pulsa('#btn-opciones'); await av(250); }
+  // 17-nov: el nivel está a la vista en la bienvenida, sin abrir Opciones, y lo marcado es lo que se juega: Fácil si nunca se
+  // eligió otro. Una sola verdad: el segmento marcado, la dificultad que anota el juego y (más abajo) la de la partida.
+  { const d = await J(() => { const b = [...document.querySelectorAll('#capa .bv-nivel .dif')]; return { n: b.length, visibles: b.filter(x => x.offsetParent && x.getBoundingClientRect().height >= 40).length, marcados: b.filter(x => x.getAttribute('aria-pressed') === 'true').map(x => x.dataset.d), juego: JUEGO.E.dificultad, opciones: !!document.querySelector('#capa .opciones') }; });
+    const quiere = P.dif || 'facil';
+    if (d.n !== 3 || d.visibles !== 3 || d.opciones) mal(`la bienvenida no muestra los tres niveles a la vista sin abrir Opciones (${JSON.stringify(d)})`);
+    if (d.marcados.join() !== quiere || d.juego !== quiere) mal(`el nivel marcado en la bienvenida (${d.marcados.join() || 'ninguno'}) no es el que se juega (${d.juego}; se esperaba ${quiere})`);
+    else console.log(`${tag} nivel a la vista en la bienvenida: marcado «${d.marcados[0]}» = el que se juega`); }
   if (P.soloInicio) { await ctx.close(); continue; }
   await pulsa('#btn-empezar');
   const t0 = Date.now(), densos = new Set();
@@ -199,6 +206,7 @@ for (const P of PANTALLAS) try {
     console.log(`${tag} vistazo a la barra: ${vz ? `${vz.ms} ms con las dos manos en la imagen · mirada más baja ${(vz.incMin * 180 / Math.PI).toFixed(0)}° · al terminar ${(vz.incFin * 180 / Math.PI).toFixed(0)}° · duró ${vz.dura} ms` : 'no hubo'}`);
     if (!vz) mal('primera persona: no hubo vistazo a la barra en la preparación');
     else { if (vz.ms < 600) mal(`primera persona: en el vistazo las dos manos se ven ${vz.ms} ms (mínimo 600)`); if (vz.incFin < -.26) mal(`primera persona: el vistazo termina con la mirada a ${(vz.incFin * 180 / Math.PI).toFixed(0)}° (tiene que haber vuelto al jurado)`); if (vz.dura > 6000) mal(`primera persona: el vistazo duró ${vz.dura} ms (tope 6000)`); } }
+  { const pd = await J(() => ({ partida: JUEGO.E.p?.cfg?.dif ?? null, juego: JUEGO.E.dificultad })), quiere = P.dif || 'facil'; if (pd.partida !== quiere || pd.juego !== quiere) mal(`la partida se jugó en «${pd.partida}» (el juego anota «${pd.juego}») y en la bienvenida estaba marcado «${quiere}»`); }
   const R = await J(() => (JUEGO.E.propios || []).map(x => ({ res: x.res, linea: x.linea, barras: (x.uno?.barras || []).map(b => b.zona + (b.sola ? '*' : '')) })));
   for (const x of R) vistas.push(...x.barras);
   console.log(`${tag} pedidas ${pedidas.join(' ')} · salieron ${vistas.join(' ')} · ${R.map(x => `${x.res}${x.linea ? ` «${x.linea}»` : ''}`).join(' · ')}`);
