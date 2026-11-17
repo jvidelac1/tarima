@@ -61,7 +61,7 @@ export function vestir(lista, fichas, poses) {
     // un modelo repetido comparte la cara: el segundo lleva la tela de otro color y no tiene primer plano (como Marangi con Brenner)
     Object.assign(PLANTEL[id], { modelo: m, corto: f.corto, nombre: f.nombre, pais: f.pais, codigo: f.codigo, genero: f.genero, categoria: f.categoria, masa: f.masa, vestido: true,
       // `aspecto` (rama look: Athlete.setAspecto): el del modelo nuevo si su ficha lo trae (`juego.aspecto` en blender/plantel.py); nunca el del modelo anterior
-      aspecto: f.aspecto || undefined,
+      aspecto: f.aspecto || undefined, pelo: f.pelo || undefined,      // `pelo`: color del pelo de la ficha (Athlete.setAspecto, `pelo.base`)
       cara: !repetido, tela: repetido ? TELAS[k] : undefined, color: (!repetido && f.color) || PLANTEL[id].color, bandera: (!repetido && f.bandera) || PLANTEL[id].bandera });
     CUERPO[id] = { estatura: P.h, femur: P.seg.femur / P.h, brazos: P.seg.arm / P.h, movilidad: CUERPO[id].movilidad };
     hechos.push(id);
@@ -69,7 +69,7 @@ export function vestir(lista, fichas, poses) {
   return hechos;
 }
 /** Terna que se juega sin `?plantel=`: una de las `ternas` de web/data/plantel.json (tools/plantel_web.py). `clasico` = sin vestuario. */
-export const PLANTEL_DEFECTO = 'hombres';
+export const PLANTEL_DEFECTO = 'clasico';      // 17-nov: el dueño publica el juego nuevo con los pesistas que ya están en producción (Ventura, Brenner, Marangi); la terna nueva queda con `?plantel=hombres`
 /** De `?plantel=` a la lista de tres: el nombre de una terna de plantel.json (`mujeres`, `hombres`...) o ids separados por coma. */
 export const ternaDe = (q, plantel) => (!q ? [] : plantel?.ternas?.[q] || q.split(',').map(x => x.trim()));
 export const FICHA = { energia: 'fon', margen: 'tec' };

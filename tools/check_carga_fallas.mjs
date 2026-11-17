@@ -20,6 +20,8 @@ import { launchOptions } from './browser.mjs';
 import { sinApi } from './sin_api.mjs';
 import ES from '../web/js/game/i18n/es.js';
 import EN from '../web/js/game/i18n/en.js';
+// modelos que el juego carga sin `?plantel=`: los clásicos si PLANTEL_DEFECTO es 'clasico', si no la terna nueva (web/js/game/roster.js)
+const MODELOS_DEFECTO = /PLANTEL_DEFECTO = 'clasico'/.test((await import('node:fs')).readFileSync(new URL('../web/js/game/roster.js', import.meta.url), 'utf8')) ? 'brenner,ventura' : 'ilarraz,jastrev,kordan';
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
@@ -125,7 +127,7 @@ async function modelo(nombre) {
   await page.waitForFunction(() => ['presentacion', 'apertura'].includes(window.JUEGO.estado().pantalla), null, { timeout: 90000 }).catch(() => null);
   const s = await J(() => ({ pantalla: JUEGO.estado().pantalla, modelos: Object.keys(JUEGO.escena.atletas).sort().join(','), aviso: !!document.getElementById('carga-aviso') }));
   await page.screenshot({ path: path.join(OUT, `modelo_${nombre}_de_vuelta.png`) });
-  if (s.pantalla !== 'presentacion' || s.modelos !== 'ilarraz,jastrev,kordan' || s.aviso) problemas.push(`${tag} con la red de vuelta no siguió a la presentación: ${JSON.stringify(s)}`);
+  if (s.pantalla !== 'presentacion' || s.modelos !== MODELOS_DEFECTO || s.aviso) problemas.push(`${tag} con la red de vuelta no siguió a la presentación: ${JSON.stringify(s)}`);
   if (errores.length) problemas.push(`${tag} errores sin atrapar: ${errores.slice(0, 3).join(' | ')}`);
   console.log(`${tag} ${antes} pedidos de GLB fallidos · «${a?.titulo}» · de vuelta: ${s.pantalla} con ${s.modelos}`);
   await ctx.close();

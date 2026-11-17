@@ -32,6 +32,8 @@ import { leerDatos } from '../web/js/sim/data.js';
 import { recalcular, resumen } from '../web/js/sim/replay.js';
 import ES from '../web/js/game/i18n/es.js';
 import EN from '../web/js/game/i18n/en.js';
+// modelos que el juego carga sin `?plantel=`: los clásicos si PLANTEL_DEFECTO es 'clasico', si no la terna nueva (web/js/game/roster.js)
+const MODELOS_DEFECTO = /PLANTEL_DEFECTO = 'clasico'/.test((await import('node:fs')).readFileSync(new URL('../web/js/game/roster.js', import.meta.url), 'utf8')) ? 'brenner,ventura' : 'ilarraz,jastrev,kordan';
 /** Señales de un toque (la libre de siempre y las de 'u': ¡SALTA!, ¡PÁRATE!, ¡DA TODO!): un toque y la señal se va. */
 const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
@@ -332,7 +334,7 @@ async function corrida(via) {
   for (const e of ['tarjeta', 'tutorial', 'guiado', 'repeticion']) if (r.visitados.includes(e)) mal(`en 'u' no tiene que aparecer «${e}» (sin tutorial aparte ni repetición propia)`);
   const rc = recalcular(r.registro, datos);
   if (!rc.ok) mal(`el registro exportado no recalcula: ${rc.error}`); else if (resumen(rc.tabla) !== r.tabla) mal(`recalculado «${resumen(rc.tabla)}», en pantalla «${r.tabla}»`);
-  if (r.modelos !== 'ilarraz,jastrev,kordan') mal(`modelos en memoria: ${r.modelos}`);
+  if (r.modelos !== MODELOS_DEFECTO) mal(`modelos en memoria: ${r.modelos}`);
   if (!(r.monitor.cuadros > 500)) mal(`el monitor de la barra casi no midió (${r.monitor.cuadros} cuadros)`);
   if (r.monitor.barraMin < .2249) mal(`la barra quedó bajo la tarima: centro a ${(r.monitor.barraMin * 1000).toFixed(1)} mm`);
   if (r.monitor.manosMax > .16) mal(`la barra se separó de las manos: ${(r.monitor.manosMax * 1000).toFixed(0)} mm`);

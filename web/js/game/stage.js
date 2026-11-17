@@ -522,7 +522,7 @@ export class Escena {
     for (const b of Object.values(this.atletas)) b.root.visible = b === a;
     // el pesista del jugador (this.yo, lo fija main.js) lleva siempre su malla lisa, nunca la del modelo con otro nombre
     const tela = id === this.yo ? JUGADOR.tela : f.tela;
-    { const asp = (id === this.yo ? JUGADOR.aspecto : null) || f.aspecto || {}; a.setAspecto({ ...asp, tela: { ...(asp.tela || {}), plano: tela || null } }); }      // aspecto por parámetros (athlete.js, ASPECTO)
+    { const asp = (id === this.yo ? JUGADOR.aspecto : null) || f.aspecto || {}; a.setAspecto({ ...asp, pelo: { ...(asp.pelo || {}), base: f.pelo || null }, tela: { ...(asp.tela || {}), plano: tela || null } }); }      // aspecto por parámetros (athlete.js, ASPECTO)
     this.activo = a; this.id = id; this.P = this.poses[f.modelo]; this.rig.setAthleteHeight(this.P.h); this.sombra = 4;
   }
   setCarga(kg, lev) { if (kg !== this.kg) { this.kg = this.barbell.setLoad(kg); this._sombraBarra(); this.sombra = 4; } if (lev && this.P) this.barbell.setGrip(lev === 's' ? this.P.grip?.snatch : this.P.grip?.clean); }
