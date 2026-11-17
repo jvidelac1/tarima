@@ -140,7 +140,7 @@ export function generar(esq, ficha = {}, calidad = 'alta', soloCampo = false) {
   // ojos: esferas chicas con iris y pupila por color de vértice
   for (const o of A.ojos) { const nU = 20, nV = 12, pos = [], ind = [], cl = [], base = [], iris = col.iris;
     for (let v = 0; v <= nV; v++) for (let u = 0; u <= nU; u++) { const th = v / nV * Math.PI, ph = u / nU * 2 * Math.PI, d = [Math.sin(th) * Math.cos(ph), Math.sin(th) * Math.sin(ph), Math.cos(th)];      // polo en +z (hacia adelante)
-      pos.push(o.c[0] + d[0] * o.r, o.c[1] + d[1] * o.r, o.c[2] + d[2] * o.r); base.push(o.c[0], o.c[1], o.c[2] + .03); const a = th / Math.PI * 180, k = a < 10 ? [.02, .02, .02] : a < 29 ? iris : a < 32 ? iris.map(c => c * .5) : [.86, .84, .8]; cl.push(...k); }
+      pos.push(o.c[0] + d[0] * o.r, o.c[1] + d[1] * o.r, o.c[2] + d[2] * o.r); base.push(o.c[0], o.c[1], o.c[2] + .03); const a = th / Math.PI * 180, k = a < 10 ? [.02, .02, .02] : a < 27 ? iris : a < 30 ? iris.map(c => c * .5) : [.93, .92, .9]; cl.push(...k); }
     for (let v = 0; v < nV; v++) for (let u = 0; u < nU; u++) { const p = v * (nU + 1) + u; ind.push(p, p + nU + 1, p + 1, p + 1, p + nU + 1, p + nU + 2); }
     extra.push({ nombre: 'ojo', pos: Float32Array.from(pos), base: Float32Array.from(base), ind: Uint32Array.from(ind), cols: cl, tipo: TIPO.ojo, rigido: ix('Head') }); }
   // hebilla del cinturón: un marco con su lengüeta, mallado aparte bien fino

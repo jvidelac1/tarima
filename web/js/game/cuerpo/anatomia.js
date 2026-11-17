@@ -131,13 +131,13 @@ export function anatomia(C, J, P, F, Sg, Jr) {
   C.huso(hp(0, .15, .018), hp(0, .05, .046), hr([.066, .066, .034]), { nombre: 'cara', k: .03, forma: 2, tm: .3 });
   C.elip(hp(0, .03, .008), hr([.034, .02, .046]), { nombre: 'piso de la boca', k: .02, piel: P.mezcla(P.cabeza, .6, T, .4) });
   C.elip(hp(0, .052, .058), hr([.026, .026, .028]), { nombre: 'boca' });
-  C.elip(hp(0, .019, .066), hr([.027, .017, .02]), { nombre: 'menton', k: .02 });
+  C.elip(hp(0, .019, .066), hr([.023, .017, .02]), { nombre: 'menton', k: .02 });
   C.huso(hp(0, .127, .084), hp(0, .091, .106), hr([.008, .0095, .0105]), { nombre: 'nariz', k: .012 });
   C.elip(hp(0, .086, .105), hr([.0115, .0105, .011]), { nombre: 'punta de la nariz', k: .012 });
   for (const s of [1, -1]) {
-    C.elip(hp(s * .042, .05, -.004), hr([.014, .02, .02]), { nombre: 'angulo de la mandibula', k: .03 });
-    C.huso(hp(s * .04, .038, .004), hp(s * .016, .017, .06), hr([.011, .012, .013]), { nombre: 'mandibula', k: .03 });
-    C.elip(hp(s * .03, .066, .044), hr([.02, .026, .022]), { nombre: 'mejilla', k: .03 });
+    C.elip(hp(s * .037, .05, -.004), hr([.013, .02, .02]), { nombre: 'angulo de la mandibula', k: .03 });
+    C.huso(hp(s * .035, .038, .004), hp(s * .014, .017, .06), hr([.01, .011, .012]), { nombre: 'mandibula', k: .03 });
+    C.elip(hp(s * .027, .066, .044), hr([.018, .026, .022]), { nombre: 'mejilla', k: .03 });
     C.elip(hp(s * .044, .097, .05), hr([.018, .015, .02]), { nombre: 'pomulo', k: .03 });
     C.huso(hp(s * .014, .1375, .083), hp(s * .055, .1345, .062), hr(.006), { nombre: 'arco superciliar', k: .02 });
     C.elip(hp(s * .013, .081, .094), hr([.007, .007, .009]), { nombre: 'ala de la nariz', k: .008 });
@@ -145,10 +145,9 @@ export function anatomia(C, J, P, F, Sg, Jr) {
   }
   const ojos = [];
   for (const s of [1, -1]) {
-    ojos.push({ c: hp(s * .0315, .117, .0705), r: .0122 * hs, s });
-    C.elip(hp(s * .0315, .117, .09), hr([.0145, .0085, .011]), { nombre: 'cuenca', resta: true, k: .008 });
-    C.elip(hp(s * .0315, .127, .0745), hr([.0165, .0055, .0125]), { nombre: 'parpado de arriba', ejes: ejesXYZ(-18, 0, 0), k: .005 });
-    C.elip(hp(s * .0315, .107, .072), hr([.0155, .0045, .0115]), { nombre: 'parpado de abajo', ejes: ejesXYZ(14, 0, 0), k: .005 });
+    ojos.push({ c: hp(s * .0315, .117, .0735), r: .0125 * hs, s });
+    C.elip(hp(s * .0315, .117, .0915), hr([.0138, .0062, .0085]), { nombre: 'cuenca', resta: true, k: .004 });
+    C.elip(hp(s * .0315, .1255, .078), hr([.016, .004, .011]), { nombre: 'parpado de arriba', ejes: ejesXYZ(-18, 0, 0), k: .004 });
     C.elip(hp(s * .085, .108, -.017), hr([.004, .017, .0085]), { nombre: 'concha de la oreja', resta: true, k: .004 });
   }
   C.base = {};
