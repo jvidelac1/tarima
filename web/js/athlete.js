@@ -18,7 +18,7 @@ const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const _v = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
 
 const SKIN_PARS = /* glsl */`
-uniform sampler2D tMask; uniform sampler2D tDetailSkin; uniform sampler2D tDetailCloth; uniform vec2 uTile; uniform float uMaskMode; uniform vec3 uScatter; uniform float uSweat; uniform float uDetail; uniform float uSkinSat; uniform float uSkinRough; uniform vec3 uHairColor; uniform vec4 uClothFlat; uniform vec3 uSkinTint; uniform vec3 uClothTint; uniform float uTone; uniform float uWrinkle; uniform float uGloss; uniform float uFino; uniform float uClothGain; uniform float uNormBias; uniform float uHairMix; uniform vec3 uPiel; uniform float uSinCabeza; varying float vCab; uniform float uSinTorso; uniform float uCorte; varying float vTor; varying float vNdcY;
+uniform sampler2D tMask; uniform sampler2D tDetailSkin; uniform sampler2D tDetailCloth; uniform vec2 uTile; uniform float uMaskMode; uniform vec3 uScatter; uniform float uSweat; uniform float uDetail; uniform float uSkinSat; uniform float uSkinRough; uniform vec3 uHairColor; uniform vec4 uClothFlat; uniform vec3 uSkinTint; uniform vec3 uClothTint; uniform float uTone; uniform float uWrinkle; uniform float uGloss; uniform float uFino; uniform float uClothGain; uniform float uNormBias; uniform float uHairMix; uniform vec3 uPiel; uniform float uSinCabeza; varying float vCab; uniform float uSinTorso; uniform float uCercaOjo; uniform float uCorte; varying float vTor; varying float vNdcY;
 vec3 gMask = vec3( 0.0 ); float gGrain = 0.0; float gPatch = 0.5;
 // ruido de valor suave (manchas redondeadas, sin textura): antes la variación de tono y los parches húmedos salían del mosaico de
 // poros y se leían como una red de vetas claras sobre la piel
@@ -73,6 +73,8 @@ const SKIN_MASK = /* glsl */`
   // cuerpo propio sin dibujar salvo antebrazos y manos (primera persona con la cámara de la barra), con trama para que entre y salga de a poco
   // y lo que queda (los brazos, que entran por abajo) se deshace contra el borde de abajo de la imagen: el corte del hombro nunca queda a la vista
   // (sin trama contra el borde: el corte del hombro queda fuera de la imagen por regla, stage.js POV.vm)
+  // y lo que queda pegado a la cámara (el hombro propio) se corta por distancia, sin trama
+  if ( uCercaOjo > 0.0 && length( vViewPosition ) < uCercaOjo ) discard;
   if ( uSinTorso > 0.0 && vTor > uCorte && fract( sin( dot( floor( gl_FragCoord.xy ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) < uSinTorso ) discard;
   // cabeza propia oculta (primera persona): lo que queda del cuello y la cabeza, achicado a un punto, se pinta de piel lisa
   diffuseColor.rgb = mix( diffuseColor.rgb, uPiel, uSinCabeza * smoothstep( 0.55, 0.85, vCab ) );
@@ -239,7 +241,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
   const uniforms = { tDetailSkin: { value: detail.skin }, tDetailCloth: { value: detail.cloth }, uTile: { value: new THREE.Vector2(mpu / .012, mpu / .008) }, uDetail: { value: 1 }, tMask: { value: mask }, uMaskMode: { value: mask ? 1 : 0 },
     uScatter: { value: new THREE.Color(...ASPECTO.piel.dispersion) }, uSweat: { value: ASPECTO.piel.sudor }, uSkinSat: { value: ASPECTO.piel.saturacion }, uSkinRough: { value: ASPECTO.piel.rugosidad }, uHairColor: { value: new THREE.Color(.03, .025, .02) }, uClothFlat: { value: new THREE.Vector4(0, 0, 0, 0) },
     uSkinTint: { value: new THREE.Color(ASPECTO.piel.tono) }, uClothTint: { value: new THREE.Color(1, 1, 1) }, uTone: { value: ASPECTO.piel.variacion }, uWrinkle: { value: ASPECTO.tela.arrugas }, uGloss: { value: ASPECTO.piel.brillo }, uFino: FINO, uClothGain: { value: .46 }, uNormBias: { value: 1.7 },
-    uHairMix: { value: .7 }, uPiel: { value: new THREE.Color(.6, .42, .33) }, uSinCabeza: { value: 0 }, uSinTorso: { value: 0 }, uCorte: { value: .5 } };
+    uHairMix: { value: .7 }, uPiel: { value: new THREE.Color(.6, .42, .33) }, uSinCabeza: { value: 0 }, uSinTorso: { value: 0 }, uCercaOjo: { value: 0 }, uCorte: { value: .5 } };
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, uniforms);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aCabeza; varying float vCab; attribute float aTorso; varying float vTor; varying float vNdcY;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvCab = aCabeza; vTor = aTorso;').replace('#include <project_vertex>', '#include <project_vertex>\nvNdcY = gl_Position.y / max( 1e-4, gl_Position.w );');
@@ -250,7 +252,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
       .replace('#include <normal_fragment_maps>', THREE.ShaderChunk.normal_fragment_maps.replaceAll('texture2D( normalMap, vNormalMapUv )', 'texture2D( normalMap, vNormalMapUv, uNormBias * gMask.r )') + '\n' + SKIN_DETAIL)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + SKIN_MATERIAL);
   };
-  m.customProgramCacheKey = () => 'tarima-skin-26';
+  m.customProgramCacheKey = () => 'tarima-skin-27';
   m.userData.skin = uniforms;
   return m;
 }
@@ -319,7 +321,8 @@ function pesoCabeza(mesh, skin) {
   // acompaña a la barra y queda dentro del cuerpo; el juego dibuja las dos caras mientras tanto (el corte del codo no se ve hueco)
   const mano = mesh.skeleton.bones.map(b => { for (let x = b; x; x = x.parent) if (x.isBone && /^(Left|Right)ForeArm$/.test(boneKey(x.name))) return true; return false; });
   // el brazo (del hombro al codo) vale 0,65: con `uCorte` en 0,8 se dibuja (brazos colgando: salen de la imagen por arriba) y en 0,5 no
-  const tr = mesh.skeleton.bones.map((b, i) => (mano[i] ? 0 : /^(Left|Right)Arm$/.test(boneKey(b.name)) ? .65 : 1));
+  // las piernas y los pies también valen 0,65 (se dibujan con `uCorte` en 0,8: al mirar la barra se ven rodillas y zapatillas; el corte de la cadera queda detrás de la cámara)
+  const tr = mesh.skeleton.bones.map((b, i) => (mano[i] ? 0 : /^(Left|Right)(Arm|UpLeg|Leg|Foot|ToeBase)/.test(boneKey(b.name)) ? .65 : 1));
   const w = new Float32Array(si.count), wt = new Float32Array(si.count);
   for (let i = 0; i < si.count; i++) { let t = 0, c = 0, d = 0; for (let k = 0; k < 4; k++) { const p = sw.getComponent(i, k), h = si.getComponent(i, k); t += p; if (es[h]) c += p; d += p * tr[h]; } w[i] = t > 0 ? c / t : 0; wt[i] = t > 0 ? d / t : 0; }
   g.setAttribute('aCabeza', new THREE.BufferAttribute(w, 1)); g.setAttribute('aTorso', new THREE.BufferAttribute(wt, 1));

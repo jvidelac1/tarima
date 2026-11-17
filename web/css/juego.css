@@ -40,6 +40,15 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;
 .veredicto small{display:block;margin-top:.25em;font-family:var(--body);font-weight:400;font-size:calc(var(--u)*1.2);line-height:1.35;letter-spacing:0;color:var(--ink);text-transform:none}
 .veredicto.mal{border-color:var(--red)}
 .veredicto.arriba{top:11%;font-size:calc(var(--u)*1.5)}
+/* el resultado de un intento, 1,5 s: grande y centrado arriba, con las tres luces (después vuelve a su lugar); en pantallas angostas queda como siempre */
+.veredicto .luces{display:none}
+@media (min-width:900px) and (min-height:480px){
+  html:root .veredicto.grande{left:50%;top:9%;transform:translateX(-50%);text-align:center;font-size:calc(var(--u)*3.4);padding:calc(var(--u)*.8) calc(var(--u)*2);max-width:min(80cqw,calc(var(--u)*60));background:rgba(6,14,48,.9)}
+  html:root .veredicto.grande .luces{display:inline-flex;vertical-align:middle;margin-left:.6em;gap:.28em}
+  html:root .veredicto.grande .luces i{width:.62em;height:.62em}
+  html:root .veredicto.grande .luces i.r::after{font-size:.5em;line-height:1.2}
+  html:root .veredicto.grande small{display:none}
+}
 .rival{position:absolute;right:calc(var(--u)*1.2 + var(--sr));top:calc(var(--u)*5 + var(--st));max-width:46%;background:rgba(6,14,48,.88);padding:calc(var(--u)*.4) calc(var(--u)*.8);font-size:calc(var(--u)*.9);letter-spacing:.06em;display:flex;gap:.6em;align-items:center}
 .rival i{display:inline-block;width:1.6em;height:1.05em;flex:none}
 .zocalo{position:absolute;left:calc(var(--u)*1.2 + var(--sl));bottom:calc(var(--u)*1.2);display:flex;align-items:stretch;background:rgba(6,14,48,.92);max-width:calc(100% - var(--u)*2.4)}

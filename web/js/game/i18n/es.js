@@ -106,6 +106,8 @@ export default {
   'opciones.cam.lateral': 'Lateral',
   'opciones.cam.baja': 'Baja',
   'opciones.cam.pov': 'Primera persona',
+  'opciones.recuadro_si': 'Con recuadro',
+  'opciones.recuadro_no': 'Sin recuadro',
   'opciones.sonido': 'Sonido',
   'opciones.sonido_si': 'Con sonido',
   'opciones.sonido_no': 'Sin sonido',

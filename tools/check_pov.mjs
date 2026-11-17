@@ -123,10 +123,6 @@ if (!SOLO || SOLO === 'pov' || SOLO === 'claves') {
   const SEGS = [['snatch', 's', 100], ['clean', 'c', 120], ['split', 'c', 60], ['power', 'c', 50], ['squat', 'c', 70]];
   for (const id of SOLO === 'claves' ? [] : ['ventura', 'brenner']) {
     for (const [seg, lev, n] of SEGS) {
-      // hoja: una foto cada 5 muestras (medio segundo de clip), con la cámara asentada en cada una
-      const lista = [];
-      for (let s = 0; s <= n; s += 5) { await J(o => window.JUEGO.test.posa(o), { id, lev, seg, s, camara: 'pov', dt: .5, dibujar: false }); const m = await J(o => window.JUEGO.test.posa(o), { id, lev, seg, s, camara: 'pov', dt: .5 }); const b = await toma(); lista.push({ t: `${seg} ${s} · ${G(m.cam.inc).toFixed(0)}°`, b }); if (b.length < 9000) problemas.push(`${id} ${seg} ${s}: la imagen en primera persona salió vacía (${b.length} bytes)`); if (!m.pov || !m.sinCabeza) problemas.push(`${id} ${seg} ${s}: la primera persona no quedó puesta o la cabeza propia se dibuja`); }
-      await hoja(`pov_${id}_${seg}`, lista, 5, 384);
       // seguido, a 60 c/s y un segundo de clip por fase: cuánto se mueve y gira la cámara
       // con el reloj del juego detenido: si no, el bucle del juego mueve la cámara por su cuenta entre una muestra y la otra
       // (cuadros de más, en tiempo real) y la medida sale más alta que el movimiento de verdad, y distinta en cada corrida
@@ -138,18 +134,41 @@ if (!SOLO || SOLO === 'pov' || SOLO === 'claves') {
           const v = Math.hypot(...m.cam.p.map((x, i) => x - ant.cam.p[i])) * 60, w = Math.abs(m.cam.inc - ant.cam.inc) * 60;
           vMax = Math.max(vMax, v); wMax = Math.max(wMax, w); aMax = Math.max(aMax, Math.abs(v - vAnt) * 60); vAnt = v;
           incMin = Math.min(incMin, m.cam.inc); incMax = Math.max(incMax, m.cam.inc);
-          lejos = Math.max(lejos, Math.hypot(m.cam.p[0] - m.Head[0], m.cam.p[1] - m.Head[1], m.cam.p[2] - m.Head[2]));
+          lejos = Math.max(lejos, Math.hypot(m.cam.p[0] - m.ojos[0], m.cam.p[1] - m.ojos[1], m.cam.p[2] - m.ojos[2]));
         }
         ant = m;
       }
       await J(() => window.JUEGO.test.real());
-      console.log(`${id.padEnd(8)} ${seg.padEnd(7)} cámara: hasta ${vMax.toFixed(2)} m/s y ${aMax.toFixed(0)} m/s² · mirada entre ${G(incMin).toFixed(0)}° y ${G(incMax).toFixed(0)}°, gira hasta ${G(wMax).toFixed(0)} °/s · a lo sumo a ${(lejos * 100).toFixed(0)} cm del hueso de la cabeza`);
+      console.log(`${id.padEnd(8)} ${seg.padEnd(7)} cámara: hasta ${vMax.toFixed(2)} m/s y ${aMax.toFixed(0)} m/s² · mirada entre ${G(incMin).toFixed(0)}° y ${G(incMax).toFixed(0)}°, gira hasta ${G(wMax).toFixed(0)} °/s · a lo sumo a ${(lejos * 100).toFixed(0)} cm de los ojos`);
       // reglas: la mirada no gira más de 160 °/s (sigue a la barra, con tope de 150) y la cámara no se aleja más de 1,4 m de la cabeza (acompaña a la barra: con la barra en el piso queda a la altura de las rodillas)
-      if (G(incMax - incMin) > 3) problemas.push(`${id} ${seg}: la mirada se inclina ${G(incMax - incMin).toFixed(0)}° (tiene que quedar al frente)`);
-      if (G(wMax) > 160) problemas.push(`${id} ${seg}: la mirada gira a ${G(wMax).toFixed(0)} °/s`);
-      if (lejos > 1.4) problemas.push(`${id} ${seg}: la cámara queda a ${(lejos * 100).toFixed(0)} cm de la cabeza`);
+      if (G(wMax) > 60) problemas.push(`${id} ${seg}: la mirada gira a ${G(wMax).toFixed(0)} °/s (tope 60: la cabeza se mueve leve)`);
+      if (!ant.sinCabeza || !ant.sinTorso) problemas.push(`${id} ${seg}: la cabeza o el tronco propios se dibujan en la vista de los ojos`);
+      if (!ant.recuadro) problemas.push(`${id} ${seg}: falta el recuadro con la vista general`);
+      if (lejos > .15) problemas.push(`${id} ${seg}: la cámara queda a ${(lejos * 100).toFixed(0)} cm de los ojos (tope 15)`);
     }
   }
+  // TIRAS a tiempo real desde los ojos, con el recuadro: una foto cada 0,1 s de la preparación completa (de pie mirando al
+  // frente, baja a la barra, agarra, ajusta, levanta la vista y espera: ahí corre la barrita), del levantamiento y del final
+  await page.setViewportSize({ width: 1280, height: 720 }); await page.waitForTimeout(200);
+  await J(() => { window.JUEGO.test.manual(); const v = document.getElementById('veredicto'); if (v) v.hidden = true; });
+  const tira = async (id, nombre, tramos) => {
+    const lista = []; let reloj = 0;
+    for (const [seg, lev, espera] of tramos) {
+      await J(o => window.JUEGO.test.posa(o), { id, lev, seg, s: 0, camara: 'pov', dt: 1 / 30, dibujar: false });
+      const T = await J(sg => window.JUEGO.test.tiempos(sg), seg), iS = Math.max(0, T.fases.indexOf('Salida')) * T.sub, tS = T.tt[Math.min(T.n - 1, iS)] || 0, fin = T.tt[T.n - 1];
+      const enS = tau => { let i = 0; while (i < T.n - 2 && T.tt[i + 1] < tau) i++; const d = T.tt[i + 1] - T.tt[i]; return i + (d > 1e-6 ? Math.min(1, Math.max(0, (tau - T.tt[i]) / d)) : 0); };
+      // reloj propio del tramo: quieto de pie, hasta la salida, espera en la salida, y el levantamiento
+      const pasos = []; for (let t = 0; t < (espera ? .8 : 0); t += 1 / 30) pasos.push(0);
+      for (let t = 0; t < tS; t += 1 / 30) pasos.push(enS(t)); for (let t = 0; t < espera; t += 1 / 30) pasos.push(enS(tS)); for (let t = tS; t <= fin + .4; t += 1 / 30) pasos.push(enS(Math.min(fin, t)));
+      for (let k = 0; k < pasos.length; k++) {
+        const foto = k % 3 === 0, m = await J(o => window.JUEGO.test.posa(o), { id, lev, seg, s: pasos[k], camara: 'pov', dt: 1 / 30, dibujar: foto });
+        if (foto) lista.push({ t: `${seg} ${reloj.toFixed(1)} s · ${G(m.cam.inc).toFixed(0)}°`, b: await toma() }); reloj += 1 / 30;
+      }
+    }
+    await hoja(nombre, lista, 6, 426);
+  };
+  for (const id of SOLO === 'claves' ? [] : ['ventura']) { await tira(id, `tira_${id}_arranque`, [['snatch', 's', 2.2]]); await tira(id, `tira_${id}_dos_tiempos`, [['clean', 'c', 2.2], ['split', 'c', 0]]); }
+  await J(() => window.JUEGO.test.real());
   // fotos grandes de las fases clave (Ventura y Brenner) y en un teléfono acostado
   const CLAVE = [['snatch', 's', 'Parado', 0], ['snatch', 's', 'Salida', 0], ['snatch', 's', 'Primer tirón', 5], ['snatch', 's', 'Segundo tirón', 5], ['snatch', 's', 'Tirón de brazos', 0], ['snatch', 's', 'Giro', 5], ['snatch', 's', 'Recepción', 0], ['snatch', 's', 'Recuperación', 0],
     ['clean', 'c', 'Salida', 0], ['clean', 'c', 'Tirón de brazos', 5], ['clean', 'c', 'Amortiguación', 0], ['clean', 'c', 'Recuperación', 0], ['split', 'c', 'Envión · Dip', 0], ['split', 'c', 'Envión · Empuje', 0], ['split', 'c', 'Envión · Empuje', 5], ['split', 'c', 'Envión · Tijera', 0], ['split', 'c', 'Envión · Final', 0]];
@@ -164,7 +183,7 @@ if (!SOLO || SOLO === 'pov' || SOLO === 'claves') {
   }
   await page.setViewportSize({ width: 960, height: 540 }); await page.waitForTimeout(200);
   // el final desde los ojos: válido de arranque y de envión, y una caída
-  for (const caso of SOLO === 'claves' ? [] : [FINALES[0], FINALES[1], FINALES[4], FINALES[7], FINALES[8]]) { const r = await recorrer('ventura', caso, 'pov', true); if (r) await hoja(`pov_final_${slug(caso[0])}`, r.lista); }
+  for (const caso of SOLO === 'claves' ? [] : [FINALES[0], FINALES[1], FINALES[4], FINALES[7], FINALES[8]]) { const r = await recorrer('ventura', caso, 'pov', true, .1); if (r) await hoja(`pov_final_${slug(caso[0])}`, r.lista, 6, 426); }
 }
 
 await browser.close(); server.close();

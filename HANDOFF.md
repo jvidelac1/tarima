@@ -2165,6 +2165,48 @@ Hojas en `~/tarima-datos/ver_visual/pov/` (`claves_alta/`: fases clave con calid
 - en el arranque el agarre es ancho y las manos quedan contra los bordes de la imagen;
 - la barra dibujada con las manos no proyecta sombra propia (la sombra se congela mientras el cuerpo se dibuja movido);
 - en una ventana más alta que ancha la cámara sigue siendo la lateral; sin probar en una placa real ni en un teléfono.
+**Cambio de rumbo del dueño (17-nov), que REEMPLAZA a los «brazos de primera persona» de arriba** (`POV.vm`, `_vm`: se
+sacaron). Sus palabras: «generalmente uno mira para adelante, no se ve los brazos… debería ver más al jurado»; «movimientos de
+cabeza… un poco más leves»; «el momento de tensión antes»; «una pantalla tipo chiquitita de cómo se hace el movimiento».
+- **La cámara son los ojos de verdad** (`_povCam`, reglas en `POV`): el cuerpo propio y la barra se dibujan donde están (sin
+  cabeza ni tronco; lo que queda a menos de 24 cm de la cámara se corta por distancia, sin trama: `uCercaOjo`; las piernas y
+  las zapatillas sí se dibujan). La **mirada es una intención, por fases**, con un resorte con amortiguamiento crítico y tope
+  de 0,9 rad/s (52 °/s): al frente (un punto fijo apenas sobre el jurado); baja a la barra cuando las manos van a tomarla,
+  la sigue mirando 0,55 s y levanta la vista; fija durante el levantamiento (la barra cruza la vista de verdad y queda
+  arriba, fuera de la imagen); al soltar baja 11° detrás del golpe y vuelve al jurado (y mira al costado si la barra se fue
+  atrás). Con movimiento reducido, fija al frente.
+- **Tensión**: mientras corre la barrita (el lente ya se cerraba) la respiración es 3,4 veces más honda, la imagen late (dos
+  golpes por latido en el lente) y se oscurece en los bordes (`velo`).
+- **Recuadro «doble visión»** (`RECUADRO`, `_recuadro`, `_propio`): la vista general fija en una pantalla chica arriba a la
+  derecha (24 % del ancho; 27 % en pantallas angostas), con el pesista entero. Con post: a una textura propia, un cuadro de
+  cada dos, y a la pantalla con el pase final. En el camino directo («Baja», «Móvil»): se dibuja en su rincón en cada cuadro.
+  Sin sombras nuevas. Opciones: «Con recuadro / Sin recuadro» al lado de la cámara (o `?recuadro=no`); se recuerda en
+  `tarima.recuadro`. **Costo sin medir en una placa.**
+- **Paso atrás con los pies** al soltar (`_pasoAtras`: cada pierna se resuelve con dos huesos; un pie y después el otro), el
+  codo ya no pega un latigazo al aflojar (brazo nunca del todo recto y entrada en 0,22 s), cámara del jurado más cerca y más
+  alta, y `renderer.debug.onShaderError` puesto desde antes de armar la escena (el constructor ya compila programas: es la
+  causa probable de que `check_carga_fallas [shader compu]` fallara a veces).
+- `check_pov`: tiras a tiempo real desde los ojos (`tira_*`: preparación completa, levantamiento y final cada 0,1 s, con el
+  recuadro); reglas: mirada ≤ 60 °/s, cámara a ≤ 15 cm de los ojos, cabeza y tronco propios sin dibujar, recuadro presente.
+
+**Final, después de la ronda 4 del director (5/10; meta 7).** Lo que cambió (`caida.js`: `GUIA`, `guiaEn`, `gestoDe`;
+`stage.js`: `_dosHuesos`, `_pies`, `_gesto`; `main.js`: `veredicto`, `fijarCamara`):
+- **Bajada en dos tramos**: de arriba a los hombros pegada al cuerpo (0,44 s, codos que flexionan, rodillas que ceden 4 cm
+  con los pies plantados) y de los hombros a la cadera con los brazos casi estirados (0,27 s); ahí se suelta. Las manos se
+  abren hacia abajo y vuelven al costado en 0,3 s. La barra cae adelante de los pies y rebota más de una vez (rebote 0,42).
+- **Paso atrás con los pies** (16 cm en 0,5 s, un pie y después el otro) mientras cae.
+- **Variación por semilla del intento** (`pl.var`, `pl.ritmo`): ritmo de 0,88 a 1,15 y uno de tres festejos (dos puños que
+  marcan; un puño arriba con el hombro acompañando; palmada de magnesio) o de tres reacciones (cabeza gacha y negación; manos
+  a la cintura; mira arriba y suelta el aire). Ninguno queda fijo: después mira al público despacio, la cabeza vuelve a medias.
+- **Fallos con la barra arriba**: los brazos reaccionan enseguida (atrás: bajan por delante a los 0,04 s; adelante: la
+  empujan lejos 0,3 s y bajan cuando la barra ya pasó).
+- **Veredicto grande** y centrado arriba con las tres luces durante 1,5 s (pantallas de 900 px o más; en teléfono queda
+  como estaba para no tapar nada), después chico en su lugar.
+- **Cámara congelada desde que termina el intento** (`fijarCamara`): el lente que volvía de la barrita (0,93 → 1) era el
+  reencuadre leve que se veía antes de soltar la barra.
+- Sin hacer de esa lista: desfase entre los extremos de la barra al rebotar, juntar los pies desde la tijera por regla (lo
+  hace el clip), darse vuelta medio paso, y medir el reencuadre en lo jugado con una prueba.
+
 Lo de abajo («no tocar» y «sigue mal») es de las cinco rondas anteriores, con la cámara vieja.
 
 Lo que las cinco rondas dejaron bien («no tocar»): barra arriba (recepción y recuperación del arranque, empuje, tijera y
