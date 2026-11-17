@@ -24,12 +24,14 @@ import { createRequire } from 'node:module';
 import { launchOptions } from './browser.mjs';
 import { sinApi } from './sin_api.mjs';
 import { saltarRival } from './saltar_rival.mjs';
-import { medirEnPagina, fila, revisar } from './tapa.mjs';
+import { medirEnPagina, fila, revisar, estadoEnPagina, seguidor } from './tapa.mjs';
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web'), OUT = path.join(ROOT, 'out/barra');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
+// --camara=pov: con esa cámara elegida (?camara=); --out=dir: otra carpeta; --final: 32 fotos cada 150 ms desde que termina cada intento
+const CAMARA = arg('camara'), TIRA = process.argv.includes('--tira'), DENSO = process.argv.includes('--final'), OUT = path.join(ROOT, arg('out') || 'out/barra');
 const HEADED = process.argv.includes('--headed'), SOLO = arg('solo'), SEMILLA = 20261113;
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml' };
 const server = http.createServer((req, res) => {
@@ -45,7 +47,7 @@ const problemas = [], notas = [], TAPA = [], INFORMA = process.env.TAPA_INFORMA 
 const dormir = ms => new Promise(r => setTimeout(r, ms));
 const browser = await chromium.launch(launchOptions({ headed: HEADED }));
 const PANTALLAS = [
-  { id: 'pc_es', lang: 'es', vp: { width: 1280, height: 720 }, tactil: false, real: true },
+  { id: 'pc_es', lang: 'es', vp: { width: 1280, height: 720 }, tactil: false, real: true, intervalo: true },
   { id: 'pc_en', lang: 'en', vp: { width: 1280, height: 720 }, tactil: false },
   { id: 'tel_es', lang: 'es', vp: { width: 667, height: 375 }, tactil: true, primera: true },
   { id: 'tel_en', lang: 'en', vp: { width: 844, height: 390 }, tactil: true },
@@ -60,10 +62,16 @@ const PANTALLAS = [
   { id: 'bajo_en', lang: 'en', vp: { width: 1800, height: 560 }, tactil: false, soloInicio: true },
   { id: 'pc600_es', lang: 'es', vp: { width: 1280, height: 600 }, tactil: false, soloInicio: true },
   { id: 'pc700_en', lang: 'en', vp: { width: 1440, height: 700 }, tactil: false, soloInicio: true },
-].filter(x => !SOLO || x.id === SOLO);
+  // 17-nov, carteles que tapan la cabeza: la primera persona en la computadora, en el teléfono acostado y parado
+  { id: 'pc_pov_es', lang: 'es', vp: { width: 1280, height: 720 }, tactil: false, camara: 'pov', intervalo: true },
+  { id: 'tel_pov_en', lang: 'en', vp: { width: 844, height: 390 }, tactil: true, camara: 'pov' },
+  { id: 'vert_pov_es', lang: 'es', vp: { width: 390, height: 844 }, tactil: true, camara: 'pov' },
+  // teléfono parado: solo a pedido (--solo=vert_es); ahí la cámara del levantamiento es la lateral, se elija la que se elija
+  { id: 'vert_es', lang: 'es', vp: { width: 390, height: 844 }, tactil: true, pedido: true },
+].filter(x => (SOLO ? x.id === SOLO : !x.pedido));
 
 for (const P of PANTALLAS) try {
-  const tag = `[${P.id}]`, mal = t => problemas.push(`${tag} ${t}`);
+  const tag = `[${P.id}]`, mal = t => problemas.push(`${tag} ${t}`), CAM = P.camara || CAMARA;
   const ctx = await browser.newContext({ viewport: P.vp, deviceScaleFactor: P.tactil ? 2 : 1, ...(P.tactil ? { hasTouch: true, isMobile: true } : {}), locale: P.lang === 'es' ? 'es-AR' : 'en-US' });
   const page = await ctx.newPage(), cdp = P.tactil ? await ctx.newCDPSession(page) : null, J = (fn, a) => page.evaluate(fn, a);
   page.on('console', m => { if (m.type() === 'error') mal(`console.error: ${m.text()}`); });
@@ -73,10 +81,20 @@ for (const P of PANTALLAS) try {
   // dónde se veía el puntero cuando llegó cada Espacio (antes que el juego: este oyente se registra primero)
   await page.addInitScript(() => { window.__P = []; addEventListener('keydown', e => { if (e.code !== 'Space' || e.repeat) return; const p = document.querySelector('#barrita .b-punt'); window.__P.push({ ts: e.timeStamp, izq: p ? parseFloat(p.style.left) : null, visible: !document.getElementById('barrita')?.hidden }); }, true); });
   // sin dibujo continuo (?dibujo=0, como check_game): por software cada cuadro tarda; antes de cada captura se fuerza uno
-  await page.goto(`${base}juego.html?lang=${P.lang}&q=baja&dibujo=0&semilla=${SEMILLA}`, { waitUntil: 'load' });
+  await page.goto(`${base}juego.html?lang=${P.lang}&q=baja&dibujo=0&semilla=${SEMILLA}${CAM ? '&camara=' + CAM + (CAM === 'pov' ? '&recuadro=si' : '') : ''}${process.env.TARIMA_PLANTEL ? '&plantel=' + process.env.TARIMA_PLANTEL : ''}${process.env.TARIMA_Q ? '&q=' + process.env.TARIMA_Q : ''}`.replace('&q=baja&dibujo=0', process.env.TARIMA_Q ? '&dibujo=0' : '&q=baja&dibujo=0'), { waitUntil: 'load' });
   if (!await J(() => window.JUEGO.listo)) { mal('el juego no inició'); await ctx.close(); continue; }
   await J(() => JUEGO.test.manual());
-  const av = ms => J(ms => JUEGO.test.avanzar(ms), ms), ir = t => J(t => JUEGO.test.hasta(t, 8), t);
+  // --tira: una foto cada 0,1 s de juego del primer intento propio entero (de la barrita al veredicto), para la hoja de control
+  let tiraOn = false, tiraK = 0;
+  const fotoTira = async () => { if (tiraK >= 160) return; await J(() => { try { window.JUEGO.escena?.cuadro?.(0, true); } catch { /* sin escena */ } }).catch(() => null); await page.screenshot({ path: path.join(OUT, `${P.id}_tira_${String(tiraK++).padStart(3, '0')}.jpg`), type: 'jpeg', quality: 72 }).catch(() => null); };
+  const av = TIRA ? async ms => { let r = 0; for (let q = ms; q > 0; q -= 100) { r = await J(ms => JUEGO.test.avanzar(ms), Math.min(100, q)); if (tiraOn) await fotoTira(); } return r; } : ms => J(ms => JUEGO.test.avanzar(ms), ms);
+  const ir = TIRA ? async t => { const a = await J(() => JUEGO.test.manual()); return t > a ? av(t - a) : a; } : t => J(t => JUEGO.test.hasta(t, 8), t);
+  // primera persona (--camara=pov): con la barrita en pantalla y en el levantamiento, la mirada en el jurado y la imagen no negra
+  const ojos = async momento => { if (CAMARA !== 'pov' || P.vp.height > P.vp.width) return; const m = await J(() => (window.JUEGO.escena.pov ? { ...window.JUEGO.test.luz(), inc: window.JUEGO.test.medir()?.cam.inc * 180 / Math.PI } : null)); if (!m) return;
+    console.log(`${tag} ojos en «${momento}»: mirada ${m.inc.toFixed(0)}° · horizonte a ${(m.horizonte * 100).toFixed(0)} % del alto · luminancia ${m.media} (desvío ${m.desvio})`);
+    if (m.media < 6 || m.desvio < 3) mal(`primera persona en «${momento}»: la imagen sale negra o casi (luminancia ${m.media}, desvío ${m.desvio})`);
+    if (m.inc < -15 || m.inc > 10) mal(`primera persona en «${momento}»: la mirada está a ${m.inc.toFixed(0)}° (tiene que estar entre -15° y +10°: en el jurado, no en el piso)`);
+    if (m.horizonte < .33 || m.horizonte > .67) mal(`primera persona en «${momento}»: el horizonte queda a ${(m.horizonte * 100).toFixed(0)} % del alto (tercio central)`); };
   const foto = async n => { await J(() => { try { window.JUEGO.escena?.cuadro?.(0, true); } catch (e) { console.error('cuadro forzado: ' + (e.stack || e)); } }).catch(() => null); return page.screenshot({ path: path.join(OUT, `${P.id}_${n}.png`) }).catch(() => null); };
   const punto = async () => { const b = await page.locator('#escena').boundingBox(); return { x: Math.round(b.x + b.width * .45), y: Math.round(b.y + b.height * .4) }; };
   const baja = async () => { if (P.tactil) { const p = await punto(); await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.x, y: p.y, id: 1 }] }); } else await page.keyboard.down('Space'); };
@@ -93,6 +111,7 @@ for (const P of PANTALLAS) try {
     const x = await J(medirEnPagina).catch(e => ({ error: String(e) })); if (x && x.error) { notas.push(`${tag} tapa ${momento}: ${x.error}`); return; }
     TAPA.push({ p: P.id, momento, x }); const r = revisar(momento, x); if (r && !INFORMA) mal(r);
   };
+  const sigue = seguidor({ page, tapa, foto: n => foto(n), medidos });
   let n = 0, hecho = '', fotoPanel = 0, lineas = [], revisada = false, medido = null;
   // la bienvenida: en cada tarjeta nada se pisa (nombre, frase y filas), la tarjeta no se corta y no queda debajo de la fila de
   // botones (Jugar, Opciones, Cómo se juega)
@@ -108,18 +127,29 @@ for (const P of PANTALLAS) try {
     for (const x of T) if (x.cruces || x.fuera || x.tapa) mal(`la tarjeta de ${x.id} no se lee entera: ${JSON.stringify(x)}`); }
   // la dificultad elegida se ve en Opciones (Fácil · Medio · Difícil · Clásico)
   if (P.dif) { await pulsa('#btn-opciones'); await av(250); await foto('0_opciones'); const d = await J(() => document.querySelector('#capa .dif[aria-pressed=true]')?.dataset.d); if (d !== P.dif) mal(`Opciones no muestra la dificultad elegida (${d})`); await pulsa('#btn-opciones'); await av(250); }
+  // 17-nov: el nivel está a la vista en la bienvenida, sin abrir Opciones, y lo marcado es lo que se juega: Fácil si nunca se
+  // eligió otro. Una sola verdad: el segmento marcado, la dificultad que anota el juego y (más abajo) la de la partida.
+  { const d = await J(() => { const b = [...document.querySelectorAll('#capa .bv-nivel .dif')]; return { n: b.length, visibles: b.filter(x => x.offsetParent && x.getBoundingClientRect().height >= 40).length, marcados: b.filter(x => x.getAttribute('aria-pressed') === 'true').map(x => x.dataset.d), juego: JUEGO.E.dificultad, opciones: !!document.querySelector('#capa .opciones') }; });
+    const quiere = P.dif || 'facil';
+    if (d.n !== 3 || d.visibles !== 3 || d.opciones) mal(`la bienvenida no muestra los tres niveles a la vista sin abrir Opciones (${JSON.stringify(d)})`);
+    if (d.marcados.join() !== quiere || d.juego !== quiere) mal(`el nivel marcado en la bienvenida (${d.marcados.join() || 'ninguno'}) no es el que se juega (${d.juego}; se esperaba ${quiere})`);
+    else console.log(`${tag} nivel a la vista en la bienvenida: marcado «${d.marcados[0]}» = el que se juega`); }
   if (P.soloInicio) { await ctx.close(); continue; }
   await pulsa('#btn-empezar');
-  const t0 = Date.now();
+  const t0 = Date.now(), densos = new Set();
   for (let g = 0; g < 20000 && Date.now() - t0 < 6 * 60000; g++) {
-    const s = await J(() => { const e = JUEGO.estado(); e.propios = (JUEGO.E.propios || []).length; e.lev = JUEGO.E.p?.lev; return e; });
+    const s = await J(estadoEnPagina);
     if (s.errores.length) { mal('error en el juego: ' + s.errores[0]); break; }
-    if (s.propios >= 3 && !(s.intento && s.intento.propio) && s.pantalla !== 'decision') break;
+    // con `intervalo`, sigue (salteando a los rivales) hasta el panel del fin del arranque y lo mide
+    if (P.intervalo && !TIRA && s.propios >= 3 && s.pantalla === 'intervalo' && s.panel) { await av(1500); await tapa('intervalo'); await foto('intervalo'); break; }
+    if (s.propios >= 3 && !(s.intento && s.intento.propio) && s.pantalla !== 'decision' && !(P.intervalo && !TIRA && s.fase !== 'c' && s.lev !== 'c')) break;
     const I = s.intento;
+    if (!TIRA) await sigue(s);
+    if (TIRA) { if (!tiraOn && tiraK === 0 && ((I && I.propio) || (s.pantalla === 'intento' && !s.panel)) && s.modo !== 'panel') tiraOn = true; /* desde el vistazo a la barra de la primera persona */ else if (tiraOn && s.propios >= 1 && s.pantalla !== 'decision') { tiraOn = false; break; } }
     if (I && I.propio && s.modo !== 'panel') {
       const sg = I.senal;
-      if (sg && sg.tipo === 'espera' && sg.barra && n < 3 && hecho !== 'quieta' + n) { hecho = 'quieta' + n; if (n === 0) { await foto('1_quieta'); await tapa('quieta'); } }
-      if (n >= 1 && !sg && !medidos.has('levanta') && I.fase && ['tiron', 'vuelo', 'pelea'].includes(I.fase)) { await tapa('levanta'); await foto('1_levanta'); }
+      if (sg && sg.tipo === 'espera' && sg.barra && n < 3 && hecho !== 'quieta' + n) { hecho = 'quieta' + n; if (n === 0) { await foto('1_quieta'); await tapa('quieta'); await ojos('quieta'); } }
+      if (n >= 1 && !sg && !medidos.has('levanta') && I.fase && ['tiron', 'vuelo', 'pelea'].includes(I.fase)) { await tapa('levanta'); await foto('1_levanta'); await ojos('levanta'); }
       if (sg && sg.clave === 'esfuerzo' && !medidos.has('esfuerzo')) { await tapa('esfuerzo'); await foto('esfuerzo'); }
       if (sg && sg.tipo === 'barra' && sg.barra.i >= 2 && !medidos.has('barra' + sg.barra.i)) { medidos.add('barra' + sg.barra.i); await ir(sg.objetivo - 200); await foto(`barrita_${sg.barra.i}`); }
       if (sg && sg.tipo === 'barra') {
@@ -134,7 +164,7 @@ for (const P of PANTALLAS) try {
         }
         const z = PEDIR[n] || 'verde', obj = sg.objetivo + (z === 'amarillo' ? Math.round((sg.barra.vMs + sg.barra.aMs) / 2) : z === 'rojo' ? 700 : 0);
         // a mitad de camino hacia el verde: la barrita corriendo (y, la primera vez, el aro de práctica)
-        await ir(sg.objetivo - 260); if (n < 2) await foto(`${n + 1}_corre`); if (n === 0) await tapa('corre');
+        await ir(sg.objetivo - 260); if (n < 2) await foto(`${n + 1}_corre`); if (n === 0) await tapa('corre'); if (n === 0) await ojos('corre');
         if (!revisada) {      // la barrita entra, no tapa el zócalo ni el botón redondo, el texto no se corta, y es ancha
           revisada = true;
           const B = await caja('barrita'), Z = await caja('zocalo'), BOT = await caja('zona'), W = P.vp.width;
@@ -152,7 +182,7 @@ for (const P of PANTALLAS) try {
         await ir(obj - 1); await toque(); hecho = k; pedidas.push(z); await av(320); await foto(`${n + 1}_${z}`); if (n === 0) await tapa('pega'); n++;
         continue;
       }
-      await J(() => JUEGO.test.avanzar(60, 30)); continue;
+      await (TIRA ? av(60) : J(() => JUEGO.test.avanzar(60, 30))); continue;
     }
     if (s.panel && !s.sobre) {
       if (['presentacion', 'apertura'].includes(s.pantalla)) await tapa(s.pantalla);
@@ -162,14 +192,21 @@ for (const P of PANTALLAS) try {
       }
       await av(450); const ok = await pulsa('#capa .panel button.ir'); await av(ok ? 400 : 200); continue;
     }
+    if (DENSO && s.pantalla === 'decision' && !densos.has(s.propios)) { densos.add(s.propios); for (let i = 0; i < 32; i++) { await J(() => { try { window.JUEGO.escena?.cuadro?.(0, true); } catch { /* sin escena */ } }); await page.screenshot({ path: path.join(OUT, `${P.id}_fin${s.propios}_${String(i).padStart(2, '0')}.jpg`), type: 'jpeg', quality: 62 }); await av(150); } }
     if (s.pantalla === 'decision') {
       const v = await J(() => document.getElementById('veredicto').hidden ? '' : document.getElementById('veredicto').textContent);
-      if (v && !lineas.includes(v)) { lineas.push(v); await tapa('veredicto'); await page.waitForTimeout(250); if (lineas.length <= 3) await foto(`${lineas.length}_veredicto`); }
+      if (v && !lineas.includes(v)) { lineas.push(v); await page.waitForTimeout(250); if (lineas.length <= 3) await foto(`${lineas.length}_veredicto`); }
     }
     if (s.pantalla === 'rival' && !medidos.has('rival')) { await av(900); await tapa('rival'); await foto('rival'); }
-    await J(() => JUEGO.test.avanzar(300, 50));
+    await (TIRA && tiraOn ? av(300) : J(() => JUEGO.test.avanzar(300, 50)));      // --tira: también el vistazo a la barra, foto a foto
     if (['rival', 'decision', 'carga', 'desplazado'].includes(s.pantalla) && g % 3 === 0 && !await saltarRival(page, P.tactil)) await toque();
   }
+  // primera persona acostada: antes de la barrita, el vistazo a la barra con las dos manos en la imagen, y la vista de vuelta en el jurado
+  if (CAM === 'pov' && P.vp.width > P.vp.height) { const vz = await J(() => JUEGO.E.vistazo || null);
+    console.log(`${tag} vistazo a la barra: ${vz ? `${vz.ms} ms con las dos manos en la imagen · mirada más baja ${(vz.incMin * 180 / Math.PI).toFixed(0)}° · al terminar ${(vz.incFin * 180 / Math.PI).toFixed(0)}° · duró ${vz.dura} ms` : 'no hubo'}`);
+    if (!vz) mal('primera persona: no hubo vistazo a la barra en la preparación');
+    else { if (vz.ms < 600) mal(`primera persona: en el vistazo las dos manos se ven ${vz.ms} ms (mínimo 600)`); if (vz.incFin < -.26) mal(`primera persona: el vistazo termina con la mirada a ${(vz.incFin * 180 / Math.PI).toFixed(0)}° (tiene que haber vuelto al jurado)`); if (vz.dura > 6000) mal(`primera persona: el vistazo duró ${vz.dura} ms (tope 6000)`); } }
+  { const pd = await J(() => ({ partida: JUEGO.E.p?.cfg?.dif ?? null, juego: JUEGO.E.dificultad })), quiere = P.dif || 'facil'; if (pd.partida !== quiere || pd.juego !== quiere) mal(`la partida se jugó en «${pd.partida}» (el juego anota «${pd.juego}») y en la bienvenida estaba marcado «${quiere}»`); }
   const R = await J(() => (JUEGO.E.propios || []).map(x => ({ res: x.res, linea: x.linea, barras: (x.uno?.barras || []).map(b => b.zona + (b.sola ? '*' : '')) })));
   for (const x of R) vistas.push(...x.barras);
   console.log(`${tag} pedidas ${pedidas.join(' ')} · salieron ${vistas.join(' ')} · ${R.map(x => `${x.res}${x.linea ? ` «${x.linea}»` : ''}`).join(' · ')}`);
@@ -194,5 +231,7 @@ await browser.close(); server.close();
 if (TAPA.length) { console.log('\nCuánto tapa la interfaz al pesista (caja proyectada desde three; tools/tapa.mjs):'); for (const id of [...new Set(TAPA.map(x => x.p))]) { console.log(`  [${id}]`); for (const x of TAPA.filter(y => y.p === id)) console.log('    ' + fila(x.momento, x.x)); } }
 fs.writeFileSync(path.join(OUT, 'tapa.json'), JSON.stringify(TAPA, null, 1));
 for (const x of notas) console.log('nota: ' + x);
+// --tira corta después del primer intento: lo que se revisa con la partida entera no vale; solo las reglas de la primera persona
+if (TIRA) { const q = problemas.filter(x => /primera persona|error en el juego/.test(x)); problemas.length = 0; problemas.push(...q); }
 if (problemas.length) { console.log(`\nFALLÓ (${problemas.length}):`); for (const p of problemas.slice(0, 30)) console.log('  ' + p); process.exit(1); }
 console.log(`\nOK: la barrita se ve y se juzga donde se toca en ${PANTALLAS.map(x => x.id).join(', ')} · capturas en out/barra`);

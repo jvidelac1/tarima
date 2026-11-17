@@ -7,11 +7,13 @@
 //     sesión (6.6): sorteo por la bandera `grabacion`, sin lienzo, campos y nombre tapados, nada sin medición.
 //  3. Las Functions de Pages (functions/): pasan /api/* al Worker con la IP y el país en cabeceras propias, y «/» muestra
 //     el juego.
-//  1b. La regla del arranque gratis (GRATIS_ETAPA='arranque', la del 12 al 15 de noviembre, que se recupera por variables)
+//  1b. La regla de producción (worker/wrangler.jsonc por defecto: GRATIS_ETAPA='arranque' y ENCUESTA_LIBRE='0', el arranque
+//     gratis y el correo obligatorio; decisión del dueño del 17 de noviembre: el muro sigue como está)
 //     con el Worker de verdad (worker/src/index.js) en Node sobre la D1 falsa de tools/servidor_local.mjs, y con este
 //     cliente hablándole: arranque gratis una vez, dos tiempos negado sin correo, permitido tras anotarse, recarga en el
 //     intervalo, otra pestaña, otro dispositivo en la misma IP, la API a mano y la regla vieja por variable.
-//  1c. La regla de producción (LIF-53, worker/wrangler.jsonc): la primera final entera gratis y el cartel, que se
+//  1c. La regla de LIF-53, pedida con variables explícitas (GRATIS_ETAPA='final' y ENCUESTA_LIBRE='1'; no es el valor por
+//     defecto, queda lista para cuando el dueño la quiera): la primera final entera gratis y el cartel, que se
 //     desbloquea con el correo o con las dos preguntas (una vez por dispositivo, 3 por red), y los eventos que manda el
 //     Worker a PostHog (anotar_ok solo para altas nuevas, anotar_repetido, encuesta_respuesta con `desbloquea`).
 import fs from 'node:fs';
@@ -82,8 +84,15 @@ ok(['2026-11-a', '2026-11-b', '2026-11-c', '2026-11-d', '2026-11-e'].every(v => 
   ok(!/once a month|a month|monthly|una por mes|al mes|por mes|mensual/i.test(priv), 'la privacidad no dice la frecuencia de las novedades');
   ok(/dos preguntas/.test(priv) && /two-question survey/.test(priv), 'la privacidad describe la encuesta de dos preguntas');
   // LIF-53: la encuesta ahora es un camino del cartel (desbloquea el juego libre) y lo dice
-  ok(/Cualquiera de las dos te deja jugar sin límite/.test(priv) && /Either one lets you play with no limit/.test(priv), 'la privacidad dice que la encuesta desbloquea el juego libre');
-  ok(!/no da ni quita nada|doesn't unlock or change anything/.test(priv), 'la privacidad ya no dice que la encuesta no da nada');
+  // el texto de la encuesta tiene que decir lo que hace la regla que se publica (worker/wrangler.jsonc): con ENCUESTA_LIBRE "1"
+  // (LIF-53) la encuesta desbloquea el juego libre; con "0" (producción al 17-nov) es opcional y no da ni quita nada
+  if (varsDelWorker().ENCUESTA_LIBRE === '1') {
+    ok(/Cualquiera de las dos te deja jugar sin límite/.test(priv) && /Either one lets you play with no limit/.test(priv), 'la privacidad dice que la encuesta desbloquea el juego libre');
+    ok(!/no da ni quita nada|doesn't unlock or change anything/.test(priv), 'la privacidad ya no dice que la encuesta no da nada');
+  } else {
+    ok(/no da ni quita nada/.test(priv) && /doesn't unlock or change anything/.test(priv), 'la privacidad dice que la encuesta es opcional y no da ni quita nada');
+    ok(!/Cualquiera de las dos te deja jugar sin límite|Either one lets you play with no limit/.test(priv), 'la privacidad no promete que la encuesta desbloquea el juego libre');
+  }
 }
 {
   // Textos del muro y de la encuesta (docs/MVP.md 4.5): el muro solo pide el correo; la encuesta nueva, exacta.
@@ -338,7 +347,7 @@ igual(expDelPase('basura'), null, 'pase inválido');
 }
 
 
-// ?muro=firme en localhost, con la regla de producción (LIF-53): 1 final entera, el cartel, el correo o las preguntas
+// ?muro=firme en localhost, sin más parámetros: el Worker simulado con la regla de LIF-53 (1 final entera, el cartel, el correo o las preguntas)
 {
   const local = new Mem(), sesion = new Mem();
   const s = base({ host: 'localhost', buscar: '?muro=firme', local, sesion, fetch: async () => { throw new Error('no debería salir'); } });
@@ -354,7 +363,7 @@ igual(expDelPase('basura'), null, 'pase inválido');
   igual([l.estado, l.fuente, l.quedan, s.copia().libre], ['ok', 'encuesta', null, true], 'simulado: juego libre por la encuesta');
 }
 
-// ?muro=firme&etapa=arranque&libre=0 en localhost: la regla del 12 al 15 de noviembre (el arranque gratis, correo obligatorio)
+// ?muro=firme&etapa=arranque&libre=0 en localhost: la regla de producción (el arranque gratis, correo obligatorio)
 {
   const local = new Mem(), sesion = new Mem();
   const s = base({ host: 'localhost', buscar: '?muro=firme&etapa=arranque&libre=0', local, sesion, fetch: async () => { throw new Error('no debería salir'); } });
@@ -370,19 +379,20 @@ igual(expDelPase('basura'), null, 'pase inválido');
   igual([(await s.envion({})).via, JSON.parse(sesion.getItem('tarima.pase')).etapa], ['lista', 'completa'], 'simulado: con el correo, el dos tiempos y el pase nuevo en la pestaña');
 }
 
-// ---------- 1b. la regla del arranque gratis con el Worker de verdad (en Node, D1 falsa) ----------
+// ---------- 1b. la regla de producción (el arranque gratis, correo obligatorio) con el Worker de verdad (en Node, D1 falsa) ----------
 {
   const ORIGEN = 'https://liftinggame.pages.dev';
   const logReal = console.log;
   console.log = (...a) => { if (typeof a[0] === 'string' && a[0].startsWith('{"')) return; logReal(...a); };      // registros del Worker
   const SECRETOS = { SECRETO_IP: 'ip'.repeat(16), SECRETO_DISPOSITIVO: 'dv'.repeat(16), SECRETO_PASE: 'pa'.repeat(16), SECRETO_BAJA: 'ba'.repeat(16) };
   const vars = varsDelWorker();
-  igual([vars.GRATIS_ETAPA, vars.GRATIS, vars.TOPE_IP, vars.BONO_ENCUESTA, vars.ENCUESTA_LIBRE, vars.ENCUESTAS_POR_IP], ['final', '1', '6', '0', '1', '3'], 'worker/wrangler.jsonc: la regla de producción es la de LIF-53 (1 final entera gratis; el correo o la encuesta desbloquean)');
-  // 1b prueba la regla del arranque gratis, que se recupera con estas variables
-  const ARRANQUE = { GRATIS_ETAPA: 'arranque', ENCUESTA_LIBRE: '0' };
+  igual([vars.GRATIS_ETAPA, vars.GRATIS, vars.TOPE_IP, vars.BONO_ENCUESTA, vars.ENCUESTA_LIBRE, vars.ENCUESTAS_POR_IP], ['arranque', '1', '6', '0', '0', '3'], 'worker/wrangler.jsonc: la regla de producción es el arranque gratis con el correo obligatorio (la encuesta no desbloquea)');
+  // 1b prueba la regla de producción con las variables del archivo, sin pisar ninguna. 1c prueba la de LIF-53, que se
+  // pide con estas variables (`workerLocal(extra, true)`)
+  const LIF53 = { GRATIS_ETAPA: 'final', GRATIS: '1', TOPE_IP: '6', BONO_ENCUESTA: '0', ENCUESTA_LIBRE: '1', ENCUESTAS_POR_IP: '3' };
   /** Un Worker con su base. `api(ruta, cuerpo, ip)` lo llama como la Function de Pages; `fetchDe(ip)` es el fetch de un navegador. */
-  function workerLocal(extra = {}, prod = false) {
-    const db = d1Falsa(), env = { ...vars, ...(prod ? {} : ARRANQUE), ...SECRETOS, ...extra, DB: db };
+  function workerLocal(extra = {}, lif53 = false) {
+    const db = d1Falsa(), env = { ...vars, ...(lif53 ? LIF53 : {}), ...SECRETOS, ...extra, DB: db };
     const llamar = async (ruta, init, ip) => {
       const pend = [], ctx = { waitUntil: p => pend.push(Promise.resolve(p).catch(() => null)), passThroughOnException() {} };
       const r = await worker.fetch(new Request(ORIGEN + ruta, { ...init, headers: { ...(init.headers || {}), origin: ORIGEN, 'cf-connecting-ip': ip } }), env, ctx);
@@ -513,7 +523,27 @@ igual(expDelPase('basura'), null, 'pase inválido');
     igual((await s.pedirPase({})).etapa, 'completa', 'cambio de regla: y la siguiente sale completa');
   }
 
-  // ---------- 1c. LIF-53: la regla de producción con el Worker de verdad ----------
+  {
+    // Quien ya dejó el correo con la versión anterior del juego (en el navegador, `tarima.lista` y nada de `tarima.libre`;
+    // en la base, el dispositivo ligado a la lista) no pierde el juego libre: ni con el servidor ni sin él.
+    const w = workerLocal(), { s, local } = cliente(w, '203.0.113.17');
+    await s.pedirPase({}); await s.anotar({ nombre: 'Lucía Romero', email: 'antes@pruebas-tarima.com', idioma: 'es' }); await s.envion({}); s.finalTerminada();
+    local.removeItem('tarima.libre');
+    const { s: s2 } = cliente(w, '203.0.113.17', local);
+    const e = await s2.estado({});
+    igual([e.puede, e.lista, e.libre, e.quedan, e.etapa, e.encuesta_disponible], [true, true, true, null, 'completa', false], 'anotado de antes: juego libre con la regla de producción');
+    local.removeItem('tarima.libre');
+    const s3 = base({ fetch: async () => { throw new TypeError('sin red'); }, local });
+    const c = await s3.estado({});
+    igual([c.fuente, c.puede, c.lista, c.libre, (await s3.pedirPase({})).estado], ['copia', true, true, true, 'sin_servidor'], 'anotado de antes, sin servidor: la copia vieja (sin tarima.libre) se lee como juego libre');
+    // Quien gastó su arranque gratis y no dejó el correo: el muro, solo con el correo; la encuesta a mano no da nada.
+    const { s: s4 } = cliente(w, '203.0.113.18');
+    await s4.pedirPase({}); s4.finalTerminada();
+    const m = await s4.pedirPase({});
+    igual([m.estado, m.motivo, m.encuesta_disponible, await s4.encuesta({ r: ENC }), (await s4.pedirPase({})).estado], ['muro', 'dispositivo', false, { ok: true, bono: 0, libre: false }, 'muro'], 'producción: gastado el arranque, el muro pide el correo y la encuesta no desbloquea');
+  }
+
+  // ---------- 1c. LIF-53 por variables explícitas (no es el valor por defecto) con el Worker de verdad ----------
   // PostHog falso: lo que el Worker manda a /i/v0/e/ queda en `capturas`; las banderas, vacías.
   const fetchReal = globalThis.fetch, capturas = [];
   globalThis.fetch = async (url, init) => {

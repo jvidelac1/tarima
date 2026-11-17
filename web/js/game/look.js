@@ -18,11 +18,12 @@ import { EVENT } from '../config.js';
 import { BOKEH } from '../post.js';
 import { FINO } from '../athlete.js';
 import { conSuperficie, setSuperficies, chapa, USO } from './materiales.js';
+import { LEJOS } from './jueces.js';
 
 /** Gradación del juego: exposición, saturación, contraste, gamma de sombras, tinte de sombras y de altas, viñeta y negro. */
 export const GRADO_LOOK = Object.freeze({ exp: 1.0, sat: .88, con: 1.03, gam: 1.0, frio: [.92, .995, 1.09], calido: [1.07, 1.0, .91], vin: .36, negro: .004 });
 /** Niebla y fondo de la sala (a oscuras, azul petróleo). */
-export const SALA = Object.freeze({ fondo: '#070a11', niebla: '#0a0f18', densidad: .021, nieblaDirecto: '#1b2740' });      // nieblaDirecto: en «Baja» y «Móvil» la bruma es más clara y azul (da fondo y profundidad sin costo: la niebla ya se calculaba)
+export const SALA = Object.freeze({ fondo: '#0a0f19', niebla: '#111b2d', densidad: .026, nieblaDirecto: '#111a2a' });      // nieblaDirecto: en «Baja» y «Móvil» la bruma es más clara y azul (da fondo y profundidad sin costo: la niebla ya se calculaba)
 
 const DISPLAY = "'Saira Condensed','Arial Narrow',sans-serif";
 const Y0 = -.1;      // piso del escenario (la tarima tiene su cara de arriba en 0)
@@ -125,12 +126,12 @@ function madera(S, aniso) {
     let R = (.66 - .27 * t) * tono, G = (.47 - .23 * t) * tono, Bc = (.29 - .17 * t) * tono, h = .62 + (hilos - .5) * .12, rg = .3 + .14 * hilos;
     // barniz comido donde se paran: más claro, más parejo y mate
     const st = Math.exp(-((cx / 1.05) * (cx / 1.05) + ((cz - .12) / .75) * ((cz - .12) / .75))), w = cl(st * 1.35 * (.3 + .95 * M[1]));
-    R += (R * 1.1 + .06 - R) * w * .55; G += (G * 1.1 + .055 - G) * w * .55; Bc += (Bc * 1.12 + .05 - Bc) * w * .55; rg += w * .36;
+    R += (R * 1.12 + .075 - R) * w * .85; G += (G * 1.12 + .07 - G) * w * .85; Bc += (Bc * 1.14 + .065 - Bc) * w * .85; rg += w * .42;
     // donde caen los discos: marcas de goma, abolladuras
     const ax = (Math.abs(cx) - .97) / .19, gl = ax * ax < 9 ? Math.exp(-ax * ax) * sm(-.8, -.35, cz) * (1 - sm(.6, .98, cz)) : 0;
-    if (gl > .01) { const mk = gl * (.35 + .9 * M[3]), kk = 1 - .5 * cl(mk); R *= kk; G *= kk; Bc *= kk; rg += mk * .25; h -= gl * sm(.64, .82, nC(x * 36, z * 36)) * .3; }
+    if (gl > .01) { const mk = gl * (.5 + 1.1 * M[3]), kk = 1 - .62 * cl(mk); R *= kk; G *= kk; Bc *= kk; rg += mk * .25; h -= gl * sm(.64, .82, nC(x * 36, z * 36)) * .3; }
     // magnesio en nubes
-    const ch = cl(sm(.55, .8, M[2] * (.42 + .95 * st + .5 * gl)) * .28);
+    const ch = cl(sm(.5, .78, M[2] * (.42 + 1.05 * st + .6 * gl)) * .44);
     if (ch > 0) { R += (.93 - R) * ch; G += (.92 - G) * ch; Bc += (.88 - Bc) * ch; rg += (.97 - rg) * cl(ch * 1.7); }
     // pintura gastada
     const pm = md[(py * Sb + px) * 4];
@@ -141,7 +142,7 @@ function madera(S, aniso) {
   const fino = vetaFina(256, 512), rr = rng(505), px = S / 4, lw = Math.max(1, S / 1024 * 1.25);
   const juntas = g => { g.beginPath(); for (let i = 0; i < NP; i++) { const x0 = i * pw * px; if (i) { g.moveTo(x0, 0); g.lineTo(x0, S); } for (const [z] of tablas[i]) if (z < 4) { g.moveTo(x0, z * px); g.lineTo(x0 + pw * px, z * px); } } g.stroke(); };
   const rayas = []; for (let k = 0; k < 170; k++) rayas.push([S * (.08 + rr() * .84), S * (.2 + rr() * .7), (rr() - .5) * 1.2 + Math.PI / 2, S * (.01 + rr() * rr() * .09), .1 + rr() * .3, .6 + rr() * 1.2]);
-  const motas = []; for (let k = 0; k < 4200; k++) { const lado = rr() < .3 ? (rr() < .5 ? -1 : 1) * (.97 + (rr() - .5) * .3) : (rr() + rr() - 1) * 1.1; motas.push([S * (lado / 4 + .5), S * ((.12 + (rr() + rr() + rr() - 1.5) * .55) / 4 + .5), 1 + rr() * 1.7, .12 + rr() * .45]); }
+  const motas = []; for (let k = 0; k < 2000; k++) { const lado = rr() < .3 ? (rr() < .5 ? -1 : 1) * (.97 + (rr() - .5) * .3) : (rr() + rr() - 1) * 1.1; motas.push([S * (lado / 4 + .5), S * ((.12 + (rr() + rr() + rr() - 1.5) * .55) / 4 + .5), 1 + rr() * 1.7, .07 + rr() * .26]); }
   const subir = (base, tile, modo, alfa, extra) => makeCanvas(S, S, g => {
     g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(base, 0, 0, S, S);
     g.globalCompositeOperation = modo; g.globalAlpha = alfa; g.fillStyle = g.createPattern(tile, 'repeat'); g.fillRect(0, 0, S, S); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.lineCap = 'round';
@@ -157,13 +158,13 @@ function madera(S, aniso) {
 
 /** Goma del escenario: baldosa de 1 m con motas, junta, polvo y roces. El lienzo cubre 2 × 2 m (cuatro baldosas distintas). */
 function gomaPiso(S, aniso) {
-  const nA = ruido(11), nB = ruido(12), pal = [[.34, .37, .44], [.46, .47, .49], [.22, .3, .42], [.6, .6, .6], [.3, .31, .33]];
+  const nA = ruido(11), nB = ruido(12), pal = [[.36, .37, .39], [.46, .47, .49], [.27, .29, .32], [.55, .55, .56], [.3, .31, .33]];      // motas grises: las de color, de lejos, se leían como manchas rojas y azules
   const lento = grillas(256, 2, (u, v, o) => { o[0] = fbm(nA, u * 8, v * 8, 4); o[1] = fbm(nB, u * 4 + 3, v * 4, 3); }), M = new Float32Array(2);
   const c = generar(S, (u, v, o, px, py) => {
     lento(u, v, M); const polvo = M[0], mancha = M[1], fino = hash2(px, py), fu = (u * 2) % 1, fv = (v * 2) % 1, du = fu < .5 ? fu : 1 - fu, dv = fv < .5 ? fv : 1 - fv, dj = du < dv ? du : dv;
-    let k = .095 + .04 * sm(.4, .8, polvo) + (fino - .5) * .012, R = k, G = k * 1.02, B = k * 1.08, h = .5 + (fino - .5) * .3, rg = .5 + .32 * sm(.35, .75, polvo) - .16 * sm(.55, .8, mancha);
+    let k = .13 + .006 * sm(.4, .8, polvo) + (fino - .5) * .012, R = k, G = k * 1.02, B = k * 1.08, h = .5 + (fino - .5) * .3, rg = .5 + .12 * sm(.35, .75, polvo) - .06 * sm(.55, .8, mancha);
     const mx = px >> 1, my = py >> 1, hm = hash2(mx + 91, my + 17);
-    if (hm < .085) { const P = pal[(hash2(mx, my) * pal.length) | 0], a = .35 + hm * 5; R += (P[0] - R) * a * .5; G += (P[1] - G) * a * .5; B += (P[2] - B) * a * .5; h += .1; rg += .08; }
+    if (hm < .05) { const P = pal[(hash2(mx, my) * pal.length) | 0], a = .35 + hm * 5; R += (P[0] - R) * a * .5; G += (P[1] - G) * a * .5; B += (P[2] - B) * a * .5; h += .1; rg += .08; }
     const gap = 1 - sm(.001, .005, dj); R *= 1 - .7 * gap; G *= 1 - .7 * gap; B *= 1 - .7 * gap; h -= gap * .45; rg += gap * .3;
     const borde = (1 - sm(.005, .05, dj)) * .5 * polvo; R += borde * .05; G += borde * .05; B += borde * .05;      // polvo juntado contra la junta
     o[0] = R; o[1] = G; o[2] = B; o[3] = cl(h); o[4] = cl(rg);
@@ -219,14 +220,98 @@ function gomaDisco(S) {
   return { roughnessMap: rough, bumpMap: bump };
 }
 
+/**
+ * Telón de fondo con luz: pliegues verticales y bañadores de piso que lo lavan desde abajo (ámbar a la izquierda, azul frío
+ * a la derecha, como los contraluces), con la caída de la luz hacia arriba. Va horneado en la textura: el telón sigue
+ * siendo un plano sin luces. 17 × 6,4 m.
+ */
+function telon(W = 1024, H = 384) {
+  const n = ruido(91), r = rng(19), pl = []; let x = 0; while (x < 1) { const w = (.012 + r() * .02); pl.push([x, w, r()]); x += w; }
+  const focos = []; for (let i = 0; i < 9; i++) { const u = (i + .5) / 9; if (Math.abs(u - .5) < .27) continue; focos.push([u + (r() - .5) * .01, u < .5 ? [1, .56, .24] : [.42, .62, 1], .8 + r() * .4]); }
+  let k = 0;
+  const c = generar(W, (u, v, o) => {
+    while (k < pl.length - 1 && pl[k + 1][0] <= u) k++; if (u < pl[k][0]) k = 0; while (k < pl.length - 1 && pl[k + 1][0] <= u) k++;
+    const P = pl[k], t = (u - P[0]) / P[1], pliegue = .5 - .5 * Math.cos(t * 6.2832), y = 1 - v;      // y: 0 en el piso, 1 arriba
+    const base = .012 + .03 * pliegue * (.6 + .4 * P[2]) + .01 * fbm(n, u * 40, v * 6, 2);
+    let R = base * .75, G = base * .85, B = base * 1.15;
+    for (const [fu, col, f] of focos) { const dx = (u - fu) * 17, ancho = .35 + y * 6.4 * .42, g = Math.exp(-(dx * dx) / (ancho * ancho)) * Math.exp(-y * 3.1) * f * (.35 + .65 * pliegue) * .5; R += col[0] * g; G += col[1] * g; B += col[2] * g; }
+    const piso = sm(0, .03, y); o[0] = cl(Math.sqrt(R * piso)); o[1] = cl(Math.sqrt(G * piso)); o[2] = cl(Math.sqrt(B * piso)); o[3] = .5; o[4] = .5;
+  }, H);
+  return canvasTexture(c.col, { aniso: 4 });
+}
+
+/** Las ocho banderas ficticias como paños largos (2,6 × 9 m): el diseño estirado a lo alto, con pliegues de tela, más luz abajo (la del escenario) que arriba, y el dobladillo. */
+function banderasLargas() {
+  const N = 8, W = 128, H = 448, src = banderines(), r = rng(73);
+  return canvasTexture(makeCanvas(N * W, H, g => {
+    g.drawImage(src, 0, 0, N * W, H);
+    for (let i = 0; i < N; i++) { const x0 = i * W; g.save(); g.beginPath(); g.rect(x0, 0, W, H); g.clip();
+      let x = x0; while (x < x0 + W) { const fw = 9 + r() * 20, lg = g.createLinearGradient(x, 0, x + fw, 0); lg.addColorStop(0, 'rgba(0,0,0,.42)'); lg.addColorStop(.5, 'rgba(255,255,255,.1)'); lg.addColorStop(1, 'rgba(0,0,0,.42)'); g.fillStyle = lg; g.fillRect(x, 0, fw, H); x += fw; }
+      g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(x0, 0, 3, H); g.fillRect(x0 + W - 3, 0, 3, H); g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(x0, H - 10, W, 10); g.restore(); }
+    const luz = g.createLinearGradient(0, 0, 0, H); luz.addColorStop(0, 'rgba(0,0,0,.8)'); luz.addColorStop(.55, 'rgba(0,0,0,.4)'); luz.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = luz; g.fillRect(0, 0, N * W, H);
+    g.fillStyle = 'rgba(40,36,44,.22)'; g.fillRect(0, 0, N * W, H);      // tela gastada: el color no es pleno
+  }), { aniso: 4 });
+}
+/** Ocho banderas de países ficticios en proporción 2:3 (192 × 128 px cada una): franjas, cantón o diagonal y un símbolo (disco, rombo, anillo, triángulo, barras), con pliegues suaves y la luz de abajo. Ninguna copia una real. */
+function banderas23() {
+  const N = 8, W = 192, H = 128, r = rng(321), P = [['#1f5d8a', '#e9e2d0', '#c2452a'], ['#263c2c', '#e3b33a', '#e6dfcc'], ['#6e1f2a', '#d9cfb8', '#16264a'], ['#4f2a78', '#efeadf', '#178f7e'], ['#c9602c', '#101c3c', '#e9e2d0'], ['#0f6a70', '#14161a', '#e3b33a'], ['#b84a78', '#f0ece2', '#2b2d33'], ['#16264a', '#9fc23a', '#e8e4da']];
+  return canvasTexture(makeCanvas(N * W, H, g => {
+    for (let i = 0; i < N; i++) { const [a, b, c] = P[i], x = i * W; g.save(); g.beginPath(); g.rect(x, 0, W, H); g.clip(); g.translate(x, 0); g.fillStyle = a; g.fillRect(0, 0, W, H);
+      switch (i % 4) { case 0: g.fillStyle = b; g.fillRect(0, H / 3, W, H / 3); break; case 1: g.fillStyle = b; g.fillRect(0, 0, W * .36, H); break; case 2: g.fillStyle = b; g.beginPath(); g.moveTo(0, H); g.lineTo(W, 0); g.lineTo(W, H * .3); g.lineTo(W * .3, H); g.fill(); break; default: g.fillStyle = b; g.fillRect(0, 0, W * .45, H * .5); }
+      const cx = [W / 2, W * .18, W * .5, W * .225][i % 4], cy = [H / 2, H / 2, H / 2, H * .25][i % 4], q = H * [.2, .13, .2, .14][i % 4]; g.fillStyle = c; g.strokeStyle = c; g.lineWidth = q * .3;
+      switch (i) { case 5: g.beginPath(); g.arc(cx, cy, q, 0, 7); g.fill(); break; case 0: for (const k of [-1, 1]) { g.beginPath(); g.moveTo(cx + k * q * .9, cy - q); g.lineTo(cx + k * q * .9 + q * .7, cy + q); g.lineTo(cx + k * q * .9 - q * .7, cy + q); g.fill(); } break; case 1: case 6: g.beginPath(); g.moveTo(cx, cy - q); g.lineTo(cx + q * .8, cy); g.lineTo(cx, cy + q); g.lineTo(cx - q * .8, cy); g.fill(); break; case 2: case 7: g.beginPath(); g.arc(cx, cy, q * .8, 0, 7); g.stroke(); break; case 3: g.beginPath(); g.moveTo(cx, cy - q); g.lineTo(cx + q, cy + q * .8); g.lineTo(cx - q, cy + q * .8); g.fill(); break; default: for (const k of [-1, 0, 1]) g.fillRect(cx + k * q * .7 - q * .15, cy - q, q * .3, q * 2); }
+      let xx = 0; while (xx < W) { const fw = 14 + r() * 26, f = g.createLinearGradient(xx, 0, xx + fw, 0); f.addColorStop(0, 'rgba(0,0,0,.26)'); f.addColorStop(.5, 'rgba(255,255,255,.07)'); f.addColorStop(1, 'rgba(0,0,0,.26)'); g.fillStyle = f; g.fillRect(xx, 0, fw, H); xx += fw; }
+      g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(0, 0, 2, H); g.fillRect(W - 2, 0, 2, H); g.fillRect(0, 0, W, 2); g.fillRect(0, H - 2, W, 2); g.restore(); }
+    const luz = g.createLinearGradient(0, 0, 0, H); luz.addColorStop(0, 'rgba(0,0,0,.5)'); luz.addColorStop(1, 'rgba(0,0,0,.05)'); g.fillStyle = luz; g.fillRect(0, 0, N * W, H); g.fillStyle = 'rgba(40,36,44,.2)'; g.fillRect(0, 0, N * W, H);
+  }), { aniso: 4 });
+}
+/** Parrilla del techo (84 × 84 m vista desde abajo): vigas, cerchas con diagonales, conductos y el resplandor cálido de las luces sobre el escenario. Cierra la sala desde cualquier cámara. */
+function techo(S = 1024) {
+  return canvasTexture(makeCanvas(S, S, g => {
+    g.fillStyle = '#07080b'; g.fillRect(0, 0, S, S); const m = S / 84, r = rng(31);
+    const res = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, 26 * m); res.addColorStop(0, 'rgba(255,196,130,.36)'); res.addColorStop(.35, 'rgba(210,150,100,.16)'); res.addColorStop(1, 'rgba(120,90,70,0)'); g.fillStyle = res; g.fillRect(0, 0, S, S);
+    for (let i = 0; i <= 14; i++) { const x = i * 6 * m; g.fillStyle = 'rgba(96,100,112,.5)'; g.fillRect(x - .22 * m, 0, .44 * m, S); g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(x + .22 * m, 0, .2 * m, S); }      // vigas principales
+    g.strokeStyle = 'rgba(86,90,102,.42)'; g.lineWidth = Math.max(1, .12 * m);
+    for (let j = 0; j <= 28; j++) { const y = j * 3 * m; g.fillStyle = 'rgba(70,74,86,.42)'; g.fillRect(0, y - .1 * m, S, .2 * m); if (j % 2 === 0) { g.beginPath(); for (let i = 0; i < 14; i++) { const x = i * 6 * m; g.moveTo(x, y); g.lineTo(x + 3 * m, y + 3 * m); g.lineTo(x + 6 * m, y); } g.stroke(); } }      // correas y diagonales
+    for (let k = 0; k < 7; k++) { const x = (8 + r() * 68) * m, w = (.5 + r() * .5) * m; g.fillStyle = 'rgba(58,62,72,.7)'; g.fillRect(x, 0, w, S); g.fillStyle = 'rgba(130,134,146,.25)'; g.fillRect(x, 0, w * .25, S); }      // conductos
+    for (const d of [15, 23, 31]) { g.strokeStyle = 'rgba(255,205,150,.1)'; g.lineWidth = 1.6 * m; g.beginPath(); g.arc(S / 2, S / 2, d * m, 0, 7); g.stroke(); }      // pasarelas de luminarias
+  }), { aniso: 4 });
+}
+/** Estandarte de lona del evento (2,3 × 4,6 m): la marca en vertical, el pictograma de la barra, franjas y la sesión; tela con pliegues, lavada por un bañador desde el piso. Tipografía, no dibujo: se ve de oficio a cualquier distancia. */
+function mural(W = 384, H = 768, calido = false) {
+  return canvasTexture(makeCanvas(W, H, g => {
+    const r = rng(calido ? 57 : 43), A = calido ? ['#5a1d16', '#2a0f0d', '#ffb060'] : ['#123f4c', '#081c24', '#6fe6f0'];
+    const lg = g.createLinearGradient(0, 0, 0, H); lg.addColorStop(0, A[1]); lg.addColorStop(1, A[0]); g.fillStyle = lg; g.fillRect(0, 0, W, H);
+    g.fillStyle = 'rgba(255,255,255,.05)'; for (let i = -8; i < 30; i++) { g.beginPath(); g.moveTo(0, i * 56); g.lineTo(W, i * 56 - 150); g.lineTo(W, i * 56 - 122); g.lineTo(0, i * 56 + 28); g.fill(); }
+    g.save(); g.translate(W * .56, H * .5); g.rotate(-Math.PI / 2); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#f2ede2'; g.font = `800 ${W * .5}px ${DISPLAY}`; g.fillText(calido ? 'OPEN · ' + EVENT.session.toUpperCase() : EVENT.marca, 0, 0, H * .78); g.restore();
+    g.fillStyle = A[2]; g.fillRect(W * .1, H * .045, W * .8, H * .012); g.fillRect(W * .1, H * .935, W * .8, H * .012);
+    { const x = W * .5, y = H * .09, q = W * .2; g.fillRect(x - q, y - q * .05, q * 2, q * .1); for (const sx of [-1, 1]) { g.fillRect(x + sx * q * .72 - q * .06, y - q * .34, q * .12, q * .68); g.fillRect(x + sx * q * .9 - q * .05, y - q * .24, q * .1, q * .48); } }
+    g.fillStyle = '#f2ede2'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `700 ${W * .1}px ${DISPLAY}`; g.fillText(calido ? 'HALTEROFILIA' : 'OPEN · ' + EVENT.session.toUpperCase(), W / 2, H * .972, W * .8);
+    let x = 0; while (x < W) { const fw = 16 + r() * 34, f = g.createLinearGradient(x, 0, x + fw, 0); f.addColorStop(0, 'rgba(0,0,0,.34)'); f.addColorStop(.5, 'rgba(255,255,255,.06)'); f.addColorStop(1, 'rgba(0,0,0,.34)'); g.fillStyle = f; g.fillRect(x, 0, fw, H); x += fw; }      // pliegues
+    const som = g.createLinearGradient(0, 0, 0, H); som.addColorStop(0, 'rgba(0,0,0,.72)'); som.addColorStop(.5, 'rgba(0,0,0,.25)'); som.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = som; g.fillRect(0, 0, W, H);      // la luz le llega de abajo
+  }), { aniso: 4 });
+}
+
 // ---------- gráficas ----------
 /** Fondo de la pantalla LED: casi negro, con líneas finas y dos paneles apagados; lo brillante son los textos y las luces. */
 function ledFondo(w, h) {
   return makeCanvas(w, h, g => {
-    const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, '#143642'); gr.addColorStop(.35, '#0c1a24'); gr.addColorStop(.65, '#1a1416'); gr.addColorStop(1, '#4a2a14'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
-    for (let i = -2; i < 26; i++) { const x = i * w / 24, calido = i >= 12; g.fillStyle = calido ? `rgba(255,150,60,${.08 + .06 * (i & 1)})` : `rgba(70,190,210,${.07 + .05 * (i & 1)})`; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + w * .012, 0); g.lineTo(x + w * .05, h); g.lineTo(x + w * .038, h); g.closePath(); g.fill(); }
-    const cg = g.createRadialGradient(w / 2, h * .62, h * .1, w / 2, h * .62, w * .32); cg.addColorStop(0, 'rgba(0,0,0,.55)'); cg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = cg; g.fillRect(0, 0, w, h);
+    const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, '#1a4958'); gr.addColorStop(.33, '#0e202b'); gr.addColorStop(.67, '#1d1719'); gr.addColorStop(1, '#5c3417'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    for (let i = -2; i < 26; i++) { const x = i * w / 24, calido = i >= 12; g.fillStyle = calido ? `rgba(255,150,60,${.1 + .08 * (i & 1)})` : `rgba(70,190,210,${.09 + .07 * (i & 1)})`; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + w * .012, 0); g.lineTo(x + w * .05, h); g.lineTo(x + w * .038, h); g.closePath(); g.fill(); }
+    // marca de agua del evento, enorme y apenas visible, y una guarda de pictogramas abajo: la pantalla nunca es un paño vacío
+    g.save(); g.globalAlpha = .07; g.fillStyle = '#dff6ff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `800 ${h * .62}px ${DISPLAY}`; g.fillText(EVENT.marca, w / 2, h * .46, w * .9); g.restore();
+    g.save(); g.globalAlpha = .16; for (let i = 0; i < 30; i++) { const x = (i + .5) * w / 30, c = i < 15 ? '#6fe6f0' : '#ffb060', s2 = h * .022; g.fillStyle = c; g.fillRect(x - s2 * 2, h * .873, s2 * 4, s2 * .22); for (const sx of [-1, 1]) { g.fillRect(x + sx * s2 * 1.45 - s2 * .14, h * .873 - s2 * .7, s2 * .28, s2 * 1.6); } } g.restore();
+    const cg = g.createRadialGradient(w / 2, h * .62, h * .1, w / 2, h * .62, w * .34); cg.addColorStop(0, 'rgba(0,0,0,.74)'); cg.addColorStop(.6, 'rgba(0,0,0,.4)'); cg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = cg; g.fillRect(0, 0, w, h);
+    { const lg = g.createLinearGradient(0, h * .6, 0, h); lg.addColorStop(0, 'rgba(120,200,220,0)'); lg.addColorStop(1, 'rgba(120,200,220,.1)'); g.fillStyle = lg; g.fillRect(0, h * .6, w / 2, h * .4); const lw = g.createLinearGradient(0, h * .6, 0, h); lw.addColorStop(0, 'rgba(255,170,90,0)'); lw.addColorStop(1, 'rgba(255,170,90,.11)'); g.fillStyle = lw; g.fillRect(w / 2, h * .6, w / 2, h * .4); }
     g.fillStyle = 'rgba(255,170,70,.85)'; g.fillRect(0, h * .93, w, h * .01); g.fillStyle = 'rgba(210,225,230,.5)'; g.fillRect(0, h * .952, w, h * .005);
+  });
+}
+/** Reflejo de la pantalla en el piso del escenario: una mancha de luz teal a la izquierda y ámbar a la derecha que se apaga hacia la tarima. */
+function brilloPiso(W = 256, H = 64) {
+  return makeCanvas(W, H, g => {
+    const gr = g.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, 'rgb(40,120,140)'); gr.addColorStop(.42, 'rgb(22,40,52)'); gr.addColorStop(.58, 'rgb(46,30,24)'); gr.addColorStop(1, 'rgb(150,84,36)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    const cae = g.createLinearGradient(0, 0, 0, H); cae.addColorStop(0, 'rgba(0,0,0,.15)'); cae.addColorStop(.35, 'rgba(0,0,0,.62)'); cae.addColorStop(1, 'rgba(0,0,0,1)'); g.fillStyle = cae; g.fillRect(0, 0, W, H);
+    for (const x of [0, 1]) { const b = g.createLinearGradient(x ? W : 0, 0, x ? W * .88 : W * .12, 0); b.addColorStop(0, 'rgba(0,0,0,1)'); b.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = b; g.fillRect(x ? W * .88 : 0, 0, W * .12, H); }
   });
 }
 /** Ocho banderines ficticios en una tira (ninguno copia una bandera real: diagonales, discos corridos, rombos y cuñas en colores raros). */
@@ -289,6 +374,31 @@ void main(){
   gl_FragColor = vec4( uColor * uFuerza * borde * cae * veta, 1.0 );
 }`;
 
+
+// ---------- halos de los focos ----------
+// Un foco de escenario visto de frente no es un disco blanco: es un punto que quema con un halo ancho, un destello
+// horizontal corto (el de un lente de transmisión) y una estrella leve. Un sprite por luminaria (un solo dibujo de puntos),
+// aditivo; brilla según cuánto mira el foco a la cámara y se apaga de costado. Sin lecturas de textura.
+const HALO_VS = /* glsl */`attribute vec3 aColor; attribute vec3 aDir; attribute float aTam;
+uniform float uAlto; uniform float uFuerza; uniform float uMax; varying vec3 vCol; varying float vK;
+void main(){
+  vec4 mv = modelViewMatrix * vec4( position, 1.0 ); float d = max( - mv.z, 0.1 );
+  vec3 alOjo = normalize( cameraPosition - position ); float f = max( dot( normalize( aDir ), alOjo ), 0.0 );
+  float k = 0.1 + 0.9 * pow( f, 5.0 ); vK = k; vCol = aColor * uFuerza * ( 0.25 + 0.75 * k );
+  gl_PointSize = clamp( aTam * ( 0.55 + 0.45 * k ) * projectionMatrix[ 1 ][ 1 ] * uAlto * 0.5 / d, 2.0, uMax );
+  gl_Position = projectionMatrix * mv;
+}`;
+const HALO_FS = /* glsl */`uniform float uDirecto; varying vec3 vCol; varying float vK;
+void main(){
+  vec2 p = gl_PointCoord * 2.0 - 1.0; float r = length( p ), borde = 1.0 - smoothstep( 0.82, 1.0, r );
+  float nucleo = exp( - r * r * 90.0 ) * 2.6, halo = exp( - r * 5.5 ) * 0.34 + exp( - r * r * 9.0 ) * 0.1;
+  float raya = exp( - abs( p.y ) * 46.0 ) * exp( - abs( p.x ) * 3.4 ) * 0.5 * vK;                      // destello anamórfico
+  float estrella = ( exp( - abs( p.x ) * 70.0 ) * exp( - abs( p.y ) * 6.0 ) + exp( - abs( p.x + p.y ) * 60.0 ) * exp( - r * 7.0 ) * 0.5 + exp( - abs( p.x - p.y ) * 60.0 ) * exp( - r * 7.0 ) * 0.5 ) * 0.16 * vK;
+  vec3 c = vCol * ( nucleo + halo + raya + estrella ) * borde;
+  if ( uDirecto > 0.5 ) c = min( vCol * 0.5 * ( exp( - r * r * 60.0 ) * 2.4 + exp( - r * 7.0 ) * 0.3 + exp( - r * 3.2 ) * 0.22 + raya * 0.8 ) * borde, vec3( 1.0 ) );      // camino directo: va al lienzo sin pase de tono (valores de pantalla, caída más corta)
+  gl_FragColor = vec4( c, 1.0 );
+}`;
+
 // ---------- utilería ----------
 const DISCOS = ['#a8241f', '#1d3f96', '#c79a12', '#1f7436', '#a8241f', '#1d3f96'];
 
@@ -303,7 +413,7 @@ export class Look {
     this.props = new THREE.Group(); this.props.name = 'Utilería'; arena.group.add(this.props);      // fijo: stage.js lo junta por material
     const paso = (nombre, f) => { try { f(); } catch (e) { console.warn('look:', nombre, e); } };
     { const g = ambiente.golpe.bind(ambiente); ambiente.golpe = (z, k) => { g(z, k); USO.value = Math.min(1, USO.value + .03); }; }      // cada barra que cae deja más magnesio
-    { const s = ambiente.setLuces.bind(ambiente); ambiente.setLuces = L => { s(L); for (const c of ambiente.uPolvo.uLuzCol.value) c.multiplyScalar(.4); }; }      // el polvo solo se insinúa en los conos (se leía como nieve)
+    { const s = ambiente.setLuces.bind(ambiente); ambiente.setLuces = L => { s(L); for (const c of ambiente.uPolvo.uLuzCol.value) c.multiplyScalar(.1); }; }      // el polvo solo se insinúa en los conos (se leía como nieve)
     { const u = ambiente.update.bind(ambiente); ambiente.update = dt => { u(dt); this.update(dt); }; }      // avanza con el ambiente (stage.js no cambia)
     paso('luces', () => this._luces(lighting));
     paso('tarima', () => this._tarima(grande ? 2048 : 1024, aniso));
@@ -314,19 +424,23 @@ export class Look {
     this.goma = null; paso('goma de disco', () => { this.goma = gomaDisco(256); this.texturas.push(this.goma.roughnessMap, this.goma.bumpMap); });
     paso('utilería', () => this._utileria(aniso, grande));
     paso('rayos', () => this._rayos(lighting));
+    paso('halos', () => this._halos());
+    paso('vestir', () => this._vestir());
   }
 
   /** Luz de competencia: sala a oscuras, clave casi cenital, contraluz cálido marcado desde atrás a la izquierda. */
   _luces(L) {
-    L.key.position.set(4.4, 9.3, 3.9); L.key.color.set('#fff0dc'); L.key.intensity = 4.7; L.key.angle = .3; L.key.penumbra = .7;
-    L.key2.color.set('#c6d6ff'); L.key2.intensity = .32;
-    L.stage.color.set('#b9c6e0'); L.stage.intensity = 1.1;
+    L.key.position.set(4.4, 9.3, 3.9); L.key.color.set('#fff0dc'); L.key.intensity = 5.1; L.key.angle = .3; L.key.penumbra = .7;
+    L.key2.color.set('#ffe9d2'); L.key2.intensity = .5; L.key2.position.set(-3.6, 4.6, 7.2);      // relleno bajo y de frente: abre las cuencas de los ojos que la cenital deja apagadas
+    L.stage.color.set('#b9c6e0'); L.stage.intensity = 2.8;
     L.hemi.color.set('#56688a'); L.hemi.groundColor.set('#2c2016'); L.hemi.intensity = .15;
     L.wash.color.set('#8fa0c4'); L.wash.intensity = .07;
     // rimA mira a la cámara general (atrás a la izquierda): es EL contraluz, cálido y ancho (también rasa el piso)
-    L.rimA.color.set('#ffa85c'); L.rimA.intensity = 6.5; L.rimA.angle = .46; L.rimA.penumbra = .85; L.rimA.position.set(-6.3, 5.6, -4.6);
-    L.rimB.color.set('#9fd0ff'); L.rimB.intensity = 5.5; L.rimB.angle = .4;
-    L.hair.color.set('#ffe2bc'); L.hair.intensity = 3.4;
+    // Contraluces heroicos: dos focos potentes desde atrás y a media altura, uno cálido y uno frío, que dibujan un filo claro en
+    // hombros, brazos, cabeza y discos desde cualquier cámara general; más la luz de pelo desde arriba y atrás.
+    L.rimA.color.set('#ffa85c'); L.rimA.intensity = 15; L.rimA.angle = .5; L.rimA.penumbra = .85; L.rimA.position.set(-5.4, 4.3, -5.0);
+    L.rimB.color.set('#9fd0ff'); L.rimB.intensity = 14; L.rimB.angle = .5; L.rimB.penumbra = .85; L.rimB.position.set(5.4, 4.5, -5.0);
+    L.hair.color.set('#ffe2bc'); L.hair.intensity = 5;
   }
   _tarima(S, aniso) {
     const A = this.arena, m = A.madera; if (!m) return;
@@ -345,26 +459,27 @@ export class Look {
     if (A.crowd) { const u = A.crowd.material.uniforms; u.uGain.value = .095; if (u.uRebote) u.uRebote.value.set(.16, .11, .065); }
     A.group.traverse(o => {
       const m = o.material; if (!m || Array.isArray(m) || !m.isMeshBasicMaterial) return;
-      if (o.geometry?.type === 'CylinderGeometry' && o.geometry.parameters.radiusTop > 30) k(m, o.geometry.parameters.height > 5 ? 1.25 : .6);      // pabellón y cinta de luz
+      if (o.geometry?.type === 'CylinderGeometry' && o.geometry.parameters.radiusTop > 30) k(m, o.geometry.parameters.height > 5 ? .05 : .2);      // pabellón y cinta de luz: casi a oscuras. Los palcos y accesos iluminados del pabellón, vistos entre las cabezas de la tribuna, eran los «maniquíes beige» (bloques claros detrás del público)
       else if (o.geometry?.type === 'PlaneGeometry' && o.geometry.parameters.width === 90) m.color.set('#090a0d');                                 // piso de sala
-      else if (o.geometry?.type === 'PlaneGeometry' && o.geometry.parameters.width === 17) m.color.multiply(new THREE.Color(.75, .85, 1.1));                                               // telón
+      else if (o.geometry?.type === 'PlaneGeometry' && o.geometry.parameters.width === 17) { const t = telon(); this.texturas.push(t); m.map?.dispose(); m.map = t; m.color.setRGB(1.15, 1.15, 1.15); m.needsUpdate = true; }                                               // telón
     });
     if (A.cinta) { const vistos = new Set(); for (const o of A.group.children) { const m = o.material; if (m?.map?.source === A.cinta.source && !vistos.has(m)) { vistos.add(m); k(m, .55); } } }
-    for (const o of A.group.children) if (o.isInstancedMesh && o.material.isMeshBasicMaterial && o.geometry.type === 'BoxGeometry' && !o.material.map) k(o.material, .6);      // escalones y barandas
+    for (const o of A.group.children) if (o.isInstancedMesh && o.material.isMeshBasicMaterial && o.geometry.type === 'BoxGeometry' && !o.material.map) o.material.color.multiply(new THREE.Color(.8, .95, 1.3));      // escalones y barandas
     // los focos del fondo: ámbar a la izquierda (acompañan al contraluz), blanco frío a la derecha; nada de rosa y celeste
     (A.beams || []).forEach((b, i) => b.mat.uniforms.uColor.value.set(i < 5 ? (i % 2 ? '#ffb469' : '#ffc890') : (i % 2 ? '#cfe0ff' : '#e9eeff')));
+    (A.beams || []).forEach((b, i) => { if (i >= 8) { b.base *= .3; if (b.base0) b.base0 *= .3; b.mat.uniforms.uStrength.value *= .3; } });      // los haces de los trusses laterales se sumaban sobre la tribuna de enfrente (quedaba beige): casi apagados
     this.salaImpostor = 1.0;
     // los dos cargadores de pie eran cápsulas azules fuera de escala (lo único que queda en esos lotes en el juego): fuera
     for (const o of A.group.children) if (o.isInstancedMesh && (o.geometry.type === 'CapsuleGeometry' || (o.geometry.type === 'SphereGeometry' && Math.abs(o.geometry.parameters.radius - .105) < 1e-6))) o.visible = false;
     // la bruma de sala (velos aditivos) lavaba los negros: a un tercio
-    { const hechos = new Set(); A.group.traverse(o => { const m = o.material; if (m?.map === A.hazeTex && m.color && !hechos.has(m)) { hechos.add(m); m.color.multiplyScalar(.3); } }); }
-    if (this.ambiente?.uPolvo) this.ambiente.uPolvo.uTam.value = .0045;
+    { const hechos = new Set(); A.group.traverse(o => { const m = o.material; if (m?.map === A.hazeTex && m.color && !hechos.has(m)) { hechos.add(m); m.color.set('#8fa0b8').multiplyScalar(.004); /* casi nada y frío: de costado los velos se sumaban en un banco beige sobre la tribuna */ } }); }
+    if (this.ambiente?.uPolvo) this.ambiente.uPolvo.uTam.value = .013;      // motas grandes, blandas y tenues (chicas y fuertes eran píxeles blancos sueltos)
   }
   /** Pantalla LED: fondo oscuro y grano de píxel en el sombreador (un punto por LED; de lejos se promedia: sin muaré). */
   _pantalla() {
     const A = this.arena, amb = this.ambiente, m = A.pantalla?.material; if (!m || !amb?.led) return;
     amb.ledFondo = ledFondo(amb.led.width, amb.led.height); amb.sinRejilla = true; amb._led();
-    m.color.multiplyScalar(2.4);
+    m.color.multiplyScalar(3.0);
     const antes = m.onBeforeCompile, yo = this;
     m.onBeforeCompile = function (sh, r) {
       antes.call(this, sh, r); if (yo.ledPlano) return;
@@ -457,6 +572,27 @@ export class Look {
       const o = new THREE.Mesh(new THREE.PlaneGeometry(w, w), m); o.rotation.set(-Math.PI / 2, 0, ry); o.position.set(x, Y0 + .003, z); o.receiveShadow = true; o.renderOrder = 1; P.add(o); (this.calcos ||= []).push(o); };
     calcoDe('tiza', -3.15, -1.9, 1.7); calcoDe('tiza', 3.2, -1.95, 1.5, 1); calcoDe('cinta', -3.6, 3.3, 1.5); calcoDe('cinta', 3.6, -3.0, 1.5, Math.PI);
 
+    // charcos de luz de los focos en el piso del escenario (alrededor de la tarima) y nube tenue de magnesio sobre el bol
+    { const cv = makeCanvas(256, 256, g => { g.fillStyle = '#000'; g.fillRect(0, 0, 256, 256); const r = rng(88);
+        const anillo = g.createRadialGradient(128, 128, 30, 128, 128, 120); anillo.addColorStop(0, 'rgba(255,214,170,.5)'); anillo.addColorStop(.5, 'rgba(200,190,200,.22)'); anillo.addColorStop(1, 'rgba(120,150,200,0)'); g.fillStyle = anillo; g.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 9; i++) { const a = i / 9 * 6.283 + r(), d = 62 + r() * 40, x = 128 + Math.cos(a) * d * 1.15, y = 128 + Math.sin(a) * d, rad = 22 + r() * 22, rg = g.createRadialGradient(x, y, 0, x, y, rad); rg.addColorStop(0, `rgba(${i % 2 ? '255,200,140' : '190,215,255'},.42)`); rg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = rg; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); } }), t = canvasTexture(cv, { aniso: 2 }); this.texturas.push(t);
+      const o = new THREE.Mesh(new THREE.PlaneGeometry(12.8, 10.8), new THREE.MeshBasicMaterial({ name: 'charcos de luz en el piso', map: t, color: new THREE.Color(.085, .085, .085), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+      o.rotation.x = -Math.PI / 2; o.position.set(0, Y0 + .0035, 0); o.renderOrder = 2; this.arena.group.add(o); (this.calcos ||= []).push(o); }
+    // marcación del piso del escenario: zona técnica alrededor de la tarima con cinta, esquineros, flechas de entrada y roces (solo con post)
+    { const S = 1024, cv = makeCanvas(S, S, g => { const r = rng(131), m = S / 13, cx = S / 2, cy = S / 2; g.clearRect(0, 0, S, S); g.lineCap = 'butt';
+        g.strokeStyle = 'rgba(214,208,190,.5)'; g.lineWidth = .05 * m; g.setLineDash([.6 * m, .25 * m]); g.strokeRect(cx - 3.1 * m, cy - 3.1 * m, 6.2 * m, 6.2 * m); g.setLineDash([]);
+        g.strokeStyle = 'rgba(226,180,60,.55)'; g.lineWidth = .07 * m; for (const sx of [-1, 1]) for (const sy of [-1, 1]) { g.beginPath(); g.moveTo(cx + sx * 3.1 * m, cy + sy * 2.6 * m); g.lineTo(cx + sx * 3.1 * m, cy + sy * 3.1 * m); g.lineTo(cx + sx * 2.6 * m, cy + sy * 3.1 * m); g.stroke(); }
+        for (let i = 0; i < 120; i++) { const a = r() * 6.283, d = (2.1 + r() * 1.0) * m, x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d * .95, rad = (.05 + r() * .22) * m, rg = g.createRadialGradient(x, y, 0, x, y, rad); rg.addColorStop(0, `rgba(236,232,222,${.03 + r() * .06})`); rg.addColorStop(1, 'rgba(236,232,222,0)'); g.fillStyle = rg; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); }      // magnesio pisado alrededor de la tarima
+        for (let i = 0; i < 90; i++) { g.strokeStyle = `rgba(${r() < .5 ? '200,200,205' : '0,0,0'},${.05 + r() * .1})`; g.lineWidth = 1 + r() * 3; const x = r() * S, y = r() * S, a = r() * 6.283, L = (.2 + r() * .9) * m; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); g.stroke(); } }), t = canvasTexture(cv, { aniso: 4 }); this.texturas.push(t);
+      const o = new THREE.Mesh(new THREE.PlaneGeometry(13, 13), new THREE.MeshStandardMaterial({ name: 'calco marcación', map: t, transparent: true, depthWrite: false, roughness: .8, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+      o.rotation.x = -Math.PI / 2; o.position.set(0, Y0 + .002, 0); o.receiveShadow = true; o.renderOrder = 1; P.add(o); (this.calcos ||= []).push(o); }
+    // la pantalla tiñe el piso delante suyo (aditivo, solo con post: va con las calcomanías)
+    { const t = canvasTexture(brilloPiso(), { aniso: 2 }); this.texturas.push(t);
+      const o = new THREE.Mesh(new THREE.PlaneGeometry(7.8, 3.0), new THREE.MeshBasicMaterial({ name: 'brillo de la pantalla en el piso', map: t, color: new THREE.Color(.5, .5, .5), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+      o.rotation.x = -Math.PI / 2; o.position.set(0, Y0 + .004, -3.45); o.renderOrder = 2; P.add(o); (this.calcos ||= []).push(o); }
+    { const cv = makeCanvas(256, 64, g => { g.fillStyle = '#000'; g.fillRect(0, 0, 256, 64); for (let i = 0; i < 6; i++) { const x = (i + .5) * 256 / 6, rg = g.createRadialGradient(x, 30, 0, x, 30, 40); rg.addColorStop(0, 'rgba(255,226,190,.55)'); rg.addColorStop(1, 'rgba(255,226,190,0)'); g.fillStyle = rg; g.fillRect(x - 40, 0, 80, 64); } }), t = canvasTexture(cv, { aniso: 2 }); this.texturas.push(t);
+      const o = new THREE.Mesh(new THREE.PlaneGeometry(12.6, 2.9), new THREE.MeshBasicMaterial({ name: 'luz del truss del frente en el piso', map: t, color: new THREE.Color(.3, .3, .3), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+      o.rotation.x = -Math.PI / 2; o.position.set(0, Y0 + .004, 3.95); o.renderOrder = 2; P.add(o); (this.calcos ||= []).push(o); }
     // pared de chapa pintada a los lados de la pantalla (materiales.js: toda por función), con columnas, caño y tablero eléctrico
     { const ch = this.chapaMat = chapa('#2a4350'); this.propMats.add(ch);
       for (const s of [-1, 1]) { const g = grupo(s * 7.05, -5.72, 0, -1);
@@ -470,11 +606,80 @@ export class Look {
       const xs = [-6.6, -5.4, -4.2, -3.0, 3.0, 4.2, 5.4, 6.6];
       xs.forEach((x, i) => { const w = .5, y1 = 5.95, y0 = 4.45 + (i % 2) * .06, b = i * 4; pos.push(x - w, y0, -4.95, x + w, y0, -4.95, x + w, y1, -4.95, x - w, y1, -4.95); uv.push(i / N, 0, (i + 1) / N, 0, (i + 1) / N, 1, i / N, 1); idx.push(b, b + 1, b + 2, b, b + 2, b + 3); });
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
-      const o = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ name: 'banderines', map: t, color: new THREE.Color(.2, .2, .2), side: THREE.DoubleSide })); o.frustumCulled = false; P.add(o); }
+      const o = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ name: 'banderines', map: t, color: new THREE.Color(.2, .2, .2), side: THREE.DoubleSide })); o.frustumCulled = false; /* reemplazados por las banderas largas de _vestir */ }
   }
 
   /** Todo lo que dibuja la utilería (después de juntarFijos las piezas fijas son mallas por material en la arena): para la variante «sin utilería» del banco. */
   utileria() { const M = this.propMats, o = []; this.arena.group.traverse(x => { if (x === this.props || x === this.discos || (x.isMesh && M.has(x.material))) o.push(x); }); return o; }
+
+
+
+  /** Lo que cierra y viste la sala: parrilla del techo, murales con siluetas a los lados de la pantalla y banderas grandes colgadas sobre las tribunas. Planos sin luces (todo pintado): valen en cualquier calidad. */
+  _vestir() {
+    const A = this.arena, G = A.group, tx = t => { this.texturas.push(t); return t; };
+    // techo: tapa el vacío de arriba (desde la primera persona se veía un cielo negro con puntos sueltos)
+    A.group.traverse(o => { if (o.geometry?.type === 'CircleGeometry' && o.geometry.parameters.radius === 42) o.visible = false; });
+    const te = new THREE.Mesh(new THREE.PlaneGeometry(84, 84), new THREE.MeshBasicMaterial({ name: 'techo', map: tx(techo()), color: new THREE.Color(.5, .5, .5), fog: false })); te.rotation.x = Math.PI / 2; te.position.y = 13; te.frustumCulled = false; G.add(te);
+    // murales a los lados de la pantalla (entre la pantalla y los tableros), lavados por bañadores desde el piso
+    for (const s of [-1, 1]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 4.6), new THREE.MeshBasicMaterial({ name: 'mural', map: tx(mural(384, 768, s > 0)), color: new THREE.Color(.55, .55, .55) })); m.position.set(s * 4.95, 2.25, -5.5); G.add(m); }
+    // banderas ficticias largas (hasta ~3 m del piso), colgadas del techo: detrás del escenario, a los costados y al frente.
+    // Entran en las tomas generales (3/4, costado, medio, frontal) y tapan la parte alta de las tribunas.
+    const bt = tx(banderasLargas()), pos = [], uv = [], idx = [], N = 8;
+    const colgar = (cx, cz, nx, nz, i, w = 2.6, y0 = 3.3, y1 = 12.4) => { const tx2 = -nz, tz = nx, b = pos.length / 3; pos.push(cx - tx2 * w / 2, y0, cz - tz * w / 2, cx + tx2 * w / 2, y0, cz + tz * w / 2, cx + tx2 * w / 2, y1, cz + tz * w / 2, cx - tx2 * w / 2, y1, cz - tz * w / 2); uv.push(i / N, 0, (i + 1) / N, 0, (i + 1) / N, 1, i / N, 1); idx.push(b, b + 1, b + 2, b, b + 2, b + 3); };
+    [-8.0, -2.5, 0, 2.5, 8.0].forEach((x, k) => colgar(x, -5.62, 0, 1, (k * 3 + 1) % N, 2.3, Math.abs(x) < 4 ? 4.3 : 2.7));      // detrás de la pantalla (las del medio terminan arriba del puente de luces)
+    // (a los costados van banderas 2:3 con símbolo: más abajo)
+    for (let k = 0; k < 7; k++) colgar(-12 + k * 4, 11.5, 0, -1, (k * 3) % N, 2.6, 4.4);
+    for (const s of [-1, 1]) colgar(s * 6.3, -4.74, 0, 1, s > 0 ? 6 : 3, 1.7, 2.72, 6.2);      // sobre el tablero y el reloj, colgadas del truss del fondo: a cuadro en 3/4, jurado y frontal      // frente (lo que mira el pesista), por encima de los árbitros
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+    const o = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ name: 'banderas', map: bt, color: new THREE.Color(.85, .85, .85), side: THREE.DoubleSide })); o.frustumCulled = false; G.add(o);
+    { const t2 = tx(banderas23()), p2 = [], u2 = [], i2 = [];      // banderas de países ficticios, 3 × 2 m, enteras a cuadro en la toma lateral
+      for (const s of [-1, 1]) for (let k = 0; k < 6; k++) { const z = -8.4 + k * 3.4, x = s * 10.85, y0 = 1.95, y1 = 3.95, b = p2.length / 3, i = (k * 3 + (s > 0 ? 2 : 5)) % 8;
+        p2.push(x, y0, z - s * 1.5, x, y0, z + s * 1.5, x, y1, z + s * 1.5, x, y1, z - s * 1.5); u2.push(i / 8, 0, (i + 1) / 8, 0, (i + 1) / 8, 1, i / 8, 1); i2.push(b, b + 1, b + 2, b, b + 2, b + 3); }
+      const g2 = new THREE.BufferGeometry(); g2.setAttribute('position', new THREE.Float32BufferAttribute(p2, 3)); g2.setAttribute('uv', new THREE.Float32BufferAttribute(u2, 2)); g2.setIndex(i2);
+      const o2 = new THREE.Mesh(g2, new THREE.MeshBasicMaterial({ name: 'banderas 2:3', map: t2, color: new THREE.Color(.62, .62, .62), side: THREE.DoubleSide })); o2.frustumCulled = false; G.add(o2); }
+    this._sombras();
+  }
+
+  /**
+   * Sombras de contacto: una mancha oscura y blanda bajo cada zapatilla y bajo los discos de cada lado, pegada a la tarima.
+   * Cuatro planos chicos con mezcla (también en «Móvil»); se apagan con la altura. Los pies y la barra se buscan por nombre
+   * en la escena (el pesista visible), sin tocar el escenario.
+   */
+  _sombras() {
+    const cv = makeCanvas(64, 64, g => { const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(0,0,0,1)'); r.addColorStop(.55, 'rgba(0,0,0,.7)'); r.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); }), t = canvasTexture(cv, { aniso: 1 }); this.texturas.push(t);
+    const mat = () => new THREE.MeshBasicMaterial({ name: 'sombra de contacto', map: t, color: 0x000000, transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+    const geo = new THREE.PlaneGeometry(1, 1); geo.rotateX(-Math.PI / 2);
+    const S = this.contacto = [0, 1, 2, 3].map(i => { const m = new THREE.Mesh(geo, mat()); m.renderOrder = 3; m.frustumCulled = false; m.visible = false; m.scale.set(i < 2 ? .27 : .42, 1, i < 2 ? .5 : .7); this.arena.group.add(m); return m; });
+    const v = new THREE.Vector3(); let pies = null, barra = null, n = 0;
+    // el primero se entera en cada dibujo: ubica los cuatro antes de que se dibujen (él mismo va con la posición del cuadro anterior)
+    this.halos.onAfterRender = () => {
+      const esc = this.arena.group.parent; if (!esc) return;
+      if (!(n++ % 30) || (pies && !pies.every(b => { for (let x = b; x; x = x.parent) if (!x.visible) return false; return true; }))) {
+        pies = null; barra = esc.getObjectByName('Barbell') || null;
+        esc.traverse(o => { if (pies || !o.isSkinnedMesh || !o.visible) return; for (let x = o; x; x = x.parent) if (!x.visible) return; const B = o.skeleton.bones, a = B.find(b => /LeftToeBase$/.test(b.name)) || B.find(b => /LeftFoot$/.test(b.name)), c = B.find(b => /RightToeBase$/.test(b.name)) || B.find(b => /RightFoot$/.test(b.name)); if (a && c) pies = [a, c]; });
+      }
+      for (let i = 0; i < 2; i++) { const m = S[i], b = pies?.[i]; if (!b) { m.visible = false; continue; } b.getWorldPosition(v); const k = 1 - Math.min(1, Math.max(0, (v.y - .1) / .22)); m.visible = k > .02 && Math.abs(v.x) < 2.1 && Math.abs(v.z) < 2.1; m.position.set(v.x, .004, v.z - .06); m.material.opacity = .9 * k; }
+      for (let i = 0; i < 2; i++) { const m = S[2 + i]; if (!barra || !barra.visible) { m.visible = false; continue; } const p = barra.position, k = 1 - Math.min(1, Math.max(0, (p.y - .225) / .4)); m.visible = k > .02; m.position.set(p.x + (i ? 1 : -1) * .93, .004, p.z); m.material.opacity = .95 * k; }
+    };
+  }
+
+  /** Halos de las luminarias del truss y de las torres (las mismas posiciones que arma arena.js). */
+  _halos() {
+    const TY = 7.1, TB = 6.3, L = [], luz = (pos, hacia, color, tam, k = 1) => L.push({ pos, hacia, color, tam, k });
+    for (let i = 0; i < 8; i++) { const x = -6.3 + i * 1.8; luz([x, TB - .3, -4.6], [x * .25, .4, -.2], i < 4 ? '#ffb877' : '#d6e4ff', 2.3, 1); }
+    for (let i = 0; i < 6; i++) { const x = -5 + i * 2; luz([x, TY - .3, 6.8], [x * .2, 1, 0], '#ffe6c4', 2.3, 1); }
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) luz([s * 7.4, TY - .35 - i * .05, 3.6 - i * 2.8], [0, 1, 0], i === 1 ? '#fff0d8' : (s < 0 ? '#ffc48a' : '#cfe0ff'), 2.0, .9);
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) luz([s * 7.22, 3.7 + i * .9, -4.4], [s * 1.2, 1.2, 0], i === 1 ? '#ffd9a0' : '#f4f0ff', 1.0, .4);
+    for (let i = 0; i < 8; i++) { const x = -4.2 + i * 1.2; luz([x, 3.56, -4.86], [x * .45, 1.3, 2.5], i % 2 ? '#ffd9a0' : '#f2ecff', 1.5, .8); }      // puente de luces sobre la pantalla
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) luz([s * 4.02, 1.55 + i * .72, -4.4], [-s * .4, 1.3, .6], i === 1 ? (s < 0 ? '#ffb877' : '#cfe0ff') : '#fff0d8', 1.3, .75);      // torres de contraluz
+    const n = L.length, P = new Float32Array(n * 3), C = new Float32Array(n * 3), D = new Float32Array(n * 3), T = new Float32Array(n), c = new THREE.Color(), a = new THREE.Vector3(), b = new THREE.Vector3();
+    L.forEach((l, i) => { a.set(...l.pos); b.set(...l.hacia).sub(a).normalize(); a.addScaledVector(b, .14); a.toArray(P, i * 3); b.toArray(D, i * 3); c.set(l.color).multiplyScalar(l.k); c.toArray(C, i * 3); T[i] = l.tam; });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('aColor', new THREE.BufferAttribute(C, 3)); g.setAttribute('aDir', new THREE.BufferAttribute(D, 3)); g.setAttribute('aTam', new THREE.BufferAttribute(T, 1));
+    const m = this.haloMat = new THREE.ShaderMaterial({ name: 'halos de focos', vertexShader: HALO_VS, fragmentShader: HALO_FS, uniforms: { uAlto: { value: 720 }, uFuerza: { value: 3.2 }, uDirecto: { value: 0 }, uMax: { value: 220 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+    const o = this.halos = new THREE.Points(g, m); o.name = 'halos de focos'; o.frustumCulled = false; o.renderOrder = 6;
+    const tam = new THREE.Vector2(); o.onBeforeRender = r => { const rt = r.getRenderTarget(); m.uniforms.uAlto.value = rt ? rt.height : r.getDrawingBufferSize(tam).y; for (const b of this.arena.beams || []) if (this.reduce || !b.puesto) { b.mat.uniforms.uStrength.value = b.base; b.puesto = true; } };      // los conos, con su fuerza desde el primer cuadro (en las fotos del banco quedaban en la inicial)
+    this.arena.group.add(o);
+  }
 
   /** Conos de bruma de la clave y de los dos contraluces. Solo se ven con post (setNivel). */
   _rayos(L) {
@@ -485,7 +690,12 @@ export class Look {
       const g = new THREE.Group(); g.position.copy(l.position); g.lookAt(hasta); g.rotateX(-Math.PI / 2);
       const m = new THREE.Mesh(geo, mat); m.scale.set(rad, len, rad); m.renderOrder = 5; m.frustumCulled = false; g.add(m); this.group.add(g); this.rayos.push({ mat, base: fuerza });
     };
-    rayo(L.rimA, .03, .62); rayo(L.rimB, .014, .6);      // solo los dos contraluces: los conos de la clave y del pelo casi no se veían y eran pantalla entera de mezcla
+    rayo(L.rimA, .018, .26); rayo(L.rimB, .016, .26);      // angostos y a la tarima      // (el cono de la clave y los del truss del frente lavaban de beige las tribunas: fuera)
+    // conos anchos y suaves desde el puente de focos y las torres hasta la tarima (focos de mentira: solo el volumen de bruma)
+    const foco = (p, t, color, ang) => ({ position: new THREE.Vector3(...p), target: { position: new THREE.Vector3(...t) }, color: new THREE.Color(color), angle: ang });
+    for (const x of [-3.0, -1.0, 1.0, 3.0]) rayo(foco([x, 3.56, -4.86], [x * .3, 0, .2], x < 0 ? '#ffd0a0' : '#dfe8ff', .1), .014, 1);
+    for (const s2 of [-1, 1]) rayo(foco([s2 * 7.22, 4.6, -4.4], [s2 * .6, 0, 0], s2 < 0 ? '#ffb877' : '#cfe0ff', .085), .014, 1);
+    for (const s2 of [-1, 1]) rayo(foco([s2 * 4.02, 3.0, -4.4], [-s2 * .9, 0, .9], s2 < 0 ? '#ffb877' : '#cfe0ff', .1), .018, 1);      // haces de las torres de contraluz, cruzados detrás del pesista      // haces angostos y definidos: anchos eran un banco de niebla beige sobre la tribuna      // solo los dos contraluces: los conos de la clave y del pelo casi no se veían y eran pantalla entera de mezcla
     this.group.visible = false;
   }
 
@@ -497,11 +707,13 @@ export class Look {
       // la utilería en el camino directo: solo el mapa de color (sin normales ni rugosidad) y sin las calcomanías del piso
       // (mezcla con luces sobre mucha pantalla): el banco decía que la utilería era el 20 % del cuadro de «Baja»
       for (const m of this.utilMats || []) { const n = d ? null : m.userData.normal, g = d ? null : m.userData.rug; if (m.normalMap !== n || m.roughnessMap !== g) { m.normalMap = n; m.roughnessMap = g; m.roughness = d ? .6 : 1; m.needsUpdate = true; } }
-      for (const o of this.calcos || []) o.visible = !d;
+      for (const o of this.calcos || []) o.visible = !d || /charcos/.test(o.material.name);
       // medido (run 43827293011): ni sin mapas la utilería entraba en la meta de «Baja» (+16 %); el banco dice que es el 22 % del cuadro.
       // En el camino directo no se dibuja (Media para arriba sí), hasta medir en una placa
       for (const o of this.utileria()) if (o !== this.props) o.visible = !d; this.props.visible = !d; }
     FINO.value = Q.directo ? 0 : 1;
+    for (const m of LEJOS.fino) m.visible = !Q.directo; for (const m of LEJOS.liviano) m.visible = !!Q.directo;      // gente lejana: malla completa con post, liviana en Móvil y Baja
+    if (this.haloMat) { this.haloMat.uniforms.uDirecto.value = Q.directo ? 1 : 0; this.haloMat.uniforms.uMax.value = Q.directo ? 130 : 240; for (const b of this.arena.beams || []) b.puesto = false; }      // en el camino directo, halos chicos: poca pantalla de mezcla
     // en el camino directo la pared de chapa (material físico en mucha pantalla) no se dibuja: queda el telón, como antes
     this.arena.group.traverse(o => { if (o.material === this.chapaMat) o.visible = sup; });      // la chapa es toda por función: sin superficies sería un paño liso
     BOKEH.uScale.value = Q.directo ? .12 : .18;      // luces de fondo: puntos con halo en el camino directo (eran discos grises), bokeh moderado con post      // superficies por función solo con post

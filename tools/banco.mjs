@@ -7,6 +7,7 @@
 //   node tools/banco.mjs --fotos=dir --niveles[=baja,alta]  fotos de cada calidad (móvil, baja, media, alta, ultra) con las cámaras
 //                                   del juego y la vista del jurado con las luces prendidas: dir/<calidad>_<toma>.png
 // Opciones: --ancho=1745 --alto=845 (ventana)  --limite=125 (segundos del banco)  --solo=baja,media  --variantes=sombras,luces  --vueltas=3  --mp=0.5,1.5  --n=10
+//           --plantel=mujeres|id,id,id (vestuario: qué modelos del plantel dibujan a los tres pesistas; ver docs/PLANTEL.md)
 //           --pesista=ventura  --lastre=18 (solo --juego: ms artificiales por megapíxel)  --json=archivo  --headed
 // Falla (exit 1) si la página tira un error, si el banco anota errores o si la calibración no llegó a decidir.
 // OJO: sin placa (GitHub Actions, contenedor) Chrome dibuja por software y LOS TIEMPOS NO DICEN NADA: ahí esto solo prueba
@@ -44,7 +45,7 @@ const guardar = o => { fs.mkdirSync(path.dirname(path.resolve(SALIDA)), { recurs
 const problemas = [];
 try {
   if (FOTOS) {
-    await page.goto(`${base}juego.html?banco=1&fotos=${tiene('niveles') || arg('niveles') ? 2 : 1}${arg('niveles') ? '&niveles=' + arg('niveles') : ''}${arg('pesista') ? '&pesista=' + arg('pesista') : ''}${arg('lab') ? '&lab=' + arg('lab') : ''}`, { waitUntil: 'load' });      // --lab=materiales: fotos del laboratorio de materiales (lab.js)
+    await page.goto(`${base}juego.html?banco=1&fotos=${tiene('niveles') || arg('niveles') ? 2 : 1}${arg('niveles') ? '&niveles=' + arg('niveles') : ''}${arg('pesista') ? '&pesista=' + arg('pesista') : ''}${arg('plantel') ? '&plantel=' + arg('plantel') : ''}${arg('tomas') ? '&tomas=' + arg('tomas') : ''}${arg('lab') ? '&lab=' + arg('lab') : ''}`, { waitUntil: 'load' });      // --lab=materiales: fotos del laboratorio de materiales (lab.js)
     await page.waitForFunction(() => (window.BANCO_FOTOS && window.BANCO_FOTOS.listo) || (window.BANCO && window.BANCO.listo), null, { timeout: 300000 });
     const info = await page.evaluate(() => ({ lista: window.BANCO_FOTOS ? window.BANCO_FOTOS.lista.map(f => f.nombre) : [], errores: window.BANCO.errores, sombra: window.BANCO_FOTOS?.opacidadSombra, cruda: window.BANCO_FOTOS?.opacidadCruda, gl: (() => { const g = window.JUEGO?.escena?.renderer.getContext(), x = g && g.getExtension('WEBGL_debug_renderer_info'); return x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : '?'; })() }));
     for (const e of info.errores) problemas.push('fotos: ' + e.split('\n')[0]);

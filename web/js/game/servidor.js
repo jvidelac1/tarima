@@ -16,10 +16,11 @@
 // Sin servidor de verdad:
 // - En localhost con el servidor estático de Python (POST da 501, 404 o 405 sin JSON) el juego anda sin límite
 //   (modo 'sin_api'): es lo que usan las pruebas del flujo «Pruebas del juego».
-// - `?muro=firme` en localhost simula el Worker en el navegador con la regla de producción (LIF-53: 1 final entera gratis,
-//   el cartel al terminarla; el correo o las dos preguntas dan el juego libre), con la cuenta en localStorage
-//   (`tarima.sim`) para que sobreviva a una recarga. `&etapa=arranque` simula el arranque gratis (muro en el intervalo);
-//   `&libre=0`, la encuesta sin desbloqueo (correo obligatorio); `?gratis=N` cambia cuántas finales.
+// - `?muro=firme` en localhost simula el Worker en el navegador con la regla de LIF-53 (1 final entera gratis, el cartel
+//   al terminarla; el correo o las dos preguntas dan el juego libre), con la cuenta en localStorage (`tarima.sim`) para
+//   que sobreviva a una recarga. `&etapa=arranque` simula el arranque gratis (muro en el intervalo); `&libre=0`, la
+//   encuesta sin desbloqueo (correo obligatorio): las dos juntas son la regla de producción (worker/wrangler.jsonc).
+//   `?gratis=N` cambia cuántas finales.
 // Fuera de localhost esos dos modos no existen.
 
 import { nombreReal } from './nombre.js';

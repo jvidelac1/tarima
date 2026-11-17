@@ -55,9 +55,13 @@ function plateFace(spec, size, aniso) {
       for (let i = 0; i < 900; i++) { const a = Math.random() * 7, r = R * (.5 + Math.random() * .5); g.fillStyle = `rgba(${Math.random() < .5 ? '255,255,255' : '0,0,0'},${Math.random() * .035})`; g.beginPath(); g.arc(c + Math.cos(a) * r, c + Math.sin(a) * r, 1 + Math.random() * 5, 0, 7); g.fill(); }
       // roces en arco (el disco gira contra otro), golpes del borde y manos con magnesio
       g.lineCap = 'round';
-      for (let i = 0; i < 70; i++) { const a = Math.random() * 7, r = R * (.57 + Math.random() * .42), l = .05 + Math.random() * Math.random() * .9; g.strokeStyle = `rgba(${Math.random() < .45 ? '245,242,232' : '8,8,10'},${.04 + Math.random() * .13})`; g.lineWidth = s * (.001 + Math.random() * .004); g.beginPath(); g.arc(c, c, r, a, a + l); g.stroke(); }
+      for (let i = 0; i < 150; i++) { const a = Math.random() * 7, r = R * (.57 + Math.random() * .42), l = .05 + Math.random() * Math.random() * .9; g.strokeStyle = `rgba(${Math.random() < .5 ? '245,242,232' : '8,8,10'},${.1 + Math.random() * .3})`; g.lineWidth = s * (.001 + Math.random() * .004); g.beginPath(); g.arc(c, c, r, a, a + l); g.stroke(); }
       for (let i = 0; i < 9; i++) { const a = Math.random() * 7, r = R * (.62 + Math.random() * .33), x = c + Math.cos(a) * r, y = c + Math.sin(a) * r, rad = s * (.03 + Math.random() * .07), rg = g.createRadialGradient(x, y, 0, x, y, rad); rg.addColorStop(0, `rgba(244,242,234,${.1 + Math.random() * .16})`); rg.addColorStop(1, 'rgba(244,242,234,0)'); g.fillStyle = rg; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); }
-      { const rg = g.createRadialGradient(c, c, R * .9, c, c, R); rg.addColorStop(0, 'rgba(0,0,0,0)'); rg.addColorStop(1, 'rgba(10,10,12,.28)'); g.fillStyle = rg; g.fillRect(0, 0, s, s); }
+      { const rg = g.createRadialGradient(c, c, R * .9, c, c, R); rg.addColorStop(0, 'rgba(0,0,0,0)'); rg.addColorStop(1, 'rgba(10,10,12,.28)'); g.fillStyle = rg; g.fillRect(0, 0, s, s); }      g.fillStyle = 'rgba(24,6,6,.2)'; g.fillRect(0, 0, s, s);      // goma que ya no es nueva: más oscura, sin perder el color (el velo gris la dejaba salmón): el color pierde fuerza
+      for (let i = 0; i < 4; i++) { const a = Math.random() * 7, r = R * (.6 + Math.random() * .3), x = c + Math.cos(a) * r, y = c + Math.sin(a) * r, rad = s * (.06 + Math.random() * .08), rg = g.createRadialGradient(x, y, 0, x, y, rad); rg.addColorStop(0, `rgba(240,236,226,${.16 + Math.random() * .14})`); rg.addColorStop(.6, 'rgba(240,236,226,.05)'); rg.addColorStop(1, 'rgba(240,236,226,0)'); g.fillStyle = rg; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); }      // manotazos de magnesio
+      // uso: el color se apaga hacia el borde (goma sucia), aureola de magnesio de las manos que lo cargan y rayas de apoyo contra el piso
+      { const rg = g.createRadialGradient(c, c, R * .55, c, c, R); rg.addColorStop(0, 'rgba(20,18,18,.06)'); rg.addColorStop(.7, 'rgba(20,10,10,.22)'); rg.addColorStop(.95, 'rgba(40,20,20,.3)'); rg.addColorStop(1, 'rgba(236,232,222,.22)'); g.fillStyle = rg; g.fillRect(0, 0, s, s); }
+      for (let i = 0; i < 26; i++) { const a = Math.random() * 7, r0 = R * (.6 + Math.random() * .3), l = R * (.04 + Math.random() * .16), w = (Math.random() - .5) * .5; g.strokeStyle = `rgba(${Math.random() < .6 ? '250,246,236' : '14,12,12'},${.06 + Math.random() * .16})`; g.lineWidth = s * (.0015 + Math.random() * .003); g.beginPath(); g.moveTo(c + Math.cos(a) * r0, c + Math.sin(a) * r0); g.lineTo(c + Math.cos(a + w) * (r0 + l), c + Math.sin(a + w) * (r0 + l)); g.stroke(); }
     }
     const ink = relief ? '#fff' : spec.ink;
     g.fillStyle = ink; g.strokeStyle = ink;
@@ -66,6 +70,7 @@ function plateFace(spec, size, aniso) {
     arcText(g, label, c, c, R * .78, Math.PI / 2, s * .2, 800);
     arcText(g, 'LIFTING GAME', c, c, R * .785, Math.PI, s * .088, 700);
     arcText(g, 'KG · LB ' + String(Math.round(spec.kg * 2.2046)), c, c, R * .785, 0, s * .062, 700);
+    if (!relief) { g.fillStyle = spec.color; for (let i = 0; i < 160; i++) { const a = Math.random() * 7, r = R * (.66 + Math.random() * .26); g.globalAlpha = .12 + Math.random() * .4; g.beginPath(); g.ellipse(c + Math.cos(a) * r, c + Math.sin(a) * r, s * (.002 + Math.random() * .012), s * (.001 + Math.random() * .004), a + 1.57, 0, 7); g.fill(); } g.globalAlpha = 1; }      // letras gastadas por el roce
     if (relief) {  // ranuras concéntricas finas del caucho
       g.strokeStyle = 'rgba(255,255,255,.22)'; g.lineWidth = 1.5;
       for (let rr = .58; rr < .98; rr += .022) { g.beginPath(); g.arc(c, c, R * rr, 0, 7); g.stroke(); }
@@ -105,11 +110,11 @@ export class Barbell {
     this.grip = .55; this.q = 0; this.v = 0; this.acc = 0; this.flexGain = 1; this.onFloor = false;
     this._faces = new Map(); this._plateGeo = new Map(); this._disposables = [];
     const { knurl, ridge } = knurlTextures(aniso); this._disposables.push(knurl, ridge);
-    knurl.repeat.set(14, 1 / .0063); ridge.repeat.set(1, 1 / .012);
+    knurl.repeat.set(9, 1 / .0098);      // rombos de ~1 cm: se leen desde el plano medio ridge.repeat.set(1, 1 / .012);
     const steel = { color: new THREE.Color('#c9ccd0'), metalness: 1, envMapIntensity: 1.25 };
     this.mat = {
       smooth: new THREE.MeshStandardMaterial({ ...steel, roughness: .2 }),
-      knurl: new THREE.MeshStandardMaterial({ ...steel, color: new THREE.Color('#b4b7bc'), roughness: .46, normalMap: knurl, normalScale: new THREE.Vector2(1.1, 1.1) }),
+      knurl: new THREE.MeshStandardMaterial({ ...steel, color: new THREE.Color('#55585e'), roughness: .78, envMapIntensity: .5, normalMap: knurl, normalScale: new THREE.Vector2(2.2, 2.2) }),
       sleeve: new THREE.MeshStandardMaterial({ ...steel, roughness: .24, normalMap: ridge, normalScale: new THREE.Vector2(.35, .35) }),
       chrome: new THREE.MeshStandardMaterial({ ...steel, color: new THREE.Color('#d8dade'), roughness: .12 }),
       hub: new THREE.MeshStandardMaterial({ color: new THREE.Color('#c4c7cc'), metalness: .92, roughness: .4, envMapIntensity: 1.6 }),
@@ -146,8 +151,19 @@ export class Barbell {
     this.setLoad(100);
   }
 
+  /** Goma del canto y del cuerpo con uso: el color del disco con roces oscuros a lo largo de la rodadura, magnesio y polvo (u: vuelta entera; v: 25 cm). */
+  _rubberMap(color) {
+    const W = 512, H = 128, t = canvasTexture(makeCanvas(W, H, g => {
+      g.fillStyle = color; g.fillRect(0, 0, W, H); g.fillStyle = 'rgba(24,6,6,.2)'; g.fillRect(0, 0, W, H);
+      const dos = f => { f(0); f(-W); f(W); };      // se repite en u sin costura
+      for (let i = 0; i < 90; i++) { const x = Math.random() * W, y = Math.random() * H, l = 6 + Math.random() * Math.random() * 150, claro = Math.random() < .45; g.strokeStyle = `rgba(${claro ? '238,234,224' : '12,10,10'},${.05 + Math.random() * (claro ? .2 : .22)})`; g.lineWidth = .6 + Math.random() * 2.4; dos(o => { g.beginPath(); g.moveTo(x + o, y); g.lineTo(x + o + l, y + (Math.random() - .5) * 3); g.stroke(); }); }
+      for (let i = 0; i < 14; i++) { const x = Math.random() * W, y = Math.random() * H, rad = 10 + Math.random() * 26, a = .08 + Math.random() * .14; dos(o => { const rg = g.createRadialGradient(x + o, y, 0, x + o, y, rad); rg.addColorStop(0, `rgba(240,236,226,${a})`); rg.addColorStop(1, 'rgba(240,236,226,0)'); g.fillStyle = rg; g.fillRect(x + o - rad, y - rad, rad * 2, rad * 2); }); }
+      for (let i = 0; i < 500; i++) { g.fillStyle = `rgba(${Math.random() < .5 ? '250,246,238' : '0,0,0'},${Math.random() * .12})`; g.fillRect(Math.random() * W, Math.random() * H, 1 + Math.random() * 2, 1 + Math.random() * 2); }
+    }), { aniso: 4, repeat: true });
+    t.repeat.set(1, 4); this._disposables.push(t); return t;
+  }
   _rubberMat(color) {
-    if (!this._rubber.has(color)) this._rubber.set(color, new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: this.goma.roughnessMap ? 1 : .62, roughnessMap: this.goma.roughnessMap || null, metalness: 0, envMapIntensity: .55 }));
+    if (!this._rubber.has(color)) this._rubber.set(color, new THREE.MeshStandardMaterial({ map: this._rubberMap(color), color: new THREE.Color(1, 1, 1), roughness: this.goma.roughnessMap ? 1 : .62, roughnessMap: this.goma.roughnessMap || null, metalness: 0, envMapIntensity: .55 }));
     return this._rubber.get(color);
   }
 

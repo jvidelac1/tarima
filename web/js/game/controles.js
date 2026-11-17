@@ -5,7 +5,7 @@
 // cada gesto es UN toque: la capa mira en qué fase está el intento en el instante del toque y lo convierte en lo que el
 // núcleo espera. Soltar la tecla no significa nada, la subida es asistida y la fijación y la bajada son automáticas.
 import { simular } from '../sim/attempt.js';
-import { TENSION, FACIL, UNO, BARRA, posBarra } from '../sim/rules.js';
+import { TENSION, FACIL, UNO, reglasB, posBarra } from '../sim/rules.js';
 import { t } from './i18n/t.js';
 
 const INF = 2147483647;
@@ -163,7 +163,7 @@ function senalU(m, now) {
  * primera vez a partir de `desde_` (más lento desde R.lentoDesde, como posBarra). Lo usan las pruebas y la práctica.
  * `R`: las reglas de la barrita del nivel (rules.js → reglasB); por defecto, Fácil.
  */
-export function proximoCentro(desde, desde_, R = BARRA) {
+export function proximoCentro(desde, desde_, R = reglasB()) {
   const P = R.pasada, L = R.lentoDesde, PL = R.pasadaLenta, xL = L * 1000 / P;
   const e = Math.max(0, desde_ - desde), xe = e <= L ? e * 1000 / P : xL + (e - L) * 1000 / PL;      // en milésimas de pasada
   const x = Math.ceil((xe - 500) / 1000) * 1000 + 500;

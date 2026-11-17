@@ -27,7 +27,7 @@ import { createRequire } from 'node:module';
 import { launchOptions } from './browser.mjs';
 import { sinApi } from './sin_api.mjs';
 import { saltarRival } from './saltar_rival.mjs';
-import { medirEnPagina, fila, revisar as revisarTapa } from './tapa.mjs';
+import { medirEnPagina, fila, revisar as revisarTapa, estadoEnPagina, seguidor } from './tapa.mjs';
 /** Señales de un toque (la libre de siempre y las de 'u': ¡SALTA!, ¡PÁRATE!, ¡DA TODO!): un toque y la señal se va. */
 const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
@@ -59,11 +59,11 @@ const CASOS = [
   { nombre: 'zurdo_740x360', w: 740, h: 360, dpr: 3, url: '&mano=izq', hastaIntentos: 2 },
   // iPhone en Safari de costado, con la barra de direcciones a la vista: quedan unos 340 px de alto
   { nombre: 'safari_844x340', w: 844, h: 340, dpr: 3, seguras: { top: 0, right: 47, bottom: 21, left: 47 }, hastaIntentos: 2 },
-  { nombre: 'android_932x430', w: 932, h: 430, dpr: 3, hastaIntentos: 2, lang: 'en' },      // en inglés (LIF-52: las explicaciones de primera vez en los dos idiomas)
+  { nombre: 'android_932x430', w: 932, h: 430, dpr: 3, hastaPropios: 2, falla: 2, lang: 'en' },      // en inglés (LIF-52: las explicaciones de primera vez en los dos idiomas)
   // LIF-50: parado, sin girar el contenido
   { nombre: 'vertical_390x844', w: 390, h: 844, dpr: 3, vertical: true, partida: true, dedos: true, seguras: { top: 47, right: 0, bottom: 34, left: 0 } },
   { nombre: 'vertical_375x667', w: 375, h: 667, dpr: 2, vertical: true, lang: 'en', url: '&muro=firme&etapa=arranque', hastaPantalla: 'muro' },
-  { nombre: 'vertical_430x932', w: 430, h: 932, dpr: 3, vertical: true, hastaIntentos: 3, seguras: { top: 59, right: 0, bottom: 34, left: 0 } },
+  { nombre: 'vertical_430x932', w: 430, h: 932, dpr: 3, vertical: true, hastaPropios: 2, falla: 2, seguras: { top: 59, right: 0, bottom: 34, left: 0 } },
 ];
 
 async function correr(C) {
@@ -200,14 +200,19 @@ async function correr(C) {
     const x = await J(medirEnPagina).catch(e => ({ error: String(e) })); if (!x) return; if (x.error) { notas.push(`${tag} tapa ${momento}: ${x.error}`); return; }
     TAPA.push({ p: C.nombre, momento, x }); const r = revisarTapa(momento, x); if (r && !INFORMA) mal(r);
   };
+  // 17-nov: los momentos que faltaban (preparación, barra arriba, veredicto grande y chico, de un rival, repetición, carga)
+  const sigue = seguidor({ page, tapa, foto: n => foto(n), medidos });
   const probado = { detalle: false, estilo: false }, aprendes = new Set(); let aprendeCerrada = false;
   const vistas = new Set(), pantallas = new Set(); let firma = '', dedosProbados = false, bordesProbados = false, campoSolo = false, nIntentos = 0, ultToque = 0, hecho = '', revisadas = 0;
-  const hasta = s => s.pantalla === 'fin' || (C.hastaIntentos && nIntentos >= C.hastaIntentos) || (C.hastaPantalla && s.pantalla === C.hastaPantalla);
+  // hastaPropios: hasta el llamado que sigue a ese intento propio (su veredicto ya pasó)
+  let masKilos = false;
+  const hasta = s => s.pantalla === 'fin' || (C.hastaIntentos && nIntentos >= C.hastaIntentos) || (C.hastaPropios && s.propios >= C.hastaPropios && s.pantalla === 'llamado') || (C.hastaPantalla && s.pantalla === C.hastaPantalla);
   for (let n = 0; n < 60000; n++) {
-    const s = await J(() => JUEGO.estado());
+    const s = await J(estadoEnPagina);
     if (s.errores.length) throw new Error('error en el juego: ' + s.errores[0]);
     if (hasta(s)) break;
-    const I = s.intento;
+    const I = s.intento, suf = s.lev === 'c' ? '@c' : '';
+    await sigue(s);
     // una captura y una revisión por pantalla nueva, por panel nuevo y por señal nueva
     const clave = `${s.pantalla}|${s.panel ? 'panel' : ''}|${s.sobre || ''}|${I && I.propio && I.senal ? I.senal.clave : ''}|${s.aprende ? 'aprende_' + s.aprende.clave : ''}`;
     if (clave !== firma && !(I && I.propio && !I.senal)) {
@@ -233,7 +238,11 @@ async function correr(C) {
           if (await J(() => !document.querySelector('#capa .pn-detalle')?.hidden)) mal('«Detalles» no se volvió a plegar');
         }
         if (!probado.estilo && /Dos tiempos · intento 1/.test(R.panel.titulo)) {
-          if (!await pulsa('#btn-estilo')) mal('en el primer dos tiempos no hay botón del estilo de envión');
+          // 17-nov: parado los tres estilos ya están a la vista (segmentos); acostado se abren con el botón del estilo
+          const aLaVista = await J(() => document.querySelectorAll('#capa .pn-estilo.abierto .envion').length === 3 && !document.querySelector('#capa #btn-estilo'));
+          if (C.vertical && !aLaVista) mal('parado: en el primer dos tiempos los tres estilos de envión no están a la vista');
+          if (aLaVista && await J(() => document.querySelector('#capa .envion[aria-pressed=true]')?.dataset.env) !== 'split') mal('los tres estilos a la vista no traen marcado el split');
+          if (!aLaVista && !await pulsa('#btn-estilo')) mal('en el primer dos tiempos no hay botón del estilo de envión');
           else {
             probado.estilo = true; await av(50); const Re = await revisar('llamado eligiendo el estilo de envión'); await foto('llamado_estilo');
             PANEL.push({ p: C.nombre, titulo: (Re.panel?.titulo || '') + ' (eligiendo estilo)', alto: Re.panel?.alto, pct: (Re.panel?.alto || 0) / C.h, detalle: false });
@@ -262,13 +271,13 @@ async function correr(C) {
       }
       const sg = I && I.propio ? I.senal : null;
       if (s.panel && ['inicio', 'presentacion', 'apertura', 'intervalo'].includes(s.pantalla)) await tapa(s.pantalla);
-      if (s.panel && s.pantalla === 'llamado') await tapa('llamado'); else if (sg && sg.tipo === 'barra') { await av(500); await tapa('corre'); } else if (sg && sg.tipo === 'espera' && sg.barra) await tapa('quieta');
-      else if (s.pantalla === 'decision') { await av(1200); await tapa('veredicto'); } else if (s.pantalla === 'rival') { await av(900); await tapa('rival'); }
+      if (s.panel && s.pantalla === 'llamado') await tapa('llamado'); else if (sg && sg.tipo === 'barra') { await av(500); await tapa('corre' + suf); } else if (sg && sg.tipo === 'espera' && sg.barra) await tapa('quieta' + suf);
+      else if (s.pantalla === 'decision') { await av(1200); await sigue(await J(estadoEnPagina)); } else if (s.pantalla === 'rival') { await av(900); await tapa('rival'); }
       if (I && I.propio && !R.zona) mal(`en el intento («${I.senal?.verbo || I.fase}») no se ve el botón táctil`);
       await foto(clave.replace(/\|+/g, '_'));
     }
     if (I && I.propio && s.modo !== 'panel') {
-      const g = I.senal; if (!g) { if (['tiron', 'vuelo', 'pelea', 'empuje', 'flexion'].includes(I.fase) && !medidos.has('levanta')) { await tapa('levanta'); await foto('levanta'); } await av(20); continue; }
+      const g = I.senal; if (!g) { if (['tiron', 'vuelo', 'pelea', 'empuje', 'flexion'].includes(I.fase) && !medidos.has('levanta' + suf)) { await tapa('levanta' + suf); await foto('levanta' + suf); } await av(20); continue; }
       vistas.add(g.verbo);
       if (C.dedos && !dedosProbados && (g.tipo === 'luz' || g.tipo === 'barra')) {
         if (g.tipo === 'barra') await ir(g.objetivo);      // 'b': después de la gracia de la barrita      // dos dedos a la vez en ¡SALTA!: dos toques anotados, un solo contacto («doble»)
@@ -296,6 +305,8 @@ async function correr(C) {
         continue;
       }
       if (I.parado) { await av(80); await toque(); continue; }
+      // un intento tocado en el rojo (lejos del verde): para ver el cartel de un intento que no sale
+      if (g.tipo === 'barra' && C.falla === s.propios + 1) { await ir(g.objetivo + 699); await toque(); await av(320); continue; }
       if (g.tipo === 'barra') { await ir(g.objetivo); await toque(); continue; }      // 'b': toca cuando el puntero pasa por el centro del verde
       if (UNTOQUE.has(g.tipo)) { await av(150); await toque(); continue; }
       if (g.tipo === 'cierre') { const k = g.clave + g.desde; if (I.seDetiene || hecho === k) { await av(30); continue; } await ir(g.objetivo); await toque(); hecho = k; continue; }
@@ -304,6 +315,8 @@ async function correr(C) {
     }
     if (s.panel && !s.sobre) {
       const hay = await J(() => !!document.querySelector('#capa .panel button.ir:not(:disabled)'));
+      // el intento que no sale: 6 kg de más (una vez: con más kilos sale después de un rival y el llamado vuelve) y tocado en el rojo
+      if (hay && s.pantalla === 'llamado' && C.falla === s.propios + 1 && !masKilos) { masKilos = true; for (let i = 0; i < 6; i++) await pulsa('#kg-mas'); }
       if (hay) { const ok = await pulsa('#capa .panel button.ir'); if (s.pantalla === 'llamado' && ok) nIntentos++; await av(ok ? 50 : 200); continue; }
     }
     await av(['rival', 'decision', 'repeticion', 'repeticion_rival'].includes(s.pantalla) ? 450 : 200);
@@ -344,7 +357,118 @@ async function correr(C) {
   await foto('final'); await ctx.close();
 }
 
-try { for (const C of CASOS.filter(c => !SOLO.length || SOLO.some(x => c.nombre.startsWith(x)))) await correr(C); }
+// ---------- selección de pesista (main.js, elegirPesista; `?elegir=1`) ----------
+// En computadora (1280 × 720, ratón y teclado), teléfono acostado (844 × 390) y parado (390 × 844): cada pesista de la terna
+// de frente, de perfil y de espalda, de pie y con la barra arriba (capturas en out/telefono/seleccion_*). Revisa que el panel
+// no tape al pesista (caja del cuerpo de three contra el panel), que entre en la pantalla, que gire solo y arrastrando, que
+// los botones de cuarto de vuelta y «barra arriba» anden, y que «Listo» vuelva a la bienvenida con ese pesista elegido.
+// Siempre se dibuja (calidad Alta; en la computadora, además, Móvil y Baja con un pesista).
+const SELECCION = [
+  { nombre: 'seleccion_pc_1280x720', w: 1280, h: 720, dpr: 1, pc: true, calidades: ['movil', 'baja'] },
+  { nombre: 'seleccion_acostado_844x390', w: 844, h: 390, dpr: 2, seguras: { top: 0, right: 47, bottom: 21, left: 47 } },
+  { nombre: 'seleccion_vertical_390x844', w: 390, h: 844, dpr: 2, vertical: true, seguras: { top: 47, right: 0, bottom: 34, left: 0 } },
+];
+async function seleccion(C, calidad = 'alta') {
+  const tag = `[${C.nombre}${calidad === 'alta' ? '' : ' ' + calidad}]`, dir = path.join(OUT, C.nombre); fs.mkdirSync(dir, { recursive: true });
+  const ctx = await browser.newContext({ viewport: { width: C.w, height: C.h }, deviceScaleFactor: C.dpr, hasTouch: !C.pc, isMobile: !C.pc });
+  const page = await ctx.newPage(), cdp = await ctx.newCDPSession(page);
+  const mal = txt => { const m = `${tag} ${txt}`; if (!problemas.includes(m)) problemas.push(m); };
+  page.on('console', m => { if (m.type() === 'error') mal(`console.error: ${m.text()}`); });
+  page.on('pageerror', e => mal(`pageerror: ${e.message}`));
+  page.on('response', r => { if (r.status() >= 400) mal(`HTTP ${r.status()}: ${r.url()}`); });
+  if (C.seguras) { try { await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: C.seguras }); } catch { /* este Chrome no emula áreas seguras */ } }
+  const J = (fn, a) => page.evaluate(fn, a), av = ms => J(ms => JUEGO.test.avanzar(ms), ms);
+  const foto = async nombre => { await J(() => { try { JUEGO.escena.cuadro(0, true); } catch (e) { console.error('cuadro forzado: ' + (e.stack || e)); } }); await page.screenshot({ path: path.join(dir, `${calidad === 'alta' ? '' : calidad + '_'}${nombre}.png`) }).catch(() => null); };
+  const pulsa = async sel => { const l = page.locator(sel).first(); if (!(await l.count()) || !(await l.isVisible())) { mal(`no está a la vista ${sel}`); return false; } if (C.pc) await l.click(); else await l.tap(); return true; };
+  const est = () => J(() => { const G = JUEGO.E.elegir, e = JUEGO.escena; return { pantalla: JUEGO.E.pantalla, G: G ? { id: G.id, asp: G.asp[G.id], clave: G.id + ':' + G.asp[G.id], visto: G.visto, ang: G.ang, meta: G.meta, arriba: G.arriba, u: G.u } : null, giro: e.giro || 0, barra: e.barbell.group.visible, toques: JUEGO.toques.total }; });
+  const hasta = async (cond, que, tope = 240000) => { const t0 = Date.now(); for (;;) { const x = await est(); if (cond(x)) return x; if (Date.now() - t0 > tope) { mal(`no se llegó a: ${que} (${JSON.stringify(x)})`); return x; } await av(100); await page.waitForTimeout(100); } };
+  /** Cajas en la página: el panel, el cuerpo del pesista (three) y la pantalla. */
+  const medir = donde => J(donde => {
+    const pn = document.querySelector('#capa .panel.elegir'), r = pn?.getBoundingClientRect(), c = JUEGO.escena.cajas()?.cuerpo, W = innerWidth, H = innerHeight, se = document.scrollingElement;
+    if (!r || !c) return { donde, falta: !r ? 'panel' : 'pesista' };
+    const ix = Math.max(0, Math.min(c.r, r.right) - Math.max(c.l, r.left)), iy = Math.max(0, Math.min(c.b, r.bottom) - Math.max(c.t, r.top)), area = Math.max(1, (c.r - c.l) * (c.b - c.t));
+    return { donde, tapa: ix * iy / area, alto: (c.b - c.t) / H, fuera: c.l < -2 || c.t < -2 || c.r > W + 2 || c.b > H + 2, cuerpo: [c.l, c.t, c.r, c.b].map(Math.round), panel: [r.left, r.top, r.right, r.bottom].map(Math.round), panelFuera: r.left < -1 || r.top < -1 || r.right > W + 1 || r.bottom > H + 1, panelCorta: pn.scrollHeight > pn.clientHeight + 1, scroll: se.scrollWidth > W + 1 || se.scrollHeight > H + 1 };
+  }, donde);
+  const MED = [];
+  const revisar = async donde => {
+    const m = await medir(donde); MED.push(m);
+    if (m.falta) return mal(`${donde}: no hay ${m.falta}`);
+    if (m.tapa > .01) mal(`${donde}: el panel tapa ${Math.round(m.tapa * 100)} % del pesista (cuerpo ${m.cuerpo}, panel ${m.panel})`);
+    if (m.fuera) mal(`${donde}: el pesista se sale de la pantalla (${m.cuerpo})`);
+    if (m.panelFuera || m.panelCorta || m.scroll) mal(`${donde}: el panel ${m.panelFuera ? 'se sale de la pantalla' : m.panelCorta ? 'no entra sin desplazar' : 'hace desplazar la página'} (${m.panel})`);
+  };
+  await page.goto(`${base}juego.html?lang=es&semilla=20261112&dibujo=0&elegir=1&calidad=${calidad}`, { waitUntil: 'load' });
+  if (!await J(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
+  await J(() => JUEGO.test.manual());
+  let x = await hasta(s => s.pantalla === 'elegir' && s.G && s.G.visto === s.G.clave, 'la selección con el pesista a la vista');
+  await J(() => JUEGO.E.precal); await av(450);
+  const ids = await J(() => [...document.querySelectorAll('#capa .panel.elegir .pesista')].map(b => b.dataset.id));
+  if (ids.length !== 3) mal(`la selección muestra ${ids.length} tarjetas`);
+  const ficha0 = await J(() => document.getElementById('el-ficha')?.innerText.replace(/\s+/g, ' ').trim());
+  console.log(`${tag} selección abierta con ${x.G?.id}: «${ficha0}»`);
+  // gira solo: un cuarto de vuelta en 3 s (una vuelta en 12 s)
+  { const a0 = (await est()).G.ang; await av(3000); const d = (await est()).G.ang - a0; if (Math.abs(d - Math.PI / 2) > .12) mal(`en 3 s giró ${d.toFixed(2)} rad (se esperaba un cuarto de vuelta)`); }
+  // arrastrando sobre la escena libre: gira con el dedo (o el ratón) y no cuenta como toque del juego
+  { const m = await medir('arrastre'), cx = m.cuerpo ? (m.cuerpo[0] + m.cuerpo[2]) / 2 : 60, cy = m.cuerpo ? (m.cuerpo[1] + m.cuerpo[3]) / 2 : 60, a0 = await est();
+    if (C.pc) { await page.mouse.move(cx, cy); await page.mouse.down(); await page.mouse.move(cx + 50, cy, { steps: 4 }); await page.mouse.up(); }
+    else { await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: cx, y: cy, id: 7 }] }); for (const dx of [15, 30, 50]) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: cx + dx, y: cy, id: 7 }] }); await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); }
+    await av(100); const a1 = await est(), d = a1.G.ang - a0.G.ang;
+    if (Math.abs(d - 50 * .012) > .1) mal(`arrastrar 50 px giró ${d.toFixed(2)} rad (se esperaban ${(50 * .012).toFixed(2)})`);
+    if (a1.toques !== a0.toques) mal(`el arrastre contó como toque del juego (${a0.toques} → ${a1.toques})`);
+    await av(1500); if (Math.abs((await est()).G.ang - a1.G.ang) > .01) mal('recién soltado, el pesista ya volvió a girar solo');
+  }
+  const frente = () => J(() => { const G = JUEGO.E.elegir; G.ang = 0; G.meta = null; G.pausa = 1e9; });
+  const vistas = async (id, pose) => {
+    await frente(); await av(60); await revisar(`${id} ${pose} frente`); await foto(`${id}_${pose}_frente`);
+    for (const v of ['perfil', 'espalda']) { await pulsa('#el-der'); await av(1000); const g = await est(), q = v === 'perfil' ? Math.PI / 2 : Math.PI; if (Math.abs(g.G.ang - q) > .02 || Math.abs(g.giro - q) > .02) mal(`${id} ${pose}: el botón de girar no dejó al pesista de ${v} (${g.G.ang.toFixed(2)} rad, escena ${g.giro.toFixed(2)})`); await revisar(`${id} ${pose} ${v}`); await foto(`${id}_${pose}_${v}`); }
+  };
+  const orden = calidad === 'alta' ? [...ids.filter(id => id === x.G?.id), ...ids.filter(id => id !== x.G?.id)] : [x.G?.id];
+  let nVistos = 0, nNuevos = 0;
+  for (const id of orden) {
+    if ((await est()).G.id !== id) { await pulsa(`#capa .panel.elegir .pesista[data-id="${id}"]`); await av(500); x = await hasta(s => s.G && s.G.id === id && s.G.visto === s.G.clave, `la plaza ${id} a la vista`); await av(300); }
+    const pr = await J(() => document.querySelector('#capa .panel.elegir .pesista[aria-pressed=true]')?.dataset.id); if (pr !== id) mal(`la tarjeta marcada es ${pr} y la plaza a la vista ${id}`);
+    // los aspectos de la plaza: el de siempre y los nuevos, que llevan la marca «(nuevo)»
+    const ops = await J(() => { const A = document.getElementById('el-aspectos'); return A.hidden ? [] : [...A.querySelectorAll('button')].map(b => ({ m: b.dataset.m, txt: b.innerText.trim(), nuevo: !!b.querySelector('.el-nuevo') })); });
+    if (ops.length && (ops[0].nuevo || ops.slice(1).some(o => !o.nuevo || !/\(nuevo\)/.test(o.txt)))) mal(`${id}: la marca «(nuevo)» no está donde corresponde (${JSON.stringify(ops)})`);
+    for (const o of calidad === 'alta' && ops.length ? ops : [{ m: (await est()).G.asp }]) {
+      const k = `${id}:${o.m}`, nom = `${id}_${o.m}`;
+      if ((await est()).G.clave !== k) { await pulsa(`#el-aspectos button[data-m="${o.m}"]`); await av(500); x = await hasta(s => s.G && s.G.clave === k && s.G.visto === k, `el modelo ${o.m} a la vista en la plaza ${id}`); await av(300); }
+      const fi = await J(() => ({ txt: document.getElementById('el-ficha')?.innerText.replace(/\s+/g, ' ').trim(), nuevo: !!document.querySelector('#el-ficha .el-nuevo'), bajando: document.querySelector('#capa .panel.elegir').classList.contains('bajando') }));
+      console.log(`${tag} ${nom}: «${fi.txt}»`); nVistos++; if (o.nuevo) nNuevos++;
+      if (!!o.nuevo !== fi.nuevo) mal(`${nom}: la ficha ${fi.nuevo ? 'lleva' : 'no lleva'} la marca «(nuevo)»`);
+      if (fi.bajando) mal(`${nom}: con el pesista a la vista sigue el aviso de descarga`);
+      if ((await est()).barra) mal(`${nom}: de pie se dibuja la barra`);
+      await vistas(nom, 'pie');
+      await pulsa('#el-pose'); await av(2600); { const g = await est(); if (!g.G.arriba || g.G.u !== 1 || !g.barra) mal(`${nom}: «barra arriba» no terminó arriba (${JSON.stringify(g.G)})`); }
+      await vistas(nom, 'arriba');
+      await pulsa('#el-pose'); await av(2600); { const g = await est(); if (g.G.arriba || g.G.u !== 0 || g.barra) mal(`${nom}: no volvió a quedar de pie (${JSON.stringify(g.G)})`); }
+    }
+  }
+  const ultimo = await est();
+  // hoy se ofrecen dos nuevos (roster.js, ASPECTOS_OFRECIDOS: Ilarraz y Kordan); Potente queda solo con el de siempre
+  if (calidad === 'alta' && (nVistos !== 5 || nNuevos !== 2)) mal(`se vieron ${nVistos} pesistas, ${nNuevos} nuevos (se esperaban 5 y 2)`);
+  if (C.pc && calidad === 'alta') {      // teclado: las flechas cambian de tarjeta y Enter sobre la elegida la confirma
+    const a = (await est()).G.id; await J(() => document.querySelector('#capa .panel.elegir .pesista[aria-pressed=true]').focus());
+    await page.keyboard.press(ids.indexOf(a) > 0 ? 'ArrowLeft' : 'ArrowRight'); await av(500); const b = await hasta(s => s.G && s.G.visto === s.G.clave, 'el pesista elegido con las flechas', 60000);
+    if (b.G.id === a) mal('las flechas no cambiaron de pesista'); await av(500); await page.keyboard.press('Enter'); await av(700);
+  } else { await pulsa('#el-listo'); await av(700); }      // la salida va detrás de un fundido corto (RITMO.fundido)
+  const fin = await J(() => ({ pantalla: JUEGO.E.pantalla, tarjetas: document.querySelectorAll('#capa .panel.bienvenida .pesista').length, marcado: document.querySelector('#capa .panel.bienvenida .pesista[aria-pressed=true]')?.dataset.id, giro: JUEGO.escena.giro || 0, aspecto: JUEGO.E.aspecto, barra: JUEGO.escena.barbell.group.visible, jugar: !!document.getElementById('btn-empezar'), errores: JUEGO.E.errores }));
+  if (fin.pantalla !== 'inicio' || fin.tarjetas !== 3 || !fin.jugar) mal(`«Listo» no volvió a la bienvenida con las tarjetas (${JSON.stringify(fin)})`);
+  if (fin.giro || !fin.barra) mal(`al salir de la selección la escena no quedó como estaba (giro ${fin.giro}, barra ${fin.barra})`);
+  if (!C.pc && calidad === 'alta' && (fin.marcado !== ultimo.G.id || (ultimo.G.asp === 'kordan' || ultimo.G.asp === 'ilarraz' ? fin.aspecto?.modelo !== ultimo.G.asp || fin.aspecto?.plaza !== ultimo.G.id : !!fin.aspecto))) mal(`«Listo» con ${ultimo.G.clave} a la vista dejó elegido ${JSON.stringify(fin.aspecto)} (tarjeta ${fin.marcado})`);
+  if (fin.errores.length) mal(`errores del juego: ${fin.errores.join(' | ').slice(0, 300)}`);
+  await foto('bienvenida_despues');
+  const alto = k => { const v = MED.filter(m => !m.falta && m.donde.includes(k)).map(m => m.alto); return v.length ? `${Math.round(Math.min(...v) * 100)}–${Math.round(Math.max(...v) * 100)} %` : '—'; };
+  console.log(`${tag} ${nVistos} pesistas (${nNuevos} nuevos), ${MED.length} vistas medidas · alto del pesista en pantalla: de pie ${alto(' pie ')}, barra arriba ${alto(' arriba ')} · el panel tapa como mucho ${Math.round(Math.max(0, ...MED.filter(m => !m.falta).map(m => m.tapa)) * 100)} % · vuelve a la bienvenida con ${fin.marcado} marcado`);
+  await ctx.close();
+}
+
+try {
+  for (const C of CASOS.filter(c => !SOLO.length || SOLO.some(x => c.nombre.startsWith(x)))) await correr(C);
+  // la selección de pesista corre aparte (--solo=seleccion): dibuja siempre y no entra en el tiempo de los demás casos
+  // los tres tamaños a la vez (cada uno en su contexto): por software son 5 pesistas por 6 vistas cada uno
+  await Promise.all(SELECCION.filter(c => SOLO.some(x => c.nombre.startsWith(x))).map(async C => { try { await seleccion(C); for (const q of C.calidades || []) await seleccion(C, q); } catch (e) { problemas.push(`[${C.nombre}] excepción de la prueba: ${e.stack || e.message}`); } }));
+}
 catch (e) { problemas.push('excepción de la prueba: ' + (e.stack || e.message)); }
 await browser.close(); server.close();
 if (TAPA.length) { console.log('\nCuánto tapa la interfaz al pesista (caja proyectada desde three; tools/tapa.mjs):'); for (const id of [...new Set(TAPA.map(x => x.p))]) { console.log(`  [${id}]`); for (const x of TAPA.filter(y => y.p === id)) console.log('    ' + fila(x.momento, x.x)); } fs.writeFileSync(path.join(OUT, 'tapa.json'), JSON.stringify(TAPA, null, 1)); }
@@ -352,4 +476,5 @@ if (PANEL.length) { console.log('\nAlto del panel del llamado (con el detalle pl
 if (PULGAR.length) { console.log('\nParado: altura del botón principal de cada panel (0 = arriba, 1 = abajo; pulgar ≥ 0,5):'); for (const x of PULGAR) console.log(`  [${x.p}] ${x.donde}: «${x.txt}» a ${x.y.toFixed(2)}`); }
 for (const n of notas) console.log('nota: ' + n);
 if (problemas.length) { console.log(`\nFALLÓ (${problemas.length}):`); for (const p of problemas.slice(0, 40)) console.log('  ' + p); process.exit(1); }
+if (SOLO.length && SOLO.every(x => x.startsWith('seleccion'))) { console.log('\nOK: selección de pesista en computadora, teléfono acostado y parado: el panel no tapa al pesista, gira solo y arrastrando, cuartos de vuelta, barra arriba y «Listo»'); process.exit(0); }
 console.log('\nOK: teléfono de costado (dos tamaños y mano izquierda) y parado (tres tamaños, sin girar el contenido), jugado con toques, campos de texto con el editor de arriba y dos dedos, sin cortes ni superposiciones');

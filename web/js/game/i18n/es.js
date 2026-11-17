@@ -73,6 +73,7 @@ export default {
   'bienvenida.jugar': 'Jugar',
   'bienvenida.opciones': 'Opciones',
   'pesista.titulo': '{nombre}, elige tu pesista',
+  'pesista.nuevo': '(nuevo)',      // marca de los modelos nuevos en la selección de pesista (pedido del dueño, 17-nov)
   'pesista.ventura.tipo': 'Compacto', 'pesista.ventura.alto': '1,70 m', 'pesista.ventura.txt': 'Perdona si tocas un poco a destiempo.',
   'pesista.brenner.tipo': 'Largo', 'pesista.brenner.alto': '1,83 m', 'pesista.brenner.txt': 'Se cansa poco y crece bajo presión.',
   'pesista.marangi.tipo': 'Potente', 'pesista.marangi.alto': '1,83 m', 'pesista.marangi.txt': 'Muy fuerte, pero pide precisión y se cansa rápido.',
@@ -105,6 +106,9 @@ export default {
   'opciones.cam.jurado': 'Jurado',
   'opciones.cam.lateral': 'Lateral',
   'opciones.cam.baja': 'Baja',
+  'opciones.cam.pov': 'Primera persona',
+  'opciones.recuadro_si': 'Con recuadro',
+  'opciones.recuadro_no': 'Sin recuadro',
   'opciones.sonido': 'Sonido',
   'opciones.sonido_si': 'Con sonido',
   'opciones.sonido_no': 'Sin sonido',

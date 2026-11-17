@@ -32,6 +32,8 @@ import { leerDatos } from '../web/js/sim/data.js';
 import { recalcular, resumen } from '../web/js/sim/replay.js';
 import ES from '../web/js/game/i18n/es.js';
 import EN from '../web/js/game/i18n/en.js';
+// modelos que el juego carga sin `?plantel=`: los clásicos si PLANTEL_DEFECTO es 'clasico', si no la terna nueva (web/js/game/roster.js)
+const MODELOS_DEFECTO = /PLANTEL_DEFECTO = 'clasico'/.test((await import('node:fs')).readFileSync(new URL('../web/js/game/roster.js', import.meta.url), 'utf8')) ? 'brenner,ventura' : 'ilarraz,jastrev,kordan';
 /** Señales de un toque (la libre de siempre y las de 'u': ¡SALTA!, ¡PÁRATE!, ¡DA TODO!): un toque y la señal se va. */
 const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
@@ -180,12 +182,15 @@ async function corrida(via) {
               // LIF-31 y LIF-43: el estilo de envión se elige en el primer dos tiempos con un solo botón (sin abrir opciones) y
               // después queda fijo, con candado y sin botones para cambiarlo
               if (o.envion && /Dos tiempos/.test(llamado)) {
-                const E0 = await J(() => ({ fijo: !!document.querySelector('#capa .pn-estilo.fijo'), boton: !!document.querySelector('#capa #btn-estilo'), opciones: document.querySelectorAll('#capa .envion').length, txt: (document.querySelector('#capa .pn-estilo')?.textContent || '').replace(/\s+/g, ' ').trim() }));
+                const E0 = await J(() => ({ fijo: !!document.querySelector('#capa .pn-estilo.fijo'), boton: !!document.querySelector('#capa #btn-estilo'), opciones: document.querySelectorAll('#capa .envion').length, marcado: document.querySelector('#capa .envion[aria-pressed=true]')?.dataset.env || null, txt: (document.querySelector('#capa .pn-estilo')?.textContent || '').replace(/\s+/g, ' ').trim() }));
                 if (/intento 1/.test(llamado)) {
                   const quiere = o.envion(llamado);
-                  if (E0.fijo || !E0.boton || E0.opciones) mal(`primer dos tiempos: el estilo de envión no está en un solo botón para elegir (${JSON.stringify(E0)})`);
-                  if (!E0.txt.includes(`${ES['jerk.titulo']} ${ES['envion.split']}`)) mal(`el botón del estilo no dice «${ES['jerk.titulo']} ${ES['envion.split']}» (lo que propone el entrenador): «${E0.txt}»`);
-                  await pulsa('#btn-estilo'); const n3 = await J(() => document.querySelectorAll('#capa .envion').length); if (n3 !== 3) mal(`al tocar el estilo no aparecieron los tres (${n3})`);
+                  // 17-nov: los tres estilos van a la vista como segmentos (el split, recomendado, primero y marcado); solo en el
+                  // teléfono acostado sigue el botón único que los abre
+                  if (E0.fijo || (E0.boton ? E0.opciones !== 0 : E0.opciones !== 3)) mal(`primer dos tiempos: el estilo de envión no está a la vista para elegir (${JSON.stringify(E0)})`);
+                  if (E0.boton) { if (!E0.txt.includes(`${ES['jerk.titulo']} ${ES['envion.split']}`)) mal(`el botón del estilo no dice «${ES['jerk.titulo']} ${ES['envion.split']}» (lo que propone el entrenador): «${E0.txt}»`); await pulsa('#btn-estilo'); }
+                  else if (E0.marcado !== 'split' || !E0.txt.includes(ES['jerk.titulo'])) mal(`los tres estilos a la vista no traen marcado el split (lo que propone el entrenador): ${JSON.stringify(E0)}`);
+                  const n3 = await J(() => [...document.querySelectorAll('#capa .envion')].map(b => b.dataset.env).join()); if (n3 !== 'split,power,squat') mal(`los tres estilos no están a la vista con el split primero (${n3})`);
                   if (!await pulsa(`.envion[data-env="${quiere}"]`)) mal(`no se pudo elegir el estilo ${quiere}`);
                   const d = await J(() => ({ foco: document.activeElement?.id, txt: (document.querySelector('#capa .pn-estilo')?.textContent || '').replace(/\s+/g, ' ').trim() }));
                   if (d.foco !== 'btn-confirmar') mal(`después de elegir el estilo el foco quedó en «${d.foco}» y no en levantar`);
@@ -254,7 +259,8 @@ async function corrida(via) {
     const n1 = await J(() => ({ plano: JUEGO.escena.plano?.key || null, luces: [...document.getElementById('luces').children].map(el => el.className).join(',') }));
     console.log(`${tag} nulo propio: ${n0.ultimo?.res}:${n0.ultimo?.causa} · cámara al empezar el veredicto «${n0.plano}», 1,8 s después «${n1.plano}» · luces ${n1.luces}`);
     if (n0.n !== 2 || n0.ultimo?.res !== 'nulo') mal(`no se pudo forzar un NULO propio en la práctica: ${JSON.stringify(n0.ultimo)}`);
-    else if (n0.plano !== 'jurado' || n1.plano !== 'jurado') mal(`con un NULO propio la cámara no fue al jurado (${n0.plano} → ${n1.plano})`);
+    // pedido del dueño (16-nov): al terminar no hay movimiento de cámara: ni vista del jurado ni otro plano
+    else if (n0.plano !== n1.plano || n1.plano === 'jurado' || n1.plano === 'caida') mal(`con un NULO propio la cámara cambió de plano (${n0.plano} → ${n1.plano}): tiene que quedar quieta`);
     if (!/r/.test(n1.luces)) mal(`en el NULO no se prendió ninguna luz roja (${n1.luces})`);
     await cerrar(); return;
   }
@@ -297,8 +303,11 @@ async function corrida(via) {
   if (!await pulsa('.cam[data-cam="jurado"]')) mal('Opciones no tiene la fila de cámara');
   else {
     const c = await J(() => ({ g: localStorage.getItem('tarima.camara'), ev: (JUEGO.eventos || []).filter(e => e.ev === 'camara_elegida').at(-1)?.props, n: document.querySelectorAll('#capa .cam').length, on: document.querySelector('#capa .cam[aria-pressed=true]')?.dataset.cam }));
-    if (c.g !== 'jurado' || c.ev?.vista !== 'jurado' || c.ev?.via !== 'opciones' || c.n !== 4 || c.on !== 'jurado') mal(`la cámara elegida en Opciones no quedó: ${JSON.stringify(c)}`);
+    if (c.g !== 'jurado' || c.ev?.vista !== 'jurado' || c.ev?.via !== 'opciones' || c.n !== 5 || c.on !== 'jurado') mal(`la cámara elegida en Opciones no quedó: ${JSON.stringify(c)}`);
     await foto('opciones_camara');
+    // la primera persona (pedido del dueño): está en la fila, queda guardada y deja el evento
+    if (!await pulsa('.cam[data-cam="pov"]')) mal('Opciones no tiene la primera persona');
+    else { const p = await J(() => ({ g: localStorage.getItem('tarima.camara'), ev: (JUEGO.eventos || []).filter(e => e.ev === 'camara_elegida').at(-1)?.props })); if (p.g !== 'pov' || p.ev?.vista !== 'pov') mal(`la primera persona no quedó elegida: ${JSON.stringify(p)}`); }
     if (!await pulsa('.cam[data-cam="3/4"]') || await J(() => localStorage.getItem('tarima.camara')) !== '3/4') mal('no se pudo volver a la cámara general');
   }
   // el estilo se elige en el primer dos tiempos y queda para los tres (LIF-43): con teclado, power (no el que propone el entrenador)
@@ -328,7 +337,7 @@ async function corrida(via) {
   for (const e of ['tarjeta', 'tutorial', 'guiado', 'repeticion']) if (r.visitados.includes(e)) mal(`en 'u' no tiene que aparecer «${e}» (sin tutorial aparte ni repetición propia)`);
   const rc = recalcular(r.registro, datos);
   if (!rc.ok) mal(`el registro exportado no recalcula: ${rc.error}`); else if (resumen(rc.tabla) !== r.tabla) mal(`recalculado «${resumen(rc.tabla)}», en pantalla «${r.tabla}»`);
-  if (r.modelos !== 'brenner,ventura') mal(`modelos en memoria: ${r.modelos}`);
+  if (r.modelos !== MODELOS_DEFECTO) mal(`modelos en memoria: ${r.modelos}`);
   if (!(r.monitor.cuadros > 500)) mal(`el monitor de la barra casi no midió (${r.monitor.cuadros} cuadros)`);
   if (r.monitor.barraMin < .2249) mal(`la barra quedó bajo la tarima: centro a ${(r.monitor.barraMin * 1000).toFixed(1)} mm`);
   if (r.monitor.manosMax > .16) mal(`la barra se separó de las manos: ${(r.monitor.manosMax * 1000).toFixed(0)} mm`);

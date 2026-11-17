@@ -3,7 +3,10 @@ sys.path.insert(0,os.path.dirname(os.path.abspath(__file__))); from common impor
 from mathutils import Vector
 R=int(os.environ.get('TARIMA_TEX','4096'))   # resolución de horneado (posición, máscaras, AO, normal de objeto)
 import body
+from style import STYLES
 NAME=sys.argv[1]; OUT=out_dir(NAME)
+# corte de la malla (escote y sisa): los pesistas del plantel paramétrico lo traen en su estilo, en m para 1,69 m; los dos originales usan el de siempre
+STY=STYLES[NAME]; KM=STY['H']/1.687 if 'escote' in STY else 1.; ESC=STY.get('escote',(.085,.19)); SIS=STY.get('sisa',(.118,.2))
 boot()
 b,rig=body.build(NAME)
 me=b.data
@@ -46,11 +49,12 @@ hemz=knee.z+.42*(hip.z-knee.z)
 def masks(x,y,z,F,soft):
     axo=np.abs(x); E=soft
     front=y<neck.y
-    scoop=np.where(front,np.sqrt((x/.085)**2+((z-(neck.z+.03))/.19)**2),np.sqrt((x/.075)**2+((z-(neck.z+.03))/.1)**2))
-    arm=np.sqrt(((axo-(sh.x+.03))/(sh.x+.03-.118))**2+((z-(sh.z+.04))/.2)**2)
+    scoop=np.where(front,np.sqrt((x/(ESC[0]*KM))**2+((z-(neck.z+.03*KM))/(ESC[1]*KM))**2),np.sqrt((x/(.075*KM))**2+((z-(neck.z+.03*KM))/(.1*KM))**2))
+    arm=np.sqrt(((axo-(sh.x+.03*KM))/(sh.x+.03*KM-SIS[0]*KM))**2+((z-(sh.z+.04*KM))/(SIS[1]*KM))**2)
     suit=np.maximum(F['torso']*sm(1-E,1+E,scoop)*sm(1-E,1+E,arm)*sm(neck.z+.03,neck.z+.02,z),F['thigh']*sm(hemz-E*.1,hemz+E*.1,z))
-    slv=F['leg']*sm(knee.z-.112-E*.1,knee.z-.112+E*.1,z)*sm(knee.z+.102+E*.1,knee.z+.102-E*.1,z)
-    sock=F['low']*sm(ank.z+.132+E*.1,ank.z+.132-E*.1,z)
+    zq=knee.z+(z-knee.z)/KM; zs=ank.z+(z-ank.z)/KM     # rodilleras y medias a la escala del pesista
+    slv=F['leg']*sm(knee.z-.112-E*.1,knee.z-.112+E*.1,zq)*sm(knee.z+.102+E*.1,knee.z+.102-E*.1,zq)
+    sock=F['low']*sm(ank.z+.132+E*.1,ank.z+.132-E*.1,zs)
     wrap=np.zeros_like(x)
     for side,fl in (('Left',F['farmL']),('Right',F['farmR'])):
         a=np.array(P(side+'ForeArm')); w=np.array(P(side+'Hand')); d=w-a; L=np.linalg.norm(d); d/=L
@@ -58,6 +62,32 @@ def masks(x,y,z,F,soft):
         wrap=np.maximum(wrap,fl*sm(.75-E*.3,.75+E*.3,t)*sm(1.1,1.08,t))
     return suit,slv,sock,wrap
 suit,slv,sock,wrap=masks(x,y,z,F,.06)
+if True:
+    FEM=STY.get('genero')=='F'; LEG=not STY.get('genero') or 'esclera' not in STY     # los dos originales (estilo legado) no se tocan
+    # Busto bajo la malla: el top deportivo lo contiene y lo alisa. Suavizado laplaciano del frente del pecho cubierto por la tela (quita la punta, baja algo el volumen).
+    E_=np.empty(len(me.edges)*2,dtype=np.int64); me.edges.foreach_get('vertices',E_); E_=E_.reshape(-1,2); dg_=np.maximum(np.bincount(E_.ravel(),minlength=N),1)[:,None]
+    # Ronda 1 del director de arte: seguían las puntas. La zona baja más (el busto de la pesada queda bajo), más pasadas; en el hombre, pocas pasadas (solo la punta del pectoral).
+    AN_=STY.get('fisico')=='anatomico'     # físico anatómico: el alisado va solo sobre el pecho. Hasta la cadera (0,72 bajo el hombro) y con 36 pasadas encogía el frente del tronco, la cadera y el muslo alto de la malla base (la sonda, que no pasa por acá, medía muslo 0,41 H y el GLB 0,35 H)
+    wb=(suit*sm(sh.z-(.40 if AN_ else .72)*KM,sh.z-(.30 if AN_ else .62)*KM,z)*sm(sh.z-.03*KM,sh.z-.09*KM,z)*(y<neck.y)*(0 if LEG else 1))[:,None]; c2=co.copy()
+    for _ in range((45 if FEM else 8) if AN_ else 45 if FEM else 36):     # PENDIENTE (bloqueante de la ronda 2): con 45 y con 140 pasadas (corrida 43944903931, 47 mm de desplazamiento) sigue un bulto en punta bajo la malla de solanet, que con la luz dura echa una sombra negra redonda; no es textura (la oclusión bajo la malla ya va suavizada en tex.py). Mirar el borde de la zona `wb` y lo que viene después (subdivide, garments)
+        A_=np.zeros_like(c2); np.add.at(A_,E_[:,0],c2[E_[:,1]]); np.add.at(A_,E_[:,1],c2[E_[:,0]]); c2=c2*(1-.65*wb)+A_/dg_*(.65*wb)
+    # Puntas del pecho (areola y pezón de la malla base): bajo la malla se leían como dos puntos marcados, en hombres y mujeres (bloqueante de contenido).
+    # Se ubican por geometría (el bulto más angosto del frente del pecho de cada lado: lo que sobresale de una copia muy alisada) y en un radio de
+    # 4,5 cm la superficie se reemplaza por la membrana que interpola el borde (laplaciano con el borde fijo, hasta converger).
+    if not LEG and not AN_:     # (en el anatómico la «punta» que encontraba esta búsqueda estaba en la ingle; la del pecho la saca geo.chest_smooth)
+        no_=np.empty(N*3); me.vertices.foreach_get('normal',no_); no_=no_.reshape(N,3); s_=c2.copy()
+        zona=(suit>.5)&(no_[:,1]<-.25)&(z<sh.z-.05*KM)&(z>sh.z-.74*KM)&(axo>.035*KM)&(axo<.26*KM)
+        for _ in range(40):
+            A_=np.zeros_like(s_); np.add.at(A_,E_[:,0],s_[E_[:,1]]); np.add.at(A_,E_[:,1],s_[E_[:,0]]); s_=np.where(zona[:,None],A_/dg_,s_)
+        sale=((c2-s_)*no_).sum(1)*zona; RN=.045*KM
+        for sgn,lado in ((1,'L'),(-1,'R')):
+            m_=zona&(c2[:,0]*sgn>0)
+            if not m_.any(): continue
+            i_=int(np.argmax(np.where(m_,sale,-1))); cn=c2[i_].copy(); d_=np.linalg.norm(c2-cn,axis=1); w_=sm(RN,RN*.72,d_)[:,None]; antes_=c2.copy()
+            for _ in range(500):
+                A_=np.zeros_like(c2); np.add.at(A_,E_[:,0],c2[E_[:,1]]); np.add.at(A_,E_[:,1],c2[E_[:,0]]); c2=c2*(1-w_)+A_/dg_*w_
+            print(f'PUNTA {NAME} {lado}: en ({cn[0]:+.3f},{cn[1]:+.3f},{cn[2]:.3f}), sobresalía {sale[i_]*1000:.1f} mm; membrana de {int((w_[:,0]>0).sum())} vértices, desplazamiento máx {np.linalg.norm(c2-antes_,axis=1).max()*1000:.1f} mm')
+    print(f'BUSTO {NAME}: alisado bajo la malla, {int((wb[:,0]>.05).sum())} vértices, desplazamiento máx {np.linalg.norm(c2-co,axis=1).max()*1000:.1f} mm'); co=c2; x,y,z=co.T; axo=np.abs(x)
 disp=np.maximum.reduce([suit*.0015,slv*.0045,sock*.003,wrap*.0025,F['scalp']*.003])
 me.vertices.foreach_set('co',(co+no*disp[:,None]).ravel()); me.update()
 for p in me.polygons: p.use_smooth=True
@@ -95,6 +125,12 @@ maps['AO']=u8(bake(kind='AO',samples=int(os.environ.get('TARIMA_AO','64')))[:,:,
 nt.links.new(df.outputs[0],out.inputs['Surface']); sc.cycles.samples=1; sc.render.bake.normal_space='OBJECT'; bpy.ops.object.bake(type='NORMAL')   # normal de objeto (para tex.py: palma/dorso, caras hacia arriba)
 a=np.empty(R*R*4,dtype=np.float32); bimg.pixels.foreach_get(a); maps['NO']=u8(a.reshape(R,R,4)[:,:,:3])
 np.savez(OUT+'maps.npz',**maps); print('MAPS',R,{k:(v.dtype.name,v.shape) for k,v in maps.items()})
+if STY.get('fisico')=='anatomico':
+    # centro de la punta del pecho (racimo de polígonos diminutos de la malla base, por densidad, como geo.chest_smooth): tex.py apaga ahí relieve, oclusión y sombra
+    el_=np.linalg.norm(co[E_[:,0]]-co[E_[:,1]],axis=1); ml_=np.zeros(N); np.add.at(ml_,E_[:,0],el_); np.add.at(ml_,E_[:,1],el_); ml_/=dg_[:,0]
+    for sgn_,k_ in ((1,'nipL'),(-1,'nipR')):
+        c_=(suit>.5)&(no[:,1]<-.15)&(co[:,0]*sgn_>.03*KM)&(co[:,2]<sh.z-.05*KM)&(co[:,2]>sh.z-.30*KM)&(np.abs(co[:,0])<.22*KM)
+        if c_.any(): LM[k_]=co[int(np.argmin(np.where(c_,ml_,9.)))].copy(); print(f'PUNTA {NAME} {k_}: centro para la textura en',np.round(LM[k_],3),flush=True)
 import json; json.dump({k:[float(u) for u in np.ravel(v)] for k,v in LM.items()},open(OUT+'lm.json','w'))
 json.dump(dict(hip=list(hip),knee=list(knee),ank=list(ank),sh=list(sh),neck=list(neck),hemz=hemz,arms={s:[list(P(s+'ForeArm')),list(P(s+'Hand')),list(P(s+'Arm'))] for s in ('Left','Right')}),open(OUT+'bones.json','w'))
 bpy.data.objects.remove(bk); b.hide_render=False; me.materials.clear()

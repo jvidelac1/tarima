@@ -21,7 +21,10 @@ export const RITMO = {
   // `porHueco` turnos enteros entre dos levantamientos propios: el siguiente decisivo va resumido (la espera no pasa de 20 s)
   decisivo: { antes: 1000, rapido: 5, rep: 2.3, veredicto: 2.6, porHueco: 1 },
   rival: { antes: 1200, rapido: 4, veredicto: 2.2, rep: 1.8, saltado: .8 },
-  fundido: { fuera: 120, dentro: 200 },
+  // 17-nov (pedido del dueño: «transiciones suaves entre cambio de pesistas»): 120 + 200 ms se sentía un corte con parpadeo;
+  // con 150 ms para irse (acelerando) y 280 ms para volver (frenando) el cambio se lee como un fundido y suma 0,11 s por
+  // turno (con 180 + 300 el turno más largo de un rival quedaba justo en el tope de 12 s de ritmo_test)
+  fundido: { fuera: 150, dentro: 280 },
 };
 /** Tecla del botón «Saltar» del turno de un rival (Espacio y los toques en la escena ya no saltean nada de los rivales). */
 export const TECLA_SALTAR = 's';

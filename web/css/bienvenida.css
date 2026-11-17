@@ -19,6 +19,12 @@ button.link{background:none;border:none;color:var(--teal);text-decoration:underl
 button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px}
 .panel .opciones{border-left:3px solid var(--line);padding-left:.7em}
 .panel .opciones .fila>span{min-width:5.5em;color:var(--mute);font-family:var(--display);text-transform:uppercase;letter-spacing:.06em}
+/* el nivel a la vista en la bienvenida (17-nov): tres segmentos iguales, el elegido lleno, y debajo su línea de siempre */
+.panel .bv-nivel{display:grid;grid-template-columns:auto repeat(3,minmax(0,1fr));align-items:center;gap:4px 6px;max-width:30em;margin:.7em 0 .4em}
+.panel .bv-nivel>span{color:var(--mute);font-family:var(--display);text-transform:uppercase;letter-spacing:.06em;font-size:clamp(12px,1.9cqh,15px);padding-right:.2em}
+.panel .bv-nivel>.nota{grid-column:1/-1;margin:0}
+.panel .bv-nivel>button{padding:.3em .2em;min-height:46px;font-size:clamp(13px,2cqh,16px)}
+.panel .bv-nivel>button[aria-pressed=true]{box-shadow:inset 0 -3px 0 var(--teal)}
 .panel .legal{margin-left:auto}
 .panel .legal a{color:var(--mute);text-underline-offset:3px;padding:.4em 0;display:inline-block}
 .pesistas.rivales{grid-template-columns:repeat(2,1fr)}
@@ -45,6 +51,7 @@ button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px
   .panel.bienvenida>.bv-cuerpo>#pesista-t{grid-column:2;grid-row:1}
   .panel.bienvenida>.bv-cuerpo>.pesistas{grid-column:2;grid-row:2/span 4;align-self:start;margin-top:0}
   .panel.bienvenida>.bv-cuerpo>.fila,.panel.bienvenida>.bv-cuerpo>.opciones{grid-column:1/-1}
+  .panel.bienvenida>.bv-cuerpo>.fila.bv-nivel{grid-column:1;margin:.3em 0 .2em}
   .panel.gana{max-width:min(96cqw,760px)}
   .panel.gana .reglas{margin:.2em 0;line-height:1.4}
   .pesistas.rivales .pesista{padding:.35em .5em}
@@ -64,6 +71,7 @@ button.grande{font-size:clamp(17px,3cqh,24px);padding:.5em 1.6em;min-height:52px
   :where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo>#pesista-t{grid-column:2;grid-row:1}
   :where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo>.pesistas{grid-column:2;grid-row:2/span 4;align-self:start;margin-top:0}
   :where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo>.fila,:where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo>.opciones{grid-column:1/-1}
+  :where(html.horiz.bajo) .panel.bienvenida>.bv-cuerpo>.fila.bv-nivel{grid-column:1;margin:.3em 0 .2em}
   :where(html.horiz.bajo) .panel.gana{max-width:min(96cqw,760px)}
   :where(html.horiz.bajo) .panel.gana .reglas{margin:.2em 0;line-height:1.4}
   :where(html.horiz.bajo) .pesistas.rivales .pesista{padding:.35em .5em}
@@ -182,3 +190,53 @@ fieldset.pregunta legend{font-family:var(--display);font-weight:700;text-transfo
 .panel .pie a.legal{margin-left:0;color:var(--mute);font-size:clamp(11px,1.6cqh,13px);text-underline-offset:3px;padding:.4em 0}
 /* en la bienvenida no van el título del evento ni el reloj (el panel lo dice todo) */
 html[data-pantalla=inicio] :is(.bug,.relojbox){display:none}
+/* Selección de pesista (main.js, elegirPesista): el panel a un costado (teléfono parado: abajo, a lo ancho) y el pesista en
+   3D en lo que queda libre. #el-zona es esa parte libre: ahí se arrastra para girarlo. Sin título del evento ni reloj. */
+html[data-pantalla=elegir] :is(.bug,.relojbox){display:none}
+#el-zona{position:absolute;inset:0;pointer-events:auto;touch-action:none;cursor:grab}
+#el-zona:active{cursor:grabbing}
+.panel.elegir{position:relative;z-index:1;align-self:center;margin-left:auto;margin-right:calc(var(--u)*1.2);max-width:min(42cqw,400px);background:rgba(8,13,30,.9)}
+.panel.elegir .pesistas{margin:.3em 0 .5em}
+.panel.elegir .pesista{padding:.4em .5em}
+.panel.elegir .pesista .b{height:.5em;margin-bottom:.35em}
+.panel.elegir .pesista b{font-size:1em;overflow-wrap:anywhere}
+.el-ficha{display:grid;gap:.2em;margin:.4em 0}
+.el-ficha .el-nombre{font-family:var(--display);font-weight:800;text-transform:uppercase;font-size:clamp(18px,3.8cqh,30px);line-height:1.05;letter-spacing:.02em;color:var(--ink)}
+.el-ficha .el-pais{display:flex;align-items:center;gap:.5em;color:var(--mute);font-size:clamp(12px,1.9cqh,15px)}
+.el-ficha .el-pais i{display:inline-block;width:1.7em;height:1.1em;flex:none}
+.el-ficha .el-datos{display:flex;align-items:baseline;gap:.6em;font-size:clamp(13px,2.2cqh,18px);color:var(--ink)}
+.el-ficha .el-datos em{font-style:normal;font-family:var(--display);font-weight:700;border:1px solid var(--teal);color:var(--teal);padding:0 .45em;letter-spacing:.04em;white-space:nowrap}
+.el-ficha small{display:block;color:var(--mute);font-size:clamp(11px,1.8cqh,14px);line-height:1.3}
+.el-ficha small.conviene{color:var(--ink);opacity:.85;margin-top:.2em}
+.el-ficha small.rm{color:var(--gold)}
+.el-ver{display:flex;gap:8px;align-items:center;margin-top:.6em}
+.el-ver button{display:inline-flex;align-items:center;justify-content:center;min-width:48px;padding:.25em .6em}
+.el-ver button.ir{margin-left:auto;min-width:6.5em}
+.el-ver svg{width:24px;height:24px;display:block}
+.el-ver #el-der svg{transform:scaleX(-1)}
+html.vert .panel.elegir{margin:0;align-self:flex-end;background:rgba(8,13,30,.94)}
+html.vert .el-ficha .el-nombre{font-size:clamp(20px,6.2vw,26px)}
+html.vert .el-ficha .el-pais,html.vert .el-ficha small{font-size:13px}
+html.vert .el-ficha .el-datos{font-size:15px}
+:where(html.horiz.bajo) .panel.elegir{max-width:min(44cqw,380px);margin-right:0;padding:8px 10px}
+:where(html.horiz.bajo) .panel.elegir h2{font-size:13px;margin:0 0 .2em}
+:where(html.horiz.bajo) .panel.elegir .pesistas{margin:.2em 0 .3em}
+:where(html.horiz.bajo) .panel.elegir .pesista{padding:.25em .45em;min-height:40px}
+:where(html.horiz.bajo) .panel.elegir .pesista .b{display:none}
+:where(html.horiz.bajo) .el-ficha{gap:.1em;margin:.25em 0}
+:where(html.horiz.bajo) .el-ficha .el-nombre{font-size:19px}
+:where(html.horiz.bajo) .el-ficha .el-pais,:where(html.horiz.bajo) .el-ficha small{font-size:11.5px;line-height:1.25}
+:where(html.horiz.bajo) .el-ficha .el-datos{font-size:13px}
+:where(html.horiz.bajo) .el-ver{margin-top:.35em}
+:where(html.horiz.bajo) .el-ver button{min-height:40px}
+/* aspectos de la plaza (el modelo de siempre y los nuevos, con la marca «(nuevo)») y el aviso mientras baja un modelo */
+.el-aspectos{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 .4em}
+.el-aspectos[hidden]{display:none}
+.el-aspectos button{flex:1 1 0;min-height:40px;padding:.2em .5em;font-size:clamp(12px,1.9cqh,15px);text-transform:none;letter-spacing:.02em;white-space:nowrap}
+.el-nuevo{color:var(--gold);font-size:.72em;font-weight:700;letter-spacing:.04em;text-transform:none;white-space:nowrap}
+.el-bajando{display:none;margin:0 0 .3em!important;color:var(--gold)!important}
+.panel.elegir.bajando .el-bajando{display:block;animation:el-late 1s ease-in-out infinite alternate}
+@keyframes el-late{from{opacity:.45}to{opacity:1}}
+html.vert .el-aspectos button{font-size:14px}
+:where(html.horiz.bajo) .el-aspectos{gap:5px;margin:0 0 .25em}
+:where(html.horiz.bajo) .el-aspectos button{min-height:36px;font-size:12.5px}

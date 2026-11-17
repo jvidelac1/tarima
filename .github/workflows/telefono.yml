@@ -5,7 +5,7 @@ name: Teléfono (táctil, de costado y parado)
 
 on:
   push:
-    branches: [main, mvp, telefono-pulido, gameplay, tablero, primera-vez, graficos, panel, graficos2, aprender, look, vertical]
+    branches: [main, mvp, telefono-pulido, gameplay, tablero, primera-vez, graficos, panel, graficos2, aprender, look, vertical, visual, pov]
     paths:
       - 'web/js/game/telefono.js'
       - 'web/js/game/audio.js'
@@ -74,6 +74,10 @@ jobs:
         if: ${{ !cancelled() }}
         timeout-minutes: 25
         run: node tools/check_telefono.mjs ${{ inputs.solo && format('--solo={0}', inputs.solo) || '' }} 2>&1 | tee out/logs/check_telefono.log
+      - name: Selección de pesista en 3D (check_telefono --solo=seleccion)
+        if: ${{ !cancelled() && !inputs.solo }}
+        timeout-minutes: 35
+        run: node tools/check_telefono.mjs --solo=seleccion --capturas=out/seleccion 2>&1 | tee out/logs/check_seleccion.log
       - name: iPhone acostado, Safari y Chrome de iOS (check_iphone)
         if: ${{ !cancelled() && !inputs.solo }}
         timeout-minutes: 15
@@ -91,7 +95,7 @@ jobs:
         run: |
           {
             echo "### Teléfono (dibujo por software)"
-            for f in check_telefono check_iphone check_toques check_game_tactil; do
+            for f in check_telefono check_seleccion check_iphone check_toques check_game_tactil; do
               echo; echo "**$f**"; echo '```'
               if [ -f "out/logs/$f.log" ]; then tail -n 40 "out/logs/$f.log"; else echo "(no corrió)"; fi
               echo '```'

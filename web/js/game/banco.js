@@ -133,21 +133,34 @@ async function fotosNiveles(B, { escena, cargas, params, msg, decir }) {
   decir('cargando los modelos'); await Promise.all(cargas);
   const id = PLANTEL[params.get('pesista')] ? params.get('pesista') : 'brenner';
   await escena.mostrar(id); escena.setCarga(140, 's'); msg.hidden = true;
-  escena.arena.setBoard({ name: id, country: 'NVK', kg: 140, attempt: 2, lift: 'Arranque', intento: 'Intento 2' });
+  escena.arena.setBoard({ name: PLANTEL[id].corto || id, country: PLANTEL[id].codigo || 'NVK', kg: 140, attempt: 2, lift: 'Arranque', intento: 'Intento 2' });
   const niveles = (params.get('niveles') || 'movil,baja,media,alta,ultra').split(',').map(x => x.trim()).filter(k => PRESET[k]), fin = tramo(escena.P, 'snatch').fin - .05;
   const tomas = [
     { n: '3-4', c: '3/4', t: 1.3, luces: null }, { n: 'frontal', c: 'baja', t: 1.3, luces: null }, { n: 'lado', c: 'lado', t: fin, luces: null },
     { n: 'jurado-vale', c: 'jurado', t: fin, luces: [true, true, true] }, { n: 'jurado-nulo', c: 'jurado', t: fin, luces: [false, true, false] }, { n: 'reversa-vale', c: 'rev', t: fin, luces: [true, true, true] },
+    { n: 'medio', c: 'medio', t: fin, luces: null }, { n: 'torso', c: 'torso', t: fin, luces: null }, { n: 'cara', c: 'cara', t: fin, luces: null }, { n: 'medio-salida', c: 'medio', t: 1.3, luces: null },
+    { n: 'parado', c: '3/4', t: 0, luces: null }, { n: 'parado-frente', c: 'baja', t: 0, luces: null }, { n: 'parado-espalda', c: 'rev', t: 0, luces: null }, { n: 'arriba-frente', c: 'baja', t: fin, luces: null }, { n: 'arriba-espalda', c: 'rev', t: fin, luces: null },      // brazos arriba a cuerpo entero (de perfil ya está «lado»): hombros, cuello y axila
     { n: 'jueces-vale', c: 'jueces', t: fin, luces: [true, true, true] }, { n: 'jueces-nulo', c: 'jueces', t: fin, luces: [false, true, false] },
   ];
-  const lista = niveles.flatMap(q => tomas.map(x => ({ ...x, q, nombre: `${q}_${x.n}` }))); let puesta = null;
+  // Hoja de posiciones (?tomas=posiciones): las doce viñetas de las láminas de referencia del dueño, con las mismas vistas, a cuerpo entero:
+  // arranque s1 inicio (perfil), s2 tirón (3/4), s3 extensión (3/4), s4 recepción (frente), s5 recepción (perfil), s6 fijación (espalda 3/4);
+  // dos tiempos c1 inicio (3/4), c2 cargada (perfil), c3 rack (espalda 3/4), c4 dip (3/4), c5 tijera / c5p power / c5q squat jerk (perfil), c6 fijación (espalda 3/4).
+  // `seg` y `fase` posan esa fase de ese segmento del clip (no el bucle del arranque). tools/hoja_posiciones.py arma la hoja junto a la lámina.
+  const P_ = (n, seg, fase, c) => ({ n: 'pos-' + n, c, seg, fase, luces: null, pos: true });
+  const posiciones = [P_('s1', 'snatch', 'Salida', 'lado'), P_('s2', 'snatch', 'Primer tirón', '3/4'), P_('s3', 'snatch', 'Triple extensión', '3/4'), P_('s4', 'snatch', 'Recepción', 'baja'), P_('s5', 'snatch', 'Recepción', 'lado'), P_('s6', 'snatch', 'Recuperación', 'rev'),
+    P_('c1', 'clean', 'Salida', '3/4'), P_('c2', 'clean', 'Amortiguación', 'lado'), P_('c3', 'clean', 'Recuperación', 'rev'), P_('c4', 'split', 'Envión · Dip', '3/4'), P_('c5', 'split', 'Envión · Tijera', 'lado'),
+    P_('c5p', 'power', 'Power jerk · Recepción', 'lado'), P_('c5q', 'squat', 'Squat jerk · Fondo', 'lado'), P_('c6', 'split', 'Envión · Final', 'rev')];
+  const cuales = (params.get('tomas') || '').split(',').filter(Boolean), elegidas = cuales.length ? [...tomas, ...posiciones].filter(x => cuales.includes(x.n) || (x.pos && cuales.includes('posiciones'))) : tomas;      // ?tomas=medio,cara: solo esas
+  const lista = niveles.flatMap(q => elegidas.map(x => ({ ...x, q, nombre: `${q}_${x.n}` }))); let puesta = null;
   window.BANCO_FOTOS = {
     lista, listo: true, opacidadSombra: null, opacidadCruda: null,
     async poner(i) {
       const f = lista[i];
       if (puesta !== f.q) { decir(`compilando ${f.q}`); escena.setCalidad(PRESET[f.q]); await escena.precalentar(); puesta = f.q; }
       escena.arena.setDecision(f.luces); escena.camara(f.c);
-      escena.setTope(escena.nativoMP * 1e6); escena.bucle(f.t, 0); escena.sombra = 4;
+      escena.setTope(escena.nativoMP * 1e6);
+      if (f.seg) { const G = tramo(escena.P, f.seg); escena.posar({ seg: G.nombre, s: G.i(f.fase), tau: G.t(f.fase), base: G.base, primero: false }, f.seg === 'snatch' ? 's' : 'c', 0); } else escena.bucle(f.t, 0);
+      escena.sombra = 4;
       for (let k = 0; k < 4; k++) escena.cuadro(k ? .016 : 5, true);
       return f.nombre;
     },
