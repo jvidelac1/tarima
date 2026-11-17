@@ -417,11 +417,16 @@ def body(NAME,OUT,STY,K,FONT,R=None,log=print):
     cont=np.clip(blur(cloth,4.5*S)-cloth,0,1)*2.*(1-cloth)*(1-hairm); col*=1-.42*np.clip(cont,0,1)[:,:,None]      # sombra de contacto: la prenda tiene espesor
     edge=blur(cloth,1.2*S)                                                            # borde de prenda apenas biselado
     am=np.clip((1-cloth)+suit*STY.get('ceñido',.5)+slv*.25+sock*.4-wrapm,0,1)*(1-hairm)                  # cuánto del relieve muscular deja ver cada prenda
+    # zona de las puntas del pecho (make.py la alisó en la malla y dejó su centro en lm.json): sin relieve muscular propio, sin oclusión ni sombra
+    gn=np.zeros((R,R),f32)
+    if 'nipL' in LM: gn=np.clip(np.maximum(T.g(LM['nipL'],.04*K),T.g(LM['nipR'],.04*K) if 'nipR' in LM else 0)*1.6,0,1)
+    anatH=anatH*(1-gn)
     H=skinH*(1-cloth)+lipH+(thick+H)*edge+hairH+chalkH+dp*.00013+anatH*am
     del skinH,lipH,hairH,chalkH
     nrm=normal_from_height(H,T.su,T.sv,T.ok)
     cavA=np.clip(1+anatC*am*(115/K),.70,1.05); del anatC                              # los surcos entre grupos musculares oscurecen (son anchos: el pasa-altos de 3 px no los ve)
     aoS=T.ao*(1-suit)+blur(T.ao,22*S)*suit
+    aoS=aoS*(1-gn)+np.maximum(aoS,.97)*gn; cavA=cavA*(1-gn)+gn
     cav=np.clip(1+(H-blur(H,3*S))*900,0.55,1.1); ao=np.clip((.12+.88*aoS)*cav*cavA,0,1)
     tn=np.array([.55,.47,.46],f32); aoc=.62+.38*aoS*np.clip(cav,0,1)*cavA; col=col*(tn[None,None,:]+(1-tn[None,None,:])*aoc[:,:,None])
     col=np.clip(col,0,1); col[~cov]=SKIN; nrm[~cov]=(.5,.5,1); rough[~cov]=.5; ao[~cov]=1

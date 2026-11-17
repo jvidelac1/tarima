@@ -73,6 +73,42 @@ def anatomy(b,rig,K,cut=1.):
     B,F,_=tex.anatomy(co,no,J,K); names,W=wget(b); keep=1-sum(W[:,j] for j,n in enumerate(names) if any(k in n for k in ('Head','Hand','Foot','Toe')))
     d=(B*ANAT_GEO[0]+F*ANAT_GEO[1]*cut)*np.clip(keep,0,1); me.vertices.foreach_set('co',(co+no*d[:,None]).ravel()); me.update()
     print(f'ANAT desplazamiento de malla: máx +{d.max()*1000:.1f} / {d.min()*1000:.1f} mm, {int((np.abs(d)>5e-4).sum())} vértices')
+def chest_smooth(b,rig,K,iters=30):
+    """Frente del pecho liso en la malla final (ya subdividida y con el relieve muscular): bajo la malla se marcaban dos puntas (hombres y
+    mujeres), que el alisado de make.py sobre la malla gruesa no sacaba. Laplaciano sobre el frente del tronco entre la clavícula y el
+    esternón bajo, con bordes en degradé: borra lo angosto (puntas, surcos finos) y deja la forma ancha. Informa la punta más alta antes y después."""
+    co=coords(b); me=b.data; N=len(co); no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3); sh=head(rig,'LeftArm')
+    E=np.empty(len(me.edges)*2,int); me.edges.foreach_get('vertices',E); E=E.reshape(-1,2); deg=np.maximum(np.bincount(E.ravel(),minlength=N),1)[:,None]
+    z=co[:,2]; ax=np.abs(co[:,0]); w=(no[:,1]<-.15)*sm(sh[2]-.76*K,sh[2]-.66*K,z)*sm(sh[2]-.05*K,sh[2]-.10*K,z)*sm(.27*K,.22*K,ax)
+    def prom(c):
+        A=np.zeros_like(c); np.add.at(A,E[:,0],c[E[:,1]]); np.add.at(A,E[:,1],c[E[:,0]]); return A/deg
+    punta=lambda c:float((((c-prom(c))*no).sum(1)*(w>.5)).max())
+    p0=punta(co); c=co.copy()
+    for _ in range(iters): c=c+(prom(c)-c)*(.6*w)[:,None]
+    # La punta (areola y pezón de la malla base) es un racimo de polígonos diminutos: cientos de vértices en 3 cm, decenas en 2 mm. El laplaciano
+    # difunde por aristas, no por milímetros, y ahí casi no avanza: por eso el bulto sobrevivía a todas las pasadas (medido en el GLB). Se ubica por
+    # densidad (el vértice del frente del pecho con las aristas más cortas, de cada lado) y en 3,2 cm la altura sobre el plano local se reemplaza por
+    # la cuádrica ajustada al anillo que la rodea.
+    el=np.linalg.norm(c[E[:,0]]-c[E[:,1]],axis=1); ml=np.zeros(N); np.add.at(ml,E[:,0],el); np.add.at(ml,E[:,1],el); ml/=deg[:,0]; RN=.032*K
+    for sgn,lado in ((1,'L'),(-1,'R')):
+        cand=(w>.3)&(c[:,0]*sgn>.03*K)
+        if not cand.any(): continue
+        i=int(np.argmin(np.where(cand,ml,9.))); cn=c[i].copy(); q=c-cn; cerca=np.linalg.norm(q,axis=1)<2.2*RN
+        n0=no[cerca&(no[:,1]<0)].mean(0); n0/=np.linalg.norm(n0); e1=np.cross(n0,[0,0,1.]); e1/=np.linalg.norm(e1); e2=np.cross(n0,e1)
+        h=q@n0; x=q@e1; y=q@e2; r=np.hypot(x,y); fr=(no@n0>.3)&(np.abs(h)<.06*K)
+        an=fr&(r>RN)&(r<1.8*RN); den=fr&(r<RN)
+        if an.sum()<12 or den.sum()<3: print(f'PUNTA {lado}: sin anillo para ajustar ({int(an.sum())} vértices)'); continue
+        Aq=np.stack([np.ones(an.sum()),x[an],y[an],x[an]**2,x[an]*y[an],y[an]**2],1); cf=np.linalg.lstsq(Aq,h[an],rcond=None)[0]
+        hf=cf[0]+cf[1]*x+cf[2]*y+cf[3]*x*x+cf[4]*x*y+cf[5]*y*y; wt=sm(RN,RN*.7,r)*den; dz=(hf-h)*wt; c=c+n0[None,:]*dz[:,None]
+        print(f'PUNTA {lado}: racimo en ({cn[0]:+.3f},{cn[1]:+.3f},{cn[2]:.3f}), arista media {ml[i]*1000:.2f} mm, {int(den.sum())} vértices en {RN*1000:.0f} mm; sobresalía {(h-hf)[den].max()*1000:.1f} mm, corrección máx {np.abs(dz).max()*1000:.1f} mm')
+    me.vertices.foreach_set('co',c.ravel()); me.update()
+    # los pesos de piel también: el suavizado de pesos del hombro (smooth_weights) termina en medio del pecho y ese borde deja un vértice «atrasado» que con los brazos arriba se levanta como una carpa (la punta)
+    names,W=wget(b); W0=W.copy()
+    for _ in range(14):
+        A=np.zeros_like(W); np.add.at(A,E[:,0],W[E[:,1]]); np.add.at(A,E[:,1],W[E[:,0]]); W=W+(A/deg-W)*(.6*w)[:,None]
+    W/=np.maximum(W.sum(1,keepdims=True),1e-9); rows=np.nonzero((w>.02)&(np.abs(W-W0).max(1)>1e-4))[0]; wset(b,names,W,rows)
+    print(f'PECHO pesos suavizados en {len(rows)} vértices (cambio máx {np.abs(W-W0).max():.3f})')
+    print(f'PECHO liso: {int((w>.05).sum())} vértices, punta más alta {p0*1000:.2f} mm -> {punta(c)*1000:.2f} mm, desplazamiento máx {np.linalg.norm(c-co,axis=1).max()*1000:.1f} mm')
 SIMPLIFY=1.0   # fracción de caras que se conserva en las zonas simplificables. 1 = no simplificar (por defecto; TARIMA_SIMP=0.32 lo activa).
 # Queda apagado: esas zonas son solo el 9 % de las caras del cuerpo (la cabeza es el 37 % y las manos el 28 %), se ahorran ~6 mil triángulos,
 # y al cambiar la densidad de vértices del muslo cambia el radio por percentil que mide poses.py (muslo 10,2 -> 8,9 cm en brenner): afloja check() sin querer.
@@ -205,7 +241,7 @@ def correctives(b,rig,K,fem=False):
     for p in pb: p.matrix_basis=Matrix()
     for n,q in basis.items(): pb[PRE+n].matrix_basis=Quaternion(q).to_matrix().to_4x4()
     bpy.context.view_layer.update(); w0={side:armup_weight(rig,side) for _,side in sides}
-    d=_delta(b,rig,basis,mask,36,.6,sculpt=armup_sculpt(rig,K,co,('pec',) if fem else ()))     # la mujer no lleva el empuje del pectoral (bajo la malla era un bulto en punta)
+    d=_delta(b,rig,basis,mask,36,.6,sculpt=armup_sculpt(rig,K,co,('pec',)))     # la mujer no lleva el empuje del pectoral (bajo la malla era un bulto en punta)
     for sgn,side in sides: keys['corr_armUp_'+side[0]]=d*((co[:,0]*sgn>0)[:,None])/max(w0[side],.5)
     # rodilla en flexión profunda y codo cerrado: peso = smoothstep(lo,hi, flexión), flexión = ángulo entre los dos segmentos
     for nm,ref,(p0,p1,p2),r in (('knee',KNEE,HINGE['knee'][0],.15),('elbow',ELBOW,HINGE['elbow'][0],.10),('wrist',WRIST,HINGE['wrist'][0],.075)):
@@ -321,6 +357,18 @@ def hair_cap(b,OUT,mat,LM,K):
         vg=o.vertex_groups.new(name=n)
         for i in nz: vg.add([int(i)],float(w[i]),'REPLACE')
     print(f'PELO malla: {len(sel)} caras, alto máx {h.max()*1000:.1f} mm, barba {int((barba>.5).sum())} vértices'); return o
+def chest_check(b,rig,K):
+    """Mide la punta más alta del frente del pecho con los brazos arriba (pose de referencia del correctivo), ya con correctivos: línea PECHO posado."""
+    co=coords(b); me=b.data; N=len(co); no=np.empty(N*3); me.vertices.foreach_get('normal',no); no=no.reshape(N,3); sh=head(rig,'LeftArm'); pb=rig.pose.bones
+    E=np.empty(len(me.edges)*2,int); me.edges.foreach_get('vertices',E); E=E.reshape(-1,2); deg=np.maximum(np.bincount(E.ravel(),minlength=N),1)[:,None]
+    z=co[:,2]; ax=np.abs(co[:,0]); w=(no[:,1]<-.15)*sm(sh[2]-.76*K,sh[2]-.66*K,z)*sm(sh[2]-.05*K,sh[2]-.10*K,z)*sm(.27*K,.22*K,ax)
+    for p in pb: p.matrix_basis=Matrix()
+    for sgn,side in ((1,'Left'),(-1,'Right')):
+        for bn,q in ARMUP.items(): pb[PRE+side+bn].matrix_basis=Quaternion(q if sgn>0 else mir(q)).to_matrix().to_4x4()
+    bpy.context.view_layer.update(); P,Nn=_posed(b,True)
+    A=np.zeros_like(P); np.add.at(A,E[:,0],P[E[:,1]]); np.add.at(A,E[:,1],P[E[:,0]]); s=((P-A/deg)*Nn).sum(1)*(w>.5)*(ax>.05*K); i=int(np.argmax(s))
+    for p in pb: p.matrix_basis=Matrix()
+    bpy.context.view_layer.update(); print(f'PECHO posado (brazos arriba): punta más alta {s[i]*1000:.2f} mm en reposo ({co[i][0]:+.3f},{co[i][1]:+.3f},{co[i][2]:.3f})')
 def rig_of(b): return next(m.object for m in b.modifiers if m.type=='ARMATURE')
 def bun(b,K,STY,LM,mat):
     """Moño del pelo atado: un ovillo achatado apoyado en el cráneo, en la dirección STY['bun']['dir'] desde el centro de la cabeza.

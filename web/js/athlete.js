@@ -86,7 +86,7 @@ const SKIN_DETAIL = /* glsl */`
   // con la máscara (R piel, G tela). uTile = mosaicos por unidad de UV, medido sobre la malla al cargar. Cada una va en dos
   // escalas: la real (poros, trama de punto: solo se ve en primer plano) y una más gruesa que sobrevive a distancia de torso.
   // Se apagan cuando un mosaico ocupa pocos píxeles, para no centellear en plano general.
-  gPatch = mix( 0.5, smoothstep( 0.3, 0.7, pielRuido( vMapUv * 47.0 + 1.3 ) * 0.7 + pielRuido( vMapUv * 113.0 ) * 0.3 ), 0.3 );      // zonas más y menos húmedas, apenas (con contraste se leía arcilla mojada)
+  if ( uFino > 0.5 ) gPatch = mix( 0.5, smoothstep( 0.3, 0.7, pielRuido( vMapUv * 47.0 + 1.3 ) * 0.7 + pielRuido( vMapUv * 113.0 ) * 0.3 ), 0.3 );      // solo con detalle fino: en el camino directo (Baja y Móvil) no se hace la cuenta      // zonas más y menos húmedas, apenas (con contraste se leía arcilla mojada)
   // arrugas de la tela: pliegues alargados de baja frecuencia (el mosaico de piel estirado), se ven desde el plano general
   vec2 d = vec2( 0.0 ); if ( uFino > 0.5 ) d = ( texture2D( tDetailSkin, vMapUv * vec2( 3.1, 10.0 ) + 0.27 ).xy * 2.0 - 1.0 ) * uWrinkle * gMask.g;
   if ( uDetail > 0.0 ) {      // en plano general ningún mosaico se resuelve (athlete.js lo apaga): se ahorran las cuatro lecturas
@@ -348,8 +348,11 @@ function capMaterial(src, mask, uv1) {
   const U = { tCuero: { value: mask || null }, uCuero: { value: mask && uv1 ? 1 : 0 } }; if (U.uCuero.value) src.alphaTest = .5;      // el borde del casco lo corta el nacimiento pintado (máscara, canal B)
   src.roughness = Math.max(src.roughness ?? .8, .78); src.metalness = 0; src.envMapIntensity = .1; src.side = THREE.FrontSide;
   src.normalMap = null;      // sin mapa de normales: en el borde fino del casco el UV de las hebras degenera y las normales salían disparadas (púas gris claro en el nacimiento); la forma la dan los gajos de la malla
-  src.onBeforeCompile = sh => { conCuero(sh, U, '0.2', '0.44'); sh.fragmentShader = sh.fragmentShader.replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.45; material.specularColorBlended *= 0.45; material.specularF90 *= 0.5;'); };
-  src.customProgramCacheKey = () => 'tarima-pelo-4';
+  src.onBeforeCompile = sh => { conCuero(sh, U, '0.1', '0.62');
+    // nacimiento en degradé: el borde del casco no es un corte sino una trama que se va raleando (abajo queda el degradé pintado en la piel)
+    sh.fragmentShader = sh.fragmentShader.replace('#include <alphatest_fragment>', 'if ( uCuero > 0.5 ) { float rn = fract( sin( dot( floor( gl_FragCoord.xy ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ); diffuseColor.a = diffuseColor.a > rn * 0.85 + 0.08 ? 1.0 : 0.0; }\n#include <alphatest_fragment>');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\nmaterial.specularColor *= 0.45; material.specularColorBlended *= 0.45; material.specularF90 *= 0.5;'); };
+  src.customProgramCacheKey = () => 'tarima-pelo-5';
   return src;
 }
 function hairDepthMaterial(src) {
