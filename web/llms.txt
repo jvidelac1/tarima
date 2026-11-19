@@ -1,0 +1,6 @@
+# Lifting Game
+
+Juego web de halterofilia olímpica. Se juega en el navegador, a un botón, sin instalar nada. Tres levantadores, arranque y dos tiempos, en español y en inglés. En el teléfono (horizontal) y en la computadora.
+
+- Jugar: https://liftinggame.pages.dev/
+- Código: https://github.com/jvidelac1/tarima
