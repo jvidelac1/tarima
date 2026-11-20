@@ -1,6 +1,30 @@
 # Lifting Game
 
-Juego web de halterofilia olímpica. Se juega en el navegador, a un botón, sin instalar nada. Tres levantadores, arranque y dos tiempos, en español y en inglés. En el teléfono (horizontal) y en la computadora.
+Juego web de halterofilia olímpica. Se juega en el navegador, a un botón, sin instalar nada. Tres pesistas ficticios, arranque y dos tiempos, en español y en inglés. En el celular (parado o de costado) y en la computadora.
+
+## Cómo se juega
+
+El nivel que viene elegido es Fácil, con la barrita.
+
+1. Eliges los kilos antes de salir. El panel dice «X de 10»: cuántas veces de diez sube la barra con ese peso.
+2. Cuando aparece la barrita, en la computadora pulsas Espacio o Enter con el puntero en el verde. En el celular, tocas la pantalla o el botón redondo. El pesista tira en ese instante. El clic del mouse no cuenta.
+3. En Fácil hay una barrita en el arranque (el tirón) y dos en el dos tiempos (la cargada y el envión). Si todas salen en verde, la barra sube siempre. El amarillo gasta energía. El rojo gasta mucha.
+
+Fuera de tu intento, Esc pausa y H abre la ayuda. La tecla S salta el turno de un rival. En los menús, las flechas mueven el foco y Enter elige. Si al pararte la energía queda justa, el juego pide unos toques más, sin apuro.
+
+## Preguntas frecuentes
+
+### ¿Es gratis?
+
+Sí. No se paga y no hay que instalar nada: se abre en el navegador. El arranque de la primera final se juega sin anotarse. Para seguir con el dos tiempos y jugar más finales, el juego pide el correo. Sigue sin costo.
+
+### ¿Funciona en el celular?
+
+Sí. En el celular se juega parado: el pesista queda arriba y el botón redondo, abajo. También de costado, con el botón bajo el pulgar. Tocar la pantalla o ese botón hace lo mismo que Espacio. Hace falta JavaScript.
+
+### ¿Qué es arranque y dos tiempos?
+
+El arranque lleva la barra del piso a arriba de la cabeza en un solo movimiento. El dos tiempos va en dos partes: primero a los hombros y después arriba de la cabeza. En la final hay tres intentos de cada uno. El total suma el mejor arranque y el mejor dos tiempos.
 
 - Jugar: https://liftinggame.pages.dev/
 - Código: https://github.com/jvidelac1/tarima
