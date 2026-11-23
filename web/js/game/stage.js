@@ -258,7 +258,7 @@ export const POV = { fov: 62, fovAncho: 104, cerca: .06, arriba: .1, adelante: .
  * luces y la fila de sonido, pausa y ayuda; no tapa la barrita ni el tablero). La cámara es la general de siempre, fija: mira a `mira` (× estatura/1,70) desde `d` m, con `fov`°. Se vuelve a
  * dibujar un cuadro de cada `cada` (con post; el recuadro guarda su imagen) para que cueste poco.
  */
-export const RECUADRO = { ancho: .24, angosto: .27, alto: .62, x: .014, y: .13, yMin: 84, parado: .44, altoParado: .8, yParado: .15, yMinParado: 118, mira: [0, 1.22, .06], d: 5.2, fov: 30, cada: 2 };
+export const RECUADRO = { ancho: .24, angosto: .27, alto: .62, x: .014, y: .13, yMin: 84, parado: .44, altoParado: .8, yParado: .15, yMinParado: 118, mira: [0, 1.22, .06], d: 5.2, fov: 30, cada: 2, bajoBoton: 14 + 24 + 34 };
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
 
@@ -921,7 +921,14 @@ export class Escena {
     r.shadowMap.needsUpdate = su;
   }
   /** La caja del recuadro en fracciones del lienzo. Con el teléfono parado va más grande y más abajo (debajo de la fila de botones y del reloj): al ancho de siempre quedaba de 100 px. */
-  _recuadroCaja(W, H) { const v = H > W, fw = v ? RECUADRO.parado : W < 900 ? RECUADRO.angosto : RECUADRO.ancho, fh = Math.min(.42, fw * W / H * (v ? RECUADRO.altoParado : RECUADRO.alto)), fx = 1 - RECUADRO.x - fw, fy = v ? Math.max(RECUADRO.yParado, RECUADRO.yMinParado / H) : Math.max(RECUADRO.y, RECUADRO.yMin / H); return { fw, fh, fx, fy }; }
+  _recuadroCaja(W, H) {
+    const v = H > W, fw = v ? RECUADRO.parado : W < 900 ? RECUADRO.angosto : RECUADRO.ancho, fx = 1 - RECUADRO.x - fw, fy = v ? Math.max(RECUADRO.yParado, RECUADRO.yMinParado / H) : Math.max(RECUADRO.y, RECUADRO.yMin / H);
+    let fh = Math.min(.42, fw * W / H * (v ? RECUADRO.altoParado : RECUADRO.alto));
+    // de costado y bajo (teléfono acostado), el recuadro termina arriba del botón de tocar y de «seguir» (juego.css: --boton
+    // de costado es clamp(96px, 29 % del alto, 150px), con 14 px de borde y la zona segura de abajo): tools/tapa.mjs, tope 5 %
+    if (!v) { const boton = Math.min(150, Math.max(96, H * .29)), libre = (H - boton - RECUADRO.bajoBoton) / H - fy; if (libre > .12) fh = Math.min(fh, libre); }
+    return { fw, fh, fx, fy };
+  }
   /** Si corresponde el recuadro en este cuadro (primera persona, prendido, con pesista y sin transición de cámara); muestra u oculta su marco. */
   _recuadroOn() { const X = this.recuadro, a = this.activo, on = !!this.pov && X.on && (X.pedido || !this.directo) && !!a && a.root.visible && !this.rig.mezcla; if (X.el && X.el.hidden === on) X.el.hidden = !on; return on; }
   /**

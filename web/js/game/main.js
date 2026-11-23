@@ -27,7 +27,7 @@ import { Partida } from '../sim/match.js';
 import { HUELLA_IA } from '../sim/ai.js';
 import { simular } from '../sim/attempt.js';
 import { recalcular, resumen } from '../sim/replay.js';
-import { EVENTO, KG_MAX, RELOJ, PLAN, exigenciaTabla, previsto, cuerpoDe, chanceUno, chanceBarra, cuerpoBarra, zonasBarra, reglasB, DIFICULTADES } from '../sim/rules.js';
+import { EVENTO, KG_MAX, RELOJ, PLAN, exigenciaTabla, previsto, cuerpoDe, chanceUno, chanceBarra, cuerpoBarra, zonasBarra, reglasB, DIFICULTADES, UNO } from '../sim/rules.js';
 import { RITMO, FASES_RAPIDAS, esDecisivo, tramoResumen, veredictoPropio, desdeRival, TECLA_SALTAR } from './ritmo.js';
 import { t, esc, fijarIdioma, detectarIdioma, idiomaActual, fijarTactil, alCambiarIdioma, IDIOMAS } from './i18n/t.js';
 import { ganchos } from './ganchos.js';
@@ -1536,7 +1536,10 @@ async function llamadoPropio(p, L) {
     const primerDT = ctx.ctl === 'f' && L.lev === 'c' && !guardado.get('tarima.dostiempos');
     E.todavias = 0; E.guardados = 0; E.fotoToques = toques.foto();
     // primera persona: antes de que aparezca la barrita, el pesista va a la barra y la mira (el vistazo); el reloj del intento empieza después
-    const yaAbajo = !corre && !primerDT && await vistazo(L.lev); if (yaAbajo) t0 = reloj.ahora();
+    const yaAbajo = !corre && !primerDT && await vistazo(L.lev);
+    // tras el vistazo, el toque que confirmó el panel quedó atrás: el reloj arranca UNO.confMs antes para que el primer toque
+    // de PREPÁRATE no se tome como parte de la confirmación («doble») y quede guardado (check_toques, 23-nov)
+    if (yaAbajo) t0 = reloj.ahora() - UNO.confMs;
     corrida = await correrIntento(ctx, { a, lev: L.lev, env, conf0: ms, t0, guia: primerDT ? EN_HOMBROS : null, yaAbajo });
     if (primerDT && corrida.m.movs.length > 1) guardado.set('tarima.dostiempos', '1');
   } else { env = L.lev === 'c' ? p.estiloFijo(L.a) ?? a.f.enviones[0] : undefined; ctx = p.contexto(env); corrida = { conf: null, ent: [], res: simular(ctx, null, []).res, grab: [], m: { movs: [] } }; }

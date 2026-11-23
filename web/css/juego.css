@@ -843,3 +843,7 @@ html.vert .panel.compacto .kgsel>button.ir{flex-basis:auto}
 html.vert .kgsel>span{display:none}
 html.vert .kgsel button.kg{min-width:46px;padding:.5em .55em}
 html.vert .kgsel output{font-size:clamp(30px,10vw,44px);min-width:2.6ch}
+
+/* 23-nov: con el teléfono parado y el recuadro de la primera persona a la vista (arriba a la derecha), la guía baja y queda
+   debajo del recuadro (stage.js, _recuadroCaja: arriba en max(15 % del alto, 118 px), alto min(42 % del alto, 35,2 % del ancho)) */
+html.vert body:has(#recuadro:not([hidden])) #tv #guia{bottom:auto;top:calc(max(var(--app-h,100vh)*.15,118px) + min(var(--app-h,100vh)*.42,35.2vw) + 8px)}
