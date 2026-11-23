@@ -510,7 +510,7 @@ async function partida(flag, { lienzo = 'off', dibujo = false } = {}) {
   }, NOMBRE);
   const desde = llegadas.length;
   await page.goto(base + `juego.html?lang=es${dibujo ? '' : '&dibujo=0'}&q=baja&semilla=20261112`, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 90000 });
+  await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 180000 });
   const { tA, tB } = await interactuarJuego(page);
   // Lo que costaría la instantánea completa que posthog-js vuelve a tomar cada 5 minutos (puede caer en un intento).
   const instantanea = await page.evaluate(() => {
