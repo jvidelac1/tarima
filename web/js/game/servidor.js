@@ -543,6 +543,12 @@ export function crearServidor(o = {}) {
     if (modo !== 'servidor') return { estado: 'sin_servidor', perfil: perfilGuardado() };
     try { const { j } = await post('/api/perfil', { dispositivo: dispositivo() }, ESPERA_PEDIDO); if (j.perfil) local.set('tarima.perfil', JSON.stringify(j.perfil)); return { estado: 'ok', perfil: j.perfil }; } catch (e) { return { estado: 'error', error: e.tipo || 'red', perfil: perfilGuardado() }; }
   }
+  /** Un error del juego (LIF-26), sin esperar respuesta: lo cuenta el Worker por día. Hasta 5 por carga. */
+  let erroresMandados = 0;
+  function error(det = {}) {
+    if (modo !== 'servidor' || erroresMandados++ >= 5) return;
+    post('/api/error', { tipo: det.tipo, pantalla: det.pantalla, mensaje: det.mensaje, archivo: det.archivo, linea: det.linea }, ESPERA_PEDIDO).catch(() => null);
+  }
   /** Un desafío (LIF-12): la final de origen por su id. */
   async function desafio(id) {
     if (modo !== 'servidor' || !Number.isSafeInteger(id)) return { estado: 'sin_servidor' };
@@ -557,7 +563,7 @@ export function crearServidor(o = {}) {
 
   return {
     get modo() { return modo; },
-    dispositivo, copia, estado, pedirPase, envion, paseParaReanudar, finalTerminada, soltarPase, anotar, encuesta, baja, mandarFinal, ranking, perfil, perfilGuardado, desafio,
+    dispositivo, copia, estado, pedirPase, envion, paseParaReanudar, finalTerminada, soltarPase, anotar, encuesta, baja, mandarFinal, ranking, perfil, perfilGuardado, desafio, error,
   };
 }
 

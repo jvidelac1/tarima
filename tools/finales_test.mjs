@@ -20,7 +20,7 @@ let nIp = 0;
 async function api(ruta, cuerpo, { cookie = null, ip = `203.0.113.${(nIp++ % 200) + 1}` } = {}) {
   const ctx = { waitUntil() {}, passThroughOnException() {} };
   const r = await worker.fetch(new Request(ORIGEN + '/api/' + ruta, { method: 'POST', headers: { origin: ORIGEN, 'content-type': 'application/json', 'cf-connecting-ip': ip, 'x-tarima-pais': 'AR', ...(cookie ? { cookie: 'tdv=' + cookie } : {}) }, body: JSON.stringify(cuerpo) }), env, ctx);
-  return { status: r.status, j: await r.json() };
+  const txt = await r.text(); return { status: r.status, j: txt ? JSON.parse(txt) : null };
 }
 /** Un jugador: un dispositivo con su cookie; `jugar` pide un pase y manda la final del bot. */
 function jugador() {
@@ -118,6 +118,11 @@ ok(rRm.status === 422, '7: el desafío aceptó progresión');
 const dd2 = await api('desafio', { id: ro.j.id });
 ok(dd2.j.aceptados === 1, '7: el desafío no cuenta quién lo aceptó: ' + dd2.j.aceptados);
 ok((await api('desafio', { id: 999999 })).status === 404, '7: un desafío inexistente no da 404');
+// 8. errores (LIF-26): se cuentan por día sin datos del dispositivo; uno mal formado no entra
+for (let k = 0; k < 3; k++) await api('error', { tipo: 'TypeError', pantalla: 'intento', mensaje: 'x is undefined, escribir a ana@correo.com', archivo: 'main.js', linea: 12 });
+await api('error', { tipo: 'no vale <b>', mensaje: 'x' });
+const er = await db.prepare('SELECT tipo, pantalla, mensaje, n FROM errores').all();
+ok(er.results.length === 1 && er.results[0].n === 3 && !/@/.test(er.results[0].mensaje), '8: los errores no se cuentan bien: ' + JSON.stringify(er.results));
 // métricas de LIF-2 desde la tabla
 const m = await db.prepare('SELECT COUNT(*) finales, SUM(caidas) caidas, SUM(intentos) intentos, SUM(todo_verde) todo_verde, SUM(saltos) saltos FROM finales').first();
 logReal(`finales guardadas: ${m.finales} · caídas ${m.caidas} de ${m.intentos} intentos · intentos todo verde ${m.todo_verde} · saltos ${m.saltos}`);

@@ -8,6 +8,7 @@ import { DESCARTABLES } from './descartables.js';
 import { codigoDispositivo, codigoIp, idAzar, igualSeguro, leerPase, leerToken, pase, token } from './cripto.js';
 import { PREFIJO, capturar, evaluarBanderas, proxy } from './posthog.js';
 import { armarMail, idiomaPagina, pagina, t } from './textos.js';
+import { anotarError, limpiarErrores, resumenDia } from './errores.js';
 import { MAX_FINAL, finalDeDesafio, guardarFinal, perfil as perfilDe, puestoEnSemana, ranking as rankingDe, revisarProgresion, validarFinal } from './finales.js';
 import { semanaDe, semillaSemana, CAMPEONATO } from '../../web/js/sim/semana.js';
 
@@ -19,7 +20,7 @@ const SECRETOS = ['SECRETO_IP', 'SECRETO_DISPOSITIVO', 'SECRETO_PASE', 'SECRETO_
 // Límites por código de IP: [máximo, período en segundos] (docs/MVP.md 5.5).
 const LIMITES = {
   estado: [60, 600], partida: [20, 600], envion: [20, 600], anotar: [5, 3600], encuesta: [3, 3600], baja_api: [3, 3600],
-  baja: [10, 3600], confirmar: [10, 3600], exportar: [10, 3600], final: [30, 3600], ranking: [120, 600], perfil: [120, 600], desafio: [120, 600],
+  baja: [10, 3600], confirmar: [10, 3600], exportar: [10, 3600], final: [30, 3600], ranking: [120, 600], perfil: [120, 600], desafio: [120, 600], error: [20, 600],
 };
 
 class ErrorHttp extends Error {
@@ -58,8 +59,15 @@ export default {
   },
 
   async scheduled(controller, env, ctx) {
-    const r = await D.limpiar(env.DB, ahoraS());
+    const ahora = ahoraS(), r = await D.limpiar(env.DB, ahora);
     log('info', { msg: 'limpieza', ...r });
+    // LIF-26: resumen de errores de ayer; si pasa el umbral, un registro de nivel error (alerta) y el evento en PostHog
+    try {
+      await limpiarErrores(env.DB, ahora).run();
+      const z = await resumenDia(env.DB, new Date((ahora - 86400) * 1000).toISOString().slice(0, 10));
+      log(z.alerta ? 'error' : 'info', { msg: z.alerta ? 'alerta_errores' : 'errores_dia', dia: z.dia, errores: z.errores, finales: z.finales, top: z.top.map(x => `${x.n}× ${x.tipo} ${x.pantalla} ${x.mensaje}`.slice(0, 120)) });
+      if (z.alerta) ctx.waitUntil(capturar(env, { event: 'alerta_errores', distinct_id: 'tarima-worker', properties: { dia: z.dia, errores: z.errores, finales: z.finales } }).catch(() => null));
+    } catch (e) { log('error', { msg: 'errores_resumen', tipo: e?.name }); }
   },
 };
 
@@ -153,7 +161,7 @@ async function banderas(env, ctx, dev, ahora) {
 
 async function api(request, env, ctx, url) {
   const ruta = url.pathname.slice(5);
-  const manejadores = { estado, partida, envion, anotar, encuesta, baja: bajaApi, final, ranking, perfil, desafio };
+  const manejadores = { estado, partida, envion, anotar, encuesta, baja: bajaApi, final, ranking, perfil, desafio, error };
   if (ruta === 'exportar') return exportar(request, env, url);
   const m = manejadores[ruta];
   if (!m) return json({ error: 'no_existe' }, 404);
@@ -221,6 +229,12 @@ async function desafio({ env, b }) {
   const f = await finalDeDesafio(env.DB, b.id);
   if (!f) return json({ estado: 'no_existe' }, 404);
   return json({ estado: 'ok', id: f.id, semilla: f.semilla, ctl: f.ctl, dif: f.dif, nivel: f.nivel, orden: f.orden, pesista: f.pesista, s: f.s, c: f.c, total: f.total, puesto: f.puesto, apodo: f.apodo, pais: f.pais, aceptados: f.aceptados, lo_superaron: f.lo_superaron });
+}
+
+// Un error del juego (LIF-26): {tipo, pantalla, mensaje, archivo, linea}. Sin dispositivo ni IP; responde 204.
+async function error({ env, b, ahora }) {
+  await anotarError(env.DB, b, ahora);
+  return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
 }
 
 // El perfil (LIF-68, LIF-11): lo que dicen las finales validadas de este dispositivo, con la progresión de cada pesista.
