@@ -71,6 +71,20 @@ del Worker de esa regla: `GRATIS_ETAPA "final"`, `GRATIS "1"`, `ENCUESTA_LIBRE "
 - Scripts: `bash tools/medir.sh [días]` (métricas de LIF-2), `bash tools/errores.sh [días]` (LIF-26). Pruebas nuevas:
   `node tools/finales_test.mjs` (sin navegador), `node tools/check_ranking.mjs` y `node tools/check_reloj.mjs` (navegador, de punta a punta). Migraciones 0004–0009.
 
+## Viralidad (23 de noviembre, con autorización del dueño)
+
+- **Regla del muro en producción: la de LIF-53** (`GRATIS_ETAPA "final"`, `ENCUESTA_LIBRE "1"`): la primera final entera es
+  gratis; después, el cartel con el correo o las 2 preguntas. Así quien llega por un desafío lo juega entero. La regla del
+  arranque gratis sigue probada por variables (check_muro_medio, worker_test, vitest con `A()`).
+- **Links con vista previa** (`functions/index.js`, HTMLRewriter): `?desafio=id` → «Nasar lifted 378 kg in this final. Can you
+  beat it?»; `?campeonato=1` → el líder de la semana. Español si el navegador lo pide.
+- **Premio por invitar:** cada final que otro juega desde tu desafío te da 2 sesiones de entrenamiento; el perfil cuenta los
+  desafíos aceptados y la bienvenida avisa los nuevos. En el podio, «Desafiar a un amigo».
+- **Campeonato:** `?campeonato=1` lo ofrece en la bienvenida; «Compartir mi puesto» en el ranking de la semana.
+- **Escuelas de entrenamiento** a la vista (aprobadas). **Monetización:** `docs/MONETIZACION.md`; «Apoyar el juego» aparece
+  solo si se carga `APOYO_URL` en `worker/wrangler.jsonc`.
+- Para medir: `bash tools/medir.sh` (finales terminadas, desafíos) y `bash tools/errores.sh`.
+
 ## Backlog
 
 En **Linear**, equipo **LIFTINGAME** (clave `LIF`, issues LIF-1 a LIF-29, en Backlog), 5 proyectos: Juego de estrategia, Competencia y comunidad,
