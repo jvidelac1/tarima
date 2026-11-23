@@ -510,7 +510,7 @@ async function partida(flag, { lienzo = 'off', dibujo = false } = {}) {
   }, NOMBRE);
   const desde = llegadas.length;
   await page.goto(base + `juego.html?lang=es${dibujo ? '' : '&dibujo=0'}&q=baja&semilla=20261112`, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 90000 });
+  await page.waitForFunction(() => window.JUEGO && window.JUEGO.listo, null, { timeout: 180000 });
   const { tA, tB } = await interactuarJuego(page);
   // Lo que costaría la instantánea completa que posthog-js vuelve a tomar cada 5 minutos (puede caer en un intento).
   const instantanea = await page.evaluate(() => {
@@ -536,8 +536,11 @@ async function partida(flag, { lienzo = 'off', dibujo = false } = {}) {
     const A = await import('/js/game/analitica.js'), c = document.getElementById('gl'), e = window.JUEGO.escena;
     // con el cartel como si mostrara el nombre del jugador (el respaldo): se mide y se ubican los carteles
     const b = e.arena.board; e.arena.board = { ...b, jugador: true, entero: false };
+    // desde el 17-nov la cámara por defecto es la primera persona, que mira al jurado: los carteles quedan detrás y no hay nada
+    // que tapar (bien). Lo que se prueba acá es que se ubiquen cuando se ven: se mide con la vista de afuera y se vuelve
+    const eraPov = !!e.pov; if (eraPov) { e.camara('3/4'); e.rig.update?.(1 / 60); e.rig.camera.updateMatrixWorld(true); }
     let r = null; const t = performance.now();
-    try { for (let i = 0; i < 200; i++) r = A.regionesLienzo(c, e); } finally { e.arena.board = b; }
+    try { for (let i = 0; i < 200; i++) r = A.regionesLienzo(c, e); } finally { e.arena.board = b; if (eraPov) e.camara('pov'); }
     const ahora = A.regionesLienzo(c, e);
     return { ms: (performance.now() - t) / 200, n: r.length, r, ancho: c.clientWidth, alto: c.clientHeight, ahora: ahora.length, cartel: { name: b?.name, jugador: b?.jugador, entero: b?.entero } };
   }).catch(e => ({ error: String(e) }));

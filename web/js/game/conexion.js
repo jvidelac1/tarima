@@ -17,7 +17,7 @@
 import { ganchos } from './ganchos.js';
 import { servidor, sugerirCorreo, pareceCorreo } from './servidor.js';
 import { nombreReal } from './nombre.js';
-import { analitica } from './analitica.js';
+import { analitica, detalleError } from './analitica.js';
 import { t, esc, idiomaActual, alCambiarIdioma, IDIOMAS } from './i18n/t.js';
 
 const guardado = { get: k => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* sin almacenamiento */ } } };
@@ -430,6 +430,12 @@ function podio(info) {
 async function arranque(o) {
   S.pantalla = o.pantalla || (() => '');
   analitica.instalarErrores(S.pantalla);
+  // LIF-26: los mismos errores, contados también en el servidor (servidor.error manda hasta 5 por carga)
+  if (typeof window !== 'undefined') {
+    const tipo = e => (e && /^[A-Za-z]{1,40}$/.test(e.name || '') ? e.name : 'Error');
+    window.addEventListener('error', e => servidor.error({ tipo: tipo(e?.error), pantalla: S.pantalla(), ...detalleError(e?.error, e) }));
+    window.addEventListener('unhandledrejection', e => servidor.error({ tipo: 'promesa_' + tipo(e?.reason), pantalla: S.pantalla(), ...detalleError(e?.reason) }));
+  }
   try { S.reanudar = servidor.paseParaReanudar(); } catch { S.reanudar = null; }
   let e = null;
   try { e = await servidor.estado({ idioma: o.idioma }); } catch { e = null; }
@@ -448,7 +454,7 @@ async function arranque(o) {
 }
 
 // Empezar otra final después del cartel cuenta como «siguió jugando» (LIF-46)
-ganchos.ev = (nombre, props) => { if (nombre === 'final_inicio') resolverSiguio(true, 'final'); analitica.ev(nombre, props); };
+ganchos.ev = (nombre, props) => { if (nombre === 'final_inicio') resolverSiguio(true, 'final'); if (nombre === 'error_juego') servidor.error(props); analitica.ev(nombre, props); };
 ganchos.registra = true;      // analitica.ev ya anota cada evento en window.JUEGO.eventos: main.js no lo repite
 ganchos.visita = n => analitica.visita(n);
 // Con el arranque gratis por delante, la bienvenida no dice «te queda 1 final gratis»: esa final es solo el arranque.
@@ -459,5 +465,11 @@ ganchos.pedirPase = pedirPase;
 ganchos.muro = muro;
 ganchos.intervalo = intervalo;
 ganchos.podio = podio;
+ganchos.mandarFinal = info => servidor.mandarFinal(info);
+ganchos.ranking = info => servidor.ranking(info);
+ganchos.perfil = () => servidor.perfil();
+ganchos.desafio = id => servidor.desafio(id);
+ganchos.entrenar = info => servidor.entrenar(info);
+ganchos.perfilGuardado = () => servidor.perfilGuardado();
 
 export const conexion = { arranque, muro, intervalo, get anotado() { return S.lista; }, get libre() { return S.libre; }, get quedan() { return S.quedan; }, S };

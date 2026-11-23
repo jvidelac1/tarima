@@ -5,7 +5,7 @@ import { idiv, rdiv, clampi, mezclar, Azar, huella, canonico } from './fixed.js'
 import { simular } from './attempt.js';
 import { gestos, decidir, elegirEnvion, envionRival, planRival, decidirPlan, estiloRival, HUELLA_IA } from './ai.js';
 import { sugerencia } from './entrenador.js';
-import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad, cuerpoDe, cuerpoBarra, HUELLA_U, HUELLAS_B, NIVELES_B, fatigaDe, sumarFatiga } from './rules.js';
+import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad, cuerpoDe, cuerpoBarra, HUELLA_U, HUELLAS_B, NIVELES_B, fatigaDe, sumarFatiga, PLANES, CATEGORIAS, CATEGORIA_BASE, techoEnCategoria } from './rules.js';
 
 const LEVS = ['s', 'c'];
 
@@ -44,7 +44,7 @@ export class Partida {
     const ctl = cfg.ctl ?? 'c'; if (!CONTROLES.includes(ctl)) throw new Error('nivel de control desconocido');
     if (cfg.ia !== undefined && cfg.ia !== HUELLA_IA) throw new Error('reglas de los rivales desconocidas');
     if (cfg.turnos !== undefined && !TURNOS.modos.includes(cfg.turnos)) throw new Error('orden de turnos desconocido');
-    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl, tactil: (ctl === 'f' || ctl === 'u' || ctl === 'b') && !!cfg.tactil, ia: cfg.ia ?? null, turnos: cfg.turnos ?? null, dif: ctl === 'b' && NIVELES_B[cfg.dif] ? cfg.dif : 'facil', envFijo: cfg.envFijo === true };
+    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl, tactil: (ctl === 'f' || ctl === 'u' || ctl === 'b') && !!cfg.tactil, ia: cfg.ia ?? null, turnos: cfg.turnos ?? null, dif: ctl === 'b' && NIVELES_B[cfg.dif] ? cfg.dif : 'facil', envFijo: cfg.envFijo === true, categoria: CATEGORIAS[cfg.categoria] && +cfg.categoria !== CATEGORIA_BASE ? +cfg.categoria : CATEGORIA_BASE, plan: ctl === 'b' && PLANES[cfg.plan] ? cfg.plan : null };
     if (cfg.envFijo !== undefined && typeof cfg.envFijo !== 'boolean') throw new Error('regla del estilo de envión desconocida');
     if (cfg.dif !== undefined && cfg.dif !== 'facil' && this.cfg.dif !== cfg.dif) throw new Error('nivel de dificultad desconocido');
     const r = new Azar(mezclar(this.cfg.semilla, 7)), N = NIVELES[cfg.nivel];
@@ -52,10 +52,14 @@ export class Partida {
     const tipo = r.ent(3), quien = r.ent(3);
     this.guion = { tipo: ['nada', 'tocado', 'forma'][tipo], a: tipo ? quien : -1 };
     this.at = cfg.atletas.map((x, i) => {
-      const f = datos.atletas[x.id]; if (!f) throw new Error('pesista desconocido: ' + x.id);
+      const f0 = datos.atletas[x.id]; if (!f0) throw new Error('pesista desconocido: ' + x.id);
+      // la progresión de la persona (LIF-14): su RM con el bono de los oros ganados con ese pesista
+      // categoría (LIF-15): el techo de todos escala igual; la progresión de la persona va encima, en kilos
+      const tc = techoEnCategoria(f0.techo, this.cfg.categoria), rm = x.ctrl === 'persona' && x.rm ? x.rm : null, tecnica = x.ctrl === 'persona' && x.tecnica ? x.tecnica : 0;
+      const f = rm || tc !== f0.techo ? { ...f0, techo: { s: tc.s + (rm ? rm.s : 0), c: tc.c + (rm ? rm.c : 0) } } : f0;
       const forma = { s: r.entre(-2, 2), c: r.entre(-2, 2) }, pct = clampi(f.ia.apertura + r.entre(-25, 25), 910, 960) + N.abre;
       const saltos = { s: f.ia.saltos.s.map(k => k + r.entre(-1, 1)), c: f.ia.saltos.c.map(k => k + r.entre(-1, 1)) }, sube1 = [r.ent(3) === 0, r.ent(3) === 0, r.ent(3) === 0, r.ent(3) === 0];
-      const a = { i, id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego', f, modelo: datos.modelos[f.modelo], resto: RESTO.ini, forma, saltos, sube1, s: [], c: [], decl: { s: 0, c: 0 }, mejor: { s: 0, c: 0 }, seqMejor: { s: -1, c: -1 }, ult: { s: -1, c: -1 }, cambios: 0, pidio: 0, bono: '', garraUno: { s: true, c: true }, fatiga: { s: 0, c: 0 } };
+      const a = { i, id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego', tecnica, f, modelo: datos.modelos[f.modelo], resto: RESTO.ini, forma, saltos, sube1, s: [], c: [], decl: { s: 0, c: 0 }, mejor: { s: 0, c: 0 }, seqMejor: { s: -1, c: -1 }, ult: { s: -1, c: -1 }, cambios: 0, pidio: 0, bono: '', garraUno: { s: true, c: true }, fatiga: { s: 0, c: 0 } };
       if (a.ctrl === 'juego') { if (N.forma) { forma.s += N.forma; forma.c += N.forma; } a.decl.s = rdiv(f.techo.s * pct, 1000); a.decl.c = rdiv(f.techo.c * pct, 1000); }
       return a;
     });
@@ -68,8 +72,15 @@ export class Partida {
       a.decl = { ...a.plan.decl };
     }
     this.fase = 'presentacion'; this.lev = 's'; this.seq = 0; this.barra = 0; this.rondaBarra = -1; this.nPedido = 0; this.ultimo = -1; this.llamado = null; this.nLlamado = 0;
-    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(this.cfg.envFijo ? { envFijo: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : ctl === 'b' ? { barra: HUELLAS_B[this.cfg.dif], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}) } : {}), ...(this.cfg.ia ? { ia: this.cfg.ia } : {}), ...(this.cfg.turnos ? { orden: this.cfg.turnos, turnos: HUELLA_TURNOS } : {}),
-      atletas: cfg.atletas.map(x => ({ id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego' })), aperturas: this.at.map(a => ({ s: a.decl.s, c: a.decl.c })), llamados: [] };
+    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(this.cfg.envFijo ? { envFijo: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : ctl === 'b' ? { barra: HUELLAS_B[this.cfg.dif], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}) } : {}), ...(this.cfg.ia ? { ia: this.cfg.ia } : {}), ...(this.cfg.turnos ? { orden: this.cfg.turnos, turnos: HUELLA_TURNOS } : {}), ...(PLANES[this.cfg.plan] ? { plan: this.cfg.plan } : {}), ...(this.cfg.categoria !== CATEGORIA_BASE ? { categoria: this.cfg.categoria } : {}),
+      atletas: cfg.atletas.map(x => ({ id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego', ...(x.ctrl === 'persona' && x.rm ? { rm: { s: x.rm.s, c: x.rm.c } } : {}), ...(x.ctrl === 'persona' && x.tecnica ? { tecnica: x.tecnica } : {}) })), aperturas: this.at.map(a => ({ s: a.decl.s, c: a.decl.c })), llamados: [] };
+  }
+
+  /** LIF-5 · el plan de competencia de la persona (solo en la barrita y antes de empezar): queda en el registro. */
+  elegirPlan(plan) {
+    if (this.fase !== 'presentacion') throw new Error('el plan se elige antes de empezar');
+    if (this.cfg.ctl !== 'b' || !PLANES[plan]) throw new Error('plan desconocido');
+    this.cfg.plan = plan; this.reg.plan = plan;
   }
 
   // ---------- aperturas y sesiones ----------
@@ -86,6 +97,8 @@ export class Partida {
   empezar() {
     const lev = this.fase === 'presentacion' ? 's' : this.fase === 'intervalo' ? 'c' : null; if (!lev) throw new Error('no hay sesión por empezar');
     if (this.at.some(a => !a.decl[lev])) throw new Error('falta una apertura');
+    // LIF-5: con plan, si el arranque salió como se planeó (3 válidos), el dos tiempos empieza sin el cansancio que trae del arranque
+    if (lev === 'c' && PLANES[this.cfg.plan]) for (const a of this.at) if (a.ctrl === 'persona') { a.planCumplido = a.s.length === 3 && a.s.every(x => x.res === 'valido'); if (a.planCumplido && a.fatiga) a.fatiga.c = 0; }
     this.fase = this.lev = lev; this.barra = 0; this.rondaBarra = -1; this.ultimo = -1; for (const a of this.at) a.pidio = 0; this._siguiente();
   }
 
@@ -205,7 +218,7 @@ export class Partida {
       cal: persona ? this.cfg.cal : 0, primera: persona && this.cfg.primera && L.n === 1, domina: L.lev === 's' || f.enviones.includes(env), jueces: this.jueces, reloj: L.reloj, ctl: persona ? this.cfg.ctl : 'c', ...(persona && this.cfg.tactil ? { tactil: true } : {}),
       // 'u' y 'b': el cuerpo de juego del pesista (rules.js → CUERPOS_U; en 'b', con el ancho de cada barrita) y si todavía
       // tiene la garra de este levantamiento
-      ...(persona && this.cfg.ctl === 'u' ? { cuerpo: cuerpoDe(a.id), garraUno: a.garraUno[L.lev] } : persona && this.cfg.ctl === 'b' ? { cuerpo: cuerpoBarra(a.id), garraUno: a.garraUno[L.lev], fatiga: a.fatiga[L.lev], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}) } : {}) };
+      ...(persona && this.cfg.ctl === 'u' ? { cuerpo: cuerpoDe(a.id), garraUno: a.garraUno[L.lev] } : persona && this.cfg.ctl === 'b' ? { cuerpo: cuerpoBarra(a.id), garraUno: a.garraUno[L.lev], fatiga: a.fatiga[L.lev], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}), ...(a.tecnica ? { tecnica: a.tecnica } : {}) } : {}) };
   }
   /** ¿Puede el pesista del llamado pedir `kg` en el instante `ms`? Devuelve el motivo si no. */
   cambioValido(ms, kg) {
@@ -276,7 +289,7 @@ export class Partida {
     const costo = RESTO.base[lev] + Math.max(0, idiv(ctx.I - 9500, 100)) * RESTO.sobre95 + (ctx.ctl === 'u' || ctx.ctl === 'b' ? 0 : Math.min(RESTO.topePelea, res.toques * RESTO.toque + idiv(res.fuera * RESTO.fueraSeg, 120))) + (valido ? 0 : RESTO.nulo) + (lev === 'c' ? RESTO.envion[ctx.env] : 0);
     const gasto = Math.max(0, idiv(costo * multFondo(a.f.attrs.fon), 1000)), seq = this.seq++;
     a.resto = Math.max(0, a.resto - gasto);
-    a[lev].push({ kg: L.kg, res: res.res, causa: res.causa, luces: res.luces, seq, env: ctx.env, et: L.et, I: ctx.I, gasto });
+    a[lev].push({ kg: L.kg, res: res.res, causa: res.causa, luces: res.luces, seq, env: ctx.env, et: L.et, I: ctx.I, gasto, ...(res.uno?.barras ? { zonas: res.uno.barras.map(b => b.zona) } : {}) });      // zonas: final.js (LIF-2)
     if (valido && L.kg > a.mejor[lev]) { a.mejor[lev] = L.kg; a.seqMejor[lev] = seq; }
     if (res.uno && res.uno.garra === 'usada') a.garraUno[lev] = false;      // 'u': una garra por levantamiento
     if (ctx.ctl === 'b' && res.uno) sumarFatiga(a.fatiga, lev, fatigaDe(res.uno));      // 'b': lo que exigió este intento cansa a los siguientes

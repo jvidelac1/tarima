@@ -516,3 +516,47 @@ export const CAUSAS = {
   aplastado: 'Aplastado', codos: 'Ceden los codos', temblor: 'Pierde la barra arriba', devuelve: 'Devuelve la barra',
   codos_blandos: 'Codos blandos', tiembla: 'Llega temblando', antes: 'Suelta antes de la chicharra', sin_apoyo: 'No fija la barra', reloj: 'Se acabó el reloj',
 };
+
+// Progresión del pesista (LIF-14, LIF-68): cada oro validado en el servidor con un pesista le sube el RM 1 kg en el arranque
+// y 1 kg en el dos tiempos, hasta 10 kg. Va en el registro (atletas[i].rm) para que el servidor la recalcule; el Worker solo
+// acepta lo que respaldan las finales que ya validó (worker/src/finales.js). El campeonato semanal se juega sin progresión.
+export const PROGRESION = { porOro: 1, tope: 10 };
+/** El bono de RM {s, c} que corresponde a `oros` finales ganadas con ese pesista. */
+export const bonoRM = oros => { const k = Math.min(PROGRESION.tope, Math.max(0, oros | 0) * PROGRESION.porOro); return { s: k, c: k }; };
+
+// Plan de competencia (LIF-5, LIF-34): antes de la final la persona elige con el entrenador qué tan arriesgado va a ir. El plan
+// cambia la chance con la que el entrenador propone los kilos del 2.º y 3.er intento (entrenador.js, sugerencia; milésimas) y,
+// si el arranque sale como se planeó (los 3 válidos), el dos tiempos empieza sin el cansancio que trae del arranque. Va en el
+// registro (`plan`) para que el servidor lo recalcule. Sin plan: «oro», el de siempre.
+export const PLANES = { seguro: { segundo: 960, tercero: 880 }, oro: { segundo: 930, tercero: 800 }, record: { segundo: 880, tercero: 650 } };
+
+// Categorías de peso (LIF-15, LIF-49): las de hombres de la IWF desde 2025. La de siempre es 88 (el juego decía «hasta 90»).
+// Cada categoría escala el RM de todos los pesistas de la final (milésimas), con las proporciones de los estándares de total
+// que cita LIF-49 (336 kg en 70, 349 en 75, 374 en 85): todos igual, así la final es pareja y el ranking va por categoría.
+// Va en el registro (`categoria`) y el servidor la recalcula. El cuerpo de los pesistas todavía no cambia (LIF-67).
+export const CATEGORIAS = { 71: 900, 79: 950, 88: 1000, 94: 1040 };
+export const CATEGORIA_BASE = 88;
+/** El techo {s, c} de un pesista en la categoría `cat` (kg enteros). */
+export const techoEnCategoria = (techo, cat) => { const k = CATEGORIAS[cat] || 1000; return k === 1000 ? techo : { s: idiv(techo.s * k + 500, 1000), c: idiv(techo.c * k + 500, 1000) }; };
+
+// Entrenamiento entre competencias (LIF-62, decisión del dueño del 16-nov; LIF-37, LIF-41): 1 o 2 minijuegos de ~20 s con la
+// misma barrita. Tirones suben el RM del arranque, sentadilla el del dos tiempos y la técnica hace más lenta la barrita del
+// pesista en las finales. Energía limitada (sesiones por final validada) y rendimientos decrecientes (topes). Cada sesión son 3
+// pasadas de la barrita: con 2 o 3 en verde suma; el servidor recalcula la sesión desde los toques (web/js/sim/entreno.js).
+export const ENTRENO = { porFinal: 2, guardaMax: 4, pasadas: 3, verdesParaSumar: 2, kg: 1, topeKg: 5, tecnica: 20, topeTecnica: 100, verde: [400, 600], amarillo: [280, 720], pasada: 1400 };
+/** Las reglas de la barrita de la persona con su técnica entrenada (milésimas más lenta, hasta ENTRENO.topeTecnica). */
+export function reglasConTecnica(dif, tecnica = 0) {
+  const R = reglasB(dif), k = Math.max(0, Math.min(ENTRENO.topeTecnica, tecnica | 0)); if (!k) return R;
+  return Object.freeze({ ...R, pasada: idiv(R.pasada * (1000 + k), 1000), pasadaLenta: idiv(R.pasadaLenta * (1000 + k), 1000) });
+}
+
+// Escuelas de entrenamiento (LIF-69): perfiles de parámetros del entrenamiento. Rusa: progreso parejo (el de ENTRENO). Búlgara:
+// sube rápido (más kilos por sesión) pero exige las 3 en el verde. China: posiciones y accesorios (más técnica por sesión). La
+// latinoamericana falta definirla con el dueño. Los textos los aprueba el dueño: hasta entonces van detrás de ?escuelas=1.
+export const ESCUELAS = { rusa: { kg: 1, verdes: 2, tecnica: 20 }, bulgara: { kg: 2, verdes: 3, tecnica: 10 }, china: { kg: 1, verdes: 2, tecnica: 40 } };
+
+// Control antidoping (LIF-19): evento de la carrera, sin efecto en el resultado. Entre los medallistas, la semilla de la final
+// sortea a uno de cada `cadaN` para el control; los pesistas son ficticios y el control da siempre limpio.
+export const ANTIDOPING = { cadaN: 3 };
+/** ¿Sale sorteado para el control el pesista `puesto` (1 a 3) de la final con `semilla`? */
+export const sorteoAntidoping = (semilla, puesto) => !!puesto && puesto <= 3 && (mezclar(semilla >>> 0, 1907, puesto) >>> 0) % ANTIDOPING.cadaN === 0;

@@ -843,3 +843,28 @@ html.vert .panel.compacto .kgsel>button.ir{flex-basis:auto}
 html.vert .kgsel>span{display:none}
 html.vert .kgsel button.kg{min-width:46px;padding:.5em .55em}
 html.vert .kgsel output{font-size:clamp(30px,10vw,44px);min-width:2.6ch}
+
+/* 23-nov: con el teléfono parado y el recuadro de la primera persona a la vista (arriba a la derecha), la guía baja y queda
+   debajo del recuadro (stage.js, _recuadroCaja: arriba en max(15 % del alto, 118 px), alto min(42 % del alto, 35,2 % del ancho)) */
+html.vert body:has(#recuadro:not([hidden])) #tv #guia{bottom:auto;top:calc(max(var(--app-h,100vh)*.15,118px) + min(var(--app-h,100vh)*.42,35.2vw) + 8px)}
+
+/* ranking (LIF-9) y campeonato semanal (LIF-8): web/js/game/ui/ranking.js */
+.sobre-ranking .rk-pests,.sobre-ranking .rk-filtro{gap:calc(var(--u)*.6);flex-wrap:wrap}
+.sobre-ranking .rk-pests button[aria-pressed=true],.sobre-ranking .rk-filtro button[aria-pressed=true]{border-color:var(--teal);color:var(--teal)}
+.sobre-ranking .rk-lista{max-height:min(46vh,calc(var(--u)*34));overflow:auto;margin:calc(var(--u)*.6) 0}
+.sobre-ranking .rk-tabla{width:100%;border-collapse:collapse;font-size:calc(var(--u)*1.2)}
+.sobre-ranking .rk-tabla td{padding:calc(var(--u)*.35) calc(var(--u)*.5);border-bottom:1px solid rgba(255,255,255,.08);text-align:left}
+.sobre-ranking .rk-tabla td:first-child,.sobre-ranking .rk-tabla td:last-child{text-align:right;white-space:nowrap}
+.sobre-ranking .rk-tabla tr.yo td{color:var(--gold);font-weight:700}
+.sobre-ranking .rk-publico{display:flex;gap:calc(var(--u)*.6);align-items:center;font-size:calc(var(--u)*1.1);margin:calc(var(--u)*.4) 0}
+.bono{font-style:normal;color:var(--ok);font-weight:700}
+.sobre-perfil th{font-size:calc(var(--u)*.95);color:var(--mute);text-align:left;padding:calc(var(--u)*.3) calc(var(--u)*.5)}
+.desafio{border:1px solid var(--gold);background:rgba(255,210,63,.08);padding:calc(var(--u)*.6) calc(var(--u)*1);margin:calc(var(--u)*.6) 0}.desafio p{margin:0 0 calc(var(--u)*.3)}
+.gana .plan{gap:calc(var(--u)*.5);flex-wrap:wrap;align-items:center}.gana .plan button[aria-pressed=true]{border-color:var(--teal);color:var(--teal)}
+.entreno .ejercicios{display:grid;grid-template-columns:repeat(auto-fit,minmax(calc(var(--u)*14),1fr));gap:calc(var(--u)*.6);margin:calc(var(--u)*.6) 0}
+.entreno .ejercicio{display:flex;flex-direction:column;align-items:flex-start;gap:calc(var(--u)*.2);text-align:left;padding:calc(var(--u)*.7)}
+.entreno .ejercicio small{font-family:var(--body);text-transform:none;font-weight:400;color:var(--mute)}.entreno .ejercicio em{font-style:normal;color:var(--ok)}
+.en-barra{position:relative;height:calc(var(--u)*3);margin:calc(var(--u)*1.2) 0;background:linear-gradient(90deg,var(--red),var(--red));border:2px solid var(--line);border-radius:calc(var(--u)*.4);overflow:hidden}
+.en-barra .en-am{position:absolute;top:0;bottom:0;background:var(--gold)}.en-barra .en-ve{position:absolute;top:0;bottom:0;background:var(--ok)}
+.en-barra .en-punt{position:absolute;top:-2px;bottom:-2px;width:6px;margin-left:-3px;background:#fff;box-shadow:0 0 0 2px #000}
+.entreno .zonas{display:flex;gap:8px}.entreno .zonas i{width:28px;height:12px;border-radius:3px;display:inline-block}.zonas .z-verde{background:var(--ok)}.zonas .z-amarillo{background:var(--gold)}.zonas .z-rojo{background:var(--red)}

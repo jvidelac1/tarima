@@ -23,7 +23,7 @@ jobs:
     # Cuatro máquinas en paralelo (antes una sola en fila: ~47 min). Cada grupo dura menos de ~15 min.
     name: ${{ matrix.titulo }} (dibujo por software)
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 55      # el grupo del teléfono (check_telefono, la selección en 3D y check_carga_fallas) pasa de 40 desde el 17-nov
     strategy:
       fail-fast: false
       matrix:

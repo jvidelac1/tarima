@@ -8,6 +8,9 @@ import { DESCARTABLES } from './descartables.js';
 import { codigoDispositivo, codigoIp, idAzar, igualSeguro, leerPase, leerToken, pase, token } from './cripto.js';
 import { PREFIJO, capturar, evaluarBanderas, proxy } from './posthog.js';
 import { armarMail, idiomaPagina, pagina, t } from './textos.js';
+import { anotarError, limpiarErrores, resumenDia } from './errores.js';
+import { MAX_FINAL, entrenar, finalDeDesafio, revisarTecnica, guardarFinal, perfil as perfilDe, puestoEnSemana, ranking as rankingDe, revisarProgresion, validarFinal } from './finales.js';
+import { semanaDe, semillaSemana, CAMPEONATO } from '../../web/js/sim/semana.js';
 
 const MAX_CUERPO = 4096;
 const COOKIE = 'tdv';
@@ -17,7 +20,7 @@ const SECRETOS = ['SECRETO_IP', 'SECRETO_DISPOSITIVO', 'SECRETO_PASE', 'SECRETO_
 // Límites por código de IP: [máximo, período en segundos] (docs/MVP.md 5.5).
 const LIMITES = {
   estado: [60, 600], partida: [20, 600], envion: [20, 600], anotar: [5, 3600], encuesta: [3, 3600], baja_api: [3, 3600],
-  baja: [10, 3600], confirmar: [10, 3600], exportar: [10, 3600],
+  baja: [10, 3600], confirmar: [10, 3600], exportar: [10, 3600], final: [30, 3600], ranking: [120, 600], perfil: [120, 600], desafio: [120, 600], error: [20, 600], entreno: [30, 600],
 };
 
 class ErrorHttp extends Error {
@@ -56,8 +59,15 @@ export default {
   },
 
   async scheduled(controller, env, ctx) {
-    const r = await D.limpiar(env.DB, ahoraS());
+    const ahora = ahoraS(), r = await D.limpiar(env.DB, ahora);
     log('info', { msg: 'limpieza', ...r });
+    // LIF-26: resumen de errores de ayer; si pasa el umbral, un registro de nivel error (alerta) y el evento en PostHog
+    try {
+      await limpiarErrores(env.DB, ahora).run();
+      const z = await resumenDia(env.DB, new Date((ahora - 86400) * 1000).toISOString().slice(0, 10));
+      log(z.alerta ? 'error' : 'info', { msg: z.alerta ? 'alerta_errores' : 'errores_dia', dia: z.dia, errores: z.errores, finales: z.finales, top: z.top.map(x => `${x.n}× ${x.tipo} ${x.pantalla} ${x.mensaje}`.slice(0, 120)) });
+      if (z.alerta) ctx.waitUntil(capturar(env, { event: 'alerta_errores', distinct_id: 'tarima-worker', properties: { dia: z.dia, errores: z.errores, finales: z.finales } }).catch(() => null));
+    } catch (e) { log('error', { msg: 'errores_resumen', tipo: e?.name }); }
   },
 };
 
@@ -85,11 +95,11 @@ async function leerCuerpo(request, max = MAX_CUERPO) {
   return new TextDecoder().decode(todo);
 }
 
-async function leerJson(request, url) {
+async function leerJson(request, url, max = MAX_CUERPO) {
   if (request.method !== 'POST') throw new ErrorHttp(405, 'metodo');
   if (request.headers.get('origin') !== url.origin) throw new ErrorHttp(403, 'origen');
   if (!/^application\/json\b/i.test(request.headers.get('content-type') || '')) throw new ErrorHttp(415, 'formato');
-  const texto = await leerCuerpo(request);
+  const texto = await leerCuerpo(request, max);
   let b;
   try { b = JSON.parse(texto); } catch { throw new ErrorHttp(400, 'formato'); }
   if (!b || typeof b !== 'object' || Array.isArray(b)) throw new ErrorHttp(400, 'formato');
@@ -151,11 +161,11 @@ async function banderas(env, ctx, dev, ahora) {
 
 async function api(request, env, ctx, url) {
   const ruta = url.pathname.slice(5);
-  const manejadores = { estado, partida, envion, anotar, encuesta, baja: bajaApi };
+  const manejadores = { estado, partida, envion, anotar, encuesta, baja: bajaApi, final, ranking, perfil, desafio, error, entreno };
   if (ruta === 'exportar') return exportar(request, env, url);
   const m = manejadores[ruta];
   if (!m) return json({ error: 'no_existe' }, 404);
-  const b = await leerJson(request, url);
+  const b = await leerJson(request, url, ruta === 'final' ? MAX_FINAL : MAX_CUERPO);
   verificarSecretos(env);
   const ahora = ahoraS();
   const i = await codigoIp(env, R.prefijoIp(ipDe(request, env)));
@@ -179,6 +189,71 @@ async function situacion({ request, env, ctx, b, i, ahora }) {
   // la IP ni el mail). Permite contar personas por día aunque posthog-js, sin cookies, estrene un id en cada carga.
   const contexto = { pais: paisDe(request, env), previas: c.usadas_d, dias: R.diasDesde(dev.creado, ahora), jugador: 'd_' + dev.d.slice(0, 16) };
   return { uuid, d, dev, flags, cfg, c, dec, contexto };
+}
+
+// Una final terminada (LIF-10): {pase, registro, campeonato?, apodo?, publico?, saltos?, duracion_s?}. El pase dice de qué
+// partida es (una final por pase) y tiene que ser de este dispositivo. El registro se recalcula con el núcleo del juego; lo
+// que se guarda es lo que da el recálculo. Responde {estado:'ok', total, puesto, semana, campeonato, ranking?} o
+// {estado:'rechazada', motivo} (422) si el registro no cierra.
+async function final({ request, env, b, ahora }) {
+  const ps = await leerPase(env, b.pase, ahora);
+  if (!ps || !Number.isSafeInteger(ps.p) || typeof ps.d !== 'string') throw new ErrorHttp(400, 'pase');
+  const uuid = cookieTdv(request) || (R.esUuid(b.dispositivo) ? b.dispositivo.toLowerCase() : null);
+  if (!uuid) throw new ErrorHttp(400, 'pase');
+  const d = await codigoDispositivo(env, uuid);
+  if (!d.startsWith(ps.d) || !(await D.partidaDe(env.DB, ps.p, d))) throw new ErrorHttp(400, 'pase');
+  const origen = Number.isSafeInteger(b.desafio) ? await finalDeDesafio(env.DB, b.desafio) : null;
+  if (b.desafio !== undefined && b.desafio !== null && !origen) return json({ estado: 'rechazada', motivo: 'desafío desconocido' }, 422);
+  const v = validarFinal(b.registro, { campeonato: b.campeonato === true, ahora, desafio: origen });
+  if (!v.ok) { log('info', { msg: 'final_rechazada', motivo: v.error }); return json({ estado: 'rechazada', motivo: v.error }, 422); }
+  const prog = await revisarProgresion(env.DB, d, b.registro, v.campeonato);
+  if (prog) { log('info', { msg: 'final_rechazada', motivo: prog }); return json({ estado: 'rechazada', motivo: prog }, 422); }
+  const tec = await revisarTecnica(env.DB, d, b.registro, v.campeonato || !!origen);
+  if (tec) { log('info', { msg: 'final_rechazada', motivo: tec }); return json({ estado: 'rechazada', motivo: tec }, 422); }
+  const id = await guardarFinal(env.DB, { p: ps.p, d, ahora, v, reg: b.registro, b, pais: paisDe(request, env) });
+  const r = { estado: id ? 'ok' : 'repetida', id, total: v.r.total, puesto: v.r.puesto, semana: v.semana, campeonato: v.campeonato, perfil: await perfilDe(env.DB, d, semanaDe(ahora).clave) };
+  if (v.campeonato) r.ranking = await puestoEnSemana(env.DB, v.semana, v.r.total, ahora);
+  if (origen) r.desafio = { id: origen.id, total: origen.total, apodo: origen.apodo, pesista: origen.pesista };
+  log('info', { msg: 'final', campeonato: v.campeonato, total: v.r.total, repetida: !id });
+  return json(r);
+}
+
+// El ranking (LIF-9): {alcance: 'semana' | 'global', pais?: true (el del visitante)}. Responde {semana, campeonato, filas}.
+async function ranking({ request, env, b, ahora }) {
+  const sem = semanaDe(ahora), alcance = b.alcance === 'global' ? 'global' : 'semana', pais = b.pais === true ? paisDe(request, env) : null;
+  const uuid = cookieTdv(request) || (R.esUuid(b.dispositivo) ? b.dispositivo.toLowerCase() : null), d = uuid ? await codigoDispositivo(env, uuid) : null;
+  const categoria = [71, 79, 88, 94].includes(b.categoria) ? b.categoria : 88;
+  const filas = await rankingDe(env.DB, { alcance, semana: sem.clave, pais, tope: 50, d, categoria });
+  return json({ alcance, semana: sem.clave, hasta: sem.fin, pais, categoria, campeonato: { ...CAMPEONATO, semilla: semillaSemana(sem.clave) }, filas });
+}
+
+// Un desafío (LIF-12): {id} → las condiciones de esa final para jugarla igual, y su resultado (sin datos del dispositivo).
+async function desafio({ env, b }) {
+  const f = await finalDeDesafio(env.DB, b.id);
+  if (!f) return json({ estado: 'no_existe' }, 404);
+  return json({ estado: 'ok', id: f.id, semilla: f.semilla, ctl: f.ctl, dif: f.dif, nivel: f.nivel, orden: f.orden, categoria: f.categoria, pesista: f.pesista, s: f.s, c: f.c, total: f.total, puesto: f.puesto, apodo: f.apodo, pais: f.pais, aceptados: f.aceptados, lo_superaron: f.lo_superaron });
+}
+
+// Un error del juego (LIF-26): {tipo, pantalla, mensaje, archivo, linea}. Sin dispositivo ni IP; responde 204.
+async function error({ env, b, ahora }) {
+  await anotarError(env.DB, b, ahora);
+  return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
+}
+
+// Una sesión de entrenamiento (LIF-62): {pesista, ejercicio, toques: [ms × 3]}. El servidor la recalcula; sin energía, 409.
+async function entreno({ request, env, b, ahora }) {
+  const uuid = cookieTdv(request) || (R.esUuid(b.dispositivo) ? b.dispositivo.toLowerCase() : null);
+  if (!uuid) throw new ErrorHttp(400, 'dispositivo');
+  const r = await entrenar(env.DB, await codigoDispositivo(env, uuid), b, ahora, ['ventura', 'brenner', 'marangi']);
+  if (!r.ok) return json({ estado: r.error === 'sin_energia' ? 'sin_energia' : 'rechazada', motivo: r.error }, r.error === 'sin_energia' ? 409 : 422);
+  return json({ estado: 'ok', zonas: r.sesion.zonas, verdes: r.sesion.verdes, suma: r.sesion.suma, entrenado: r.entrenado, disponibles: r.disponibles });
+}
+
+// El perfil (LIF-68, LIF-11): lo que dicen las finales validadas de este dispositivo, con la progresión de cada pesista.
+async function perfil({ request, env, b }) {
+  const uuid = cookieTdv(request) || (R.esUuid(b.dispositivo) ? b.dispositivo.toLowerCase() : null);
+  if (!uuid) return json({ perfil: null });
+  return json({ perfil: await perfilDe(env.DB, await codigoDispositivo(env, uuid), semanaDe(ahoraS()).clave) });
 }
 
 // La regla vigente, para los textos del juego: hasta dónde llega una final gratis, cuántas, cuánto suma la encuesta y si

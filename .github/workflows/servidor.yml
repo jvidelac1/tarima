@@ -18,6 +18,8 @@ on:
       - 'web/privacidad.html'
       - 'web/vendor/posthog/**'
       - 'tools/servidor_test.mjs'
+      - 'tools/finales_test.mjs'
+      - 'tools/final_bot.mjs'
       - 'tools/worker_test.mjs'
       - 'tools/check_analitica.mjs'
       - 'tools/desplegar.sh'
@@ -36,6 +38,8 @@ on:
       - 'web/privacidad.html'
       - 'web/vendor/posthog/**'
       - 'tools/servidor_test.mjs'
+      - 'tools/finales_test.mjs'
+      - 'tools/final_bot.mjs'
       - 'tools/worker_test.mjs'
       - 'tools/check_analitica.mjs'
       - 'tools/desplegar.sh'
@@ -82,6 +86,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node tools/servidor_test.mjs 2>&1 | tee out/logs/servidor_test.log
 
+      - name: Finales validadas, ranking y campeonato semanal (finales_test)
+        if: ${{ !cancelled() }}
+        run: node tools/finales_test.mjs 2>&1 | tee out/logs/finales_test.log
+
       - name: Regla pura del Worker (worker_test)
         if: ${{ !cancelled() }}
         run: node tools/worker_test.mjs 2>&1 | tee out/logs/worker_test.log
@@ -120,7 +128,7 @@ jobs:
         run: |
           {
             echo "### Servidor y publicación"
-            for f in servidor_test worker_test worker_vitest empaquetado check_analitica; do
+            for f in servidor_test finales_test worker_test worker_vitest empaquetado check_analitica; do
               echo; echo "**$f**"; echo '```'
               if [ -f "out/logs/$f.log" ]; then tail -n 30 "out/logs/$f.log"; else echo "(no corrió)"; fi
               echo '```'
