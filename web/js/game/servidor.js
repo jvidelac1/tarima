@@ -519,9 +519,33 @@ export function crearServidor(o = {}) {
     return Promise.reject(new ErrorRed('http', 404, { error: 'no_existe' }));
   }
 
+  // ---------- finales validadas y ranking (LIF-10, LIF-9, LIF-8) ----------
+
+  /**
+   * Manda el registro de la final que terminó, con el pase de esa final (antes de finalTerminada, que lo suelta). El
+   * servidor la recalcula y la guarda. Nunca frena el juego: sin pase, sin servidor o con error devuelve {estado} y listo.
+   * @returns {Promise<{estado:'ok'|'repetida', total:number, puesto:number|null, semana:string, campeonato:boolean, ranking?:{puesto:number, de:number}} | {estado:'sin_pase'|'rechazada'|'error', motivo?:string}>}
+   */
+  async function mandarFinal({ registro, campeonato = false, apodo = null, publico = false, saltos = null, duracion_s = null } = {}) {
+    let pase = null; try { pase = JSON.parse(sesion.get(CLAVES.pase) || 'null')?.pase || null; } catch { pase = null; }
+    if (!pase || modo !== 'servidor' || !registro) return { estado: 'sin_pase' };
+    try {
+      const { j } = await post('/api/final', { pase, registro, dispositivo: dispositivo(), campeonato: !!campeonato, ...(publico && apodo ? { apodo, publico: true } : {}), saltos, duracion_s }, ESPERA_PEDIDO);
+      return j;
+    } catch (e) {
+      if (e.status === 422) return { estado: 'rechazada', motivo: e.cuerpo?.motivo || null };
+      return { estado: 'error', error: e.tipo || 'red' };
+    }
+  }
+  /** El ranking: {alcance: 'semana' | 'global', pais?: boolean}. Devuelve lo del servidor o {estado:'error'}. */
+  async function ranking({ alcance = 'semana', pais = false } = {}) {
+    if (modo !== 'servidor') return { estado: 'sin_servidor' };
+    try { const { j } = await post('/api/ranking', { alcance, pais: !!pais, dispositivo: dispositivo() }, ESPERA_PEDIDO); return { estado: 'ok', ...j }; } catch (e) { return { estado: 'error', error: e.tipo || 'red' }; }
+  }
+
   return {
     get modo() { return modo; },
-    dispositivo, copia, estado, pedirPase, envion, paseParaReanudar, finalTerminada, soltarPase, anotar, encuesta, baja,
+    dispositivo, copia, estado, pedirPase, envion, paseParaReanudar, finalTerminada, soltarPase, anotar, encuesta, baja, mandarFinal, ranking,
   };
 }
 

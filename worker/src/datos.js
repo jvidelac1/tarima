@@ -121,6 +121,8 @@ export async function limpiar(db, ahora) {
     ['sin_confirmar', db.prepare(`DELETE FROM lista WHERE confirmado_en IS NULL AND confirmar_mandado_en IS NOT NULL
       AND confirmar_mandado_en <= ?1`).bind(ahora - SIN_CONFIRMAR)],
     ['limites', db.prepare('DELETE FROM limites WHERE hasta <= ?1').bind(ahora)],
+    // finales del ranking (LIF-10): el resultado queda, el código del dispositivo se borra a los 180 días (privacidad.html)
+    ['finales', db.prepare("UPDATE finales SET d = '' WHERE d != '' AND en <= ?1").bind(ahora - RETENCION)],
   ];
   const r = await db.batch(pasos.map(p => p[1]));
   return Object.fromEntries(pasos.map((p, k) => [p[0], r[k].meta.changes]));

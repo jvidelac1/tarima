@@ -5,6 +5,7 @@ import { env } from 'cloudflare:workers';
 import { createExecutionContext, createScheduledController, waitOnExecutionContext } from 'cloudflare:test';
 import worker from '../src/index.js';
 import { codigoDispositivo, leerPase } from '../src/cripto.js';
+import REG from './final_ejemplo.json';
 
 const ORIGEN = 'https://tarima.test';
 let nIp = 0;
@@ -753,5 +754,22 @@ describe('limpieza diaria y registros', () => {
     expect(logs.length).toBeGreaterThan(0);
     const todo = logs.join('\n');
     for (const x of [ip, a, email, 'x@y.com']) expect(todo).not.toContain(x);
+  });
+});
+
+describe('finales validadas y ranking (LIF-10, LIF-9)', () => {
+  it('una final entra recalculada en el runtime de Workers; adulterada, no; el ranking responde', async () => {
+    const ip = nuevaIp(), a = uuid(), p = await pedirPartida(a, ip);
+    const r = await llamar('/api/final', { pase: p.j.pase, registro: REG, dispositivo: a }, { ip, cookie: `tdv=${a}` });
+    expect(r.status).toBe(200);
+    expect(r.j).toMatchObject({ estado: 'ok', campeonato: false });
+    expect(r.j.total).toBeGreaterThan(0);
+    const malo = JSON.parse(JSON.stringify(REG)); malo.llamados.find(c => c.ent).kg += 30;
+    const p2 = await pedirPartida(a, ip), r2 = await llamar('/api/final', { pase: p2.j.pase, registro: malo, dispositivo: a }, { ip, cookie: `tdv=${a}` });
+    expect(r2.status).toBe(422);
+    const rk = await llamar('/api/ranking', { alcance: 'global' }, { ip, cookie: `tdv=${a}` });
+    expect(rk.status).toBe(200);
+    expect(rk.j.filas[0]).toMatchObject({ puesto: 1, yo: true, total: r.j.total });
+    expect(rk.j.semana).toMatch(/^\d{4}-W\d{2}$/);
   });
 });

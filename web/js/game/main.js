@@ -27,6 +27,8 @@ import { Partida } from '../sim/match.js';
 import { HUELLA_IA } from '../sim/ai.js';
 import { simular } from '../sim/attempt.js';
 import { recalcular, resumen } from '../sim/replay.js';
+import { CAMPEONATO, semanaDe, semillaSemana } from '../sim/semana.js';
+import { rankingHTML } from './ui/ranking.js';
 import { EVENTO, KG_MAX, RELOJ, PLAN, exigenciaTabla, previsto, cuerpoDe, chanceUno, chanceBarra, cuerpoBarra, zonasBarra, reglasB, DIFICULTADES, UNO } from '../sim/rules.js';
 import { RITMO, FASES_RAPIDAS, esDecisivo, tramoResumen, veredictoPropio, desdeRival, TECLA_SALTAR } from './ritmo.js';
 import { t, esc, fijarIdioma, detectarIdioma, idiomaActual, fijarTactil, alCambiarIdioma, IDIOMAS } from './i18n/t.js';
@@ -340,6 +342,30 @@ function pintarSobre(tipo) {
   el.querySelector('#so-seguir').onclick = cerrarSobre; const ay = el.querySelector('#so-ayuda'), sa = el.querySelector('#so-salir');
   if (ay) ay.onclick = () => pintarSobre('ayuda'); if (sa) sa.onclick = () => location.reload();
   el.querySelectorAll('.idi').forEach(b => { b.onclick = () => { cambiarIdioma(b.dataset.lang); el.querySelector(`.idi[data-lang="${idiomaActual()}"]`)?.focus(); }; });
+}
+/**
+ * El ranking (LIF-9) y el campeonato semanal (LIF-8), en #sobre, desde la bienvenida o el podio. Pide la lista al servidor
+ * (ganchos.ranking) y la repinta al llegar; las pestañas y el filtro por país vuelven a pedirla.
+ */
+function abrirRanking(alcance = 'semana') {
+  if (E.sobre) return;
+  const act = document.activeElement; E.sobre = { tipo: 'ranking', foco: act && $('capa').contains(act) ? act : null, solto: false }; boton.activo = false;
+  E.rk = { alcance, pais: false, datos: 'cargando', n: 0 }; pintarRanking(); cargarRanking();
+  ev('ranking_visto', { alcance, pantalla: E.pantalla });
+}
+async function cargarRanking() {
+  const R = E.rk; if (!R) return; const n = ++R.n; R.datos = 'cargando'; pintarRanking();
+  let d = null; try { d = await ganchos.ranking({ alcance: R.alcance, pais: R.pais }); } catch { d = null; }
+  if (E.rk !== R || R.n !== n) return; R.datos = d && d.estado === 'ok' ? d : 'error'; pintarRanking();
+}
+function pintarRanking() {
+  const el = $('sobre'), R = E.rk; if (!R || E.sobre?.tipo !== 'ranking') return;
+  el.innerHTML = `<div class="panel chico sobre-ranking">${rankingHTML({ alcance: R.alcance, pais: R.pais, datos: R.datos, publico: guardado.get('tarima.ranking_publico') === '1', nombre: esc(nombreJugador()), t, esc, tipo: id => t(`pesista.${id}.tipo`) || id, idioma: idiomaActual() })}</div>`;
+  el.hidden = false; if (!el.contains(document.activeElement)) enfocar(el.firstElementChild);
+  el.querySelector('#so-seguir').onclick = () => { E.rk = null; cerrarSobre(); };
+  el.querySelectorAll('[data-rk]').forEach(b => { b.onclick = () => { if (R.alcance !== b.dataset.rk) { R.alcance = b.dataset.rk; cargarRanking(); } }; });
+  el.querySelectorAll('[data-rkpais]').forEach(b => { b.onclick = () => { const v = b.dataset.rkpais === '1'; if (R.pais !== v) { R.pais = v; cargarRanking(); } }; });
+  const pub = el.querySelector('#rk-publico'); if (pub) pub.onchange = () => { guardado.set('tarima.ranking_publico', pub.checked ? '1' : '0'); ev('ranking_publico', { publico: pub.checked }); };
 }
 /** Abre la pausa o la ayuda: congela el reloj del juego (el del llamado no corre) hasta volver. */
 function abrirSobre(tipo) {
@@ -1046,7 +1072,7 @@ async function inicio() {
       ${nombreHTML}
       ${tarjetas ? `<h2 id="pesista-t">${esc(t('pesista.titulo', { nombre: mostrado() }))}</h2>
       <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b>${cfg.ctl === 'b' ? `<small class="conviene">${t(`pesista.${id}.b`)}</small><small class="rm">${t('rm.tarjeta', { s: datos.atletas[id].techo.s, c: datos.atletas[id].techo.c })}</small>` : `${cuerpoHTML(id, uno)}<small class="conviene">${t(uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small>`}</button>`).join('')}</div>` : ''}
-      ${nivelHTML}${opciones}</div><div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button id="btn-opciones" aria-expanded="${S.opciones}"><span aria-hidden="true">⚙</span> ${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button><button class="link" id="btn-ayuda">${t('boton.ayuda')}</button><a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
+      ${nivelHTML}${opciones}</div><div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${primera ? '' : `<button id="btn-campeonato" data-completa>${t('bienvenida.campeonato')}</button>`}${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button id="btn-opciones" aria-expanded="${S.opciones}"><span aria-hidden="true">⚙</span> ${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button>${primera ? '' : `<button class="link" id="btn-ranking">${t('bienvenida.ranking')}</button>`}<button class="link" id="btn-ayuda">${t('boton.ayuda')}</button><a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
       `, 'bienvenida');
     pn.querySelector('a.legal')?.addEventListener('click', () => ev('privacidad_abierta', { pantalla: E.pantalla }));
     if (abrio) { const bc = pn.querySelector('.bv-cuerpo') || pn; bc.scrollTop = bc.scrollHeight; }      // Opciones se abre arriba de la fila de botones: se lleva a la vista
@@ -1072,10 +1098,11 @@ async function inicio() {
     else if (b.dataset.sonido) sonido.encender(b.dataset.sonido === 'si');      // dentro del toque: en el iPhone así se desbloquea
     else if (b.dataset.instalar) telefono.avisoInstalar(true);
     else if (b.id === 'btn-ayuda') abrirSobre('ayuda');
+    else if (b.id === 'btn-ranking') abrirRanking();
     else if (b.id === 'btn-nosoy') { S.editar = true; S.nombre = ''; S.cambio = true; S.focoNombre = true; }
     // el tutorial se ofrece una sola vez: queda anotado al salir del inicio (se haga o se saltee), así que recargar no lo repite
     else {
-      const principalBtn = b.id === 'btn-empezar'; cfg.calentar = uno ? false : facil ? principalBtn === falta : principalBtn; cfg.primera = primera; if (facil) guardado.set('tarima.tutorial', '1');
+      cfg.campeonato = b.id === 'btn-campeonato'; const principalBtn = b.id === 'btn-empezar'; cfg.calentar = uno ? false : facil ? principalBtn === falta : principalBtn; cfg.primera = primera; if (facil) guardado.set('tarima.tutorial', '1');
       if (S.editar) guardado.set('tarima.nombre', limpiarNombre(S.nombre));
       ev('nombre_puesto', { vacio: !limpiarNombre(guardado.get('tarima.nombre')), vuelve, cambio: S.cambio });
       ev('pesista_elegido', { pesista: TIPO[cfg.id], por_defecto: !S.tocoPesista, ofrecido: !primera, modelo: PLANTEL[cfg.id].modelo });
@@ -1602,6 +1629,7 @@ async function llamadoRival(p, L, cfg) {
     if (!via && o.salto) { via = o.salto; momento = 'veredicto'; }
     if (!via && decisivo && r.res.res !== 'valido') { const v = await repeticion(L.lev, r, '', { rival: true, titulo: t('rival.repeticion', { rival: quien(a) }) }); if (v) { via = v; momento = 'repeticion'; } }
   } finally { if (boton.oye === oyeTurnoRival) boton.oye = null; E.saltarRival = null; TB.congelado = false; }
+  if (via) E.saltosFinal = (E.saltosFinal || 0) + 1;
   if (via) ev('rival_salteado', { modo: 'entero', via, momento, ms: Math.round(reloj.ahora() - ts), decisivo });
   botonSaltar(false); turno(null); etiqueta(null); zocalo(null);
 }
@@ -1692,18 +1720,31 @@ async function cierre(p) {
   await saltable(2500, 900);      // durante 2,5 s, solo el resultado (un toque los adelanta)
   let quedan = null; try { quedan = ganchos.quedan?.() ?? null; } catch { /* sin dato */ }
   const otra = quedan === 1 ? t('podio.otra_quedan') : Number.isFinite(quedan) && quedan > 1 ? t('podio.otra_quedan_n', { n: quedan }) : t('podio.otra');
-  const botones = () => `<div class="fila"><button class="ir grande" id="btn-revancha" data-completa>${otra}</button><button id="btn-cambiar">${t('podio.cambiar')}</button><button id="btn-compartir">${t('podio.compartir')}</button></div><p class="chica" id="compartido" hidden></p><div id="podio-extra"></div>`;
+  const botones = () => `<div class="fila"><button class="ir grande" id="btn-revancha" data-completa>${otra}</button><button id="btn-cambiar">${t('podio.cambiar')}</button><button id="btn-compartir">${t('podio.compartir')}</button></div><p class="chica" id="compartido" hidden></p><p class="chica" id="podio-rk"${E.rkLinea ? '' : ' hidden'}>${E.rkLinea || ''}</p><div id="podio-extra"></div>`;
+  E.rkLinea = null;
+  // «Ver ranking» llega después de pintar el podio (la respuesta del servidor): se atiende por delegación en #capa
+  const verRk = e => { if (e.target.closest?.('#btn-rk') && !E.sobre) { sonido.activar(); abrirRanking(E.cfg?.campeonato ? 'semana' : 'global'); } };
+  $('capa').addEventListener('click', verRk); E.quitarVerRk?.(); E.quitarVerRk = () => $('capa').removeEventListener('click', verRk);
   let pn = capa.poner(arriba() + botones(), 'podio-panel');
+  // LIF-10 · lo que dijo el servidor de esta final: el puesto en el campeonato, o que quedó anotada, con el link al ranking
+  const camp = !!E.cfg?.campeonato;
+  Promise.race([E.envio, new Promise(r => setTimeout(r, 6000, null))]).then(r => {
+    if (!r || (r.estado !== 'ok' && r.estado !== 'repetida')) return;
+    ev('final_validada', { campeonato: camp, puesto_semana: r.ranking?.puesto ?? null });
+    E.rkLinea = `${camp && r.ranking ? t('podio.campeonato', { puesto: r.ranking.puesto, de: r.ranking.de }) : t('podio.validada')} <button class="link" id="btn-rk">${t('podio.ver_ranking')}</button>`;
+    E.repintar?.();      // el podio se vuelve a pintar con la línea (y su botón escuchado)
+  });
   let extra = null; try { extra = await ganchos.podio({ n: E.finalN, puesto, total: yo.total || 0, medalla, lugar: pn.querySelector('#podio-extra'), nombre: nombreJugador(), t }); } catch (e) { console.warn('ganchos.podio:', e); }
   // el cartel al terminar la final gratis (LIF-53). Desbloquee o no, después va al inicio, que ya ofrece elegir o cambiar
   // de pesista (las tarjetas aparecen después de la primera final)
   if (extra === 'muro') { visita('muro'); await mostrarMuro('podio'); return 'inicio'; }
   bloquear(pn); visita('fin');
+  if (E.rkLinea && !pn.querySelector('#btn-rk')) pn = capa.poner(arriba() + botones(), 'podio-panel');
   for (;;) {
     const b = await Promise.race([clic(pn, '#btn-revancha,#btn-cambiar,#btn-compartir'), new Promise(res => { E.repintar = () => res(null); })]);
     if (!b) { pn = capa.poner(arriba() + botones(), 'podio-panel'); continue; }
     if (b.id === 'btn-compartir') { compartir(p, medalla, yo.total, pn); continue; }
-    capa.quitar(); return b.id === 'btn-revancha' ? 'revancha' : 'cambiar';
+    E.quitarVerRk?.(); E.quitarVerRk = null; capa.quitar(); return b.id === 'btn-revancha' ? 'revancha' : 'cambiar';
   }
 }
 
@@ -1729,9 +1770,12 @@ async function pedirPase(cfg, n, origen) {
 // ---------- la partida ----------
 /** Una final entera, de la carga a la ceremonia. Devuelve 'revancha', 'cambiar' o 'inicio'. */
 async function partida(cfg) {
-  E.cfg = cfg; E.yo = IDS.indexOf(cfg.id); escena.yo = cfg.id; E.registro = null;
+  // campeonato semanal (LIF-8): la final de la semana, con sus condiciones fijas, sin tocar lo que la persona eligió para jugar libre
+  const sem = cfg.campeonato ? semanaDe(Math.floor(Date.now() / 1000)) : null;
+  if (sem) cfg = { ...cfg, ctl: CAMPEONATO.ctl, dif: CAMPEONATO.dif, nivel: CAMPEONATO.nivel, orden: CAMPEONATO.orden, calentar: false, semana: sem.clave };
+  E.cfg = cfg; E.saltosFinal = 0; E.yo = IDS.indexOf(cfg.id); escena.yo = cfg.id; E.registro = null;
   document.documentElement.classList.toggle('juego-u', esU(cfg.ctl));      // menos carteles mientras se juega (juego.css, al final)
-  const semilla = params.has('semilla') && !E.jugadas ? (+params.get('semilla') >>> 0) : (crypto.getRandomValues(new Uint32Array(1))[0] >>> 0);
+  const semilla = sem ? semillaSemana(sem.clave) : params.has('semilla') && !E.jugadas ? (+params.get('semilla') >>> 0) : (crypto.getRandomValues(new Uint32Array(1))[0] >>> 0);
   E.jugadas = (E.jugadas || 0) + 1;
   // en 'u' no hay ventanas: la corrección de atraso no se usa
   let errMedio = null; cfg.cal = cfg.cal ?? (tactil() && !esU(cfg.ctl) ? CAL_TACTIL : 0);
@@ -1768,6 +1812,8 @@ async function partida(cfg) {
   }
   limpiarVeredicto(); tablero(null); E.registro = JSON.parse(JSON.stringify(p.reg));
   const rc = recalcular(E.registro, datos); if (!rc.ok || resumen(rc.tabla) !== resumen(p.tabla())) E.errores.push('el registro no recalcula a la misma tabla: ' + (rc.error || ''));
+  // LIF-10: el servidor la recalcula y la anota (con el pase de esta final, que el podio suelta): no se espera acá
+  E.envio = Promise.resolve().then(() => ganchos.mandarFinal({ registro: E.registro, campeonato: !!cfg.campeonato, apodo: nombreJugador(), publico: guardado.get('tarima.ranking_publico') === '1', saltos: E.saltosFinal || 0, duracion_s: Math.round((performance.now() - (E.tFinal0 || performance.now())) / 1000) })).catch(() => null);
   return cierre(p);
 }
 

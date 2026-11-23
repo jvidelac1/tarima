@@ -276,7 +276,7 @@ export class Partida {
     const costo = RESTO.base[lev] + Math.max(0, idiv(ctx.I - 9500, 100)) * RESTO.sobre95 + (ctx.ctl === 'u' || ctx.ctl === 'b' ? 0 : Math.min(RESTO.topePelea, res.toques * RESTO.toque + idiv(res.fuera * RESTO.fueraSeg, 120))) + (valido ? 0 : RESTO.nulo) + (lev === 'c' ? RESTO.envion[ctx.env] : 0);
     const gasto = Math.max(0, idiv(costo * multFondo(a.f.attrs.fon), 1000)), seq = this.seq++;
     a.resto = Math.max(0, a.resto - gasto);
-    a[lev].push({ kg: L.kg, res: res.res, causa: res.causa, luces: res.luces, seq, env: ctx.env, et: L.et, I: ctx.I, gasto });
+    a[lev].push({ kg: L.kg, res: res.res, causa: res.causa, luces: res.luces, seq, env: ctx.env, et: L.et, I: ctx.I, gasto, ...(res.uno?.barras ? { zonas: res.uno.barras.map(b => b.zona) } : {}) });      // zonas: final.js (LIF-2)
     if (valido && L.kg > a.mejor[lev]) { a.mejor[lev] = L.kg; a.seqMejor[lev] = seq; }
     if (res.uno && res.uno.garra === 'usada') a.garraUno[lev] = false;      // 'u': una garra por levantamiento
     if (ctx.ctl === 'b' && res.uno) sumarFatiga(a.fatiga, lev, fatigaDe(res.uno));      // 'b': lo que exigió este intento cansa a los siguientes

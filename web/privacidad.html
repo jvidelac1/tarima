@@ -94,6 +94,10 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
     <p>En el servidor no guardamos ese identificador ni tu dirección IP. Guardamos un código que sale de pasar cada uno por una clave secreta (HMAC). De la IP se usa la dirección entera en IPv4 y el prefijo /64 en IPv6. Sin esa clave, que solo tiene el servidor, no se puede volver del código a la IP.</p>
     <p>El código de la IP se borra a los 30 días. El del dispositivo, a los 180 días sin jugar. Lo hacemos por interés legítimo: que las finales gratis sean de verdad limitadas.</p>
 
+    <h2>Ranking y campeonato semanal</h2>
+    <p>Cuando terminas una final, el juego manda a nuestro servidor lo que tocaste en cada intento (no un resultado). El servidor vuelve a calcular la final con las mismas reglas del juego y guarda el resultado: pesista, kilos, intentos válidos y caídas, si era la final del campeonato de la semana, el país desde el que jugaste (sale de la conexión, no de una ubicación precisa) y el código del dispositivo de arriba. Con eso se arma el ranking.</p>
+    <p>En el ranking sales como «Anónimo». Tu nombre aparece solo si marcas «Mostrar mi nombre» en el ranking, y desde la final siguiente; lo puedes desmarcar cuando quieras. El código del dispositivo de cada final se borra a los 180 días; el resultado queda en el ranking histórico sin él.</p>
+
     <h2>Lista de espera</h2>
     <p>Si te anotas, guardamos tu correo, el nombre que pusiste, el idioma, el país aproximado (según tu conexión), la fecha y la versión de este texto.</p>
     <p>Los usamos para avisarte cuando abra el acceso anticipado. Si marcaste la otra casilla, también para mandarte novedades del juego. La base es tu consentimiento.</p>
@@ -151,6 +155,10 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
     <p>To count your free finals we store a random ID for your browser. It lives in site storage and in a technical cookie (<code>tdv</code>), used only to talk to our server, which lasts 180 days.</p>
     <p>On the server we store neither that ID nor your IP address. We store a code made by running each one through a secret key (HMAC). For the IP we use the full address on IPv4 and the /64 prefix on IPv6. Without that key, which only the server has, the code can't be turned back into the IP.</p>
     <p>The IP code is deleted after 30 days. The device code, after 180 days without play. Legal basis: our legitimate interest in keeping free finals actually limited.</p>
+
+    <h2>Leaderboard and weekly championship</h2>
+    <p>When you finish a final, the game sends our server what you pressed on each attempt (not a result). The server recalculates the final with the same game rules and stores the result: lifter, kilos, good lifts and misses, whether it was this week's championship final, the country you played from (from the connection, not a precise location) and the device code above. That's what the leaderboard is made of.</p>
+    <p>On the leaderboard you show up as “Anonymous”. Your name appears only if you tick “Show my name” on the leaderboard, starting from your next final; you can untick it any time. Each final's device code is deleted after 180 days; the result stays on the all-time leaderboard without it.</p>
 
     <h2>Waitlist</h2>
     <p>If you join, we store your email, the name you entered, language, approximate country (from your connection), the date and the version of this text.</p>

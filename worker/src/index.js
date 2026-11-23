@@ -8,6 +8,8 @@ import { DESCARTABLES } from './descartables.js';
 import { codigoDispositivo, codigoIp, idAzar, igualSeguro, leerPase, leerToken, pase, token } from './cripto.js';
 import { PREFIJO, capturar, evaluarBanderas, proxy } from './posthog.js';
 import { armarMail, idiomaPagina, pagina, t } from './textos.js';
+import { MAX_FINAL, guardarFinal, puestoEnSemana, ranking as rankingDe, validarFinal } from './finales.js';
+import { semanaDe, semillaSemana, CAMPEONATO } from '../../web/js/sim/semana.js';
 
 const MAX_CUERPO = 4096;
 const COOKIE = 'tdv';
@@ -17,7 +19,7 @@ const SECRETOS = ['SECRETO_IP', 'SECRETO_DISPOSITIVO', 'SECRETO_PASE', 'SECRETO_
 // Límites por código de IP: [máximo, período en segundos] (docs/MVP.md 5.5).
 const LIMITES = {
   estado: [60, 600], partida: [20, 600], envion: [20, 600], anotar: [5, 3600], encuesta: [3, 3600], baja_api: [3, 3600],
-  baja: [10, 3600], confirmar: [10, 3600], exportar: [10, 3600],
+  baja: [10, 3600], confirmar: [10, 3600], exportar: [10, 3600], final: [30, 3600], ranking: [120, 600],
 };
 
 class ErrorHttp extends Error {
@@ -85,11 +87,11 @@ async function leerCuerpo(request, max = MAX_CUERPO) {
   return new TextDecoder().decode(todo);
 }
 
-async function leerJson(request, url) {
+async function leerJson(request, url, max = MAX_CUERPO) {
   if (request.method !== 'POST') throw new ErrorHttp(405, 'metodo');
   if (request.headers.get('origin') !== url.origin) throw new ErrorHttp(403, 'origen');
   if (!/^application\/json\b/i.test(request.headers.get('content-type') || '')) throw new ErrorHttp(415, 'formato');
-  const texto = await leerCuerpo(request);
+  const texto = await leerCuerpo(request, max);
   let b;
   try { b = JSON.parse(texto); } catch { throw new ErrorHttp(400, 'formato'); }
   if (!b || typeof b !== 'object' || Array.isArray(b)) throw new ErrorHttp(400, 'formato');
@@ -151,11 +153,11 @@ async function banderas(env, ctx, dev, ahora) {
 
 async function api(request, env, ctx, url) {
   const ruta = url.pathname.slice(5);
-  const manejadores = { estado, partida, envion, anotar, encuesta, baja: bajaApi };
+  const manejadores = { estado, partida, envion, anotar, encuesta, baja: bajaApi, final, ranking };
   if (ruta === 'exportar') return exportar(request, env, url);
   const m = manejadores[ruta];
   if (!m) return json({ error: 'no_existe' }, 404);
-  const b = await leerJson(request, url);
+  const b = await leerJson(request, url, ruta === 'final' ? MAX_FINAL : MAX_CUERPO);
   verificarSecretos(env);
   const ahora = ahoraS();
   const i = await codigoIp(env, R.prefijoIp(ipDe(request, env)));
@@ -179,6 +181,34 @@ async function situacion({ request, env, ctx, b, i, ahora }) {
   // la IP ni el mail). Permite contar personas por día aunque posthog-js, sin cookies, estrene un id en cada carga.
   const contexto = { pais: paisDe(request, env), previas: c.usadas_d, dias: R.diasDesde(dev.creado, ahora), jugador: 'd_' + dev.d.slice(0, 16) };
   return { uuid, d, dev, flags, cfg, c, dec, contexto };
+}
+
+// Una final terminada (LIF-10): {pase, registro, campeonato?, apodo?, publico?, saltos?, duracion_s?}. El pase dice de qué
+// partida es (una final por pase) y tiene que ser de este dispositivo. El registro se recalcula con el núcleo del juego; lo
+// que se guarda es lo que da el recálculo. Responde {estado:'ok', total, puesto, semana, campeonato, ranking?} o
+// {estado:'rechazada', motivo} (422) si el registro no cierra.
+async function final({ request, env, b, ahora }) {
+  const ps = await leerPase(env, b.pase, ahora);
+  if (!ps || !Number.isSafeInteger(ps.p) || typeof ps.d !== 'string') throw new ErrorHttp(400, 'pase');
+  const uuid = cookieTdv(request) || (R.esUuid(b.dispositivo) ? b.dispositivo.toLowerCase() : null);
+  if (!uuid) throw new ErrorHttp(400, 'pase');
+  const d = await codigoDispositivo(env, uuid);
+  if (!d.startsWith(ps.d) || !(await D.partidaDe(env.DB, ps.p, d))) throw new ErrorHttp(400, 'pase');
+  const v = validarFinal(b.registro, { campeonato: b.campeonato === true, ahora });
+  if (!v.ok) { log('info', { msg: 'final_rechazada', motivo: v.error }); return json({ estado: 'rechazada', motivo: v.error }, 422); }
+  const id = await guardarFinal(env.DB, { p: ps.p, d, ahora, v, reg: b.registro, b, pais: paisDe(request, env) });
+  const r = { estado: id ? 'ok' : 'repetida', total: v.r.total, puesto: v.r.puesto, semana: v.semana, campeonato: v.campeonato };
+  if (v.campeonato) r.ranking = await puestoEnSemana(env.DB, v.semana, v.r.total, ahora);
+  log('info', { msg: 'final', campeonato: v.campeonato, total: v.r.total, repetida: !id });
+  return json(r);
+}
+
+// El ranking (LIF-9): {alcance: 'semana' | 'global', pais?: true (el del visitante)}. Responde {semana, campeonato, filas}.
+async function ranking({ request, env, b, ahora }) {
+  const sem = semanaDe(ahora), alcance = b.alcance === 'global' ? 'global' : 'semana', pais = b.pais === true ? paisDe(request, env) : null;
+  const uuid = cookieTdv(request) || (R.esUuid(b.dispositivo) ? b.dispositivo.toLowerCase() : null), d = uuid ? await codigoDispositivo(env, uuid) : null;
+  const filas = await rankingDe(env.DB, { alcance, semana: sem.clave, pais, tope: 50, d });
+  return json({ alcance, semana: sem.clave, hasta: sem.fin, pais, campeonato: { ...CAMPEONATO, semilla: semillaSemana(sem.clave) }, filas });
 }
 
 // La regla vigente, para los textos del juego: hasta dónde llega una final gratis, cuántas, cuánto suma la encuesta y si

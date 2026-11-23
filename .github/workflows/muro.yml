@@ -31,6 +31,7 @@ on:
       - 'tools/servidor_local.mjs'
       - 'tools/check_muro.mjs'
       - 'tools/check_muro_medio.mjs'
+      - 'tools/check_ranking.mjs'
       - 'web/js/game/arranque.js'
       - '.github/workflows/muro.yml'
   pull_request:
@@ -53,6 +54,7 @@ on:
       - 'tools/servidor_local.mjs'
       - 'tools/check_muro.mjs'
       - 'tools/check_muro_medio.mjs'
+      - 'tools/check_ranking.mjs'
       - 'web/js/game/arranque.js'
       - '.github/workflows/muro.yml'
   workflow_dispatch:
@@ -98,12 +100,16 @@ jobs:
         if: ${{ !cancelled() }}
         timeout-minutes: 28
         run: node tools/check_muro_medio.mjs --solo=es 2>&1 | tee out/logs/check_muro_medio_es.log
+      - name: Campeonato semanal y ranking de punta a punta (check_ranking)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 20
+        run: node tools/check_ranking.mjs 2>&1 | tee out/logs/check_ranking.log
       - name: Resumen
         if: ${{ always() }}
         run: |
           {
             echo "### Muro en el medio de la final (regla de producción, valor por defecto; Worker local, dibujo por software)"
-            for f in check_muro_medio_en check_muro_medio_es; do
+            for f in check_muro_medio_en check_muro_medio_es check_ranking; do
               echo; echo "**$f**"; echo '```'
               if [ -f "out/logs/$f.log" ]; then tail -n 30 "out/logs/$f.log"; else echo "(no corrió)"; fi
               echo '```'

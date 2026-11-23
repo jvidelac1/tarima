@@ -1,0 +1,83 @@
+// Finales validadas (LIF-10), ranking (LIF-9) y campeonato semanal (LIF-8). El cliente manda lo que el jugador tocó (el
+// registro de la partida), nunca un resultado: el Worker la recalcula con el mismo núcleo del juego y guarda lo que da.
+import sim from '../../web/data/sim.json' with { type: 'json' };
+import { leerDatos } from '../../web/js/sim/data.js';
+import { recalcular } from '../../web/js/sim/replay.js';
+import { resumenFinal } from '../../web/js/sim/final.js';
+import { CAMPEONATO, semanaDe, semillaSemana } from '../../web/js/sim/semana.js';
+import { normalizarNombre } from './reglas.js';
+
+let datos = null;
+const datosSim = () => (datos ||= leerDatos(sim));
+
+export const MAX_FINAL = 16384;      // bytes del cuerpo de /api/final (un registro real pesa 1,5 a 3 KB)
+const TOPE_SALTOS = 60, TOPE_DURA = 3 * 3600;
+
+/**
+ * Valida una final contra su registro. `campeonato`: si dice ser la del campeonato, tiene que ser la de esa semana (o la
+ * anterior, si terminó en la primera hora de la semana nueva) y con sus condiciones.
+ * @returns {{ok:true, r:object, semana:string, campeonato:boolean} | {ok:false, error:string}}
+ */
+export function validarFinal(reg, { campeonato = false, ahora }) {
+  const rc = recalcular(reg, datosSim());
+  if (!rc.ok) return { ok: false, error: rc.error };
+  const r = resumenFinal(rc.partida);
+  let semana = semanaDe(ahora).clave;
+  if (campeonato) {
+    const previa = semanaDe(ahora - 3600).clave, vale = [semana, previa].find(k => semillaSemana(k) === reg.semilla);
+    if (!vale) return { ok: false, error: 'no es la final de la semana' };
+    if (reg.ctl !== CAMPEONATO.ctl || (reg.dif ?? 'facil') !== CAMPEONATO.dif || reg.nivel !== CAMPEONATO.nivel || reg.orden !== CAMPEONATO.orden) return { ok: false, error: 'condiciones del campeonato' };
+    semana = vale;
+  }
+  return { ok: true, r, semana, campeonato };
+}
+
+/** Lo que manda el cliente además del registro: entero en rango o null. */
+const entero = (v, max) => (Number.isInteger(v) && v >= 0 && v <= max ? v : null);
+
+/** Inserta la final. Devuelve el id, o null si ese pase ya tenía una final. */
+export async function guardarFinal(db, { p, d, ahora, v, reg, b, pais }) {
+  const r = v.r, apodo = b.publico === true ? normalizarNombre(b.apodo) : null;
+  const res = await db.prepare(`INSERT INTO finales (p, d, en, semana, campeonato, semilla, ctl, dif, nivel, pesista, s, c, total, puesto,
+      intentos, validos, nulos, caidas, barritas, verdes, todo_verde, saltos, duracion_s, apodo, pais)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)
+      ON CONFLICT (p) DO NOTHING`).bind(p, d, ahora, v.semana, v.campeonato ? 1 : 0, reg.semilla, reg.ctl ?? 'c', reg.dif ?? 'facil', reg.nivel, r.pesista,
+    r.s, r.c, r.total, r.puesto, r.intentos, r.validos, r.nulos, r.caidas, r.barritas, r.verdes, r.todo_verde,
+    entero(b.saltos, TOPE_SALTOS), entero(b.duracion_s, TOPE_DURA), apodo, pais).run();
+  return res.meta.changes === 1 ? res.meta.last_row_id : null;
+}
+
+/** Puesto de un total en la semana del campeonato (1 = el mejor; empata quien llegó antes). */
+export async function puestoEnSemana(db, semana, total, en) {
+  const x = await db.prepare(`SELECT
+      (SELECT COUNT(*) FROM (SELECT d, MAX(total) t, MIN(en) e FROM finales WHERE campeonato = 1 AND semana = ?1 GROUP BY d)
+        WHERE t > ?2 OR (t = ?2 AND e < ?3)) + 1 AS puesto,
+      (SELECT COUNT(DISTINCT d) FROM finales WHERE campeonato = 1 AND semana = ?1) AS de`).bind(semana, total, en).first();
+  return { puesto: x.puesto, de: x.de };
+}
+
+const ALCANCES = new Set(['semana', 'global']);
+/**
+ * Ranking: `semana` (campeonato de esa semana: el mejor total de cada dispositivo) o `global` (mejor total validado de cada
+ * dispositivo, con los campeonatos ganados). `pais` filtra (código de 2 letras). Sin apodo publicado sale anónimo.
+ */
+export async function ranking(db, { alcance = 'semana', semana, pais = null, tope = 50, d = null }) {
+  if (!ALCANCES.has(alcance)) alcance = 'semana';
+  const filtroPais = pais ? 'AND pais = ?2' : '';
+  let filas;
+  if (alcance === 'semana') {
+    filas = (await db.prepare(`SELECT d, MAX(total) AS total, MIN(en) AS en, COUNT(*) AS finales,
+        (SELECT apodo FROM finales g WHERE g.d = f.d AND g.apodo IS NOT NULL ORDER BY g.en DESC LIMIT 1) AS apodo,
+        (SELECT pesista FROM finales g WHERE g.d = f.d AND g.campeonato = 1 AND g.semana = ?1 ORDER BY g.total DESC, g.en LIMIT 1) AS pesista,
+        MAX(pais) AS pais
+      FROM finales f WHERE campeonato = 1 AND semana = ?1 ${filtroPais} GROUP BY d ORDER BY total DESC, en LIMIT ?3`).bind(semana, pais, tope).all()).results;
+  } else {
+    filas = (await db.prepare(`SELECT d, MAX(total) AS total, MIN(en) AS en, COUNT(*) AS finales,
+        (SELECT apodo FROM finales g WHERE g.d = f.d AND g.apodo IS NOT NULL ORDER BY g.en DESC LIMIT 1) AS apodo,
+        (SELECT pesista FROM finales g WHERE g.d = f.d ORDER BY g.total DESC, g.en LIMIT 1) AS pesista,
+        MAX(pais) AS pais,
+        (SELECT COUNT(*) FROM campeones k WHERE k.d = f.d AND k.semana != ?1) AS titulos
+      FROM finales f WHERE d != '' ${filtroPais} GROUP BY d ORDER BY titulos DESC, total DESC, en LIMIT ?3`).bind(semana, pais, tope).all()).results;
+  }
+  return filas.map((f, k) => ({ puesto: k + 1, apodo: f.apodo || null, pais: f.pais || null, pesista: f.pesista, total: f.total, finales: f.finales, ...(f.titulos !== undefined ? { titulos: f.titulos } : {}), ...(d && f.d === d ? { yo: true } : {}) }));
+}

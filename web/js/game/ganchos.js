@@ -56,6 +56,15 @@ export const ganchos = {
    */
   podio(info) { void info; return null; },
 
+  /**
+   * LIF-10 · al terminar la final (antes del podio): manda el registro para que el servidor la recalcule y la guarde. Sin
+   * servidor no hace nada. @param {{registro:object, campeonato:boolean, apodo:string|null, publico:boolean, saltos:number, duracion_s:number}} info
+   */
+  async mandarFinal(info) { void info; return { estado: 'sin_servidor' }; },
+
+  /** LIF-9 · el ranking: {alcance:'semana'|'global', pais:boolean}. Sin servidor, {estado:'sin_servidor'}. */
+  async ranking(info) { void info; return { estado: 'sin_servidor' }; },
+
   /** Texto del botón «Jugar otra vez»: cuántas finales gratis quedan (null: no se sabe, no se dice nada; Infinity: anotado). */
   quedan() { return null; },
 };
