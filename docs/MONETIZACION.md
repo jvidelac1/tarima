@@ -19,11 +19,14 @@ vez). Cobrar antes de retener empuja a los pocos que vuelven.
 
 ## LIF-27 · Modelo elegido
 
+Sigue las fases que decidió el dueño el 15-nov (LIF-27): 1) retención y datos; 2) ranking y calendario sin pagar (hecho el 23-nov:
+campeonato semanal, ranking, desafíos); 3) tienda cosmética; 4) pase de temporada y lifetime.
+
 **Gratis para jugar; ingresos por una temporada cosmética opcional y por apoyo voluntario. Nada que dé ventaja en la tarima.**
 
 1. **Nada pay-to-win.** El campeonato semanal y el ranking se juegan sin progresión ni entrenamiento (ya es así), y ningún
    pago cambia kilos, barrita ni rivales. Es lo que hace creíble el ranking validado en el servidor.
-2. **Temporada (8 semanas) con un pase cosmético** (aprox. USD 3,99): colores de malla y cinturón, marco del perfil, la
+2. **Temporada (8 semanas) con un pase cosmético** (USD 4,99, la referencia del dueño del 15-nov en LIF-27; más adelante lifetime USD 24,99 y packs USD 1,99 / 4,99 / 9,99, siempre cosméticos): colores de malla y cinturón, marco del perfil, la
    bandera del jugador en el tablero, tarjeta para compartir con diseño de temporada, historial de campeonatos de la temporada.
    Lo cosmético depende de la pista visual (Gemini, LIF-65): el primer pase puede ser solo de 2D (tarjeta, marco, tablero).
 3. **Apoyo voluntario** («Invitá un café al que hace el juego»), sin beneficios, desde la bienvenida y el podio.
