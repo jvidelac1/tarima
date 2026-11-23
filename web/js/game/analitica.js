@@ -54,6 +54,8 @@ export const EVENTOS = new Set([
   'plan_elegido',
   // LIF-15: categoría de peso
   'categoria_elegida',
+  // LIF-62: entrenamiento entre competencias
+  'entreno_abierto', 'entreno_hecho',
 ]);
 
 export const BANDERAS = { 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio', grabacion_lienzo: 'compu' };

@@ -538,3 +538,14 @@ export const CATEGORIAS = { 71: 900, 79: 950, 88: 1000, 94: 1040 };
 export const CATEGORIA_BASE = 88;
 /** El techo {s, c} de un pesista en la categoría `cat` (kg enteros). */
 export const techoEnCategoria = (techo, cat) => { const k = CATEGORIAS[cat] || 1000; return k === 1000 ? techo : { s: idiv(techo.s * k + 500, 1000), c: idiv(techo.c * k + 500, 1000) }; };
+
+// Entrenamiento entre competencias (LIF-62, decisión del dueño del 16-nov; LIF-37, LIF-41): 1 o 2 minijuegos de ~20 s con la
+// misma barrita. Tirones suben el RM del arranque, sentadilla el del dos tiempos y la técnica hace más lenta la barrita del
+// pesista en las finales. Energía limitada (sesiones por final validada) y rendimientos decrecientes (topes). Cada sesión son 3
+// pasadas de la barrita: con 2 o 3 en verde suma; el servidor recalcula la sesión desde los toques (web/js/sim/entreno.js).
+export const ENTRENO = { porFinal: 2, guardaMax: 4, pasadas: 3, verdesParaSumar: 2, kg: 1, topeKg: 5, tecnica: 20, topeTecnica: 100, verde: [400, 600], amarillo: [280, 720], pasada: 1400 };
+/** Las reglas de la barrita de la persona con su técnica entrenada (milésimas más lenta, hasta ENTRENO.topeTecnica). */
+export function reglasConTecnica(dif, tecnica = 0) {
+  const R = reglasB(dif), k = Math.max(0, Math.min(ENTRENO.topeTecnica, tecnica | 0)); if (!k) return R;
+  return Object.freeze({ ...R, pasada: idiv(R.pasada * (1000 + k), 1000), pasadaLenta: idiv(R.pasadaLenta * (1000 + k), 1000) });
+}

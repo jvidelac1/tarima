@@ -6,7 +6,8 @@ import { recalcular } from '../../web/js/sim/replay.js';
 import { resumenFinal } from '../../web/js/sim/final.js';
 import { CAMPEONATO, semanaDe, semillaSemana } from '../../web/js/sim/semana.js';
 import { normalizarNombre } from './reglas.js';
-import { bonoRM } from '../../web/js/sim/rules.js';
+import { bonoRM, ENTRENO } from '../../web/js/sim/rules.js';
+import { sesionEntreno } from '../../web/js/sim/entreno.js';
 
 let datos = null;
 const datosSim = () => (datos ||= leerDatos(sim));
@@ -98,8 +99,34 @@ export const orosCon = async (db, d, pesista) => (await db.prepare('SELECT COUNT
 export async function revisarProgresion(db, d, reg, campeonato) {
   const yo = reg.atletas.find(x => x && x.ctrl === 'persona'); if (!yo || !yo.rm) return null;
   if (campeonato && (yo.rm.s || yo.rm.c)) return 'el campeonato se juega sin progresión';
-  const tope = bonoRM(await orosCon(db, d, yo.id));
-  return yo.rm.s > tope.s || yo.rm.c > tope.c ? 'progresión sin respaldo' : null;
+  const tope = bonoRM(await orosCon(db, d, yo.id)), e = await entrenado(db, d, yo.id);
+  return yo.rm.s > tope.s + e.kg_s || yo.rm.c > tope.c + e.kg_c ? 'progresión sin respaldo' : null;
+}
+/** La técnica del registro (atletas[persona].tecnica) tiene que estar entrenada (LIF-62); el campeonato y el desafío, sin ella. */
+export async function revisarTecnica(db, d, reg, sinProgresion) {
+  const yo = reg.atletas.find(x => x && x.ctrl === 'persona'); if (!yo || !yo.tecnica) return null;
+  if (sinProgresion) return 'el campeonato y el desafío se juegan sin entrenamiento';
+  return yo.tecnica > (await entrenado(db, d, yo.id)).tecnica ? 'técnica sin respaldo' : null;
+}
+
+/** Lo entrenado de un dispositivo con un pesista: {kg_s, kg_c, tecnica} (ya con los topes). */
+export async function entrenado(db, d, pesista) {
+  const x = await db.prepare('SELECT COALESCE(SUM(kg_s), 0) AS kg_s, COALESCE(SUM(kg_c), 0) AS kg_c, COALESCE(SUM(tecnica), 0) AS tecnica FROM entrenos WHERE d = ?1 AND pesista = ?2').bind(d, pesista).first();
+  return { kg_s: Math.min(ENTRENO.topeKg, x.kg_s), kg_c: Math.min(ENTRENO.topeKg, x.kg_c), tecnica: Math.min(ENTRENO.topeTecnica, x.tecnica) };
+}
+/** Sesiones de entrenamiento disponibles: ENTRENO.porFinal por final validada, menos las hechas, hasta ENTRENO.guardaMax. */
+export async function sesionesDisponibles(db, d) {
+  const x = await db.prepare('SELECT (SELECT COUNT(*) FROM finales WHERE d = ?1) AS finales, (SELECT COUNT(*) FROM entrenos WHERE d = ?1) AS hechas').bind(d).first();
+  return Math.max(0, Math.min(ENTRENO.guardaMax, x.finales * ENTRENO.porFinal - x.hechas));
+}
+/** Una sesión: la recalcula y la guarda si hay energía. {ok, sesion, disponibles} o {ok:false, error}. */
+export async function entrenar(db, d, b, ahora, PESISTAS) {
+  if (!PESISTAS.includes(b.pesista)) return { ok: false, error: 'pesista' };
+  if ((await sesionesDisponibles(db, d)) < 1) return { ok: false, error: 'sin_energia' };
+  const antes = await entrenado(db, d, b.pesista), r = sesionEntreno(b.ejercicio, b.toques, antes);
+  if (!r.ok) return { ok: false, error: r.error };
+  await db.prepare('INSERT INTO entrenos (d, en, pesista, ejercicio, verdes, kg_s, kg_c, tecnica) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)').bind(d, ahora, b.pesista, b.ejercicio, r.verdes, r.suma.kg_s, r.suma.kg_c, r.suma.tecnica).run();
+  return { ok: true, sesion: r, entrenado: await entrenado(db, d, b.pesista), disponibles: await sesionesDisponibles(db, d) };
 }
 
 /** El perfil del jugador (LIF-68, LIF-11), sacado de sus finales validadas. */
@@ -113,7 +140,8 @@ export async function perfil(db, d, semana = '') {
   return {
     finales: tot.finales || 0, oros: tot.oros || 0, platas: tot.platas || 0, bronces: tot.bronces || 0, mejor_total: tot.mejor_total || 0,
     validos: tot.validos || 0, intentos: tot.intentos || 0, de_campeonato: tot.de_campeonato || 0, titulos: tot.titulos || 0,
-    pesistas: Object.fromEntries(por.map(x => [x.pesista, { finales: x.finales, oros: x.oros || 0, mejor_total: x.mejor_total || 0, mejor_s: x.mejor_s || 0, mejor_c: x.mejor_c || 0, rm: bonoRM(x.oros || 0) }])),
+    pesistas: Object.fromEntries(await Promise.all(por.map(async x => [x.pesista, { finales: x.finales, oros: x.oros || 0, mejor_total: x.mejor_total || 0, mejor_s: x.mejor_s || 0, mejor_c: x.mejor_c || 0, rm: bonoRM(x.oros || 0), entreno: await entrenado(db, d, x.pesista) }]))),
+    entreno: { disponibles: await sesionesDisponibles(db, d), entrenados: Object.fromEntries(await Promise.all(['ventura', 'brenner', 'marangi'].map(async id => [id, await entrenado(db, d, id)]))) },
     recientes: recientes.map(x => ({ en: x.en, pesista: x.pesista, total: x.total, puesto: x.puesto, campeonato: !!x.campeonato })),
   };
 }

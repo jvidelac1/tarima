@@ -9,7 +9,7 @@ import { codigoDispositivo, codigoIp, idAzar, igualSeguro, leerPase, leerToken, 
 import { PREFIJO, capturar, evaluarBanderas, proxy } from './posthog.js';
 import { armarMail, idiomaPagina, pagina, t } from './textos.js';
 import { anotarError, limpiarErrores, resumenDia } from './errores.js';
-import { MAX_FINAL, finalDeDesafio, guardarFinal, perfil as perfilDe, puestoEnSemana, ranking as rankingDe, revisarProgresion, validarFinal } from './finales.js';
+import { MAX_FINAL, entrenar, finalDeDesafio, revisarTecnica, guardarFinal, perfil as perfilDe, puestoEnSemana, ranking as rankingDe, revisarProgresion, validarFinal } from './finales.js';
 import { semanaDe, semillaSemana, CAMPEONATO } from '../../web/js/sim/semana.js';
 
 const MAX_CUERPO = 4096;
@@ -20,7 +20,7 @@ const SECRETOS = ['SECRETO_IP', 'SECRETO_DISPOSITIVO', 'SECRETO_PASE', 'SECRETO_
 // Límites por código de IP: [máximo, período en segundos] (docs/MVP.md 5.5).
 const LIMITES = {
   estado: [60, 600], partida: [20, 600], envion: [20, 600], anotar: [5, 3600], encuesta: [3, 3600], baja_api: [3, 3600],
-  baja: [10, 3600], confirmar: [10, 3600], exportar: [10, 3600], final: [30, 3600], ranking: [120, 600], perfil: [120, 600], desafio: [120, 600], error: [20, 600],
+  baja: [10, 3600], confirmar: [10, 3600], exportar: [10, 3600], final: [30, 3600], ranking: [120, 600], perfil: [120, 600], desafio: [120, 600], error: [20, 600], entreno: [30, 600],
 };
 
 class ErrorHttp extends Error {
@@ -161,7 +161,7 @@ async function banderas(env, ctx, dev, ahora) {
 
 async function api(request, env, ctx, url) {
   const ruta = url.pathname.slice(5);
-  const manejadores = { estado, partida, envion, anotar, encuesta, baja: bajaApi, final, ranking, perfil, desafio, error };
+  const manejadores = { estado, partida, envion, anotar, encuesta, baja: bajaApi, final, ranking, perfil, desafio, error, entreno };
   if (ruta === 'exportar') return exportar(request, env, url);
   const m = manejadores[ruta];
   if (!m) return json({ error: 'no_existe' }, 404);
@@ -208,6 +208,8 @@ async function final({ request, env, b, ahora }) {
   if (!v.ok) { log('info', { msg: 'final_rechazada', motivo: v.error }); return json({ estado: 'rechazada', motivo: v.error }, 422); }
   const prog = await revisarProgresion(env.DB, d, b.registro, v.campeonato);
   if (prog) { log('info', { msg: 'final_rechazada', motivo: prog }); return json({ estado: 'rechazada', motivo: prog }, 422); }
+  const tec = await revisarTecnica(env.DB, d, b.registro, v.campeonato || !!origen);
+  if (tec) { log('info', { msg: 'final_rechazada', motivo: tec }); return json({ estado: 'rechazada', motivo: tec }, 422); }
   const id = await guardarFinal(env.DB, { p: ps.p, d, ahora, v, reg: b.registro, b, pais: paisDe(request, env) });
   const r = { estado: id ? 'ok' : 'repetida', id, total: v.r.total, puesto: v.r.puesto, semana: v.semana, campeonato: v.campeonato, perfil: await perfilDe(env.DB, d, semanaDe(ahora).clave) };
   if (v.campeonato) r.ranking = await puestoEnSemana(env.DB, v.semana, v.r.total, ahora);
@@ -236,6 +238,15 @@ async function desafio({ env, b }) {
 async function error({ env, b, ahora }) {
   await anotarError(env.DB, b, ahora);
   return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
+}
+
+// Una sesión de entrenamiento (LIF-62): {pesista, ejercicio, toques: [ms × 3]}. El servidor la recalcula; sin energía, 409.
+async function entreno({ request, env, b, ahora }) {
+  const uuid = cookieTdv(request) || (R.esUuid(b.dispositivo) ? b.dispositivo.toLowerCase() : null);
+  if (!uuid) throw new ErrorHttp(400, 'dispositivo');
+  const r = await entrenar(env.DB, await codigoDispositivo(env, uuid), b, ahora, ['ventura', 'brenner', 'marangi']);
+  if (!r.ok) return json({ estado: r.error === 'sin_energia' ? 'sin_energia' : 'rechazada', motivo: r.error }, r.error === 'sin_energia' ? 409 : 422);
+  return json({ estado: 'ok', zonas: r.sesion.zonas, verdes: r.sesion.verdes, suma: r.sesion.suma, entrenado: r.entrenado, disponibles: r.disponibles });
 }
 
 // El perfil (LIF-68, LIF-11): lo que dicen las finales validadas de este dispositivo, con la progresión de cada pesista.

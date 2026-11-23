@@ -135,6 +135,21 @@ ok(g71.j.categoria === 71 && g71.j.filas.length === 1 && g71.j.filas[0].yo, '10:
 ok((await K1.mandar(camp(801, { categoria: 71 }), { campeonato: true })).status === 422, '10: el campeonato aceptó otra categoría');
 const gc = JSON.parse(JSON.stringify(finalBot(802).reg)); gc.categoria = 90;
 ok((await K1.mandar({ reg: gc })).status === 422, '10: una categoría inventada entró');
+// 11. entrenamiento (LIF-62): energía por final validada, sesiones recalculadas, topes y el bono en la final
+const T1 = jugador();
+ok((await api('entreno', { pesista: 'ventura', ejercicio: 'tiron', toques: [700, 700, 700] }, { cookie: T1.uuid })).status === 409, '11: entrenó sin finales');
+await T1.mandar(finalBot(900, { yo: 0 }));
+const e1 = await api('entreno', { pesista: 'ventura', ejercicio: 'tiron', toques: [700, 700, 700] }, { cookie: T1.uuid });
+ok(e1.j.estado === 'ok' && e1.j.suma.kg_s === 1 && e1.j.disponibles === 1, '11: la sesión de tirones no sumó 1 kg: ' + JSON.stringify(e1.j));
+const e2 = await api('entreno', { pesista: 'ventura', ejercicio: 'tecnica', toques: [0, 0, 700] }, { cookie: T1.uuid });
+ok(e2.j.estado === 'ok' && e2.j.suma.tecnica === 0 && e2.j.disponibles === 0, '11: una sesión con 1 verde sumó o no gastó energía: ' + JSON.stringify(e2.j));
+ok((await api('entreno', { pesista: 'ventura', ejercicio: 'tiron', toques: [700, 700, 700] }, { cookie: T1.uuid })).status === 409, '11: entrenó sin energía');
+const bono = finalBot(901, { yo: 0, rm: { s: 1, c: 0 } }); const rb = await T1.mandar(bono);
+ok(rb.j.estado === 'ok', '11: la final con el kilo entrenado no entró: ' + JSON.stringify(rb.j).slice(0, 160));
+const rt = await T1.mandar(finalBot(902, { yo: 0, tecnica: 20 }));
+ok(rt.status === 422, '11: la final con técnica no entrenada entró');
+const pt = (await api('perfil', {}, { cookie: T1.uuid })).j.perfil;
+ok(pt.entreno && pt.entreno.entrenados.ventura.kg_s === 1, '11: el perfil no dice lo entrenado: ' + JSON.stringify(pt.entreno));
 // métricas de LIF-2 desde la tabla
 const m = await db.prepare('SELECT COUNT(*) finales, SUM(caidas) caidas, SUM(intentos) intentos, SUM(todo_verde) todo_verde, SUM(saltos) saltos FROM finales').first();
 logReal(`finales guardadas: ${m.finales} · caídas ${m.caidas} de ${m.intentos} intentos · intentos todo verde ${m.todo_verde} · saltos ${m.saltos}`);

@@ -543,6 +543,12 @@ export function crearServidor(o = {}) {
     if (modo !== 'servidor') return { estado: 'sin_servidor', perfil: perfilGuardado() };
     try { const { j } = await post('/api/perfil', { dispositivo: dispositivo() }, ESPERA_PEDIDO); if (j.perfil) local.set('tarima.perfil', JSON.stringify(j.perfil)); return { estado: 'ok', perfil: j.perfil }; } catch (e) { return { estado: 'error', error: e.tipo || 'red', perfil: perfilGuardado() }; }
   }
+  /** Una sesión de entrenamiento (LIF-62): el servidor la recalcula y devuelve lo entrenado y la energía que queda. */
+  async function entrenar({ pesista, ejercicio, toques }) {
+    if (modo !== 'servidor') return { estado: 'sin_servidor' };
+    try { const { j } = await post('/api/entreno', { pesista, ejercicio, toques, dispositivo: dispositivo() }, ESPERA_PEDIDO); perfil().catch(() => null); return j; }
+    catch (e) { return e.status === 409 ? { estado: 'sin_energia' } : { estado: 'error', error: e.tipo || 'red' }; }
+  }
   /** Un error del juego (LIF-26), sin esperar respuesta: lo cuenta el Worker por día. Hasta 5 por carga. */
   let erroresMandados = 0;
   function error(det = {}) {
@@ -563,7 +569,7 @@ export function crearServidor(o = {}) {
 
   return {
     get modo() { return modo; },
-    dispositivo, copia, estado, pedirPase, envion, paseParaReanudar, finalTerminada, soltarPase, anotar, encuesta, baja, mandarFinal, ranking, perfil, perfilGuardado, desafio, error,
+    dispositivo, copia, estado, pedirPase, envion, paseParaReanudar, finalTerminada, soltarPase, anotar, encuesta, baja, mandarFinal, ranking, perfil, perfilGuardado, desafio, error, entrenar,
   };
 }
 

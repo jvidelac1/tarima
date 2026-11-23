@@ -55,11 +55,11 @@ export class Partida {
       const f0 = datos.atletas[x.id]; if (!f0) throw new Error('pesista desconocido: ' + x.id);
       // la progresión de la persona (LIF-14): su RM con el bono de los oros ganados con ese pesista
       // categoría (LIF-15): el techo de todos escala igual; la progresión de la persona va encima, en kilos
-      const tc = techoEnCategoria(f0.techo, this.cfg.categoria), rm = x.ctrl === 'persona' && x.rm ? x.rm : null;
+      const tc = techoEnCategoria(f0.techo, this.cfg.categoria), rm = x.ctrl === 'persona' && x.rm ? x.rm : null, tecnica = x.ctrl === 'persona' && x.tecnica ? x.tecnica : 0;
       const f = rm || tc !== f0.techo ? { ...f0, techo: { s: tc.s + (rm ? rm.s : 0), c: tc.c + (rm ? rm.c : 0) } } : f0;
       const forma = { s: r.entre(-2, 2), c: r.entre(-2, 2) }, pct = clampi(f.ia.apertura + r.entre(-25, 25), 910, 960) + N.abre;
       const saltos = { s: f.ia.saltos.s.map(k => k + r.entre(-1, 1)), c: f.ia.saltos.c.map(k => k + r.entre(-1, 1)) }, sube1 = [r.ent(3) === 0, r.ent(3) === 0, r.ent(3) === 0, r.ent(3) === 0];
-      const a = { i, id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego', f, modelo: datos.modelos[f.modelo], resto: RESTO.ini, forma, saltos, sube1, s: [], c: [], decl: { s: 0, c: 0 }, mejor: { s: 0, c: 0 }, seqMejor: { s: -1, c: -1 }, ult: { s: -1, c: -1 }, cambios: 0, pidio: 0, bono: '', garraUno: { s: true, c: true }, fatiga: { s: 0, c: 0 } };
+      const a = { i, id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego', tecnica, f, modelo: datos.modelos[f.modelo], resto: RESTO.ini, forma, saltos, sube1, s: [], c: [], decl: { s: 0, c: 0 }, mejor: { s: 0, c: 0 }, seqMejor: { s: -1, c: -1 }, ult: { s: -1, c: -1 }, cambios: 0, pidio: 0, bono: '', garraUno: { s: true, c: true }, fatiga: { s: 0, c: 0 } };
       if (a.ctrl === 'juego') { if (N.forma) { forma.s += N.forma; forma.c += N.forma; } a.decl.s = rdiv(f.techo.s * pct, 1000); a.decl.c = rdiv(f.techo.c * pct, 1000); }
       return a;
     });
@@ -73,7 +73,7 @@ export class Partida {
     }
     this.fase = 'presentacion'; this.lev = 's'; this.seq = 0; this.barra = 0; this.rondaBarra = -1; this.nPedido = 0; this.ultimo = -1; this.llamado = null; this.nLlamado = 0;
     this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(this.cfg.envFijo ? { envFijo: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : ctl === 'b' ? { barra: HUELLAS_B[this.cfg.dif], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}) } : {}), ...(this.cfg.ia ? { ia: this.cfg.ia } : {}), ...(this.cfg.turnos ? { orden: this.cfg.turnos, turnos: HUELLA_TURNOS } : {}), ...(PLANES[this.cfg.plan] ? { plan: this.cfg.plan } : {}), ...(this.cfg.categoria !== CATEGORIA_BASE ? { categoria: this.cfg.categoria } : {}),
-      atletas: cfg.atletas.map(x => ({ id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego', ...(x.ctrl === 'persona' && x.rm ? { rm: { s: x.rm.s, c: x.rm.c } } : {}) })), aperturas: this.at.map(a => ({ s: a.decl.s, c: a.decl.c })), llamados: [] };
+      atletas: cfg.atletas.map(x => ({ id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego', ...(x.ctrl === 'persona' && x.rm ? { rm: { s: x.rm.s, c: x.rm.c } } : {}), ...(x.ctrl === 'persona' && x.tecnica ? { tecnica: x.tecnica } : {}) })), aperturas: this.at.map(a => ({ s: a.decl.s, c: a.decl.c })), llamados: [] };
   }
 
   /** LIF-5 · el plan de competencia de la persona (solo en la barrita y antes de empezar): queda en el registro. */
@@ -218,7 +218,7 @@ export class Partida {
       cal: persona ? this.cfg.cal : 0, primera: persona && this.cfg.primera && L.n === 1, domina: L.lev === 's' || f.enviones.includes(env), jueces: this.jueces, reloj: L.reloj, ctl: persona ? this.cfg.ctl : 'c', ...(persona && this.cfg.tactil ? { tactil: true } : {}),
       // 'u' y 'b': el cuerpo de juego del pesista (rules.js → CUERPOS_U; en 'b', con el ancho de cada barrita) y si todavía
       // tiene la garra de este levantamiento
-      ...(persona && this.cfg.ctl === 'u' ? { cuerpo: cuerpoDe(a.id), garraUno: a.garraUno[L.lev] } : persona && this.cfg.ctl === 'b' ? { cuerpo: cuerpoBarra(a.id), garraUno: a.garraUno[L.lev], fatiga: a.fatiga[L.lev], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}) } : {}) };
+      ...(persona && this.cfg.ctl === 'u' ? { cuerpo: cuerpoDe(a.id), garraUno: a.garraUno[L.lev] } : persona && this.cfg.ctl === 'b' ? { cuerpo: cuerpoBarra(a.id), garraUno: a.garraUno[L.lev], fatiga: a.fatiga[L.lev], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}), ...(a.tecnica ? { tecnica: a.tecnica } : {}) } : {}) };
   }
   /** ¿Puede el pesista del llamado pedir `kg` en el instante `ms`? Devuelve el motivo si no. */
   cambioValido(ms, kg) {

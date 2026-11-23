@@ -30,7 +30,8 @@ import { recalcular, resumen } from '../sim/replay.js';
 import { CAMPEONATO, semanaDe, semillaSemana } from '../sim/semana.js';
 import { rankingHTML } from './ui/ranking.js';
 import { tarjetaPodio } from './ui/tarjeta.js';
-import { bonoRM, CATEGORIAS, CATEGORIA_BASE, techoEnCategoria } from '../sim/rules.js';
+import { entrenar as pantallaEntreno } from './ui/entreno.js';
+import { bonoRM, CATEGORIAS, CATEGORIA_BASE, techoEnCategoria, reglasConTecnica, ENTRENO } from '../sim/rules.js';
 import { EVENTO, KG_MAX, RELOJ, PLAN, exigenciaTabla, previsto, cuerpoDe, chanceUno, chanceBarra, cuerpoBarra, zonasBarra, reglasB, DIFICULTADES, UNO } from '../sim/rules.js';
 import { RITMO, FASES_RAPIDAS, esDecisivo, tramoResumen, veredictoPropio, desdeRival, TECLA_SALTAR } from './ritmo.js';
 import { t, esc, fijarIdioma, detectarIdioma, idiomaActual, fijarTactil, alCambiarIdioma, IDIOMAS } from './i18n/t.js';
@@ -346,7 +347,18 @@ function pintarSobre(tipo) {
   el.querySelectorAll('.idi').forEach(b => { b.onclick = () => { cambiarIdioma(b.dataset.lang); el.querySelector(`.idi[data-lang="${idiomaActual()}"]`)?.focus(); }; });
 }
 /** LIF-14 · el bono de RM de un pesista según el perfil validado que quedó guardado ({s:0, c:0} si no hay). */
-function bonoDe(id) { let pf = null; try { pf = ganchos.perfilGuardado?.() || null; } catch { pf = null; } return bonoRM(pf?.pesistas?.[id]?.oros || 0); }
+function perfilG() { try { return ganchos.perfilGuardado?.() || null; } catch { return null; } }
+function bonoDe(id) { const pf = perfilG(), b = bonoRM(pf?.pesistas?.[id]?.oros || 0), e = pf?.entreno?.entrenados?.[id]; return e ? { s: b.s + (e.kg_s || 0), c: b.c + (e.kg_c || 0) } : b; }
+/** LIF-62 · la técnica entrenada del pesista (milésimas más lenta la barrita), según el perfil validado. */
+const tecnicaDe = id => perfilG()?.entreno?.entrenados?.[id]?.tecnica || 0;
+const sesionesEntreno = () => perfilG()?.entreno?.disponibles || 0;
+/** LIF-62 · el entrenamiento con el pesista elegido; al volver, el perfil ya trae lo nuevo. */
+async function abrirEntreno(id) {
+  visita('entreno'); ev('entreno_abierto', { pesista: TIPO[id], disponibles: sesionesEntreno() });
+  const e = perfilG()?.entreno?.entrenados?.[id] || { kg_s: 0, kg_c: 0, tecnica: 0 };
+  await pantallaEntreno({ capa: $('capa'), t, esc, ahora: () => reloj.ahora(), pesista: t(`pesista.${id}.tipo`), entrenado: e, disponibles: sesionesEntreno(), ev, mandar: (ejercicio, toques) => ganchos.entrenar({ pesista: id, ejercicio, toques }) });
+  try { await ganchos.perfil?.(); } catch { /* sin servidor */ }
+}
 const conBono = (n, b) => (b ? `${n} <em class="bono">+${b}</em>` : String(n));
 /** LIF-68 y LIF-11 · «Mi perfil» en #sobre: lo que dicen las finales validadas, con la progresión de cada pesista. */
 function abrirPerfil() {
@@ -675,7 +687,7 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
     // que suena mientras corre el puntero y el acercamiento de la cámara
     const fantasma = barra && lev === 's' && !!ctx.primera && !guardado.get('tarima.visto.b_fantasma'); if (fantasma) primeraVez('b_fantasma');
     let cortaSubida = null, barritaViva = -1, acerca = false; const frame = { ms: 16 };
-    if (barra) { barritaUI.setTactil(T); barritaUI.R = reglasB(ctx.dif); barritaUI.empezar(); }
+    if (barra) { barritaUI.setTactil(T); barritaUI.R = reglasConTecnica(ctx.dif, ctx.tecnica); barritaUI.empezar(); }
     // 'u': los discos de margen a la vista (ui/margen.js) y lo que el cuerpo del pesista hace fácil o difícil (una vez cada uno)
     const FD = uno ? fuerteDebil(cuerpoDe(a.id)) : null, tipoTxt = uno ? t(`pesista.${a.id}.tipo`) : '';
     if (uno) { margenUI.empezar({ garra: ctx.garraUno !== false, m: 3000 - (barra ? ctx.fatiga || 0 : 0) }); if (barra && ctx.fatiga) margenUI.decir(t('margen.cansancio', { d: cuartos(ctx.fatiga) }), 'mal', reloj.ahora()); }
@@ -1104,7 +1116,7 @@ async function inicio() {
       ${nombreHTML}
       ${tarjetas ? `<h2 id="pesista-t">${esc(t('pesista.titulo', { nombre: mostrado() }))}</h2>
       <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b>${cfg.ctl === 'b' ? `<small class="conviene">${t(`pesista.${id}.b`)}</small><small class="rm">${t('rm.tarjeta', { s: conBono(techoEnCategoria(datos.atletas[id].techo, cfg.categoria).s, bonoDe(id).s), c: conBono(techoEnCategoria(datos.atletas[id].techo, cfg.categoria).c, bonoDe(id).c) })}</small>` : `${cuerpoHTML(id, uno)}<small class="conviene">${t(uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small>`}</button>`).join('')}</div>` : ''}
-      ${des ? '' : nivelHTML}${opciones}</div>${desafioHTML}<div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${primera ? '' : `<button id="btn-campeonato" data-completa>${t('bienvenida.campeonato')}</button>`}${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button id="btn-opciones" aria-expanded="${S.opciones}"><span aria-hidden="true">⚙</span> ${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button>${primera ? '' : `<button class="link" id="btn-ranking">${t('bienvenida.ranking')}</button><button class="link" id="btn-perfil">${t('bienvenida.perfil')}</button>`}<button class="link" id="btn-ayuda">${t('boton.ayuda')}</button><a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
+      ${des ? '' : nivelHTML}${opciones}</div>${desafioHTML}<div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${primera ? '' : `<button id="btn-campeonato" data-completa>${t('bienvenida.campeonato')}</button>`}${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button id="btn-opciones" aria-expanded="${S.opciones}"><span aria-hidden="true">⚙</span> ${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button>${primera ? '' : `<button class="link" id="btn-ranking">${t('bienvenida.ranking')}</button><button class="link" id="btn-perfil">${t('bienvenida.perfil')}</button>${sesionesEntreno() > 0 ? `<button class="link" id="btn-entrenar">${t('bienvenida.entrenar', { n: sesionesEntreno() })}</button>` : ''}`}<button class="link" id="btn-ayuda">${t('boton.ayuda')}</button><a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
       `, 'bienvenida');
     pn.querySelector('a.legal')?.addEventListener('click', () => ev('privacidad_abierta', { pantalla: E.pantalla }));
     if (abrio) { const bc = pn.querySelector('.bv-cuerpo') || pn; bc.scrollTop = bc.scrollHeight; }      // Opciones se abre arriba de la fila de botones: se lleva a la vista
@@ -1133,6 +1145,7 @@ async function inicio() {
     else if (b.id === 'btn-ayuda') abrirSobre('ayuda');
     else if (b.id === 'btn-ranking') abrirRanking();
     else if (b.id === 'btn-perfil') abrirPerfil();
+    else if (b.id === 'btn-entrenar') { await abrirEntreno(cfg.id); visita('inicio'); }
     else if (b.id === 'btn-sin-desafio') { E.desafioDejado = true; ev('desafio_dejado', {}); }
     else if (b.id === 'btn-nosoy') { S.editar = true; S.nombre = ''; S.cambio = true; S.focoNombre = true; }
     // el tutorial se ofrece una sola vez: queda anotado al salir del inicio (se haga o se saltee), así que recargar no lo repite
@@ -1774,7 +1787,7 @@ async function cierre(p) {
   const botones = () => `<div class="fila"><button class="ir grande" id="btn-revancha" data-completa>${otra}</button><button id="btn-cambiar">${t('podio.cambiar')}</button><button id="btn-compartir">${t('podio.compartir')}</button></div><p class="chica" id="compartido" hidden></p><p class="chica" id="podio-rk"${E.rkLinea ? '' : ' hidden'}>${E.rkLinea || ''}</p><div id="podio-extra"></div>`;
   E.rkLinea = null; E.rkCamp = null; E.finalId = null; if (E.cfg?.desafio) E.desafioDejado = true;      // un desafío se juega una vez: la revancha ya es libre
   // «Ver ranking» llega después de pintar el podio (la respuesta del servidor): se atiende por delegación en #capa
-  const verRk = e => { if (e.target.closest?.('#btn-rk') && !E.sobre) { sonido.activar(); abrirRanking(E.cfg?.campeonato ? 'semana' : 'global'); } };
+  const verRk = e => { if (e.target.closest?.('#btn-rk') && !E.sobre) { sonido.activar(); abrirRanking(E.cfg?.campeonato ? 'semana' : 'global'); } else if (e.target.closest?.('#btn-ent') && !E.sobre) { E.irEntreno = true; E.repintar?.(); } };
   $('capa').addEventListener('click', verRk); E.quitarVerRk?.(); E.quitarVerRk = () => $('capa').removeEventListener('click', verRk);
   let pn = capa.poner(arriba() + botones(), 'podio-panel');
   // LIF-10 · lo que dijo el servidor de esta final: el puesto en el campeonato, o que quedó anotada, con el link al ranking
@@ -1786,7 +1799,8 @@ async function cierre(p) {
     const dz = r.desafio ? (yo.total > r.desafio.total ? 'desafio.superado' : yo.total === r.desafio.total ? 'desafio.empate' : 'desafio.no') : null;
     E.rkCamp = camp && r.ranking ? { puesto: r.ranking.puesto, de: r.ranking.de } : null;
     const mayus = x => x.charAt(0).toUpperCase() + x.slice(1);
-    E.rkLinea = `${dz ? mayus(t(dz, { quien: r.desafio.apodo ? esc(r.desafio.apodo) : t('desafio.alguien'), suyo: r.desafio.total, mio: yo.total || 0, dif: Math.abs((yo.total || 0) - r.desafio.total) })) + ' · ' : ''}${camp && r.ranking ? t('podio.campeonato', { puesto: r.ranking.puesto, de: r.ranking.de }) : t('podio.validada')} <button class="link" id="btn-rk">${t('podio.ver_ranking')}</button>`;
+    const nEnt = r.perfil?.entreno?.disponibles || 0;
+    E.rkLinea = `${dz ? mayus(t(dz, { quien: r.desafio.apodo ? esc(r.desafio.apodo) : t('desafio.alguien'), suyo: r.desafio.total, mio: yo.total || 0, dif: Math.abs((yo.total || 0) - r.desafio.total) })) + ' · ' : ''}${camp && r.ranking ? t('podio.campeonato', { puesto: r.ranking.puesto, de: r.ranking.de }) : t('podio.validada')} <button class="link" id="btn-rk">${t('podio.ver_ranking')}</button>${nEnt > 0 && E.cfg?.ctl === 'b' ? ` · <button class="link" id="btn-ent">${t('bienvenida.entrenar', { n: nEnt })}</button>` : ''}`;
     E.repintar?.();      // el podio se vuelve a pintar con la línea (y su botón escuchado)
   });
   let extra = null; try { extra = await ganchos.podio({ n: E.finalN, puesto, total: yo.total || 0, medalla, lugar: pn.querySelector('#podio-extra'), nombre: nombreJugador(), t }); } catch (e) { console.warn('ganchos.podio:', e); }
@@ -1797,7 +1811,7 @@ async function cierre(p) {
   if (E.rkLinea && !pn.querySelector('#btn-rk')) pn = capa.poner(arriba() + botones(), 'podio-panel');
   for (;;) {
     const b = await Promise.race([clic(pn, '#btn-revancha,#btn-cambiar,#btn-compartir'), new Promise(res => { E.repintar = () => res(null); })]);
-    if (!b) { pn = capa.poner(arriba() + botones(), 'podio-panel'); continue; }
+    if (!b) { if (E.irEntreno) { E.irEntreno = false; E.rkLinea = E.rkLinea?.replace(/ · <button class="link" id="btn-ent">.*$/, '') ?? null; await abrirEntreno(E.cfg.id); visita('fin'); } pn = capa.poner(arriba() + botones(), 'podio-panel'); continue; }
     if (b.id === 'btn-compartir') { compartir(p, medalla, yo.total, pn); continue; }
     E.quitarVerRk?.(); E.quitarVerRk = null; capa.quitar(); return b.id === 'btn-revancha' ? 'revancha' : 'cambiar';
   }
@@ -1853,8 +1867,8 @@ async function partida(cfg) {
   if (!pase) return 'inicio';
   E.turnoDe = null; E.pedidoPend = null; PD.abierto = false; E.pase = pase; E.finalN = pase.n ?? n; E.finalIniciada = false; E.tFinal0 = performance.now(); E.antes = null; E.primeraFinal = n === 1; E.rivalesSeguidos = 0; E.casi = null;
   // LIF-14 · el RM con la progresión del perfil validado (el campeonato se juega sin ella)
-  const bono = cfg.campeonato || cfg.desafio ? null : bonoDe(cfg.id), rmYo = bono && (bono.s || bono.c) ? bono : null;
-  const p = E.p = new Partida(datos, { semilla, ...(cfg.categoria && cfg.categoria !== CATEGORIA_BASE ? { categoria: cfg.categoria } : {}), ia: HUELLA_IA, envFijo: true, turnos: cfg.orden === 'oficial' ? 'oficial' : 'rondas', nivel: cfg.nivel, cal: cfg.cal, primera: cfg.primera, ctl: cfg.ctl, ...(cfg.ctl === 'b' && cfg.dif !== 'facil' ? { dif: cfg.dif } : {}), tactil: (cfg.ctl === 'f' || esU(cfg.ctl)) && tactil(), atletas: IDS.map((id, i) => ({ id, ctrl: i === E.yo ? 'persona' : 'juego', ...(i === E.yo && rmYo ? { rm: rmYo } : {}) })) });
+  const bono = cfg.campeonato || cfg.desafio ? null : bonoDe(cfg.id), rmYo = bono && (bono.s || bono.c) ? bono : null, tecYo = cfg.campeonato || cfg.desafio || cfg.ctl !== 'b' ? 0 : tecnicaDe(cfg.id);
+  const p = E.p = new Partida(datos, { semilla, ...(cfg.categoria && cfg.categoria !== CATEGORIA_BASE ? { categoria: cfg.categoria } : {}), ia: HUELLA_IA, envFijo: true, turnos: cfg.orden === 'oficial' ? 'oficial' : 'rondas', nivel: cfg.nivel, cal: cfg.cal, primera: cfg.primera, ctl: cfg.ctl, ...(cfg.ctl === 'b' && cfg.dif !== 'facil' ? { dif: cfg.dif } : {}), tactil: (cfg.ctl === 'f' || esU(cfg.ctl)) && tactil(), atletas: IDS.map((id, i) => ({ id, ctrl: i === E.yo ? 'persona' : 'juego', ...(i === E.yo && rmYo ? { rm: rmYo } : {}), ...(i === E.yo && tecYo ? { tecnica: tecYo } : {}) })) });
   await presentacion(p, cfg, errMedio, n === 1); p.empezar();
   while (p.fase !== 'fin') {
     if (p.fase === 'intervalo') {

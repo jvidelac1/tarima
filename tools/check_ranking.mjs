@@ -117,13 +117,27 @@ try {
   await pulsa('#btn-perfil'); await esperar(() => /Finales: 1 /.test(document.querySelector('.sobre-perfil')?.textContent || ''), 'el perfil con la final', 10000);
   await foto('perfil');
   await pulsa('.sobre-perfil #so-seguir'); await esperar(() => document.getElementById('sobre').hidden, 'el cierre del perfil');
+  // 5b. entrenamiento (LIF-62): la final dio 2 sesiones; tirones con 3 en el verde suman 1 kg al arranque (validado en el servidor)
+  await esperar(() => !!document.getElementById('btn-entrenar'), '«Entrenar (2)» en la bienvenida', 10000);
+  const ent0 = await J(() => document.getElementById('btn-entrenar')?.textContent || '');
+  if (!/2/.test(ent0)) mal('5b: la bienvenida no ofrece 2 sesiones: ' + ent0);
+  await pulsa('#btn-entrenar'); await esperar(() => !!document.querySelector('.ejercicio[data-ej="tiron"]'), 'los ejercicios');
+  await foto('entreno');
+  await pulsa('.ejercicio[data-ej="tiron"]');
+  for (let k = 0; k < 3; k++) { await esperar(() => !!document.getElementById('en-toca'), 'la pasada ' + (k + 1)); await av(700); await pulsa('#en-toca'); await page.waitForTimeout(450); }
+  await esperar(() => /Sumaste 1 kg al RM del arranque/.test(document.querySelector('.entreno')?.textContent || ''), 'el resultado del entrenamiento', 10000);
+  await foto('entreno_resultado');
+  const en = await srv.db.prepare('SELECT ejercicio, verdes, kg_s FROM entrenos').all();
+  if (en.results.length !== 1 || en.results[0].kg_s !== 1 || en.results[0].verdes !== 3) mal('5b: la sesión no quedó en el servidor: ' + JSON.stringify(en.results));
+  await pulsa('#en-ok'); await esperar(() => !!document.getElementById('en-salir'), 'la vuelta a los ejercicios'); await pulsa('#en-salir');
+  await esperar(() => !!document.getElementById('btn-empezar'), 'la bienvenida después de entrenar');
   if (oro) {
     const rm = await J(id => document.querySelector(`.pesista[data-id="${id}"] .rm`)?.textContent || '', pesista);
-    if (!/\+1/.test(rm)) mal('5: con un oro, la tarjeta no muestra el RM +1: ' + rm);
+    if (!/\+2/.test(rm)) mal('5: con un oro y un kilo entrenado, la tarjeta no muestra el arranque +2: ' + rm);
     // la final siguiente (libre) se juega con el bono y el servidor la acepta
     await pulsa('#btn-empezar'); await esperar(() => !!JUEGO.E.p, 'la final libre', 60000);
     const rmReg = await J(() => JUEGO.E.p.reg.atletas.find(a => a.ctrl === 'persona').rm);
-    if (!rmReg || rmReg.s !== 1) mal('5: la final libre no lleva el bono en el registro: ' + JSON.stringify(rmReg));
+    if (!rmReg || rmReg.s !== 2 || rmReg.c !== 1) mal('5: la final libre no lleva el bono (oro + entrenamiento) en el registro: ' + JSON.stringify(rmReg));
     await jugar(s => s.pantalla === 'fin', 'la final con bono');
     await esperar(() => /anotada|puesto/.test(document.getElementById('podio-rk')?.textContent || ''), 'la final con bono anotada', 20000);
   } else console.log('(sin oro en el campeonato: no se prueba el bono)');
