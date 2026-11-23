@@ -556,9 +556,9 @@ export function crearServidor(o = {}) {
   }
   function perfilGuardado() { try { return JSON.parse(local.get('tarima.perfil') || 'null'); } catch { return null; } }
   /** El ranking: {alcance: 'semana' | 'global', pais?: boolean}. Devuelve lo del servidor o {estado:'error'}. */
-  async function ranking({ alcance = 'semana', pais = false } = {}) {
+  async function ranking({ alcance = 'semana', pais = false, categoria = 88 } = {}) {
     if (modo !== 'servidor') return { estado: 'sin_servidor' };
-    try { const { j } = await post('/api/ranking', { alcance, pais: !!pais, dispositivo: dispositivo() }, ESPERA_PEDIDO); return { estado: 'ok', ...j }; } catch (e) { return { estado: 'error', error: e.tipo || 'red' }; }
+    try { const { j } = await post('/api/ranking', { alcance, pais: !!pais, categoria, dispositivo: dispositivo() }, ESPERA_PEDIDO); return { estado: 'ok', ...j }; } catch (e) { return { estado: 'error', error: e.tipo || 'red' }; }
   }
 
   return {

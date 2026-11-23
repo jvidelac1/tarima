@@ -49,7 +49,23 @@ async function caso(dif) {
   }
   await ctx.close();
 }
-try { await caso('medio'); await caso('facil'); } catch (e) { mal('excepción: ' + e.message); }
+async function categoria() {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } }), page = await ctx.newPage();
+  page.on('pageerror', e => mal(`[categoría] pageerror: ${e.message}`));
+  await page.addInitScript(() => { if (!sessionStorage.getItem('__i')) { localStorage.setItem('tarima.categoria', '71'); localStorage.setItem('tarima.jugadas', '1'); localStorage.setItem('tarima.nombre', 'Prueba'); localStorage.setItem('tarima.tutorial', '1'); sessionStorage.setItem('__i', '1'); } });
+  await page.goto(`${srv.url}?dibujo=0&q=baja&lang=es&semilla=4242`, { waitUntil: 'load' });
+  await page.waitForFunction(() => window.JUEGO?.listo && window.JUEGO.test, null, { timeout: 60000 }); await page.evaluate(() => JUEGO.test.manual());
+  await page.locator('#btn-opciones').focus(); await page.keyboard.press('Enter'); await page.evaluate(() => JUEGO.test.avanzar(300));
+  const marcada = await page.evaluate(() => document.querySelector('[data-cat][aria-pressed=true]')?.dataset.cat);
+  if (marcada !== '71') mal(`[categoría] Opciones no marca la categoría guardada: ${marcada}`);
+  await page.locator('#btn-empezar').focus(); await page.keyboard.press('Enter');
+  for (let k = 0; k < 300 && !await page.evaluate(() => !!JUEGO.E.p); k++) { await page.evaluate(() => JUEGO.test.avanzar(200)); await page.waitForTimeout(20); }
+  const x = await page.evaluate(() => ({ cat: JUEGO.E.p?.reg.categoria, sub: document.getElementById('ev-sub')?.textContent, techo: JUEGO.E.p?.at.find(a => a.ctrl === 'persona')?.f.techo }));
+  if (x.cat !== 71 || !/71/.test(x.sub || '')) mal('[categoría] la final no es en 71: ' + JSON.stringify(x));
+  console.log('[categoría] ' + JSON.stringify(x));
+  await ctx.close();
+}
+try { await caso('medio'); await caso('facil'); await categoria(); } catch (e) { mal('excepción: ' + e.message); }
 await browser.close(); await srv.cerrar();
-console.log(problemas.length ? `\nFALLÓ (${problemas.length}):\n  ${problemas.join('\n  ')}` : '\nOK: reloj en Medio (avisa, baja y vence) y sin reloj en Fácil');
+console.log(problemas.length ? `\nFALLÓ (${problemas.length}):\n  ${problemas.join('\n  ')}` : '\nOK: reloj en Medio (avisa, baja y vence), sin reloj en Fácil, y la final en la categoría elegida');
 process.exit(problemas.length ? 1 : 0);

@@ -747,4 +747,8 @@ export default {
   'plan.record_nota': 'Your coach suggests heavier weights: bigger total, more risk.',
   'plan.premio': 'Make all 3 snatches and you start the clean & jerk fresh.',
   'plan.cumplido': 'Plan done: you start the clean & jerk fresh.',
+  // categorías de peso (LIF-15, LIF-49)
+  'opciones.categoria': 'Weight class',
+  'app.sesion_cat': '{cat} kg class',
+  'ranking.categoria': '{cat} kg class.',
 };

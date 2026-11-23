@@ -529,3 +529,12 @@ export const bonoRM = oros => { const k = Math.min(PROGRESION.tope, Math.max(0, 
 // si el arranque sale como se planeó (los 3 válidos), el dos tiempos empieza sin el cansancio que trae del arranque. Va en el
 // registro (`plan`) para que el servidor lo recalcule. Sin plan: «oro», el de siempre.
 export const PLANES = { seguro: { segundo: 960, tercero: 880 }, oro: { segundo: 930, tercero: 800 }, record: { segundo: 880, tercero: 650 } };
+
+// Categorías de peso (LIF-15, LIF-49): las de hombres de la IWF desde 2025. La de siempre es 88 (el juego decía «hasta 90»).
+// Cada categoría escala el RM de todos los pesistas de la final (milésimas), con las proporciones de los estándares de total
+// que cita LIF-49 (336 kg en 70, 349 en 75, 374 en 85): todos igual, así la final es pareja y el ranking va por categoría.
+// Va en el registro (`categoria`) y el servidor la recalcula. El cuerpo de los pesistas todavía no cambia (LIF-67).
+export const CATEGORIAS = { 71: 900, 79: 950, 88: 1000, 94: 1040 };
+export const CATEGORIA_BASE = 88;
+/** El techo {s, c} de un pesista en la categoría `cat` (kg enteros). */
+export const techoEnCategoria = (techo, cat) => { const k = CATEGORIAS[cat] || 1000; return k === 1000 ? techo : { s: idiv(techo.s * k + 500, 1000), c: idiv(techo.c * k + 500, 1000) }; };

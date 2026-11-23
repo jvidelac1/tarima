@@ -127,6 +127,14 @@ ok(er.results.length === 1 && er.results[0].n === 3 && !/@/.test(er.results[0].m
 const P1 = jugador(), rp1 = await P1.mandar(finalBot(700, { plan: 'record' })), gp = JSON.parse(JSON.stringify(finalBot(701, { plan: 'seguro' }).reg)); gp.plan = 'trampa';
 ok(rp1.j.estado === 'ok', '9: una final con plan no entró: ' + JSON.stringify(rp1.j).slice(0, 150));
 ok((await P1.mandar({ reg: gp })).status === 422, '9: un plan inventado entró');
+// 10. categorías (LIF-15): la final guarda su categoría y el histórico se filtra por ella; el campeonato es en 88
+const K1 = jugador(), rk1 = await K1.mandar(finalBot(800, { categoria: 71 }));
+ok(rk1.j.estado === 'ok', '10: una final en 71 no entró: ' + JSON.stringify(rk1.j).slice(0, 150));
+const g71 = await api('ranking', { alcance: 'global', categoria: 71 }, { cookie: K1.uuid });
+ok(g71.j.categoria === 71 && g71.j.filas.length === 1 && g71.j.filas[0].yo, '10: el histórico de 71 no tiene solo esa final: ' + JSON.stringify(g71.j.filas));
+ok((await K1.mandar(camp(801, { categoria: 71 }), { campeonato: true })).status === 422, '10: el campeonato aceptó otra categoría');
+const gc = JSON.parse(JSON.stringify(finalBot(802).reg)); gc.categoria = 90;
+ok((await K1.mandar({ reg: gc })).status === 422, '10: una categoría inventada entró');
 // métricas de LIF-2 desde la tabla
 const m = await db.prepare('SELECT COUNT(*) finales, SUM(caidas) caidas, SUM(intentos) intentos, SUM(todo_verde) todo_verde, SUM(saltos) saltos FROM finales').first();
 logReal(`finales guardadas: ${m.finales} · caídas ${m.caidas} de ${m.intentos} intentos · intentos todo verde ${m.todo_verde} · saltos ${m.saltos}`);

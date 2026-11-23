@@ -25,7 +25,7 @@ export function rankingHTML({ alcance, pais, datos, publico, nombre, t, esc, tip
     cuerpo = `<table class="rk-tabla"><tbody>${filas}</tbody></table>`;
   }
   const cierra = datos && typeof datos === 'object' && datos.hasta ? new Date((datos.hasta - 1) * 1000).toLocaleDateString(idioma === 'es' ? 'es' : 'en', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }) : null;
-  const nota = alcance === 'semana' ? `${t('campeonato.nota')}${cierra ? ' ' + t('ranking.cierra', { fecha: esc(cierra) }) : ''}` : t('ranking.nota_global');
+  const nota = alcance === 'semana' ? `${t('campeonato.nota')}${cierra ? ' ' + t('ranking.cierra', { fecha: esc(cierra) }) : ''}` : `${t('ranking.nota_global')} ${datos && typeof datos === 'object' && datos.categoria ? t('ranking.categoria', { cat: datos.categoria }) : ''}`;
   return `<h2>${t('ranking.titulo')}</h2>
     <div class="fila rk-pests">${pest('semana', t('ranking.semana'))}${pest('global', t('ranking.global'))}</div>
     <div class="fila rk-filtro">${filtro(false, t('ranking.todos'))}${filtro(true, t('ranking.pais'))}</div>

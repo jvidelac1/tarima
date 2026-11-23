@@ -30,7 +30,7 @@ import { recalcular, resumen } from '../sim/replay.js';
 import { CAMPEONATO, semanaDe, semillaSemana } from '../sim/semana.js';
 import { rankingHTML } from './ui/ranking.js';
 import { tarjetaPodio } from './ui/tarjeta.js';
-import { bonoRM } from '../sim/rules.js';
+import { bonoRM, CATEGORIAS, CATEGORIA_BASE, techoEnCategoria } from '../sim/rules.js';
 import { EVENTO, KG_MAX, RELOJ, PLAN, exigenciaTabla, previsto, cuerpoDe, chanceUno, chanceBarra, cuerpoBarra, zonasBarra, reglasB, DIFICULTADES, UNO } from '../sim/rules.js';
 import { RITMO, FASES_RAPIDAS, esDecisivo, tramoResumen, veredictoPropio, desdeRival, TECLA_SALTAR } from './ritmo.js';
 import { t, esc, fijarIdioma, detectarIdioma, idiomaActual, fijarTactil, alCambiarIdioma, IDIOMAS } from './i18n/t.js';
@@ -300,7 +300,7 @@ function cambiarIdioma(l) {
 /** Textos que viven en juego.html: se pintan al cargar y cada vez que cambia el idioma. */
 function pintarFijos() {
   const pon = (id, txt) => { const el = $(id); if (el && el.textContent !== txt) el.textContent = txt; };
-  pon('ev-titulo', t('app.evento')); pon('ev-sub', t('app.sesion')); pon('sinfoco', t('foco.perdido'));
+  pon('ev-titulo', t('app.evento')); pon('ev-sub', t('app.sesion_cat', { cat: E.cfg?.categoria || (CATEGORIAS[+guardado.get('tarima.categoria')] ? +guardado.get('tarima.categoria') : CATEGORIA_BASE) })); pon('sinfoco', t('foco.perdido'));
   if (!E.intento?.propio) pon('zona-txt', t('zona.toca'));
   const sal = $('saltar'); if (sal) sal.innerHTML = `${esc(t('practica.saltar'))} <kbd class="tecla ch">${t('tecla.esc')}</kbd>`;
   const pa = $('pausa'); if (pa) { pa.setAttribute('aria-label', t('boton.pausa')); pa.title = `${t('boton.pausa')} (Esc)`; }
@@ -383,7 +383,7 @@ function abrirRanking(alcance = 'semana') {
 }
 async function cargarRanking() {
   const R = E.rk; if (!R) return; const n = ++R.n; R.datos = 'cargando'; pintarRanking();
-  let d = null; try { d = await ganchos.ranking({ alcance: R.alcance, pais: R.pais }); } catch { d = null; }
+  let d = null; try { d = await ganchos.ranking({ alcance: R.alcance, pais: R.pais, categoria: R.alcance === 'global' ? (E.cfg?.categoria || +guardado.get('tarima.categoria') || CATEGORIA_BASE) : CATEGORIA_BASE }); } catch { d = null; }
   if (E.rk !== R || R.n !== n) return; R.datos = d && d.estado === 'ok' ? d : 'error'; pintarRanking();
 }
 function pintarRanking() {
@@ -1058,7 +1058,8 @@ function ctlInicial() { const q = params.get('ctl'); if (q === 'c' || q === 'f' 
  */
 async function inicio() {
   visita('inicio'); zocalo(null); relojLibre(); const primera = !guardado.get('tarima.jugadas');
-  const cfg = { id: guardado.get('tarima.pesista') || 'ventura', nivel: guardado.get('tarima.nivel') || 'amistoso', ritmo: params.get('ritmo') === 'completa' ? 'completa' : 'expres', ctl: ctlInicial(), dif: difInicial(), orden: guardado.get('tarima.orden') === 'oficial' ? 'oficial' : 'rondas' };
+  const catG = +guardado.get('tarima.categoria');
+  const cfg = { categoria: CATEGORIAS[catG] ? catG : CATEGORIA_BASE, id: guardado.get('tarima.pesista') || 'ventura', nivel: guardado.get('tarima.nivel') || 'amistoso', ritmo: params.get('ritmo') === 'completa' ? 'completa' : 'expres', ctl: ctlInicial(), dif: difInicial(), orden: guardado.get('tarima.orden') === 'oficial' ? 'oficial' : 'rondas' };
   if (!IDS.includes(cfg.id)) cfg.id = 'ventura';
   // Difícil juega con rivales parejos, salvo que la persona haya elegido los rivales a mano
   if (cfg.ctl === 'b' && cfg.dif === 'dificil' && cfg.nivel === 'amistoso' && !guardado.get('tarima.nivel_elegido')) cfg.nivel = 'normal';
@@ -1088,6 +1089,7 @@ async function inicio() {
     const nivelHTML = conNivel ? `<div class="fila bv-nivel" role="group" aria-label="${esc(t('opciones.dificultad'))}"><span>${t('opciones.dificultad')}</span>${DIFICULTADES.map(d => opt('dif', 'd', d, cfg.ctl === 'c' ? null : cfg.dif, 'opciones.dif.' + d)).join('')}<small class="nota">${t('opciones.dif_nota.' + (cfg.ctl === 'c' ? 'clasico' : cfg.dif))}</small></div>` : '';
     const opciones = S.opciones ? `<div class="opciones">
         <div class="fila"><span>${t('opciones.dificultad')}</span>${conNivel ? '' : DIFICULTADES.map(d => opt('dif', 'd', d, cfg.ctl === 'c' ? null : cfg.dif, 'opciones.dif.' + d)).join('')}${opt('ctl', 'c', 'c', cfg.ctl, 'opciones.pro')}${conNivel ? '' : `<small class="nota">${t('opciones.dif_nota.' + (cfg.ctl === 'c' ? 'clasico' : cfg.dif))}</small>`}</div>
+        <div class="fila"><span>${t('opciones.categoria')}</span>${Object.keys(CATEGORIAS).map(k => `<button class="cat" data-cat="${k}" aria-pressed="${+k === cfg.categoria}">${k} kg</button>`).join('')}</div>
         <div class="fila"><span>${t('opciones.rivales')}</span>${opt('nivel', 'n', 'amistoso', cfg.nivel, 'opciones.tranquilos')}${opt('nivel', 'n', 'normal', cfg.nivel, 'opciones.parejos')}${opt('nivel', 'n', 'dificil', cfg.nivel, 'opciones.duros')}</div>
         <div class="fila"><span>${t('opciones.orden')}</span>${opt('orden', 'o', 'rondas', cfg.orden, 'opciones.orden_rondas')}${opt('orden', 'o', 'oficial', cfg.orden, 'opciones.orden_oficial')}<small class="nota">${t('opciones.orden_nota.' + cfg.orden)}</small></div>
         <div class="fila"><span>${t('opciones.final')}</span>${opt('ritmo', 'r', 'expres', cfg.ritmo, 'opciones.rapida')}${opt('ritmo', 'r', 'completa', cfg.ritmo, 'opciones.completa')}</div>
@@ -1101,7 +1103,7 @@ async function inicio() {
       ${params.has('c') ? `<p class="desafio">${t('bienvenida.desafio')}</p>` : ''}${q ? `<p class="quedan">${q}</p>` : ''}
       ${nombreHTML}
       ${tarjetas ? `<h2 id="pesista-t">${esc(t('pesista.titulo', { nombre: mostrado() }))}</h2>
-      <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b>${cfg.ctl === 'b' ? `<small class="conviene">${t(`pesista.${id}.b`)}</small><small class="rm">${t('rm.tarjeta', { s: conBono(datos.atletas[id].techo.s, bonoDe(id).s), c: conBono(datos.atletas[id].techo.c, bonoDe(id).c) })}</small>` : `${cuerpoHTML(id, uno)}<small class="conviene">${t(uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small>`}</button>`).join('')}</div>` : ''}
+      <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b>${cfg.ctl === 'b' ? `<small class="conviene">${t(`pesista.${id}.b`)}</small><small class="rm">${t('rm.tarjeta', { s: conBono(techoEnCategoria(datos.atletas[id].techo, cfg.categoria).s, bonoDe(id).s), c: conBono(techoEnCategoria(datos.atletas[id].techo, cfg.categoria).c, bonoDe(id).c) })}</small>` : `${cuerpoHTML(id, uno)}<small class="conviene">${t(uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small>`}</button>`).join('')}</div>` : ''}
       ${des ? '' : nivelHTML}${opciones}</div>${desafioHTML}<div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${primera ? '' : `<button id="btn-campeonato" data-completa>${t('bienvenida.campeonato')}</button>`}${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button id="btn-opciones" aria-expanded="${S.opciones}"><span aria-hidden="true">⚙</span> ${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button>${primera ? '' : `<button class="link" id="btn-ranking">${t('bienvenida.ranking')}</button><button class="link" id="btn-perfil">${t('bienvenida.perfil')}</button>`}<button class="link" id="btn-ayuda">${t('boton.ayuda')}</button><a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
       `, 'bienvenida');
     pn.querySelector('a.legal')?.addEventListener('click', () => ev('privacidad_abierta', { pantalla: E.pantalla }));
@@ -1119,6 +1121,7 @@ async function inicio() {
     if (!b) continue;      // cambió el idioma desde la pausa: se vuelve a pintar
     if (b.dataset.lang) { cambiarIdioma(b.dataset.lang); continue; }
     if (b.dataset.id) { cfg.id = b.dataset.id; await verPesista(); }      // la tarjeta abre la selección con el pesista en 3D
+    else if (b.dataset.cat) { cfg.categoria = +b.dataset.cat; ev('categoria_elegida', { categoria: cfg.categoria }); }
     else if (b.dataset.n) { cfg.nivel = b.dataset.n; guardado.set('tarima.nivel_elegido', '1'); } else if (b.dataset.r) cfg.ritmo = b.dataset.r; else if (b.dataset.c) cfg.ctl = b.dataset.c; else if (b.dataset.o) cfg.orden = b.dataset.o;
     // dificultad: Fácil, Medio y Difícil son la barrita; Difícil trae rivales parejos si estaban los tranquilos
     else if (b.dataset.d) { cfg.dif = b.dataset.d; if (cfg.ctl === 'c') cfg.ctl = 'b'; if (cfg.dif === 'dificil' && cfg.nivel === 'amistoso') cfg.nivel = 'normal'; fijarDificultad(cfg); }
@@ -1142,7 +1145,7 @@ async function inicio() {
       break;
     }
   }
-  guardado.set('tarima.pesista', cfg.id); guardado.set('tarima.aspecto', E.aspecto?.plaza === cfg.id ? E.aspecto.modelo : ''); guardado.set('tarima.nivel', cfg.nivel); guardado.set('tarima.ctl', cfg.ctl); guardado.set('tarima.dificultad', cfg.dif); guardado.set('tarima.orden', cfg.orden); fijarDificultad(cfg); capa.quitar(); return cfg;
+  guardado.set('tarima.categoria', String(cfg.categoria)); guardado.set('tarima.pesista', cfg.id); guardado.set('tarima.aspecto', E.aspecto?.plaza === cfg.id ? E.aspecto.modelo : ''); guardado.set('tarima.nivel', cfg.nivel); guardado.set('tarima.ctl', cfg.ctl); guardado.set('tarima.dificultad', cfg.dif); guardado.set('tarima.orden', cfg.orden); fijarDificultad(cfg); capa.quitar(); return cfg;
 }
 
 /** Dibujos de los botones de la selección de pesista (sin texto): girar un cuarto de vuelta y barra arriba. */
@@ -1825,9 +1828,9 @@ async function partida(cfg) {
   // campeonato semanal (LIF-8): la final de la semana, con sus condiciones fijas, sin tocar lo que la persona eligió para jugar libre
   const sem = cfg.campeonato ? semanaDe(Math.floor(Date.now() / 1000)) : null;
   const des = !sem && cfg.desafio && E.desafio?.id === cfg.desafio ? E.desafio : null;
-  if (des) cfg = { ...cfg, ctl: des.ctl, dif: des.dif, nivel: des.nivel, orden: des.orden, calentar: false };
-  if (sem) cfg = { ...cfg, ctl: CAMPEONATO.ctl, dif: CAMPEONATO.dif, nivel: CAMPEONATO.nivel, orden: CAMPEONATO.orden, calentar: false, semana: sem.clave };
-  E.cfg = cfg; E.saltosFinal = 0; E.yo = IDS.indexOf(cfg.id); escena.yo = cfg.id; E.registro = null;
+  if (des) cfg = { ...cfg, ctl: des.ctl, dif: des.dif, nivel: des.nivel, orden: des.orden, categoria: des.categoria || CATEGORIA_BASE, calentar: false };
+  if (sem) cfg = { ...cfg, categoria: CATEGORIA_BASE, ctl: CAMPEONATO.ctl, dif: CAMPEONATO.dif, nivel: CAMPEONATO.nivel, orden: CAMPEONATO.orden, calentar: false, semana: sem.clave };
+  E.cfg = cfg; E.saltosFinal = 0; $('ev-sub').textContent = t('app.sesion_cat', { cat: cfg.categoria || CATEGORIA_BASE }); E.yo = IDS.indexOf(cfg.id); escena.yo = cfg.id; E.registro = null;
   document.documentElement.classList.toggle('juego-u', esU(cfg.ctl));      // menos carteles mientras se juega (juego.css, al final)
   const semilla = des ? des.semilla >>> 0 : sem ? semillaSemana(sem.clave) : params.has('semilla') && !E.jugadas ? (+params.get('semilla') >>> 0) : (crypto.getRandomValues(new Uint32Array(1))[0] >>> 0);
   E.jugadas = (E.jugadas || 0) + 1;
@@ -1851,7 +1854,7 @@ async function partida(cfg) {
   E.turnoDe = null; E.pedidoPend = null; PD.abierto = false; E.pase = pase; E.finalN = pase.n ?? n; E.finalIniciada = false; E.tFinal0 = performance.now(); E.antes = null; E.primeraFinal = n === 1; E.rivalesSeguidos = 0; E.casi = null;
   // LIF-14 · el RM con la progresión del perfil validado (el campeonato se juega sin ella)
   const bono = cfg.campeonato || cfg.desafio ? null : bonoDe(cfg.id), rmYo = bono && (bono.s || bono.c) ? bono : null;
-  const p = E.p = new Partida(datos, { semilla, ia: HUELLA_IA, envFijo: true, turnos: cfg.orden === 'oficial' ? 'oficial' : 'rondas', nivel: cfg.nivel, cal: cfg.cal, primera: cfg.primera, ctl: cfg.ctl, ...(cfg.ctl === 'b' && cfg.dif !== 'facil' ? { dif: cfg.dif } : {}), tactil: (cfg.ctl === 'f' || esU(cfg.ctl)) && tactil(), atletas: IDS.map((id, i) => ({ id, ctrl: i === E.yo ? 'persona' : 'juego', ...(i === E.yo && rmYo ? { rm: rmYo } : {}) })) });
+  const p = E.p = new Partida(datos, { semilla, ...(cfg.categoria && cfg.categoria !== CATEGORIA_BASE ? { categoria: cfg.categoria } : {}), ia: HUELLA_IA, envFijo: true, turnos: cfg.orden === 'oficial' ? 'oficial' : 'rondas', nivel: cfg.nivel, cal: cfg.cal, primera: cfg.primera, ctl: cfg.ctl, ...(cfg.ctl === 'b' && cfg.dif !== 'facil' ? { dif: cfg.dif } : {}), tactil: (cfg.ctl === 'f' || esU(cfg.ctl)) && tactil(), atletas: IDS.map((id, i) => ({ id, ctrl: i === E.yo ? 'persona' : 'juego', ...(i === E.yo && rmYo ? { rm: rmYo } : {}) })) });
   await presentacion(p, cfg, errMedio, n === 1); p.empezar();
   while (p.fase !== 'fin') {
     if (p.fase === 'intervalo') {

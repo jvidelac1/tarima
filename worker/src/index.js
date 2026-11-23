@@ -220,15 +220,16 @@ async function final({ request, env, b, ahora }) {
 async function ranking({ request, env, b, ahora }) {
   const sem = semanaDe(ahora), alcance = b.alcance === 'global' ? 'global' : 'semana', pais = b.pais === true ? paisDe(request, env) : null;
   const uuid = cookieTdv(request) || (R.esUuid(b.dispositivo) ? b.dispositivo.toLowerCase() : null), d = uuid ? await codigoDispositivo(env, uuid) : null;
-  const filas = await rankingDe(env.DB, { alcance, semana: sem.clave, pais, tope: 50, d });
-  return json({ alcance, semana: sem.clave, hasta: sem.fin, pais, campeonato: { ...CAMPEONATO, semilla: semillaSemana(sem.clave) }, filas });
+  const categoria = [71, 79, 88, 94].includes(b.categoria) ? b.categoria : 88;
+  const filas = await rankingDe(env.DB, { alcance, semana: sem.clave, pais, tope: 50, d, categoria });
+  return json({ alcance, semana: sem.clave, hasta: sem.fin, pais, categoria, campeonato: { ...CAMPEONATO, semilla: semillaSemana(sem.clave) }, filas });
 }
 
 // Un desafío (LIF-12): {id} → las condiciones de esa final para jugarla igual, y su resultado (sin datos del dispositivo).
 async function desafio({ env, b }) {
   const f = await finalDeDesafio(env.DB, b.id);
   if (!f) return json({ estado: 'no_existe' }, 404);
-  return json({ estado: 'ok', id: f.id, semilla: f.semilla, ctl: f.ctl, dif: f.dif, nivel: f.nivel, orden: f.orden, pesista: f.pesista, s: f.s, c: f.c, total: f.total, puesto: f.puesto, apodo: f.apodo, pais: f.pais, aceptados: f.aceptados, lo_superaron: f.lo_superaron });
+  return json({ estado: 'ok', id: f.id, semilla: f.semilla, ctl: f.ctl, dif: f.dif, nivel: f.nivel, orden: f.orden, categoria: f.categoria, pesista: f.pesista, s: f.s, c: f.c, total: f.total, puesto: f.puesto, apodo: f.apodo, pais: f.pais, aceptados: f.aceptados, lo_superaron: f.lo_superaron });
 }
 
 // Un error del juego (LIF-26): {tipo, pantalla, mensaje, archivo, linea}. Sin dispositivo ni IP; responde 204.

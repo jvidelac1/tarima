@@ -764,4 +764,8 @@ export default {
   'plan.record_nota': 'El entrenador propone kilos más altos: más total, más riesgo.',
   'plan.premio': 'Si haces los 3 arranques, empiezas el dos tiempos descansado.',
   'plan.cumplido': 'Plan cumplido: empiezas el dos tiempos descansado.',
+  // categorías de peso (LIF-15, LIF-49)
+  'opciones.categoria': 'Categoría',
+  'app.sesion_cat': 'Categoría {cat} kg',
+  'ranking.categoria': 'Categoría {cat} kg.',
 };

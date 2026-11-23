@@ -52,6 +52,8 @@ export const EVENTOS = new Set([
   'final_validada', 'ranking_visto', 'ranking_publico', 'perfil_visto', 'desafio_abierto', 'desafio_dejado',
   // LIF-5: el plan de competencia
   'plan_elegido',
+  // LIF-15: categoría de peso
+  'categoria_elegida',
 ]);
 
 export const BANDERAS = { 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio', grabacion_lienzo: 'compu' };

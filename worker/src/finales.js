@@ -27,12 +27,12 @@ export function validarFinal(reg, { campeonato = false, ahora, desafio = null })
   if (campeonato) {
     const previa = semanaDe(ahora - 3600).clave, vale = [semana, previa].find(k => semillaSemana(k) === reg.semilla);
     if (!vale) return { ok: false, error: 'no es la final de la semana' };
-    if (reg.ctl !== CAMPEONATO.ctl || (reg.dif ?? 'facil') !== CAMPEONATO.dif || reg.nivel !== CAMPEONATO.nivel || reg.orden !== CAMPEONATO.orden) return { ok: false, error: 'condiciones del campeonato' };
+    if (reg.ctl !== CAMPEONATO.ctl || (reg.dif ?? 'facil') !== CAMPEONATO.dif || reg.nivel !== CAMPEONATO.nivel || reg.orden !== CAMPEONATO.orden || reg.categoria !== undefined) return { ok: false, error: 'condiciones del campeonato' };
     semana = vale;
   }
   // desafío (LIF-12): la misma final que la de origen, sin progresión
   if (desafio) {
-    if (reg.semilla !== desafio.semilla || (reg.ctl ?? 'c') !== desafio.ctl || (reg.dif ?? 'facil') !== desafio.dif || reg.nivel !== desafio.nivel || (reg.orden ?? 'rondas') !== desafio.orden) return { ok: false, error: 'no es la final del desafío' };
+    if (reg.semilla !== desafio.semilla || (reg.ctl ?? 'c') !== desafio.ctl || (reg.dif ?? 'facil') !== desafio.dif || reg.nivel !== desafio.nivel || (reg.orden ?? 'rondas') !== desafio.orden || (reg.categoria ?? 88) !== (desafio.categoria ?? 88)) return { ok: false, error: 'no es la final del desafío' };
     const yo = reg.atletas.find(x => x && x.ctrl === 'persona'); if (yo?.rm && (yo.rm.s || yo.rm.c)) return { ok: false, error: 'el desafío se juega sin progresión' };
   }
   return { ok: true, r, semana, campeonato: campeonato && !desafio, desafio: desafio ? desafio.id : null };
@@ -45,11 +45,11 @@ const entero = (v, max) => (Number.isInteger(v) && v >= 0 && v <= max ? v : null
 export async function guardarFinal(db, { p, d, ahora, v, reg, b, pais }) {
   const r = v.r, apodo = b.publico === true ? normalizarNombre(b.apodo) : null;
   const res = await db.prepare(`INSERT INTO finales (p, d, en, semana, campeonato, semilla, ctl, dif, nivel, pesista, s, c, total, puesto,
-      intentos, validos, nulos, caidas, barritas, verdes, todo_verde, saltos, duracion_s, apodo, pais, desafio, orden)
-      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)
+      intentos, validos, nulos, caidas, barritas, verdes, todo_verde, saltos, duracion_s, apodo, pais, desafio, orden, categoria)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28)
       ON CONFLICT (p) DO NOTHING`).bind(p, d, ahora, v.semana, v.campeonato ? 1 : 0, reg.semilla, reg.ctl ?? 'c', reg.dif ?? 'facil', reg.nivel, r.pesista,
     r.s, r.c, r.total, r.puesto, r.intentos, r.validos, r.nulos, r.caidas, r.barritas, r.verdes, r.todo_verde,
-    entero(b.saltos, TOPE_SALTOS), entero(b.duracion_s, TOPE_DURA), apodo, pais, v.desafio ?? null, reg.orden ?? 'rondas').run();
+    entero(b.saltos, TOPE_SALTOS), entero(b.duracion_s, TOPE_DURA), apodo, pais, v.desafio ?? null, reg.orden ?? 'rondas', reg.categoria ?? 88).run();
   return res.meta.changes === 1 ? res.meta.last_row_id : null;
 }
 
@@ -67,7 +67,7 @@ const ALCANCES = new Set(['semana', 'global']);
  * Ranking: `semana` (campeonato de esa semana: el mejor total de cada dispositivo) o `global` (mejor total validado de cada
  * dispositivo, con los campeonatos ganados). `pais` filtra (código de 2 letras). Sin apodo publicado sale anónimo.
  */
-export async function ranking(db, { alcance = 'semana', semana, pais = null, tope = 50, d = null }) {
+export async function ranking(db, { alcance = 'semana', semana, pais = null, tope = 50, d = null, categoria = 88 }) {
   if (!ALCANCES.has(alcance)) alcance = 'semana';
   const filtroPais = pais ? 'AND pais = ?2' : '';
   let filas;
@@ -83,7 +83,7 @@ export async function ranking(db, { alcance = 'semana', semana, pais = null, top
         (SELECT pesista FROM finales g WHERE g.d = f.d ORDER BY g.total DESC, g.en LIMIT 1) AS pesista,
         MAX(pais) AS pais,
         (SELECT COUNT(*) FROM campeones k WHERE k.d = f.d AND k.semana != ?1) AS titulos
-      FROM finales f WHERE d != '' ${filtroPais} GROUP BY d ORDER BY titulos DESC, total DESC, en LIMIT ?3`).bind(semana, pais, tope).all()).results;
+      FROM finales f WHERE d != '' AND categoria = ?4 ${filtroPais} GROUP BY d ORDER BY titulos DESC, total DESC, en LIMIT ?3`).bind(semana, pais, tope, categoria).all()).results;
   }
   return filas.map((f, k) => ({ puesto: k + 1, apodo: f.apodo || null, pais: f.pais || null, pesista: f.pesista, total: f.total, finales: f.finales, ...(f.titulos !== undefined ? { titulos: f.titulos } : {}), ...(d && f.d === d ? { yo: true } : {}) }));
 }
@@ -121,7 +121,7 @@ export async function perfil(db, d, semana = '') {
 /** Una final de origen para un desafío (LIF-12): sus condiciones y su resultado, sin nada del dispositivo. */
 export async function finalDeDesafio(db, id) {
   if (!Number.isSafeInteger(id) || id < 1) return null;
-  const f = await db.prepare(`SELECT id, semilla, ctl, dif, nivel, orden, pesista, s, c, total, puesto, apodo, pais, en,
+  const f = await db.prepare(`SELECT id, semilla, ctl, dif, nivel, orden, categoria, pesista, s, c, total, puesto, apodo, pais, en,
       (SELECT COUNT(*) FROM finales g WHERE g.desafio = finales.id) AS aceptados,
       (SELECT COUNT(*) FROM finales g WHERE g.desafio = finales.id AND g.total > finales.total) AS lo_superaron
     FROM finales WHERE id = ?1`).bind(id).first();
