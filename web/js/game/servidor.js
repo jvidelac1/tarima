@@ -544,9 +544,9 @@ export function crearServidor(o = {}) {
     try { const { j } = await post('/api/perfil', { dispositivo: dispositivo() }, ESPERA_PEDIDO); if (j.perfil) local.set('tarima.perfil', JSON.stringify(j.perfil)); return { estado: 'ok', perfil: j.perfil }; } catch (e) { return { estado: 'error', error: e.tipo || 'red', perfil: perfilGuardado() }; }
   }
   /** Una sesión de entrenamiento (LIF-62): el servidor la recalcula y devuelve lo entrenado y la energía que queda. */
-  async function entrenar({ pesista, ejercicio, toques }) {
+  async function entrenar({ pesista, ejercicio, toques, escuela = 'rusa' }) {
     if (modo !== 'servidor') return { estado: 'sin_servidor' };
-    try { const { j } = await post('/api/entreno', { pesista, ejercicio, toques, dispositivo: dispositivo() }, ESPERA_PEDIDO); perfil().catch(() => null); return j; }
+    try { const { j } = await post('/api/entreno', { pesista, ejercicio, toques, escuela, dispositivo: dispositivo() }, ESPERA_PEDIDO); perfil().catch(() => null); return j; }
     catch (e) { return e.status === 409 ? { estado: 'sin_energia' } : { estado: 'error', error: e.tipo || 'red' }; }
   }
   /** Un error del juego (LIF-26), sin esperar respuesta: lo cuenta el Worker por día. Hasta 5 por carga. */

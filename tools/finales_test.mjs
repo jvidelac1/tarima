@@ -150,6 +150,12 @@ const rt = await T1.mandar(finalBot(902, { yo: 0, tecnica: 20 }));
 ok(rt.status === 422, '11: la final con técnica no entrenada entró');
 const pt = (await api('perfil', {}, { cookie: T1.uuid })).j.perfil;
 ok(pt.entreno && pt.entreno.entrenados.ventura.kg_s === 1, '11: el perfil no dice lo entrenado: ' + JSON.stringify(pt.entreno));
+// 12. escuelas (LIF-69): la búlgara suma 2 kg con 3 en el verde y nada con 2; la china, más técnica
+const S1 = jugador(); await S1.mandar(finalBot(950, { yo: 0 })); await S1.mandar(finalBot(951, { yo: 0 }));
+const b3 = await api('entreno', { pesista: 'ventura', ejercicio: 'tiron', toques: [700, 700, 700], escuela: 'bulgara' }, { cookie: S1.uuid });
+const b2 = await api('entreno', { pesista: 'ventura', ejercicio: 'sentadilla', toques: [700, 700, 0], escuela: 'bulgara' }, { cookie: S1.uuid });
+const c1 = await api('entreno', { pesista: 'ventura', ejercicio: 'tecnica', toques: [700, 700, 0], escuela: 'china' }, { cookie: S1.uuid });
+ok(b3.j.suma?.kg_s === 2 && b2.j.suma?.kg_c === 0 && c1.j.suma?.tecnica === 40, '12: las escuelas no suman lo de su perfil: ' + JSON.stringify([b3.j.suma, b2.j.suma, c1.j.suma]));
 // métricas de LIF-2 desde la tabla
 const m = await db.prepare('SELECT COUNT(*) finales, SUM(caidas) caidas, SUM(intentos) intentos, SUM(todo_verde) todo_verde, SUM(saltos) saltos FROM finales').first();
 logReal(`finales guardadas: ${m.finales} · caídas ${m.caidas} de ${m.intentos} intentos · intentos todo verde ${m.todo_verde} · saltos ${m.saltos}`);

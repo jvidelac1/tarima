@@ -549,3 +549,8 @@ export function reglasConTecnica(dif, tecnica = 0) {
   const R = reglasB(dif), k = Math.max(0, Math.min(ENTRENO.topeTecnica, tecnica | 0)); if (!k) return R;
   return Object.freeze({ ...R, pasada: idiv(R.pasada * (1000 + k), 1000), pasadaLenta: idiv(R.pasadaLenta * (1000 + k), 1000) });
 }
+
+// Escuelas de entrenamiento (LIF-69): perfiles de parámetros del entrenamiento. Rusa: progreso parejo (el de ENTRENO). Búlgara:
+// sube rápido (más kilos por sesión) pero exige las 3 en el verde. China: posiciones y accesorios (más técnica por sesión). La
+// latinoamericana falta definirla con el dueño. Los textos los aprueba el dueño: hasta entonces van detrás de ?escuelas=1.
+export const ESCUELAS = { rusa: { kg: 1, verdes: 2, tecnica: 20 }, bulgara: { kg: 2, verdes: 3, tecnica: 10 }, china: { kg: 1, verdes: 2, tecnica: 40 } };

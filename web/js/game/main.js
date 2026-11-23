@@ -356,7 +356,7 @@ const sesionesEntreno = () => perfilG()?.entreno?.disponibles || 0;
 async function abrirEntreno(id) {
   visita('entreno'); ev('entreno_abierto', { pesista: TIPO[id], disponibles: sesionesEntreno() });
   const e = perfilG()?.entreno?.entrenados?.[id] || { kg_s: 0, kg_c: 0, tecnica: 0 };
-  await pantallaEntreno({ capa: $('capa'), t, esc, ahora: () => reloj.ahora(), pesista: t(`pesista.${id}.tipo`), entrenado: e, disponibles: sesionesEntreno(), ev, mandar: (ejercicio, toques) => ganchos.entrenar({ pesista: id, ejercicio, toques }) });
+  await pantallaEntreno({ capa: $('capa'), t, esc, ahora: () => reloj.ahora(), pesista: t(`pesista.${id}.tipo`), entrenado: e, disponibles: sesionesEntreno(), ev, conEscuelas: params.get('escuelas') === '1', escuela: guardado.get('tarima.escuela') || 'rusa', alElegirEscuela: k => { guardado.set('tarima.escuela', k); ev('escuela_elegida', { escuela: k }); }, mandar: (ejercicio, toques, escuela) => ganchos.entrenar({ pesista: id, ejercicio, toques, escuela }) });
   try { await ganchos.perfil?.(); } catch { /* sin servidor */ }
 }
 const conBono = (n, b) => (b ? `${n} <em class="bono">+${b}</em>` : String(n));

@@ -18,19 +18,21 @@ const R = { ...reglasB('facil'), pasada: ENTRENO.pasada };
  * @returns {Promise<{hechas:number}>}
  */
 export async function entrenar(o) {
-  const { capa, t, esc } = o; let disp = o.disponibles, ent = { ...o.entrenado }, hechas = 0;
+  const { capa, t, esc } = o; let disp = o.disponibles, ent = { ...o.entrenado }, hechas = 0, escuela = o.escuela || 'rusa';
   const panel = html => { capa.innerHTML = `<div class="panel entreno">${html}</div>`; return capa.firstElementChild; };
   const clic = (pn, sel) => new Promise(res => pn.querySelectorAll(sel).forEach(b => b.addEventListener('click', () => res(b))));
   for (;;) {
     const prog = { tiron: `${ent.kg_s}/${ENTRENO.topeKg} kg`, sentadilla: `${ent.kg_c}/${ENTRENO.topeKg} kg`, tecnica: `${Math.round(ent.tecnica / 10)}/${ENTRENO.topeTecnica / 10} %` };
     const pn = panel(`<h2>${t('entreno.titulo', { pesista: esc(o.pesista) })}</h2><p>${t('entreno.intro', { n: disp })}</p>
+      ${o.conEscuelas ? `<div class="fila escuelas"><span>${t('entreno.escuela')}</span>${['rusa', 'bulgara', 'china'].map(k => `<button data-esc="${k}" aria-pressed="${k === escuela}">${t('escuela.' + k)}</button>`).join('')}</div><p class="chica">${t('escuela.' + escuela + '_nota')}</p>` : ''}
       <div class="ejercicios">${EJERCICIOS.map(k => `<button class="ejercicio" data-ej="${k}"${disp < 1 ? ' disabled' : ''}><b>${t('entreno.' + k)}</b><small>${t('entreno.' + k + '_nota')}</small><em>${prog[k]}</em></button>`).join('')}</div>
       <div class="fila"><button class="ir" id="en-salir">${t('entreno.listo')}</button></div>`);
     (pn.querySelector('.ejercicio:not([disabled])') || pn.querySelector('#en-salir')).focus();
-    const b = await clic(pn, '.ejercicio,#en-salir');
+    const b = await clic(pn, '.ejercicio,#en-salir,[data-esc]');
+    if (b.dataset.esc) { escuela = b.dataset.esc; o.alElegirEscuela?.(escuela); continue; }
     if (b.id === 'en-salir') { capa.innerHTML = ''; return { hechas }; }
     const ej = b.dataset.ej, toques = await pasadas(o, ej);
-    let r = null; try { r = await o.mandar(ej, toques); } catch { r = null; }
+    let r = null; try { r = await o.mandar(ej, toques, o.conEscuelas ? escuela : 'rusa'); } catch { r = null; }
     const zonas = toques.map(zonaEntreno), verdes = zonas.filter(z => z === 'verde').length;
     let msg;
     if (r && r.estado === 'ok') { disp = r.disponibles; ent = r.entrenado; hechas++; const s = r.suma; msg = s.kg_s ? t('entreno.suma_s', { kg: s.kg_s }) : s.kg_c ? t('entreno.suma_c', { kg: s.kg_c }) : s.tecnica ? t('entreno.suma_tecnica') : verdes >= ENTRENO.verdesParaSumar ? t('entreno.tope') : t('entreno.no_suma'); }

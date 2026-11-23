@@ -772,4 +772,12 @@ export default {
   'entreno.sin_energia': 'No sessions left: play a final.',
   'entreno.sin_servidor': 'Offline: this session wasn’t saved.',
   'entreno.seguir': 'Continue',
+  // escuelas (LIF-69; textos para aprobar, detrás de ?escuelas=1)
+  'entreno.escuela': 'School',
+  'escuela.rusa': 'Russian',
+  'escuela.bulgara': 'Bulgarian',
+  'escuela.china': 'Chinese',
+  'escuela.rusa_nota': 'Volume and variations: steady progress.',
+  'escuela.bulgara_nota': 'Daily maxes: twice the kilos, but you need all 3 in the green.',
+  'escuela.china_nota': 'Positions and accessories: more technique per session.',
 };

@@ -123,9 +123,10 @@ export async function sesionesDisponibles(db, d) {
 export async function entrenar(db, d, b, ahora, PESISTAS) {
   if (!PESISTAS.includes(b.pesista)) return { ok: false, error: 'pesista' };
   if ((await sesionesDisponibles(db, d)) < 1) return { ok: false, error: 'sin_energia' };
-  const antes = await entrenado(db, d, b.pesista), r = sesionEntreno(b.ejercicio, b.toques, antes);
+  const escuela = ['rusa', 'bulgara', 'china'].includes(b.escuela) ? b.escuela : 'rusa';
+  const antes = await entrenado(db, d, b.pesista), r = sesionEntreno(b.ejercicio, b.toques, antes, escuela);
   if (!r.ok) return { ok: false, error: r.error };
-  await db.prepare('INSERT INTO entrenos (d, en, pesista, ejercicio, verdes, kg_s, kg_c, tecnica) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)').bind(d, ahora, b.pesista, b.ejercicio, r.verdes, r.suma.kg_s, r.suma.kg_c, r.suma.tecnica).run();
+  await db.prepare('INSERT INTO entrenos (d, en, pesista, ejercicio, verdes, kg_s, kg_c, tecnica, escuela) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)').bind(d, ahora, b.pesista, b.ejercicio, r.verdes, r.suma.kg_s, r.suma.kg_c, r.suma.tecnica, escuela).run();
   return { ok: true, sesion: r, entrenado: await entrenado(db, d, b.pesista), disponibles: await sesionesDisponibles(db, d) };
 }
 

@@ -789,4 +789,12 @@ export default {
   'entreno.sin_energia': 'No te quedan sesiones: juega una final.',
   'entreno.sin_servidor': 'Sin conexión: esta sesión no se guardó.',
   'entreno.seguir': 'Seguir',
+  // escuelas (LIF-69; textos para aprobar, detrás de ?escuelas=1)
+  'entreno.escuela': 'Escuela',
+  'escuela.rusa': 'Rusa',
+  'escuela.bulgara': 'Búlgara',
+  'escuela.china': 'China',
+  'escuela.rusa_nota': 'Volumen y variantes: progreso parejo.',
+  'escuela.bulgara_nota': 'Máximos diarios: suma el doble de kilos, pero pide las 3 en el verde.',
+  'escuela.china_nota': 'Posiciones y accesorios: suma más técnica por sesión.',
 };
