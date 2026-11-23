@@ -58,10 +58,18 @@ del Worker de esa regla: `GRATIS_ETAPA "final"`, `GRATIS "1"`, `ENCUESTA_LIBRE "
   lo acepta si lo respaldan los oros de ese dispositivo con ese pesista. «Mi perfil» en la bienvenida.
 - **Desafío (LIF-12)** `?desafio=id`: «Compartir» lleva el link de la final validada; quien lo abre juega la misma final
   y el podio compara los totales (`/api/desafio`).
+- **Reloj de la competencia (LIF-35)** en Medio y Difícil: si llega a 0:00 sin confirmar, el intento se pierde. Fácil, sin reloj.
+- **Plan con el entrenador (LIF-5, LIF-34):** Asegurar · Pelear el oro · Ir por el récord antes de la final; si el arranque sale
+  3 de 3, el dos tiempos empieza descansado. En el registro (`plan`).
+- **Categorías de peso (LIF-15, LIF-49):** 71, 79, 88 (la de siempre) y 94 kg en Opciones; escalan el RM de todos igual
+  (`CATEGORIAS`), el histórico del ranking es por categoría. Los cuerpos todavía no cambian (LIF-67).
+- **Entrenamiento (LIF-62, base de LIF-37, 41 y 69):** «Entrenar (N)» en la bienvenida y el podio: tirones, sentadilla o
+  técnica, 3 pasadas de la barrita; 2 sesiones por final validada; el servidor recalcula cada sesión (`/api/entreno`).
+  Escuelas (LIF-69) detrás de `?escuelas=1` hasta que el dueño apruebe los textos.
 - **Tarjeta para compartir (LIF-23)**, veredicto más corto (LIF-7), errores contados en D1 con alerta diaria (LIF-26).
 - **Rojos de main arreglados:** el toque guardado después del vistazo y la interfaz fuera del recuadro de la primera persona.
 - Scripts: `bash tools/medir.sh [días]` (métricas de LIF-2), `bash tools/errores.sh [días]` (LIF-26). Pruebas nuevas:
-  `node tools/finales_test.mjs` (sin navegador), `node tools/check_ranking.mjs` (navegador, de punta a punta).
+  `node tools/finales_test.mjs` (sin navegador), `node tools/check_ranking.mjs` y `node tools/check_reloj.mjs` (navegador, de punta a punta). Migraciones 0004–0009.
 
 ## Backlog
 
