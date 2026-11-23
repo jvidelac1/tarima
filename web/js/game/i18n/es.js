@@ -797,4 +797,6 @@ export default {
   'escuela.rusa_nota': 'Volumen y variantes: progreso parejo.',
   'escuela.bulgara_nota': 'Máximos diarios: suma el doble de kilos, pero pide las 3 en el verde.',
   'escuela.china_nota': 'Posiciones y accesorios: suma más técnica por sesión.',
+  // control antidoping (LIF-19)
+  'antidoping.limpio': 'Control antidoping: {nombre} salió sorteado después del podio. Resultado: limpio.',
 };

@@ -780,4 +780,6 @@ export default {
   'escuela.rusa_nota': 'Volume and variations: steady progress.',
   'escuela.bulgara_nota': 'Daily maxes: twice the kilos, but you need all 3 in the green.',
   'escuela.china_nota': 'Positions and accessories: more technique per session.',
+  // control antidoping (LIF-19)
+  'antidoping.limpio': 'Doping control: {nombre} was drawn after the podium. Result: clean.',
 };

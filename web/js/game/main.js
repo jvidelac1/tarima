@@ -31,7 +31,7 @@ import { CAMPEONATO, semanaDe, semillaSemana } from '../sim/semana.js';
 import { rankingHTML } from './ui/ranking.js';
 import { tarjetaPodio } from './ui/tarjeta.js';
 import { entrenar as pantallaEntreno } from './ui/entreno.js';
-import { bonoRM, CATEGORIAS, CATEGORIA_BASE, techoEnCategoria, reglasConTecnica, ENTRENO } from '../sim/rules.js';
+import { bonoRM, CATEGORIAS, CATEGORIA_BASE, techoEnCategoria, reglasConTecnica, ENTRENO, sorteoAntidoping } from '../sim/rules.js';
 import { EVENTO, KG_MAX, RELOJ, PLAN, exigenciaTabla, previsto, cuerpoDe, chanceUno, chanceBarra, cuerpoBarra, zonasBarra, reglasB, DIFICULTADES, UNO } from '../sim/rules.js';
 import { RITMO, FASES_RAPIDAS, esDecisivo, tramoResumen, veredictoPropio, desdeRival, TECLA_SALTAR } from './ritmo.js';
 import { t, esc, fijarIdioma, detectarIdioma, idiomaActual, fijarTactil, alCambiarIdioma, IDIOMAS } from './i18n/t.js';
@@ -1784,7 +1784,9 @@ async function cierre(p) {
   await saltable(2500, 900);      // durante 2,5 s, solo el resultado (un toque los adelanta)
   let quedan = null; try { quedan = ganchos.quedan?.() ?? null; } catch { /* sin dato */ }
   const otra = quedan === 1 ? t('podio.otra_quedan') : Number.isFinite(quedan) && quedan > 1 ? t('podio.otra_quedan_n', { n: quedan }) : t('podio.otra');
-  const botones = () => `<div class="fila"><button class="ir grande" id="btn-revancha" data-completa>${otra}</button><button id="btn-cambiar">${t('podio.cambiar')}</button><button id="btn-compartir">${t('podio.compartir')}</button></div><p class="chica" id="compartido" hidden></p><p class="chica" id="podio-rk"${E.rkLinea ? '' : ' hidden'}>${E.rkLinea || ''}</p><div id="podio-extra"></div>`;
+  const botones = () => `<div class="fila"><button class="ir grande" id="btn-revancha" data-completa>${otra}</button><button id="btn-cambiar">${t('podio.cambiar')}</button><button id="btn-compartir">${t('podio.compartir')}</button></div><p class="chica" id="compartido" hidden></p>${E.dopaje ? `<p class="chica" id="podio-dopaje">${t('antidoping.limpio', { nombre: esc(nombreJugador()) })}</p>` : ''}<p class="chica" id="podio-rk"${E.rkLinea ? '' : ' hidden'}>${E.rkLinea || ''}</p><div id="podio-extra"></div>`;
+  // LIF-19 · el control antidoping: si la semilla sortea al jugador entre los medallistas, una línea en el podio (siempre limpio)
+  E.dopaje = sorteoAntidoping(p.cfg.semilla, puesto); if (E.dopaje) ev('antidoping', { puesto });
   E.rkLinea = null; E.rkCamp = null; E.finalId = null; if (E.cfg?.desafio) E.desafioDejado = true;      // un desafío se juega una vez: la revancha ya es libre
   // «Ver ranking» llega después de pintar el podio (la respuesta del servidor): se atiende por delegación en #capa
   const verRk = e => { if (e.target.closest?.('#btn-rk') && !E.sobre) { sonido.activar(); abrirRanking(E.cfg?.campeonato ? 'semana' : 'global'); } else if (e.target.closest?.('#btn-ent') && !E.sobre) { E.irEntreno = true; E.repintar?.(); } };

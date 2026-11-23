@@ -554,3 +554,9 @@ export function reglasConTecnica(dif, tecnica = 0) {
 // sube rápido (más kilos por sesión) pero exige las 3 en el verde. China: posiciones y accesorios (más técnica por sesión). La
 // latinoamericana falta definirla con el dueño. Los textos los aprueba el dueño: hasta entonces van detrás de ?escuelas=1.
 export const ESCUELAS = { rusa: { kg: 1, verdes: 2, tecnica: 20 }, bulgara: { kg: 2, verdes: 3, tecnica: 10 }, china: { kg: 1, verdes: 2, tecnica: 40 } };
+
+// Control antidoping (LIF-19): evento de la carrera, sin efecto en el resultado. Entre los medallistas, la semilla de la final
+// sortea a uno de cada `cadaN` para el control; los pesistas son ficticios y el control da siempre limpio.
+export const ANTIDOPING = { cadaN: 3 };
+/** ¿Sale sorteado para el control el pesista `puesto` (1 a 3) de la final con `semilla`? */
+export const sorteoAntidoping = (semilla, puesto) => !!puesto && puesto <= 3 && (mezclar(semilla >>> 0, 1907, puesto) >>> 0) % ANTIDOPING.cadaN === 0;
