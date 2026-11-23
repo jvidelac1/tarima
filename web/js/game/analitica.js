@@ -58,6 +58,8 @@ export const EVENTOS = new Set([
   'entreno_abierto', 'entreno_hecho', 'escuela_elegida',
   // LIF-19: control antidoping
   'antidoping',
+  // LIF-29: apoyo voluntario
+  'apoyo_click',
 ]);
 
 export const BANDERAS = { 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio', grabacion_lienzo: 'compu' };

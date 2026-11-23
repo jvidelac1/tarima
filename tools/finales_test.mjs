@@ -156,6 +156,13 @@ const b3 = await api('entreno', { pesista: 'ventura', ejercicio: 'tiron', toques
 const b2 = await api('entreno', { pesista: 'ventura', ejercicio: 'sentadilla', toques: [700, 700, 0], escuela: 'bulgara' }, { cookie: S1.uuid });
 const c1 = await api('entreno', { pesista: 'ventura', ejercicio: 'tecnica', toques: [700, 700, 0], escuela: 'china' }, { cookie: S1.uuid });
 ok(b3.j.suma?.kg_s === 2 && b2.j.suma?.kg_c === 0 && c1.j.suma?.tecnica === 40, '12: las escuelas no suman lo de su perfil: ' + JSON.stringify([b3.j.suma, b2.j.suma, c1.j.suma]));
+// 13. apoyo (LIF-29): /api/estado trae el enlace solo si es https y está configurado
+const est0 = await api('estado', { dispositivo: crypto.randomUUID() });
+ok(est0.j.apoyo === undefined, '13: sin APOYO_URL el estado trae un enlace');
+env.APOYO_URL = 'https://ko-fi.com/ejemplo'; const est1 = await api('estado', { dispositivo: crypto.randomUUID() });
+ok(est1.j.apoyo === 'https://ko-fi.com/ejemplo', '13: con APOYO_URL el estado no trae el enlace');
+env.APOYO_URL = 'javascript:alert(1)'; const est2 = await api('estado', { dispositivo: crypto.randomUUID() }); env.APOYO_URL = '';
+ok(est2.j.apoyo === undefined, '13: un enlace que no es https entró');
 // métricas de LIF-2 desde la tabla
 const m = await db.prepare('SELECT COUNT(*) finales, SUM(caidas) caidas, SUM(intentos) intentos, SUM(todo_verde) todo_verde, SUM(saltos) saltos FROM finales').first();
 logReal(`finales guardadas: ${m.finales} · caídas ${m.caidas} de ${m.intentos} intentos · intentos todo verde ${m.todo_verde} · saltos ${m.saltos}`);

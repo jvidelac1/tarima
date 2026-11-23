@@ -782,4 +782,6 @@ export default {
   'escuela.china_nota': 'Positions and accessories: more technique per session.',
   // control antidoping (LIF-19)
   'antidoping.limpio': 'Doping control: {nombre} was drawn after the podium. Result: clean.',
+  // apoyo voluntario (LIF-29)
+  'apoyo.boton': 'Support the game',
 };

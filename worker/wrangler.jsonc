@@ -56,6 +56,7 @@
     "ENCUESTA_LIBRE": "0",
     "ENCUESTAS_POR_IP": "3",
     "MAIL_DESDE": "",
+    "APOYO_URL": "",
     "TURNSTILE": "0",
     // La IP y el país del visitante llegan en x-tarima-ip y x-tarima-pais, que pone la Function de Pages (pisando lo
     // que mande el navegador). Solo es seguro porque este Worker no tiene dirección pública: si algún día se le agrega

@@ -799,4 +799,6 @@ export default {
   'escuela.china_nota': 'Posiciones y accesorios: suma más técnica por sesión.',
   // control antidoping (LIF-19)
   'antidoping.limpio': 'Control antidoping: {nombre} salió sorteado después del podio. Resultado: limpio.',
+  // apoyo voluntario (LIF-29)
+  'apoyo.boton': 'Apoyar el juego',
 };

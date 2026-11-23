@@ -256,6 +256,9 @@ async function perfil({ request, env, b }) {
   return json({ perfil: await perfilDe(env.DB, await codigoDispositivo(env, uuid), semanaDe(ahoraS()).clave) });
 }
 
+// LIF-29 · el enlace de «Apoyar el juego» (Ko-fi o similar, cuenta del dueño): solo una URL https; vacío, el juego no lo muestra.
+const apoyoUrl = env => (typeof env.APOYO_URL === 'string' && /^https:\/\/[\w.-]+\/[\w./?=&%-]*$/.test(env.APOYO_URL) ? env.APOYO_URL : null);
+
 // La regla vigente, para los textos del juego: hasta dónde llega una final gratis, cuántas, cuánto suma la encuesta y si
 // la encuesta desbloquea el juego libre (ENCUESTA_LIBRE).
 const reglaDe = cfg => ({ etapa: cfg.etapa, gratis: cfg.gratis, bono: cfg.bono, libre: cfg.encuesta_libre });
@@ -264,7 +267,7 @@ async function estado(a) {
   const s = await situacion(a);
   const r = {
     dispositivo: s.uuid, puede: s.dec.puede, quedan: s.dec.quedan, lista: !!s.dev.lista_id, libre: s.dec.libre, etapa: s.dec.etapa,
-    encuesta_disponible: s.dec.encuesta_disponible, flags: s.flags, contexto: s.contexto, regla: reglaDe(s.cfg), metricas: metricas(a.env),
+    encuesta_disponible: s.dec.encuesta_disponible, flags: s.flags, contexto: s.contexto, regla: reglaDe(s.cfg), metricas: metricas(a.env), ...(apoyoUrl(a.env) ? { apoyo: apoyoUrl(a.env) } : {}),
   };
   if (s.dev.lista_id) r.lista_id = s.dev.lista_id;
   if (!s.dec.puede) r.motivo = s.dec.motivo;
