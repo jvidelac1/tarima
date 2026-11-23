@@ -166,8 +166,11 @@ const VARS = (() => { const txt = fs.readFileSync(path.join(ROOT, 'worker/wrangl
   }
   // La regla de producción es la que trae worker/wrangler.jsonc por defecto (decisión del dueño del 17 de noviembre: el
   // muro sigue como está, después del arranque): las pruebas de esta sección corren con las variables del archivo.
-  const PROD = { GRATIS_ETAPA: VARS.GRATIS_ETAPA, GRATIS: VARS.GRATIS, TOPE_IP: VARS.TOPE_IP, BONO_ENCUESTA: VARS.BONO_ENCUESTA, ENCUESTA_LIBRE: VARS.ENCUESTA_LIBRE, ENCUESTAS_POR_IP: VARS.ENCUESTAS_POR_IP };
-  igual(PROD, { GRATIS_ETAPA: 'arranque', GRATIS: '1', TOPE_IP: '6', BONO_ENCUESTA: '0', ENCUESTA_LIBRE: '0', ENCUESTAS_POR_IP: '3' }, 'worker/wrangler.jsonc: por defecto, el arranque gratis y el correo obligatorio (la regla de producción)');
+  // Desde el 23-nov producción usa la regla de LIF-53 (viralidad, OK del dueño); esta sección sigue probando la del arranque
+  // gratis, ahora pedida con variables.
+  const DEF = { GRATIS_ETAPA: VARS.GRATIS_ETAPA, GRATIS: VARS.GRATIS, TOPE_IP: VARS.TOPE_IP, BONO_ENCUESTA: VARS.BONO_ENCUESTA, ENCUESTA_LIBRE: VARS.ENCUESTA_LIBRE, ENCUESTAS_POR_IP: VARS.ENCUESTAS_POR_IP };
+  igual(DEF, { GRATIS_ETAPA: 'final', GRATIS: '1', TOPE_IP: '6', BONO_ENCUESTA: '0', ENCUESTA_LIBRE: '1', ENCUESTAS_POR_IP: '3' }, 'worker/wrangler.jsonc: por defecto, la regla de LIF-53 (la primera final entera gratis, el cartel con correo o 2 preguntas)');
+  const PROD = { ...DEF, GRATIS_ETAPA: 'arranque', ENCUESTA_LIBRE: '0' };
   // Con bono 1: la maquinaria del bono en el intervalo (no es producción).
   const BONO1 = { ...PROD, BONO_ENCUESTA: '1' };
   igual(R.config(PROD), { etapa: 'arranque', gratis: 1, tope_ip: 6, bono: 0, encuestas_por_ip: 3, encuesta_libre: false }, 'worker/wrangler.jsonc: la final gratis da solo el arranque y la encuesta no desbloquea');
