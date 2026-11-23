@@ -724,4 +724,7 @@ export default {
   'perfil.oros': 'Golds',
   'perfil.mejor': 'Best total',
   'perfil.progresion': 'Each gold with a lifter raises their PR by 1 kg in the snatch and 1 kg in the clean & jerk, up to 10 kg. The weekly championship is played without that boost.',
+  // tarjeta para compartir (LIF-23)
+  'tarjeta.pie': 'Can you beat me? One-button weightlifting, free in your browser.',
+  'compartir.copiado_imagen': 'Text copied and image downloaded. Paste it anywhere.',
 };

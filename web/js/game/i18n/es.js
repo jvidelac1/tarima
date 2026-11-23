@@ -741,4 +741,7 @@ export default {
   'perfil.oros': 'Oros',
   'perfil.mejor': 'Mejor total',
   'perfil.progresion': 'Cada oro con un pesista le sube el RM 1 kg en el arranque y 1 kg en el dos tiempos, hasta 10 kg. El campeonato semanal se juega sin esa mejora.',
+  // tarjeta para compartir (LIF-23)
+  'tarjeta.pie': '¿Me ganas? Halterofilia a un botón, gratis en el navegador.',
+  'compartir.copiado_imagen': 'Texto copiado e imagen descargada. Pégalo donde quieras.',
 };

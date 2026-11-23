@@ -29,6 +29,7 @@ import { simular } from '../sim/attempt.js';
 import { recalcular, resumen } from '../sim/replay.js';
 import { CAMPEONATO, semanaDe, semillaSemana } from '../sim/semana.js';
 import { rankingHTML } from './ui/ranking.js';
+import { tarjetaPodio } from './ui/tarjeta.js';
 import { bonoRM } from '../sim/rules.js';
 import { EVENTO, KG_MAX, RELOJ, PLAN, exigenciaTabla, previsto, cuerpoDe, chanceUno, chanceBarra, cuerpoBarra, zonasBarra, reglasB, DIFICULTADES, UNO } from '../sim/rules.js';
 import { RITMO, FASES_RAPIDAS, esDecisivo, tramoResumen, veredictoPropio, desdeRival, TECLA_SALTAR } from './ritmo.js';
@@ -1712,10 +1713,17 @@ async function compartir(p, medalla, total, pn) {
   const link = `${location.origin}${location.pathname}?c=${codigo}`;
   const txt = t('compartir.texto', { medalla: t('medalla.' + medalla), total: total || 0, marcas_s: marcas('s'), marcas_c: marcas('c'), link });
   const nota = pn.querySelector('#compartido'), decir = k => { if (nota) { nota.hidden = false; nota.textContent = t(k); } };
+  // LIF-23 · la tarjeta con el resultado (imagen): con el teléfono va junto al texto; en la compu, el texto se copia y la imagen se descarga
+  const ints = lev => p.at[E.yo][lev].map(x => ({ kg: x.kg, ok: x.res === 'valido' }));
+  const pie = E.cfg?.campeonato && E.rkCamp ? t('podio.campeonato', E.rkCamp) : t('tarjeta.pie');
+  let img = null; try { const b = await tarjetaPodio({ titulo: t(medalla === 'oro' ? 'podio.oro' : medalla === 'plata' ? 'podio.plata' : medalla === 'bronce' ? 'podio.bronce' : 'podio.sin_total', { nombre: nombreJugador() }), medalla, total, arranque: ints('s'), dosTiempos: ints('c'), lineaArr: t('lev.s'), lineaDT: t('lev.c'), pie, url: location.host + location.pathname.replace(/juego\.html$/, '') }); if (b) img = new File([b], 'lifting-game.png', { type: 'image/png' }); } catch { img = null; }
   let via = 'copiar';
   try {
-    if (navigator.share && tactil()) { via = 'nativo'; await navigator.share({ text: txt }); }
-    else { await navigator.clipboard.writeText(txt); decir('compartir.copiado'); }
+    if (navigator.share && tactil()) { via = img && navigator.canShare?.({ files: [img] }) ? 'nativo_imagen' : 'nativo'; await navigator.share(via === 'nativo_imagen' ? { files: [img], text: txt } : { text: txt }); }
+    else {
+      await navigator.clipboard.writeText(txt).catch(() => null);
+      if (img) { via = 'copiar_imagen'; const u = URL.createObjectURL(img), a = document.createElement('a'); a.href = u; a.download = img.name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); decir('compartir.copiado_imagen'); } else decir('compartir.copiado');
+    }
   } catch (e) { if (e?.name !== 'AbortError') decir('compartir.error'); }
   ev('compartir', { via, medalla, pantalla: E.pantalla });
 }
@@ -1749,7 +1757,7 @@ async function cierre(p) {
   let quedan = null; try { quedan = ganchos.quedan?.() ?? null; } catch { /* sin dato */ }
   const otra = quedan === 1 ? t('podio.otra_quedan') : Number.isFinite(quedan) && quedan > 1 ? t('podio.otra_quedan_n', { n: quedan }) : t('podio.otra');
   const botones = () => `<div class="fila"><button class="ir grande" id="btn-revancha" data-completa>${otra}</button><button id="btn-cambiar">${t('podio.cambiar')}</button><button id="btn-compartir">${t('podio.compartir')}</button></div><p class="chica" id="compartido" hidden></p><p class="chica" id="podio-rk"${E.rkLinea ? '' : ' hidden'}>${E.rkLinea || ''}</p><div id="podio-extra"></div>`;
-  E.rkLinea = null;
+  E.rkLinea = null; E.rkCamp = null;
   // «Ver ranking» llega después de pintar el podio (la respuesta del servidor): se atiende por delegación en #capa
   const verRk = e => { if (e.target.closest?.('#btn-rk') && !E.sobre) { sonido.activar(); abrirRanking(E.cfg?.campeonato ? 'semana' : 'global'); } };
   $('capa').addEventListener('click', verRk); E.quitarVerRk?.(); E.quitarVerRk = () => $('capa').removeEventListener('click', verRk);
@@ -1759,6 +1767,7 @@ async function cierre(p) {
   Promise.race([E.envio, new Promise(r => setTimeout(r, 6000, null))]).then(r => {
     if (!r || (r.estado !== 'ok' && r.estado !== 'repetida')) return;
     ev('final_validada', { campeonato: camp, puesto_semana: r.ranking?.puesto ?? null });
+    E.rkCamp = camp && r.ranking ? { puesto: r.ranking.puesto, de: r.ranking.de } : null;
     E.rkLinea = `${camp && r.ranking ? t('podio.campeonato', { puesto: r.ranking.puesto, de: r.ranking.de }) : t('podio.validada')} <button class="link" id="btn-rk">${t('podio.ver_ranking')}</button>`;
     E.repintar?.();      // el podio se vuelve a pintar con la línea (y su botón escuchado)
   });
