@@ -1386,12 +1386,18 @@ async function presentacion(p, cfg, errMedio, primera) {
   const html = () => `${idiomasHTML(true)}${primera && !esU(cfg.ctl) ? `<h2>${t('gana.titulo')}</h2><ol class="reglas"><li>${t('gana.l1')}</li><li>${t('gana.l2')}</li><li>${t('gana.l3')}</li></ol>` : ''}
     <h2>${t('gana.rivales')}</h2><div class="pesistas rivales">${rivales.map(a => `<div class="pesista"><div class="b" style="background:${PLANTEL[a.id].bandera}"></div><b>${esc(quien(a))}</b><small>${t('gana.abre', { s: a.decl.s, c: a.decl.c })}${a.plan ? `<span class="estilo"> · ${t('rival.estilo.' + a.plan.estilo)}</span>` : ''}</small></div>`).join('')}</div>
     ${G.tipo !== 'nada' ? `<p>${esc(G.tipo === 'tocado' && esU(cfg.ctl) ? t('guion.tocado_u', { rival: quien(p.at[G.a]) }) : GUIONES[G.tipo](G.a >= 0 ? quien(p.at[G.a]) : ''))}</p>` : ''}<p>${t('gana.forma', { s: forma(yo.forma.s), c: forma(yo.forma.c) })}</p>`;
-  let pn = capa.poner(`${html()}<div class="fila"><button class="ir grande" id="btn-gana">${t('gana.seguir')}</button></div>`, 'gana');
+  // LIF-5 y LIF-34 · el plan con el entrenador (solo en la barrita): un toque, con «Pelear el oro» marcado si nunca eligió otro
+  const conPlan = cfg.ctl === 'b'; let plan = ['seguro', 'oro', 'record'].includes(guardado.get('tarima.plan')) ? guardado.get('tarima.plan') : 'oro';
+  const planHTML = () => conPlan ? `<div class="fila plan" role="group" aria-label="${esc(t('plan.titulo'))}"><span>${t('plan.titulo')}</span>${['seguro', 'oro', 'record'].map(k => `<button data-plan="${k}" aria-pressed="${k === plan}">${t('plan.' + k)}</button>`).join('')}</div><p class="chica">${t('plan.' + plan + '_nota')} ${t('plan.premio')}</p>` : '';
+  const pinta = () => capa.poner(`${html()}${planHTML()}<div class="fila"><button class="ir grande" id="btn-gana">${t('gana.seguir')}</button></div>`, 'gana');
+  let pn = pinta();
   bloquear(pn);
   for (;;) {
-    const b = await Promise.race([clic(pn, '#btn-gana'), new Promise(res => { E.repintar = () => res(null); })]);
-    if (b) break; pn = capa.poner(`${html()}<div class="fila"><button class="ir grande" id="btn-gana">${t('gana.seguir')}</button></div>`, 'gana');
+    const b = await Promise.race([clic(pn, '#btn-gana,[data-plan]'), new Promise(res => { E.repintar = () => res(null); })]);
+    if (b && b.dataset.plan) { plan = b.dataset.plan; guardado.set('tarima.plan', plan); ev('plan_elegido', { plan }); pn = pinta(); continue; }
+    if (b) break; pn = pinta();
   }
+  if (conPlan) p.elegirPlan(plan);
   visita('apertura'); await elegirApertura(p, 's', sug, () => ''); E.pctApertura = pct;
 }
 
@@ -1708,7 +1714,7 @@ function cortarFinal(p) {
 
 async function intervalo(p) {
   visita('intervalo'); const f = p.at[E.yo].f, sug = Math.round(f.techo.c * (E.pctApertura || .935));
-  const html = () => { const yo = p.tabla().find(x => x.a === E.yo), n = yo && yo.puesto; return `<h1>${t('intervalo.titulo')}</h1>${tableroHTML(p, { yo: E.yo, nombre: nombreJugador() })}<p>${n ? t('intervalo.texto', { n, pos: t('pos.' + n) }) : t('intervalo.sin_puesto')}</p>`; };
+  const html = () => { const yo = p.tabla().find(x => x.a === E.yo), n = yo && yo.puesto; return `<h1>${t('intervalo.titulo')}</h1>${tableroHTML(p, { yo: E.yo, nombre: nombreJugador() })}<p>${n ? t('intervalo.texto', { n, pos: t('pos.' + n) }) : t('intervalo.sin_puesto')}</p>${p.cfg.plan && p.at[E.yo].s.length === 3 && p.at[E.yo].s.every(x => x.res === 'valido') ? `<p class="cuenta">${t('plan.cumplido')}</p>` : ''}`; };
   await elegirApertura(p, 'c', sug, html); p.empezar();
 }
 

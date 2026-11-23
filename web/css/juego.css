@@ -860,3 +860,4 @@ html.vert body:has(#recuadro:not([hidden])) #tv #guia{bottom:auto;top:calc(max(v
 .bono{font-style:normal;color:var(--ok);font-weight:700}
 .sobre-perfil th{font-size:calc(var(--u)*.95);color:var(--mute);text-align:left;padding:calc(var(--u)*.3) calc(var(--u)*.5)}
 .desafio{border:1px solid var(--gold);background:rgba(255,210,63,.08);padding:calc(var(--u)*.6) calc(var(--u)*1);margin:calc(var(--u)*.6) 0}.desafio p{margin:0 0 calc(var(--u)*.3)}
+.gana .plan{gap:calc(var(--u)*.5);flex-wrap:wrap;align-items:center}.gana .plan button[aria-pressed=true]{border-color:var(--teal);color:var(--teal)}

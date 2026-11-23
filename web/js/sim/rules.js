@@ -523,3 +523,9 @@ export const CAUSAS = {
 export const PROGRESION = { porOro: 1, tope: 10 };
 /** El bono de RM {s, c} que corresponde a `oros` finales ganadas con ese pesista. */
 export const bonoRM = oros => { const k = Math.min(PROGRESION.tope, Math.max(0, oros | 0) * PROGRESION.porOro); return { s: k, c: k }; };
+
+// Plan de competencia (LIF-5, LIF-34): antes de la final la persona elige con el entrenador qué tan arriesgado va a ir. El plan
+// cambia la chance con la que el entrenador propone los kilos del 2.º y 3.er intento (entrenador.js, sugerencia; milésimas) y,
+// si el arranque sale como se planeó (los 3 válidos), el dos tiempos empieza sin el cansancio que trae del arranque. Va en el
+// registro (`plan`) para que el servidor lo recalcule. Sin plan: «oro», el de siempre.
+export const PLANES = { seguro: { segundo: 960, tercero: 880 }, oro: { segundo: 930, tercero: 800 }, record: { segundo: 880, tercero: 650 } };

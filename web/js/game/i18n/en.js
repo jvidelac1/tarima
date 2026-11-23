@@ -737,4 +737,14 @@ export default {
   // reloj en Medio y Difícil (LIF-35)
   'llamado.reloj_b': 'The clock is running: confirm before it hits 0:00 or you lose the attempt ({s} s).',
   'explica.reloj.b': 'The clock ran out before you confirmed: that attempt doesn’t count.',
+  // plan de competencia (LIF-5, LIF-34)
+  'plan.titulo': 'Plan',
+  'plan.seguro': 'Play it safe',
+  'plan.oro': 'Go for gold',
+  'plan.record': 'Go for the record',
+  'plan.seguro_nota': 'Your coach suggests weights you make almost every time.',
+  'plan.oro_nota': 'Your coach suggests weights to win without overreaching.',
+  'plan.record_nota': 'Your coach suggests heavier weights: bigger total, more risk.',
+  'plan.premio': 'Make all 3 snatches and you start the clean & jerk fresh.',
+  'plan.cumplido': 'Plan done: you start the clean & jerk fresh.',
 };

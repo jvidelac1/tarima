@@ -3,7 +3,7 @@
 // nunca con rivales normales. Ahora lee lo mismo que la persona ve en el panel: la chance de cada peso («X de 10», rules.js →
 // chanceUno) y La cuenta (los kilos que hacen falta para el oro). La persona puede cambiarlo con ← → antes de confirmar.
 // Núcleo: enteros (chances en milésimas), sin DOM ni reloj; lo usan match.js, main.js y tools/pesistas_test.mjs.
-import { chanceUno, chanceBarra, cuerpoDe, cuerpoBarra, KG_MAX, RESTO, multFondo, techoMomento, intensidad } from './rules.js';
+import { chanceUno, chanceBarra, cuerpoDe, cuerpoBarra, KG_MAX, RESTO, multFondo, techoMomento, intensidad, PLANES } from './rules.js';
 import { idiv } from './fixed.js';
 
 /**
@@ -45,9 +45,9 @@ export function sugerencia(p, i, lev, env, o = {}) {
   const hasta = x => { let k = min; while (k + 1 <= KG_MAX && ch(k + 1) >= x) k++; return k; };
   let seguro;
   // 'b' es un poco más prudente: la persona puede pegar en el amarillo y el cansancio pasa factura al intento siguiente
-  const pb = p.cfg.ctl === 'b';
-  if (n === 2) { const k9 = hasta(pb ? 930 : 900); seguro = k9; while (seguro > min && chanceDespues(p, i, lev, seguro, seguro + 1, env, o) < 600) seguro--; if (chanceDespues(p, i, lev, seguro, seguro + 1, env, o) < 600) seguro = k9; }
-  else seguro = hasta(pb ? 800 : 750);
+  const pb = p.cfg.ctl === 'b', pl = pb && a.ctrl === 'persona' && PLANES[p.cfg.plan] ? PLANES[p.cfg.plan] : null;      // LIF-5: el plan elegido
+  if (n === 2) { const k9 = hasta(pl ? pl.segundo : pb ? 930 : 900); seguro = k9; while (seguro > min && chanceDespues(p, i, lev, seguro, seguro + 1, env, o) < 600) seguro--; if (chanceDespues(p, i, lev, seguro, seguro + 1, env, o) < 600) seguro = k9; }
+  else seguro = hasta(pl ? pl.tercero : pb ? 800 : 750);
   if (lev === 'c' && C.oro !== null && C.oro > seguro && C.oro <= KG_MAX && ch(C.oro) >= (n === 3 ? 200 : 500)) return C.oro;
   return seguro;
 }

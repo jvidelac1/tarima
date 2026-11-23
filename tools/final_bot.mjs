@@ -7,10 +7,11 @@ import { reglasB } from '../web/js/sim/rules.js';
 import { datos, ATL, PERFILES, jugarBarra } from './barra_bots.mjs';
 
 /** Juega una final con la persona en `yo` y devuelve { reg, tabla, p }. */
-export function finalBot(k, { yo = k % 3, perfil = 'medio', dif = 'facil', nivel = 'amistoso', semilla = mezclar(k, 4242) >>> 0, rm = null } = {}) {
+export function finalBot(k, { yo = k % 3, perfil = 'medio', dif = 'facil', nivel = 'amistoso', semilla = mezclar(k, 4242) >>> 0, rm = null, plan = null } = {}) {
   const R = reglasB(dif);
   const p = new Partida(datos, { semilla, ia: HUELLA_IA, envFijo: true, turnos: 'rondas', nivel, cal: 0, primera: false, ctl: 'b', ...(dif !== 'facil' ? { dif } : {}), tactil: true, atletas: ATL.map((id, i) => ({ id, ctrl: i === yo ? 'persona' : 'juego', ...(i === yo && rm ? { rm } : {}) })) });
   for (const lev of ['s', 'c']) { const [lo, hi] = p.rangoApertura(yo, lev); p.abrir(yo, lev, Math.max(lo, Math.min(hi, Math.round(p.at[yo].f.techo[lev] * R.apertura / 1000)))); }
+  if (plan) p.elegirPlan(plan);
   p.empezar();
   for (let g = 0; p.fase !== 'fin' && g < 80; g++) {
     if (p.fase === 'intervalo') { p.empezar(); continue; }

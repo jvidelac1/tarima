@@ -123,6 +123,10 @@ for (let k = 0; k < 3; k++) await api('error', { tipo: 'TypeError', pantalla: 'i
 await api('error', { tipo: 'no vale <b>', mensaje: 'x' });
 const er = await db.prepare('SELECT tipo, pantalla, mensaje, n FROM errores').all();
 ok(er.results.length === 1 && er.results[0].n === 3 && !/@/.test(er.results[0].mensaje), '8: los errores no se cuentan bien: ' + JSON.stringify(er.results));
+// 9. plan de competencia (LIF-5): entra en el registro y el servidor lo recalcula; uno inventado no entra
+const P1 = jugador(), rp1 = await P1.mandar(finalBot(700, { plan: 'record' })), gp = JSON.parse(JSON.stringify(finalBot(701, { plan: 'seguro' }).reg)); gp.plan = 'trampa';
+ok(rp1.j.estado === 'ok', '9: una final con plan no entró: ' + JSON.stringify(rp1.j).slice(0, 150));
+ok((await P1.mandar({ reg: gp })).status === 422, '9: un plan inventado entró');
 // métricas de LIF-2 desde la tabla
 const m = await db.prepare('SELECT COUNT(*) finales, SUM(caidas) caidas, SUM(intentos) intentos, SUM(todo_verde) todo_verde, SUM(saltos) saltos FROM finales').first();
 logReal(`finales guardadas: ${m.finales} · caídas ${m.caidas} de ${m.intentos} intentos · intentos todo verde ${m.todo_verde} · saltos ${m.saltos}`);

@@ -754,4 +754,14 @@ export default {
   // reloj en Medio y Difícil (LIF-35)
   'llamado.reloj_b': 'El reloj corre: confirma antes de que llegue a 0:00 o pierdes el intento ({s} s).',
   'explica.reloj.b': 'Se acabó el reloj antes de confirmar: ese intento no cuenta.',
+  // plan de competencia (LIF-5, LIF-34)
+  'plan.titulo': 'Plan',
+  'plan.seguro': 'Asegurar',
+  'plan.oro': 'Pelear el oro',
+  'plan.record': 'Ir por el récord',
+  'plan.seguro_nota': 'El entrenador propone kilos que salen casi siempre.',
+  'plan.oro_nota': 'El entrenador propone kilos para ganar sin pasarse.',
+  'plan.record_nota': 'El entrenador propone kilos más altos: más total, más riesgo.',
+  'plan.premio': 'Si haces los 3 arranques, empiezas el dos tiempos descansado.',
+  'plan.cumplido': 'Plan cumplido: empiezas el dos tiempos descansado.',
 };

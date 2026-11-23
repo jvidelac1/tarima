@@ -5,7 +5,7 @@ import { idiv, rdiv, clampi, mezclar, Azar, huella, canonico } from './fixed.js'
 import { simular } from './attempt.js';
 import { gestos, decidir, elegirEnvion, envionRival, planRival, decidirPlan, estiloRival, HUELLA_IA } from './ai.js';
 import { sugerencia } from './entrenador.js';
-import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad, cuerpoDe, cuerpoBarra, HUELLA_U, HUELLAS_B, NIVELES_B, fatigaDe, sumarFatiga } from './rules.js';
+import { VERSION, RELOJ, RESTO, APERTURA, PLAN, NIVELES, KG_MAX, EVENTO, CONTROLES, multFondo, techoMomento, intensidad, cuerpoDe, cuerpoBarra, HUELLA_U, HUELLAS_B, NIVELES_B, fatigaDe, sumarFatiga, PLANES } from './rules.js';
 
 const LEVS = ['s', 'c'];
 
@@ -44,7 +44,7 @@ export class Partida {
     const ctl = cfg.ctl ?? 'c'; if (!CONTROLES.includes(ctl)) throw new Error('nivel de control desconocido');
     if (cfg.ia !== undefined && cfg.ia !== HUELLA_IA) throw new Error('reglas de los rivales desconocidas');
     if (cfg.turnos !== undefined && !TURNOS.modos.includes(cfg.turnos)) throw new Error('orden de turnos desconocido');
-    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl, tactil: (ctl === 'f' || ctl === 'u' || ctl === 'b') && !!cfg.tactil, ia: cfg.ia ?? null, turnos: cfg.turnos ?? null, dif: ctl === 'b' && NIVELES_B[cfg.dif] ? cfg.dif : 'facil', envFijo: cfg.envFijo === true };
+    this.d = datos; this.cfg = { semilla: cfg.semilla >>> 0, nivel: cfg.nivel, cal: clampi(cfg.cal | 0, 0, 100), primera: !!cfg.primera, ctl, tactil: (ctl === 'f' || ctl === 'u' || ctl === 'b') && !!cfg.tactil, ia: cfg.ia ?? null, turnos: cfg.turnos ?? null, dif: ctl === 'b' && NIVELES_B[cfg.dif] ? cfg.dif : 'facil', envFijo: cfg.envFijo === true, plan: ctl === 'b' && PLANES[cfg.plan] ? cfg.plan : null };
     if (cfg.envFijo !== undefined && typeof cfg.envFijo !== 'boolean') throw new Error('regla del estilo de envión desconocida');
     if (cfg.dif !== undefined && cfg.dif !== 'facil' && this.cfg.dif !== cfg.dif) throw new Error('nivel de dificultad desconocido');
     const r = new Azar(mezclar(this.cfg.semilla, 7)), N = NIVELES[cfg.nivel];
@@ -70,8 +70,15 @@ export class Partida {
       a.decl = { ...a.plan.decl };
     }
     this.fase = 'presentacion'; this.lev = 's'; this.seq = 0; this.barra = 0; this.rondaBarra = -1; this.nPedido = 0; this.ultimo = -1; this.llamado = null; this.nLlamado = 0;
-    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(this.cfg.envFijo ? { envFijo: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : ctl === 'b' ? { barra: HUELLAS_B[this.cfg.dif], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}) } : {}), ...(this.cfg.ia ? { ia: this.cfg.ia } : {}), ...(this.cfg.turnos ? { orden: this.cfg.turnos, turnos: HUELLA_TURNOS } : {}),
+    this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(this.cfg.envFijo ? { envFijo: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : ctl === 'b' ? { barra: HUELLAS_B[this.cfg.dif], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}) } : {}), ...(this.cfg.ia ? { ia: this.cfg.ia } : {}), ...(this.cfg.turnos ? { orden: this.cfg.turnos, turnos: HUELLA_TURNOS } : {}), ...(PLANES[this.cfg.plan] ? { plan: this.cfg.plan } : {}),
       atletas: cfg.atletas.map(x => ({ id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego', ...(x.ctrl === 'persona' && x.rm ? { rm: { s: x.rm.s, c: x.rm.c } } : {}) })), aperturas: this.at.map(a => ({ s: a.decl.s, c: a.decl.c })), llamados: [] };
+  }
+
+  /** LIF-5 · el plan de competencia de la persona (solo en la barrita y antes de empezar): queda en el registro. */
+  elegirPlan(plan) {
+    if (this.fase !== 'presentacion') throw new Error('el plan se elige antes de empezar');
+    if (this.cfg.ctl !== 'b' || !PLANES[plan]) throw new Error('plan desconocido');
+    this.cfg.plan = plan; this.reg.plan = plan;
   }
 
   // ---------- aperturas y sesiones ----------
@@ -88,6 +95,8 @@ export class Partida {
   empezar() {
     const lev = this.fase === 'presentacion' ? 's' : this.fase === 'intervalo' ? 'c' : null; if (!lev) throw new Error('no hay sesión por empezar');
     if (this.at.some(a => !a.decl[lev])) throw new Error('falta una apertura');
+    // LIF-5: con plan, si el arranque salió como se planeó (3 válidos), el dos tiempos empieza sin el cansancio que trae del arranque
+    if (lev === 'c' && PLANES[this.cfg.plan]) for (const a of this.at) if (a.ctrl === 'persona') { a.planCumplido = a.s.length === 3 && a.s.every(x => x.res === 'valido'); if (a.planCumplido && a.fatiga) a.fatiga.c = 0; }
     this.fase = this.lev = lev; this.barra = 0; this.rondaBarra = -1; this.ultimo = -1; for (const a of this.at) a.pidio = 0; this._siguiente();
   }
 
