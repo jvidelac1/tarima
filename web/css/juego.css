@@ -868,3 +868,4 @@ html.vert body:has(#recuadro:not([hidden])) #tv #guia{bottom:auto;top:calc(max(v
 .en-barra .en-am{position:absolute;top:0;bottom:0;background:var(--gold)}.en-barra .en-ve{position:absolute;top:0;bottom:0;background:var(--ok)}
 .en-barra .en-punt{position:absolute;top:-2px;bottom:-2px;width:6px;margin-left:-3px;background:#fff;box-shadow:0 0 0 2px #000}
 .entreno .zonas{display:flex;gap:8px}.entreno .zonas i{width:28px;height:12px;border-radius:3px;display:inline-block}.zonas .z-verde{background:var(--ok)}.zonas .z-amarillo{background:var(--gold)}.zonas .z-rojo{background:var(--red)}
+#btn-compartir.desafiar{border-color:var(--gold);color:var(--gold)}

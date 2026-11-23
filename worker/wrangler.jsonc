@@ -49,13 +49,14 @@
     // dispositivo y hasta ENCUESTAS_POR_IP por red en 30 días).
     // Otras: 2 finales enteras gratis con correo obligatorio (regla del 12 de noviembre, antes de la noche):
     // GRATIS_ETAPA "final", GRATIS "2", ENCUESTA_LIBRE "0".
-    "GRATIS_ETAPA": "arranque",
+    "GRATIS_ETAPA": "final",
     "GRATIS": "1",
     "TOPE_IP": "6",
     "BONO_ENCUESTA": "0",
-    "ENCUESTA_LIBRE": "0",
+    "ENCUESTA_LIBRE": "1",
     "ENCUESTAS_POR_IP": "3",
     "MAIL_DESDE": "",
+    "APOYO_URL": "",
     "TURNSTILE": "0",
     // La IP y el país del visitante llegan en x-tarima-ip y x-tarima-pais, que pone la Function de Pages (pisando lo
     // que mande el navegador). Solo es seguro porque este Worker no tiene dirección pública: si algún día se le agrega

@@ -799,4 +799,15 @@ export default {
   'escuela.china_nota': 'Posiciones y accesorios: suma más técnica por sesión.',
   // control antidoping (LIF-19)
   'antidoping.limpio': 'Control antidoping: {nombre} salió sorteado después del podio. Resultado: limpio.',
+  // apoyo voluntario (LIF-29)
+  'apoyo.boton': 'Apoyar el juego',
+  // viralidad: desafíos
+  'podio.desafiar': 'Desafiar a un amigo',
+  'perfil.desafios': 'Tus desafíos los jugaron {n} personas; {m} te superaron. Cada una te dio 2 sesiones de entrenamiento.',
+  'perfil.desafios_cero': 'Comparte una final con «Desafiar a un amigo»: cada persona que la juegue te da 2 sesiones de entrenamiento.',
+  'bienvenida.desafios_nuevos': '{n} personas jugaron tu desafío: tienes {s} sesiones de entrenamiento más.',
+  // viralidad: campeonato
+  'campeonato.aviso': 'Campeonato de la semana: la misma final para todos. «Jugar» la juega; el ranking cierra el domingo.',
+  'ranking.compartir': 'Compartir mi puesto',
+  'ranking.compartir_txt': 'Voy {puesto}.º de {de} en el campeonato semanal de Lifting Game con {total} kg. ¿Me ganas? {link}',
 };

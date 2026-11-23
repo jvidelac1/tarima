@@ -42,7 +42,7 @@ const CORREO = 'jugador.intervalo@pruebas-tarima.com';      // example.com está
 
 async function escenario(L) {
   const tactil = L === 'es', D = EN, tag = `[${L}]`, dir = path.join(OUT, L); fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
-  const srv = await iniciarServidorLocal({ silencio: true });      // sin `vars`: la regla es la de worker/wrangler.jsonc
+  const srv = await iniciarServidorLocal({ silencio: true, vars: { GRATIS_ETAPA: 'arranque', GRATIS: '1', ENCUESTA_LIBRE: '0', BONO_ENCUESTA: '0' } });      // la regla del arranque gratis, por variables (producción usa la de LIF-53 desde el 23-nov)
   if (srv.env.GRATIS_ETAPA !== 'arranque' || srv.env.GRATIS !== '1' || srv.env.ENCUESTA_LIBRE !== '0' || srv.env.BONO_ENCUESTA !== '0') problemas.push(`${tag} worker/wrangler.jsonc no trae la regla de producción (el arranque gratis, correo obligatorio): GRATIS_ETAPA=${srv.env.GRATIS_ETAPA} GRATIS=${srv.env.GRATIS} ENCUESTA_LIBRE=${srv.env.ENCUESTA_LIBRE} BONO_ENCUESTA=${srv.env.BONO_ENCUESTA}`);
   const base = srv.url.replace(/\/$/, '');
   const ctx = await browser.newContext(tactil

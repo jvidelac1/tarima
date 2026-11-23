@@ -65,6 +65,9 @@ export const ganchos = {
   /** LIF-9 · el ranking: {alcance:'semana'|'global', pais:boolean}. Sin servidor, {estado:'sin_servidor'}. */
   async ranking(info) { void info; return { estado: 'sin_servidor' }; },
 
+  /** LIF-29 · el enlace de «Apoyar el juego» (null: no se muestra). */
+  apoyo() { return null; },
+
   /** LIF-62 · una sesión de entrenamiento {pesista, ejercicio, toques}. */
   async entrenar(info) { void info; return { estado: 'sin_servidor' }; },
 

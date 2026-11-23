@@ -347,6 +347,9 @@ function pintarSobre(tipo) {
   el.querySelectorAll('.idi').forEach(b => { b.onclick = () => { cambiarIdioma(b.dataset.lang); el.querySelector(`.idi[data-lang="${idiomaActual()}"]`)?.focus(); }; });
 }
 /** LIF-14 · el bono de RM de un pesista según el perfil validado que quedó guardado ({s:0, c:0} si no hay). */
+/** LIF-29 · el enlace de apoyo, si el Worker lo trae; el clic se mide (apoyo_click). */
+function apoyoUrl() { try { return ganchos.apoyo?.() || null; } catch { return null; } }
+document.addEventListener('click', e => { if (e.target.closest?.('#btn-apoyo')) ev('apoyo_click', { pantalla: E.pantalla }); });
 function perfilG() { try { return ganchos.perfilGuardado?.() || null; } catch { return null; } }
 function bonoDe(id) { const pf = perfilG(), b = bonoRM(pf?.pesistas?.[id]?.oros || 0), e = pf?.entreno?.entrenados?.[id]; return e ? { s: b.s + (e.kg_s || 0), c: b.c + (e.kg_c || 0) } : b; }
 /** LIF-62 · la técnica entrenada del pesista (milésimas más lenta la barrita), según el perfil validado. */
@@ -356,7 +359,8 @@ const sesionesEntreno = () => perfilG()?.entreno?.disponibles || 0;
 async function abrirEntreno(id) {
   visita('entreno'); ev('entreno_abierto', { pesista: TIPO[id], disponibles: sesionesEntreno() });
   const e = perfilG()?.entreno?.entrenados?.[id] || { kg_s: 0, kg_c: 0, tecnica: 0 };
-  await pantallaEntreno({ capa: $('capa'), t, esc, ahora: () => reloj.ahora(), pesista: t(`pesista.${id}.tipo`), entrenado: e, disponibles: sesionesEntreno(), ev, conEscuelas: params.get('escuelas') === '1', escuela: guardado.get('tarima.escuela') || 'rusa', alElegirEscuela: k => { guardado.set('tarima.escuela', k); ev('escuela_elegida', { escuela: k }); }, mandar: (ejercicio, toques, escuela) => ganchos.entrenar({ pesista: id, ejercicio, toques, escuela }) });
+  await pantallaEntreno({ capa: $('capa'), t, esc, ahora: () => reloj.ahora(), pesista: t(`pesista.${id}.tipo`), entrenado: e, disponibles: sesionesEntreno(), ev, conEscuelas: true,      // LIF-69: aprobadas por el dueño el 23-nov
+     escuela: guardado.get('tarima.escuela') || 'rusa', alElegirEscuela: k => { guardado.set('tarima.escuela', k); ev('escuela_elegida', { escuela: k }); }, mandar: (ejercicio, toques, escuela) => ganchos.entrenar({ pesista: id, ejercicio, toques, escuela }) });
   try { await ganchos.perfil?.(); } catch { /* sin servidor */ }
 }
 const conBono = (n, b) => (b ? `${n} <em class="bono">+${b}</em>` : String(n));
@@ -377,6 +381,7 @@ function pintarPerfil() {
     const filas = IDS.map(id => { const x = d.pesistas[id]; if (!x) return ''; const f = datos.atletas[id].techo; return `<tr><td>${esc(t(`pesista.${id}.tipo`))}</td><td>${x.finales}</td><td>${x.oros}</td><td>${conBono(f.s + x.rm.s, x.rm.s)} / ${conBono(f.c + x.rm.c, x.rm.c)}</td><td><b>${x.mejor_total}</b> kg</td></tr>`; }).join('');
     cuerpo = `<p>${t('perfil.resumen', { finales: d.finales, oros: d.oros, platas: d.platas, bronces: d.bronces, pct, mejor: d.mejor_total, titulos: d.titulos })}</p>
       <table class="rk-tabla"><thead><tr><th>${t('perfil.pesista')}</th><th>${t('perfil.finales')}</th><th>${t('perfil.oros')}</th><th>RM</th><th>${t('perfil.mejor')}</th></tr></thead><tbody>${filas}</tbody></table>
+      ${d.desafios && d.desafios.aceptados ? `<p>${t('perfil.desafios', { n: d.desafios.aceptados, m: d.desafios.te_superaron || 0 })}</p>` : `<p class="chica">${t('perfil.desafios_cero')}</p>`}
       <p class="chica">${t('perfil.progresion')}</p>`;
   }
   el.innerHTML = `<div class="panel chico sobre-ranking sobre-perfil"><h2>${t('perfil.titulo', { nombre: esc(nombreJugador()) })}</h2>${cuerpo}<div class="fila"><button class="ir" id="so-seguir">${t('ranking.cerrar')}</button></div></div>`;
@@ -405,6 +410,12 @@ function pintarRanking() {
   el.querySelector('#so-seguir').onclick = () => { E.rk = null; cerrarSobre(); };
   el.querySelectorAll('[data-rk]').forEach(b => { b.onclick = () => { if (R.alcance !== b.dataset.rk) { R.alcance = b.dataset.rk; cargarRanking(); } }; });
   el.querySelectorAll('[data-rkpais]').forEach(b => { b.onclick = () => { const v = b.dataset.rkpais === '1'; if (R.pais !== v) { R.pais = v; cargarRanking(); } }; });
+  const comp = el.querySelector('#rk-compartir'); if (comp) comp.onclick = async () => {
+    const yo = R.datos?.filas?.find(f => f.yo), link = `${location.origin}${location.pathname.replace(/juego(\.html)?$/, '')}?campeonato=1`;
+    const txt = t('ranking.compartir_txt', { puesto: yo.puesto, de: R.datos.filas.length, total: yo.total, link });
+    try { if (navigator.share && tactil()) await navigator.share({ text: txt }); else { await navigator.clipboard.writeText(txt); comp.textContent = t('compartir.copiado'); } } catch { /* cancelado */ }
+    ev('compartir', { via: 'ranking', medalla: null, pantalla: E.pantalla });
+  };
   const pub = el.querySelector('#rk-publico'); if (pub) pub.onchange = () => { guardado.set('tarima.ranking_publico', pub.checked ? '1' : '0'); ev('ranking_publico', { publico: pub.checked }); };
 }
 /** Abre la pausa o la ayuda: congela el reloj del juego (el del llamado no corre) hasta volver. */
@@ -1088,7 +1099,11 @@ async function inicio() {
     let est = null; try { est = ganchos.estado?.() || null; } catch { /* sin estado */ }
     const q = est && est.anotado ? t('bienvenida.anotado') : est && Number.isFinite(est.quedan) ? (est.quedan === 1 ? t('bienvenida.quedan_1') : t('bienvenida.quedan', { n: est.quedan })) : '';
     const des = E.desafio && E.desafio.estado === 'ok' && !E.desafioDejado ? E.desafio : null;
-    const desafioHTML = des ? `<div class="desafio"><p>${t('desafio.aviso', { quien: des.apodo ? `<b>${esc(des.apodo)}</b>` : t('desafio.alguien'), total: des.total })}</p><button class="link" id="btn-sin-desafio">${t('desafio.dejar')}</button></div>` : '';
+    const campLink = !des && params.get('campeonato') === '1' && !E.campDejado;
+    const desafioHTML = campLink ? `<div class="desafio"><p>${t('campeonato.aviso')}</p></div>` : des ? `<div class="desafio"><p>${t('desafio.aviso', { quien: des.apodo ? `<b>${esc(des.apodo)}</b>` : t('desafio.alguien'), total: des.total })}</p><button class="link" id="btn-sin-desafio">${t('desafio.dejar')}</button></div>` : '';
+    const acept = perfilG()?.desafios?.aceptados || 0, vistos = +guardado.get('tarima.desafios_vistos') || 0;
+    const nuevosDes = acept > vistos ? `<p class="cuenta nuevos-desafios">${t('bienvenida.desafios_nuevos', { n: acept - vistos, s: (acept - vistos) * ENTRENO.porFinal })}</p>` : '';
+    if (nuevosDes) { guardado.set('tarima.desafios_vistos', String(acept)); ev('desafios_aceptados_vistos', { nuevos: acept - vistos }); }
     const nombreHTML = S.editar
       ? `<label class="nombre" for="nombre"><span>${t('bienvenida.nombre')}</span><input id="nombre" type="text" value="${esc(S.nombre)}" maxlength="20" placeholder="${esc(t('bienvenida.nombre_ph'))}" title="${esc(t('bienvenida.nombre_nota'))}" autocomplete="nickname" autocapitalize="words" spellcheck="false" enterkeyhint="go"></label>`
       : `<p class="vuelve">${t('bienvenida.vuelve', { nombre: `<b>${esc(guardadoNombre)}</b>` })} <button class="link" id="btn-nosoy">${t('bienvenida.no_soy')}</button></p>`;
@@ -1116,7 +1131,7 @@ async function inicio() {
       ${nombreHTML}
       ${tarjetas ? `<h2 id="pesista-t">${esc(t('pesista.titulo', { nombre: mostrado() }))}</h2>
       <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b>${cfg.ctl === 'b' ? `<small class="conviene">${t(`pesista.${id}.b`)}</small><small class="rm">${t('rm.tarjeta', { s: conBono(techoEnCategoria(datos.atletas[id].techo, cfg.categoria).s, bonoDe(id).s), c: conBono(techoEnCategoria(datos.atletas[id].techo, cfg.categoria).c, bonoDe(id).c) })}</small>` : `${cuerpoHTML(id, uno)}<small class="conviene">${t(uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small>`}</button>`).join('')}</div>` : ''}
-      ${des ? '' : nivelHTML}${opciones}</div>${desafioHTML}<div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${primera ? '' : `<button id="btn-campeonato" data-completa>${t('bienvenida.campeonato')}</button>`}${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button id="btn-opciones" aria-expanded="${S.opciones}"><span aria-hidden="true">⚙</span> ${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button>${primera ? '' : `<button class="link" id="btn-ranking">${t('bienvenida.ranking')}</button><button class="link" id="btn-perfil">${t('bienvenida.perfil')}</button>${sesionesEntreno() > 0 ? `<button class="link" id="btn-entrenar">${t('bienvenida.entrenar', { n: sesionesEntreno() })}</button>` : ''}`}<button class="link" id="btn-ayuda">${t('boton.ayuda')}</button><a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
+      ${des ? '' : nivelHTML}${opciones}</div>${desafioHTML}${nuevosDes}<div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${primera ? '' : `<button id="btn-campeonato" data-completa>${t('bienvenida.campeonato')}</button>`}${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button id="btn-opciones" aria-expanded="${S.opciones}"><span aria-hidden="true">⚙</span> ${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button>${primera ? '' : `<button class="link" id="btn-ranking">${t('bienvenida.ranking')}</button><button class="link" id="btn-perfil">${t('bienvenida.perfil')}</button>${sesionesEntreno() > 0 ? `<button class="link" id="btn-entrenar">${t('bienvenida.entrenar', { n: sesionesEntreno() })}</button>` : ''}`}<button class="link" id="btn-ayuda">${t('boton.ayuda')}</button>${apoyoUrl() ? `<a class="link" id="btn-apoyo" href="${esc(apoyoUrl())}" target="_blank" rel="noopener">${t('apoyo.boton')}</a>` : ''}<a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
       `, 'bienvenida');
     pn.querySelector('a.legal')?.addEventListener('click', () => ev('privacidad_abierta', { pantalla: E.pantalla }));
     if (abrio) { const bc = pn.querySelector('.bv-cuerpo') || pn; bc.scrollTop = bc.scrollHeight; }      // Opciones se abre arriba de la fila de botones: se lleva a la vista
@@ -1150,7 +1165,7 @@ async function inicio() {
     else if (b.id === 'btn-nosoy') { S.editar = true; S.nombre = ''; S.cambio = true; S.focoNombre = true; }
     // el tutorial se ofrece una sola vez: queda anotado al salir del inicio (se haga o se saltee), así que recargar no lo repite
     else {
-      cfg.campeonato = b.id === 'btn-campeonato'; cfg.desafio = !cfg.campeonato && b.id === 'btn-empezar' && E.desafio?.estado === 'ok' && !E.desafioDejado ? E.desafio.id : null; const principalBtn = b.id === 'btn-empezar'; cfg.calentar = uno ? false : facil ? principalBtn === falta : principalBtn; cfg.primera = primera; if (facil) guardado.set('tarima.tutorial', '1');
+      cfg.campeonato = b.id === 'btn-campeonato' || (b.id === 'btn-empezar' && params.get('campeonato') === '1' && !E.campDejado && !(E.desafio?.estado === 'ok' && !E.desafioDejado)); if (cfg.campeonato && params.get('campeonato') === '1') E.campDejado = true; cfg.desafio = !cfg.campeonato && b.id === 'btn-empezar' && E.desafio?.estado === 'ok' && !E.desafioDejado ? E.desafio.id : null; const principalBtn = b.id === 'btn-empezar'; cfg.calentar = uno ? false : facil ? principalBtn === falta : principalBtn; cfg.primera = primera; if (facil) guardado.set('tarima.tutorial', '1');
       if (S.editar) guardado.set('tarima.nombre', limpiarNombre(S.nombre));
       ev('nombre_puesto', { vacio: !limpiarNombre(guardado.get('tarima.nombre')), vuelve, cambio: S.cambio });
       ev('pesista_elegido', { pesista: TIPO[cfg.id], por_defecto: !S.tocoPesista, ofrecido: !primera, modelo: PLANTEL[cfg.id].modelo });
@@ -1784,7 +1799,7 @@ async function cierre(p) {
   await saltable(2500, 900);      // durante 2,5 s, solo el resultado (un toque los adelanta)
   let quedan = null; try { quedan = ganchos.quedan?.() ?? null; } catch { /* sin dato */ }
   const otra = quedan === 1 ? t('podio.otra_quedan') : Number.isFinite(quedan) && quedan > 1 ? t('podio.otra_quedan_n', { n: quedan }) : t('podio.otra');
-  const botones = () => `<div class="fila"><button class="ir grande" id="btn-revancha" data-completa>${otra}</button><button id="btn-cambiar">${t('podio.cambiar')}</button><button id="btn-compartir">${t('podio.compartir')}</button></div><p class="chica" id="compartido" hidden></p>${E.dopaje ? `<p class="chica" id="podio-dopaje">${t('antidoping.limpio', { nombre: esc(nombreJugador()) })}</p>` : ''}<p class="chica" id="podio-rk"${E.rkLinea ? '' : ' hidden'}>${E.rkLinea || ''}</p><div id="podio-extra"></div>`;
+  const botones = () => `<div class="fila"><button class="ir grande" id="btn-revancha" data-completa>${otra}</button><button id="btn-cambiar">${t('podio.cambiar')}</button><button id="btn-compartir"${E.finalId ? ' class="desafiar"' : ''}>${t(E.finalId ? 'podio.desafiar' : 'podio.compartir')}</button></div><p class="chica" id="compartido" hidden></p>${E.dopaje ? `<p class="chica" id="podio-dopaje">${t('antidoping.limpio', { nombre: esc(nombreJugador()) })}</p>` : ''}<p class="chica" id="podio-rk"${E.rkLinea ? '' : ' hidden'}>${E.rkLinea || ''}</p><div id="podio-extra"></div>`;
   // LIF-19 · el control antidoping: si la semilla sortea al jugador entre los medallistas, una línea en el podio (siempre limpio)
   E.dopaje = sorteoAntidoping(p.cfg.semilla, puesto); if (E.dopaje) ev('antidoping', { puesto });
   E.rkLinea = null; E.rkCamp = null; E.finalId = null; if (E.cfg?.desafio) E.desafioDejado = true;      // un desafío se juega una vez: la revancha ya es libre

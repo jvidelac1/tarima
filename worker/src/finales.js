@@ -116,8 +116,10 @@ export async function entrenado(db, d, pesista) {
 }
 /** Sesiones de entrenamiento disponibles: ENTRENO.porFinal por final validada, menos las hechas, hasta ENTRENO.guardaMax. */
 export async function sesionesDisponibles(db, d) {
-  const x = await db.prepare('SELECT (SELECT COUNT(*) FROM finales WHERE d = ?1) AS finales, (SELECT COUNT(*) FROM entrenos WHERE d = ?1) AS hechas').bind(d).first();
-  return Math.max(0, Math.min(ENTRENO.guardaMax, x.finales * ENTRENO.porFinal - x.hechas));
+  // viralidad: cada final que otro jugó desde un desafío tuyo te da las mismas sesiones que una final propia
+  const x = await db.prepare(`SELECT (SELECT COUNT(*) FROM finales WHERE d = ?1) AS finales, (SELECT COUNT(*) FROM entrenos WHERE d = ?1) AS hechas,
+      (SELECT COUNT(*) FROM finales g WHERE g.d != ?1 AND g.desafio IN (SELECT id FROM finales WHERE d = ?1)) AS invitados`).bind(d).first();
+  return Math.max(0, Math.min(ENTRENO.guardaMax, (x.finales + x.invitados) * ENTRENO.porFinal - x.hechas));
 }
 /** Una sesión: la recalcula y la guarda si hay energía. {ok, sesion, disponibles} o {ok:false, error}. */
 export async function entrenar(db, d, b, ahora, PESISTAS) {
@@ -142,6 +144,7 @@ export async function perfil(db, d, semana = '') {
     finales: tot.finales || 0, oros: tot.oros || 0, platas: tot.platas || 0, bronces: tot.bronces || 0, mejor_total: tot.mejor_total || 0,
     validos: tot.validos || 0, intentos: tot.intentos || 0, de_campeonato: tot.de_campeonato || 0, titulos: tot.titulos || 0,
     pesistas: Object.fromEntries(await Promise.all(por.map(async x => [x.pesista, { finales: x.finales, oros: x.oros || 0, mejor_total: x.mejor_total || 0, mejor_s: x.mejor_s || 0, mejor_c: x.mejor_c || 0, rm: bonoRM(x.oros || 0), entreno: await entrenado(db, d, x.pesista) }]))),
+    desafios: await db.prepare(`SELECT COUNT(*) AS aceptados, COALESCE(SUM(g.total > f.total), 0) AS te_superaron FROM finales g JOIN finales f ON g.desafio = f.id WHERE f.d = ?1 AND g.d != ?1`).bind(d).first(),
     entreno: { disponibles: await sesionesDisponibles(db, d), entrenados: Object.fromEntries(await Promise.all(['ventura', 'brenner', 'marangi'].map(async id => [id, await entrenado(db, d, id)]))) },
     recientes: recientes.map(x => ({ en: x.en, pesista: x.pesista, total: x.total, puesto: x.puesto, campeonato: !!x.campeonato })),
   };

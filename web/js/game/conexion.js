@@ -459,6 +459,7 @@ ganchos.registra = true;      // analitica.ev ya anota cada evento en window.JUE
 ganchos.visita = n => analitica.visita(n);
 // Con el arranque gratis por delante, la bienvenida no dice «te queda 1 final gratis»: esa final es solo el arranque.
 const quedanVisibles = () => (S.lista || S.libre ? Infinity : S.proxima === 'arranque' ? null : S.quedan);
+ganchos.apoyo = () => (typeof S.estado?.apoyo === 'string' && S.estado.apoyo.startsWith('https://') ? S.estado.apoyo : null);
 ganchos.estado = () => (S.estado || S.lista || S.quedan !== null ? { quedan: quedanVisibles(), anotado: S.lista, libre: S.libre } : null);
 ganchos.quedan = quedanVisibles;
 ganchos.pedirPase = pedirPase;
