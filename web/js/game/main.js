@@ -29,6 +29,7 @@ import { simular } from '../sim/attempt.js';
 import { recalcular, resumen } from '../sim/replay.js';
 import { CAMPEONATO, semanaDe, semillaSemana } from '../sim/semana.js';
 import { rankingHTML } from './ui/ranking.js';
+import { bonoRM } from '../sim/rules.js';
 import { EVENTO, KG_MAX, RELOJ, PLAN, exigenciaTabla, previsto, cuerpoDe, chanceUno, chanceBarra, cuerpoBarra, zonasBarra, reglasB, DIFICULTADES, UNO } from '../sim/rules.js';
 import { RITMO, FASES_RAPIDAS, esDecisivo, tramoResumen, veredictoPropio, desdeRival, TECLA_SALTAR } from './ritmo.js';
 import { t, esc, fijarIdioma, detectarIdioma, idiomaActual, fijarTactil, alCambiarIdioma, IDIOMAS } from './i18n/t.js';
@@ -342,6 +343,32 @@ function pintarSobre(tipo) {
   el.querySelector('#so-seguir').onclick = cerrarSobre; const ay = el.querySelector('#so-ayuda'), sa = el.querySelector('#so-salir');
   if (ay) ay.onclick = () => pintarSobre('ayuda'); if (sa) sa.onclick = () => location.reload();
   el.querySelectorAll('.idi').forEach(b => { b.onclick = () => { cambiarIdioma(b.dataset.lang); el.querySelector(`.idi[data-lang="${idiomaActual()}"]`)?.focus(); }; });
+}
+/** LIF-14 · el bono de RM de un pesista según el perfil validado que quedó guardado ({s:0, c:0} si no hay). */
+function bonoDe(id) { let pf = null; try { pf = ganchos.perfilGuardado?.() || null; } catch { pf = null; } return bonoRM(pf?.pesistas?.[id]?.oros || 0); }
+const conBono = (n, b) => (b ? `${n} <em class="bono">+${b}</em>` : String(n));
+/** LIF-68 y LIF-11 · «Mi perfil» en #sobre: lo que dicen las finales validadas, con la progresión de cada pesista. */
+function abrirPerfil() {
+  if (E.sobre) return;
+  const act = document.activeElement; E.sobre = { tipo: 'perfil', foco: act && $('capa').contains(act) ? act : null, solto: false }; boton.activo = false;
+  E.pf = { datos: ganchos.perfilGuardado?.() || 'cargando' }; pintarPerfil(); ev('perfil_visto', { pantalla: E.pantalla });
+  Promise.resolve(ganchos.perfil?.()).then(r => { if (!E.pf) return; E.pf.datos = r?.perfil || (E.pf.datos === 'cargando' ? 'error' : E.pf.datos); pintarPerfil(); }).catch(() => null);
+}
+function pintarPerfil() {
+  const el = $('sobre'), P = E.pf; if (!P || E.sobre?.tipo !== 'perfil') return; const d = P.datos;
+  let cuerpo;
+  if (d === 'cargando') cuerpo = `<p class="chica">${t('ranking.cargando')}</p>`;
+  else if (!d || d === 'error' || !d.finales) cuerpo = `<p class="chica">${t(d === 'error' ? 'ranking.error' : 'perfil.vacio')}</p>`;
+  else {
+    const pct = d.intentos ? Math.round(d.validos * 100 / d.intentos) : 0;
+    const filas = IDS.map(id => { const x = d.pesistas[id]; if (!x) return ''; const f = datos.atletas[id].techo; return `<tr><td>${esc(t(`pesista.${id}.tipo`))}</td><td>${x.finales}</td><td>${x.oros}</td><td>${conBono(f.s + x.rm.s, x.rm.s)} / ${conBono(f.c + x.rm.c, x.rm.c)}</td><td><b>${x.mejor_total}</b> kg</td></tr>`; }).join('');
+    cuerpo = `<p>${t('perfil.resumen', { finales: d.finales, oros: d.oros, platas: d.platas, bronces: d.bronces, pct, mejor: d.mejor_total, titulos: d.titulos })}</p>
+      <table class="rk-tabla"><thead><tr><th>${t('perfil.pesista')}</th><th>${t('perfil.finales')}</th><th>${t('perfil.oros')}</th><th>RM</th><th>${t('perfil.mejor')}</th></tr></thead><tbody>${filas}</tbody></table>
+      <p class="chica">${t('perfil.progresion')}</p>`;
+  }
+  el.innerHTML = `<div class="panel chico sobre-ranking sobre-perfil"><h2>${t('perfil.titulo', { nombre: esc(nombreJugador()) })}</h2>${cuerpo}<div class="fila"><button class="ir" id="so-seguir">${t('ranking.cerrar')}</button></div></div>`;
+  el.hidden = false; if (!el.contains(document.activeElement)) enfocar(el.firstElementChild);
+  el.querySelector('#so-seguir').onclick = () => { E.pf = null; cerrarSobre(); };
 }
 /**
  * El ranking (LIF-9) y el campeonato semanal (LIF-8), en #sobre, desde la bienvenida o el podio. Pide la lista al servidor
@@ -1071,8 +1098,8 @@ async function inicio() {
       ${params.has('c') ? `<p class="desafio">${t('bienvenida.desafio')}</p>` : ''}${q ? `<p class="quedan">${q}</p>` : ''}
       ${nombreHTML}
       ${tarjetas ? `<h2 id="pesista-t">${esc(t('pesista.titulo', { nombre: mostrado() }))}</h2>
-      <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b>${cfg.ctl === 'b' ? `<small class="conviene">${t(`pesista.${id}.b`)}</small><small class="rm">${t('rm.tarjeta', { s: datos.atletas[id].techo.s, c: datos.atletas[id].techo.c })}</small>` : `${cuerpoHTML(id, uno)}<small class="conviene">${t(uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small>`}</button>`).join('')}</div>` : ''}
-      ${nivelHTML}${opciones}</div><div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${primera ? '' : `<button id="btn-campeonato" data-completa>${t('bienvenida.campeonato')}</button>`}${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button id="btn-opciones" aria-expanded="${S.opciones}"><span aria-hidden="true">⚙</span> ${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button>${primera ? '' : `<button class="link" id="btn-ranking">${t('bienvenida.ranking')}</button>`}<button class="link" id="btn-ayuda">${t('boton.ayuda')}</button><a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
+      <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b>${cfg.ctl === 'b' ? `<small class="conviene">${t(`pesista.${id}.b`)}</small><small class="rm">${t('rm.tarjeta', { s: conBono(datos.atletas[id].techo.s, bonoDe(id).s), c: conBono(datos.atletas[id].techo.c, bonoDe(id).c) })}</small>` : `${cuerpoHTML(id, uno)}<small class="conviene">${t(uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small>`}</button>`).join('')}</div>` : ''}
+      ${nivelHTML}${opciones}</div><div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${primera ? '' : `<button id="btn-campeonato" data-completa>${t('bienvenida.campeonato')}</button>`}${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button id="btn-opciones" aria-expanded="${S.opciones}"><span aria-hidden="true">⚙</span> ${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button>${primera ? '' : `<button class="link" id="btn-ranking">${t('bienvenida.ranking')}</button><button class="link" id="btn-perfil">${t('bienvenida.perfil')}</button>`}<button class="link" id="btn-ayuda">${t('boton.ayuda')}</button><a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
       `, 'bienvenida');
     pn.querySelector('a.legal')?.addEventListener('click', () => ev('privacidad_abierta', { pantalla: E.pantalla }));
     if (abrio) { const bc = pn.querySelector('.bv-cuerpo') || pn; bc.scrollTop = bc.scrollHeight; }      // Opciones se abre arriba de la fila de botones: se lleva a la vista
@@ -1099,6 +1126,7 @@ async function inicio() {
     else if (b.dataset.instalar) telefono.avisoInstalar(true);
     else if (b.id === 'btn-ayuda') abrirSobre('ayuda');
     else if (b.id === 'btn-ranking') abrirRanking();
+    else if (b.id === 'btn-perfil') abrirPerfil();
     else if (b.id === 'btn-nosoy') { S.editar = true; S.nombre = ''; S.cambio = true; S.focoNombre = true; }
     // el tutorial se ofrece una sola vez: queda anotado al salir del inicio (se haga o se saltee), así que recargar no lo repite
     else {
@@ -1148,7 +1176,7 @@ async function elegirPesista(cfg, nombre = '') {
     return `<b class="el-nombre">${esc(f.nombre || f.corto)}${marca(f)}</b>
       ${f.pais ? `<span class="el-pais"><i style="background:${f.bandera}"></i>${esc(f.codigo || '')} · ${esc(f.pais)}</span>` : ''}
       <span class="el-datos">${f.categoria ? `<em>${esc(f.categoria)} kg</em>` : ''}<span>${f.alto}${f.masa ? ` · ${dec(f.masa, f.masa % 1 ? 1 : 0)} kg` : ''}</span></span>
-      <small class="conviene">${t(cfg.ctl === 'b' ? `pesista.${id}.b` : uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small><small class="rm">${t('rm.tarjeta', { s: at.techo.s, c: at.techo.c })}</small>`;
+      <small class="conviene">${t(cfg.ctl === 'b' ? `pesista.${id}.b` : uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small><small class="rm">${t('rm.tarjeta', { s: conBono(at.techo.s, bonoDe(id).s), c: conBono(at.techo.c, bonoDe(id).c) })}</small>`;
   };
   /** La pose del arranque en `u` (0 = de pie, 1 = barra arriba): el clip entero, con arranque y frenado suaves. */
   const pose = u => { const S = tramo(escena.P, 'snatch'), k = u * u * (3 - 2 * u), tau = k * (S.fin - .05); return u <= 0 ? poseParado(escena.P, 's') : { seg: S.nombre, s: S.inv(tau), tau, base: S.base, primero: true }; };
@@ -1795,7 +1823,9 @@ async function partida(cfg) {
   const n = (+guardado.get('tarima.jugadas') || 0) + 1, pase = await pedirPase(cfg, n, 'bienvenida');
   if (!pase) return 'inicio';
   E.turnoDe = null; E.pedidoPend = null; PD.abierto = false; E.pase = pase; E.finalN = pase.n ?? n; E.finalIniciada = false; E.tFinal0 = performance.now(); E.antes = null; E.primeraFinal = n === 1; E.rivalesSeguidos = 0; E.casi = null;
-  const p = E.p = new Partida(datos, { semilla, ia: HUELLA_IA, envFijo: true, turnos: cfg.orden === 'oficial' ? 'oficial' : 'rondas', nivel: cfg.nivel, cal: cfg.cal, primera: cfg.primera, ctl: cfg.ctl, ...(cfg.ctl === 'b' && cfg.dif !== 'facil' ? { dif: cfg.dif } : {}), tactil: (cfg.ctl === 'f' || esU(cfg.ctl)) && tactil(), atletas: IDS.map((id, i) => ({ id, ctrl: i === E.yo ? 'persona' : 'juego' })) });
+  // LIF-14 · el RM con la progresión del perfil validado (el campeonato se juega sin ella)
+  const bono = cfg.campeonato ? null : bonoDe(cfg.id), rmYo = bono && (bono.s || bono.c) ? bono : null;
+  const p = E.p = new Partida(datos, { semilla, ia: HUELLA_IA, envFijo: true, turnos: cfg.orden === 'oficial' ? 'oficial' : 'rondas', nivel: cfg.nivel, cal: cfg.cal, primera: cfg.primera, ctl: cfg.ctl, ...(cfg.ctl === 'b' && cfg.dif !== 'facil' ? { dif: cfg.dif } : {}), tactil: (cfg.ctl === 'f' || esU(cfg.ctl)) && tactil(), atletas: IDS.map((id, i) => ({ id, ctrl: i === E.yo ? 'persona' : 'juego', ...(i === E.yo && rmYo ? { rm: rmYo } : {}) })) });
   await presentacion(p, cfg, errMedio, n === 1); p.empezar();
   while (p.fase !== 'fin') {
     if (p.fase === 'intervalo') {

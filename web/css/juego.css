@@ -857,3 +857,5 @@ html.vert body:has(#recuadro:not([hidden])) #tv #guia{bottom:auto;top:calc(max(v
 .sobre-ranking .rk-tabla td:first-child,.sobre-ranking .rk-tabla td:last-child{text-align:right;white-space:nowrap}
 .sobre-ranking .rk-tabla tr.yo td{color:var(--gold);font-weight:700}
 .sobre-ranking .rk-publico{display:flex;gap:calc(var(--u)*.6);align-items:center;font-size:calc(var(--u)*1.1);margin:calc(var(--u)*.4) 0}
+.bono{font-style:normal;color:var(--ok);font-weight:700}
+.sobre-perfil th{font-size:calc(var(--u)*.95);color:var(--mute);text-align:left;padding:calc(var(--u)*.3) calc(var(--u)*.5)}

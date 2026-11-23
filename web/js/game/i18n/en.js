@@ -714,4 +714,14 @@ export default {
   'podio.campeonato': 'Weekly championship: #{puesto} of {de}',
   'podio.validada': 'Final recorded on the leaderboard.',
   'podio.ver_ranking': 'See leaderboard',
+  // perfil y progresión (LIF-68, LIF-11, LIF-14)
+  'bienvenida.perfil': 'My profile',
+  'perfil.titulo': "{nombre}'s profile",
+  'perfil.vacio': 'No finals recorded on the server yet. Play a full final and come back.',
+  'perfil.resumen': 'Finals: {finales} · golds: {oros} · silvers: {platas} · bronzes: {bronces} · weekly championships won: {titulos} · good lifts: {pct} % · best total: {mejor} kg',
+  'perfil.pesista': 'Lifter',
+  'perfil.finales': 'Finals',
+  'perfil.oros': 'Golds',
+  'perfil.mejor': 'Best total',
+  'perfil.progresion': 'Each gold with a lifter raises their PR by 1 kg in the snatch and 1 kg in the clean & jerk, up to 10 kg. The weekly championship is played without that boost.',
 };

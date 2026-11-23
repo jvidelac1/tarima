@@ -531,12 +531,19 @@ export function crearServidor(o = {}) {
     if (!pase || modo !== 'servidor' || !registro) return { estado: 'sin_pase' };
     try {
       const { j } = await post('/api/final', { pase, registro, dispositivo: dispositivo(), campeonato: !!campeonato, ...(publico && apodo ? { apodo, publico: true } : {}), saltos, duracion_s }, ESPERA_PEDIDO);
+      if (j && j.perfil) local.set('tarima.perfil', JSON.stringify(j.perfil));
       return j;
     } catch (e) {
       if (e.status === 422) return { estado: 'rechazada', motivo: e.cuerpo?.motivo || null };
       return { estado: 'error', error: e.tipo || 'red' };
     }
   }
+  /** El perfil validado por el servidor (LIF-68): lo guarda en el almacenamiento del sitio para la próxima carga. */
+  async function perfil() {
+    if (modo !== 'servidor') return { estado: 'sin_servidor', perfil: perfilGuardado() };
+    try { const { j } = await post('/api/perfil', { dispositivo: dispositivo() }, ESPERA_PEDIDO); if (j.perfil) local.set('tarima.perfil', JSON.stringify(j.perfil)); return { estado: 'ok', perfil: j.perfil }; } catch (e) { return { estado: 'error', error: e.tipo || 'red', perfil: perfilGuardado() }; }
+  }
+  function perfilGuardado() { try { return JSON.parse(local.get('tarima.perfil') || 'null'); } catch { return null; } }
   /** El ranking: {alcance: 'semana' | 'global', pais?: boolean}. Devuelve lo del servidor o {estado:'error'}. */
   async function ranking({ alcance = 'semana', pais = false } = {}) {
     if (modo !== 'servidor') return { estado: 'sin_servidor' };
@@ -545,7 +552,7 @@ export function crearServidor(o = {}) {
 
   return {
     get modo() { return modo; },
-    dispositivo, copia, estado, pedirPase, envion, paseParaReanudar, finalTerminada, soltarPase, anotar, encuesta, baja, mandarFinal, ranking,
+    dispositivo, copia, estado, pedirPase, envion, paseParaReanudar, finalTerminada, soltarPase, anotar, encuesta, baja, mandarFinal, ranking, perfil, perfilGuardado,
   };
 }
 

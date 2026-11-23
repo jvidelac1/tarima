@@ -65,6 +65,10 @@ export const ganchos = {
   /** LIF-9 · el ranking: {alcance:'semana'|'global', pais:boolean}. Sin servidor, {estado:'sin_servidor'}. */
   async ranking(info) { void info; return { estado: 'sin_servidor' }; },
 
+  /** LIF-68 · el perfil validado: {estado, perfil}. `perfilGuardado()` devuelve el último sin esperar (o null). */
+  async perfil() { return { estado: 'sin_servidor', perfil: null }; },
+  perfilGuardado() { return null; },
+
   /** Texto del botón «Jugar otra vez»: cuántas finales gratis quedan (null: no se sabe, no se dice nada; Infinity: anotado). */
   quedan() { return null; },
 };

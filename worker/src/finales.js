@@ -6,6 +6,7 @@ import { recalcular } from '../../web/js/sim/replay.js';
 import { resumenFinal } from '../../web/js/sim/final.js';
 import { CAMPEONATO, semanaDe, semillaSemana } from '../../web/js/sim/semana.js';
 import { normalizarNombre } from './reglas.js';
+import { bonoRM } from '../../web/js/sim/rules.js';
 
 let datos = null;
 const datosSim = () => (datos ||= leerDatos(sim));
@@ -80,4 +81,34 @@ export async function ranking(db, { alcance = 'semana', semana, pais = null, top
       FROM finales f WHERE d != '' ${filtroPais} GROUP BY d ORDER BY titulos DESC, total DESC, en LIMIT ?3`).bind(semana, pais, tope).all()).results;
   }
   return filas.map((f, k) => ({ puesto: k + 1, apodo: f.apodo || null, pais: f.pais || null, pesista: f.pesista, total: f.total, finales: f.finales, ...(f.titulos !== undefined ? { titulos: f.titulos } : {}), ...(d && f.d === d ? { yo: true } : {}) }));
+}
+
+/** Oros validados de un dispositivo con un pesista (la base de su progresión). */
+export const orosCon = async (db, d, pesista) => (await db.prepare('SELECT COUNT(*) AS n FROM finales WHERE d = ?1 AND pesista = ?2 AND puesto = 1').bind(d, pesista).first()).n;
+
+/**
+ * La progresión que trae el registro (atletas[persona].rm) tiene que estar respaldada por los oros ya validados con ese
+ * pesista, y el campeonato se juega sin progresión. Devuelve null si está bien, o el motivo.
+ */
+export async function revisarProgresion(db, d, reg, campeonato) {
+  const yo = reg.atletas.find(x => x && x.ctrl === 'persona'); if (!yo || !yo.rm) return null;
+  if (campeonato && (yo.rm.s || yo.rm.c)) return 'el campeonato se juega sin progresión';
+  const tope = bonoRM(await orosCon(db, d, yo.id));
+  return yo.rm.s > tope.s || yo.rm.c > tope.c ? 'progresión sin respaldo' : null;
+}
+
+/** El perfil del jugador (LIF-68, LIF-11), sacado de sus finales validadas. */
+export async function perfil(db, d, semana = '') {
+  const tot = await db.prepare(`SELECT COUNT(*) AS finales, SUM(puesto = 1) AS oros, SUM(puesto = 2) AS platas, SUM(puesto = 3) AS bronces,
+      MAX(total) AS mejor_total, SUM(validos) AS validos, SUM(intentos) AS intentos, SUM(campeonato) AS de_campeonato,
+      (SELECT COUNT(*) FROM campeones k WHERE k.d = ?1 AND k.semana != ?2) AS titulos FROM finales WHERE d = ?1`).bind(d, semana).first();
+  const por = (await db.prepare(`SELECT pesista, COUNT(*) AS finales, SUM(puesto = 1) AS oros, MAX(total) AS mejor_total, MAX(s) AS mejor_s, MAX(c) AS mejor_c
+      FROM finales WHERE d = ?1 GROUP BY pesista`).bind(d).all()).results;
+  const recientes = (await db.prepare(`SELECT en, pesista, total, puesto, campeonato FROM finales WHERE d = ?1 ORDER BY en DESC LIMIT 10`).bind(d).all()).results;
+  return {
+    finales: tot.finales || 0, oros: tot.oros || 0, platas: tot.platas || 0, bronces: tot.bronces || 0, mejor_total: tot.mejor_total || 0,
+    validos: tot.validos || 0, intentos: tot.intentos || 0, de_campeonato: tot.de_campeonato || 0, titulos: tot.titulos || 0,
+    pesistas: Object.fromEntries(por.map(x => [x.pesista, { finales: x.finales, oros: x.oros || 0, mejor_total: x.mejor_total || 0, mejor_s: x.mejor_s || 0, mejor_c: x.mejor_c || 0, rm: bonoRM(x.oros || 0) }])),
+    recientes: recientes.map(x => ({ en: x.en, pesista: x.pesista, total: x.total, puesto: x.puesto, campeonato: !!x.campeonato })),
+  };
 }

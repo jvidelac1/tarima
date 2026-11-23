@@ -52,7 +52,9 @@ export class Partida {
     const tipo = r.ent(3), quien = r.ent(3);
     this.guion = { tipo: ['nada', 'tocado', 'forma'][tipo], a: tipo ? quien : -1 };
     this.at = cfg.atletas.map((x, i) => {
-      const f = datos.atletas[x.id]; if (!f) throw new Error('pesista desconocido: ' + x.id);
+      const f0 = datos.atletas[x.id]; if (!f0) throw new Error('pesista desconocido: ' + x.id);
+      // la progresión de la persona (LIF-14): su RM con el bono de los oros ganados con ese pesista
+      const rm = x.ctrl === 'persona' && x.rm ? x.rm : null, f = rm ? { ...f0, techo: { s: f0.techo.s + rm.s, c: f0.techo.c + rm.c } } : f0;
       const forma = { s: r.entre(-2, 2), c: r.entre(-2, 2) }, pct = clampi(f.ia.apertura + r.entre(-25, 25), 910, 960) + N.abre;
       const saltos = { s: f.ia.saltos.s.map(k => k + r.entre(-1, 1)), c: f.ia.saltos.c.map(k => k + r.entre(-1, 1)) }, sube1 = [r.ent(3) === 0, r.ent(3) === 0, r.ent(3) === 0, r.ent(3) === 0];
       const a = { i, id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego', f, modelo: datos.modelos[f.modelo], resto: RESTO.ini, forma, saltos, sube1, s: [], c: [], decl: { s: 0, c: 0 }, mejor: { s: 0, c: 0 }, seqMejor: { s: -1, c: -1 }, ult: { s: -1, c: -1 }, cambios: 0, pidio: 0, bono: '', garraUno: { s: true, c: true }, fatiga: { s: 0, c: 0 } };
@@ -69,7 +71,7 @@ export class Partida {
     }
     this.fase = 'presentacion'; this.lev = 's'; this.seq = 0; this.barra = 0; this.rondaBarra = -1; this.nPedido = 0; this.ultimo = -1; this.llamado = null; this.nLlamado = 0;
     this.reg = { v: 2, sim: VERSION, datos: datos.huella, temporada: datos.temporada, semilla: this.cfg.semilla, cal: this.cfg.cal, nivel: this.cfg.nivel, primera: this.cfg.primera, ctl, ...(this.cfg.tactil ? { tactil: true } : {}), ...(this.cfg.envFijo ? { envFijo: true } : {}), ...(ctl === 'u' ? { uno: HUELLA_U } : ctl === 'b' ? { barra: HUELLAS_B[this.cfg.dif], ...(this.cfg.dif !== 'facil' ? { dif: this.cfg.dif } : {}) } : {}), ...(this.cfg.ia ? { ia: this.cfg.ia } : {}), ...(this.cfg.turnos ? { orden: this.cfg.turnos, turnos: HUELLA_TURNOS } : {}),
-      atletas: cfg.atletas.map(x => ({ id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego' })), aperturas: this.at.map(a => ({ s: a.decl.s, c: a.decl.c })), llamados: [] };
+      atletas: cfg.atletas.map(x => ({ id: x.id, ctrl: x.ctrl === 'persona' ? 'persona' : 'juego', ...(x.ctrl === 'persona' && x.rm ? { rm: { s: x.rm.s, c: x.rm.c } } : {}) })), aperturas: this.at.map(a => ({ s: a.decl.s, c: a.decl.c })), llamados: [] };
   }
 
   // ---------- aperturas y sesiones ----------

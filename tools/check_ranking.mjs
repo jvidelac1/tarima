@@ -95,6 +95,23 @@ try {
   const yo = await J(() => document.querySelector('.sobre-ranking tr.yo')?.textContent.replace(/\s+/g, ' ').trim());
   if (!/Anónimo/.test(yo || '') || !new RegExp(`${enJuego} kg`).test(yo || '')) mal('4: mi fila no es anónima con mi total: ' + yo);
   await foto('ranking_con_final');
+  // 5. perfil y progresión (LIF-68, LIF-14): de vuelta en la bienvenida, «Mi perfil» dice la final y, con oro, el RM sube 1 kg
+  const oro = await J(() => JUEGO.E.p.tabla().find(f => f.a === JUEGO.E.yo).puesto === 1), pesista = await J(() => JUEGO.E.cfg.id);
+  await page.reload({ waitUntil: 'load' }); await page.waitForFunction(() => window.JUEGO?.listo && window.JUEGO.test, null, { timeout: 60000 }); await J(() => JUEGO.test.manual());
+  await esperar(() => !!document.getElementById('btn-perfil'), 'la bienvenida con «Mi perfil»');
+  await pulsa('#btn-perfil'); await esperar(() => /Finales: 1 /.test(document.querySelector('.sobre-perfil')?.textContent || ''), 'el perfil con la final', 10000);
+  await foto('perfil');
+  await pulsa('.sobre-perfil #so-seguir'); await esperar(() => document.getElementById('sobre').hidden, 'el cierre del perfil');
+  if (oro) {
+    const rm = await J(id => document.querySelector(`.pesista[data-id="${id}"] .rm`)?.textContent || '', pesista);
+    if (!/\+1/.test(rm)) mal('5: con un oro, la tarjeta no muestra el RM +1: ' + rm);
+    // la final siguiente (libre) se juega con el bono y el servidor la acepta
+    await pulsa('#btn-empezar'); await esperar(() => !!JUEGO.E.p, 'la final libre', 60000);
+    const rmReg = await J(() => JUEGO.E.p.reg.atletas.find(a => a.ctrl === 'persona').rm);
+    if (!rmReg || rmReg.s !== 1) mal('5: la final libre no lleva el bono en el registro: ' + JSON.stringify(rmReg));
+    await jugar(s => s.pantalla === 'fin', 'la final con bono');
+    await esperar(() => /anotada|puesto/.test(document.getElementById('podio-rk')?.textContent || ''), 'la final con bono anotada', 20000);
+  } else console.log('(sin oro en el campeonato: no se prueba el bono)');
   console.log(`campeonato ${sem.clave}: total ${enJuego} kg · fila «${yo}» · dispositivo ${uuid.slice(0, 8)}`);
 } catch (e) { mal('excepción: ' + e.message); await foto('excepcion'); }
 await browser.close(); await srv.cerrar?.();

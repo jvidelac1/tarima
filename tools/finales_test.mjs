@@ -87,6 +87,23 @@ ok(rp.j.pais === 'AR' && rp.j.filas.length === 4, '4: el filtro por país no and
 await db.prepare("UPDATE finales SET semana = '2000-W01' WHERE campeonato = 1").run();
 const rg = await A.ranking({ alcance: 'global' }), G = rg.j.filas;
 ok(G.length === 4 && G[0].titulos === 1 && G.slice(1).every(f => f.titulos === 0), '5: el ranking global no cuenta el título: ' + JSON.stringify(G.map(f => f.titulos)));
+// 6. progresión (LIF-14): el bono de RM tiene que estar respaldado por oros validados con ese pesista; el perfil lo dice
+const C = jugador(); let oros = 0, k6 = 300;
+const sinRespaldo = await C.mandar(finalBot(k6++, { yo: 0, rm: { s: 1, c: 1 } }));
+ok(sinRespaldo.status === 422 && /respaldo/.test(sinRespaldo.j.motivo || ''), '6: un bono de RM sin oros entró: ' + JSON.stringify(sinRespaldo.j));
+for (let n = 0; n < 40 && oros < 2; n++) { const r = await C.mandar(finalBot(k6++, { yo: 0, perfil: 'bueno', nivel: 'amistoso' })); if (r.j.puesto === 1) oros++; }
+ok(oros === 2, '6: el bot no ganó 2 oros con Compacto en 40 finales');
+const conRespaldo = await C.mandar(finalBot(k6++, { yo: 0, rm: { s: 2, c: 2 } })), orosYa = conRespaldo.j.perfil?.pesistas?.ventura?.oros ?? 99, demas = await C.mandar(finalBot(k6++, { yo: 0, rm: { s: orosYa + 1, c: 2 } }));
+ok(conRespaldo.j.estado === 'ok', '6: un bono de RM respaldado por 2 oros no entró: ' + JSON.stringify(conRespaldo.j).slice(0, 200));
+ok(demas.status === 422, '6: un bono de RM mayor que los oros entró');
+const otroPesista = await C.mandar(finalBot(k6++, { yo: 1, rm: { s: 1, c: 1 } }));
+ok(otroPesista.status === 422, '6: los oros de un pesista dieron bono a otro');
+const campRm = await C.mandar(camp(k6++, { yo: 0, rm: { s: 1, c: 1 } }), { campeonato: true });
+ok(campRm.status === 422, '6: el campeonato aceptó progresión');
+const pf = (await api('perfil', {}, { cookie: C.uuid })).j.perfil, pv = pf?.pesistas?.ventura;
+ok(pv && pv.rm.s >= 2 && pf.oros >= 2 && pf.finales >= 3 && pf.recientes.length >= 3, '6: el perfil no dice los oros, el bono o las recientes: ' + JSON.stringify(pf).slice(0, 300));
+ok(conRespaldo.j.perfil && conRespaldo.j.perfil.finales >= 3 && conRespaldo.j.perfil.pesistas.ventura, '6: /api/final no devuelve el perfil al día');
+logReal(`perfil: ${pf.finales} finales · ${pf.oros} oros · Compacto RM +${pv?.rm.s} · mejor total ${pf.mejor_total}`);
 // métricas de LIF-2 desde la tabla
 const m = await db.prepare('SELECT COUNT(*) finales, SUM(caidas) caidas, SUM(intentos) intentos, SUM(todo_verde) todo_verde, SUM(saltos) saltos FROM finales').first();
 logReal(`finales guardadas: ${m.finales} · caídas ${m.caidas} de ${m.intentos} intentos · intentos todo verde ${m.todo_verde} · saltos ${m.saltos}`);

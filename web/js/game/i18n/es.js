@@ -731,4 +731,14 @@ export default {
   'podio.campeonato': 'Campeonato semanal: puesto {puesto} de {de}',
   'podio.validada': 'Final anotada en el ranking.',
   'podio.ver_ranking': 'Ver ranking',
+  // perfil y progresión (LIF-68, LIF-11, LIF-14)
+  'bienvenida.perfil': 'Mi perfil',
+  'perfil.titulo': 'Perfil de {nombre}',
+  'perfil.vacio': 'Todavía no hay finales anotadas en el servidor. Juega una final entera y vuelve.',
+  'perfil.resumen': 'Finales: {finales} · oros: {oros} · platas: {platas} · bronces: {bronces} · campeonatos semanales ganados: {titulos} · intentos válidos: {pct} % · mejor total: {mejor} kg',
+  'perfil.pesista': 'Pesista',
+  'perfil.finales': 'Finales',
+  'perfil.oros': 'Oros',
+  'perfil.mejor': 'Mejor total',
+  'perfil.progresion': 'Cada oro con un pesista le sube el RM 1 kg en el arranque y 1 kg en el dos tiempos, hasta 10 kg. El campeonato semanal se juega sin esa mejora.',
 };

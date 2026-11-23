@@ -516,3 +516,10 @@ export const CAUSAS = {
   aplastado: 'Aplastado', codos: 'Ceden los codos', temblor: 'Pierde la barra arriba', devuelve: 'Devuelve la barra',
   codos_blandos: 'Codos blandos', tiembla: 'Llega temblando', antes: 'Suelta antes de la chicharra', sin_apoyo: 'No fija la barra', reloj: 'Se acabó el reloj',
 };
+
+// Progresión del pesista (LIF-14, LIF-68): cada oro validado en el servidor con un pesista le sube el RM 1 kg en el arranque
+// y 1 kg en el dos tiempos, hasta 10 kg. Va en el registro (atletas[i].rm) para que el servidor la recalcule; el Worker solo
+// acepta lo que respaldan las finales que ya validó (worker/src/finales.js). El campeonato semanal se juega sin progresión.
+export const PROGRESION = { porOro: 1, tope: 10 };
+/** El bono de RM {s, c} que corresponde a `oros` finales ganadas con ese pesista. */
+export const bonoRM = oros => { const k = Math.min(PROGRESION.tope, Math.max(0, oros | 0) * PROGRESION.porOro); return { s: k, c: k }; };

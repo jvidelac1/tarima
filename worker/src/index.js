@@ -8,7 +8,7 @@ import { DESCARTABLES } from './descartables.js';
 import { codigoDispositivo, codigoIp, idAzar, igualSeguro, leerPase, leerToken, pase, token } from './cripto.js';
 import { PREFIJO, capturar, evaluarBanderas, proxy } from './posthog.js';
 import { armarMail, idiomaPagina, pagina, t } from './textos.js';
-import { MAX_FINAL, guardarFinal, puestoEnSemana, ranking as rankingDe, validarFinal } from './finales.js';
+import { MAX_FINAL, guardarFinal, perfil as perfilDe, puestoEnSemana, ranking as rankingDe, revisarProgresion, validarFinal } from './finales.js';
 import { semanaDe, semillaSemana, CAMPEONATO } from '../../web/js/sim/semana.js';
 
 const MAX_CUERPO = 4096;
@@ -19,7 +19,7 @@ const SECRETOS = ['SECRETO_IP', 'SECRETO_DISPOSITIVO', 'SECRETO_PASE', 'SECRETO_
 // Límites por código de IP: [máximo, período en segundos] (docs/MVP.md 5.5).
 const LIMITES = {
   estado: [60, 600], partida: [20, 600], envion: [20, 600], anotar: [5, 3600], encuesta: [3, 3600], baja_api: [3, 3600],
-  baja: [10, 3600], confirmar: [10, 3600], exportar: [10, 3600], final: [30, 3600], ranking: [120, 600],
+  baja: [10, 3600], confirmar: [10, 3600], exportar: [10, 3600], final: [30, 3600], ranking: [120, 600], perfil: [120, 600],
 };
 
 class ErrorHttp extends Error {
@@ -153,7 +153,7 @@ async function banderas(env, ctx, dev, ahora) {
 
 async function api(request, env, ctx, url) {
   const ruta = url.pathname.slice(5);
-  const manejadores = { estado, partida, envion, anotar, encuesta, baja: bajaApi, final, ranking };
+  const manejadores = { estado, partida, envion, anotar, encuesta, baja: bajaApi, final, ranking, perfil };
   if (ruta === 'exportar') return exportar(request, env, url);
   const m = manejadores[ruta];
   if (!m) return json({ error: 'no_existe' }, 404);
@@ -196,8 +196,10 @@ async function final({ request, env, b, ahora }) {
   if (!d.startsWith(ps.d) || !(await D.partidaDe(env.DB, ps.p, d))) throw new ErrorHttp(400, 'pase');
   const v = validarFinal(b.registro, { campeonato: b.campeonato === true, ahora });
   if (!v.ok) { log('info', { msg: 'final_rechazada', motivo: v.error }); return json({ estado: 'rechazada', motivo: v.error }, 422); }
+  const prog = await revisarProgresion(env.DB, d, b.registro, v.campeonato);
+  if (prog) { log('info', { msg: 'final_rechazada', motivo: prog }); return json({ estado: 'rechazada', motivo: prog }, 422); }
   const id = await guardarFinal(env.DB, { p: ps.p, d, ahora, v, reg: b.registro, b, pais: paisDe(request, env) });
-  const r = { estado: id ? 'ok' : 'repetida', total: v.r.total, puesto: v.r.puesto, semana: v.semana, campeonato: v.campeonato };
+  const r = { estado: id ? 'ok' : 'repetida', total: v.r.total, puesto: v.r.puesto, semana: v.semana, campeonato: v.campeonato, perfil: await perfilDe(env.DB, d, semanaDe(ahora).clave) };
   if (v.campeonato) r.ranking = await puestoEnSemana(env.DB, v.semana, v.r.total, ahora);
   log('info', { msg: 'final', campeonato: v.campeonato, total: v.r.total, repetida: !id });
   return json(r);
@@ -209,6 +211,13 @@ async function ranking({ request, env, b, ahora }) {
   const uuid = cookieTdv(request) || (R.esUuid(b.dispositivo) ? b.dispositivo.toLowerCase() : null), d = uuid ? await codigoDispositivo(env, uuid) : null;
   const filas = await rankingDe(env.DB, { alcance, semana: sem.clave, pais, tope: 50, d });
   return json({ alcance, semana: sem.clave, hasta: sem.fin, pais, campeonato: { ...CAMPEONATO, semilla: semillaSemana(sem.clave) }, filas });
+}
+
+// El perfil (LIF-68, LIF-11): lo que dicen las finales validadas de este dispositivo, con la progresión de cada pesista.
+async function perfil({ request, env, b }) {
+  const uuid = cookieTdv(request) || (R.esUuid(b.dispositivo) ? b.dispositivo.toLowerCase() : null);
+  if (!uuid) return json({ perfil: null });
+  return json({ perfil: await perfilDe(env.DB, await codigoDispositivo(env, uuid), semanaDe(ahoraS()).clave) });
 }
 
 // La regla vigente, para los textos del juego: hasta dónde llega una final gratis, cuántas, cuánto suma la encuesta y si

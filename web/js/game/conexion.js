@@ -461,5 +461,7 @@ ganchos.intervalo = intervalo;
 ganchos.podio = podio;
 ganchos.mandarFinal = info => servidor.mandarFinal(info);
 ganchos.ranking = info => servidor.ranking(info);
+ganchos.perfil = () => servidor.perfil();
+ganchos.perfilGuardado = () => servidor.perfilGuardado();
 
 export const conexion = { arranque, muro, intervalo, get anotado() { return S.lista; }, get libre() { return S.libre; }, get quedan() { return S.quedan; }, S };
