@@ -410,6 +410,12 @@ function pintarRanking() {
   el.querySelector('#so-seguir').onclick = () => { E.rk = null; cerrarSobre(); };
   el.querySelectorAll('[data-rk]').forEach(b => { b.onclick = () => { if (R.alcance !== b.dataset.rk) { R.alcance = b.dataset.rk; cargarRanking(); } }; });
   el.querySelectorAll('[data-rkpais]').forEach(b => { b.onclick = () => { const v = b.dataset.rkpais === '1'; if (R.pais !== v) { R.pais = v; cargarRanking(); } }; });
+  const comp = el.querySelector('#rk-compartir'); if (comp) comp.onclick = async () => {
+    const yo = R.datos?.filas?.find(f => f.yo), link = `${location.origin}${location.pathname.replace(/juego(\.html)?$/, '')}?campeonato=1`;
+    const txt = t('ranking.compartir_txt', { puesto: yo.puesto, de: R.datos.filas.length, total: yo.total, link });
+    try { if (navigator.share && tactil()) await navigator.share({ text: txt }); else { await navigator.clipboard.writeText(txt); comp.textContent = t('compartir.copiado'); } } catch { /* cancelado */ }
+    ev('compartir', { via: 'ranking', medalla: null, pantalla: E.pantalla });
+  };
   const pub = el.querySelector('#rk-publico'); if (pub) pub.onchange = () => { guardado.set('tarima.ranking_publico', pub.checked ? '1' : '0'); ev('ranking_publico', { publico: pub.checked }); };
 }
 /** Abre la pausa o la ayuda: congela el reloj del juego (el del llamado no corre) hasta volver. */
@@ -1093,7 +1099,8 @@ async function inicio() {
     let est = null; try { est = ganchos.estado?.() || null; } catch { /* sin estado */ }
     const q = est && est.anotado ? t('bienvenida.anotado') : est && Number.isFinite(est.quedan) ? (est.quedan === 1 ? t('bienvenida.quedan_1') : t('bienvenida.quedan', { n: est.quedan })) : '';
     const des = E.desafio && E.desafio.estado === 'ok' && !E.desafioDejado ? E.desafio : null;
-    const desafioHTML = des ? `<div class="desafio"><p>${t('desafio.aviso', { quien: des.apodo ? `<b>${esc(des.apodo)}</b>` : t('desafio.alguien'), total: des.total })}</p><button class="link" id="btn-sin-desafio">${t('desafio.dejar')}</button></div>` : '';
+    const campLink = !des && params.get('campeonato') === '1' && !E.campDejado;
+    const desafioHTML = campLink ? `<div class="desafio"><p>${t('campeonato.aviso')}</p></div>` : des ? `<div class="desafio"><p>${t('desafio.aviso', { quien: des.apodo ? `<b>${esc(des.apodo)}</b>` : t('desafio.alguien'), total: des.total })}</p><button class="link" id="btn-sin-desafio">${t('desafio.dejar')}</button></div>` : '';
     const acept = perfilG()?.desafios?.aceptados || 0, vistos = +guardado.get('tarima.desafios_vistos') || 0;
     const nuevosDes = acept > vistos ? `<p class="cuenta nuevos-desafios">${t('bienvenida.desafios_nuevos', { n: acept - vistos, s: (acept - vistos) * ENTRENO.porFinal })}</p>` : '';
     if (nuevosDes) { guardado.set('tarima.desafios_vistos', String(acept)); ev('desafios_aceptados_vistos', { nuevos: acept - vistos }); }
@@ -1158,7 +1165,7 @@ async function inicio() {
     else if (b.id === 'btn-nosoy') { S.editar = true; S.nombre = ''; S.cambio = true; S.focoNombre = true; }
     // el tutorial se ofrece una sola vez: queda anotado al salir del inicio (se haga o se saltee), así que recargar no lo repite
     else {
-      cfg.campeonato = b.id === 'btn-campeonato'; cfg.desafio = !cfg.campeonato && b.id === 'btn-empezar' && E.desafio?.estado === 'ok' && !E.desafioDejado ? E.desafio.id : null; const principalBtn = b.id === 'btn-empezar'; cfg.calentar = uno ? false : facil ? principalBtn === falta : principalBtn; cfg.primera = primera; if (facil) guardado.set('tarima.tutorial', '1');
+      cfg.campeonato = b.id === 'btn-campeonato' || (b.id === 'btn-empezar' && params.get('campeonato') === '1' && !E.campDejado && !(E.desafio?.estado === 'ok' && !E.desafioDejado)); if (cfg.campeonato && params.get('campeonato') === '1') E.campDejado = true; cfg.desafio = !cfg.campeonato && b.id === 'btn-empezar' && E.desafio?.estado === 'ok' && !E.desafioDejado ? E.desafio.id : null; const principalBtn = b.id === 'btn-empezar'; cfg.calentar = uno ? false : facil ? principalBtn === falta : principalBtn; cfg.primera = primera; if (facil) guardado.set('tarima.tutorial', '1');
       if (S.editar) guardado.set('tarima.nombre', limpiarNombre(S.nombre));
       ev('nombre_puesto', { vacio: !limpiarNombre(guardado.get('tarima.nombre')), vuelve, cambio: S.cambio });
       ev('pesista_elegido', { pesista: TIPO[cfg.id], por_defecto: !S.tocoPesista, ofrecido: !primera, modelo: PLANTEL[cfg.id].modelo });

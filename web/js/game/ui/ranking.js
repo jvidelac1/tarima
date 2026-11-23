@@ -32,5 +32,5 @@ export function rankingHTML({ alcance, pais, datos, publico, nombre, t, esc, tip
     <p class="chica">${nota}</p>
     <div class="rk-lista">${cuerpo}</div>
     <label class="rk-publico"><input type="checkbox" id="rk-publico"${publico ? ' checked' : ''}> ${t('ranking.publico', { nombre })}</label>
-    <div class="fila"><button class="ir" id="so-seguir">${t('ranking.cerrar')}</button></div>`;
+    <div class="fila">${alcance === 'semana' && datos && typeof datos === 'object' && datos.filas?.some(f => f.yo) ? `<button id="rk-compartir">${t('ranking.compartir')}</button>` : ''}<button class="ir" id="so-seguir">${t('ranking.cerrar')}</button></div>`;
 }

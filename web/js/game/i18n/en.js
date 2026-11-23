@@ -789,4 +789,8 @@ export default {
   'perfil.desafios': '{n} people played your challenges; {m} beat you. Each one gave you 2 training sessions.',
   'perfil.desafios_cero': 'Share a final with “Challenge a friend”: each person who plays it gives you 2 training sessions.',
   'bienvenida.desafios_nuevos': '{n} people played your challenge: you got {s} more training sessions.',
+  // viralidad: campeonato
+  'campeonato.aviso': 'This week’s championship: the same final for everyone. “Play” plays it; the leaderboard closes on Sunday.',
+  'ranking.compartir': 'Share my place',
+  'ranking.compartir_txt': 'I’m #{puesto} of {de} in the Lifting Game weekly championship with {total} kg. Can you beat me? {link}',
 };
