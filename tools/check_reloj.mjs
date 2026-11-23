@@ -55,6 +55,7 @@ async function categoria() {
   await page.addInitScript(() => { if (!sessionStorage.getItem('__i')) { localStorage.setItem('tarima.categoria', '71'); localStorage.setItem('tarima.jugadas', '1'); localStorage.setItem('tarima.nombre', 'Prueba'); localStorage.setItem('tarima.tutorial', '1'); sessionStorage.setItem('__i', '1'); } });
   await page.goto(`${srv.url}?dibujo=0&q=baja&lang=es&semilla=4242`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.JUEGO?.listo && window.JUEGO.test, null, { timeout: 60000 }); await page.evaluate(() => JUEGO.test.manual());
+  for (let k = 0; k < 300 && !await page.evaluate(() => !!document.getElementById('btn-opciones')?.offsetParent); k++) { await page.evaluate(() => JUEGO.test.avanzar(200)); await page.waitForTimeout(30); }
   await page.locator('#btn-opciones').focus(); await page.keyboard.press('Enter'); await page.evaluate(() => JUEGO.test.avanzar(300));
   const marcada = await page.evaluate(() => document.querySelector('[data-cat][aria-pressed=true]')?.dataset.cat);
   if (marcada !== '71') mal(`[categoría] Opciones no marca la categoría guardada: ${marcada}`);
