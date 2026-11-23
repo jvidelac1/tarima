@@ -43,6 +43,26 @@ eventos `muro_resultado`, `siguio_jugando`, `escena_visible`, `carga_fallida`, y
 Worker; si la carga falla, reintentos y un aviso claro (descarga o 3D) en lugar de la interfaz sin el levantador. Variables
 del Worker de esa regla: `GRATIS_ETAPA "final"`, `GRATIS "1"`, `ENCUESTA_LIBRE "1"` (**desde el 17 de noviembre no es el valor por defecto**: por decisión del dueño el muro sigue como en producción, después del arranque y con correo obligatorio, `GRATIS_ETAPA "arranque"` y `ENCUESTA_LIBRE "0"`; la de LIF-53 se prende con esas dos variables, `docs/MVP.md`, «Regla del muro que se publica el 17 de noviembre»); consentimiento `2026-11-g` (LIF-45: la grabación de sesión puede llevar el 3D, con «LIFTING GAME» en los carteles en vez del nombre del jugador y el tapado como respaldo; bandera `grabacion_lienzo`).
 
+## Cambios del 23 de noviembre (rama `backlog`)
+
+- **Finales validadas en el servidor (LIF-10).** Al terminar una final, el juego manda el registro (lo que se tocó) con el
+  pase de esa final a `/api/final`; el Worker la recalcula con el mismo núcleo (`web/js/sim/replay.js`, importado desde
+  `worker/src/finales.js`) y guarda el resultado en la tabla `finales` de D1 (migraciones 0004–0006). Registro adulterado:
+  422. Una final por pase.
+- **Campeonato semanal (LIF-8).** La misma final para todos durante la semana ISO (UTC): semilla de
+  `web/js/sim/semana.js`, barrita en Fácil contra rivales «normal», sin progresión. Botón en la bienvenida (quien ya jugó).
+- **Ranking (LIF-9)** `/api/ranking`: campeonato de la semana o histórico (campeonatos ganados, después mejor total),
+  todos o mi país. Anónimo salvo «Mostrar mi nombre» (desde la final siguiente).
+- **Perfil y progresión (LIF-68, LIF-14, LIF-11)** `/api/perfil`: cada oro validado con un pesista le sube el RM 1 kg
+  en cada levantamiento, hasta 10 (`PROGRESION` en rules.js); va en el registro (`atletas[persona].rm`) y el servidor solo
+  lo acepta si lo respaldan los oros de ese dispositivo con ese pesista. «Mi perfil» en la bienvenida.
+- **Desafío (LIF-12)** `?desafio=id`: «Compartir» lleva el link de la final validada; quien lo abre juega la misma final
+  y el podio compara los totales (`/api/desafio`).
+- **Tarjeta para compartir (LIF-23)**, veredicto más corto (LIF-7), errores contados en D1 con alerta diaria (LIF-26).
+- **Rojos de main arreglados:** el toque guardado después del vistazo y la interfaz fuera del recuadro de la primera persona.
+- Scripts: `bash tools/medir.sh [días]` (métricas de LIF-2), `bash tools/errores.sh [días]` (LIF-26). Pruebas nuevas:
+  `node tools/finales_test.mjs` (sin navegador), `node tools/check_ranking.mjs` (navegador, de punta a punta).
+
 ## Backlog
 
 En **Linear**, equipo **LIFTINGAME** (clave `LIF`, issues LIF-1 a LIF-29, en Backlog), 5 proyectos: Juego de estrategia, Competencia y comunidad,

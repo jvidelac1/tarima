@@ -1050,6 +1050,12 @@ Todos van en minúscula y en español. Ninguno lleva nombre, mail, IP ni disposi
 | `pedido_cambiado` | «Cambiar» el pedido en el turno de un rival (15-nov, LIF-4) | `lev`, `intento`, `de`, `kg`, `via` (`boton`, `tecla`), `pendiente` (entró como cambio de su llamado), `orden` |
 | `explicacion_vista` | Sale una explicación de primera vez (LIF-52, `ui/aprende.js`) | `clave` (`estilo`, `dificultad`, `kilos`, `cambiar`, `nulo`, `luces`, `total`), `momento` (`llamado`, `rival`, `decision`), `pantalla`, `vez` (1, o 2 si la primera se cortó antes de leerla) |
 | `explicacion_cerrada` | Se va la explicación | `clave`, `via` (`boton`: la ✕; `sola`: cambió el momento, salió otra o pasaron 15 s), `ms` a la vista, `leida` (la cerró, estuvo 3,5 s o es la segunda vez: no vuelve a salir) |
+| `final_validada` | El servidor recalculó y anotó la final (LIF-10) | `campeonato` (bool), `puesto_semana` (puesto en el campeonato o null) |
+| `ranking_visto` | Abre el ranking (LIF-9) | `alcance` (`semana`, `global`), `pantalla` |
+| `ranking_publico` | Marca o desmarca «Mostrar mi nombre» en el ranking | `publico` (bool) |
+| `perfil_visto` | Abre «Mi perfil» (LIF-68, LIF-11) | `pantalla` |
+| `desafio_abierto` | Llega con un link de desafío ?desafio=id (LIF-12) | `ok` (la final de origen existe) |
+| `desafio_dejado` | Prefiere una final libre en vez del desafío | — |
 | `veredicto_salteado` | Un toque saltea el veredicto propio (`'u'`) | `ms`, `resultado` |
 | `final_fin` | Podio | `n`, `puesto` (1 a 3 o null), `total`, `duracion_s` |
 | `compartir` | Botón compartir | `via` (`nativo`, `copiar`), `medalla`, `pantalla` |

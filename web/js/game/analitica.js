@@ -48,6 +48,8 @@ export const EVENTOS = new Set([
   'camara_elegida',
   // LIF-52: las explicaciones de primera vez (ui/aprende.js): cuándo salen y cómo se cierran
   'explicacion_vista', 'explicacion_cerrada',
+  // LIF-8, LIF-9, LIF-10, LIF-11, LIF-12, LIF-68: finales validadas, ranking, perfil y desafíos
+  'final_validada', 'ranking_visto', 'ranking_publico', 'perfil_visto', 'desafio_abierto', 'desafio_dejado',
 ]);
 
 export const BANDERAS = { 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio', grabacion_lienzo: 'compu' };
