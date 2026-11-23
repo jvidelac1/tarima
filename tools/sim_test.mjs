@@ -43,6 +43,7 @@ import { marcadorDe, amenaza, etiquetasRival } from '../web/js/game/ui/marcador.
 import { PLANTEL, JUGADOR, FICHA, nivelFicha, CUERPO } from '../web/js/game/roster.js';
 import { tableroHTML, datosTablero, tableroVivoHTML, ordenSalida } from '../web/js/game/ui/tablero.js';
 import { opcionesPedido, pedidoHTML } from '../web/js/game/ui/pedido.js';
+import { tensionRival, rachaDe, anotar, pronosticoHTML } from '../web/js/game/ui/pronostico.js';
 import { dificultadDe, deDiez } from '../web/js/game/ui/mensajes.js';
 import { DICCIONARIOS, tr, fijarIdioma, detectarIdioma } from '../web/js/game/i18n/t.js';
 import { APRENDE, CLAVES as CLAVES_APRENDE, elegir as elegirAprende, textoDe as textoAprende } from '../web/js/game/ui/aprende.js';
@@ -841,6 +842,33 @@ function lineaNombraToques(res, lev, I) {
   // «2 cambios por intento» y «solo hacia arriba» (Cambiar); la barra que no baja dentro de la ronda y la progresión ya las verifica jugar()
   ok(TURNOS.previos === 2 && TURNOS.soloSube === true, `aprende: «Cambiar» dice 2 cambios hacia arriba y TURNOS es ${JSON.stringify(TURNOS)}`);
   console.log(`20. Aprender jugando: ${APRENDE.length} explicaciones en es y en (≤ 150 caracteres), una por momento · ${decididos} veredictos de jueces (${nulos} no vale) con 2 o 3 blancas = vale · ${sinTotal} sin total por falta de un válido`);
+}
+
+// 21. Turno de un rival (23-nov): qué está en juego para la persona, la racha de pronósticos y el «¿Subes?» del pedido
+{
+  let r = rachaDe('basura'); ok(r.racha === 0 && r.n === 0, 'pronóstico: una racha ilegible no vuelve a cero');
+  for (const a of [true, true, false, true, true, true]) r = anotar(r, a);
+  ok(r.racha === 3 && r.mejor === 3 && r.ok === 5 && r.n === 6, `pronóstico: racha ${JSON.stringify(r)}`);
+  ok(rachaDe(JSON.stringify(r)).mejor === 3, 'pronóstico: la racha guardada no se lee');
+  ok(pronosticoHTML({ fase: 'pide', voto: null, rival: 'X', tension: 'pasa' }).includes('data-prono="si"'), 'pronóstico: sin botones');
+  ok(pronosticoHTML({ fase: 'listo', voto: null, rival: 'X', tension: null }) === '', 'pronóstico: sin voto ni tensión, el recuadro no se va');
+  let vistos = 0, malos = 0, tensos = 0;
+  for (let k = 0; k < 40; k++) {
+    const p = new Partida(datos, { semilla: 900 + k, nivel: 'normal', cal: 0, primera: false, ctl: 'b', ia: HUELLA_IA, turnos: 'rondas', atletas: IDS.map((x, i) => ({ id: x, ctrl: i === 0 ? 'persona' : 'juego' })) });
+    for (const lev of ['s', 'c']) { const [lo, hi] = p.rangoApertura(0, lev); p.abrir(0, lev, Math.round((lo + hi) / 2)); }
+    p.empezar();
+    for (let g = 0; p.fase !== 'fin' && g < 60; g++) {
+      if (p.fase === 'intervalo') { p.empezar(); continue; }
+      const L = { ...p.llamado };
+      if (p.at[L.a].ctrl === 'persona') { const env = L.lev === 'c' ? 'split' : undefined, ctx = p.contexto(env), gs = jugarBarra(ctx, PERFILES.novato, 900 + k * 61 + g); p.resolver({ conf: gs.conf, env, ent: gs.ent }); continue; }
+      const op = opcionesPedido(p, 0); if (op) { const h = pedidoHTML(op, { abierto: false, kg: 0 }); ok(h.includes(`data-pedido="kg${op.min}"`), `pedido: sin «¿Subes?» con ${op.min}`); }
+      const ten = tensionRival(p, 0, L), antes = p.tabla().findIndex(f => f.a === 0), x = p.resolverIA(); vistos++; if (ten) tensos++;
+      if (x.res.res === 'valido' && (ten === 'pasa' || ten === 'oro')) { const des = p.tabla().findIndex(f => f.a === 0); if (!(des > antes)) malos++; }
+    }
+  }
+  ok(malos === 0, `tensión: ${malos} veces dijo «te pasa» y la persona no bajó de puesto`);
+  ok(tensos > 0, 'tensión: nunca hay nada en juego');
+  console.log(`21. Turno de un rival: ${vistos} llamados, ${tensos} con algo en juego para la persona · racha de pronósticos y «¿Subes?»`);
 }
 
 console.log(fallas.length ? `\nFALLÓ: ${fallas.length} problemas` : `\nOK en ${((Date.now() - t0) / 1000).toFixed(1)} s`);

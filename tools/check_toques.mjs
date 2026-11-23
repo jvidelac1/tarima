@@ -71,7 +71,7 @@ let estadoIntento = null;      // lo que hace la prueba dentro del intento propi
 const t0 = Date.now();
 for (;;) {
   if (Date.now() - t0 > 6 * 60000) { mal('la prueba no avanza en 6 minutos'); break; }
-  const s = await J(() => { const e = JUEGO.estado(); e.propios = (JUEGO.E.propios || []).length; const tr = document.querySelector('#tablero tr.ahora'), sb = document.getElementById('saltar-rival'); e.turno = { ve: !!tr && !tr.classList.contains('yo') && !document.getElementById('tablero').hidden, txt: tr ? tr.textContent : '', senal: !document.getElementById('senal').hidden, zona: getComputedStyle(document.getElementById('zona')).display !== 'none', saltar: !!sb && !sb.hidden, boton: sb ? sb.textContent : '' }; return e; });
+  const s = await J(() => { const e = JUEGO.estado(); e.propios = (JUEGO.E.propios || []).length; const tr = document.querySelector('#tablero tr.ahora'), pr = document.getElementById('prono'); e.turno = { ve: !!tr && !tr.classList.contains('yo') && !document.getElementById('tablero').hidden, txt: tr ? tr.textContent : '', senal: !document.getElementById('senal').hidden, zona: getComputedStyle(document.getElementById('zona')).display !== 'none', prono: !!pr && !pr.hidden, pide: !!pr && !pr.hidden && pr.classList.contains('pide'), boton: pr ? pr.textContent : '', saltar: !!document.getElementById('saltar-rival') }; return e; });
   if (s.errores.length) { mal('error en el juego: ' + s.errores[0]); break; }
   if (s.propios >= 3 && rivalVisto && (R.pedido || s.propios >= 6) && !(s.intento && s.intento.propio) && s.pantalla !== 'decision') break;      // los tres primeros propios y al menos un turno de un rival
   const I = s.intento;
@@ -102,18 +102,18 @@ for (;;) {
     await dormir(10); continue;
   }
   if (estadoIntento && !(I && I.propio)) estadoIntento = null;
-  if (s.turno.ve && s.turno.saltar && !rivalVisto) rivalVisto = { ...s.turno, pantalla: s.pantalla };      // el botón sale cuando termina el fundido
-  // 7. el primer turno de un rival: Espacio no lo saltea; la tecla S sí
-  if (s.pantalla === 'rival' && s.turno.saltar && !rivalSalto) {
-    await dormir(700); const cuenta = () => J(() => ({ p: JUEGO.estado().pantalla, now: JUEGO.estado().intento?.now ?? null, ev: JUEGO.eventos.filter(e => e.ev === 'rival_salteado').map(e => e.props) }));
-    const a = await cuenta(); await espacio(); await dormir(450); const b = await cuenta();
-    await page.keyboard.press('KeyS'); await dormir(1200); const c = await cuenta();
-    rivalSalto = { espacioNoSalta: b.ev.length === a.ev.length && b.p === 'rival' && b.now !== null && b.now > (a.now ?? 0), teclaS: c.ev.length === a.ev.length + 1 && c.ev.at(-1).via === 'tecla', despues: c.p, ev: c.ev.at(-1) || null };
-    ultSalto = Date.now(); continue;
+  if (s.turno.ve && s.turno.pide && !rivalVisto) rivalVisto = { ...s.turno, pantalla: s.pantalla };
+  // 7. el primer turno de un rival (23-nov, sin «Saltar»): Espacio no hace nada y la flecha → pronostica «la levanta»
+  if (s.turno.pide && !rivalSalto) {
+    const cuenta = () => J(() => ({ p: JUEGO.estado().pantalla, now: JUEGO.estado().intento?.now ?? null, elegido: !!document.querySelector('#prono .elegido'), pide: document.getElementById('prono')?.classList.contains('pide') }));
+    const a = await cuenta(); await espacio(); await dormir(80); const b = await cuenta();
+    await page.keyboard.press('ArrowRight'); await dormir(120); const c = await cuenta();
+    rivalSalto = { espacioNoHace: !b.elegido && b.pide && b.p === a.p, flecha: c.elegido && !c.pide, despues: c.p };
+    continue;
   }
   // 8. «Cambiar» en el turno de un rival (LIF-4): la tecla C lo abre, «+» sube un kilo y «Pedir» lo pide; la fila propia del
   // tablero muestra el peso nuevo y sale el evento pedido_cambiado. Con el mouse: no cuenta como toque
-  if (s.pantalla === 'rival' && s.turno.saltar && rivalSalto && !R.pedido) {
+  if (s.pantalla === 'rival' && s.turno.prono && rivalSalto && !R.pedido) {
     const leer = () => J(() => ({ boton: !!document.querySelector('#tablero [data-pedido="abrir"]'), abierto: !!document.querySelector('#tablero [data-pedido="ok"]'), kg: +(document.querySelector('#tablero tr.yo .tb-pide b')?.textContent || 0), ev: JUEGO.eventos.filter(e => e.ev === 'pedido_cambiado').map(e => e.props) }));
     const a = await leer(); if (!a.boton) { R.pedido = { boton: false }; continue; }
     await page.keyboard.press('KeyC'); await dormir(250); const b = await leer();
@@ -122,7 +122,6 @@ for (;;) {
     R.pedido = { boton: true, abrio: b.abierto, antes: a.kg, despues: c.kg, ev: c.ev, cerro: !c.abierto };
     continue;
   }
-  if (s.turno.saltar && Date.now() - ultSalto > 1500) { await page.keyboard.press('KeyS'); ultSalto = Date.now(); continue; }
   if (s.panel && !s.sobre) {
     const P = await J(() => { const pn = document.querySelector('#capa .panel'), ir = pn?.querySelector('button.ir:not(:disabled)'); return { ir: !!ir, foco: document.activeElement === ir }; });
     if (P.ir) {
@@ -131,12 +130,12 @@ for (;;) {
       await dormir(500); if (!P.foco) await J(() => document.querySelector('#capa .panel button.ir:not(:disabled)')?.focus()); await enter(); await dormir(300); continue;
     }
   }
-  if (['decision', 'repeticion', 'carga', 'desplazado'].includes(s.pantalla) && !s.turno.saltar && Date.now() - ultSalto > 1500) { await espacio(); ultSalto = Date.now(); continue; }
+  if (['decision', 'repeticion', 'carga', 'desplazado'].includes(s.pantalla) && !s.turno.prono && Date.now() - ultSalto > 1500) { await espacio(); ultSalto = Date.now(); continue; }
   await dormir(30);
 }
 await dormir(1600);
 const gl = await J(() => { const g = JUEGO.escena?.renderer?.getContext(), x = g?.getExtension('WEBGL_debug_renderer_info'); return x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : ''; }).catch(() => '');
-const fin = await J(() => ({ pinta: JUEGO.toques.pinta.slice(), manejo: JUEGO.toques.manejo.slice(), total: JUEGO.toques.total, T: window.__T, A: window.__A, eventos: JUEGO.eventos.filter(e => e.ev === 'intento_propio').map(e => e.props), propios: (JUEGO.E.propios || []).map(x => `${x.res}${x.causa ? ':' + x.causa : ''}`) }));
+const fin = await J(() => ({ prono: JUEGO.eventos.filter(e => e.ev === 'pronostico').map(e => e.props), pinta: JUEGO.toques.pinta.slice(), manejo: JUEGO.toques.manejo.slice(), total: JUEGO.toques.total, T: window.__T, A: window.__A, eventos: JUEGO.eventos.filter(e => e.ev === 'intento_propio').map(e => e.props), propios: (JUEGO.E.propios || []).map(x => `${x.res}${x.causa ? ':' + x.causa : ''}`) }));
 await browser.close(); server.close();
 
 // ---------- veredicto ----------
@@ -156,8 +155,9 @@ if (!R.doble) mal('no se llegó a probar el doble toque'); else if (R.doble.leng
 if (!R.rafagas) mal('no se llegó a probar la ráfaga en ¡PÁRATE!');
 if (!R.foco) mal('no se llegó a probar Espacio con un botón enfocado'); else if (R.foco.clics || R.foco.mueve || !R.foco.anotado.length || !R.foco.tira) mal(`con un botón enfocado, Espacio tiene que ser del levantamiento: ${JSON.stringify(R.foco)}`);
 if (!R.pausa || !R.pausa.abrio || !R.pausa.cerro) mal(`la pausa en el llamado: ${JSON.stringify(R.pausa)}`);
-if (!rivalVisto) mal('no se vio el turno de un rival'); else if (!rivalVisto.ve || rivalVisto.senal || rivalVisto.zona || !rivalVisto.saltar || !/S\b/.test(rivalVisto.boton) || !/ahora|now/i.test(rivalVisto.txt)) mal(`en el turno de un rival: ${JSON.stringify(rivalVisto)}`);
-if (!rivalSalto) mal('no se probó saltar el turno de un rival'); else if (!rivalSalto.espacioNoSalta || !rivalSalto.teclaS) mal(`saltar el turno de un rival: Espacio no tiene que saltearlo y la tecla S sí: ${JSON.stringify(rivalSalto)}`);
+if (!rivalVisto) mal('no se vio el turno de un rival'); else if (!rivalVisto.ve || rivalVisto.senal || rivalVisto.zona || rivalVisto.saltar || !/→/.test(rivalVisto.boton) || !/ahora|now/i.test(rivalVisto.txt)) mal(`en el turno de un rival (sin «Saltar», con el pronóstico): ${JSON.stringify(rivalVisto)}`);
+if (!rivalSalto) mal('no se probó el pronóstico en el turno de un rival'); else if (!rivalSalto.espacioNoHace || !rivalSalto.flecha) mal(`pronóstico: Espacio no tiene que hacer nada y la flecha → tiene que votar: ${JSON.stringify(rivalSalto)}`);
+if (rivalSalto && !fin.prono.some(e => e.voto === 'si' && e.via === 'tecla' && typeof e.acierto === 'boolean')) mal(`el pronóstico no llegó al veredicto (evento pronostico): ${JSON.stringify(fin.prono)}`);
 // acuse (meta I): en el mismo manejador (la tecla ya está hundida al salir del evento) y pintado en el cuadro siguiente
 { const A = fin.A.filter(x => x.intento), p95 = xs => { const v = xs.slice().sort((a, b) => a - b); return v.length ? v[Math.min(v.length - 1, Math.floor(v.length * .95))] : 0; };
   const sinHundir = A.filter(x => !x.on).length, dom = p95(A.map(x => x.dom)), pinta = p95(A.map(x => x.pinta)), man = p95(fin.manejo);
@@ -176,7 +176,7 @@ if (!ip || !Number.isFinite(ip.toques) || !Number.isFinite(ip.aceptados) || !Num
 const motivos = {}; for (const x of fin.T) if (x.ok === false) motivos[x.motivo] = (motivos[x.motivo] || 0) + 1;
 console.log(`pulsaciones: ${enviados} mandadas, ${fin.total} anotadas, ${fin.T.filter(x => x.ok).length} aceptadas · descartadas por motivo: ${JSON.stringify(motivos)}`);
 console.log(`PREPÁRATE → ¡TIRA!: ${JSON.stringify(R.guardado)} · toque largo: ${JSON.stringify(R.largo)} · doble: ${JSON.stringify(R.doble)} · ráfagas en ¡PÁRATE!: ${R.rafagas} · botón con foco: ${JSON.stringify(R.foco)} · pausa: ${JSON.stringify(R.pausa)}`);
-console.log(`turno de un rival: ${JSON.stringify(rivalVisto)} · saltar: ${JSON.stringify(rivalSalto)} · intentos propios: ${fin.propios.join(' · ')}`);
+console.log(`turno de un rival: ${JSON.stringify(rivalVisto)} · pronóstico: ${JSON.stringify(rivalSalto)} ${JSON.stringify(fin.prono[0] || null)} · intentos propios: ${fin.propios.join(' · ')}`);
 console.log(`intento_propio: ${fin.eventos.map(e => JSON.stringify({ toques: e.toques, aceptados: e.aceptados, descartados: e.descartados, ...Object.fromEntries(Object.entries(e).filter(([k]) => k.startsWith('desc_'))), guardados: e.guardados })).join(' · ')}`);
 for (const n of notas) console.log('nota: ' + n);
 if (problemas.length) { console.log(`\nFALLÓ (${problemas.length}):`); for (const p of problemas) console.log('  ' + p); process.exit(1); }

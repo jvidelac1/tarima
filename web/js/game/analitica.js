@@ -36,6 +36,8 @@ export const EVENTOS = new Set([
   'medicion_desactivada', 'error_juego',
   // Gameplay 2 (docs/JUEGO.md G2.7): un toque saltea el turno de un rival o el veredicto propio
   'rival_salteado', 'veredicto_salteado',
+  // 23-nov: el turno de un rival ya no se saltea; la persona pronostica si la levanta (ui/pronostico.js)
+  'pronostico',
   // muro en el medio de la final (12-nov)
   'muro_cerrado', 'final_cortada', 'envion_ok', 'envion_negado',
   // LIF-46 y LIF-53: el cartel con dos caminos y lo que pasó después

@@ -36,7 +36,7 @@ const UNTOQUE = new Set(['libre', 'luz', 'uno', 'decide']);
 
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
-const SALTA = process.argv.includes('--salta');
+const SALTA = false;      // desde el 23-nov no hay «Saltar» en el turno de un rival (--salta ya no hace nada)
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web'), OUT = path.join(ROOT, 'out', 'recorrido' + (process.argv.includes('--lang=en') ? '_en' : '') + (SALTA ? '_salta' : ''));
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const HEADED = process.argv.includes('--headed'), FOTOS = !process.argv.includes('--sin-fotos'), SEMILLA = +(arg('semilla') || 20261112), LANG = arg('lang') === 'en' ? 'en' : 'es';

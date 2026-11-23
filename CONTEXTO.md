@@ -85,6 +85,18 @@ del Worker de esa regla: `GRATIS_ETAPA "final"`, `GRATIS "1"`, `ENCUESTA_LIBRE "
   solo si se carga `APOYO_URL` en `worker/wrangler.jsonc`.
 - Para medir: `bash tools/medir.sh` (finales terminadas, desafíos) y `bash tools/errores.sh`.
 
+## Turno de los rivales (23 de noviembre, decisión del dueño)
+
+«Que no se pueda saltear a los pesistas, pero que no sea aburrido esperar los tiros, rápido.» Lo que eligió:
+- **Sin botón «Saltar».** Todo turno de rival se ve, desde poco antes de su primera explosión, con las fases de espera a ×8
+  y luces rápidas: **~5 s por turno** (antes 8,3 s de mediana; `tools/ritmo_test.mjs`, meta mediana ≤ 5,5 s y máximo ≤ 7 s).
+- **Pronóstico «¿La levanta?»** (Sí / No, o las flechas → ←) hasta su explosión. Acertar suma una racha que queda en el
+  dispositivo (`tarima.prono`), se ve en el perfil y, desde 3 seguidos, en la tarjeta para compartir. **No cambia kilos,
+  rivales ni ranking.** Evento `pronostico`.
+- **Qué está en juego:** «Si la levanta, te pasa / te saca el oro / queda primero» (`ui/pronostico.js → tensionRival`), con
+  latido en los decisivos.
+- **«¿Subes?»** con los dos pesos más cercanos a un toque, junto a «Cambiar» (LIF-4).
+
 ## Backlog
 
 En **Linear**, equipo **LIFTINGAME** (clave `LIF`, issues LIF-1 a LIF-29, en Backlog), 5 proyectos: Juego de estrategia, Competencia y comunidad,

@@ -11,7 +11,7 @@
 /** Corre en la página (page.evaluate). Deja en window.__vista {ap: [{k, t0, t1, txt}], vivos}. */
 export function instalarEnPagina() {
   if (window.__vista) return true;
-  const SEL = { veredicto: '#veredicto', rival: '#rival', turno: '#turno', marcador: '#marcador', tablero: '#tablero', etiqueta: '#etiqueta', zocalo: '#zocalo', seguir: '#seguir', cartel: '#cartel', guia: '#guia', saltar: '#saltar-rival', panel: '#capa > .panel' };
+  const SEL = { veredicto: '#veredicto', rival: '#rival', turno: '#turno', marcador: '#marcador', tablero: '#tablero', etiqueta: '#etiqueta', zocalo: '#zocalo', seguir: '#seguir', cartel: '#cartel', guia: '#guia', saltar: '#prono', panel: '#capa > .panel' };
   const SIN_TEXTO = new Set(['tablero', 'marcador', 'zocalo', 'saltar']);      // se actualizan en el lugar: solo cuenta que aparezcan
   const V = window.__vista = { ap: [], vivos: {} };
   const ahora = () => Math.round(window.JUEGO?.reloj?.ahora?.() ?? performance.now());
