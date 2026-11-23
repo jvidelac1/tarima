@@ -727,4 +727,11 @@ export default {
   // tarjeta para compartir (LIF-23)
   'tarjeta.pie': 'Can you beat me? One-button weightlifting, free in your browser.',
   'compartir.copiado_imagen': 'Text copied and image downloaded. Paste it anywhere.',
+  // desafío (LIF-12)
+  'desafio.aviso': 'Challenge: {quien} lifted {total} kg in this same final. “Play” plays it, so you can beat it.',
+  'desafio.alguien': 'someone',
+  'desafio.dejar': 'Play a free final',
+  'desafio.superado': 'You beat {quien} by {dif} kg ({mio} vs {suyo})!',
+  'desafio.empate': 'Tie with {quien}: {mio} kg each.',
+  'desafio.no': '{quien} stays ahead: {suyo} kg vs your {mio}.',
 };

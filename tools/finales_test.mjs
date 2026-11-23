@@ -104,6 +104,20 @@ const pf = (await api('perfil', {}, { cookie: C.uuid })).j.perfil, pv = pf?.pesi
 ok(pv && pv.rm.s >= 2 && pf.oros >= 2 && pf.finales >= 3 && pf.recientes.length >= 3, '6: el perfil no dice los oros, el bono o las recientes: ' + JSON.stringify(pf).slice(0, 300));
 ok(conRespaldo.j.perfil && conRespaldo.j.perfil.finales >= 3 && conRespaldo.j.perfil.pesistas.ventura, '6: /api/final no devuelve el perfil al día');
 logReal(`perfil: ${pf.finales} finales · ${pf.oros} oros · Compacto RM +${pv?.rm.s} · mejor total ${pf.mejor_total}`);
+// 7. desafío (LIF-12): la final de origen se pide por id; quien acepta juega la misma final, sin progresión
+const D1 = jugador(), fo = finalBot(500, { yo: 1, perfil: 'bueno' }), ro = await D1.mandar(fo, { apodo: 'Nasar', publico: true });
+ok(Number.isSafeInteger(ro.j.id), '7: /api/final no devuelve el id para compartir');
+const dd = await api('desafio', { id: ro.j.id });
+ok(dd.j.estado === 'ok' && dd.j.semilla === fo.reg.semilla && dd.j.total === ro.j.total && dd.j.apodo === 'Nasar' && dd.j.d === undefined, '7: el desafío no dice la final de origen: ' + JSON.stringify(dd.j));
+const D2 = jugador(), fa = finalBot(501, { yo: 0, semilla: dd.j.semilla, nivel: dd.j.nivel }), ra = await D2.mandar(fa, { desafio: ro.j.id });
+ok(ra.j.estado === 'ok' && ra.j.desafio?.total === ro.j.total, '7: la final del desafío no entró: ' + JSON.stringify(ra.j).slice(0, 200));
+const rOtra = await D2.mandar(finalBot(502, { yo: 0 }), { desafio: ro.j.id });
+ok(rOtra.status === 422, '7: una final con otra semilla entró como desafío');
+const rRm = await D2.mandar(finalBot(503, { yo: 0, semilla: dd.j.semilla, nivel: dd.j.nivel, rm: { s: 1, c: 1 } }), { desafio: ro.j.id });
+ok(rRm.status === 422, '7: el desafío aceptó progresión');
+const dd2 = await api('desafio', { id: ro.j.id });
+ok(dd2.j.aceptados === 1, '7: el desafío no cuenta quién lo aceptó: ' + dd2.j.aceptados);
+ok((await api('desafio', { id: 999999 })).status === 404, '7: un desafío inexistente no da 404');
 // métricas de LIF-2 desde la tabla
 const m = await db.prepare('SELECT COUNT(*) finales, SUM(caidas) caidas, SUM(intentos) intentos, SUM(todo_verde) todo_verde, SUM(saltos) saltos FROM finales').first();
 logReal(`finales guardadas: ${m.finales} · caídas ${m.caidas} de ${m.intentos} intentos · intentos todo verde ${m.todo_verde} · saltos ${m.saltos}`);

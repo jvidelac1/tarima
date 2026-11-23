@@ -526,11 +526,11 @@ export function crearServidor(o = {}) {
    * servidor la recalcula y la guarda. Nunca frena el juego: sin pase, sin servidor o con error devuelve {estado} y listo.
    * @returns {Promise<{estado:'ok'|'repetida', total:number, puesto:number|null, semana:string, campeonato:boolean, ranking?:{puesto:number, de:number}} | {estado:'sin_pase'|'rechazada'|'error', motivo?:string}>}
    */
-  async function mandarFinal({ registro, campeonato = false, apodo = null, publico = false, saltos = null, duracion_s = null } = {}) {
+  async function mandarFinal({ registro, campeonato = false, desafio = null, apodo = null, publico = false, saltos = null, duracion_s = null } = {}) {
     let pase = null; try { pase = JSON.parse(sesion.get(CLAVES.pase) || 'null')?.pase || null; } catch { pase = null; }
     if (!pase || modo !== 'servidor' || !registro) return { estado: 'sin_pase' };
     try {
-      const { j } = await post('/api/final', { pase, registro, dispositivo: dispositivo(), campeonato: !!campeonato, ...(publico && apodo ? { apodo, publico: true } : {}), saltos, duracion_s }, ESPERA_PEDIDO);
+      const { j } = await post('/api/final', { pase, registro, dispositivo: dispositivo(), campeonato: !!campeonato, ...(Number.isSafeInteger(desafio) ? { desafio } : {}), ...(publico && apodo ? { apodo, publico: true } : {}), saltos, duracion_s }, ESPERA_PEDIDO);
       if (j && j.perfil) local.set('tarima.perfil', JSON.stringify(j.perfil));
       return j;
     } catch (e) {
@@ -543,6 +543,11 @@ export function crearServidor(o = {}) {
     if (modo !== 'servidor') return { estado: 'sin_servidor', perfil: perfilGuardado() };
     try { const { j } = await post('/api/perfil', { dispositivo: dispositivo() }, ESPERA_PEDIDO); if (j.perfil) local.set('tarima.perfil', JSON.stringify(j.perfil)); return { estado: 'ok', perfil: j.perfil }; } catch (e) { return { estado: 'error', error: e.tipo || 'red', perfil: perfilGuardado() }; }
   }
+  /** Un desafío (LIF-12): la final de origen por su id. */
+  async function desafio(id) {
+    if (modo !== 'servidor' || !Number.isSafeInteger(id)) return { estado: 'sin_servidor' };
+    try { const { j } = await post('/api/desafio', { id }, ESPERA_PEDIDO); return j; } catch (e) { return { estado: e.status === 404 ? 'no_existe' : 'error' }; }
+  }
   function perfilGuardado() { try { return JSON.parse(local.get('tarima.perfil') || 'null'); } catch { return null; } }
   /** El ranking: {alcance: 'semana' | 'global', pais?: boolean}. Devuelve lo del servidor o {estado:'error'}. */
   async function ranking({ alcance = 'semana', pais = false } = {}) {
@@ -552,7 +557,7 @@ export function crearServidor(o = {}) {
 
   return {
     get modo() { return modo; },
-    dispositivo, copia, estado, pedirPase, envion, paseParaReanudar, finalTerminada, soltarPase, anotar, encuesta, baja, mandarFinal, ranking, perfil, perfilGuardado,
+    dispositivo, copia, estado, pedirPase, envion, paseParaReanudar, finalTerminada, soltarPase, anotar, encuesta, baja, mandarFinal, ranking, perfil, perfilGuardado, desafio,
   };
 }
 

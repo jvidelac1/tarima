@@ -36,6 +36,21 @@ const toque = async () => { await page.keyboard.down('Space'); await av(30); awa
 const pulsa = async sel => { const l = page.locator(sel).first(); if (!(await l.count()) || !(await l.isVisible())) return false; await l.focus(); await page.keyboard.press('Enter'); return true; };
 const esperar = async (fn, que, ms = 15000, a) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await J(fn, a)) return true; await av(100); await page.waitForTimeout(40); } mal(`no apareció: ${que}`); return false; };
 
+async function jugarEn(pg) {
+  const JJ = (fn, a) => pg.evaluate(fn, a), a2 = ms => JJ(ms => JUEGO.test.avanzar(ms), ms), i2 = t => JJ(t => JUEGO.test.hasta(t, 8), t);
+  const tq = async () => { await pg.keyboard.down('Space'); await a2(30); await pg.keyboard.up('Space'); };
+  const t0 = Date.now();
+  for (let n = 0; ; n++) {
+    if (Date.now() - t0 > 12 * 60000) throw new Error('desafío: no avanza');
+    const s = await JJ(() => JUEGO.estado()); if (s.errores.length) throw new Error('error en el juego (desafío): ' + s.errores[0]);
+    if (s.pantalla === 'fin') return;
+    const I = s.intento;
+    if (I && I.propio && s.modo !== 'panel') { const g = I.senal; if (!g) { await a2(20); continue; } if (I.parado) { await a2(80); await tq(); continue; } if (g.tipo === 'barra') { await i2(g.objetivo); await tq(); continue; } if (UNTOQUE.has(g.tipo)) { await a2(150); await tq(); continue; } await a2(30); continue; }
+    if (s.panel && !s.sobre && await JJ(() => !!document.querySelector('#capa .panel button.ir:not(:disabled)'))) { await a2(450); const l = pg.locator('#capa .panel button.ir:not(:disabled)').first(); if (await l.count() && await l.isVisible()) { await l.focus(); await pg.keyboard.press('Enter'); await a2(60); continue; } }
+    await a2(['rival', 'decision', 'repeticion', 'repeticion_rival'].includes(s.pantalla) ? 450 : 200);
+    if (!(I && I.propio) && n % 3 === 0 && await saltarRival(pg, false)) continue;
+  }
+}
 async function jugar(hasta, que, minutos = 12) {
   const t0 = Date.now();
   for (let n = 0; ; n++) {
@@ -112,6 +127,33 @@ try {
     await jugar(s => s.pantalla === 'fin', 'la final con bono');
     await esperar(() => /anotada|puesto/.test(document.getElementById('podio-rk')?.textContent || ''), 'la final con bono anotada', 20000);
   } else console.log('(sin oro en el campeonato: no se prueba el bono)');
+  // 6. desafío (LIF-12): otro navegador abre el link de una final validada, juega esa misma final y el podio compara
+  const origen = await srv.db.prepare('SELECT id, semilla, total FROM finales WHERE campeonato = 0 ORDER BY id DESC LIMIT 1').first()
+    || await srv.db.prepare('SELECT id, semilla, total FROM finales ORDER BY id LIMIT 1').first();
+  const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: 'en-US' }), pg2 = await ctx2.newPage();
+  pg2.on('pageerror', e => mal(`pageerror (desafío): ${e.message}`));
+  await pg2.goto(`${base}/?dibujo=0&q=baja&lang=es&desafio=${origen.id}`, { waitUntil: 'load' });
+  await pg2.waitForFunction(() => window.JUEGO?.listo && window.JUEGO.test, null, { timeout: 60000 }); await pg2.evaluate(() => JUEGO.test.manual());
+  const page0 = page; globalThis.__pg = pg2;
+  const J2 = (fn, a) => pg2.evaluate(fn, a), av2 = ms => J2(ms => JUEGO.test.avanzar(ms), ms);
+  const t0d = Date.now(); while (Date.now() - t0d < 20000 && !await J2(() => !!document.querySelector('.desafio'))) { await av2(100); await pg2.waitForTimeout(40); }
+  const aviso = await J2(() => document.querySelector('.desafio p')?.textContent || '');
+  if (!new RegExp(`${origen.total} kg`).test(aviso)) mal('6: la bienvenida no ofrece el desafío: ' + aviso);
+  await pg2.screenshot({ path: path.join(OUT, '06_desafio_bienvenida.png') });
+  await pg2.locator('#btn-empezar').focus(); await pg2.keyboard.press('Enter');
+  const t1 = Date.now(); while (Date.now() - t1 < 60000 && !await J2(() => !!JUEGO.E.p)) { await av2(100); await pg2.waitForTimeout(40); }
+  const sd = await J2(() => JUEGO.E.p?.reg.semilla);
+  if (sd !== origen.semilla) mal(`6: el desafío no juega la misma final (semilla ${sd} contra ${origen.semilla})`);
+  // jugar con el driver sobre la segunda página
+  const viejo = { J, av, ir, toque, pulsa }; void viejo;
+  await jugarEn(pg2);
+  const t2 = Date.now(); let linea = ''; while (Date.now() - t2 < 20000 && !/Superaste|Empate|sigue arriba/.test(linea)) { await av2(100); await pg2.waitForTimeout(40); linea = await J2(() => document.getElementById('podio-rk')?.textContent || ''); }
+  if (!/Superaste|Empate|sigue arriba/.test(linea)) mal('6: el podio no compara con el desafío: ' + linea);
+  await pg2.screenshot({ path: path.join(OUT, '07_desafio_podio.png') });
+  const fd = await srv.db.prepare('SELECT desafio FROM finales WHERE desafio IS NOT NULL').first();
+  if (!fd || fd.desafio !== origen.id) mal('6: la final del desafío no quedó ligada a la de origen');
+  console.log('desafío: ' + linea.replace(/\s+/g, ' ').trim());
+  void page0;
   console.log(`campeonato ${sem.clave}: total ${enJuego} kg · fila «${yo}» · dispositivo ${uuid.slice(0, 8)}`);
 } catch (e) { mal('excepción: ' + e.message); await foto('excepcion'); }
 await browser.close(); await srv.cerrar?.();

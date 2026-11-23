@@ -19,7 +19,7 @@ const TOPE_SALTOS = 60, TOPE_DURA = 3 * 3600;
  * anterior, si terminó en la primera hora de la semana nueva) y con sus condiciones.
  * @returns {{ok:true, r:object, semana:string, campeonato:boolean} | {ok:false, error:string}}
  */
-export function validarFinal(reg, { campeonato = false, ahora }) {
+export function validarFinal(reg, { campeonato = false, ahora, desafio = null }) {
   const rc = recalcular(reg, datosSim());
   if (!rc.ok) return { ok: false, error: rc.error };
   const r = resumenFinal(rc.partida);
@@ -30,7 +30,12 @@ export function validarFinal(reg, { campeonato = false, ahora }) {
     if (reg.ctl !== CAMPEONATO.ctl || (reg.dif ?? 'facil') !== CAMPEONATO.dif || reg.nivel !== CAMPEONATO.nivel || reg.orden !== CAMPEONATO.orden) return { ok: false, error: 'condiciones del campeonato' };
     semana = vale;
   }
-  return { ok: true, r, semana, campeonato };
+  // desafío (LIF-12): la misma final que la de origen, sin progresión
+  if (desafio) {
+    if (reg.semilla !== desafio.semilla || (reg.ctl ?? 'c') !== desafio.ctl || (reg.dif ?? 'facil') !== desafio.dif || reg.nivel !== desafio.nivel || (reg.orden ?? 'rondas') !== desafio.orden) return { ok: false, error: 'no es la final del desafío' };
+    const yo = reg.atletas.find(x => x && x.ctrl === 'persona'); if (yo?.rm && (yo.rm.s || yo.rm.c)) return { ok: false, error: 'el desafío se juega sin progresión' };
+  }
+  return { ok: true, r, semana, campeonato: campeonato && !desafio, desafio: desafio ? desafio.id : null };
 }
 
 /** Lo que manda el cliente además del registro: entero en rango o null. */
@@ -40,11 +45,11 @@ const entero = (v, max) => (Number.isInteger(v) && v >= 0 && v <= max ? v : null
 export async function guardarFinal(db, { p, d, ahora, v, reg, b, pais }) {
   const r = v.r, apodo = b.publico === true ? normalizarNombre(b.apodo) : null;
   const res = await db.prepare(`INSERT INTO finales (p, d, en, semana, campeonato, semilla, ctl, dif, nivel, pesista, s, c, total, puesto,
-      intentos, validos, nulos, caidas, barritas, verdes, todo_verde, saltos, duracion_s, apodo, pais)
-      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)
+      intentos, validos, nulos, caidas, barritas, verdes, todo_verde, saltos, duracion_s, apodo, pais, desafio, orden)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)
       ON CONFLICT (p) DO NOTHING`).bind(p, d, ahora, v.semana, v.campeonato ? 1 : 0, reg.semilla, reg.ctl ?? 'c', reg.dif ?? 'facil', reg.nivel, r.pesista,
     r.s, r.c, r.total, r.puesto, r.intentos, r.validos, r.nulos, r.caidas, r.barritas, r.verdes, r.todo_verde,
-    entero(b.saltos, TOPE_SALTOS), entero(b.duracion_s, TOPE_DURA), apodo, pais).run();
+    entero(b.saltos, TOPE_SALTOS), entero(b.duracion_s, TOPE_DURA), apodo, pais, v.desafio ?? null, reg.orden ?? 'rondas').run();
   return res.meta.changes === 1 ? res.meta.last_row_id : null;
 }
 
@@ -111,4 +116,14 @@ export async function perfil(db, d, semana = '') {
     pesistas: Object.fromEntries(por.map(x => [x.pesista, { finales: x.finales, oros: x.oros || 0, mejor_total: x.mejor_total || 0, mejor_s: x.mejor_s || 0, mejor_c: x.mejor_c || 0, rm: bonoRM(x.oros || 0) }])),
     recientes: recientes.map(x => ({ en: x.en, pesista: x.pesista, total: x.total, puesto: x.puesto, campeonato: !!x.campeonato })),
   };
+}
+
+/** Una final de origen para un desafío (LIF-12): sus condiciones y su resultado, sin nada del dispositivo. */
+export async function finalDeDesafio(db, id) {
+  if (!Number.isSafeInteger(id) || id < 1) return null;
+  const f = await db.prepare(`SELECT id, semilla, ctl, dif, nivel, orden, pesista, s, c, total, puesto, apodo, pais, en,
+      (SELECT COUNT(*) FROM finales g WHERE g.desafio = finales.id) AS aceptados,
+      (SELECT COUNT(*) FROM finales g WHERE g.desafio = finales.id AND g.total > finales.total) AS lo_superaron
+    FROM finales WHERE id = ?1`).bind(id).first();
+  return f || null;
 }

@@ -1074,6 +1074,8 @@ async function inicio() {
     const T = tactil(), facil = cfg.ctl !== 'c', uno = esU(cfg.ctl), falta = !guardado.get('tarima.tutorial'); E.ctl = cfg.ctl;
     let est = null; try { est = ganchos.estado?.() || null; } catch { /* sin estado */ }
     const q = est && est.anotado ? t('bienvenida.anotado') : est && Number.isFinite(est.quedan) ? (est.quedan === 1 ? t('bienvenida.quedan_1') : t('bienvenida.quedan', { n: est.quedan })) : '';
+    const des = E.desafio && E.desafio.estado === 'ok' && !E.desafioDejado ? E.desafio : null;
+    const desafioHTML = des ? `<div class="desafio"><p>${t('desafio.aviso', { quien: des.apodo ? `<b>${esc(des.apodo)}</b>` : t('desafio.alguien'), total: des.total })}</p><button class="link" id="btn-sin-desafio">${t('desafio.dejar')}</button></div>` : '';
     const nombreHTML = S.editar
       ? `<label class="nombre" for="nombre"><span>${t('bienvenida.nombre')}</span><input id="nombre" type="text" value="${esc(S.nombre)}" maxlength="20" placeholder="${esc(t('bienvenida.nombre_ph'))}" title="${esc(t('bienvenida.nombre_nota'))}" autocomplete="nickname" autocapitalize="words" spellcheck="false" enterkeyhint="go"></label>`
       : `<p class="vuelve">${t('bienvenida.vuelve', { nombre: `<b>${esc(guardadoNombre)}</b>` })} <button class="link" id="btn-nosoy">${t('bienvenida.no_soy')}</button></p>`;
@@ -1100,7 +1102,7 @@ async function inicio() {
       ${nombreHTML}
       ${tarjetas ? `<h2 id="pesista-t">${esc(t('pesista.titulo', { nombre: mostrado() }))}</h2>
       <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b>${cfg.ctl === 'b' ? `<small class="conviene">${t(`pesista.${id}.b`)}</small><small class="rm">${t('rm.tarjeta', { s: conBono(datos.atletas[id].techo.s, bonoDe(id).s), c: conBono(datos.atletas[id].techo.c, bonoDe(id).c) })}</small>` : `${cuerpoHTML(id, uno)}<small class="conviene">${t(uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small>`}</button>`).join('')}</div>` : ''}
-      ${nivelHTML}${opciones}</div><div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${primera ? '' : `<button id="btn-campeonato" data-completa>${t('bienvenida.campeonato')}</button>`}${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button id="btn-opciones" aria-expanded="${S.opciones}"><span aria-hidden="true">⚙</span> ${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button>${primera ? '' : `<button class="link" id="btn-ranking">${t('bienvenida.ranking')}</button><button class="link" id="btn-perfil">${t('bienvenida.perfil')}</button>`}<button class="link" id="btn-ayuda">${t('boton.ayuda')}</button><a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
+      ${des ? '' : nivelHTML}${opciones}</div>${desafioHTML}<div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${primera ? '' : `<button id="btn-campeonato" data-completa>${t('bienvenida.campeonato')}</button>`}${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button id="btn-opciones" aria-expanded="${S.opciones}"><span aria-hidden="true">⚙</span> ${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button>${primera ? '' : `<button class="link" id="btn-ranking">${t('bienvenida.ranking')}</button><button class="link" id="btn-perfil">${t('bienvenida.perfil')}</button>`}<button class="link" id="btn-ayuda">${t('boton.ayuda')}</button><a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
       `, 'bienvenida');
     pn.querySelector('a.legal')?.addEventListener('click', () => ev('privacidad_abierta', { pantalla: E.pantalla }));
     if (abrio) { const bc = pn.querySelector('.bv-cuerpo') || pn; bc.scrollTop = bc.scrollHeight; }      // Opciones se abre arriba de la fila de botones: se lleva a la vista
@@ -1128,10 +1130,11 @@ async function inicio() {
     else if (b.id === 'btn-ayuda') abrirSobre('ayuda');
     else if (b.id === 'btn-ranking') abrirRanking();
     else if (b.id === 'btn-perfil') abrirPerfil();
+    else if (b.id === 'btn-sin-desafio') { E.desafioDejado = true; ev('desafio_dejado', {}); }
     else if (b.id === 'btn-nosoy') { S.editar = true; S.nombre = ''; S.cambio = true; S.focoNombre = true; }
     // el tutorial se ofrece una sola vez: queda anotado al salir del inicio (se haga o se saltee), así que recargar no lo repite
     else {
-      cfg.campeonato = b.id === 'btn-campeonato'; const principalBtn = b.id === 'btn-empezar'; cfg.calentar = uno ? false : facil ? principalBtn === falta : principalBtn; cfg.primera = primera; if (facil) guardado.set('tarima.tutorial', '1');
+      cfg.campeonato = b.id === 'btn-campeonato'; cfg.desafio = !cfg.campeonato && b.id === 'btn-empezar' && E.desafio?.estado === 'ok' && !E.desafioDejado ? E.desafio.id : null; const principalBtn = b.id === 'btn-empezar'; cfg.calentar = uno ? false : facil ? principalBtn === falta : principalBtn; cfg.primera = primera; if (facil) guardado.set('tarima.tutorial', '1');
       if (S.editar) guardado.set('tarima.nombre', limpiarNombre(S.nombre));
       ev('nombre_puesto', { vacio: !limpiarNombre(guardado.get('tarima.nombre')), vuelve, cambio: S.cambio });
       ev('pesista_elegido', { pesista: TIPO[cfg.id], por_defecto: !S.tocoPesista, ofrecido: !primera, modelo: PLANTEL[cfg.id].modelo });
@@ -1710,7 +1713,7 @@ async function intervalo(p) {
 async function compartir(p, medalla, total, pn) {
   const marcas = lev => p.at[E.yo][lev].map(x => (x.res === 'valido' ? '✅' : '❌')).join('') || '—';
   const codigo = [...crypto.getRandomValues(new Uint8Array(6))].map(x => (x % 36).toString(36)).join('');
-  const link = `${location.origin}${location.pathname}?c=${codigo}`;
+  const link = E.finalId ? `${location.origin}${location.pathname}?desafio=${E.finalId}` : `${location.origin}${location.pathname}?c=${codigo}`;
   const txt = t('compartir.texto', { medalla: t('medalla.' + medalla), total: total || 0, marcas_s: marcas('s'), marcas_c: marcas('c'), link });
   const nota = pn.querySelector('#compartido'), decir = k => { if (nota) { nota.hidden = false; nota.textContent = t(k); } };
   // LIF-23 · la tarjeta con el resultado (imagen): con el teléfono va junto al texto; en la compu, el texto se copia y la imagen se descarga
@@ -1757,7 +1760,7 @@ async function cierre(p) {
   let quedan = null; try { quedan = ganchos.quedan?.() ?? null; } catch { /* sin dato */ }
   const otra = quedan === 1 ? t('podio.otra_quedan') : Number.isFinite(quedan) && quedan > 1 ? t('podio.otra_quedan_n', { n: quedan }) : t('podio.otra');
   const botones = () => `<div class="fila"><button class="ir grande" id="btn-revancha" data-completa>${otra}</button><button id="btn-cambiar">${t('podio.cambiar')}</button><button id="btn-compartir">${t('podio.compartir')}</button></div><p class="chica" id="compartido" hidden></p><p class="chica" id="podio-rk"${E.rkLinea ? '' : ' hidden'}>${E.rkLinea || ''}</p><div id="podio-extra"></div>`;
-  E.rkLinea = null; E.rkCamp = null;
+  E.rkLinea = null; E.rkCamp = null; E.finalId = null; if (E.cfg?.desafio) E.desafioDejado = true;      // un desafío se juega una vez: la revancha ya es libre
   // «Ver ranking» llega después de pintar el podio (la respuesta del servidor): se atiende por delegación en #capa
   const verRk = e => { if (e.target.closest?.('#btn-rk') && !E.sobre) { sonido.activar(); abrirRanking(E.cfg?.campeonato ? 'semana' : 'global'); } };
   $('capa').addEventListener('click', verRk); E.quitarVerRk?.(); E.quitarVerRk = () => $('capa').removeEventListener('click', verRk);
@@ -1767,8 +1770,11 @@ async function cierre(p) {
   Promise.race([E.envio, new Promise(r => setTimeout(r, 6000, null))]).then(r => {
     if (!r || (r.estado !== 'ok' && r.estado !== 'repetida')) return;
     ev('final_validada', { campeonato: camp, puesto_semana: r.ranking?.puesto ?? null });
+    E.finalId = r.id ?? null;
+    const dz = r.desafio ? (yo.total > r.desafio.total ? 'desafio.superado' : yo.total === r.desafio.total ? 'desafio.empate' : 'desafio.no') : null;
     E.rkCamp = camp && r.ranking ? { puesto: r.ranking.puesto, de: r.ranking.de } : null;
-    E.rkLinea = `${camp && r.ranking ? t('podio.campeonato', { puesto: r.ranking.puesto, de: r.ranking.de }) : t('podio.validada')} <button class="link" id="btn-rk">${t('podio.ver_ranking')}</button>`;
+    const mayus = x => x.charAt(0).toUpperCase() + x.slice(1);
+    E.rkLinea = `${dz ? mayus(t(dz, { quien: r.desafio.apodo ? esc(r.desafio.apodo) : t('desafio.alguien'), suyo: r.desafio.total, mio: yo.total || 0, dif: Math.abs((yo.total || 0) - r.desafio.total) })) + ' · ' : ''}${camp && r.ranking ? t('podio.campeonato', { puesto: r.ranking.puesto, de: r.ranking.de }) : t('podio.validada')} <button class="link" id="btn-rk">${t('podio.ver_ranking')}</button>`;
     E.repintar?.();      // el podio se vuelve a pintar con la línea (y su botón escuchado)
   });
   let extra = null; try { extra = await ganchos.podio({ n: E.finalN, puesto, total: yo.total || 0, medalla, lugar: pn.querySelector('#podio-extra'), nombre: nombreJugador(), t }); } catch (e) { console.warn('ganchos.podio:', e); }
@@ -1809,10 +1815,12 @@ async function pedirPase(cfg, n, origen) {
 async function partida(cfg) {
   // campeonato semanal (LIF-8): la final de la semana, con sus condiciones fijas, sin tocar lo que la persona eligió para jugar libre
   const sem = cfg.campeonato ? semanaDe(Math.floor(Date.now() / 1000)) : null;
+  const des = !sem && cfg.desafio && E.desafio?.id === cfg.desafio ? E.desafio : null;
+  if (des) cfg = { ...cfg, ctl: des.ctl, dif: des.dif, nivel: des.nivel, orden: des.orden, calentar: false };
   if (sem) cfg = { ...cfg, ctl: CAMPEONATO.ctl, dif: CAMPEONATO.dif, nivel: CAMPEONATO.nivel, orden: CAMPEONATO.orden, calentar: false, semana: sem.clave };
   E.cfg = cfg; E.saltosFinal = 0; E.yo = IDS.indexOf(cfg.id); escena.yo = cfg.id; E.registro = null;
   document.documentElement.classList.toggle('juego-u', esU(cfg.ctl));      // menos carteles mientras se juega (juego.css, al final)
-  const semilla = sem ? semillaSemana(sem.clave) : params.has('semilla') && !E.jugadas ? (+params.get('semilla') >>> 0) : (crypto.getRandomValues(new Uint32Array(1))[0] >>> 0);
+  const semilla = des ? des.semilla >>> 0 : sem ? semillaSemana(sem.clave) : params.has('semilla') && !E.jugadas ? (+params.get('semilla') >>> 0) : (crypto.getRandomValues(new Uint32Array(1))[0] >>> 0);
   E.jugadas = (E.jugadas || 0) + 1;
   // en 'u' no hay ventanas: la corrección de atraso no se usa
   let errMedio = null; cfg.cal = cfg.cal ?? (tactil() && !esU(cfg.ctl) ? CAL_TACTIL : 0);
@@ -1833,7 +1841,7 @@ async function partida(cfg) {
   if (!pase) return 'inicio';
   E.turnoDe = null; E.pedidoPend = null; PD.abierto = false; E.pase = pase; E.finalN = pase.n ?? n; E.finalIniciada = false; E.tFinal0 = performance.now(); E.antes = null; E.primeraFinal = n === 1; E.rivalesSeguidos = 0; E.casi = null;
   // LIF-14 · el RM con la progresión del perfil validado (el campeonato se juega sin ella)
-  const bono = cfg.campeonato ? null : bonoDe(cfg.id), rmYo = bono && (bono.s || bono.c) ? bono : null;
+  const bono = cfg.campeonato || cfg.desafio ? null : bonoDe(cfg.id), rmYo = bono && (bono.s || bono.c) ? bono : null;
   const p = E.p = new Partida(datos, { semilla, ia: HUELLA_IA, envFijo: true, turnos: cfg.orden === 'oficial' ? 'oficial' : 'rondas', nivel: cfg.nivel, cal: cfg.cal, primera: cfg.primera, ctl: cfg.ctl, ...(cfg.ctl === 'b' && cfg.dif !== 'facil' ? { dif: cfg.dif } : {}), tactil: (cfg.ctl === 'f' || esU(cfg.ctl)) && tactil(), atletas: IDS.map((id, i) => ({ id, ctrl: i === E.yo ? 'persona' : 'juego', ...(i === E.yo && rmYo ? { rm: rmYo } : {}) })) });
   await presentacion(p, cfg, errMedio, n === 1); p.empezar();
   while (p.fase !== 'fin') {
@@ -1852,7 +1860,7 @@ async function partida(cfg) {
   limpiarVeredicto(); tablero(null); E.registro = JSON.parse(JSON.stringify(p.reg));
   const rc = recalcular(E.registro, datos); if (!rc.ok || resumen(rc.tabla) !== resumen(p.tabla())) E.errores.push('el registro no recalcula a la misma tabla: ' + (rc.error || ''));
   // LIF-10: el servidor la recalcula y la anota (con el pase de esta final, que el podio suelta): no se espera acá
-  E.envio = Promise.resolve().then(() => ganchos.mandarFinal({ registro: E.registro, campeonato: !!cfg.campeonato, apodo: nombreJugador(), publico: guardado.get('tarima.ranking_publico') === '1', saltos: E.saltosFinal || 0, duracion_s: Math.round((performance.now() - (E.tFinal0 || performance.now())) / 1000) })).catch(() => null);
+  E.envio = Promise.resolve().then(() => ganchos.mandarFinal({ registro: E.registro, campeonato: !!cfg.campeonato, desafio: cfg.desafio ?? null, apodo: nombreJugador(), publico: guardado.get('tarima.ranking_publico') === '1', saltos: E.saltosFinal || 0, duracion_s: Math.round((performance.now() - (E.tFinal0 || performance.now())) / 1000) })).catch(() => null);
   return cierre(p);
 }
 
@@ -1990,7 +1998,9 @@ async function iniciar() {
   ev('juego_abierto', { carga_ms: Math.round(performance.now()), pantalla_inicial: A.muro ? 'muro' : 'bienvenida', reintentos_modulo: window.__tarimaReintentos || 0, orientacion: telefono.orientacion });
   (async () => {
     if (A.muro) { visita('muro'); await mostrarMuro('carga', A); }
-    let cfg = null; for (;;) { if (!cfg) cfg = await inicio(); const r = await partida(cfg); cfg = r === 'revancha' ? { ...cfg, calentar: false, primera: false } : null; }
+    // LIF-12 · un link de desafío (?desafio=id): la final de origen se pide antes de la bienvenida, que la ofrece
+    const idDes = Number(params.get('desafio')); if (Number.isSafeInteger(idDes) && idDes > 0) { try { E.desafio = await ganchos.desafio(idDes); } catch { E.desafio = null; } ev('desafio_abierto', { ok: E.desafio?.estado === 'ok' }); }
+    let cfg = null; for (;;) { if (!cfg) cfg = await inicio(); const r = await partida(cfg); cfg = r === 'revancha' ? { ...cfg, calentar: false, primera: false, desafio: null } : null; }
   })().catch(e => fallar(e));
 }
 

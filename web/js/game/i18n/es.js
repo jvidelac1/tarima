@@ -744,4 +744,11 @@ export default {
   // tarjeta para compartir (LIF-23)
   'tarjeta.pie': '¿Me ganas? Halterofilia a un botón, gratis en el navegador.',
   'compartir.copiado_imagen': 'Texto copiado e imagen descargada. Pégalo donde quieras.',
+  // desafío (LIF-12)
+  'desafio.aviso': 'Desafío: {quien} hizo {total} kg en esta misma final. «Jugar» la juega igual, para superarlo.',
+  'desafio.alguien': 'alguien',
+  'desafio.dejar': 'Jugar una final libre',
+  'desafio.superado': '¡Superaste a {quien} por {dif} kg ({mio} contra {suyo})!',
+  'desafio.empate': 'Empate con {quien}: {mio} kg los dos.',
+  'desafio.no': '{quien} sigue arriba: {suyo} kg contra tus {mio}.',
 };
