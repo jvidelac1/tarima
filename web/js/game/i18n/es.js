@@ -801,4 +801,9 @@ export default {
   'antidoping.limpio': 'Control antidoping: {nombre} salió sorteado después del podio. Resultado: limpio.',
   // apoyo voluntario (LIF-29)
   'apoyo.boton': 'Apoyar el juego',
+  // viralidad: desafíos
+  'podio.desafiar': 'Desafiar a un amigo',
+  'perfil.desafios': 'Tus desafíos los jugaron {n} personas; {m} te superaron. Cada una te dio 2 sesiones de entrenamiento.',
+  'perfil.desafios_cero': 'Comparte una final con «Desafiar a un amigo»: cada persona que la juegue te da 2 sesiones de entrenamiento.',
+  'bienvenida.desafios_nuevos': '{n} personas jugaron tu desafío: tienes {s} sesiones de entrenamiento más.',
 };

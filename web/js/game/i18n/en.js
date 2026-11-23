@@ -784,4 +784,9 @@ export default {
   'antidoping.limpio': 'Doping control: {nombre} was drawn after the podium. Result: clean.',
   // apoyo voluntario (LIF-29)
   'apoyo.boton': 'Support the game',
+  // viralidad: desafíos
+  'podio.desafiar': 'Challenge a friend',
+  'perfil.desafios': '{n} people played your challenges; {m} beat you. Each one gave you 2 training sessions.',
+  'perfil.desafios_cero': 'Share a final with “Challenge a friend”: each person who plays it gives you 2 training sessions.',
+  'bienvenida.desafios_nuevos': '{n} people played your challenge: you got {s} more training sessions.',
 };

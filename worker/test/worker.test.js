@@ -19,7 +19,7 @@ const uuid = () => crypto.randomUUID();
 const VIEJA = { GRATIS_ETAPA: 'final', GRATIS: '2', BONO_ENCUESTA: '2', ENCUESTA_LIBRE: '0' };
 const E = (extra = {}) => Object.assign({}, env, VIEJA, extra);
 const LIF53 = { GRATIS_ETAPA: 'final', GRATIS: '1', TOPE_IP: '6', BONO_ENCUESTA: '0', ENCUESTA_LIBRE: '1', ENCUESTAS_POR_IP: '3' };
-const A = (extra = {}) => Object.assign({}, env, extra);
+const A = (extra = {}) => Object.assign({}, env, { GRATIS_ETAPA: 'arranque', GRATIS: '1', ENCUESTA_LIBRE: '0', BONO_ENCUESTA: '0' }, extra);      // la regla del arranque gratis (producción hasta el 23-nov), por variables
 const P = (extra = {}) => Object.assign({}, env, LIF53, extra);
 
 let salidas; // pedidos que el Worker hizo hacia afuera
@@ -337,8 +337,8 @@ describe('primera vez (LIF-53, por variables explícitas): la final entera grati
   const partidaP = (dispositivo, ip, o = {}) => llamar('/api/partida', { dispositivo, idioma: 'es' }, { ip, e: P(), ...o });
   const encuestaP = (dispositivo, r, ip, o = {}) => llamar('/api/encuesta', { dispositivo, r, idioma: 'en', sesion: 'ses-1', momento: 'podio' }, { ip, e: P(), ...o });
 
-  it('worker/wrangler.jsonc trae la regla de producción (el arranque gratis, correo obligatorio); la de LIF-53 se pide con variables', () => {
-    expect([env.GRATIS_ETAPA, env.GRATIS, env.TOPE_IP, env.BONO_ENCUESTA, env.ENCUESTA_LIBRE, env.ENCUESTAS_POR_IP]).toEqual(['arranque', '1', '6', '0', '0', '3']);
+  it('worker/wrangler.jsonc trae la regla de LIF-53 (producción desde el 23-nov); la del arranque gratis se pide con variables', () => {
+    expect([env.GRATIS_ETAPA, env.GRATIS, env.TOPE_IP, env.BONO_ENCUESTA, env.ENCUESTA_LIBRE, env.ENCUESTAS_POR_IP]).toEqual(['final', '1', '6', '0', '1', '3']);
     const e = P();
     expect([e.GRATIS_ETAPA, e.GRATIS, e.TOPE_IP, e.BONO_ENCUESTA, e.ENCUESTA_LIBRE, e.ENCUESTAS_POR_IP]).toEqual(['final', '1', '6', '0', '1', '3']);
     expect(env.ENCUESTA_ID).toBeUndefined();

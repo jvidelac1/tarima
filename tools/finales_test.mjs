@@ -163,6 +163,12 @@ env.APOYO_URL = 'https://ko-fi.com/ejemplo'; const est1 = await api('estado', { 
 ok(est1.j.apoyo === 'https://ko-fi.com/ejemplo', '13: con APOYO_URL el estado no trae el enlace');
 env.APOYO_URL = 'javascript:alert(1)'; const est2 = await api('estado', { dispositivo: crypto.randomUUID() }); env.APOYO_URL = '';
 ok(est2.j.apoyo === undefined, '13: un enlace que no es https entró');
+// 14. viralidad: quien juega tu desafío te da sesiones de entrenamiento y el perfil lo cuenta
+const V1 = jugador(), V2 = jugador(), rv = await V1.mandar(finalBot(1000, { yo: 0 })), ddv = (await api('desafio', { id: rv.j.id })).j;
+const pv0 = (await api('perfil', {}, { cookie: V1.uuid })).j.perfil;
+await V2.mandar(finalBot(1001, { yo: 1, semilla: ddv.semilla, nivel: ddv.nivel }), { desafio: rv.j.id });
+const pv1 = (await api('perfil', {}, { cookie: V1.uuid })).j.perfil;
+ok(pv1.desafios.aceptados === 1 && pv1.entreno.disponibles === pv0.entreno.disponibles + 2, '14: el desafío aceptado no dio sesiones o no se cuenta: ' + JSON.stringify([pv0.entreno, pv1.entreno, pv1.desafios]));
 // métricas de LIF-2 desde la tabla
 const m = await db.prepare('SELECT COUNT(*) finales, SUM(caidas) caidas, SUM(intentos) intentos, SUM(todo_verde) todo_verde, SUM(saltos) saltos FROM finales').first();
 logReal(`finales guardadas: ${m.finales} · caídas ${m.caidas} de ${m.intentos} intentos · intentos todo verde ${m.todo_verde} · saltos ${m.saltos}`);
