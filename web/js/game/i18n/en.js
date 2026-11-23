@@ -734,4 +734,7 @@ export default {
   'desafio.superado': 'You beat {quien} by {dif} kg ({mio} vs {suyo})!',
   'desafio.empate': 'Tie with {quien}: {mio} kg each.',
   'desafio.no': '{quien} stays ahead: {suyo} kg vs your {mio}.',
+  // reloj en Medio y Difícil (LIF-35)
+  'llamado.reloj_b': 'The clock is running: confirm before it hits 0:00 or you lose the attempt ({s} s).',
+  'explica.reloj.b': 'The clock ran out before you confirmed: that attempt doesn’t count.',
 };

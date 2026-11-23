@@ -1430,7 +1430,7 @@ function encuadreLibre() {
 }
 
 /** Panel único del llamado propio: kilos (fichas y ajuste fino), envión, qué hace falta, frase del entrenador y Confirmar. */
-function panelLlamado(p, L, t0, alConfirmar, corre = true) {
+function panelLlamado(p, L, t0, alConfirmar, corre = true, conReloj = false) {
   const a = p.at[L.a], min = p.minimo(L.a), tv = p.techoVisible(L.a, L.lev, false), facil = p.cfg.ctl !== 'c', uno = esU(p.cfg.ctl), barra = p.cfg.ctl === 'b', envFijo = L.lev === 'c' ? p.estiloFijo(L.a) : null, envGuardado = guardado.get(`tarima.env.${p.cfg.ctl}.${a.id}`),
     // LIF-43: el estilo de envión queda fijo desde el primer dos tiempos; antes, el último que eligió o el que propone el entrenador (split)
     S = { kg: L.kg, env: envFijo || (['split', 'power', 'squat'].includes(envGuardado) ? envGuardado : null) || (uno ? cuerpoDe(a.id).casa : facil ? 'split' : a.f.enviones[0]), mas: false, elige: false, detalle: guardado.get('tarima.panel.detalle') === '1', dt: p.cfg.ctl === 'f' && L.lev === 'c' && !guardado.get('tarima.dostiempos'), seguro: false };
@@ -1513,12 +1513,12 @@ function panelLlamado(p, L, t0, alConfirmar, corre = true) {
     const atajos = `<div class="fila">${facil ? `<span>${t('ficha.titulo')}</span>` : ''}${Object.entries(fichas).map(([k, v]) => `<button class="ficha" data-kg="${v}" ${fijo ? 'disabled' : ''} aria-pressed="${v === S.kg}">${t('ficha.' + k)} ${v}</button>`).join('')}</div>`;
     const envion = L.lev === 'c' ? `<div class="fila"><span>${t('envion.titulo')}</span>${Object.keys(ENVIONES).map(e => `<button class="envion" data-env="${e}" aria-pressed="${e === S.env}"${envFijo && e !== envFijo ? ' disabled' : ''}>${ENVIONES[e]}${a.f.enviones.includes(e) ? '' : ' *'}</button>`).join('')}${envFijo ? `<span class="pn-estilo fijo" title="${esc(t('jerk.fijo_nota'))}">${CANDADO}<em>${esc(t('jerk.fijo'))}</em></span>` : ''}</div>` : '';
     const noDomina = L.lev === 'c' && !a.f.enviones.includes(S.env) ? ` · ${t('envion.no_domina')}` : '';
-    const reloj0 = corre ? `<b>${t('llamado.corre')}</b>` : `<b>${t('llamado.sin_apuro', { tactil: T })}</b>`;
+    const reloj0 = corre ? `<b>${t('llamado.corre')}</b>` : conReloj ? `<b>${t('llamado.reloj_b', { s: Math.round(L.reloj / 1000) })}</b>` : `<b>${t('llamado.sin_apuro', { tactil: T })}</b>`;
     const pedido = t('llamado.pedido', { kg: L.kg, min, c: a.cambios });
     // el motivo del fallo anterior queda escrito en el llamado siguiente (machacando se puede no haberlo leído)
     const antes = E.antes ? `<p class="chica antes">${esc(t('llamado.antes', { causa: E.antes }))}</p>` : '';
     // Un toque: a la vista quedan los kilos, qué dice el entrenador, qué hace falta y qué tecla va; el resto, en «Más opciones»
-    const cuerpo = uno ? uPintar(kilos, antes, fijo, T) : facil
+    const cuerpo = uno ? uPintar(kilos, antes, fijo, T) + (conReloj ? `<p class="que reloj">${reloj0}</p>` : '') : facil
       ? `${kilos}${antes}<p class="frase">${frase(S.kg)} ${t('llamado.mas_dificil')}${T ? '' : ` <span class="chica">(${t('llamado.teclas')})</span>`}</p>${cuenta ? `<p class="cuenta">${cuenta}</p>` : ''}
         ${explica ? `<p class="que">${explica}</p>` : ''}<p class="que reloj">${reloj0}</p>
         ${S.kg !== L.kg ? `<p class="chica">${t('llamado.cambio', { kg: L.kg })}</p>` : ''}${fijo ? `<p class="chica">${t('llamado.fijo')}</p>` : ''}
@@ -1578,10 +1578,13 @@ async function llamadoPropio(p, L) {
   await pasarA(a.id, () => { escena.setCarga(L.kg, L.lev); escena.posar(poseParado(escena.P, L.lev), L.lev); setLuces(null); zocalo(a, L); }, repite);
   etiqueta(L.et);
   const corre = p.cfg.ctl === 'c', uno = esU(p.cfg.ctl); let t0 = reloj.ahora(), ctx = null, env, kgFinal = L.kg, desplazado = false, corrida = null;
+  // LIF-35: en la barrita, Medio y Difícil tienen el reloj de la competencia en el panel (1:00, o 2:00 si te sigues a ti mismo, en
+  // tiempo del juego: RELOJ.normal y RELOJ.seguido); si llega a 0:00 sin confirmar, el intento se pierde. Fácil, sin reloj.
+  const conReloj = p.cfg.ctl === 'b' && !!p.cfg.dif && p.cfg.dif !== 'facil', cuenta = corre || conReloj;
   E.rivalesSeguidos = 0; E.rivalesEnteros = 0;
-  const elegido = new Promise(res => panelLlamado(p, L, t0, res, corre)); if (uno) relojLibre(); else setReloj(L.reloj);
+  const elegido = new Promise(res => panelLlamado(p, L, t0, res, corre, conReloj)); if (uno && !conReloj) relojLibre(); else setReloj(L.reloj);
   encuadrarLibre();      // plano americano del pesista en la parte que el panel deja libre, con un movimiento suave
-  const vence = new Promise(res => { if (corre) enCuadro = ahora => { setReloj(L.reloj - (ahora - t0)); if (ahora - t0 >= L.reloj) { enCuadro = null; res(null); } }; });
+  const vence = new Promise(res => { if (cuenta) enCuadro = ahora => { setReloj(L.reloj - (ahora - t0)); if (ahora - t0 >= L.reloj) { enCuadro = null; res(null); } }; });
   const S = await Promise.race([elegido, vence]); enCuadro = null; capa.quitar(); E.antes = null; soltarFoco();
   if (!corre) t0 = reloj.ahora();
   const ms = corre ? Math.min(L.reloj, Math.round(reloj.ahora() - t0)) : 0;

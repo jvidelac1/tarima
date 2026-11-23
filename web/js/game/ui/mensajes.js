@@ -121,6 +121,7 @@ function lineaU(res, o, l) {
  * Válido: solo si quedó al límite.
  */
 function lineaB(res, o, l) {
+  if (res && res.causa === 'reloj') return tr(l, 'explica.reloj.b');      // LIF-35: no confirmó a tiempo (Medio y Difícil)
   const u = res && res.uno; if (!u) return '';
   const lev = o.lev || (Object.keys(u.gastos)[1] === 'pararse' ? 'c' : 's');
   if (res.res === 'valido') return u.al_limite ? tr(l, 'explica.u.limite', { discos: discos(u.margen_fin, l) }) : '';

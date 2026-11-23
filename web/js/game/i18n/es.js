@@ -751,4 +751,7 @@ export default {
   'desafio.superado': '¡Superaste a {quien} por {dif} kg ({mio} contra {suyo})!',
   'desafio.empate': 'Empate con {quien}: {mio} kg los dos.',
   'desafio.no': '{quien} sigue arriba: {suyo} kg contra tus {mio}.',
+  // reloj en Medio y Difícil (LIF-35)
+  'llamado.reloj_b': 'El reloj corre: confirma antes de que llegue a 0:00 o pierdes el intento ({s} s).',
+  'explica.reloj.b': 'Se acabó el reloj antes de confirmar: ese intento no cuenta.',
 };
