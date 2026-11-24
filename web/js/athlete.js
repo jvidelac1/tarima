@@ -5,6 +5,7 @@ import { MeshoptSimplifier } from 'three/addons/libs/meshopt_simplifier.module.j
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { smoothstep, disposeObject } from './util.js';
 import { CORR } from './config.js';
+import { poseReferencia } from './pose_ref.js';
 
 /** Nombre de hueso sin el prefijo de Mixamo (el GLB trae 'mixamorig:Spine2'; three lo deja en 'mixamorigSpine2'). */
 const boneKey = n => n.replace(/^mixamorig:?/, '');
@@ -472,6 +473,8 @@ export class Athlete {
     if (!this.barBone) throw new Error(`${name}.glb no trae el hueso Bar`);
     this._byName = new Map(this.bones.map(x => [boneKey(x.name), x]));
 
+    // reposo del GLB (antes de tocar ninguna animación): de ahí salen las poses de referencia T y A (pose_ref.js)
+    this.reposo = this.bones.map(x => [x, x.quaternion.clone(), x.position.clone()]);
     // muestreo de la acción a `sub` muestras por fase (1 s de clip por fase)
     const clip = gltf.animations.find(a => a.name === 'Poses') || gltf.animations[0];
     const mixer = new THREE.AnimationMixer(this.root), act = mixer.clipAction(clip); act.play();
@@ -591,6 +594,15 @@ export class Athlete {
       w[k.key] = smoothstep(this.corrRange.knee[0], this.corrRange.knee[1], THREE.MathUtils.radToDeg(_v.angleTo(_b)));
     }
     for (const mo of this.morphs) for (const key in w) { const idx = mo.dict[key]; if (idx !== undefined) mo.mesh.morphTargetInfluences[idx] = w[key]; }
+  }
+  /**
+   * Pose de referencia 'T' (brazos horizontales) o 'A' (a 45°), calculada sobre el esqueleto desde el reposo del GLB, sin
+   * correctivos (pose_ref.js; docs/GRAFICOS_PLAN.md, G1). La barra no acompaña: quien la llama la oculta. `setSample` vuelve al clip.
+   */
+  poseReferencia(tipo = 'T') {
+    const r = poseReferencia(THREE, this._byName, this.reposo, this.root, tipo);
+    for (const mo of this.morphs) for (const key in mo.dict) if (key.startsWith('corr_')) mo.mesh.morphTargetInfluences[mo.dict[key]] = 0;
+    return r;
   }
   /** Mayor diferencia entre dos muestras: [mm de barra, grados de hueso]. Sirve para verificar el contrato 2. */
   sampleDiff(i, j) {
