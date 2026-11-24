@@ -606,6 +606,8 @@ export class Escena {
       const lado = Math.sin(p.t * Math.PI * 2 * .21) * p.w; for (const k of ['Spine', 'Spine1']) this._girarHueso(a, k, _pa.set(0, 0, 1), RESPIRA.peso * lado);
       a.root.updateMatrixWorld(true);
     }
+    // la barra que se le va (caida.js, PIERDE): el tronco y la cabeza reaccionan antes de que las manos la sigan
+    if (p.pierde?.u > 0) { for (const k of ['Spine1', 'Spine2']) this._girarHueso(a, k, _pa.set(1, 0, 0), p.pierde.tronco / 2); for (const k of ['Neck', 'Head']) this._girarHueso(a, k, _pa.set(1, 0, 0), p.pierde.cabeza / 2); a.root.updateMatrixWorld(true); }
     if (p.pies && ((p.pies.u > 0 && p.pies.u < 1) || p.pies.dy)) this._pies(a, p.pies);
     if (p.empuje?.w > 0) for (const [L, sx] of [['Left', 1], ['Right', -1]]) { this._apuntarHueso(a, L + 'Arm', L + 'ForeArm', _pe.set(sx * .2, .85, .5).normalize(), p.empuje.w); this._apuntarHueso(a, L + 'ForeArm', L + 'Hand', _pf.set(sx * .12, .8, .6).normalize(), p.empuje.w); }
     if (p.mano?.w > 0) this._manosEnBarra(a, p.mano);
