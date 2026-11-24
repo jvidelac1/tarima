@@ -538,7 +538,8 @@ async function partida(flag, { lienzo = 'off', dibujo = false } = {}) {
     const b = e.arena.board; e.arena.board = { ...b, jugador: true, entero: false };
     // desde el 17-nov la cámara por defecto es la primera persona, que mira al jurado: los carteles quedan detrás y no hay nada
     // que tapar (bien). Lo que se prueba acá es que se ubiquen cuando se ven: se mide con la vista de afuera y se vuelve
-    const eraPov = !!e.pov; if (eraPov) { e.camara('3/4'); e.rig.update?.(1 / 60); e.rig.camera.updateMatrixWorld(true); }
+    // (23-nov: con los turnos de rival de ~5 s la medición puede caer en un plano cerrado o en un fundido: siempre con la de afuera)
+    const eraPov = !!e.pov; e.camara('3/4'); e.rig.update?.(1 / 60); e.rig.camera.updateMatrixWorld(true);
     let r = null; const t = performance.now();
     try { for (let i = 0; i < 200; i++) r = A.regionesLienzo(c, e); } finally { e.arena.board = b; if (eraPov) e.camara('pov'); }
     const ahora = A.regionesLienzo(c, e);

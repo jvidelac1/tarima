@@ -810,6 +810,7 @@ html.vert #prono .pr-q button{min-height:46px;min-width:72px}
 /* veredicto de un rival con «Saltar» todavía a la vista (pasa cuando una explicación de primera vez alarga el turno): el
    veredicto sube por encima del botón (60 px + aire) en vez de quedar debajo */
 html.vert body:has(#prono:not([hidden])) #tv #veredicto{bottom:calc(var(--sb) + var(--bm) + 92px)}
+html.vert body:has(#prono.listo:not([hidden])) #tv #veredicto{bottom:calc(var(--sb) + var(--bm) + 52px)}      /* con el resultado, el pronóstico es una línea */
 /* el cartel grande (y el zócalo de Clásico) sin salirse a lo ancho */
 html.vert #tv #cartel{white-space:normal;text-align:center;width:max-content;max-width:calc(100% - 28px);font-size:calc(var(--u)*2.4);top:calc(var(--techo-v) + 8px)}
 html.vert #tv #zocalo{bottom:calc(var(--sobre-boton) + var(--u)*5)}

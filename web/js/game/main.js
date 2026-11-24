@@ -648,7 +648,7 @@ function pintarProno() {
     el.addEventListener('click', e => { const b = e.target.closest('[data-prono]'); if (b && !b.disabled) { e.preventDefault(); votar(b.dataset.prono, 'boton'); } });
     $('tv').appendChild(el);
   }
-  const html = PR.S ? pronosticoHTML({ ...PR.S, tecla: !tactil() }) : '';
+  const html = PR.S ? pronosticoHTML({ ...PR.S, tecla: !tactil(), compacto: document.documentElement.classList.contains('vert') }) : '';
   if (html !== PR.html) { PR.el.innerHTML = html; PR.html = html; }
   PR.el.hidden = !html; PR.el.className = 'prono' + (PR.S ? ' ' + PR.S.fase : '') + (PR.S?.tension ? ' tenso' : '');
 }
@@ -1704,9 +1704,11 @@ async function llamadoRival(p, L, cfg) {
   const x = p.resolverIA();
   visita('rival');
   const todo = simular(x.ctx, x.conf, x.ent), M0 = todo.movs[0], tCierra = M0 ? (M0.tr || M0.tx || M0.tp || todo.res.t) : todo.res.t;
-  boton.oye = oyeTurnoRival; abrirProno(quien(a), tension);
-  // con la imagen tapada, el rival ya queda en la pose con la que empieza a verse (sin salto al arrancar su intento)
+  boton.oye = oyeTurnoRival;
+  // con la imagen tapada, el rival ya queda en la pose con la que empieza a verse (sin salto al arrancar su intento); el
+  // pronóstico aparece ahí, cuando ya se fue el veredicto anterior
   await pasarA(a.id, () => {
+    abrirProno(quien(a), tension);
     setLuces(null); setReloj(L.reloj); escena.setCarga(L.kg, L.lev);
     const tv0 = desdeRival(todo, x.conf), m0 = simular(x.ctx, x.conf, x.ent, tv0), pose = m0.res && m0.res.res === 'fallo' ? null : poseDe(m0, tv0, escena.P);
     escena.posar(pose || poseParado(escena.P, L.lev), L.lev); escena.camara(camVista(false)); zocalo(a, L);

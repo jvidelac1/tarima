@@ -42,7 +42,7 @@ export function pronosticoHTML(S) {
   const kbd = k => (S.tecla ? ` <kbd class="tecla">${k}</kbd>` : '');
   const ten = S.tension ? `<p class="pr-ten">${esc(t('prono.tension.' + S.tension, { rival: S.rival }))}</p>` : '';
   if (S.fase === 'listo') {
-    if (!S.voto) return ten;
+    if (!S.voto) return S.compacto ? '' : ten;      // teléfono parado: sin voto, durante el veredicto no queda nada
     const txt = S.acierto ? t(S.racha > 1 ? 'prono.acierto_racha' : 'prono.acierto', { n: S.racha }) : t('prono.fallo');
     return `<p class="pr-res ${S.acierto ? 'ok' : 'mal'}">${esc(txt)}</p>`;
   }
