@@ -615,6 +615,7 @@ export class Athlete {
    * defecto, así un modelo compartido no arrastra el aspecto del pesista anterior. No compila nada (son uniforms).
    */
   setAspecto(a = {}) {
+    if (!this._enSkin) { this._aspecto0 = a; this.skinPuesto = null; }      // un aspecto nuevo saca el tinte del skin de piel y tela; quien viste (stage.js) llama a setSkin después
     const u = this.skin, P = { ...ASPECTO.piel, ...(a.piel || {}) }, H = { ...ASPECTO.pelo, ...(a.pelo || {}) }, T = { ...ASPECTO.tela, ...(a.tela || {}) };
     const M = this._peloMedia, base = H.base && M ? _color(H.base, new THREE.Color()) : null;      // solo con pelo de malla opaca y textura leída
     if (u) {
@@ -626,6 +627,26 @@ export class Athlete {
     if (this.cuerpo) this.cuerpo.sheen = T.brillo;
     if (this.pelo) { _color(H.color, this.pelo.color); if (base) this.pelo.color.multiply(new THREE.Color(Math.min(1, base.r / Math.max(M.r, 1e-4)), Math.min(1, base.g / Math.max(M.g, 1e-4)), Math.min(1, base.b / Math.max(M.b, 1e-4)))); }      // nunca aclara
     this.aspecto = { piel: P, pelo: H, tela: T };
+  }
+  /**
+   * Skin (game/skins.js, `resolverSkin`): multiplicadores de color sobre lo que ya está cargado. `r.piel` y `r.malla` multiplican
+   * el tono de la piel y el tinte de la tela; `r.pelo` es el color del pelo; `r.materiales[nombre]`, el color de las zapatillas
+   * y el cinturón (materiales aparte). null vuelve al aspecto sin skin. No baja ni compila nada: son uniforms y colores.
+   * Se puede llamar las veces que haga falta (parte siempre del último `setAspecto` que no vino de un skin).
+   */
+  setSkin(r = null) {
+    const a0 = this._aspecto0 || {}; this._enSkin = true;
+    try { this.setAspecto(r?.pelo ? { ...a0, pelo: { ...(a0.pelo || {}), base: r.pelo } } : a0); } finally { this._enSkin = false; }
+    const u = this.skin, c = new THREE.Color();
+    if (u && r?.piel) u.uSkinTint.value.multiply(c.setRGB(r.piel[0], r.piel[1], r.piel[2]));
+    if (u && r?.malla) u.uClothTint.value.multiply(c.setRGB(r.malla[0], r.malla[1], r.malla[2]));
+    this._color0 ||= new Map();
+    for (const o of this.meshes) for (const m of [].concat(o.material || [])) {
+      const k = r?.materiales?.[m.name]; if (!k && !this._color0.has(m)) continue;
+      if (!this._color0.has(m)) this._color0.set(m, m.color.clone());
+      m.color.copy(this._color0.get(m)); if (k) m.color.multiply(c.setRGB(k[0], k[1], k[2]));
+    }
+    this.skinPuesto = r || null;
   }
   /** Tela de color plano sobre la máscara de tela (color de three o null para volver a la textura). Por defecto, apagada. */
   setClothFlat(color) { for (const m of this.meshes) for (const mat of [].concat(m.material || [])) { const u = mat.userData?.skin?.uClothFlat; if (u) { if (color) u.value.set(color.r, color.g, color.b, 1); else u.value.w = 0; } } }

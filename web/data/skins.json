@@ -1,0 +1,12 @@
+{
+ "v": 1,
+ "nota": "Skins de equipo (docs/GRAFICOS_PLAN.md, G6). Solo ids y colores: los nombres que ve el jugador los aprueba el dueño. Se prueban con juego.html?skin=<id>.",
+ "skins": {
+  "carbon": { "capellada": "#1b1c20", "suela": "#3a3a3e", "taco": "#2a2622", "tira": "#c8c9cc", "cordon": "#d9d9dc", "cinturon": "#141416", "hebilla": "#9a9da3" },
+  "brasa": { "capellada": "#b3261e", "suela": "#f2f0ea", "taco": "#5a3a22", "tira": "#f4f2ec", "cordon": "#f4f2ec", "cinturon": "#3a1c14", "hebilla": "#d8c9a8" },
+  "oro": { "capellada": "#f1efe8", "suela": "#b08a2e", "taco": "#6b4a24", "tira": "#c9a13a", "cordon": "#c9a13a", "cinturon": "#6e4a1e", "hebilla": "#e6c766" },
+  "hielo": { "capellada": "#dfe9f2", "suela": "#2b6cb0", "taco": "#3a3f48", "tira": "#2b6cb0", "cordon": "#f5f8fb", "cinturon": "#22303f", "hebilla": "#c7d3df" },
+  "noche": { "malla": "#141a26", "capellada": "#20242c", "suela": "#16181d", "taco": "#16181d", "tira": "#5b6577", "cordon": "#8d97a8", "cinturon": "#101216", "hebilla": "#6f7785", "pelo": "#0b0a09" },
+  "platino": { "pelo": "#cfc9b8", "capellada": "#f3f2ee", "suela": "#d9d7d0", "taco": "#8a7a66", "tira": "#9aa0a8", "cordon": "#f3f2ee", "cinturon": "#4a3a2c", "hebilla": "#dfe1e4" }
+ }
+}

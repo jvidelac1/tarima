@@ -5,6 +5,7 @@ import { reloj, Boton, toques, principal, claveDe, enfocar, navegar, enCampo } f
 import { Escena, PLANOS } from './stage.js';
 import { poseDe, poseParado, marcas, tramo } from './sequence.js';
 import { armarCaida, poseCaida } from './caida.js';
+import { resolverSkin } from './skins.js';
 import { sugerencia, chanceDe } from '../sim/entrenador.js';
 import { PLANTEL, JUGADOR, FICHA, nivelFicha, ENVIONES, LEV, ETIQUETAS, GUIONES, CUERPO, BARRA, vestir, ternaDe, PLANTEL_DEFECTO, fijarBase, basePlantel, aspectosDe, vestirJugador } from './roster.js';
 import { Registrador, Gobernador, calidadInicial, medirRefresco, decidirCalidad, pasoDe, metaDe, nombreDe, escalones, pisoDe, PRESET, PISO_MP, MARGEN, TECHO_MP } from './perf.js';
@@ -2033,6 +2034,11 @@ async function iniciar() {
   fijarBase();
   { const pz = IDS.includes(guardado.get('tarima.pesista')) ? guardado.get('tarima.pesista') : 'ventura', m = guardado.get('tarima.aspecto');
     if (m && poses[m]) { try { const pl = await plantelJSON(); if (aspectosDe(pz, pl.pesistas, poses).includes(m) && vestirJugador(pz, m, pl.pesistas, poses)) E.aspecto = { plaza: pz, modelo: m }; } catch (e) { console.warn('aspecto:', e); } } }
+  // Skins (docs/GRAFICOS_PLAN.md, G6): `?skin=<id>` viste al pesista del jugador (o al que esté en escena si todavía no hay
+  // jugador: las fotos del banco) con un equipo de data/skins.json. Sin el parámetro no se baja nada ni cambia nada.
+  { const sk = params.get('skin');
+    if (sk) { try { const [cat, pl] = await Promise.all([fetch('data/skins.json').then(r => { if (!r.ok) throw new Error('data/skins.json: ' + r.status); return r.json(); }), plantelJSON()]);
+      if (cat.skins?.[sk]) escena.skinDe = (id, f) => (escena.yo == null || id === escena.yo ? resolverSkin(cat.skins[sk], pl.pesistas?.[f.modelo] || {}) : null); else console.warn('skin: no existe', sk); } catch (e) { console.warn('skin:', e); } } }
   await Promise.all([`800 20px 'Saira Condensed'`, `700 20px 'Saira Condensed'`, `500 20px 'Saira Condensed'`].map(f => document.fonts.load(f).catch(() => null)));
   Object.assign(C, calidadInicial(params.get('calidad') || params.get('q'), tactil())); fijarHz(await refresco);
   if (C.auto) C.Q = { ...C.Q, dpr: 2 };      // en automático el tope de píxeles lo pone la calibración, no la densidad de cada calidad

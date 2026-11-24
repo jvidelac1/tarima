@@ -124,6 +124,15 @@ jobs:
           for plaza in brenner marangi; do
             node tools/banco.mjs --fotos=out/graficos/plantel/$plaza --niveles=alta --tomas=${{ inputs.tomas || 'medio,torso,cara,3-4,medio-salida' }} --plantel=$TERNA --pesista=$plaza --ancho=1280 --alto=620 2>&1 | tee -a out/logs/fotos_plantel.log || true
           done
+      - name: Skins sobre el mismo pesista (tomas con «skins»; docs/GRAFICOS_PLAN.md, G6)
+        if: ${{ !cancelled() && contains(inputs.tomas, 'skins') && hashFiles('web/models/ilarraz.glb') != '' }}
+        timeout-minutes: 25
+        env:
+          TERNA: ${{ inputs.terna || env.TERNA }}
+        run: |
+          for s in carbon brasa oro hielo noche platino; do
+            node tools/banco.mjs --fotos=out/graficos/skins/$s --niveles=alta --tomas=parado,medio-salida --skin=$s --plantel=$TERNA --pesista=ventura --ancho=1280 --alto=620 2>&1 | tee -a out/logs/fotos_skins.log || true
+          done
       - name: Banco de medición con el ambiente (banco)
         if: ${{ !cancelled() && inputs.banco }}
         timeout-minutes: 20
