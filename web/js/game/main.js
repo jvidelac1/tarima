@@ -651,6 +651,19 @@ function pintarProno() {
   const html = PR.S ? pronosticoHTML({ ...PR.S, tecla: !tactil(), compacto: document.documentElement.classList.contains('vert') }) : '';
   if (html !== PR.html) { PR.el.innerHTML = html; PR.html = html; }
   PR.el.hidden = !html; PR.el.className = 'prono' + (PR.S ? ' ' + PR.S.fase : '') + (PR.S?.tension ? ' tenso' : '');
+  ubicarAcuse();
+}
+/**
+ * Con el pronóstico a la vista, el acuse (la tecla dibujada que dice que el toque llegó: todo toque lo tiene) va justo encima
+ * de él, para no pisarse; sin pronóstico vuelve a su lugar. En coordenadas del diseño (offset*), que valen también con el
+ * teléfono rotado por CSS.
+ */
+function ubicarAcuse() {
+  const ac = $('acuse'), tv = $('tv'); if (!ac || !tv) return;
+  if (!PR.el || PR.el.hidden) { if (ac.dataset.prono) { ac.removeAttribute('style'); delete ac.dataset.prono; } return; }
+  const vert = document.documentElement.classList.contains('vert'), abajo = Math.round(tv.clientHeight - PR.el.offsetTop + 6);
+  const lado = vert ? 'left:50%;right:auto;transform:translateX(-50%)' : `left:auto;right:${Math.round(tv.clientWidth - PR.el.offsetLeft - PR.el.offsetWidth)}px;transform:none`;
+  ac.dataset.prono = '1'; ac.setAttribute('style', `top:auto;bottom:${abajo}px;${lado}`);
 }
 function abrirProno(rival, tension) { PR.S = { fase: 'pide', voto: null, acierto: null, racha: 0, rival, tension, t0: reloj.ahora() }; pintarProno(); }
 function votar(voto, via) {
@@ -2051,6 +2064,7 @@ async function iniciar() {
   if (!$('camb')) { const cb = document.createElement('button'); cb.id = 'camb'; cb.type = 'button'; cb.hidden = true; $('sonidob').after(cb); cb.onclick = () => { alternarCamara(); cb.blur(); }; pintarCamb(); }
   // el selector ES · EN de cualquier panel (bienvenida, cómo se gana, kilos, llamado, intervalo, podio, muro, encuesta)
   $('capa').addEventListener('click', e => { const b = e.target.closest?.('.idi'); if (b && b.dataset.lang) { cambiarIdioma(b.dataset.lang); $('capa').querySelector(`.idi[data-lang="${idiomaActual()}"]`)?.focus({ preventScroll: true }); } });
+  addEventListener('resize', () => requestAnimationFrame(ubicarAcuse));
   addEventListener('keydown', alTeclado, true); $('pausa').onclick = () => abrirSobre('pausa'); $('saltar').onclick = () => E.saltar?.();
   { const f = document.createElement('div'); f.id = 'fundido'; f.setAttribute('aria-hidden', 'true'); $('gl').after(f); }      // el negro de los fundidos (RITMO.fundido)
   ponerAcuse(); if (params.get('depura') === '1') depura = new Depura($('depura'), () => ({ perf: perf.ult, calidad: window.JUEGO.calidad, toques, pantalla: E.pantalla }));

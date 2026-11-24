@@ -337,7 +337,7 @@ body:has(.etiqueta:not([hidden])) .marcador{top:calc(var(--u)*7 + var(--st))}
 html.turno-rival #marcador{top:calc(var(--u)*10.6 + var(--st))}      /* debajo del cartel del turno del rival: con «Si Brenner levanta…» lo pisaba */
 /* durante el turno de un rival no hay botón de levantar ni señal: tocar solo saltea (y lo dice el cartel) */
 html.turno-rival #zona,html.turno-rival #senal{display:none!important}
-body:has(#prono:not([hidden])) #zona,body:has(#prono:not([hidden])) #senal,body:has(#prono:not([hidden])) #acuse{display:none!important}      /* 23-nov: en el turno de un rival un toque no hace nada; el pronóstico va en su lugar */      /* el acuse queda: dice que el toque llegó (y que saltea) */
+body:has(#prono:not([hidden])) #zona,body:has(#prono:not([hidden])) #senal{display:none!important}      /* 23-nov: en el turno de un rival el pronóstico va en su lugar (el acuse queda, encima: main.js → ubicarAcuse) */      /* el acuse queda: dice que el toque llegó (y que saltea) */
 
 /* ---------- campo de texto en el teléfono: un editor arriba de lo visible, derecho, con «Listo» ---------- */
 #editor{position:fixed;left:0;right:0;top:var(--vvy,0px);z-index:60;background:#080d1e;border-bottom:3px solid var(--teal);padding:calc(10px + env(safe-area-inset-top,0px)) calc(12px + env(safe-area-inset-right,0px)) 10px calc(12px + env(safe-area-inset-left,0px));box-shadow:0 10px 30px rgba(0,0,0,.6)}
@@ -653,7 +653,6 @@ html[data-pantalla=intento] #tablero,body:has(#margen:not([hidden])) #tablero{to
   :where(html.horiz.bajo) .tablero .tb-pie p{font-size:calc(var(--u)*.95)}
   html:where(.horiz.bajo)[data-pantalla=intento] #tablero,:where(html.horiz.bajo) body:has(#margen:not([hidden])) #tablero{display:none}
   :where(html.horiz) .prono{right:calc(var(--sr) + var(--bm));bottom:calc(var(--sb) + var(--bm))}
-  html:where(.horiz).zurdo .prono{right:auto;left:calc(var(--sl) + var(--bm));align-items:flex-start}
 }
 /* panel del llamado: una línea con la dificultad, el porcentaje del RM y la chance («Medio · 92 % de tu RM (163 kg) · 8 de 10») */
 .rm-linea{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25em .6em}
@@ -809,8 +808,8 @@ html.vert #prono .pr-q button{min-height:46px;min-width:72px}
 @keyframes lateV{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.1)}}
 /* veredicto de un rival con «Saltar» todavía a la vista (pasa cuando una explicación de primera vez alarga el turno): el
    veredicto sube por encima del botón (60 px + aire) en vez de quedar debajo */
-html.vert body:has(#prono:not([hidden])) #tv #veredicto{bottom:calc(var(--sb) + var(--bm) + 92px)}
-html.vert body:has(#prono.listo:not([hidden])) #tv #veredicto{bottom:calc(var(--sb) + var(--bm) + 52px)}      /* con el resultado, el pronóstico es una línea */
+html.vert body:has(#prono:not([hidden])) #tv #veredicto{bottom:calc(var(--sb) + var(--bm) + 124px)}
+html.vert body:has(#prono.listo:not([hidden])) #tv #veredicto{bottom:calc(var(--sb) + var(--bm) + 84px)}      /* con el resultado, el pronóstico es una línea */
 /* el cartel grande (y el zócalo de Clásico) sin salirse a lo ancho */
 html.vert #tv #cartel{white-space:normal;text-align:center;width:max-content;max-width:calc(100% - 28px);font-size:calc(var(--u)*2.4);top:calc(var(--techo-v) + 8px)}
 html.vert #tv #zocalo{bottom:calc(var(--sobre-boton) + var(--u)*5)}
