@@ -12,7 +12,7 @@ minijuegos y competencia. Desde ahora se pueden tocar los gráficos.
 | Oro con rivales «parejos» | 44–62 % siguiendo el panel | ídem |
 | Barrita en Fácil, jugador **novato** (±120 ms de error) | 100 % de intentos válidos hasta el 92 % de su máximo | `tools/barra_bots.mjs` |
 | Barrita en Fácil, jugador **medio** (±70 ms) | 99–100 % válidos hasta el 97 % | ídem |
-| Ancho del verde | Medio: 80 % de la barra · Difícil: 65 % | `web/js/sim/rules.js` → `NIVELES_B` |
+| Ancho del verde en la apertura | Fácil ±200 ms (28 % de la barra) · Medio ±136 ms · Difícil ±92 ms: un jugador del montón (±70 ms) lo acierta casi siempre | `web/js/sim/rules.js` → `BARRA`, `NIVELES_B` |
 | «Todo verde = la barra sube siempre» (`verdeSalva`) | Activo desde el 13-nov | `rules.js` → `BARRA.verdeSalva` |
 | El campeonato semanal (el que cuenta para el ranking) | Se juega en barrita **Fácil** | `web/js/sim/semana.js` → `CAMPEONATO` |
 | Dónde se caen las barras | Potente: 98 % en el tramo «arriba» (después de recibir); Largo: 90 % al pararse | `pesistas_test.mjs` |
@@ -20,7 +20,7 @@ minijuegos y competencia. Desde ahora se pueden tocar los gráficos.
 Conclusiones:
 1. **La dificultad está en el lugar equivocado.** Los rivales son lo que decide el oro, y arrancan tranquilos. La
    barrita casi no castiga: el verde es enorme y, si todo sale verde, la barra no se cae nunca.
-2. **«Difícil» no es difícil**: un jugador del montón saca verde casi siempre con un verde del 65 %.
+2. **«Difícil» no es difícil**: el verde dura ±92 ms y un jugador del montón lo acierta casi siempre.
 3. **La caída «arriba» se decide tarde**: el núcleo resuelve la energía tramo por tramo y el último tramo se cierra
    cuando el pesista ya recibió la barra. Por eso se ve bien y de golpe se cae, sin aviso.
 4. El ranking existe pero está escondido: el botón «Ranking» de la bienvenida no aparece en la primera visita, y en
@@ -136,10 +136,9 @@ jugando. Revisarlo en PostHog (falta el acceso de lectura, LIF-24).
 - Dificultad: **bastante más difícil** (primera final ~60 % de oro; después 25–40 % con rivales parejos).
 - **Solo la franja perfecta salva**; el verde común puede fallar si los kilos son demasiados.
 - Historias a Linear (equipo LIF) y arrancar con la semana 1.
-- Animaciones: preguntó si hay algo mejor que Blender. Propuesta: **animación por código** en el visor (poses clave
-  del esqueleto que ya existe + interpolación + IK de pies y manos), como ya hace `web/js/game/caida.js`. Sin
-  Blender, sin archivos nuevos que exportar, se ajusta en caliente y se prueba igual que el resto. Blender queda
-  solo si una pose nueva necesita deformar la malla de otra forma.
+- Gráficos (24-nov, noche): todo lo gráfico lo hace un agente con **Fable 5.2**, lo más real posible (humanos semi-reales,
+  T pose y A pose, skins intercambiables, movimientos reales). Su plan va en `docs/GRAFICOS_PLAN.md`. Anula la decisión
+  de LIF-64 (Gemini).
 
 ## Orden propuesto
 
