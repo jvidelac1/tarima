@@ -42,10 +42,11 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       // repetir da lo mismo (la pose no depende de la anterior)
       poseReferencia(T3, H, reposo, raiz, tipo === 'T' ? 'A' : 'T'); poseReferencia(T3, H, reposo, raiz, tipo); const m2 = medirReferencia(T3, H, raiz);
       ok(Math.abs(m2.envergadura - m.envergadura) < 1e-6 && Math.abs(m2.izq.brazo - m.izq.brazo) < 1e-4, `${e}no da lo mismo al repetir`);
-      // palmas hacia abajo: la normal de la palma (índice × meñique por el lado) mira hacia abajo
+      // palmas hacia abajo: la palma (la contraria al dorso, que es índice × meñique por el lado) mira hacia abajo; el pulgar queda adelante
       for (const [L, sx] of [['Left', 1], ['Right', -1]]) {
-        const P = n => H.get(n).getWorldPosition(new T3.Vector3()), h = P(L + 'Hand'), nrm = P(L + 'HandIndex1').sub(h).cross(P(L + 'HandPinky1').sub(h)).multiplyScalar(sx).normalize();
+        const P = n => H.get(n).getWorldPosition(new T3.Vector3()), h = P(L + 'Hand'), nrm = P(L + 'HandIndex1').sub(h).cross(P(L + 'HandPinky1').sub(h)).multiplyScalar(-sx).normalize();
         ok(nrm.y < -Math.cos((REF[tipo].brazo + 12) * Math.PI / 180) + .05, `${e}la palma ${L} no mira hacia abajo (normal y = ${nrm.y.toFixed(2)})`);
+        ok(P(L + 'HandThumb1').z > P(L + 'HandPinky1').z, `${e}el pulgar ${L} no quedó adelante`);
       }
       filas.push(`${id.padEnd(9)} ${tipo.padEnd(6)}  brazo ${m.izq.brazo.toFixed(1).padStart(5)}° / ${m.der.brazo.toFixed(1).padStart(5)}°  codo ${m.izq.codo.toFixed(1).padStart(4)}°  pierna ${m.izq.pierna.toFixed(1).padStart(4)}°  envergadura ${m.envergadura.toFixed(3)} m  asimetría ${(m.asimetria * 1000).toFixed(1)} mm`);
     }

@@ -2038,7 +2038,7 @@ async function iniciar() {
   // jugador: las fotos del banco) con un equipo de data/skins.json. Sin el parámetro no se baja nada ni cambia nada.
   { const sk = params.get('skin');
     if (sk) { try { const [cat, pl] = await Promise.all([fetch('data/skins.json').then(r => { if (!r.ok) throw new Error('data/skins.json: ' + r.status); return r.json(); }), plantelJSON()]);
-      if (cat.skins?.[sk]) escena.skinDe = (id, f) => (escena.yo == null || id === escena.yo ? resolverSkin(cat.skins[sk], pl.pesistas?.[f.modelo] || {}) : null); else console.warn('skin: no existe', sk); } catch (e) { console.warn('skin:', e); } } }
+      if (cat.skins?.[sk]) E.skinDe = (id, f) => (escena.yo == null || id === escena.yo ? resolverSkin(cat.skins[sk], pl.pesistas?.[f.modelo] || {}) : null); else console.warn('skin: no existe', sk); } catch (e) { console.warn('skin:', e); } } }
   await Promise.all([`800 20px 'Saira Condensed'`, `700 20px 'Saira Condensed'`, `500 20px 'Saira Condensed'`].map(f => document.fonts.load(f).catch(() => null)));
   Object.assign(C, calidadInicial(params.get('calidad') || params.get('q'), tactil())); fijarHz(await refresco);
   if (C.auto) C.Q = { ...C.Q, dpr: 2 };      // en automático el tope de píxeles lo pone la calibración, no la densidad de cada calidad
@@ -2051,6 +2051,7 @@ async function iniciar() {
     E.shaderMal = E.shaderMal || log || 'shader'; console.error('THREE: el programa no compila:', log);
   };
   try { escena = new Escena($('gl'), C.Q, { reduceMotion, alShader }); } catch (e) { cargaUI.ocultar(); return falloGrafico('webgl', e); }
+  escena.skinDe = E.skinDe || null;      // skin pedido con ?skin= (arriba): la escena todavía no existía
   escena.setRecuadro(recuadroOn(), recuadroPedido());
   escena.poses = poses; nombrar(); orientacion();
   escena.renderer.debug.onShaderError = alShader;

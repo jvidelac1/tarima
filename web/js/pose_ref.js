@@ -47,10 +47,10 @@ export function poseReferencia(T3, H, reposo, raiz, tipo = 'T') {
     const d = dir(sx * Math.cos(ang), -Math.sin(ang), 0);
     apuntar(L + 'Arm', L + 'ForeArm', d); apuntar(L + 'ForeArm', L + 'Hand', d);
     if (H.get(L + 'HandMiddle1')) apuntar(L + 'Hand', L + 'HandMiddle1', d);
-    // palmas hacia abajo: la normal de la palma (índice × meñique, con el signo del lado) se lleva lo más abajo que deja el eje del brazo
+    // palmas hacia abajo: índice × meñique (por el lado) es el DORSO de la mano; la palma es la contraria y se lleva lo más abajo que deja el eje del brazo
     const i1 = H.get(L + 'HandIndex1'), p1 = H.get(L + 'HandPinky1');
     if (i1 && p1) {
-      const m = pos(L + 'Hand'), n = i1.getWorldPosition(V()).sub(m).cross(p1.getWorldPosition(V()).sub(m)).multiplyScalar(sx).normalize();
+      const m = pos(L + 'Hand'), n = i1.getWorldPosition(V()).sub(m).cross(p1.getWorldPosition(V()).sub(m)).multiplyScalar(-sx).normalize();
       const pl = v => v.clone().addScaledVector(d, -v.dot(d)), a = pl(n), b = pl(abajo);
       if (a.lengthSq() > 1e-8 && b.lengthSq() > 1e-8) { a.normalize(); b.normalize(); girar(L + 'Arm', d, Math.atan2(V().crossVectors(a, b).dot(d), a.dot(b))); }
     }

@@ -146,6 +146,12 @@ cambió antes de soltarla; el tiempo «firme» (barra y cuerpo quietos) antes de
 previo va hacia el mismo lado al que después cae la barra. `check_escenas` sigue en 0 `BAD` (la barra no atraviesa el
 cuerpo). Hoja de cuadros de antes y después por causa.
 
+*Hecho en esta rama* para las barras perdidas **desde arriba** (arranque y envión: barra atrás, adelante, la pierde en
+el fondo, ceden los codos, temblor): `PIERDE` en `caida.js`. La barra se le va 11 a 16 cm en 0,37 a 0,48 s, con las manos
+en ella; a los 90 a 125 ms ya se nota. *Falta (G3b):* lo mismo para la cargada perdida sentado (los codos caen y la barra
+rueda de los hombros) y para la barra devuelta de los hombros; ahí las manos están en el rack y hay que resolverlas con
+otra regla, que quiero mirar cuadro a cuadro antes de darla por buena.
+
 **G4 · Aviso previo mientras todavía se puede salvar.** Cuando al pesista le queda poca energía para el tramo que
 viene, se nota antes de que el núcleo decida: tiembla más, la barra se inclina, la cara aprieta.
 *Depende del núcleo:* necesito un dato de solo lectura (ver sección 7). *Aceptación:* con el dato en 0 no cambia nada
@@ -217,6 +223,11 @@ triple extensión y vuelve), **sentadilla** (de la recepción de la cargada a de
 levantamiento entero con barra liviana). Las pasadas de la barrita mueven la repetición: verde, limpia; rojo, se frena
 o se le va. *Aceptación:* prueba sin navegador de los ciclos (la barra nunca atraviesa el piso, las manos no la
 sueltan, vuelve a la pose de partida); costo de la escena menor o igual al de la sala en «Móvil»; fotos.
+*Cómo lo haría (sin tocar el núcleo):* `ui/entreno.js` avisa qué ejercicio se eligió y la zona de cada pasada
+(`alElegir`, `alToque`); `main.js` pone al pesista del jugador en la escena y mueve la repetición con
+`escena.posar()` sobre las fases del clip; el panel de la barrita pasa a un costado (acostado) o abajo (parado) para
+que el pesista se vea. Eso cambia la disposición de la pantalla en el teléfono, así que va con `check_telefono` y con
+tu visto bueno del boceto antes de construir el gimnasio.
 
 ## 6. Lo que necesito que me autorices (no bajé nada)
 
