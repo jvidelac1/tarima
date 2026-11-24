@@ -9,8 +9,7 @@ import {
   ventanas, calidad, palabra, alturaExplosion, desvioExplosion, velTiron, exigenciaTabla, alturaTabla, periodoAnillo, errorAnillo, gradoTension,
   anchoFacil, asistFacil, segunHolgura, TENSION, FACIL, ACOMODO_MS, ALTURA_MIN, TOPE_DESVIO, ALTURA_ENVION, NO_DOMINA, EXI_ARRANQUE, EXI_ERROR, PELEA, TRABA, FIJA, HOMBROS, JUEZ, esfuerzoPropio,
   UNO, CUERPO_NEUTRO, TRAMOS, gastoTramo, conSuerte, ruidoDe, garraAlcanza,
-  TRAMO_BARRA, posBarra, zonasBarra, zonaBarra, pideEsfuerzo, reglasB, barritaDeTramo, costoBarra,
-} from './rules.js';
+  TRAMO_BARRA, posBarra, zonasBarra, zonaBarra, pideEsfuerzo, reglasB, barritaDeTramo, costoBarra, reglasConTecnica } from './rules.js';
 
 const INF = 2147483647;
 const PASO = k => idiv(k * 25, 3);           // ms del paso k de la pelea (120 por segundo)
@@ -48,7 +47,7 @@ export class Intento {
     this.gestos = []; this.toques = 0; this.fuera = 0; this.amagues = 0;
     this.temblor = 0; this.trabaMs = -1; this.rodilla = false;
     this.movs = []; this.M = null; this.fij = null;
-    this.B = c.ctl === 'b'; this.R = this.B ? reglasB(c.dif) : null; this.U = c.ctl === 'u' || this.B ? this._uIni() : null;
+    this.B = c.ctl === 'b'; this.R = this.B ? reglasConTecnica(c.dif, c.tecnica) : null; this.U = c.ctl === 'u' || this.B ? this._uIni() : null;
   }
   get fin() { return this.res !== null; }
 
@@ -477,6 +476,7 @@ export class Intento {
   _uProximo() {
     const M = this.M, U = this.U;
     switch (this.fase) {
+      case 'llamado': return this.c.reloj || INF;      // LIF-35: con reloj (Medio y Difícil), sin confirmar se pierde el intento
       case 'acomodo': return this.tSet;
       case 'tension': return this.tSet + (this.B ? this.R.soloMs : UNO.tiraSolo);
       case 'barra': return U.pend.t0 + this.R.soloMs;
@@ -494,6 +494,7 @@ export class Intento {
   _uVence(d) {
     const M = this.M, U = this.U;
     switch (this.fase) {
+      case 'llamado': return this._nulo(d, 'reloj');
       case 'acomodo': this._mov(this.c.lev, d); this.fase = 'tension'; if (this.B) { this._b(0).t0 = d; return; } if (this._uAbre()) this._uTira(d); return;
       case 'tension': U.tiraSola = true; if (this.B) this._bPega(d, 0, true); return this._uTira(d);
       case 'tiron':

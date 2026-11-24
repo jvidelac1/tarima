@@ -385,8 +385,11 @@ igual(expDelPase('basura'), null, 'pase inválido');
   const logReal = console.log;
   console.log = (...a) => { if (typeof a[0] === 'string' && a[0].startsWith('{"')) return; logReal(...a); };      // registros del Worker
   const SECRETOS = { SECRETO_IP: 'ip'.repeat(16), SECRETO_DISPOSITIVO: 'dv'.repeat(16), SECRETO_PASE: 'pa'.repeat(16), SECRETO_BAJA: 'ba'.repeat(16) };
-  const vars = varsDelWorker();
-  igual([vars.GRATIS_ETAPA, vars.GRATIS, vars.TOPE_IP, vars.BONO_ENCUESTA, vars.ENCUESTA_LIBRE, vars.ENCUESTAS_POR_IP], ['arranque', '1', '6', '0', '0', '3'], 'worker/wrangler.jsonc: la regla de producción es el arranque gratis con el correo obligatorio (la encuesta no desbloquea)');
+  // 23-nov (viralidad, con el OK del dueño): producción pasa a la regla de LIF-53 (la primera final entera gratis y el cartel con
+  // el correo o las 2 preguntas). Las pruebas de siempre siguen con la regla del arranque gratis, que se pide con variables.
+  const def = varsDelWorker();
+  igual([def.GRATIS_ETAPA, def.GRATIS, def.TOPE_IP, def.BONO_ENCUESTA, def.ENCUESTA_LIBRE, def.ENCUESTAS_POR_IP], ['final', '1', '6', '0', '1', '3'], 'worker/wrangler.jsonc: la regla de producción es la de LIF-53 (la primera final entera gratis, el cartel con correo o 2 preguntas)');
+  const vars = { ...def, GRATIS_ETAPA: 'arranque', ENCUESTA_LIBRE: '0' };
   // 1b prueba la regla de producción con las variables del archivo, sin pisar ninguna. 1c prueba la de LIF-53, que se
   // pide con estas variables (`workerLocal(extra, true)`)
   const LIF53 = { GRATIS_ETAPA: 'final', GRATIS: '1', TOPE_IP: '6', BONO_ENCUESTA: '0', ENCUESTA_LIBRE: '1', ENCUESTAS_POR_IP: '3' };

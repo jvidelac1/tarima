@@ -519,9 +519,57 @@ export function crearServidor(o = {}) {
     return Promise.reject(new ErrorRed('http', 404, { error: 'no_existe' }));
   }
 
+  // ---------- finales validadas y ranking (LIF-10, LIF-9, LIF-8) ----------
+
+  /**
+   * Manda el registro de la final que terminó, con el pase de esa final (antes de finalTerminada, que lo suelta). El
+   * servidor la recalcula y la guarda. Nunca frena el juego: sin pase, sin servidor o con error devuelve {estado} y listo.
+   * @returns {Promise<{estado:'ok'|'repetida', total:number, puesto:number|null, semana:string, campeonato:boolean, ranking?:{puesto:number, de:number}} | {estado:'sin_pase'|'rechazada'|'error', motivo?:string}>}
+   */
+  async function mandarFinal({ registro, campeonato = false, desafio = null, apodo = null, publico = false, saltos = null, duracion_s = null } = {}) {
+    let pase = null; try { pase = JSON.parse(sesion.get(CLAVES.pase) || 'null')?.pase || null; } catch { pase = null; }
+    if (!pase || modo !== 'servidor' || !registro) return { estado: 'sin_pase' };
+    try {
+      const { j } = await post('/api/final', { pase, registro, dispositivo: dispositivo(), campeonato: !!campeonato, ...(Number.isSafeInteger(desafio) ? { desafio } : {}), ...(publico && apodo ? { apodo, publico: true } : {}), saltos, duracion_s }, ESPERA_PEDIDO);
+      if (j && j.perfil) local.set('tarima.perfil', JSON.stringify(j.perfil));
+      return j;
+    } catch (e) {
+      if (e.status === 422) return { estado: 'rechazada', motivo: e.cuerpo?.motivo || null };
+      return { estado: 'error', error: e.tipo || 'red' };
+    }
+  }
+  /** El perfil validado por el servidor (LIF-68): lo guarda en el almacenamiento del sitio para la próxima carga. */
+  async function perfil() {
+    if (modo !== 'servidor') return { estado: 'sin_servidor', perfil: perfilGuardado() };
+    try { const { j } = await post('/api/perfil', { dispositivo: dispositivo() }, ESPERA_PEDIDO); if (j.perfil) local.set('tarima.perfil', JSON.stringify(j.perfil)); return { estado: 'ok', perfil: j.perfil }; } catch (e) { return { estado: 'error', error: e.tipo || 'red', perfil: perfilGuardado() }; }
+  }
+  /** Una sesión de entrenamiento (LIF-62): el servidor la recalcula y devuelve lo entrenado y la energía que queda. */
+  async function entrenar({ pesista, ejercicio, toques, escuela = 'rusa' }) {
+    if (modo !== 'servidor') return { estado: 'sin_servidor' };
+    try { const { j } = await post('/api/entreno', { pesista, ejercicio, toques, escuela, dispositivo: dispositivo() }, ESPERA_PEDIDO); perfil().catch(() => null); return j; }
+    catch (e) { return e.status === 409 ? { estado: 'sin_energia' } : { estado: 'error', error: e.tipo || 'red' }; }
+  }
+  /** Un error del juego (LIF-26), sin esperar respuesta: lo cuenta el Worker por día. Hasta 5 por carga. */
+  let erroresMandados = 0;
+  function error(det = {}) {
+    if (modo !== 'servidor' || erroresMandados++ >= 5) return;
+    post('/api/error', { tipo: det.tipo, pantalla: det.pantalla, mensaje: det.mensaje, archivo: det.archivo, linea: det.linea }, ESPERA_PEDIDO).catch(() => null);
+  }
+  /** Un desafío (LIF-12): la final de origen por su id. */
+  async function desafio(id) {
+    if (modo !== 'servidor' || !Number.isSafeInteger(id)) return { estado: 'sin_servidor' };
+    try { const { j } = await post('/api/desafio', { id }, ESPERA_PEDIDO); return j; } catch (e) { return { estado: e.status === 404 ? 'no_existe' : 'error' }; }
+  }
+  function perfilGuardado() { try { return JSON.parse(local.get('tarima.perfil') || 'null'); } catch { return null; } }
+  /** El ranking: {alcance: 'semana' | 'global', pais?: boolean}. Devuelve lo del servidor o {estado:'error'}. */
+  async function ranking({ alcance = 'semana', pais = false, categoria = 88 } = {}) {
+    if (modo !== 'servidor') return { estado: 'sin_servidor' };
+    try { const { j } = await post('/api/ranking', { alcance, pais: !!pais, categoria, dispositivo: dispositivo() }, ESPERA_PEDIDO); return { estado: 'ok', ...j }; } catch (e) { return { estado: 'error', error: e.tipo || 'red' }; }
+  }
+
   return {
     get modo() { return modo; },
-    dispositivo, copia, estado, pedirPase, envion, paseParaReanudar, finalTerminada, soltarPase, anotar, encuesta, baja,
+    dispositivo, copia, estado, pedirPase, envion, paseParaReanudar, finalTerminada, soltarPase, anotar, encuesta, baja, mandarFinal, ranking, perfil, perfilGuardado, desafio, error, entrenar,
   };
 }
 

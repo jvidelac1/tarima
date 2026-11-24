@@ -2,7 +2,7 @@
 // servidor: el cliente manda lo que el jugador tocó, nunca un resultado. Cualquier registro que no cierre se rechaza.
 import { Partida, TURNOS, HUELLA_TURNOS } from './match.js';
 import { HUELLA_IA } from './ai.js';
-import { VERSION, NIVELES, RELOJ, CONTROLES, HUELLA_U, HUELLAS_B, NIVELES_B } from './rules.js';
+import { VERSION, NIVELES, RELOJ, CONTROLES, HUELLA_U, HUELLAS_B, NIVELES_B, PROGRESION, PLANES, CATEGORIAS, CATEGORIA_BASE, ENTRENO } from './rules.js';
 
 const MAX_ENT = 4000, MAX_MS = 240000;
 const entero = x => Number.isInteger(x);
@@ -49,7 +49,14 @@ export function recalcular(reg, datos, o = {}) {
     if ((reg.orden !== undefined || reg.turnos !== undefined) && (reg.turnos !== HUELLA_TURNOS || !TURNOS.modos.includes(reg.orden))) return { ok: false, error: 'huella u orden de los turnos' };
     const turnos = reg.orden !== undefined, maxLl = turnos ? 40 + 6 * TURNOS.previos : 40;
     if (!Array.isArray(reg.atletas) || !Array.isArray(reg.aperturas) || reg.aperturas.length !== 3 || !Array.isArray(reg.llamados) || reg.llamados.length > maxLl) return { ok: false, error: 'forma del registro' };
-    const p = new Partida(datos, { semilla: reg.semilla, nivel: reg.nivel, cal: reg.cal, primera: reg.primera, ctl: reg.ctl, tactil: reg.tactil === true, ...(reg.ia !== undefined ? { ia: reg.ia } : {}), ...(turnos ? { turnos: reg.orden } : {}), ...(reg.dif !== undefined ? { dif: reg.dif } : {}), ...(reg.envFijo ? { envFijo: true } : {}), atletas: reg.atletas });
+    // progresión (LIF-14): solo la persona, enteros entre 0 y el tope; el servidor además la compara con los oros que validó
+    for (const x of reg.atletas) if (x && x.rm !== undefined) { const r = x.rm; if (x.ctrl !== 'persona' || !r || Object.keys(r).length !== 2 || ![r.s, r.c].every(v => entero(v) && v >= 0 && v <= PROGRESION.tope + ENTRENO.topeKg)) return { ok: false, error: 'progresión mal formada' }; }
+    // técnica entrenada (LIF-62): solo la persona, en la barrita, entre 1 y el tope
+    for (const x of reg.atletas) if (x && x.tecnica !== undefined && (x.ctrl !== 'persona' || reg.ctl !== 'b' || !entero(x.tecnica) || x.tecnica < 1 || x.tecnica > ENTRENO.topeTecnica)) return { ok: false, error: 'técnica mal formada' };
+    // plan de competencia (LIF-5): solo en la barrita y con un nombre conocido
+    if (reg.plan !== undefined && (reg.ctl !== 'b' || !PLANES[reg.plan])) return { ok: false, error: 'plan desconocido' };
+    if (reg.categoria !== undefined && (!CATEGORIAS[reg.categoria] || reg.categoria === CATEGORIA_BASE)) return { ok: false, error: 'categoría desconocida' };
+    const p = new Partida(datos, { semilla: reg.semilla, nivel: reg.nivel, cal: reg.cal, primera: reg.primera, ctl: reg.ctl, tactil: reg.tactil === true, ...(reg.ia !== undefined ? { ia: reg.ia } : {}), ...(turnos ? { turnos: reg.orden } : {}), ...(reg.dif !== undefined ? { dif: reg.dif } : {}), ...(reg.envFijo ? { envFijo: true } : {}), ...(reg.plan ? { plan: reg.plan } : {}), ...(reg.categoria ? { categoria: reg.categoria } : {}), atletas: reg.atletas });
     const abrir = lev => { p.at.forEach((a, i) => { if (a.ctrl === 'persona') p.abrir(i, lev, reg.aperturas[i][lev]); else if (reg.aperturas[i][lev] !== a.decl[lev]) throw new Error('la apertura de un rival no coincide'); }); p.empezar(); };
     abrir('s');
     for (const c of reg.llamados) {

@@ -36,6 +36,8 @@ export const EVENTOS = new Set([
   'medicion_desactivada', 'error_juego',
   // Gameplay 2 (docs/JUEGO.md G2.7): un toque saltea el turno de un rival o el veredicto propio
   'rival_salteado', 'veredicto_salteado',
+  // 23-nov: el turno de un rival ya no se saltea; la persona pronostica si la levanta (ui/pronostico.js)
+  'pronostico',
   // muro en el medio de la final (12-nov)
   'muro_cerrado', 'final_cortada', 'envion_ok', 'envion_negado',
   // LIF-46 y LIF-53: el cartel con dos caminos y lo que pasó después
@@ -48,6 +50,20 @@ export const EVENTOS = new Set([
   'camara_elegida',
   // LIF-52: las explicaciones de primera vez (ui/aprende.js): cuándo salen y cómo se cierran
   'explicacion_vista', 'explicacion_cerrada',
+  // LIF-8, LIF-9, LIF-10, LIF-11, LIF-12, LIF-68: finales validadas, ranking, perfil y desafíos
+  'final_validada', 'ranking_visto', 'ranking_publico', 'perfil_visto', 'desafio_abierto', 'desafio_dejado',
+  // LIF-5: el plan de competencia
+  'plan_elegido',
+  // LIF-15: categoría de peso
+  'categoria_elegida',
+  // LIF-62: entrenamiento entre competencias
+  'entreno_abierto', 'entreno_hecho', 'escuela_elegida',
+  // LIF-19: control antidoping
+  'antidoping',
+  // LIF-29: apoyo voluntario
+  'apoyo_click',
+  // viralidad: desafíos que otros jugaron
+  'desafios_aceptados_vistos',
 ]);
 
 export const BANDERAS = { 'muro-partidas-gratis': '2', 'muro-texto': 'a', 'invitacion-podio1': 'on', grabacion: 'tercio', grabacion_lienzo: 'compu' };

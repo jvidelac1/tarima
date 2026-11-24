@@ -7,11 +7,11 @@
 //   propioOk, propioFallo     el veredicto propio en 'u': `tVer` + esto (s); el válido no llega a 3 s
 //   antes, rapido             la vista entera (decisivo o ritmo «Completa»): desde `antes` ms antes de agarrar la barra, y
 //                             `rapido` veces más rápido en las fases lentas
-//   rival                     desde el 13-nov (pedido del dueño: «quiero ver el levantamiento completo de mi rival, aunque lo
-//                             pueda saltar con un botón»): todo turno de rival se ve ENTERO, desde `antes` ms antes de que
-//                             agarre la barra, las fases de espera (pelea, de pie, barra en los hombros) `rapido` veces más
-//                             rápido, el veredicto en `veredicto` s como mucho y la repetición (`rep` s) solo si cae un decisivo.
-//                             Saltado (botón «Saltar» o la tecla S): luces de golpe y la línea en `saltado` s.
+//   rival                     desde el 23-nov (pedido del dueño: «que no se pueda saltear a los pesistas, pero que no sea
+//                             aburrido esperar los tiros: rápido»): sin botón «Saltar»; todo turno de rival se ve desde
+//                             `antes` ms antes de su primera explosión (lo justo para pronosticar), las fases de espera
+//                             `rapido` veces más rápido, las luces desde `luz` s cada `paso` s (`pasoLento` si se juega
+//                             una medalla), el veredicto en `veredicto` s como mucho (la línea, `lee` s). Sin repetición. ~5 s.
 //   fundido                   el paso de un pesista al otro: fundido a negro de `fundido.fuera` ms y vuelta en `fundido.dentro` ms
 export const RITMO = {
   rivalAntes: 1000, rivalDespues: 150, resumen: { luz: .1, ver: .2, total: 1 }, filaDesde: 3, fila: 1200,
@@ -20,14 +20,12 @@ export const RITMO = {
   // veredicto en `veredicto` s como mucho (la barra que rebota se corta) y repetición de `rep` ms solo si cae. Como mucho
   // `porHueco` turnos enteros entre dos levantamientos propios: el siguiente decisivo va resumido (la espera no pasa de 20 s)
   decisivo: { antes: 1000, rapido: 5, rep: 2.3, veredicto: 2.6, porHueco: 1 },
-  rival: { antes: 1200, rapido: 4, veredicto: 2.2, rep: 1.8, saltado: .8 },
+  rival: { antes: 1300, rapido: 8, veredicto: 1.3, luz: .12, paso: .12, pasoLento: .25, lee: .5 },
   // 17-nov (pedido del dueño: «transiciones suaves entre cambio de pesistas»): 120 + 200 ms se sentía un corte con parpadeo;
   // con 150 ms para irse (acelerando) y 280 ms para volver (frenando) el cambio se lee como un fundido y suma 0,11 s por
   // turno (con 180 + 300 el turno más largo de un rival quedaba justo en el tope de 12 s de ritmo_test)
   fundido: { fuera: 150, dentro: 280 },
 };
-/** Tecla del botón «Saltar» del turno de un rival (Espacio y los toques en la escena ya no saltean nada de los rivales). */
-export const TECLA_SALTAR = 's';
 /** Fases de un rival que se muestran RITMO.rapido veces más rápido. */
 export const FASES_RAPIDAS = new Set(['pelea', 'traba', 'post', 'hombros', 'fijacion', 'freno']);
 /** Un turno de rival que se ve entero (G2.7): el que se juega el oro o una medalla en su último dos tiempos. */
@@ -52,8 +50,8 @@ export function tramoResumen(m) {
   const x = M.tr || M.tx || M.tp || res.t, de = Math.max(0, x - RITMO.rivalAntes), a = Math.min(res.t, (M.tc || x) + RITMO.rivalDespues);
   return { de, a: Math.max(a, de) };
 }
-/** Desde dónde se muestra el turno de un rival (ms de su intento): `RITMO.rival.antes` antes de que agarre la barra. */
-export function desdeRival(m, conf) { const M = m.movs[0]; return Math.max(0, conf - 500, (M && M.tp || 0) - RITMO.rival.antes); }
+/** Desde dónde se muestra el turno de un rival (ms de su intento): `RITMO.rival.antes` antes de su primera explosión. */
+export function desdeRival(m, conf) { const M = m.movs[0]; return Math.max(0, conf, (M && (M.tr || M.tx || M.tp) || 0) - RITMO.rival.antes); }
 /** Desde dónde se muestra entero el turno decisivo de un rival (ms de su intento): 1 s antes de su primera explosión. */
 export function desdeDecisivo(m, conf) { const M = m.movs[0]; return Math.max(0, conf, (M && (M.tr || M.tx || M.tp) || 0) - RITMO.decisivo.antes); }
 /**

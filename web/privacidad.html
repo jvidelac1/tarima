@@ -25,7 +25,7 @@
 <meta name="theme-color" content="#03050c">
 <meta name="referrer" content="no-referrer">
 <title>Lifting Game · Privacy</title>
-<meta name="description" content="Privacy policy for Lifting Game: what is stored, the waitlist, measurement, and how to unsubscribe.">
+<meta name="description" content="Privacidad de Lifting Game: qué se guarda, el ranking y cómo darse de baja.">
 <link rel="canonical" href="https://liftinggame.pages.dev/privacidad">
 <link rel="icon" href="data:,">
 <style>
@@ -96,6 +96,11 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
     <p>En el servidor no guardamos ese identificador ni tu dirección IP. Guardamos un código que sale de pasar cada uno por una clave secreta (HMAC). De la IP se usa la dirección entera en IPv4 y el prefijo /64 en IPv6. Sin esa clave, que solo tiene el servidor, no se puede volver del código a la IP.</p>
     <p>El código de la IP se borra a los 30 días. El del dispositivo, a los 180 días sin jugar. Lo hacemos por interés legítimo: que las finales gratis sean de verdad limitadas.</p>
 
+    <h2>Ranking y campeonato semanal</h2>
+    <p>Cuando terminas una final, el juego manda a nuestro servidor lo que tocaste en cada intento (no un resultado). El servidor vuelve a calcular la final con las mismas reglas del juego y guarda el resultado: pesista, kilos, intentos válidos y caídas, si era la final del campeonato de la semana, el país desde el que jugaste (sale de la conexión, no de una ubicación precisa) y el código del dispositivo de arriba. Con eso se arma el ranking.</p>
+    <p>En el ranking sales como «Anónimo». Tu nombre aparece solo si marcas «Mostrar mi nombre» en el ranking, y desde la final siguiente; lo puedes desmarcar cuando quieras. El código del dispositivo de cada final se borra a los 180 días; el resultado queda en el ranking histórico sin él.</p>
+    <p>Si el juego falla, el servidor cuenta el error por día: el tipo, la pantalla y el mensaje recortado (sin mails ni direcciones), sin identificador ni IP. Esos conteos se borran a los 90 días.</p>
+
     <h2>Lista de espera</h2>
     <p>Si te anotas, guardamos tu correo, el nombre que pusiste, el idioma, el país aproximado (según tu conexión), la fecha y la versión de este texto.</p>
     <p>Los usamos para avisarte cuando abra el acceso anticipado. Si marcaste la otra casilla, también para mandarte novedades del juego. La base es tu consentimiento.</p>
@@ -114,7 +119,8 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
     </div>
 
     <h2>Encuesta</h2>
-    <p>Después de anotarte puedes contestar, si quieres, una encuesta de dos preguntas: cómo prefieres jugar Lifting Game y qué te gustaría que tenga el juego, más un texto libre opcional. Es opcional: puedes saltearla y no da ni quita nada.</p>
+    <p>Al terminar tu final gratis, para seguir jugando puedes dejar tu correo o contestar una encuesta de dos preguntas: cómo prefieres jugar Lifting Game y qué te gustaría que tenga el juego, más un texto libre opcional. Cualquiera de las dos te deja jugar sin límite en ese dispositivo. Si dejas tu correo, después puedes contestar la encuesta si quieres, o saltearla.</p>
+    <p>Si la contestas para seguir jugando, en el servidor guardamos que este dispositivo ya la contestó (con el mismo código del dispositivo de las finales gratis, y el código de la IP durante 30 días), para que se conteste una sola vez y no se repita desde la misma conexión. No guardamos tus respuestas con esos códigos.</p>
     <p>Las respuestas van a la medición (PostHog) sin tu correo ni tu nombre. Del texto libre sacamos lo que parezca un correo o una dirección web. No escribas datos personales en él.</p>
 
     <h2>Alojamiento</h2>
@@ -154,6 +160,11 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
     <p>On the server we store neither that ID nor your IP address. We store a code made by running each one through a secret key (HMAC). For the IP we use the full address on IPv4 and the /64 prefix on IPv6. Without that key, which only the server has, the code can't be turned back into the IP.</p>
     <p>The IP code is deleted after 30 days. The device code, after 180 days without play. Legal basis: our legitimate interest in keeping free finals actually limited.</p>
 
+    <h2>Leaderboard and weekly championship</h2>
+    <p>When you finish a final, the game sends our server what you pressed on each attempt (not a result). The server recalculates the final with the same game rules and stores the result: lifter, kilos, good lifts and misses, whether it was this week's championship final, the country you played from (from the connection, not a precise location) and the device code above. That's what the leaderboard is made of.</p>
+    <p>On the leaderboard you show up as “Anonymous”. Your name appears only if you tick “Show my name” on the leaderboard, starting from your next final; you can untick it any time. Each final's device code is deleted after 180 days; the result stays on the all-time leaderboard without it.</p>
+    <p>If the game crashes, the server counts the error per day: its type, the screen and the trimmed message (no emails or addresses), with no ID or IP. Those counts are deleted after 90 days.</p>
+
     <h2>Waitlist</h2>
     <p>If you join, we store your email, the name you entered, language, approximate country (from your connection), the date and the version of this text.</p>
     <p>We use them to tell you when early access opens. If you ticked the other box, also to send you game news. Legal basis: your consent.</p>
@@ -172,7 +183,8 @@ input[type=email]:focus{outline:2px solid var(--teal);outline-offset:1px}
     </div>
 
     <h2>Survey</h2>
-    <p>After you join you can, if you want, answer a two-question survey: how you'd rather play Lifting Game and what you'd like the game to have, plus an optional free-text field. It's optional: you can skip it, and it doesn't unlock or change anything.</p>
+    <p>When your free final ends, to keep playing you can leave your email or answer a two-question survey: how you'd rather play Lifting Game and what you'd like the game to have, plus an optional free-text field. Either one lets you play with no limit on that device. If you leave your email, you can answer the survey afterwards if you want, or skip it.</p>
+    <p>If you answer it to keep playing, our server stores that this device already answered (with the same device code used for the free finals, and the IP code for 30 days), so it's answered only once and not repeated from the same connection. We don't store your answers with those codes.</p>
     <p>Answers go to our measurement (PostHog) without your email or name. We strip anything that looks like an email or a web address from the free text. Please don't write personal details in it.</p>
 
     <h2>Hosting</h2>

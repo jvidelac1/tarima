@@ -1046,10 +1046,17 @@ Todos van en minúscula y en español. Ninguno lleva nombre, mail, IP ni disposi
 | `final_inicio` | Primer llamado propio | `n`, `fuente`, `pesista`, `nivel`, `ritmo`, `ctl`; desde el 15-nov `orden` (`rondas`, `oficial`) |
 | `intento_propio` | Veredicto propio | `final_n`, `lev`, `intento`, `kg`, `resultado` (`vale`, `no_vale`, `cayo`), `causa` (clave), `perfecto`, `bien`, `temprano`, `tarde`, `todavia_no` |
 | `intento_propio` en `'u'` (13-nov) | Veredicto propio | además: `ctl`, `margen_ini`, `dia`, `gasto_tiron`, `gasto_arriba`, `gasto_pararse`, `margen_fin` (milésimas de disco), `garra` (`disponible`, `usada`, `guardada`, `gastada`), `tramo_caida`, `tramo_mayor`, `intensidad` (%), `patron_entrada` (`ausente`, `mantiene`, `machaca`, `de_mas`, `uno_por_paso`). `perfecto`, `bien`, `temprano`, `tarde`, `todavia_no` y `guardados` van en `null`. Desde la revisión 2.1: `dia` es la suerte sumada de los tres tramos (milésimas), `garra` ya no toma `guardada` (la garra se usa sola), y en todos los niveles `acuse_p95_ms` y `acuse_n` (del evento al cuadro siguiente, medido en el aparato) |
-| `rival_salteado` | El botón «Saltar» (o la tecla S) saltea el turno de un rival (desde el 13-nov: Espacio y los toques en la escena ya no) | `modo` (`entero`; antes `resumen`, `fila`), `via` (`boton`, `tecla`), `momento` (`intento`, `veredicto`, `repeticion`), `ms`, `decisivo` |
+| `rival_salteado` | (Sin uso desde el 23-nov: ya no se puede saltear a un rival.) El botón «Saltar» (o la tecla S) saltea el turno de un rival (desde el 13-nov: Espacio y los toques en la escena ya no) | `modo` (`entero`; antes `resumen`, `fila`), `via` (`boton`, `tecla`), `momento` (`intento`, `veredicto`, `repeticion`), `ms`, `decisivo` |
+| `pronostico` | Veredicto de un rival al que la persona le pronosticó «¿La levanta?» (desde el 23-nov) | `voto` (`si`/`no`), `acierto`, `racha`, `mejor`, `via`, `ms`, `tension` |
 | `pedido_cambiado` | «Cambiar» el pedido en el turno de un rival (15-nov, LIF-4) | `lev`, `intento`, `de`, `kg`, `via` (`boton`, `tecla`), `pendiente` (entró como cambio de su llamado), `orden` |
 | `explicacion_vista` | Sale una explicación de primera vez (LIF-52, `ui/aprende.js`) | `clave` (`estilo`, `dificultad`, `kilos`, `cambiar`, `nulo`, `luces`, `total`), `momento` (`llamado`, `rival`, `decision`), `pantalla`, `vez` (1, o 2 si la primera se cortó antes de leerla) |
 | `explicacion_cerrada` | Se va la explicación | `clave`, `via` (`boton`: la ✕; `sola`: cambió el momento, salió otra o pasaron 15 s), `ms` a la vista, `leida` (la cerró, estuvo 3,5 s o es la segunda vez: no vuelve a salir) |
+| `final_validada` | El servidor recalculó y anotó la final (LIF-10) | `campeonato` (bool), `puesto_semana` (puesto en el campeonato o null) |
+| `ranking_visto` | Abre el ranking (LIF-9) | `alcance` (`semana`, `global`), `pantalla` |
+| `ranking_publico` | Marca o desmarca «Mostrar mi nombre» en el ranking | `publico` (bool) |
+| `perfil_visto` | Abre «Mi perfil» (LIF-68, LIF-11) | `pantalla` |
+| `desafio_abierto` | Llega con un link de desafío ?desafio=id (LIF-12) | `ok` (la final de origen existe) |
+| `desafio_dejado` | Prefiere una final libre en vez del desafío | — |
 | `veredicto_salteado` | Un toque saltea el veredicto propio (`'u'`) | `ms`, `resultado` |
 | `final_fin` | Podio | `n`, `puesto` (1 a 3 o null), `total`, `duracion_s` |
 | `compartir` | Botón compartir | `via` (`nativo`, `copiar`), `medalla`, `pantalla` |

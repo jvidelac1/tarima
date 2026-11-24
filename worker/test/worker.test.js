@@ -5,6 +5,7 @@ import { env } from 'cloudflare:workers';
 import { createExecutionContext, createScheduledController, waitOnExecutionContext } from 'cloudflare:test';
 import worker from '../src/index.js';
 import { codigoDispositivo, leerPase } from '../src/cripto.js';
+import REG from './final_ejemplo.json';
 
 const ORIGEN = 'https://tarima.test';
 let nIp = 0;
@@ -18,7 +19,7 @@ const uuid = () => crypto.randomUUID();
 const VIEJA = { GRATIS_ETAPA: 'final', GRATIS: '2', BONO_ENCUESTA: '2', ENCUESTA_LIBRE: '0' };
 const E = (extra = {}) => Object.assign({}, env, VIEJA, extra);
 const LIF53 = { GRATIS_ETAPA: 'final', GRATIS: '1', TOPE_IP: '6', BONO_ENCUESTA: '0', ENCUESTA_LIBRE: '1', ENCUESTAS_POR_IP: '3' };
-const A = (extra = {}) => Object.assign({}, env, extra);
+const A = (extra = {}) => Object.assign({}, env, { GRATIS_ETAPA: 'arranque', GRATIS: '1', ENCUESTA_LIBRE: '0', BONO_ENCUESTA: '0' }, extra);      // la regla del arranque gratis (producción hasta el 23-nov), por variables
 const P = (extra = {}) => Object.assign({}, env, LIF53, extra);
 
 let salidas; // pedidos que el Worker hizo hacia afuera
@@ -336,8 +337,8 @@ describe('primera vez (LIF-53, por variables explícitas): la final entera grati
   const partidaP = (dispositivo, ip, o = {}) => llamar('/api/partida', { dispositivo, idioma: 'es' }, { ip, e: P(), ...o });
   const encuestaP = (dispositivo, r, ip, o = {}) => llamar('/api/encuesta', { dispositivo, r, idioma: 'en', sesion: 'ses-1', momento: 'podio' }, { ip, e: P(), ...o });
 
-  it('worker/wrangler.jsonc trae la regla de producción (el arranque gratis, correo obligatorio); la de LIF-53 se pide con variables', () => {
-    expect([env.GRATIS_ETAPA, env.GRATIS, env.TOPE_IP, env.BONO_ENCUESTA, env.ENCUESTA_LIBRE, env.ENCUESTAS_POR_IP]).toEqual(['arranque', '1', '6', '0', '0', '3']);
+  it('worker/wrangler.jsonc trae la regla de LIF-53 (producción desde el 23-nov); la del arranque gratis se pide con variables', () => {
+    expect([env.GRATIS_ETAPA, env.GRATIS, env.TOPE_IP, env.BONO_ENCUESTA, env.ENCUESTA_LIBRE, env.ENCUESTAS_POR_IP]).toEqual(['final', '1', '6', '0', '1', '3']);
     const e = P();
     expect([e.GRATIS_ETAPA, e.GRATIS, e.TOPE_IP, e.BONO_ENCUESTA, e.ENCUESTA_LIBRE, e.ENCUESTAS_POR_IP]).toEqual(['final', '1', '6', '0', '1', '3']);
     expect(env.ENCUESTA_ID).toBeUndefined();
@@ -753,5 +754,22 @@ describe('limpieza diaria y registros', () => {
     expect(logs.length).toBeGreaterThan(0);
     const todo = logs.join('\n');
     for (const x of [ip, a, email, 'x@y.com']) expect(todo).not.toContain(x);
+  });
+});
+
+describe('finales validadas y ranking (LIF-10, LIF-9)', () => {
+  it('una final entra recalculada en el runtime de Workers; adulterada, no; el ranking responde', async () => {
+    const ip = nuevaIp(), a = uuid(), p = await pedirPartida(a, ip);
+    const r = await llamar('/api/final', { pase: p.j.pase, registro: REG, dispositivo: a }, { ip, cookie: `tdv=${a}` });
+    expect(r.status).toBe(200);
+    expect(r.j).toMatchObject({ estado: 'ok', campeonato: false });
+    expect(r.j.total).toBeGreaterThan(0);
+    const malo = JSON.parse(JSON.stringify(REG)); malo.llamados.find(c => c.ent).kg += 30;
+    const p2 = await pedirPartida(a, ip), r2 = await llamar('/api/final', { pase: p2.j.pase, registro: malo, dispositivo: a }, { ip, cookie: `tdv=${a}` });
+    expect(r2.status).toBe(422);
+    const rk = await llamar('/api/ranking', { alcance: 'global' }, { ip, cookie: `tdv=${a}` });
+    expect(rk.status).toBe(200);
+    expect(rk.j.filas[0]).toMatchObject({ puesto: 1, yo: true, total: r.j.total });
+    expect(rk.j.semana).toMatch(/^\d{4}-W\d{2}$/);
   });
 });
