@@ -703,6 +703,9 @@ export default {
   // campeonato semanal y ranking (LIF-8, LIF-9)
   'bienvenida.campeonato': 'Weekly championship',
   'bienvenida.ranking': 'Leaderboard',
+  'portada.puesto': 'This week you are #{puesto} of {de}.',
+  'portada.campeonato': 'Weekly championship: {de} on the board.',
+  'portada.ver': 'See leaderboard',
   'campeonato.nota': 'The same final for everyone all week: Easy level and even rivals.',
   'ranking.titulo': 'Leaderboard',
   'ranking.semana': "This week's championship",

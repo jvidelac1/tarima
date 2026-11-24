@@ -720,6 +720,9 @@ export default {
   // campeonato semanal y ranking (LIF-8, LIF-9)
   'bienvenida.campeonato': 'Campeonato semanal',
   'bienvenida.ranking': 'Ranking',
+  'portada.puesto': 'Esta semana vas en el puesto {puesto} de {de}.',
+  'portada.campeonato': 'Campeonato de la semana: {de} en la tabla.',
+  'portada.ver': 'Ver ranking',
   'campeonato.nota': 'La misma final para todos durante la semana: nivel Fácil y rivales parejos.',
   'ranking.titulo': 'Ranking',
   'ranking.semana': 'Campeonato de la semana',

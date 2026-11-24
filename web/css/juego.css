@@ -882,3 +882,7 @@ html.vert body:has(#recuadro:not([hidden])) #tv #guia{bottom:auto;top:calc(max(v
 .en-barra .en-punt{position:absolute;top:-2px;bottom:-2px;width:6px;margin-left:-3px;background:#fff;box-shadow:0 0 0 2px #000}
 .entreno .zonas{display:flex;gap:8px}.entreno .zonas i{width:28px;height:12px;border-radius:3px;display:inline-block}.zonas .z-verde{background:var(--ok)}.zonas .z-amarillo{background:var(--gold)}.zonas .z-rojo{background:var(--red)}
 #btn-compartir.desafiar{border-color:var(--gold);color:var(--gold)}
+
+/* LIF-81: el puesto de la semana en la bienvenida */
+.rk-portada{display:flex;align-items:center;gap:.5em;width:100%;margin:.4em 0 .2em;padding:.55em .8em;border:1px solid var(--gold);border-radius:10px;background:rgba(255,200,60,.08);color:inherit;font:inherit;text-align:left;cursor:pointer}
+.rk-portada b{margin-left:auto;color:var(--gold);white-space:nowrap}

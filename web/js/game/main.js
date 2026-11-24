@@ -394,6 +394,21 @@ function pintarPerfil() {
  * El ranking (LIF-9) y el campeonato semanal (LIF-8), en #sobre, desde la bienvenida o el podio. Pide la lista al servidor
  * (ganchos.ranking) y la repinta al llegar; las pestañas y el filtro por país vuelven a pedirla.
  */
+/**
+ * LIF-81 · el ranking a la vista: en la bienvenida, «Esta semana: puesto 14 de 230» (o cuántos hay en el campeonato) y
+ * tocarlo abre el ranking. Se pide una vez por visita a la bienvenida y se vuelve a pedir después de cada final.
+ */
+function cargarRkPortada() {
+  if (E.rkPortada !== undefined) return; E.rkPortada = null;
+  Promise.resolve().then(() => ganchos.ranking({ alcance: 'semana', pais: false, categoria: CATEGORIA_BASE })).then(d => {
+    if (!d || d.estado !== 'ok' || !d.filas?.length) { E.rkPortada = false; return; }
+    const yo = d.filas.find(f => f.yo); E.rkPortada = { puesto: yo ? yo.puesto : null, de: d.filas.length }; E.repintar?.();
+  }).catch(() => { E.rkPortada = false; });
+}
+function rkPortadaHTML() {
+  const R = E.rkPortada; if (!R) return '';
+  return `<button class="rk-portada" id="btn-rk-portada"><span aria-hidden="true">🏆</span> ${R.puesto ? t('portada.puesto', { puesto: R.puesto, de: R.de }) : t('portada.campeonato', { de: R.de })} <b>${t('portada.ver')}</b></button>`;
+}
 function abrirRanking(alcance = 'semana') {
   if (E.sobre) return;
   const act = document.activeElement; E.sobre = { tipo: 'ranking', foco: act && $('capa').contains(act) ? act : null, solto: false }; boton.activo = false;
@@ -1115,6 +1130,7 @@ function ctlInicial() { const q = params.get('ctl'); if (q === 'c' || q === 'f' 
  */
 async function inicio() {
   visita('inicio'); zocalo(null); relojLibre(); const primera = !guardado.get('tarima.jugadas');
+  if (!primera) cargarRkPortada();
   const catG = +guardado.get('tarima.categoria');
   const cfg = { categoria: CATEGORIAS[catG] ? catG : CATEGORIA_BASE, id: guardado.get('tarima.pesista') || 'ventura', nivel: guardado.get('tarima.nivel') || 'amistoso', ritmo: params.get('ritmo') === 'completa' ? 'completa' : 'expres', ctl: ctlInicial(), dif: difInicial(), orden: guardado.get('tarima.orden') === 'oficial' ? 'oficial' : 'rondas' };
   if (!IDS.includes(cfg.id)) cfg.id = 'ventura';
@@ -1165,7 +1181,7 @@ async function inicio() {
       ${nombreHTML}
       ${tarjetas ? `<h2 id="pesista-t">${esc(t('pesista.titulo', { nombre: mostrado() }))}</h2>
       <div class="pesistas">${IDS.map(id => `<button class="pesista" data-id="${id}" aria-pressed="${id === cfg.id}"><div class="b" style="background:${PLANTEL[id].bandera}"></div><b>${t(`pesista.${id}.tipo`)}</b>${cfg.ctl === 'b' ? `<small class="conviene">${t(`pesista.${id}.b`)}</small><small class="rm">${t('rm.tarjeta', { s: conBono(techoEnCategoria(datos.atletas[id].techo, cfg.categoria).s, bonoDe(id).s), c: conBono(techoEnCategoria(datos.atletas[id].techo, cfg.categoria).c, bonoDe(id).c) })}</small>` : `${cuerpoHTML(id, uno)}<small class="conviene">${t(uno ? `pesista.${id}.u` : `pesista.${id}.conviene`)}</small>`}</button>`).join('')}</div>` : ''}
-      ${des ? '' : nivelHTML}${opciones}</div>${desafioHTML}${nuevosDes}<div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${primera ? '' : `<button id="btn-campeonato" data-completa>${t('bienvenida.campeonato')}</button>`}${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button id="btn-opciones" aria-expanded="${S.opciones}"><span aria-hidden="true">⚙</span> ${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button>${primera ? '' : `<button class="link" id="btn-ranking">${t('bienvenida.ranking')}</button><button class="link" id="btn-perfil">${t('bienvenida.perfil')}</button>${sesionesEntreno() > 0 ? `<button class="link" id="btn-entrenar">${t('bienvenida.entrenar', { n: sesionesEntreno() })}</button>` : ''}`}<button class="link" id="btn-ayuda">${t('boton.ayuda')}</button>${apoyoUrl() ? `<a class="link" id="btn-apoyo" href="${esc(apoyoUrl())}" target="_blank" rel="noopener">${t('apoyo.boton')}</a>` : ''}<a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
+      ${des ? '' : nivelHTML}${opciones}</div>${desafioHTML}${nuevosDes}${primera ? '' : rkPortadaHTML()}<div class="fila pie"><button class="ir grande" id="btn-empezar" data-completa>${t('bienvenida.jugar')}</button>${primera ? '' : `<button id="btn-campeonato" data-completa>${t('bienvenida.campeonato')}</button>`}${uno ? '' : `<button id="btn-otro" data-completa>${t(facil ? (falta ? 'opciones.saltar_practica' : 'opciones.repetir_practica') : 'opciones.sin_calentar')}</button>`}<span class="secundarios"><button id="btn-opciones" aria-expanded="${S.opciones}"><span aria-hidden="true">⚙</span> ${t('bienvenida.opciones')} ${S.opciones ? '▴' : '▾'}</button>${primera ? '' : `<button class="link" id="btn-ranking">${t('bienvenida.ranking')}</button><button class="link" id="btn-perfil">${t('bienvenida.perfil')}</button>${sesionesEntreno() > 0 ? `<button class="link" id="btn-entrenar">${t('bienvenida.entrenar', { n: sesionesEntreno() })}</button>` : ''}`}<button class="link" id="btn-ayuda">${t('boton.ayuda')}</button>${apoyoUrl() ? `<a class="link" id="btn-apoyo" href="${esc(apoyoUrl())}" target="_blank" rel="noopener">${t('apoyo.boton')}</a>` : ''}<a class="legal" href="privacidad.html?lang=${idiomaActual()}" target="_blank" rel="noopener">${t('app.privacidad')}</a></span></div>
       `, 'bienvenida');
     pn.querySelector('a.legal')?.addEventListener('click', () => ev('privacidad_abierta', { pantalla: E.pantalla }));
     if (abrio) { const bc = pn.querySelector('.bv-cuerpo') || pn; bc.scrollTop = bc.scrollHeight; }      // Opciones se abre arriba de la fila de botones: se lleva a la vista
@@ -1193,6 +1209,7 @@ async function inicio() {
     else if (b.dataset.instalar) telefono.avisoInstalar(true);
     else if (b.id === 'btn-ayuda') abrirSobre('ayuda');
     else if (b.id === 'btn-ranking') abrirRanking();
+    else if (b.id === 'btn-rk-portada') { ev('ranking_portada', { puesto: E.rkPortada?.puesto ?? null }); abrirRanking(); }
     else if (b.id === 'btn-perfil') abrirPerfil();
     else if (b.id === 'btn-entrenar') { await abrirEntreno(cfg.id); visita('inicio'); }
     else if (b.id === 'btn-sin-desafio') { E.desafioDejado = true; ev('desafio_dejado', {}); }
@@ -1844,6 +1861,7 @@ async function cierre(p) {
   const camp = !!E.cfg?.campeonato;
   Promise.race([E.envio, new Promise(r => setTimeout(r, 6000, null))]).then(r => {
     if (!r || (r.estado !== 'ok' && r.estado !== 'repetida')) return;
+    E.rkPortada = undefined;      // LIF-81: la bienvenida vuelve a pedir el puesto
     ev('final_validada', { campeonato: camp, puesto_semana: r.ranking?.puesto ?? null });
     E.finalId = r.id ?? null;
     const dz = r.desafio ? (yo.total > r.desafio.total ? 'desafio.superado' : yo.total === r.desafio.total ? 'desafio.empate' : 'desafio.no') : null;

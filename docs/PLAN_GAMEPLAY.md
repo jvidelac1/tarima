@@ -140,6 +140,24 @@ jugando. Revisarlo en PostHog (falta el acceso de lectura, LIF-24).
   T pose y A pose, skins intercambiables, movimientos reales). Su plan va en `docs/GRAFICOS_PLAN.md`. Anula la decisión
   de LIF-64 (Gemini).
 
+## Hecho (24-nov, rama gameplay-dificultad)
+
+- **A1–A3 (LIF-70, 71, 72):** barrita 2.0. Verde más angosto (Fácil ×0,70; Difícil ×0,46), franja perfecta en el centro
+  (la única que asegura la barra), «¡PERFECTO!» solo ahí y «¡BIEN!» en el resto del verde. Rivales tranquilos más
+  firmes y parejos un poco más humanos. Metas en `tools/barra_bots.mjs`. Medido (150 finales por casilla):
+
+  | Nivel · rivales · jugador | Oro antes | Oro ahora |
+  |---|---|---|
+  | Fácil · tranquilos · medio | 94 % | 61 % |
+  | Fácil · tranquilos · bueno | 97 % | 68 % |
+  | Fácil · parejos · medio | 23 % | 28 % |
+  | Fácil · parejos · bueno | 32 % | 38 % |
+  | Medio · tranquilos · medio | 79 % | 36 % |
+
+- **C1 (LIF-81):** «Esta semana vas en el puesto X de Y» en la bienvenida; tocarlo abre el ranking.
+- A4 quedó cubierto con los números de arriba (se arranca con tranquilos, pero ya no se gana siempre). A5 (campeonato
+  en Medio) queda en Fácil por ahora: en Medio el oro con parejos baja a 8 % y el ranking se vaciaría.
+
 ## Orden propuesto
 
 1. Semana 1: A1, A2, A3, B1, C1 (medir, endurecer la barrita, entender las caídas, ranking visible).
