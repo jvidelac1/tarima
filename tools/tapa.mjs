@@ -16,7 +16,7 @@ export function medirEnPagina() {
   const vw = innerWidth, vh = innerHeight;
   const opacidad = e => { let o = 1; for (let x = e; x && x.nodeType === 1; x = x.parentElement) { const c = getComputedStyle(x); if (c.display === 'none' || c.visibility === 'hidden') return 0; o *= +c.opacity; } return o; };
   const visible = e => e && !e.hidden && opacidad(e) > .5;
-  const SEL = ['#tv > *', '#capa > .panel', '#zona', '#pausa', '#sonidob', '#ayudab', '#saltar', '#saltar-rival', '#sobre', '#instalar', '#sinfoco'];
+  const SEL = ['#tv > *', '#capa > .panel', '#zona', '#pausa', '#sonidob', '#ayudab', '#saltar', '#prono', '#sobre', '#instalar', '#sinfoco'];
   const ui = [], tenue = [];      // `tenue`: lo que se ve aunque sea a medias (para la cabeza y la barra)
   for (const e of document.querySelectorAll(SEL.join(','))) {
     if (!e || e.hidden) continue; const o = opacidad(e); if (!(o > .2)) continue; const r = e.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue;

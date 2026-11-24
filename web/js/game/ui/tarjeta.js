@@ -12,6 +12,7 @@ const DISPLAY = "'Saira Condensed','Arial Narrow',system-ui,sans-serif", BODY = 
  * @param {{kg:number, ok:boolean}[]} d.arranque  los tres intentos  @param {{kg:number, ok:boolean}[]} d.dosTiempos
  * @param {string} d.lineaArr  «Arranque»  @param {string} d.lineaDT  «Dos tiempos»
  * @param {string} d.pie       texto chico de abajo (el campeonato o la invitación)
+ * @param {string} [d.prono] la mejor racha de pronósticos («Pronósticos: 5 seguidos»), o vacío
  * @param {string} d.url       sin protocolo
  * @returns {Promise<Blob|null>}
  */
@@ -40,6 +41,7 @@ export async function tarjetaPodio(d) {
   };
   fila(860, d.lineaArr, d.arranque); fila(1000, d.lineaDT, d.dosTiempos);
   g.fillStyle = C.tinta; g.font = `400 40px ${BODY}`; ajustar(g, d.pie || '', 80, 1150, W - 160);
+  if (d.prono) { g.fillStyle = C.oro; g.font = `600 36px ${BODY}`; ajustar(g, d.prono, 80, 1205, W - 160); }      // la mejor racha de pronósticos
   g.fillStyle = C.teal; g.font = `700 48px ${DISPLAY}`; g.fillText(d.url, 80, 1260);
   return new Promise(res => { try { cv.toBlob(b => res(b), 'image/png'); } catch { res(null); } });
 }

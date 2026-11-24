@@ -336,7 +336,8 @@ html.rotado #app{position:fixed;left:0;top:0;flex:none;width:var(--app-w,100vh);
 body:has(.etiqueta:not([hidden])) .marcador{top:calc(var(--u)*7 + var(--st))}
 html.turno-rival #marcador{top:calc(var(--u)*10.6 + var(--st))}      /* debajo del cartel del turno del rival: con «Si Brenner levanta…» lo pisaba */
 /* durante el turno de un rival no hay botón de levantar ni señal: tocar solo saltea (y lo dice el cartel) */
-html.turno-rival #zona,html.turno-rival #senal{display:none!important}      /* el acuse queda: dice que el toque llegó (y que saltea) */
+html.turno-rival #zona,html.turno-rival #senal{display:none!important}
+body:has(#prono:not([hidden])) #zona,body:has(#prono:not([hidden])) #senal{display:none!important}      /* 23-nov: en el turno de un rival el pronóstico va en su lugar (el acuse queda, encima: main.js → ubicarAcuse) */      /* el acuse queda: dice que el toque llegó (y que saltea) */
 
 /* ---------- campo de texto en el teléfono: un editor arriba de lo visible, derecho, con «Listo» ---------- */
 #editor{position:fixed;left:0;right:0;top:var(--vvy,0px);z-index:60;background:#080d1e;border-bottom:3px solid var(--teal);padding:calc(10px + env(safe-area-inset-top,0px)) calc(12px + env(safe-area-inset-right,0px)) 10px calc(12px + env(safe-area-inset-left,0px));box-shadow:0 10px 30px rgba(0,0,0,.6)}
@@ -562,7 +563,7 @@ html.juego-u .seguir{font-size:calc(var(--u)*.95);padding:.3em .65em;background:
    y no pisa los transform de cada cartel. Un panel que se repinta (un kilo más, otro estilo) no vuelve a entrar: la clase
    .entra la pone capa.poner solo cuando el panel es otro. Con movimiento reducido, nada. */
 @media (prefers-reduced-motion:no-preference){
-  .tablero:not([hidden]),.zocalo:not([hidden]),.saltar-rival:not([hidden]),.barrita:not([hidden]),.seguir:not([hidden]),.etiqueta:not([hidden]){animation:aparece .22s ease-out}
+  .tablero:not([hidden]),.zocalo:not([hidden]),.prono:not([hidden]),.barrita:not([hidden]),.seguir:not([hidden]),.etiqueta:not([hidden]){animation:aparece .22s ease-out}
   #capa>.panel.entra{animation:aparece .2s ease-out}
 }
 @keyframes aparece{from{opacity:0}to{opacity:1}}
@@ -630,9 +631,18 @@ html.juego-u :is(#marcador,#turno,#rival,#zocalo,#etiqueta){display:none!importa
 html[data-pantalla=intento] #tablero,body:has(#margen:not([hidden])) #tablero{top:auto;bottom:calc(var(--u)*1.1 + var(--sb));--u:clamp(7px,1.25cqh,11px);opacity:.62;max-width:18cqw}
 :is(html[data-pantalla=intento],body:has(#margen:not([hidden]))) #tablero :is(thead,.tb-pie,.tb-e,.tb-p,.tb-n small,.tb-pide small,.tb-m:not(.tb-t)){display:none}
 /* botón «Saltar» del turno de un rival: abajo a la derecha, encima del acuse; con teclado muestra su tecla (S) */
-.saltar-rival{position:absolute;z-index:6;right:calc(18px + var(--sr));bottom:calc(56px + var(--sb));display:flex;align-items:center;gap:.55em;font-family:var(--display);font-weight:800;font-size:clamp(15px,2.3vh,21px);letter-spacing:.08em;min-height:48px;padding:.35em 1.1em;background:rgba(6,14,48,.9);border:2px solid var(--teal);color:#fff;border-radius:.35em}
-.saltar-rival .tecla{font-size:.8em}
-@media (prefers-reduced-motion:no-preference){.saltar-rival.late{animation:late .5s ease-in-out 2}}
+.prono{position:absolute;z-index:6;right:calc(18px + var(--sr));bottom:calc(56px + var(--sb));display:flex;flex-direction:column;align-items:flex-end;gap:.4em;font-family:var(--display);font-weight:800;font-size:clamp(15px,2.3vh,21px);letter-spacing:.04em;color:#fff;pointer-events:none}
+.prono p{margin:0;padding:.3em .8em;background:rgba(6,14,48,.9);border-radius:.35em}
+.prono .pr-ten{border:2px solid var(--gold);color:var(--gold)}
+.prono .pr-q{display:flex;align-items:center;gap:.45em;padding:.3em .4em .3em .8em;background:rgba(6,14,48,.9);border:2px solid var(--teal);border-radius:.35em;pointer-events:auto}
+.prono .pr-q button{min-height:44px;min-width:64px;padding:0 .8em;font:inherit;color:#fff;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.35);border-radius:.3em;cursor:pointer}
+.prono .pr-q button.elegido{background:var(--teal);border-color:var(--teal);color:#06102e}
+.prono .pr-q button:disabled:not(.elegido){opacity:.35}
+.prono .pr-q .tecla{font-size:.75em}
+.prono .pr-res.ok{border:2px solid var(--teal)}
+.prono .pr-res.mal{opacity:.85}
+.tablero .tb-sube-q{font-weight:700;margin-right:.3em}
+.tablero .tb-sube{min-height:36px;min-width:52px;margin-right:.3em;font:inherit;font-weight:800;color:#fff;background:rgba(255,255,255,.1);border:2px solid var(--teal);border-radius:.3em;cursor:pointer}
 @media (pointer:coarse){
   /* teléfono acostado: el tablero compacto arriba a la izquierda (nombre, lo que lleva, lo que pide); en el levantamiento propio
      no va (la regla de tools/tapa.mjs: nada sobre el pesista). «Saltar» va donde está el botón redondo, que en el turno de un
@@ -642,8 +652,7 @@ html[data-pantalla=intento] #tablero,body:has(#margen:not([hidden])) #tablero{to
   :where(html.horiz.bajo) .tablero .tb-n span{max-width:calc(var(--u)*7.5)}
   :where(html.horiz.bajo) .tablero .tb-pie p{font-size:calc(var(--u)*.95)}
   html:where(.horiz.bajo)[data-pantalla=intento] #tablero,:where(html.horiz.bajo) body:has(#margen:not([hidden])) #tablero{display:none}
-  :where(html.horiz) .saltar-rival{right:calc(var(--sr) + var(--bm));bottom:calc(var(--sb) + var(--bm));min-height:64px;width:var(--boton);padding:0;justify-content:center;font-size:clamp(16px,calc(var(--boton)*.17),22px);border-radius:32px}
-  html:where(.horiz).zurdo .saltar-rival{right:auto;left:calc(var(--sl) + var(--bm))}
+  :where(html.horiz) .prono{right:calc(var(--sr) + var(--bm));bottom:calc(var(--sb) + var(--bm))}
 }
 /* panel del llamado: una línea con la dificultad, el porcentaje del RM y la chance («Medio · 92 % de tu RM (163 kg) · 8 de 10») */
 .rm-linea{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25em .6em}
@@ -793,12 +802,14 @@ html.vert #tv #guia{left:calc(var(--sl) + 12px);right:calc(var(--sr) + 12px);top
 /* «Saltar práctica» arriba a la izquierda (a la derecha están los botones chicos) */
 html.vert #saltar{left:calc(var(--sl) + 8px);transform:none;top:calc(var(--st) + 8px);min-height:40px}
 /* turno de un rival: «Saltar» donde está el botón redondo, grande para el pulgar */
-html.vert #saltar-rival{right:auto;left:50%;transform:translateX(-50%);bottom:calc(var(--sb) + var(--bm));min-height:60px;padding:0 1.8em;justify-content:center;font-size:20px;border-radius:30px}
-@media (prefers-reduced-motion:no-preference){html.vert .saltar-rival.late{animation:lateV .5s ease-in-out 2}}
+html.vert #prono{right:auto;left:50%;transform:translateX(-50%);bottom:calc(var(--sb) + var(--bm));align-items:center;gap:.25em;font-size:17px;width:max-content;max-width:calc(100vw - 32px)}
+html.vert #prono .pr-ten{font-size:13px;padding:.15em .6em}
+html.vert #prono .pr-q button{min-height:46px;min-width:72px}
 @keyframes lateV{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.1)}}
 /* veredicto de un rival con «Saltar» todavía a la vista (pasa cuando una explicación de primera vez alarga el turno): el
    veredicto sube por encima del botón (60 px + aire) en vez de quedar debajo */
-html.vert body:has(#saltar-rival:not([hidden])) #tv #veredicto{bottom:calc(var(--sb) + var(--bm) + 68px)}
+html.vert body:has(#prono:not([hidden])) #tv #veredicto{bottom:calc(var(--sb) + var(--bm) + 124px)}
+html.vert body:has(#prono.listo:not([hidden])) #tv #veredicto{bottom:calc(var(--sb) + var(--bm) + 84px)}      /* con el resultado, el pronóstico es una línea */
 /* el cartel grande (y el zócalo de Clásico) sin salirse a lo ancho */
 html.vert #tv #cartel{white-space:normal;text-align:center;width:max-content;max-width:calc(100% - 28px);font-size:calc(var(--u)*2.4);top:calc(var(--techo-v) + 8px)}
 html.vert #tv #zocalo{bottom:calc(var(--sobre-boton) + var(--u)*5)}

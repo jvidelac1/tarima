@@ -19,15 +19,13 @@
 // Dificultad (rules.js → NIVELES_B): en 'b' mide los tres niveles, cada uno con su apertura sugerida y sus metas: final mediana
 // ≤ 150 / 165 / 180 s (Fácil / Medio / Difícil), intento propio p90 ≤ 10 · 15, ≤ 12 · 16 y ≤ 14 · 18 s, barras caídas con el
 // panel ≤ 15 / 18 / 25 %, espera máxima ≤ 20 / 21 / 21 s.
-// Turnos de los rivales (13-nov, pedido del dueño: «quiero ver el levantamiento completo de mi rival, aunque lo pueda
-// saltar con un botón»): todo turno de rival se ve entero (RITMO.rival) y cada paso de un pesista a otro lleva un fundido
-// (RITMO.fundido). Dos espectadores: el que MIRA todo (informativo: sin meta de final ni de espera, pero ningún turno de rival
-// pasa de 12 s) y el que SALTA cada rival con el botón al segundo de empezar (`--reaccion`, 1 s): ese tiene que seguir
-// cumpliendo las metas de siempre (final mediana ≤ 150 s en Fácil, espera máxima ≤ 20 s).
+// Turnos de los rivales (23-nov, pedido del dueño: «que no se pueda saltear a los pesistas, pero que no sea aburrida la
+// dinámica de esperar los tiros, rápido»): no hay botón «Saltar»; todo turno de rival se ve (RITMO.rival) desde poco antes
+// de su primera explosión, con su fundido (RITMO.fundido). Meta: turno de rival mediana ≤ 5,5 s y máximo ≤ 7 s (antes, 8,3 s de mediana).
 // Orden de los turnos (LIF-3, match.js → TURNOS): por defecto 'rondas', como el juego; --orden=oficial o --orden=viejo (sin
 // turnos: los registros de antes) para comparar. Informa además cuántos turnos de rivales seguidos ve el jugador entre dos
 // levantamientos propios (máximo y p90).
-// Uso: node tools/ritmo_test.mjs [--semillas=60] [--panel=2.5] [--ctl=b|u] [--dif=facil,medio,dificil] [--reaccion=1] [--espectador=mira,salta] [--orden=rondas|oficial|viejo]
+// Uso: node tools/ritmo_test.mjs [--semillas=60] [--panel=2.5] [--ctl=b|u] [--dif=facil,medio,dificil] [--orden=rondas|oficial|viejo]
 import { Partida } from '../web/js/sim/match.js';
 import { HUELLA_IA } from '../web/js/sim/ai.js';      // los rivales del juego (con personalidad)
 import { Intento, simular } from '../web/js/sim/attempt.js';
@@ -44,8 +42,8 @@ const SEM = +(arg('semillas') || 60), PANEL = +(arg('panel') || 2.5), CTL = arg(
 const JUGADORES = CTL === 'u' ? { novato: { ...BOTS_U.reactivo, lag: 60 }, ausente: BOTS_U.ausente } : { novato: PERFILES.novato, lento: { ...PERFILES.novato, reac: 9000 } };
 const jugar = (ctx, B, sem) => (CTL === 'b' ? jugarBarra(ctx, B, sem) : jugarUno(ctx, B, sem));
 const ORDEN = arg('orden') || 'rondas', TURNOS_CFG = ORDEN === 'viejo' ? {} : { turnos: ORDEN };
-const REACCION = +(arg('reaccion') || 1), ESPECTADORES = (arg('espectador') || 'mira,salta').split(',');
-const FUNDIDO = (RITMO.fundido.fuera + RITMO.fundido.dentro) / 1000, MAX_RIVAL = 12;
+const ESPECTADORES = ['mira'];
+const FUNDIDO = (RITMO.fundido.fuera + RITMO.fundido.dentro) / 1000, MAX_RIVAL = 7, MED_RIVAL = 5.5;
 const INFORMATIVO = (q, esp) => q === 'lento' || esp === 'mira';
 const q = (xs, p) => { const v = xs.slice().sort((a, b) => a - b); return v.length ? v[Math.min(v.length - 1, Math.floor(v.length * p))] : 0; };
 
@@ -123,13 +121,11 @@ for (const nivel of ['amistoso', 'normal']) for (const id of ATL) for (let k = 0
     // rival
     const antes = p.tabla()[0], lider0 = antes && antes.puesto === 1 ? antes.a : null, x = p.resolverIA(), d = p.tabla()[0], lider1 = d && d.puesto === 1 ? d.a : null;
     void lider0; void lider1; seguidos++;
-    const decisivo = esDecisivo(L.et), modo = esp === 'salta' ? 'saltado' : 'entero'; enteros++;
-    const ok = x.res.res === 'valido', mov = x.res.gestos?.at(-1)?.mov || L.lev, tLuz = !ok ? .45 : .2, paso = (L.et || []).some(e => e === 'oro' || e === 'medalla' || e === 'todo_o_nada') ? .55 : .3, tVer = tLuz + 2 * paso + .25;
+    const decisivo = esDecisivo(L.et), modo = 'entero'; enteros++;
+    const ok = x.res.res === 'valido', mov = x.res.gestos?.at(-1)?.mov || L.lev, tLuz = RITMO.rival.luz, paso = (L.et || []).some(e => e === 'oro' || e === 'medalla' || e === 'todo_o_nada') ? RITMO.rival.pasoLento : RITMO.rival.paso, tVer = tLuz + 2 * paso + .25;
     const vista = vistaEntera(x.ctx, x.conf, x.ent, x.res);
-    // fundido de entrada; el que salta: al segundo, fundido corto al final del intento y el veredicto de 1 s
-    let t = FUNDIDO;
-    if (esp === 'salta') t += Math.min(vista, REACCION) + (vista > REACCION ? RITMO.fundido.fuera / 1000 : 0) + RITMO.rival.saltado;
-    else t += vista + Math.min(Math.max(RITMO.rival.veredicto, tVer + 1.2), Math.max(tVer + 1.3, durFinal(x.res, mov))) + (decisivo && !ok ? RITMO.rival.rep + FUNDIDO : 0);
+    // fundido de entrada, la vista y el veredicto (main.js → decision con o.max = RITMO.rival.veredicto); sin repetición
+    const t = FUNDIDO + vista + Math.min(Math.max(RITMO.rival.veredicto, tVer + RITMO.rival.lee), Math.max(tVer + 1.3, durFinal(x.res, mov)));
     (decisivo ? decisivos : rivalesNo).push(t); ultimo = L.a;
     reloj += t; traza.push(`${modo} ${t.toFixed(1)}`);
   }
@@ -139,11 +135,11 @@ for (const nivel of ['amistoso', 'normal']) for (const id of ATL) for (let k = 0
 
 const s = x => x.toFixed(1);
 const mFinal = q(finales, .5), eMax = Math.max(...esperas), e90 = q(esperas, .9), e50 = q(esperas, .5), rMax = Math.max(...rivalesNo), vOk = Math.max(...verOk), vMal = Math.max(...verMal), pS = q(intS, .9), pC = q(intC, .9), caidas = caidasPlan.caidas * 100 / caidasPlan.n;
-console.log(`\n[${esp === 'salta' ? `salta cada rival con el botón a los ${REACCION} s` : 'mira cada rival entero'}] ${quien === 'novato' ? (CTL === 'b' ? 'Novato (±120 ms, primera o segunda pasada)' : 'Novato (toca, a veces no)') : quien === 'lento' ? 'Lento (espera a que el puntero vaya despacio: informativo)' : 'Ausente (no toca nunca)'} · ritmo de la final en '${CTL}'${CTL === 'b' ? ` (${dif})` : ''} · ${finales.length} finales (${SEM} semillas × 3 pesistas × rivales amistosos y normales) · panel ${PANEL} s por decisión`);
+console.log(`\n[mira cada rival, sin saltar] ${quien === 'novato' ? (CTL === 'b' ? 'Novato (±120 ms, primera o segunda pasada)' : 'Novato (toca, a veces no)') : quien === 'lento' ? 'Lento (espera a que el puntero vaya despacio: informativo)' : 'Ausente (no toca nunca)'} · ritmo de la final en '${CTL}'${CTL === 'b' ? ` (${dif})` : ''} · ${finales.length} finales (${SEM} semillas × 3 pesistas × rivales amistosos y normales) · panel ${PANEL} s por decisión`);
 console.log(`orden ${ORDEN} · turnos de rivales seguidos entre dos levantamientos propios: mediana ${q(rachas, .5)}, p90 ${q(rachas, .9)}, máximo ${Math.max(...rachas)}`);
 console.log(`final completa: mediana ${s(mFinal)} s, p90 ${s(q(finales, .9))} s, máxima ${s(Math.max(...finales))} s   meta mediana ≤ ${MT.final} s`);
 console.log(`espera sin tocar entre un levantamiento propio y el siguiente panel: mediana ${s(e50)} s, p90 ${s(e90)} s, máxima ${s(eMax)} s   meta ≤ 10 · ≤ 15 · ≤ ${MT.espera} s`);
-console.log(`turno de rival (con su fundido): mediana ${s(q(rivalesNo.concat(decisivos), .5))} s, p90 ${s(q(rivalesNo.concat(decisivos), .9))} s, máximo ${s(Math.max(rMax, ...decisivos))} s · decisivos (con repetición si caen): mediana ${s(q(decisivos, .5))} s, máximo ${s(Math.max(0, ...decisivos))} s · ${decisivos.length} de ${decisivos.length + rivalesNo.length} turnos   meta ≤ ${MAX_RIVAL} s`);
+console.log(`turno de rival (con su fundido): mediana ${s(q(rivalesNo.concat(decisivos), .5))} s, p90 ${s(q(rivalesNo.concat(decisivos), .9))} s, máximo ${s(Math.max(rMax, ...decisivos))} s · decisivos: mediana ${s(q(decisivos, .5))} s, máximo ${s(Math.max(0, ...decisivos))} s · ${decisivos.length} de ${decisivos.length + rivalesNo.length} turnos   meta mediana ≤ ${MED_RIVAL} · máximo ≤ ${MAX_RIVAL} s`);
 console.log(`veredicto propio después de las luces: válido ${s(vOk)} s, caída ${verMal.length ? s(vMal) : '—'} s   meta válido ≤ 3 s en total, caída tVer + 2,4 s`);
 console.log(`intento propio: arranque p90 ${s(pS)} s · dos tiempos p90 ${s(pC)} s   meta ${quien === 'ausente' ? '≤ 9 · ≤ 14' : CTL === 'b' ? `≤ ${MT.s} · ≤ ${MT.c}` : '≤ 7 · ≤ 12'} s`);
 const caidasG = caidasPanel(dif, NOVATO, D, R);
@@ -151,7 +147,7 @@ console.log(`con lo que trae el panel: ${s(caidasG)} % de barras caídas en ${SE
 if (peores.length) console.log(`esperas de más de 20 s (${peores.length}): ${peores.slice(0, 4).join(' · ')}`);
 if (mFinal > MT.final && !INFORMATIVO(quien, esp)) mal.push(`${dif} ${quien}: final: mediana ${s(mFinal)} s (meta ≤ ${MT.final})`);
 if ((eMax > MT.espera || e90 > 15 || e50 > 10) && !INFORMATIVO(quien, esp)) mal.push(`${dif} ${quien}: espera: mediana ${s(e50)}, p90 ${s(e90)}, máxima ${s(eMax)} s (meta ≤ 10 · ≤ 15 · ≤ ${MT.espera})`);
-if (Math.max(rMax, ...decisivos) > MAX_RIVAL) mal.push(`${esp} ${quien}: un turno de rival dura ${s(Math.max(rMax, ...decisivos))} s (meta ≤ ${MAX_RIVAL})`);
+if (Math.max(rMax, ...decisivos) > MAX_RIVAL || q(rivalesNo.concat(decisivos), .5) > MED_RIVAL) mal.push(`${quien}: turno de rival: mediana ${s(q(rivalesNo.concat(decisivos), .5))} s, máximo ${s(Math.max(rMax, ...decisivos))} s (meta ≤ ${MED_RIVAL} · ≤ ${MAX_RIVAL})`);
 if (veredictoPropio(true).total > 3) mal.push(`el veredicto propio válido dura ${s(veredictoPropio(true).total)} s (meta ≤ 3)`);
 // en 'b' el jugador elige cuándo tira (la barrita reemplaza a ¡TIRA! y ¡ARRIBA!, que salían solas a los 2 s): ≤ 10 · ≤ 15 s
 const [mS, mC] = quien === 'ausente' ? [9, 14] : CTL === 'b' ? [MT.s, MT.c] : [7, 12];      // 'b': + el esfuerzo de pararse en los exigentes      // quien no toca espera a que cada paso salga solo: un poco más largo, nunca trabado

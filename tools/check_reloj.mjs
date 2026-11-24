@@ -30,7 +30,7 @@ async function caso(dif) {
     if (s.pantalla === 'llamado' && s.panel && await J(() => !!document.querySelector('#capa .panel #kg-mas'))) break;
     if (s.panel && await J(() => !!document.querySelector('#capa .panel button.ir:not(:disabled)'))) { await av(450); await pulsa('#capa .panel button.ir:not(:disabled)'); }
     await av(300);
-    await J(() => document.getElementById('saltar-rival')?.click());
+    await J(() => void 0);
   }
   const r0 = await J(() => ({ reloj: document.getElementById('reloj').textContent, que: (document.querySelector('#capa .panel')?.textContent || '').match(/[^.]*reloj[^.]*\./i)?.[0] || '' }));
   await av(5000);

@@ -48,7 +48,7 @@ jobs:
   telefono:
     name: Teléfono emulado con toques
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 55      # 23-nov: sin «Saltar», las partidas esperan cada turno de rival (~5 s)
     env:
       TARIMA_ANGLE: swiftshader
     steps:

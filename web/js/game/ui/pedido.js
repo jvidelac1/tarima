@@ -30,7 +30,11 @@ export function opcionesPedido(p, yo, pend = null) {
 export function pedidoHTML(op, S, o = {}) {
   if (!op) return '';
   const kbd = k => (o.tecla ? ` <kbd class="tecla">${k}</kbd>` : '');
-  if (!S.abierto) return `<button type="button" class="tb-cambiar" data-pedido="abrir" aria-label="${esc(t('pedido.aria', { kg: op.decl }))}">${esc(t('pedido.boton'))}${kbd(TECLA_PEDIDO.toUpperCase())}</button>`;
+  // 23-nov: cerrado, además de «Cambiar», la pregunta «¿Subes?» con los dos pesos más cercanos, a un toque
+  if (!S.abierto) {
+    const sube = [op.min, op.min + 1].filter(k => k <= op.max).map(k => `<button type="button" class="tb-sube" data-pedido="kg${k}" aria-label="${esc(t('pedido.pedir', { kg: k }))}">${k}</button>`).join('');
+    return `<span class="tb-sube-q">${esc(t('pedido.subes'))}</span>${sube}<button type="button" class="tb-cambiar" data-pedido="abrir" aria-label="${esc(t('pedido.aria', { kg: op.decl }))}">${esc(t('pedido.boton'))}${kbd(TECLA_PEDIDO.toUpperCase())}</button>`;
+  }
   const ch = o.chance ? o.chance(S.kg) : null;
   return `<div class="tb-ped" role="group" aria-label="${esc(t('pedido.aria', { kg: op.decl }))}">`
     + `<button type="button" data-pedido="menos" aria-label="${esc(t('pedido.menos'))}"${S.kg <= op.min ? ' disabled' : ''}>−</button>`
