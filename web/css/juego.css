@@ -336,7 +336,8 @@ html.rotado #app{position:fixed;left:0;top:0;flex:none;width:var(--app-w,100vh);
 body:has(.etiqueta:not([hidden])) .marcador{top:calc(var(--u)*7 + var(--st))}
 html.turno-rival #marcador{top:calc(var(--u)*10.6 + var(--st))}      /* debajo del cartel del turno del rival: con «Si Brenner levanta…» lo pisaba */
 /* durante el turno de un rival no hay botón de levantar ni señal: tocar solo saltea (y lo dice el cartel) */
-html.turno-rival #zona,html.turno-rival #senal{display:none!important}      /* el acuse queda: dice que el toque llegó (y que saltea) */
+html.turno-rival #zona,html.turno-rival #senal{display:none!important}
+body:has(#prono:not([hidden])) #zona,body:has(#prono:not([hidden])) #senal,body:has(#prono:not([hidden])) #acuse{display:none!important}      /* 23-nov: en el turno de un rival un toque no hace nada; el pronóstico va en su lugar */      /* el acuse queda: dice que el toque llegó (y que saltea) */
 
 /* ---------- campo de texto en el teléfono: un editor arriba de lo visible, derecho, con «Listo» ---------- */
 #editor{position:fixed;left:0;right:0;top:var(--vvy,0px);z-index:60;background:#080d1e;border-bottom:3px solid var(--teal);padding:calc(10px + env(safe-area-inset-top,0px)) calc(12px + env(safe-area-inset-right,0px)) 10px calc(12px + env(safe-area-inset-left,0px));box-shadow:0 10px 30px rgba(0,0,0,.6)}
@@ -802,12 +803,13 @@ html.vert #tv #guia{left:calc(var(--sl) + 12px);right:calc(var(--sr) + 12px);top
 /* «Saltar práctica» arriba a la izquierda (a la derecha están los botones chicos) */
 html.vert #saltar{left:calc(var(--sl) + 8px);transform:none;top:calc(var(--st) + 8px);min-height:40px}
 /* turno de un rival: «Saltar» donde está el botón redondo, grande para el pulgar */
-html.vert #prono{right:auto;left:50%;transform:translateX(-50%);bottom:calc(var(--sb) + var(--bm));align-items:center;font-size:19px;width:max-content;max-width:calc(100vw - 32px)}
-html.vert #prono .pr-q button{min-height:52px;min-width:80px}
+html.vert #prono{right:auto;left:50%;transform:translateX(-50%);bottom:calc(var(--sb) + var(--bm));align-items:center;gap:.25em;font-size:17px;width:max-content;max-width:calc(100vw - 32px)}
+html.vert #prono .pr-ten{font-size:13px;padding:.15em .6em}
+html.vert #prono .pr-q button{min-height:46px;min-width:72px}
 @keyframes lateV{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.1)}}
 /* veredicto de un rival con «Saltar» todavía a la vista (pasa cuando una explicación de primera vez alarga el turno): el
    veredicto sube por encima del botón (60 px + aire) en vez de quedar debajo */
-html.vert body:has(#prono:not([hidden])) #tv #veredicto{bottom:calc(var(--sb) + var(--bm) + 68px)}
+html.vert body:has(#prono:not([hidden])) #tv #veredicto{bottom:calc(var(--sb) + var(--bm) + 92px)}
 /* el cartel grande (y el zócalo de Clásico) sin salirse a lo ancho */
 html.vert #tv #cartel{white-space:normal;text-align:center;width:max-content;max-width:calc(100% - 28px);font-size:calc(var(--u)*2.4);top:calc(var(--techo-v) + 8px)}
 html.vert #tv #zocalo{bottom:calc(var(--sobre-boton) + var(--u)*5)}

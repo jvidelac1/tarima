@@ -106,7 +106,7 @@ export class Aprende {
     if (!document.documentElement.classList.contains('vert')) return;
     const tv = this.el.parentElement, q = tv?.getBoundingClientRect(); if (!q) return;
     let arriba = q.bottom;
-    for (const sel of ['#veredicto', '#prono', '#zona', '#seguir', '#barrita', '#senal']) {
+    for (const sel of ['#veredicto', '#prono', '#acuse', '#zona', '#seguir', '#barrita', '#senal']) {
       const e = document.querySelector(sel); if (!e || e.hidden) continue; const r = e.getBoundingClientRect(); if (r.width > 0 && r.height > 0 && r.top < arriba) arriba = r.top;      // #zona es fija: sin offsetParent
     }
     this.el.style.bottom = Math.round(q.bottom - arriba + 8) + 'px';
