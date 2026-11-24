@@ -210,7 +210,7 @@ export function poseCaida(pl, g0, destino, t, R = null) {
   if (pl.pierde) {
     // la barra se le va (PIERDE): hasta `dur` el cuerpo sigue en la pose del final, las manos van con la barra y el tronco reacciona;
     // después corre el final de siempre, contado desde que la suelta
-    const D = pl.pierde, t1 = t - D.dur, p = poseCaida({ ...pl, pierde: null }, g0, destino, Math.max(0, t1), R);
+    const D = pl.pierde, t1 = t - D.dur, p = poseCaida({ ...pl, pierde: null, tras: D }, g0, destino, Math.max(0, t1), R);
     const u = t1 < 0 ? suave(t / D.dur) : 1 - suave(t1 / PIERDE.vuelve), hunde = -D.hunde * u;
     p.t = t; p.pierde = { lado: D.lado, u, tronco: D.tronco * u, cabeza: D.cabeza * u };
     if (hunde) { p.dy = (p.dy || 0) + hunde; if (!p.pies) p.pies = { dz: 0, u: 0, dy: hunde }; }
@@ -243,8 +243,10 @@ export function poseCaida(pl, g0, destino, t, R = null) {
   if (pl.tipo === 'bajada' || pl.tipo === 'arriba') {
     // barra perdida desde arriba: los brazos reaccionan con ella (≤ 0,1 s). Atrás: bajan enseguida por delante (la barra no está ahí).
     // Adelante: primero la empujan lejos (`empuje`) y bajan cuando ya pasó por debajo de los hombros (`BARRIDO.espera`: check_escenas)
-    const ts = t - pl.suelta, atras = pl.causa === 'atras', tq = atras ? ts - .04 : tb - (pl.causa === 'adelante' ? .1 : BARRIDO.espera),  x = suave(tq / BARRIDO.dur), wP = suave((tq - BARRIDO.dur * .7) / (BARRIDO.dur * .45)), i = Math.floor(gC), f0 = Math.floor(g0);
-    const empuje = !atras && ts > 0 ? { w: suave(ts / .1) * (1 - suave((tq + .05) / .15)) } : null;
+    // después de una pérdida (`tras`: PIERDE) hacia adelante no hay empujón: las manos quedan arriba, la barra ya se fue por delante, y los
+    // brazos bajan recién cuando salió de su alcance (`libreEn`, lo calcula armarCaida con la caída de la barra y la altura de los hombros)
+    const ts = t - pl.suelta, atras = pl.causa === 'atras', tras = pl.tras && !atras, tq = tras ? ts - Math.max(.3, pl.tras.libreEn ?? .45) : atras ? ts - .04 : tb - (pl.causa === 'adelante' ? .1 : BARRIDO.espera),  x = suave(tq / BARRIDO.dur), wP = suave((tq - BARRIDO.dur * .7) / (BARRIDO.dur * .45)), i = Math.floor(gC), f0 = Math.floor(g0);
+    const empuje = !atras && !tras && ts > 0 ? { w: suave(ts / .1) * (1 - suave((tq + .05) / .15)) } : null;
     return { i, j: i + 1, u: gC - i, k: destino, w, dz, dy, t, brazos: { i: f0, j: f0 + 1, u: g0 - f0, k: destino, w: wP }, empuje, barrido: tq > 0 ? { x, w: suave(tq / .1) * (1 - wP) } : null, gesto: gestoDe(pl, tq - BARRIDO.dur * 1.1, f0) };
   }
   const i = Math.floor(gC), a0 = K[kB], a1 = K[Math.min(n, kB + 1)], f0 = Math.floor(a0);
@@ -270,6 +272,9 @@ export function armarCaida(res, mov, bar, piso, g0 = 0, R = null, cuerpo = null)
     // la barra se le va en las manos antes de caer (PIERDE); `ritmo` hace que ninguna pérdida dure igual que otra
     Object.assign(pl.pierde, { dur: PIERDE.dur * pl.ritmo, y0: bar.y, z0: bar.z });
     barra = new BarraPerdida({ ...pl.pierde, vy: pl.vy, vz: pl.vz, piso }); Object.assign(pl.pierde, barra.g);
+    // cuándo sale la barra del alcance de los brazos (s desde que la suelta): hasta entonces no bajan por delante
+    { const D = pl.pierde, H = cuerpo?.hombros, alcance = H ? Math.min(.85, Math.max(.68, 1.5 * (H.y - (cuerpo.cadera?.y ?? H.y - .5)))) : .75, hy = H ? H.y : bar.y - .5, hz = H ? H.z : 0;
+      D.libreEn = 1.2; for (let x = 0; x < 1.2; x += .01) { const y = Math.max(piso, D.y1 + D.vy * x - GRAV / 2 * x * x), z = D.z1 + D.vz * x; if (Math.hypot(y - hy, z - hz) > alcance + .08 || y <= piso + .02) { D.libreEn = x; break; } } }
   } else barra = new BarraLibre({ y: bar.y, z: bar.z, vy: pl.vy, vz: pl.vz, piso });
   const dur = Math.max(tiemposCaida(pl, g0, R).fin + (pl.pierde?.dur || 0), pl.suelta + barra.reposo) + .1;
   return { tipo, pl, barra, dur, R };

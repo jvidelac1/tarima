@@ -69,10 +69,15 @@ for (const causa of ['atras', 'adelante', 'codos', 'fondo', 'temblor']) for (con
   ok(p2.w === 0 && pS.w === 0, e + 'se mezcla hacia «Parado» antes de soltar');
   ok(!pD.mano || pD.mano.w === 0, e + 'las manos siguen en la barra después de soltarla');
   ok(pF.w === 1 && (!pF.pierde || pF.pierde.u === 0) && Math.abs(pF.dy || 0) < 1e-9, e + 'no termina de pie y derecho');
+  // los brazos no bajan por delante hasta que la barra salió de su alcance (0,68 a 0,85 m del hombro); si se fue atrás, bajan enseguida
+  ok(D.libreEn > 0 && D.libreEn < 1.2, `${e}la barra nunca sale del alcance de los brazos (${D.libreEn})`);
+  if (D.lado !== 'atras') { const R0 = { sub: 10, rec: 90, fin: 140, brazosDe: 90, brazosA: 60 };
+    for (let x = 0; x < D.libreEn - .005 && x < .3; x += .02) { const q = poseCaida(c.pl, g0, 0, D.dur + x, R0); ok(!q.barrido && !q.empuje, `${e}los brazos se mueven hacia la barra a los ${x.toFixed(2)} s de soltarla`); }
+    const q = poseCaida(c.pl, g0, 0, D.dur + Math.max(.3, D.libreEn) + .3, R0); ok(q.barrido && q.barrido.x > 0, e + 'los brazos nunca bajan'); }
   // siempre igual para el mismo intento (la repetición)
   const c2 = armarCaida(res, mov, bar, .225, g0, null, { hombros: { y: bar.y - .5, z: 0 }, cadera: { y: bar.y - 1 }, kg: 140 }), q = c2.barra.en(D.dur * .7);
   ok(Math.abs(q.y - en(D.dur * .7).y) < 1e-12 && Math.abs(q.z - en(D.dur * .7).z) < 1e-12, e + 'no da lo mismo al repetir');
-  if (g0 === 93.0) perd.push(`pérdida ${(causa + ' ' + mov).padEnd(11)} ${D.lado.padEnd(8)} ${D.dur.toFixed(2)} s en las manos · firme ${(firme * 1000).toFixed(0).padStart(3)} ms · se va ${(d(bS, b0) * 100).toFixed(1)} cm (z ${((bS.z - b0.z) * 100).toFixed(0)}, y ${((bS.y - b0.y) * 100).toFixed(0)}) · sale a ${c.barra.g.vz.toFixed(2)} m/s`);
+  if (g0 === 93.0) perd.push(`pérdida ${(causa + ' ' + mov).padEnd(11)} ${D.lado.padEnd(8)} ${D.dur.toFixed(2)} s en las manos · firme ${(firme * 1000).toFixed(0).padStart(3)} ms · se va ${(d(bS, b0) * 100).toFixed(1)} cm (z ${((bS.z - b0.z) * 100).toFixed(0)}, y ${((bS.y - b0.y) * 100).toFixed(0)}) · sale a ${c.barra.g.vz.toFixed(2)} m/s · fuera del alcance a los ${D.libreEn.toFixed(2)} s`);
 }
 ok(perd.length >= 8, 'no se probaron las pérdidas desde arriba');
 // los demás finales no cambian: sin pérdida
