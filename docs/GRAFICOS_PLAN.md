@@ -264,12 +264,35 @@ barra todavía en las manos.
 3. G9, G13, G14, G11, G12, G8 (Blender en Actions: una historia por corrida, con su lámina).
 4. G10 y G16 cuando estén los permisos.
 
-## 9. Estado
+## 9. Estado (24-nov, rama `graficos-fable`, PR #9)
 
-| Historia | Estado | Nota |
-|---|---|---|
-| G0 | hecha | |
-| G1 | en curso | |
-| G3 | en curso | |
-| G6 | en curso | |
-| resto | pendiente | G10 y G16 frenadas por permisos |
+| Historia | Estado | Qué quedó | Dónde mirarlo |
+|---|---|---|---|
+| G0 Presupuesto | hecha | `tools/presupuesto_modelos.mjs`, en `pruebas.yml`. Los seis modelos pasan | salida de la prueba |
+| G1 Poses T y A | hecha | `web/js/pose_ref.js`, `Athlete.poseReferencia`, visor `?ref=T` y `?ref=A`, `tools/pose_ref_test.mjs` (6 pesistas: brazos a 0,0° y 45,0°, asimetría de 2,5 a 9,3 mm) | `docs/img/graficos/g1_referencia_T_A.jpg` |
+| G2 Lámina de control | a medias | Están las tomas `referencia` del banco de fotos (`graficos.yml -f tomas=referencia`); falta sumar cara, manos y sentadilla en una sola hoja | ídem |
+| G3 El fallo se ve venir | hecha para las barras perdidas desde arriba | `PIERDE` en `caida.js`; `caida_test` (firme 90 a 125 ms, tope 200) y `check_escenas` con 0 `BAD` | `docs/img/graficos/g3_caidas_antes_despues.jpg` |
+| G3b Cargada perdida y barra devuelta | pendiente | | |
+| G4 Aviso previo | pendiente | espera el dato del núcleo (sección 7) | |
+| G6 Skins como dato | hecha (primera versión) | `web/data/skins.json` (6 equipos), `web/js/game/skins.js`, `Athlete.setSkin`, `juego.html?skin=<id>`, `tools/skins_test.mjs`. Cambia zapatillas, cinturón, pelo y tiñe la malla entera | `docs/img/graficos/g6_skins.jpg` |
+| G5, G7 a G17 | pendientes | G10 y G16 frenadas por permisos (sección 6) | |
+
+### Lo que mostraron las poses de referencia (sirve para G9 y G13)
+
+Con los brazos en T se ve lo que en las poses del levantamiento queda disimulado:
+
+- El reposo con el que se arman hoy los modelos **no es ni T ni A**: brazos a 42° con el codo doblado 46° y las piernas
+  abiertas 6° a 8° (`pose_ref_test --tabla`). Por eso de pie los brazos cuelgan abiertos, como de muñeco.
+- El hombro se afina y se hunde al subir el brazo a la horizontal (los pesos de piel del deltoides y la axila), y la
+  cabeza se ve grande contra el ancho de hombros. Son los dos primeros arreglos de G9 y G13.
+- Cadera y muslo quedan más anchos que el tórax en los tres: lee a figura de reloj de arena, no a pesista.
+
+### Límites conocidos de lo hecho
+
+- **Skins:** la malla se tiñe entera (multiplica el color horneado): el vivo amarillo de Ilarraz con el skin `noche` se
+  va al naranja y las vendas de muñeca se oscurecen. Pintar cada parte con su color es G7. Los nombres de los skins son
+  ids internos: los que vea el jugador, y si se regalan, se ganan o se venden, lo decidís vos.
+- **Caídas:** la pérdida ocurre después de que el núcleo cierra el intento (suma 0,37 a 0,48 s a esos finales). Para que
+  empiece antes hace falta el dato de la sección 7.
+- **Rendimiento:** nada de lo hecho suma texturas, sombreadores ni triángulos. No medí milisegundos por cuadro en un
+  teléfono real (Actions dibuja por software).
