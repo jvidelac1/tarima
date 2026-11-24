@@ -7,8 +7,8 @@
 //   Maneras de tocar raras (no miran): machacador (8 toques por segundo desde que confirma), mantiene (apoya y no suelta),
 //   ausente (no toca nunca), doble (cada toque son dos a 40–110 ms).
 // Uso: node tools/barra_bots.mjs [--n=400]   tabla por perfil × pesista × % de kilos y criterio de Gameplay 3:
-//   novato con la apertura sugerida (90 %): ≥ 95 % válidos y ≥ 60 % verde, en arranque y dos tiempos con los tres;
-//   al 100 %: novato entre 30 y 70 % válidos y el bueno más que el novato; diferencias por pesista en cada barrita (el
+//   novato con la apertura sugerida (90 %): ≥ 95 % válidos y ≥ 50 % verde, en arranque y dos tiempos con los tres;
+//   al 100 %: novato entre 30 y 70 % válidos en el arranque (15 a 70 en el dos tiempos, LIF-70) y el bueno más que el novato; diferencias por pesista en cada barrita (el
 //   verde del pesista fuerte en esa barrita, más ancho que el del débil); ninguna caída por no tocar con la apertura.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -101,14 +101,15 @@ export function verificar(ctx, S) {
 
 /** Una casilla: `n` intentos del perfil con el pesista, levantamiento e intensidad dados. */
 export function casilla(id, lev, I, B, n, sem0 = 0, extra = {}, envFijo = null) {
-  const o = { n: 0, v: 0, z: { verde: 0, amarillo: 0, rojo: 0 }, zi: [0, 1, 2, 3].map(() => ({ verde: 0, amarillo: 0, rojo: 0 })), caidaPorZona: { verde: 0, amarillo: 0, rojo: 0 }, contactos: 0, esf: 0, esfOk: 0, todoVerde: 0, salvados: 0 };
+  const o = { n: 0, v: 0, z: { verde: 0, amarillo: 0, rojo: 0 }, zi: [0, 1, 2, 3].map(() => ({ verde: 0, amarillo: 0, rojo: 0 })), caidaPorZona: { verde: 0, amarillo: 0, rojo: 0 }, caidaPerfecta: 0, perf: 0, contactos: 0, esf: 0, esfOk: 0, todoVerde: 0, salvados: 0 };
   const env = lev === 'c' ? envFijo || cuerpoBarra(id).casa : undefined;
   for (let k = 0; k < n; k++) {
     const sem = mezclar(sem0, k, I, lev === 'c' ? 1 : 0, ATL.indexOf(id)), ctx = ctxBarra(id, lev, env, I, sem, extra), S = jugarBarra(ctx, B, mezclar(sem, 5)), res = verificar(ctx, S).res;
     o.n++; if (res.res === 'valido') o.v++; o.contactos += S.contactos; if (res.uno.esfuerzo) { o.esf++; if (res.uno.esfuerzo.ok) o.esfOk++; }
     let peor = 'verde';
     for (const b of res.uno.barras || []) { o.z[b.zona]++; o.zi[b.i][b.zona]++; if (b.zona === 'rojo' || (b.zona === 'amarillo' && peor === 'verde')) peor = b.zona; }
-    if (res.res !== 'valido') o.caidaPorZona[peor]++;
+    const todoPerf = !!res.uno.barras?.length && res.uno.barras.every(b => b.perf); for (const b of res.uno.barras || []) if (b.perf) o.perf++;
+    if (res.res !== 'valido') { o.caidaPorZona[peor]++; if (todoPerf) o.caidaPerfecta++; }
     // todo verde (rules.js, BARRA.verdeSalva): sube siempre; `salvados`: los que se quedaban sin energía (sin la regla, la garra salvaba algunos)
     if (res.uno.barras?.length && peor === 'verde') { o.todoVerde++; if (res.uno.protegido) o.salvados++; }
   }
@@ -138,7 +139,7 @@ if (principal) {
   // todo verde: cuántos intentos tienen todas sus barritas en verde (y entonces suben siempre) y cuántos de esos se quedaban sin energía
   console.log('\nTodo verde % de los intentos (los tres pesistas juntos) · entre paréntesis, los que se quedaban sin energía y salvó el verde sin gastar la garra (% de los intentos)');
   for (const lev of ['s', 'c']) for (const pf of ['novato', 'medio', 'bueno', 'tipico']) {
-    const fila = Is.map(I => { let n = 0, tv = 0, sv = 0; for (const id of ATL) { const o = T[pf][`${id}|${lev}|${I}`]; n += o.n; tv += o.todoVerde; sv += o.salvados; if (o.caidaPorZona.verde) mal.push(`${dif} ${pf} ${NOMBRE[id]} ${lev} ${I / 100} %: ${o.caidaPorZona.verde} caídas con todas las barritas en verde`); } return `${pc(tv, n).toFixed(0).padStart(4)} (${pc(sv, n).toFixed(0)})`.padStart(17); });
+    const fila = Is.map(I => { let n = 0, tv = 0, sv = 0; for (const id of ATL) { const o = T[pf][`${id}|${lev}|${I}`]; n += o.n; tv += o.todoVerde; sv += o.salvados; if (o.caidaPerfecta) mal.push(`${dif} ${pf} ${NOMBRE[id]} ${lev} ${I / 100} %: ${o.caidaPerfecta} caídas con todas las barritas perfectas`); } return `${pc(tv, n).toFixed(0).padStart(4)} (${pc(sv, n).toFixed(0)})`.padStart(17); });
     console.log(`${lev === 's' ? 'arranque' : 'dos t.  '} ${pf.padEnd(8)}${fila.join('')}`);
   }
   // ancho del verde por pesista y barrita (ms de puntero, medio ancho) al 90 y al 100 %
@@ -150,10 +151,10 @@ if (principal) {
     if (dif === 'facil') {
       const o = T.novato[`${id}|${lev}|9000`], nz = o.z.verde + o.z.amarillo + o.z.rojo;
       if (pc(o.v, o.n) < 95) mal.push(`novato ${NOMBRE[id]} ${lev} al 90 %: ${pc(o.v, o.n)} % válidos (meta ≥ 95)`);
-      if (pc(o.z.verde, nz) < 60) mal.push(`novato ${NOMBRE[id]} ${lev} al 90 %: ${pc(o.z.verde, nz)} % verde (meta ≥ 60)`);
+      if (pc(o.z.verde, nz) < 50) mal.push(`novato ${NOMBRE[id]} ${lev} al 90 %: ${pc(o.z.verde, nz)} % verde (meta ≥ 50)`);
       const n100 = T.novato[`${id}|${lev}|10000`];
       // (hasta 70: con todo verde sube siempre, el novato que pega en el verde ancho de Largo en el tirón levanta un poco más)
-      if (pc(n100.v, n100.n) < 30 || pc(n100.v, n100.n) > 70) mal.push(`novato ${NOMBRE[id]} ${lev} al 100 %: ${pc(n100.v, n100.n)} % válidos (meta 30 a 70)`);
+      { const lo = lev === 'c' ? 15 : 30; if (pc(n100.v, n100.n) < lo || pc(n100.v, n100.n) > 70) mal.push(`novato ${NOMBRE[id]} ${lev} al 100 %: ${pc(n100.v, n100.n)} % válidos (meta ${lo} a 70)`); }
     } else {
       // metas de la dificultad: con la apertura sugerida, Medio: novato ≥ 90 % y medio ≥ 95 %; Difícil: novato ≥ 75 % y bueno ≥ 95 %
       const [pn, pm, qm] = dif === 'medio' ? [90, 'medio', 95] : [75, 'bueno', 95];
@@ -221,7 +222,12 @@ if (principal) {
   // ganable: en Medio, el novato con lo que trae el panel gana contra amistosos; en Difícil, el bueno que lee su puntería
   // gana contra normales
   const media = k => { const xs = OROS[k] || []; return xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length); };
-  if (dif === 'medio' && media('amistoso|novato|panel') < 50) mal.push(`medio: el novato con el panel gana el oro solo el ${media('amistoso|novato|panel').toFixed(0)} % contra amistosos (meta ≥ 50)`);
+  // LIF-70 (A1, plan de gameplay del 24-nov): la primera final (Fácil, amistosos) se gana ~60 % y no casi siempre; con
+  // rivales parejos, el jugador medio o bueno que sigue el panel gana entre 20 y 45 %
+  const entre = (k, lo, hi, que) => { const x = media(k); if (x < lo || x > hi) mal.push(`${dif}: ${que} gana el oro el ${x.toFixed(0)} % (meta ${lo} a ${hi})`); };
+  if (dif === 'facil') { entre('amistoso|medio|panel', 45, 75, 'el jugador medio con el panel, contra amistosos,'); entre('normal|medio|panel', 20, 45, 'el jugador medio con el panel, contra parejos,'); entre('normal|bueno|panel', 25, 50, 'el bueno con el panel, contra parejos,'); }
+  // Medio es un escalón arriba de Fácil (solo la franja perfecta salva y hay más barritas): el novato todavía gana a veces
+  if (dif === 'medio') { if (media('amistoso|novato|panel') < 12) mal.push(`medio: el novato con el panel gana el oro solo el ${media('amistoso|novato|panel').toFixed(0)} % contra amistosos (meta ≥ 12)`); entre('amistoso|medio|panel', 20, 50, 'el jugador medio con el panel, contra amistosos,'); }
   if (dif === 'dificil' && media('normal|bueno|lector') < 25) mal.push(`dificil: el bueno que lee su puntería gana el oro solo el ${media('normal|bueno|lector').toFixed(0)} % contra normales (meta ≥ 25)`);
   // chance del panel (perfil típico) contra lo medido con el bot típico, por casilla (informativo; la prueba es chance_test)
   let peor = 0;

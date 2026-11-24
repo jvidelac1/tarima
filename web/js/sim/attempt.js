@@ -9,7 +9,7 @@ import {
   ventanas, calidad, palabra, alturaExplosion, desvioExplosion, velTiron, exigenciaTabla, alturaTabla, periodoAnillo, errorAnillo, gradoTension,
   anchoFacil, asistFacil, segunHolgura, TENSION, FACIL, ACOMODO_MS, ALTURA_MIN, TOPE_DESVIO, ALTURA_ENVION, NO_DOMINA, EXI_ARRANQUE, EXI_ERROR, PELEA, TRABA, FIJA, HOMBROS, JUEZ, esfuerzoPropio,
   UNO, CUERPO_NEUTRO, TRAMOS, gastoTramo, conSuerte, ruidoDe, garraAlcanza,
-  TRAMO_BARRA, posBarra, zonasBarra, zonaBarra, pideEsfuerzo, reglasB, barritaDeTramo, costoBarra, reglasConTecnica } from './rules.js';
+  TRAMO_BARRA, posBarra, zonasBarra, zonaBarra, esPerfecto, pideEsfuerzo, reglasB, barritaDeTramo, costoBarra, reglasConTecnica } from './rules.js';
 
 const INF = 2147483647;
 const PASO = k => idiv(k * 25, 3);           // ms del paso k de la pelea (120 por segundo)
@@ -300,7 +300,7 @@ export class Intento {
     return { cuerpo, suerte, dia: suerte.reduce((a, x) => a + x, 0), m0, m: m0, fatiga: this.B ? c.fatiga || 0 : 0, esfuerzo: null, esfuerzoSolo: false, protegido: 0, gastos: {}, suertes: {}, log: [], garra: c.garraUno === false ? 'gastada' : 'disponible', noAlcanza: false,
       guarda: 0, ign: 0, ultBaja: -INF, contactos: [], salto: null, pisoton: null, caida: null, freno: null, tiraSola: false, arribaSola: false,
       // 'b': las barritas (zonas, y dónde cayó cada toque) y lo que su toque le suma al gasto de su tramo
-      pend: null, barras: this.B ? this.R.barritas[c.lev].map(i => ({ i, z: zonasBarra(c.I, cuerpo, i, !!c.primera, c.env || 'split', this.R), t0: null, t: null, pos: null, zona: null, sola: false })) : null, extra: {} };
+      pend: null, barras: this.B ? this.R.barritas[c.lev].map(i => ({ i, z: zonasBarra(c.I, cuerpo, i, !!c.primera, c.env || 'split', this.R), t0: null, t: null, pos: null, zona: null, perf: false, sola: false })) : null, extra: {} };
   }
   _uEntrada(t, v) {
     const U = this.U;
@@ -335,13 +335,13 @@ export class Intento {
     return 'listo';
   }
   /** 'b' (BARRA.verdeSalva): ¿todas las barritas jugadas hasta ahora salieron verdes? Entonces ningún tramo tira la barra. */
-  _bTodoVerde() { return !!(this.B && this.R.verdeSalva && this.U.barras.every(b => !b.zona || b.zona === 'verde')); }
+  _bTodoVerde() { return !!(this.B && this.R.verdeSalva && this.U.barras.every(b => !b.zona || b.perf)); }
   /** La barrita `i` de este intento (0 tirón, 1 envión, 2 atrapar, 3 pararse). */
   _b(i) { return this.U.barras.find(b => b.i === i); }
   /** Juzga la barrita `i` en t (o la marca REGULAR si salió sola) y anota lo que su tramo gasta de más. */
   _bPega(t, i, sola) {
     const U = this.U, b = this._b(i); b.t = t; b.sola = sola;
-    b.pos = posBarra(t - b.t0, this.R); b.zona = sola ? 'amarillo' : zonaBarra(b.pos, b.z);
+    b.pos = posBarra(t - b.t0, this.R); b.zona = sola ? 'amarillo' : zonaBarra(b.pos, b.z); b.perf = !sola && esPerfecto(b.pos, b.z);
     U.extra[TRAMO_BARRA[i]] = costoBarra(this.R, i, b.zona);
     return b.zona;
   }
@@ -441,7 +441,7 @@ export class Intento {
     U.gastos[tramo] = g; U.suertes[tramo] = gs - g0; U.m -= g;
     // 'b', todo en verde hasta acá (BARRA.verdeSalva): el tramo se completa con la energía en 0; lo que faltó cansa igual
     const salva = U.m < 0 && this._bTodoVerde() ? -U.m : 0; if (salva) { U.protegido += salva; U.m = 0; }
-    U.log.push({ t, tramo, gasto: g, suerte: gs - g0, ...(bb ? { toque: extra, zona: bb.zona } : {}), ...(this.B && tramo === 'pararse' && (U.esfuerzo || U.esfuerzoSolo) ? { esfuerzo: U.esfuerzo ? U.esfuerzo.ok : true } : {}), ...(salva ? { salva } : {}), m: U.m });
+    U.log.push({ t, tramo, gasto: g, suerte: gs - g0, ...(bb ? { toque: extra, zona: bb.zona, ...(bb.perf ? { perf: true } : {}) } : {}), ...(this.B && tramo === 'pararse' && (U.esfuerzo || U.esfuerzoSolo) ? { esfuerzo: U.esfuerzo ? U.esfuerzo.ok : true } : {}), ...(salva ? { salva } : {}), m: U.m });
     if (U.m >= 0) return sigue(t);
     if (U.m >= UNO.frenoMin && U.garra === 'disponible') {
       // la garra se usa sola si con ella el resto llega (sin suerte); si no alcanzaría, no se gasta
@@ -523,7 +523,7 @@ export class Intento {
     const cuenta = {}; for (const x of U.contactos) cuenta[x.que] = (cuenta[x.que] || 0) + 1;
     return { margen_ini: U.m0, dia: U.dia, gastos: { ...g }, suertes: { ...U.suertes }, margen_fin: U.m, garra: U.garra, garra_no_alcanza: U.noAlcanza, tramo_caida: U.caida, tramo_mayor: mayor, salto: U.salto !== null, pisoton: U.pisoton !== null,
       tira_sola: U.tiraSola, arriba_sola: U.arribaSola, al_limite: !U.caida && U.m < UNO.alLimite, contactos: cuenta,
-      ...(this.B ? { fatiga: U.fatiga, esfuerzo: U.esfuerzo ? { meta: U.esfuerzo.meta, n: U.esfuerzo.n, ok: U.esfuerzo.ok } : null, ...(U.esfuerzoSolo ? { esfuerzo_solo: true } : {}), ...(U.protegido ? { protegido: U.protegido } : {}), barras: U.barras.filter(b => b.zona).map(b => ({ i: b.i, zona: b.zona, pos: b.pos, v: b.z.v, a: b.z.a, sola: b.sola, extra: costoBarra(this.R, b.i, b.zona) })) } : {}) };
+      ...(this.B ? { fatiga: U.fatiga, esfuerzo: U.esfuerzo ? { meta: U.esfuerzo.meta, n: U.esfuerzo.n, ok: U.esfuerzo.ok } : null, ...(U.esfuerzoSolo ? { esfuerzo_solo: true } : {}), ...(U.protegido ? { protegido: U.protegido } : {}), barras: U.barras.filter(b => b.zona).map(b => ({ i: b.i, zona: b.zona, perf: b.perf, pos: b.pos, v: b.z.v, a: b.z.a, p: b.z.p, sola: b.sola, extra: costoBarra(this.R, b.i, b.zona) })) } : {}) };
   }
 
   // ---------- resultados ----------

@@ -146,8 +146,9 @@ export const sonido = {
     g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.045, t + .5); o.connect(g).connect(ctx.destination); o.start(t);
     return () => { if (fin) return; fin = true; try { const t2 = ctx.currentTime; g.gain.cancelScheduledValues(t2); g.gain.setValueAtTime(.03, t2); g.gain.exponentialRampToValueAtTime(.0001, t2 + .06); o.stop(t2 + .08); } catch { /* ya cortado */ } };
   },
-  pega(zona) {
-    if (zona === 'verde') { tono(880, 880, .22, 'triangle', .16); tono(1320, 1320, .3, 'sine', .1); ruido(.6, .07, 2600); vibra(30); }
+  pega(zona, perf = false) {
+    if (zona === 'verde' && perf) { tono(880, 880, .22, 'triangle', .16); tono(1320, 1320, .3, 'sine', .12); tono(1760, 1760, .35, 'sine', .07); ruido(.6, .07, 2600); vibra([30, 30, 30]); }
+    else if (zona === 'verde') { tono(880, 880, .22, 'triangle', .16); tono(1320, 1320, .3, 'sine', .1); ruido(.6, .07, 2600); vibra(30); }
     else if (zona === 'amarillo') { tono(300, 240, .14, 'square', .09); ruido(.06, .2, 800); vibra(18); }
     else { tono(130, 80, .3, 'sawtooth', .12); vibra([20, 40, 20]); }
   },

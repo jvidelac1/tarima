@@ -9,7 +9,7 @@
    "persona": 0,
    "ctl": "b",
    "turnos": "rondas",
-   "tabla": "ventura:160+201=361#1 brenner:165+191=356#2 marangi:167+188=355#3"
+   "tabla": "brenner:169+194=363#1 marangi:163+197=360#2 ventura:160+196=356#3"
   },
   {
    "semilla": 22000054,
@@ -33,7 +33,7 @@
    "persona": 0,
    "ctl": "b",
    "turnos": "oficial",
-   "tabla": "ventura:163+200=363#1 marangi:168+193=361#2 brenner:157+193=350#3"
+   "tabla": "brenner:168+200=368#1 marangi:170+197=367#2 ventura:163+188=351#3"
   },
   {
    "semilla": 55000135,
@@ -41,7 +41,7 @@
    "persona": 1,
    "ctl": "c",
    "turnos": "rondas",
-   "tabla": "marangi:165+210=375#1 ventura:165+202=367#2 brenner:166+190=356#3"
+   "tabla": "ventura:167+202=369#1 marangi:165+204=369#2 brenner:166+190=356#3"
   },
   {
    "semilla": 66000162,
@@ -57,7 +57,7 @@
    "persona": 0,
    "ctl": "b",
    "turnos": "rondas",
-   "tabla": "ventura:166+203=369#1 brenner:154+186=340#2 marangi:0+199=0#-"
+   "tabla": "brenner:166+199=365#1 ventura:154+202=356#2 marangi:0+195=0#-"
   },
   {
    "semilla": 88000216,
@@ -65,7 +65,7 @@
    "persona": 1,
    "ctl": "c",
    "turnos": "oficial",
-   "tabla": "marangi:176+215=391#1 ventura:167+209=376#2 brenner:171+197=368#3"
+   "tabla": "marangi:176+214=390#1 ventura:167+212=379#2 brenner:171+197=368#3"
   },
   {
    "semilla": 99000243,
@@ -81,7 +81,7 @@
    "persona": 0,
    "ctl": "b",
    "turnos": "oficial",
-   "tabla": "brenner:163+198=361#1 ventura:152+206=358#2 marangi:161+194=355#3"
+   "tabla": "marangi:164+200=364#1 brenner:166+195=361#2 ventura:152+199=351#3"
   },
   {
    "semilla": 121000297,
@@ -89,7 +89,7 @@
    "persona": 1,
    "ctl": "c",
    "turnos": "rondas",
-   "tabla": "ventura:163+211=374#1 brenner:173+200=373#2 marangi:166+198=364#3"
+   "tabla": "brenner:173+200=373#1 ventura:163+205=368#2 marangi:166+201=367#3"
   },
   {
    "semilla": 132000324,

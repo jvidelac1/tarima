@@ -611,7 +611,8 @@ export default {
   // ---- 'b' level (the bar, docs/JUEGO.md Gameplay 3): signal, words, panel, lines and hints
   'barra.verbo': 'TAP IN THE GREEN',
   'barra.sub': '{t} when the pointer is in the green',
-  'barra.verde': 'PERFECT!',
+  'barra.verde': 'GOOD!',
+  'barra.perfecto': 'PERFECT!',
   'barra.amarillo': 'FAIR',
   'barra.rojo': 'WAY OFF',
   'barra.todavia': 'not yet',
@@ -634,6 +635,8 @@ export default {
   'llamado.b_sin_apuro': 'No rush: the pointer waits for you.',
   'explica.b.zona': '{kg} kg is {pct} % and you hit {toques}: out of energy in {donde}.',
   'explica.b.zona_corta': 'You hit {toques} and ran out of energy in {donde}.',
+  'explica.b.sin_perfecto': '{kg} kg is {pct} %: you hit the green, but without a perfect it ran out of energy in {donde}.',
+  'explica.b.sin_perfecto_corta': 'Green, but not perfect: out of energy in {donde}.',
   'explica.b.toque': 'the {zona} {en}', 'explica.b.y': ' and ',
   'barra.en.s0': 'on the pull', 'barra.en.c0': 'on the clean', 'barra.en.c1': 'on the jerk',
   'barra.en.s2': 'on the overhead catch', 'barra.en.s3': 'standing up', 'barra.en.c3': 'standing up',

@@ -117,7 +117,8 @@ function lineaU(res, o, l) {
 /**
  * Línea de 'b' (docs/JUEGO.md, Gameplay 3): dónde se quedó sin energía y, siempre, cada barrita que no salió verde y en qué
  * barrita fue: «173 kg es el 99 % y pegaste en el amarillo en el envión (−½): se quedó sin energía en el envión». Con todas
- * las barritas en verde la barra no se cae (rules.js, BARRA.verdeSalva), así que una caída siempre tiene un toque que nombrar.
+ * las barritas en la franja perfecta la barra no se cae (rules.js, BARRA.verdeSalva); con todo verde pero no perfecto, la
+ * línea dice eso (los kilos eran demasiados).
  * Válido: solo si quedó al límite.
  */
 function lineaB(res, o, l) {
@@ -130,8 +131,8 @@ function lineaB(res, o, l) {
   const larga = o.kg && o.pct;
   // el cansancio se nombra si sin él se paraba
   const cansado = u.fatiga && u.margen_fin + u.fatiga >= 0 ? tr(l, 'explica.b.cansado', { d: cuartos(u.fatiga) }) : '';
-  // no debería pasar (todo verde sube): la línea de 'u', sin toques
-  if (!B.length) return (larga ? tr(l, 'explica.u.cae', v) : tr(l, 'explica.u.cae_corta', v)) + cansado;
+  // todo verde pero no todo perfecto (desde la 2.0 solo la franja perfecta salva): los kilos eran demasiados
+  if (!B.length) return tr(l, larga ? 'explica.b.sin_perfecto' : 'explica.b.sin_perfecto_corta', v) + cansado;
   // «el amarillo en el envión», «el amarillo en la cargada y en el rojo en el envión»: cada toque que falló, en orden
   const toques = B.map(b => tr(l, 'explica.b.toque', { zona: tr(l, 'barra.z.' + b.zona), en: tr(l, `barra.en.${lev}${b.i}`) })).join(tr(l, 'explica.b.y'));
   return tr(l, larga ? 'explica.b.zona' : 'explica.b.zona_corta', { ...v, toques, d: cuartos(extra) }) + cansado;

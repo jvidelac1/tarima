@@ -489,7 +489,9 @@ function lineaNombraToques(res, lev, I) {
   for (const l of ['es', 'en']) {
     const txt = explicar(res, 'b', true, { lev, quien: 'Ana', kg: 170, pct: Math.round(I / 100) }, l), corta = explicar(res, 'b', false, { lev }, l);
     const falta = res.uno.barras.filter(b => b.zona !== 'verde').map(b => tr(l, 'explica.b.toque', { zona: tr(l, 'barra.z.' + b.zona), en: tr(l, `barra.en.${lev}${b.i}`) }));
-    if (!res.uno.tramo_caida || !txt || !falta.length || falta.some(x => !txt.includes(x) || !corta.includes(x)) || /\b(ms|undefined)\b|[{}]/i.test(txt + corta) || txt.length > 170) { bien = false; console.log(`  MAL: línea de caída de 'b' (${l}): «${txt}» · «${corta}» · ${JSON.stringify(res.uno.barras)}`); }
+    // todo verde sin perfecto: la línea lo dice (rules.js, BARRA.perfecto)
+    const sinPerf = !falta.length && txt === explicar(res, 'b', true, { lev, quien: 'Ana', kg: 170, pct: Math.round(I / 100) }, l) && txt.includes(tr(l, 'barra.z.verde'));
+    if (!res.uno.tramo_caida || !txt || (!falta.length && !sinPerf) || falta.some(x => !txt.includes(x) || !corta.includes(x)) || /\b(ms|undefined)\b|[{}]/i.test(txt + corta) || txt.length > 170) { bien = false; console.log(`  MAL: línea de caída de 'b' (${l}): «${txt}» · «${corta}» · ${JSON.stringify(res.uno.barras)}`); }
   }
   return bien;
 }
@@ -520,13 +522,13 @@ function lineaNombraToques(res, lev, I) {
       const ctx = { lev, env, I, tec: f.attrs.tec, temple: 0, garra: f.attrs.gar, anclas: datos.modelos[f.modelo], semilla: mezclar(k, 6), cal: 0, primera: false, domina: true, jueces: [1000, 1000, 1000], reloj: 30000, ctl: 'b', cuerpo: c, garraUno: k % 4 !== 0 };
       const S = jugarBarra(ctx, Object.values(PERFILES)[k % 4], k), res = S.m.res;
       for (const b of res.uno.barras) { zonas[b.zona]++; ok(b.sola || zonaBarra(b.pos, zonasBarra(I, c, b.i, false, env || 'split')) === b.zona, `zona mal juzgada: ${JSON.stringify(b)}`); }
-      if (res.uno.barras.every(b => b.zona === 'verde')) { todoVerde++; ok(res.res === 'valido', `todo verde y se cae: ${JSON.stringify(res.uno)}`); }
+      if (res.uno.barras.every(b => b.perf)) { todoVerde++; ok(res.res === 'valido', `todo perfecto y se cae: ${JSON.stringify(res.uno)}`); }
       if (res.res !== 'fallo') continue;
       if (!lineaNombraToques(res, lev, I)) sinLinea++;
     }
   }
   ok(!sinLinea, `${sinLinea} caídas de 'b' sin línea que nombre el tramo, la zona y la barrita de cada toque que falló`);
-  ok(todoVerde > 50, `muy pocos intentos todo en verde para probar la regla (${todoVerde})`);
+  ok(todoVerde > 50, `muy pocos intentos todo perfecto para probar la regla (${todoVerde})`);
   // todo verde, la barra sube (BARRA.verdeSalva): con el puntero siempre en el centro, cualquier peso, cansancio y suerte, en
   // los tres niveles; y la chance de alguien que siempre pega en el verde es 10 de 10
   { let n = 0, salvados = 0, esfSolo = 0;
@@ -534,7 +536,7 @@ function lineaNombraToques(res, lev, I) {
       const R = reglasB(dif), lev = k % 2 ? 'c' : 's', id = IDS[k % 3], f = datos.atletas[id], I = 9900 + 30 * (k % 15), c = cuerpoBarra(id), env = lev === 'c' ? ['split', 'power', 'squat'][k % 3] : undefined;
       const ctx = { lev, env, I, tec: f.attrs.tec, temple: 0, garra: f.attrs.gar, anclas: datos.modelos[f.modelo], semilla: mezclar(k, 8, dif.length), cal: 0, primera: false, domina: true, jueces: [1000, 1000, 1000], reloj: 30000, ctl: 'b', cuerpo: c, garraUno: k % 4 !== 0, fatiga: 250 * (k % 4), ...(dif === 'facil' ? {} : { dif }) };
       const S = jugarBarra(ctx, { sd: 0, sesgo: 0, despiste: 0, reac: 400, ritmo: 400, noEsfuerzo: 1000 }, k), res = S.m.res; n++;
-      ok(res.uno.barras.length === R.barritas[lev].length && res.uno.barras.every(b => b.zona === 'verde') && res.res === 'valido', `${dif} ${lev} ${I}: todo verde tiene que subir: ${res.res} ${JSON.stringify(res.uno)}`);
+      ok(res.uno.barras.length === R.barritas[lev].length && res.uno.barras.every(b => b.zona === 'verde' && b.perf) && res.res === 'valido', `${dif} ${lev} ${I}: todo perfecto tiene que subir: ${res.res} ${JSON.stringify(res.uno)}`);
       ok(!res.uno.esfuerzo, `${dif}: con todo verde el esfuerzo de pararse no aparece: ${JSON.stringify(res.uno.esfuerzo)}`);
       if (res.uno.protegido) salvados++; if (res.uno.esfuerzo_solo) esfSolo++;
       ok(chanceBarra(I, lev, env, c, { dif, fatiga: ctx.fatiga, garra: ctx.garraUno, perfil: { sd: 1, sesgo: 0, despiste: 0, esfuerzo: 0 } }) === 1000, `${dif} ${lev} ${I}: la chance de quien pega siempre en el verde no es 10 de 10`);
@@ -611,7 +613,7 @@ function lineaNombraToques(res, lev, I) {
       ok(JSON.stringify(re.res) === JSON.stringify(res), `${dif}: el intento recalculado no da lo mismo`);
       for (const b of res.uno.barras) { tipos[b.i] = (tipos[b.i] || 0) + 1; ok(b.sola || zonaBarra(b.pos, zonasBarra(I, c, b.i, false, env || 'split', R)) === b.zona, `${dif}: zona mal juzgada: ${JSON.stringify(b)}`); }
       if (res.res === 'valido') ok(res.uno.barras.map(b => b.i).join() === R.barritas[lev].join(), `${dif} ${lev}: barritas ${res.uno.barras.map(b => b.i)} y el nivel dice ${R.barritas[lev]}`);
-      if (res.uno.barras.every(b => b.zona === 'verde')) ok(res.res === 'valido', `${dif}: todo verde y se cae: ${JSON.stringify(res.uno)}`);
+      if (res.uno.barras.every(b => b.perf)) ok(res.res === 'valido', `${dif}: todo perfecto y se cae: ${JSON.stringify(res.uno)}`);
       else if (res.res === 'fallo') ok(lineaNombraToques(res, lev, I), `${dif}: la línea de caída no nombra cada toque que falló`);
     }
     // el puntero de cada nivel va y vuelve en su pasada, y en Difícil nunca se pone lento antes del minuto

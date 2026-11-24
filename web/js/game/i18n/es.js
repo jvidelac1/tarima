@@ -628,7 +628,8 @@ export default {
   // ---- nivel 'b' (la barrita, docs/JUEGO.md Gameplay 3): señal, palabras, panel, líneas y ayudas
   'barra.verbo': 'TOCA EN EL VERDE',
   'barra.sub': '{t} cuando el puntero esté en el verde',
-  'barra.verde': '¡PERFECTO!',
+  'barra.verde': '¡BIEN!',
+  'barra.perfecto': '¡PERFECTO!',
   'barra.amarillo': 'REGULAR',
   'barra.rojo': 'LEJOS',
   'barra.todavia': 'todavía',
@@ -651,6 +652,8 @@ export default {
   'llamado.b_sin_apuro': 'Sin apuro: el puntero te espera.',
   'explica.b.zona': '{kg} kg es el {pct} % y pegaste en {toques}: se quedó sin energía en {donde}.',
   'explica.b.zona_corta': 'Pegaste en {toques} y se quedó sin energía en {donde}.',
+  'explica.b.sin_perfecto': '{kg} kg es el {pct} %: pegaste en el verde, pero sin perfecto no alcanzó y se quedó sin energía en {donde}.',
+  'explica.b.sin_perfecto_corta': 'Verde, pero no perfecto: se quedó sin energía en {donde}.',
   'explica.b.toque': 'el {zona} {en}', 'explica.b.y': ' y en ',
   'barra.en.s0': 'en el tirón', 'barra.en.c0': 'en la cargada', 'barra.en.c1': 'en el envión',
   'barra.en.s2': 'al atraparla arriba', 'barra.en.s3': 'al pararte', 'barra.en.c3': 'al pararte',

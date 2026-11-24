@@ -773,7 +773,7 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
           if (barra) {
             // 'b': el toque juzgado en el instante del evento; respuesta inmediata (golpe y marca) y el pesista tira ya
             const Q = QUE_B[r.que] || QUE_B.listo;
-            if (Q.zona) { const mB = alDia(ctx, conf, ent, r.t, ctl), b = mB.U.barras.find(x => x.t === r.t && x.zona); sonido.pega(Q.zona); cortaSubida?.(); cortaSubida = null; if (b) barritaUI.pega(b.i, b.zona, b.pos, reloj.ahora()); if (Q.zona === 'verde') $('escena').classList.add('verde'), setTimeout(() => $('escena').classList.remove('verde'), 450); }
+            if (Q.zona) { const mB = alDia(ctx, conf, ent, r.t, ctl), b = mB.U.barras.find(x => x.t === r.t && x.zona); sonido.pega(Q.zona, !!b?.perf); cortaSubida?.(); cortaSubida = null; if (b) barritaUI.pega(b.i, b.zona, b.pos, reloj.ahora(), b.perf); if (Q.zona === 'verde') $('escena').classList.add('verde'), setTimeout(() => $('escena').classList.remove('verde'), 450); }
             else { decir(t(Q.clave), { nota: true, gris: !!Q.gris }); if (r.que === 'de_pie') { sonido.pisoton(); sacudir(); } else if (r.que === 'esfuerzo') sonido.tic(); }
             if (presenta) presenta.hasta = Math.min(presenta.hasta, reloj.ahora());
             if (toques.abierto) toques.abierto.nota = r.que; toques.resolver(true, r.que || 'gesto'); return;
