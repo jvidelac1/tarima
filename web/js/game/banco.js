@@ -165,6 +165,7 @@ async function fotosNiveles(B, { escena, cargas, params, msg, decir }) {
       escena.barbell.group.visible = !f.ref;
       if (f.ref) { const G = tramo(escena.P, 'clean'); escena.posar({ seg: G.nombre, s: G.i('Parado'), tau: G.t('Parado'), base: G.base, primero: true }, 'c', 0); escena.activo.poseReferencia(f.ref); }
       else if (f.seg) { const G = tramo(escena.P, f.seg); escena.posar({ seg: G.nombre, s: G.i(f.fase), tau: G.t(f.fase), base: G.base, primero: false }, f.seg === 'snatch' ? 's' : 'c', 0); } else escena.bucle(f.t, 0);
+      await escena.activo?.pielLista;      // skin con textura de piel (?skin=): la foto espera a que baje
       escena.sombra = 4;
       for (let k = 0; k < 4; k++) escena.cuadro(k ? .016 : 5, true);
       return f.nombre;

@@ -19,7 +19,8 @@ const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const _v = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
 
 const SKIN_PARS = /* glsl */`
-uniform sampler2D tMask; uniform sampler2D tDetailSkin; uniform sampler2D tDetailCloth; uniform vec2 uTile; uniform float uMaskMode; uniform vec3 uScatter; uniform float uSweat; uniform float uDetail; uniform float uSkinSat; uniform float uSkinRough; uniform vec3 uHairColor; uniform vec4 uClothFlat; uniform vec3 uSkinTint; uniform vec3 uClothTint; uniform float uTone; uniform float uWrinkle; uniform float uGloss; uniform float uFino; uniform float uClothGain; uniform float uNormBias; uniform float uHairMix; uniform vec3 uPiel; uniform float uSinCabeza; varying float vCab; uniform float uSinTorso; uniform float uCercaOjo; uniform float uCorte; varying float vTor; varying float vNdcY;
+#define PIEL_SOMBRA 0.7
+uniform sampler2D tMask; uniform sampler2D tDetailSkin; uniform sampler2D tDetailCloth; uniform vec2 uTile; uniform float uMaskMode; uniform vec3 uScatter; uniform float uSweat; uniform float uDetail; uniform float uSkinSat; uniform float uSkinRough; uniform vec3 uHairColor; uniform vec4 uClothFlat; uniform vec3 uSkinTint; uniform vec3 uClothTint; uniform float uTone; uniform float uWrinkle; uniform float uGloss; uniform float uFino; uniform float uClothGain; uniform float uNormBias; uniform float uHairMix; uniform vec3 uPiel; uniform float uSinCabeza; varying float vCab; uniform float uSinTorso; uniform float uCercaOjo; uniform float uCorte; varying float vTor; varying float vNdcY; uniform sampler2D tPielTex; uniform float uPielTex; uniform vec3 uPielK; uniform vec3 uPielBase;
 vec3 gMask = vec3( 0.0 ); float gGrain = 0.0; float gPatch = 0.5;
 // ruido de valor suave (manchas redondeadas, sin textura): antes la variación de tono y los parches húmedos salían del mosaico de
 // poros y se leían como una red de vetas claras sobre la piel
@@ -55,6 +56,10 @@ const SKIN_MASK = /* glsl */`
     float sk = smoothstep( 0.2, 0.32, gr ) * ( 1.0 - smoothstep( 0.72, 0.88, gr ) ) * ( 1.0 - smoothstep( 0.55, 0.75, br ) ) * smoothstep( 0.04, 0.1, lum );
     gMask = vec3( sk, 1.0 - sk, 0.0 );
   }
+  // textura de piel de un skin (game/skins.js, pielTex; mismo UV): reemplaza el albedo de la piel y conserva el sombreado
+  // pintado en el horneado (pliegues, relieve) como la razón entre lo horneado y el tono base de la ficha
+  if ( uPielTex > 0.0 && uMaskMode > 0.5 ) { float l0 = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) ) / max( 1e-3, dot( uPielBase, vec3( 0.2126, 0.7152, 0.0722 ) ) );
+    diffuseColor.rgb = mix( diffuseColor.rgb, texture2D( tPielTex, vMapUv ).rgb * uPielK * mix( 1.0, clamp( l0, 0.55, 1.2 ), PIEL_SOMBRA ), uPielTex * smoothstep( 0.5, 0.9, gMask.r ) ); }
   // el albedo de piel llega saturado del horneado: se baja un poco para que la luz cálida no lo vuelva naranja
   diffuseColor.rgb = mix( diffuseColor.rgb, mix( vec3( dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) ) ), diffuseColor.rgb, uSkinSat ), gMask.r );
   // tono de piel (parámetro del personaje) y su variación: parches grandes más rojizos o más pálidos (uTone), como la piel de verdad
@@ -191,6 +196,13 @@ async function bajar(url, avisa, { estancado = 20000 } = {}) {
   } finally { clearTimeout(reloj); }
 }
 
+/** Texturas de piel de los skins (game/skins.js, `pielTex`), una por ruta; solo se bajan si un skin las pide. */
+const pielTex = new Map();
+function loadPielTex(url, aniso) {
+  if (!pielTex.has(url)) pielTex.set(url, new THREE.TextureLoader().loadAsync(url).then(t => { t.flipY = false; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = aniso; t.needsUpdate = true; return t; }).catch(e => { pielTex.delete(url); throw new Error(`${url}: no bajó (${e?.type || e?.message || 'error'})`); }));
+  return pielTex.get(url);
+}
+
 /** Normales de detalle compartidas por todos los personajes (las escribe tools/export_web.py). */
 let detailPromise = null;
 function loadDetail(aniso) {
@@ -245,7 +257,8 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
   const uniforms = { tDetailSkin: { value: detail.skin }, tDetailCloth: { value: detail.cloth }, uTile: { value: new THREE.Vector2(mpu / .012, mpu / .008) }, uDetail: { value: 1 }, tMask: { value: mask }, uMaskMode: { value: mask ? 1 : 0 },
     uScatter: { value: new THREE.Color(...ASPECTO.piel.dispersion) }, uSweat: { value: ASPECTO.piel.sudor }, uSkinSat: { value: ASPECTO.piel.saturacion }, uSkinRough: { value: ASPECTO.piel.rugosidad }, uHairColor: { value: new THREE.Color(.03, .025, .02) }, uClothFlat: { value: new THREE.Vector4(0, 0, 0, 0) },
     uSkinTint: { value: new THREE.Color(ASPECTO.piel.tono) }, uClothTint: { value: new THREE.Color(1, 1, 1) }, uTone: { value: ASPECTO.piel.variacion }, uWrinkle: { value: ASPECTO.tela.arrugas }, uGloss: { value: ASPECTO.piel.brillo }, uFino: FINO, uClothGain: { value: .46 }, uNormBias: { value: 1.1 },
-    uHairMix: { value: .7 }, uPiel: { value: new THREE.Color(.6, .42, .33) }, uSinCabeza: { value: 0 }, uSinTorso: { value: 0 }, uCercaOjo: { value: 0 }, uCorte: { value: .5 } };
+    uHairMix: { value: .7 }, uPiel: { value: new THREE.Color(.6, .42, .33) }, uSinCabeza: { value: 0 }, uSinTorso: { value: 0 }, uCercaOjo: { value: 0 }, uCorte: { value: .5 },
+    tPielTex: { value: null }, uPielTex: { value: 0 }, uPielK: { value: new THREE.Color(1, 1, 1) }, uPielBase: { value: new THREE.Color(.6, .42, .33) } };
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, uniforms);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aCabeza; varying float vCab; attribute float aTorso; varying float vTor; varying float vNdcY;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvCab = aCabeza; vTor = aTorso;').replace('#include <project_vertex>', '#include <project_vertex>\nvNdcY = gl_Position.y / max( 1e-4, gl_Position.w );');
@@ -256,7 +269,7 @@ function bodyMaterial(src, mask, aniso, detail, mpu) {
       .replace('#include <normal_fragment_maps>', THREE.ShaderChunk.normal_fragment_maps.replaceAll('texture2D( normalMap, vNormalMapUv )', 'texture2D( normalMap, vNormalMapUv, uNormBias * gMask.r )') + '\n' + SKIN_DETAIL)
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n' + SKIN_MATERIAL);
   };
-  m.customProgramCacheKey = () => 'tarima-skin-27';
+  m.customProgramCacheKey = () => 'tarima-skin-28';
   m.userData.skin = uniforms;
   return m;
 }
@@ -428,6 +441,7 @@ export class Athlete {
   }
 
   constructor(name, data, gltf, mask, aniso, detail) {
+    this._aniso = aniso;
     this.name = name; this.root = gltf.scene; this.root.position.y = SOLE; this.root.visible = false;
     this.bones = []; this.meshes = []; this.morphs = []; this.lods = []; this.lod = 0; this.shared = new Set([detail.skin, detail.cloth]); this._lost = new Set();
     const done = new Map(), all = [], extra = [];
@@ -647,6 +661,10 @@ export class Athlete {
       m.color.copy(this._color0.get(m)); if (k) m.color.multiply(c.setRGB(k[0], k[1], k[2]));
     }
     this.skinPuesto = r || null;
+    // textura de piel del skin: baja una vez (compartida) y se enciende si el skin sigue puesto cuando llega
+    if (u?.uPielTex) { u.uPielTex.value = 0; const p = r?.pielTex;
+      if (p) { u.uPielK.value.setRGB(p.k[0], p.k[1], p.k[2]); u.uPielBase.value.setRGB(p.base[0], p.base[1], p.base[2]);
+        this.pielLista = loadPielTex(p.url, this._aniso || 8).then(t => { if (this.skinPuesto === r) { u.tPielTex.value = t; u.uPielTex.value = 1; } }).catch(e => console.warn('skin:', e.message)); } }
   }
   /** Tela de color plano sobre la máscara de tela (color de three o null para volver a la textura). Por defecto, apagada. */
   setClothFlat(color) { for (const m of this.meshes) for (const mat of [].concat(m.material || [])) { const u = mat.userData?.skin?.uClothFlat; if (u) { if (color) u.value.set(color.r, color.g, color.b, 1); else u.value.w = 0; } } }

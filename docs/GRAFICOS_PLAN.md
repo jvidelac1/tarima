@@ -273,7 +273,7 @@ barra todavía en las manos.
 | G2 Lámina de control | a medias | Están las tomas `referencia` del banco de fotos (`graficos.yml -f tomas=referencia`); falta sumar cara, manos y sentadilla en una sola hoja | ídem |
 | G3 El fallo se ve venir | hecha para las barras perdidas desde arriba | `PIERDE` en `caida.js`; `caida_test` (firme 90 a 125 ms, tope 200) y `check_escenas` con 0 `BAD` | `docs/img/graficos/g3_caidas_antes_despues.jpg` |
 | G3b Cargada perdida y barra devuelta | pendiente | | |
-| G4 Aviso previo | pendiente | espera el dato del núcleo (sección 7) | |
+| G4 Aviso previo | pendiente | el dato ya existe en `main` (PR #11): `Intento#aviso`; falta traerlo a la rama | |
 | G6 Skins como dato | hecha (primera versión) | `web/data/skins.json` (6 equipos), `web/js/game/skins.js`, `Athlete.setSkin`, `juego.html?skin=<id>`, `tools/skins_test.mjs`. Cambia zapatillas, cinturón, pelo y tiñe la malla entera | `docs/img/graficos/g6_skins.jpg` |
 | G5, G7 a G17 | pendientes | G10 y G16 frenadas por permisos (sección 6) | |
 
@@ -287,6 +287,33 @@ Con los brazos en T se ve lo que en las poses del levantamiento queda disimulado
   cabeza se ve grande contra el ancho de hombros. Son los dos primeros arreglos de G9 y G13.
 - Cadera y muslo quedan más anchos que el tórax en los tres: lee a figura de reloj de arena, no a pesista.
 
+### Prueba: una piel de MakeHuman sobre un pesista (25-nov)
+
+Autorizaste bajar **una** piel. Bajé `mindfront_aksel_skin` del paquete «Skins 02» (varón, CC0 según el manifiesto del
+paquete, `packs/skins02.json`): el difuso y el mapa de normales, 9,1 MB leídos por rangos del zip de 72 MB (el resto no se
+bajó). Al juego entra solo el difuso, a 1024 px en WebP: `web/models/piel_mh_aksel.webp`, 67 KB. Se arma con
+`tools/piel_makehuman.py` (el original trae un ojo morado pintado; se tapa con el otro ojo espejado).
+
+- **Calza sin trabajo de UV.** El cuerpo de todos los pesistas es la malla base de MakeHuman (MPFB) y conserva su UV, así
+  que cualquier piel de MakeHuman cae en su lugar: cara, manos, ombligo, todo. No hace falta rehacer nada en Blender.
+- **Cómo está puesto.** Skin `mh_aksel` (`juego.html?skin=mh_aksel`), campo nuevo `pielTex` + `pielBase` en
+  `data/skins.json`. El sombreador cambia el color de la piel por la textura donde la máscara dice piel, conserva el
+  sombreado pintado del horneado (relieve, pliegues) y lleva la textura al tono de la ficha de cada pesista. Es el único
+  skin que baja un archivo, y solo si se pide. Mismo programa de sombreado (un muestreo más, apagado sin el skin).
+- **Cómo se ve** (`docs/img/graficos/prueba_piel_makehuman.jpg`, antes a la izquierda). En el plano del juego casi no se
+  nota: cambia el tono (menos naranja, más rosado y pálido). De cerca la cara gana (labios, lunares, variación de color)
+  pero pierde la barba de dos días y parte de las cejas que pinta nuestro horneado, y el cuerpo queda más liso: esta
+  piel es un difuso suave, su detalle (vello, poro) está en el mapa de normales y en el de brillo, que no se usaron.
+- **Qué falta para que valga la pena** (es G10): mezclar la piel en el horneado de Blender en vez de en el navegador
+  (cejas, barba y vello nuestros por encima; nada de costo en el teléfono), sumar su mapa de normales al nuestro, y elegir
+  2 o 3 pieles por tono (una clara, una media, una oscura) en vez de teñir una clara: multiplicarla hasta el tono de
+  Ilarraz la apaga.
+
+### Dato del núcleo para G4
+
+En `main` (PR #11, sin mergear al escribir esto) el núcleo expone `Intento#aviso` → `{ riesgo 0..1000, tramo, causa,
+tFallo }`, de solo lectura. Es lo que pedía la sección 7: G4 se arma sobre ese dato cuando esté en la rama.
+
 ### Límites conocidos de lo hecho
 
 - **Skins:** la malla se tiñe entera (multiplica el color horneado): el vivo amarillo de Ilarraz con el skin `noche` se
@@ -294,5 +321,5 @@ Con los brazos en T se ve lo que en las poses del levantamiento queda disimulado
   ids internos: los que vea el jugador, y si se regalan, se ganan o se venden, lo decidís vos.
 - **Caídas:** la pérdida ocurre después de que el núcleo cierra el intento (suma 0,37 a 0,48 s a esos finales). Para que
   empiece antes hace falta el dato de la sección 7.
-- **Rendimiento:** nada de lo hecho suma texturas, sombreadores ni triángulos. No medí milisegundos por cuadro en un
+- **Rendimiento:** nada de lo hecho suma texturas, sombreadores ni triángulos (salvo el skin de prueba `mh_aksel`: 67 KB, solo si se pide). No medí milisegundos por cuadro en un
   teléfono real (Actions dibuja por software).
