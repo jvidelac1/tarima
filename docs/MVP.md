@@ -1053,6 +1053,7 @@ Todos van en minúscula y en español. Ninguno lleva nombre, mail, IP ni disposi
 | `explicacion_cerrada` | Se va la explicación | `clave`, `via` (`boton`: la ✕; `sola`: cambió el momento, salió otra o pasaron 15 s), `ms` a la vista, `leida` (la cerró, estuvo 3,5 s o es la segunda vez: no vuelve a salir) |
 | `final_validada` | El servidor recalculó y anotó la final (LIF-10) | `campeonato` (bool), `puesto_semana` (puesto en el campeonato o null) |
 | `ranking_visto` | Abre el ranking (LIF-9) | `alcance` (`semana`, `global`), `pantalla` |
+| `ranking_portada` | Toca el puesto de la semana en la bienvenida (LIF-81, desde el 24-nov) | `puesto` (null si no está en la tabla) |
 | `ranking_publico` | Marca o desmarca «Mostrar mi nombre» en el ranking | `publico` (bool) |
 | `perfil_visto` | Abre «Mi perfil» (LIF-68, LIF-11) | `pantalla` |
 | `desafio_abierto` | Llega con un link de desafío ?desafio=id (LIF-12) | `ok` (la final de origen existe) |

@@ -103,7 +103,7 @@ export const EVENTO = { titulo: 'Lifting Game Open 2026', sesion: 'Final · 90 k
 export const APERTURA = { min: 880, max: 970 };            // milésimas del techo de ficha
 export const PLAN = [4, 3];                                  // saltos del plan del entrenador para el jugador
 /** Niveles: error típico de tiempo (ms) y de pelea (milésimas) de los rivales, kilos de forma y cuánto más abajo abren y declaran (milésimas del techo). */
-export const NIVELES = { amistoso: { sd: 55, pelea: 90, forma: 0, abre: -35 }, normal: { sd: 36, pelea: 60, forma: 0, abre: 0 }, dificil: { sd: 27, pelea: 40, forma: 1, abre: 0 } };
+export const NIVELES = { amistoso: { sd: 46, pelea: 76, forma: 0, abre: -18 }, normal: { sd: 40, pelea: 66, forma: 0, abre: 0 }, dificil: { sd: 27, pelea: 40, forma: 1, abre: 0 } };
 export const KG_MAX = 260;
 
 /**
@@ -308,9 +308,13 @@ export function chanceUno(I, lev, env, cuerpo, o = {}) {
  *                se para solo, con el mismo premio que si lo hubiera hecho. Con una barrita amarilla o roja (o una que salió
  *                sola, que cuenta como regular) se vuelve a las reglas de siempre desde ese tramo, y la línea de caída nombra
  *                esa barrita. Si todas las barritas del levantamiento salen verdes, la barra sube siempre
+ *   perfecto     (versión 2.0, 24-nov, decisión de Juan: «solo perfecto salva») la franja PERFECTA, en el centro del verde:
+ *                medio ancho = el del verde × `perfecto` milésimas. Desde la 2.0, `verdeSalva` solo protege si TODAS las
+ *                barritas jugadas salieron perfectas; un verde común no cuesta energía de más pero ya no garantiza la barra
+ *                (los kilos demasiado altos se caen igual). El verde también es más angosto (`verde` de cada nivel, abajo)
  */
 export const BARRA = {
-  version: '1.1', verdeSalva: true,
+  version: '2.0', verdeSalva: true, perfecto: 300,
   pasada: 1400, lentoDesde: 8000, pasadaLenta: 1700, soloMs: 60000, respiraMs: 800, doble: 120, graciaMs: 250,
   tI: [9000, 9500, 10000, 10300, 10600], tVerde: [170, 125, 75, 30, 0], tAmarillo: [220, 180, 140, 150, 160], primera: 1400, topeVerde: 380, topeAmarillo: 470,
   costo: { verde: 0, amarillo: 600, rojo: 1500 },
@@ -336,7 +340,7 @@ export const BARRA = {
  * (Probado y descartado: abaratar el amarillo de 600 a 500 de energía. Subía los válidos del novato al 100 % por encima de
  * la meta de 30 a 70 % de barra_bots: el techo dejaba de ser una moneda al aire.)
  */
-const FACIL_17 = { version: '1.2', tVerde: [200, 150, 75, 30, 0], tAmarillo: [260, 210, 140, 150, 160], lentoDesde: 4000, pasadaLenta: 1900 };
+const FACIL_17 = { version: '2.0', verde: 700, tVerde: [200, 150, 75, 30, 0], tAmarillo: [260, 210, 140, 150, 160], lentoDesde: 4000, pasadaLenta: 1900 };
 /** Huella de las reglas de 'b' (BARRA, lo que cambia Fácil, UNO y los cuerpos): va en la cabecera de los registros de 'b' y replay.js la exige. */
 export const HUELLA_B = huella(canonico({ BARRA, facil: FACIL_17, UNO, CUERPOS_U, CUERPO_NEUTRO }));
 /**
@@ -359,12 +363,12 @@ export const DIFICULTADES = ['facil', 'medio', 'dificil'];
 const PESISTAS_B2 = { ventura: { atrapa: 1150, pararse: 1000 }, brenner: { atrapa: 1000, pararse: 850 }, marangi: { atrapa: 850, pararse: 1150 } };
 export const NIVELES_B = {
   medio: {
-    version: '1.0', barritas: { s: [0, 2], c: [0, 3, 1] }, pasada: 1200, pasadaLenta: 1500, lentoDesde: 8000, verde: 800, amarillo: 1000,
+    version: '2.0', barritas: { s: [0, 2], c: [0, 3, 1] }, pasada: 1200, pasadaLenta: 1500, lentoDesde: 8000, verde: 800, amarillo: 900, perfecto: 300,
     costoExtra: { verde: 0, amarillo: 350, rojo: 900 }, esfuerzo: { desdeI: 9200, umbral: 100, toques: 5, ms: 3000, premio: 350 },
     tipico: { sesgo: 28, sd: 100, despiste: 38, esfuerzo: 930 }, apertura: 890,
   },
   dificil: {
-    version: '1.0', barritas: { s: [0, 2, 3], c: [0, 3, 1] }, pasada: 1000, pasadaLenta: 1000, lentoDesde: 60000, verde: 650, amarillo: 900,
+    version: '2.0', barritas: { s: [0, 2, 3], c: [0, 3, 1] }, pasada: 1000, pasadaLenta: 1000, lentoDesde: 60000, verde: 460, amarillo: 750, perfecto: 220,
     costo: { verde: 0, amarillo: 450, rojo: 1200 }, costoExtra: { verde: 0, amarillo: 300, rojo: 800 }, esfuerzo: { desdeI: 8800, umbral: 100, toques: 6, ms: 3000, premio: 400 },
     tipico: { sesgo: 25, sd: 90, despiste: 35, esfuerzo: 900 }, apertura: 880,
   },
@@ -434,10 +438,13 @@ export function zonasBarra(I, cuerpo, i, primera = false, env = 'split', R = reg
   let v = Math.min(BARRA.topeVerde, idiv(vMs * 1000, BARRA.pasada)), a = Math.min(BARRA.topeAmarillo, Math.max(v + 10, idiv(aMs * 1000, BARRA.pasada)));
   if (R.verde !== undefined && R.verde !== 1000) v = idiv(v * R.verde, 1000);
   if (R.amarillo !== undefined && R.amarillo !== 1000) a = Math.max(v + 10, idiv(a * R.amarillo, 1000));
-  return { v, a, vMs: idiv(v * R.pasada, 1000), aMs: idiv(a * R.pasada, 1000) };
+  const p = Math.max(6, idiv(v * (R.perfecto ?? BARRA.perfecto), 1000));
+  return { v, a, p, vMs: idiv(v * R.pasada, 1000), aMs: idiv(a * R.pasada, 1000), pMs: idiv(p * R.pasada, 1000) };
 }
 /** Zona de una posición del puntero: 'verde', 'amarillo' o 'rojo'. */
 export function zonaBarra(pos, z) { const d = Math.abs(pos - 500); return d <= z.v ? 'verde' : d <= z.a ? 'amarillo' : 'rojo'; }
+/** ¿La posición cae en la franja perfecta (el centro del verde, `z.p`)? */
+export const esPerfecto = (pos, z) => z.p !== undefined && Math.abs(pos - 500) <= z.p;
 /** Lo que cuesta de más la zona `zona` de la barrita `i` en las reglas `R`. */
 export const costoBarra = (R, i, zona) => (i >= 2 ? R.costoExtra : R.costo)[zona];
 
@@ -451,14 +458,17 @@ export function phi(x, den) {
 }
 /**
  * Cuántos toques de cada 1000 caen en verde, amarillo y rojo para una persona `perfil` ({sesgo, sd, despiste}, en ms y
- * milésimas) con las zonas `z` (zonasBarra). Enteros que suman 1000.
+ * milésimas) con las zonas `z` (zonasBarra). Enteros: verde + amarillo + rojo = 1000; `perfecto` es la parte del verde
+ * que cae en la franja perfecta.
  */
 export function repartoBarra(z, perfil = BARRA.tipico) {
   const { sesgo: s, sd, despiste: d } = perfil, dentro = h => phi(h - s, sd) - phi(-h - s, sd);
   const gv = dentro(z.vMs), ga = dentro(z.aMs);
   const uv = idiv((2 * z.v + 1) * 1000000, 1001), ua = idiv((2 * z.a + 1) * 1000000, 1001);
   const pv = idiv(gv * (1000 - d) + uv * d, 1000000), pva = idiv(ga * (1000 - d) + ua * d, 1000000);
-  return { verde: pv, amarillo: Math.max(0, pva - pv), rojo: Math.max(0, 1000 - pva) };
+  // la franja perfecta (z.p, dentro del verde): `perfecto` es parte de `verde`
+  const pp = z.p === undefined ? 0 : Math.min(pv, idiv(dentro(z.pMs) * (1000 - d) + idiv((2 * z.p + 1) * 1000000, 1001) * d, 1000000));
+  return { verde: pv, amarillo: Math.max(0, pva - pv), rojo: Math.max(0, 1000 - pva), perfecto: pp };
 }
 /**
  * Chance (milésimas) de que suba un peso en 'b' para la persona `o.perfil` (por defecto la típica del nivel): como chanceUno,
@@ -470,8 +480,8 @@ export function repartoBarra(z, perfil = BARRA.tipico) {
 export function chanceBarra(I, lev, env, cuerpo, o = {}) {
   const Rg = reglasB(o.dif), T = TRAMOS[lev], G = T.map(tr => gastoTramo(tr, I, lev, env, cuerpo)), k = cuerpo.ruido || 0, n = 2 * k + 1, perfil = o.perfil || Rg.tipico;
   // reparto de zonas de la barrita de cada tramo (null: el tramo no tiene barrita)
-  // cada zona: [peso, costo, ¿verde?]
-  const R = T.map(tr => { const i = barritaDeTramo(Rg, lev, tr); if (i < 0) return null; const r = repartoBarra(zonasBarra(I, cuerpo, i, !!o.primera, env, Rg), perfil); return [[r.verde, costoBarra(Rg, i, 'verde'), true], [r.amarillo, costoBarra(Rg, i, 'amarillo'), false], [r.rojo, costoBarra(Rg, i, 'rojo'), false]]; });
+  // cada zona: [peso, costo, ¿salva?] (desde la 2.0 solo la franja perfecta salva; el verde común no cuesta de más)
+  const R = T.map(tr => { const i = barritaDeTramo(Rg, lev, tr); if (i < 0) return null; const r = repartoBarra(zonasBarra(I, cuerpo, i, !!o.primera, env, Rg), perfil); return [[r.perfecto, costoBarra(Rg, i, 'verde'), true], [r.verde - r.perfecto, costoBarra(Rg, i, 'verde'), false], [r.amarillo, costoBarra(Rg, i, 'amarillo'), false], [r.rojo, costoBarra(Rg, i, 'rojo'), false]]; });
   const memo = new Map(), E = Rg.esfuerzo, pe = perfil.esfuerzo ?? 1000, salva = !!Rg.verdeSalva;
   // `tv`: todas las barritas jugadas hasta acá salieron verdes (al empezar no se jugó ninguna; el primer tramo siempre tiene la suya)
   const f = (i, m, garra, tv) => {

@@ -416,6 +416,8 @@ body:has(#margen:not([hidden])) .rival{top:calc(var(--u)*10.6 + var(--st))}
 .barrita .b-pista{position:relative;height:calc(var(--u)*3.4);border-radius:calc(var(--u)*.5);background:repeating-linear-gradient(135deg,#d0392f 0 9px,#9e2620 9px 18px);box-shadow:0 0 0 2px rgba(255,255,255,.6),0 6px 18px rgba(0,0,0,.65)}
 .barrita .b-am{position:absolute;top:0;bottom:0;background:#f4c430}
 .barrita .b-ve{position:absolute;top:-4px;bottom:-4px;background:#22c56b;border:3px solid #fff;border-radius:5px;box-shadow:0 0 14px rgba(34,197,107,.65)}
+.barrita .b-pe{position:absolute;top:-7px;bottom:-7px;background:#fff6c2;border-radius:3px;box-shadow:0 0 12px rgba(255,214,90,.9);pointer-events:none}
+.barrita .b-pal.verde.perfecto{color:var(--gold)}
 .barrita.en-verde .b-ve{background:#3ee68a;box-shadow:0 0 22px rgba(62,230,138,.95)}
 .barrita[data-estado=espera] .b-pista{filter:saturate(.55) brightness(.8)}
 .barrita .b-punt{position:absolute;top:calc(var(--u)*-1.1);bottom:calc(var(--u)*-.5);width:0}
@@ -880,3 +882,7 @@ html.vert body:has(#recuadro:not([hidden])) #tv #guia{bottom:auto;top:calc(max(v
 .en-barra .en-punt{position:absolute;top:-2px;bottom:-2px;width:6px;margin-left:-3px;background:#fff;box-shadow:0 0 0 2px #000}
 .entreno .zonas{display:flex;gap:8px}.entreno .zonas i{width:28px;height:12px;border-radius:3px;display:inline-block}.zonas .z-verde{background:var(--ok)}.zonas .z-amarillo{background:var(--gold)}.zonas .z-rojo{background:var(--red)}
 #btn-compartir.desafiar{border-color:var(--gold);color:var(--gold)}
+
+/* LIF-81: el puesto de la semana en la bienvenida */
+.rk-portada{display:flex;align-items:center;gap:.5em;width:100%;margin:.4em 0 .2em;padding:.55em .8em;border:1px solid var(--gold);border-radius:10px;background:rgba(255,200,60,.08);color:inherit;font:inherit;text-align:left;cursor:pointer}
+.rk-portada b{margin-left:auto;color:var(--gold);white-space:nowrap}

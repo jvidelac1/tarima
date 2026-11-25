@@ -5,13 +5,13 @@
    "semilla": 2000003,
    "nivel": "amistoso",
    "persona": 0,
-   "tabla": "marangi:167+197=364#1 brenner:168+193=361#2 ventura:159+195=354#3"
+   "tabla": "marangi:170+202=372#1 brenner:173+196=369#2 ventura:159+196=355#3"
   },
   {
    "semilla": 4000006,
    "nivel": "normal",
    "persona": 1,
-   "tabla": "marangi:174+202=376#1 brenner:167+205=372#2 ventura:166+201=367#3"
+   "tabla": "brenner:175+200=375#1 ventura:166+206=372#2 marangi:168+0=0#-"
   },
   {
    "semilla": 6000009,
@@ -23,13 +23,13 @@
    "semilla": 8000012,
    "nivel": "amistoso",
    "persona": 0,
-   "tabla": "ventura:155+208=363#1 marangi:161+198=359#2 brenner:161+193=354#3"
+   "tabla": "brenner:170+196=366#1 marangi:164+198=362#2 ventura:155+207=362#3"
   },
   {
    "semilla": 10000015,
    "nivel": "normal",
    "persona": 1,
-   "tabla": "ventura:167+209=376#1 marangi:171+204=375#2 brenner:157+0=0#-"
+   "tabla": "ventura:167+206=373#1 marangi:171+195=366#2 brenner:157+0=0#-"
   },
   {
    "semilla": 12000018,
@@ -41,13 +41,13 @@
    "semilla": 14000021,
    "nivel": "amistoso",
    "persona": 0,
-   "tabla": "brenner:166+194=360#1 ventura:153+202=355#2 marangi:157+192=349#3"
+   "tabla": "brenner:169+197=366#1 marangi:160+195=355#2 ventura:153+202=355#3"
   },
   {
    "semilla": 16000024,
    "nivel": "normal",
    "persona": 1,
-   "tabla": "ventura:165+206=371#1 marangi:166+197=363#2 brenner:170+192=362#3"
+   "tabla": "ventura:165+205=370#1 marangi:166+197=363#2 brenner:170+192=362#3"
   },
   {
    "semilla": 18000027,
