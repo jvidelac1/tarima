@@ -71,6 +71,10 @@ jobs:
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/barra_bots.mjs 2>&1 | tee out/logs/barra_bots.log
 
+      - name: Aviso de caída del núcleo (aviso_test, LIF-78)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/aviso_test.mjs 2>&1 | tee out/logs/aviso_test.log
+
       - name: Toques con el dedo, sin navegador (dedo_test, niveles 'b' y 'u')
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/dedo_test.mjs 2>&1 | tee out/logs/dedo_test.log
@@ -200,7 +204,7 @@ jobs:
           {
             echo "### Pruebas del juego (dibujo por software: no mide cuadros por segundo)"
             echo "Grupo: ${{ matrix.titulo }}"
-            for f in sim_test barra_bots play_human dedo_test perf_test caida_test check_escenas check_game check_barra check_toques check_telefono check_carga_fallas check_iphone check_fluidez capturas check_recorrido check_recorrido_en; do
+            for f in sim_test barra_bots aviso_test play_human dedo_test perf_test caida_test check_escenas check_game check_barra check_toques check_telefono check_carga_fallas check_iphone check_fluidez capturas check_recorrido check_recorrido_en; do
               [ -f "out/logs/$f.log" ] || continue
               echo; echo "**$f**"; echo '```'
               tail -n 14 "out/logs/$f.log"
