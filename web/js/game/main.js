@@ -17,7 +17,7 @@ import { Depura } from './ui/depura.js';
 import { Margen } from './ui/margen.js';
 import { Barrita } from './ui/barrita.js';
 import { Aprende, varsGlosario } from './ui/aprende.js';
-import { explicar, pasos, PALABRAS, GUIA, discos, puntos, tramoTxt, deDiez, fuerteDebil, nivelTramo, cuartos, dificultadDe } from './ui/mensajes.js';
+import { explicar, notaBarra, pasos, PALABRAS, GUIA, discos, puntos, tramoTxt, deDiez, fuerteDebil, nivelTramo, cuartos, dificultadDe } from './ui/mensajes.js';
 import { alDia, tocar, senal as senalDe, GUIADO, EN_HOMBROS, QUE_U, QUE_B, proximoCentro } from './controles.js';
 import { tableroHTML, datosTablero, tableroVivoHTML } from './ui/tablero.js';
 import { opcionesPedido, pedidoHTML, TECLA_PEDIDO } from './ui/pedido.js';
@@ -994,7 +994,7 @@ async function decision(a, lev, res, et, propio, o = {}) {
   // el primer NO VALE propio explica una vez cuándo vale un levantamiento (tarima.visto.no_vale)
   const primerNoVale = propio && !o.practica && res.res === 'nulo' && primeraVez('no_vale') ? ` · ${t('veredicto.primer_no_vale')}` : '';
   // un rival en 'b' y 'u': solo la causa si falló (las luces ya se ven arriba): menos texto a la vez
-  const rivalU = !propio && esU(E.cfg?.ctl), sub = (propio ? (linea ? linea + (res.res === 'fallo' ? '' : ` · ${luces}`) : o.sub ? `${o.sub} · ${luces}` : luces) : rivalU ? (res.causa ? t('causa.' + res.causa) : '') : (res.causa ? t('causa.' + res.causa) + ' · ' : '') + luces) + primerNoVale;
+  const rivalU = !propio && esU(E.cfg?.ctl), nota = propio && ok && !o.practica ? notaBarra(res) : null, conNota = x => (nota ? `${t('veredicto.nota', { n: nota })} · ${x}` : x), sub = (propio ? conNota(linea ? linea + (res.res === 'fallo' ? '' : ` · ${luces}`) : o.sub ? `${o.sub} · ${luces}` : luces) : rivalU ? (res.causa ? t('causa.' + res.causa) : '') : (res.causa ? t('causa.' + res.causa) + ' · ' : '') + luces) + primerNoVale;
   const titulo = t(ok ? 'veredicto.vale' : res.res === 'nulo' ? 'veredicto.no_vale' : 'veredicto.cayo');
   if (propio) (E.propios ||= []).push({ pantalla: E.previa || '', res: res.res, causa: res.causa, linea, ctl: o.ctl || 'c', ...(res.uno ? { uno: res.uno } : {}) });
   // momentos (s desde el final del intento)
@@ -1701,7 +1701,7 @@ async function llamadoPropio(p, L) {
   if (JSON.stringify(x.res) !== JSON.stringify(corrida.res)) E.errores.push('el resultado mostrado no coincide con el recalculado');
   const pal = k => (uno ? null : (x.res.gestos || []).filter(g => g.pal === k).length), U = x.res.uno;
   // en 'u' los campos de los círculos quedan en null (los paneles de PostHog no se rompen) y se suma el margen
-  ev('intento_propio', { final_n: E.finalN, lev: L.lev, intento: L.n, kg: kgFinal, resultado: x.res.res === 'valido' ? 'vale' : x.res.res === 'nulo' ? 'no_vale' : 'cayo', causa: x.res.causa || null, perfecto: pal('perfecto'), bien: pal('bien'), temprano: pal('temprano'), tarde: pal('tarde'), todavia_no: uno ? null : E.todavias || 0, guardados: uno ? null : E.guardados || 0, tactil: tactil(), ctl: ctx.ctl, dificultad: E.dificultad,
+  ev('intento_propio', { final_n: E.finalN, lev: L.lev, intento: L.n, kg: kgFinal, resultado: x.res.res === 'valido' ? 'vale' : x.res.res === 'nulo' ? 'no_vale' : 'cayo', causa: x.res.causa || null, perfecto: pal('perfecto'), bien: pal('bien'), temprano: pal('temprano'), tarde: pal('tarde'), todavia_no: uno ? null : E.todavias || 0, guardados: uno ? null : E.guardados || 0, tactil: tactil(), ctl: ctx.ctl, dificultad: E.dificultad, nota: notaBarra(x.res),
     ...(U ? { margen_ini: U.margen_ini, dia: U.dia, gasto_tiron: U.gastos.tiron ?? null, gasto_arriba: U.gastos.arriba ?? null, gasto_pararse: U.gastos.pararse ?? null, margen_fin: U.margen_fin, garra: U.garra, tramo_caida: U.tramo_caida, tramo_mayor: U.tramo_mayor, intensidad: Math.round(ctx.I / 10) / 10, patron_entrada: patronEntrada(corrida, U),
       ...(U.barras ? { fatiga: U.fatiga ?? 0, esfuerzo: U.esfuerzo ? (U.esfuerzo.ok ? 'hecho' : 'no') : null, barra_1: U.barras[0]?.zona ?? null, barra_2: U.barras[1]?.zona ?? null, barra_3: U.barras[2]?.zona ?? null, barra_sola: U.barras.some(b => b.sola), barra_pos_1: U.barras[0]?.pos ?? null, barra_pos_2: U.barras[1]?.pos ?? null } : {}) } : {}),
     ...(E.fotoToques ? toques.desde(E.fotoToques) : {}) });
