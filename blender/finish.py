@@ -122,5 +122,5 @@ try:
     if 'escote' in STY: geo.chest_check(b,rig,K)
 except Exception as e: print('PECHO posado error',e)
 bpy.ops.wm.save_as_mainfile(filepath=OUT+'s3b.blend')  # punto de partida de pose_only.py
-if os.environ.get('TARIMA_NOPOSES'): sys.exit(0)   # solo malla (renders de control con blender/ctl.py)
+if os.environ.get('TARIMA_NOPOSES'): sys.exit(0)   # solo malla (renders de control con blender/ctl3.py)
 exec(open(os.path.join(HERE,'poses.py'),encoding='utf-8').read())
