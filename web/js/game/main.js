@@ -5,6 +5,7 @@ import { reloj, Boton, toques, principal, claveDe, enfocar, navegar, enCampo } f
 import { Escena, PLANOS } from './stage.js';
 import { poseDe, poseParado, marcas, tramo } from './sequence.js';
 import { armarCaida, poseCaida } from './caida.js';
+import { resolverSkin } from './skins.js';
 import { sugerencia, chanceDe } from '../sim/entrenador.js';
 import { PLANTEL, JUGADOR, FICHA, nivelFicha, ENVIONES, LEV, ETIQUETAS, GUIONES, CUERPO, BARRA, vestir, ternaDe, PLANTEL_DEFECTO, fijarBase, basePlantel, aspectosDe, vestirJugador } from './roster.js';
 import { Registrador, Gobernador, calidadInicial, medirRefresco, decidirCalidad, pasoDe, metaDe, nombreDe, escalones, pisoDe, PRESET, PISO_MP, MARGEN, TECHO_MP } from './perf.js';
@@ -2055,6 +2056,11 @@ async function iniciar() {
   fijarBase();
   { const pz = IDS.includes(guardado.get('tarima.pesista')) ? guardado.get('tarima.pesista') : 'ventura', m = guardado.get('tarima.aspecto');
     if (m && poses[m]) { try { const pl = await plantelJSON(); if (aspectosDe(pz, pl.pesistas, poses).includes(m) && vestirJugador(pz, m, pl.pesistas, poses)) E.aspecto = { plaza: pz, modelo: m }; } catch (e) { console.warn('aspecto:', e); } } }
+  // Skins (docs/GRAFICOS_PLAN.md, G6): `?skin=<id>` viste al pesista del jugador (o al que esté en escena si todavía no hay
+  // jugador: las fotos del banco) con un equipo de data/skins.json. Sin el parámetro no se baja nada ni cambia nada.
+  { const sk = params.get('skin');
+    if (sk) { try { const [cat, pl] = await Promise.all([fetch('data/skins.json').then(r => { if (!r.ok) throw new Error('data/skins.json: ' + r.status); return r.json(); }), plantelJSON()]);
+      if (cat.skins?.[sk]) E.skinDe = (id, f) => (escena.yo == null || id === escena.yo ? resolverSkin(cat.skins[sk], pl.pesistas?.[f.modelo] || {}) : null); else console.warn('skin: no existe', sk); } catch (e) { console.warn('skin:', e); } } }
   await Promise.all([`800 20px 'Saira Condensed'`, `700 20px 'Saira Condensed'`, `500 20px 'Saira Condensed'`].map(f => document.fonts.load(f).catch(() => null)));
   Object.assign(C, calidadInicial(params.get('calidad') || params.get('q'), tactil())); fijarHz(await refresco);
   if (C.auto) C.Q = { ...C.Q, dpr: 2 };      // en automático el tope de píxeles lo pone la calibración, no la densidad de cada calidad
@@ -2067,6 +2073,7 @@ async function iniciar() {
     E.shaderMal = E.shaderMal || log || 'shader'; console.error('THREE: el programa no compila:', log);
   };
   try { escena = new Escena($('gl'), C.Q, { reduceMotion, alShader }); } catch (e) { cargaUI.ocultar(); return falloGrafico('webgl', e); }
+  escena.skinDe = E.skinDe || null;      // skin pedido con ?skin= (arriba): la escena todavía no existía
   // Pesista nuevo (character.js): prendido para todos; ?humano=0 lo apaga en este navegador (queda recordado) y ?humano=1 lo vuelve a prender.
   // Las caras son provisorias (personajes ficticios; se van a reemplazar por otras nuevas). Para prenderlo para todos:
   // PESISTA_NUEVO_PUBLICADO = true.
@@ -2226,7 +2233,7 @@ window.JUEGO = {
     /** Lleva la escena de final() al instante t (s), la dibuja si `dibujar`, y mide holguras entre la barra y el cuerpo. */
     finalEn(t, dibujar = false, dt = 1 / 60, dtCam = .5) { const c = E.prueba; dibujarFinal(c, t, dt, false);
       // las luces y el veredicto como en el juego (decision): de a una desde 0,2 s y el cartel a 1,05 s
-      if (c.resP) { const ok = c.resP.res === 'valido', L = ok ? [true, true, true] : c.resP.res === 'nulo' ? [false, true, false] : [false, false, false], n = Math.max(0, Math.min(3, Math.floor((t - .2) / .3) + 1)); setLuces(t < .2 ? null : L.map((x, i) => (i < n ? x : null))); const ver = t >= 1.05 ? textoDe(ok ? 'veredicto.vale' : c.resP.res === 'nulo' ? 'veredicto.no_vale' : 'veredicto.cayo') : ''; if (ver !== c.verP) { c.verP = ver; veredicto(ver, '', !ok, ver ? L : null); clearTimeout(veredictoReloj); } $('veredicto').classList.toggle('grande', !!ver && t < 2.55); } escena.cuadro(dtCam, dibujar); return holgura(t - c.pl.suelta, c.pl.guia ? c.pl.guia.dur : 0); },
+      if (c.resP) { const ok = c.resP.res === 'valido', L = ok ? [true, true, true] : c.resP.res === 'nulo' ? [false, true, false] : [false, false, false], n = Math.max(0, Math.min(3, Math.floor((t - .2) / .3) + 1)); setLuces(t < .2 ? null : L.map((x, i) => (i < n ? x : null))); const ver = t >= 1.05 ? textoDe(ok ? 'veredicto.vale' : c.resP.res === 'nulo' ? 'veredicto.no_vale' : 'veredicto.cayo') : ''; if (ver !== c.verP) { c.verP = ver; veredicto(ver, '', !ok, ver ? L : null); clearTimeout(veredictoReloj); } $('veredicto').classList.toggle('grande', !!ver && t < 2.55); } escena.cuadro(dtCam, dibujar); return holgura(t - c.pl.suelta, c.pl.guia ? c.pl.guia.dur : c.pl.pierde ? c.pl.pierde.dur : 0); },
     /** Cambio de carga a mano: de `kg0` a `kg1`, con la manga en primer plano. Devuelve la duración (s). */
     async carga(kg0, kg1, id = 'ventura') { await escena.cargar(id); await escena.mostrar(id); escena.setCarga(kg0, 's'); escena.posar(poseParado(escena.P, 's'), 's'); await escena.mostrar(null); escena.barraSuelta({ y: escena.pisoBarra, z: escena.barZ, ang: 0 }); const A = E.pruebaCarga = escena.cambioDeCarga(kg1); escena.primerPlano('manga'); return A ? { dur: A.dur, sale: A.sale, entra: A.entra } : null; },
     cargaEn(t, dibujar = false) { const A = E.pruebaCarga, x = A.en(t); escena.barraSuelta({ y: escena.pisoBarra, z: escena.barZ, ang: 0 }); escena.cuadro(.5, dibujar); return x; },

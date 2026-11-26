@@ -93,6 +93,8 @@ for (const id of ['ventura', 'brenner']) {
       await page.evaluate(o => window.JUEGO.test.final(o), { id, lev, seg, fase, mov, res, camara: 'caida' });
       await page.evaluate(t => window.JUEGO.test.finalEn(t, true), info.suelta + .5); await foto(`${k}_2_caida`);
       await page.evaluate(t => window.JUEGO.test.finalEn(t, true), info.dur); await foto(`${k}_3_fin`);
+      // la barra perdida desde arriba (docs/GRAFICOS_PLAN.md, G3): tira de cuadros de costado, desde el final hasta que cae, para ver que se le va antes de soltarla
+      if (info.tipo === 'arriba' && id === 'ventura') { await page.evaluate(o => window.JUEGO.test.final(o), { id, lev, seg, fase, mov, res, camara: 'lado' }); let n = 0; for (const t of [0, .12, .24, .36, .5, .75]) { await page.evaluate(t => window.JUEGO.test.finalEn(t, true), t); await foto(`${k}_tira_${n++}`); } }
     }
   }
 }

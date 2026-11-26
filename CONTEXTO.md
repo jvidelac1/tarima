@@ -97,6 +97,14 @@ del Worker de esa regla: `GRATIS_ETAPA "final"`, `GRATIS "1"`, `ENCUESTA_LIBRE "
   latido en los decisivos.
 - **«¿Subes?»** con los dos pesos más cercanos a un toque, junto a «Cambiar» (LIF-4).
 
+## Gráficos (24 de noviembre, rama `graficos-fable`)
+
+Todo lo gráfico (pesistas, movimiento, caídas, skins, gimnasio) lo lleva un agente con Fable 5.2; anula lo de Gemini
+(LIF-64). El diagnóstico, el camino de producción, el presupuesto para el teléfono y las historias G0 a G17 están en
+**`docs/GRAFICOS_PLAN.md`**. Hecho en esa rama: presupuesto de modelos como prueba, poses de referencia T y A
+(`index.html?ref=T`), la barra perdida desde arriba que se ve venir (`caida.js`, `PIERDE`) y skins como datos
+(`juego.html?skin=carbon`). Pruebas nuevas sin navegador: `presupuesto_modelos`, `pose_ref_test`, `skins_test`.
+
 ## Backlog
 
 En **Linear**, equipo **LIFTINGAME** (clave `LIF`, issues LIF-1 a LIF-29, en Backlog), 5 proyectos: Juego de estrategia, Competencia y comunidad,

@@ -22,6 +22,7 @@ const STEPS = [{ q: 'baja', s: 1 }, { q: 'media', s: .8 }, { q: 'media', s: 1 },
 const stepKey = i => STEPS[i].q + (STEPS[i].s < 1 ? '@' + STEPS[i].s : '');
 
 const S = {
+  ref: ['T', 'A'].includes(params.get('ref')) ? params.get('ref') : null,      // pose de referencia (pose_ref.js): ?ref=T o ?ref=A
   data: null, who: null, lift: params.get('lift') === 's' ? 's' : 'c', jerk: ['split', 'power', 'squat'].includes(params.get('jerk')) ? params.get('jerk') : 'split',
   t: 0, playing: false, slow: false, replay: false, scrubbing: true, trace: params.has('trace'), endT: -1,
   qSel: QUALITY[params.get('q')] ? params.get('q') : (store.get('tarima.q') && QUALITY[store.get('tarima.q')] ? store.get('tarima.q') : 'auto'), qName: null,
@@ -168,6 +169,9 @@ function apply(simDt) {
   tl.barFix(S.t, a.barWorld(v)); barbell.setPosition(v); rig.barY = v.y; rig.barAhead = S.playing ? tl.barTopAhead(S.t) : v.y;
   rig.headY = a.boneWorld('Head', v2).y + .14; aimShot(); S.shadowDirty = 3;
   if (S.scrubbing || simDt <= 0) barbell.settle(v.y); else barbell.step(simDt, v.y, S.playing ? tl.barAcc(S.t) : 0);
+  // pose de referencia T o A: el cuerpo deja el clip y la barra no se dibuja (los controles siguen moviendo el clip por debajo)
+  if (S.ref) { a.poseReferencia(S.ref); rig.headY = a.boneWorld('Head', v2).y + .14; }
+  if (barbell.group.visible !== !S.ref) { barbell.group.visible = !S.ref; trace.group.visible = S.trace && !S.ref; }
   trace.setTime(S.t);
   const p = s / tl.sub;
   hud.update(tl.readout(p), v.y * 100, S.playing ? tl.barVel(S.t) : 0, p, tl.peakVel().v, S.t, S.playing);
@@ -286,6 +290,8 @@ async function init() {
 window.TARIMA = {
   state: S, renderer, scene, rig, get barbell() { return barbell; }, get post() { return post; }, get arena() { return arena; },
   setWho, setLift, setJerk, play, setKg,
+  /** Pose de referencia: 'T', 'A' o null para volver al clip (docs/GRAFICOS_PLAN.md, G1). */
+  ref(k) { S.ref = k === 'T' || k === 'A' ? k : null; apply(0); },
   seekPhase(p) { if (!S.tl) return; stopAt(S.tl.timeAtPhase(p)); apply(0); }, seekTime(t) { if (!S.tl) return; stopAt(clamp(t, 0, S.tl.duration)); apply(0); },
   setQuality(q) { applyQuality(q); }, measureInsets, gov, STEPS, stepKey, applyStep, SHOTS,
   /** Primer plano por clave ('cara', 'torso', 'rack', 'manos', 'pies'…); sin argumento vuelve a la cámara fija. */

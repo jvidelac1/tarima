@@ -116,6 +116,18 @@ jobs:
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         run: node tools/caida_test.mjs 2>&1 | tee out/logs/caida_test.log
 
+      - name: Presupuesto de los modelos (presupuesto_modelos; docs/GRAFICOS_PLAN.md, G0)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/presupuesto_modelos.mjs 2>&1 | tee out/logs/presupuesto_modelos.log
+
+      - name: Poses de referencia T y A sin navegador (pose_ref_test, G1)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/pose_ref_test.mjs --tabla 2>&1 | tee out/logs/pose_ref_test.log
+
+      - name: Skins sin navegador (skins_test, G6)
+        if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
+        run: node tools/skins_test.mjs 2>&1 | tee out/logs/skins_test.log
+
       - name: Escenas de emoción (check_escenas)
         if: ${{ !cancelled() && matrix.grupo == 'nucleo' }}
         timeout-minutes: 20

@@ -3,7 +3,7 @@
 // - La barra suelta es un cuerpo con gravedad, rebote de los discos de goma contra la tarima y rodado con resistencia.
 //   Aritmética simple con paso fijo: el mismo instante da siempre el mismo estado (la repetición vuelve a calcularlo).
 // - El pesista solo usa poses de poses.json: sostiene la del fallo y después se mezcla en línea recta hacia «Parado»
-//   (athlete.setMix). La barra se suelta ANTES de que el cuerpo se mueva, y sale hacia donde no está el cuerpo.
+//   (athlete.setMix). La barra sale hacia donde no está el cuerpo. Perdida desde arriba, primero se le va en las manos (PIERDE).
 // - La raíz puede correrse unos centímetros (el salto hacia atrás de la barra adelante, el paso adelante de la barra atrás).
 // Sin three ni DOM: lo usa el juego y lo prueba tools/caida_test.mjs.
 
@@ -73,6 +73,42 @@ export class BarraGuiada {
 }
 
 /**
+ * PÉRDIDA (docs/GRAFICOS_PLAN.md, G3): la barra perdida desde arriba de la cabeza no se suelta de golpe con el pesista
+ * quieto. Primero SE LE VA, todavía en las manos, durante `dur` s (por `ritmo`): hacia atrás (`atras`), hacia adelante
+ * (`adelante`: barra adelante, la pierde en el fondo o de pie) o hacia abajo porque ceden los codos (`cede`), cada vez más
+ * rápido y con un temblor chico; el cuerpo reacciona (`cuerpo`: el tronco y la cabeza giran, rad; `hunde`: m que baja la
+ * cadera con los pies plantados) y las manos van con ella (stage.js las resuelve sobre la barra). Recién ahí la suelta, con
+ * el empujón del plan hacia el mismo lado. A los 0,2 s del final la barra ya se movió más de 1 cm: nunca queda firme.
+ * `entra`: s en que las manos pasan de la pose a seguir la barra; `sale`: s en que la sueltan; `vuelve`: s en que el tronco vuelve.
+ */
+export const PIERDE = { dur: .42, entra: .1, sale: .12, vuelve: .5, tiembla: .006,
+  atras: { dz: -.15, dy: -.05, hunde: 0, tronco: .16, cabeza: .14 },
+  adelante: { dz: .15, dy: -.05, hunde: .02, tronco: .1, cabeza: -.12 },
+  cede: { dz: .08, dy: -.08, hunde: .04, tronco: .05, cabeza: .2 } };
+/** Hacia dónde se le va la barra según la causa del núcleo. */
+export const ladoPerdida = causa => (causa === 'atras' ? 'atras' : causa === 'adelante' || causa === 'fondo' || causa === 'temblor' ? 'adelante' : 'cede');
+/** Posición de la barra que se le va, a t s del final (todavía en las manos). */
+export function perdidaEn(G, t) {
+  const u = Math.min(1, Math.max(0, t / G.dur)), k = u * u, tm = (G.tiembla || 0) * Math.sin(Math.PI * u) * Math.sin(t * 40.8);
+  return { y: G.y0 + G.dy * k, z: G.z0 + G.dz * k + tm };
+}
+/** Barra perdida desde arriba: se va en las manos (`guiada`) y después cae sola (BarraLibre). Misma interfaz que BarraGuiada. */
+export class BarraPerdida {
+  constructor({ y0, z0, dy, dz, dur, tiembla = 0, vy = 0, vz = 0, piso = .225 }) {
+    const y1 = Math.max(y0 + dy, piso + .25), vzS = 2 * dz / dur, lado = Math.sign(dz || vz) || 1;
+    this.g = { y0, z0, dy: y1 - y0, dz, dur, tiembla, y1, z1: z0 + dz, vy, vz: lado * Math.max(Math.abs(vz), Math.abs(vzS)) };
+    this.libre = new BarraLibre({ y: y1, z: this.g.z1, vy: this.g.vy, vz: this.g.vz, piso }); this.en(0);
+  }
+  en(t) {
+    const G = this.g;
+    if (t < G.dur) { const q = perdidaEn(G, t); this.libre.reset(); Object.assign(this, { guiada: true, y: q.y, z: q.z, ang: 0, apoyada: false, quieta: false, golpes: [] }); return this; }
+    const L = this.libre.en(t - G.dur);
+    Object.assign(this, { guiada: false, y: L.y, z: L.z, ang: L.ang, apoyada: L.apoyada, quieta: L.quieta, golpes: L.golpes.map(x => ({ ...x, t: x.t + G.dur })) }); return this;
+  }
+  get reposo() { return this.g.dur + this.libre.reposo; }
+}
+
+/**
  * Cómo termina el intento. null: no hay nada que soltar (nulo por reloj sin levantar).
  * - bajo: tirón sin altura o anticipado; la barra está entre la rodilla y el pecho.
  * - hombros: la barra en los hombros con el pesista de pie (devuelve, o la flexión del envión que no sale).
@@ -104,6 +140,7 @@ export function planCaida(tipo, causa, valido = false) {
   }[tipo];
   if (!P) return null;
   const pl = { tipo, causa, ...P, salto: null, valido };
+  if (tipo === 'arriba') { const lado = ladoPerdida(causa); pl.pierde = { lado, dur: PIERDE.dur, tiembla: PIERDE.tiembla, ...PIERDE[lado] }; }
   if (tipo === 'arriba' && causa === 'adelante') Object.assign(pl, { vz: 1.15, salto: { dz: -.14, desde: .05, dur: .32 } });
   if (tipo === 'arriba' && causa === 'atras') Object.assign(pl, { vz: -1.25, vy: .2, salto: { dz: .2, desde: .05, dur: .4 } });
   return pl;
@@ -170,6 +207,19 @@ export function tiemposCaida(pl, g0, R) {
  * Con las reglas `R`, además `brazos` ({i, u, k, w} para los huesos de los brazos) y el cuerpo que sigue el clip.
  */
 export function poseCaida(pl, g0, destino, t, R = null) {
+  if (pl.pierde) {
+    // la barra se le va (PIERDE): hasta `dur` el cuerpo sigue en la pose del final, las manos van con la barra y el tronco reacciona;
+    // después corre el final de siempre, contado desde que la suelta
+    const D = pl.pierde, t1 = t - D.dur, p = poseCaida({ ...pl, pierde: null, tras: D }, g0, destino, Math.max(0, t1), R);
+    const u = t1 < 0 ? suave(t / D.dur) : 1 - suave(t1 / PIERDE.vuelve), hunde = -D.hunde * u;
+    p.t = t; p.pierde = { lado: D.lado, u, tronco: D.tronco * u, cabeza: D.cabeza * u };
+    if (hunde) { p.dy = (p.dy || 0) + hunde; if (!p.pies) p.pies = { dz: 0, u: 0, dy: hunde }; }
+    if (D.y0 !== undefined) {
+      if (t1 < 0) { const q = perdidaEn(D, t); p.mano = { y: q.y, z: q.z, w: suave(t / PIERDE.entra), dedos: 0 }; p.empuje = p.barrido = p.gesto = null; }
+      else if (!p.mano && t1 < PIERDE.sale) p.mano = { y: D.y1 + D.vy * t1 - GRAV / 2 * t1 * t1, z: D.z1 + D.vz * t1, w: 1 - suave(t1 / PIERDE.sale), dedos: suave(t1 / PIERDE.sale) };
+    }
+    return p;
+  }
   let dz = 0, dy = 0;
   if (pl.salto) { const s = Math.min(1, Math.max(0, (t - pl.salto.desde) / pl.salto.dur)); dz = pl.salto.dz * suave(s); dy = .05 * Math.sin(Math.PI * s); }
   // paso atrás (bajada controlada): la raíz retrocede y cada pie se levanta y se apoya por turno; no hay saltito
@@ -193,8 +243,10 @@ export function poseCaida(pl, g0, destino, t, R = null) {
   if (pl.tipo === 'bajada' || pl.tipo === 'arriba') {
     // barra perdida desde arriba: los brazos reaccionan con ella (≤ 0,1 s). Atrás: bajan enseguida por delante (la barra no está ahí).
     // Adelante: primero la empujan lejos (`empuje`) y bajan cuando ya pasó por debajo de los hombros (`BARRIDO.espera`: check_escenas)
-    const ts = t - pl.suelta, atras = pl.causa === 'atras', tq = atras ? ts - .04 : tb - (pl.causa === 'adelante' ? .1 : BARRIDO.espera),  x = suave(tq / BARRIDO.dur), wP = suave((tq - BARRIDO.dur * .7) / (BARRIDO.dur * .45)), i = Math.floor(gC), f0 = Math.floor(g0);
-    const empuje = !atras && ts > 0 ? { w: suave(ts / .1) * (1 - suave((tq + .05) / .15)) } : null;
+    // después de una pérdida (`tras`: PIERDE) hacia adelante no hay empujón: las manos quedan arriba, la barra ya se fue por delante, y los
+    // brazos bajan recién cuando salió de su alcance (`libreEn`, lo calcula armarCaida con la caída de la barra y la altura de los hombros)
+    const ts = t - pl.suelta, atras = pl.causa === 'atras', tras = pl.tras && !atras, tq = tras ? ts - Math.max(.3, pl.tras.libreEn ?? .45) : atras ? ts - .04 : tb - (pl.causa === 'adelante' ? .1 : BARRIDO.espera),  x = suave(tq / BARRIDO.dur), wP = suave((tq - BARRIDO.dur * .7) / (BARRIDO.dur * .45)), i = Math.floor(gC), f0 = Math.floor(g0);
+    const empuje = !atras && !tras && ts > 0 ? { w: suave(ts / .1) * (1 - suave((tq + .05) / .15)) } : null;
     return { i, j: i + 1, u: gC - i, k: destino, w, dz, dy, t, brazos: { i: f0, j: f0 + 1, u: g0 - f0, k: destino, w: wP }, empuje, barrido: tq > 0 ? { x, w: suave(tq / .1) * (1 - wP) } : null, gesto: gestoDe(pl, tq - BARRIDO.dur * 1.1, f0) };
   }
   const i = Math.floor(gC), a0 = K[kB], a1 = K[Math.min(n, kB + 1)], f0 = Math.floor(a0);
@@ -216,7 +268,14 @@ export function armarCaida(res, mov, bar, piso, g0 = 0, R = null, cuerpo = null)
     pl.guia = { y0: bar.y, z0: bar.z, y1: H.y - GUIA.hombro[0], z1: H.z + GUIA.hombro[1], y2: (cuerpo.cadera?.y ?? H.y - .5) + GUIA.cadera[0], z2: H.z + GUIA.cadera[1], d1: GUIA.d1 * k, d2: GUIA.d2 * k }; pl.guia.dur = pl.guia.d1 + pl.guia.d2;
     pl.paso = { dz: GUIA.paso, desde: pl.suelta + pl.guia.d1 + pl.guia.d2 * .4, dur: GUIA.pasoDur * k };
     barra = new BarraGuiada({ ...pl.guia, piso });
+  } else if (pl.pierde) {
+    // la barra se le va en las manos antes de caer (PIERDE); `ritmo` hace que ninguna pérdida dure igual que otra
+    Object.assign(pl.pierde, { dur: PIERDE.dur * pl.ritmo, y0: bar.y, z0: bar.z });
+    barra = new BarraPerdida({ ...pl.pierde, vy: pl.vy, vz: pl.vz, piso }); Object.assign(pl.pierde, barra.g);
+    // cuándo sale la barra del alcance de los brazos (s desde que la suelta): hasta entonces no bajan por delante
+    { const D = pl.pierde, H = cuerpo?.hombros, alcance = H ? Math.min(.85, Math.max(.68, 1.5 * (H.y - (cuerpo.cadera?.y ?? H.y - .5)))) : .75, hy = H ? H.y : bar.y - .5, hz = H ? H.z : 0;
+      D.libreEn = 1.2; for (let x = 0; x < 1.2; x += .01) { const y = Math.max(piso, D.y1 + D.vy * x - GRAV / 2 * x * x), z = D.z1 + D.vz * x; if (Math.hypot(y - hy, z - hz) > alcance + .08 || y <= piso + .02) { D.libreEn = x; break; } } }
   } else barra = new BarraLibre({ y: bar.y, z: bar.z, vy: pl.vy, vz: pl.vz, piso });
-  const dur = Math.max(tiemposCaida(pl, g0, R).fin, pl.suelta + barra.reposo) + .1;
+  const dur = Math.max(tiemposCaida(pl, g0, R).fin + (pl.pierde?.dur || 0), pl.suelta + barra.reposo) + .1;
   return { tipo, pl, barra, dur, R };
 }

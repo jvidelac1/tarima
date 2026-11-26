@@ -150,7 +150,10 @@ async function fotosNiveles(B, { escena, cargas, params, msg, decir }) {
   const posiciones = [P_('s1', 'snatch', 'Salida', 'lado'), P_('s2', 'snatch', 'Primer tirón', '3/4'), P_('s3', 'snatch', 'Triple extensión', '3/4'), P_('s4', 'snatch', 'Recepción', 'baja'), P_('s5', 'snatch', 'Recepción', 'lado'), P_('s6', 'snatch', 'Recuperación', 'rev'),
     P_('c1', 'clean', 'Salida', '3/4'), P_('c2', 'clean', 'Amortiguación', 'lado'), P_('c3', 'clean', 'Recuperación', 'rev'), P_('c4', 'split', 'Envión · Dip', '3/4'), P_('c5', 'split', 'Envión · Tijera', 'lado'),
     P_('c5p', 'power', 'Power jerk · Recepción', 'lado'), P_('c5q', 'squat', 'Squat jerk · Fondo', 'lado'), P_('c6', 'split', 'Envión · Final', 'rev')];
-  const cuales = (params.get('tomas') || '').split(',').filter(Boolean), elegidas = cuales.length ? [...tomas, ...posiciones].filter(x => cuales.includes(x.n) || (x.pos && cuales.includes('posiciones'))) : tomas;      // ?tomas=medio,cara: solo esas
+  // Poses de referencia (?tomas=referencia; docs/GRAFICOS_PLAN.md, G1 y G2): T de frente y de espalda, A de tres cuartos y de costado, sin la barra.
+  const R_ = (n, ref, c) => ({ n: 'ref-' + n, c, ref, luces: null });
+  const referencia = [R_('T-frente', 'T', 'baja'), R_('T-espalda', 'T', 'rev'), R_('A-3-4', 'A', '3/4'), R_('A-lado', 'A', 'lado')];
+  const cuales = (params.get('tomas') || '').split(',').filter(Boolean), elegidas = cuales.length ? [...tomas, ...posiciones, ...referencia].filter(x => cuales.includes(x.n) || (x.pos && cuales.includes('posiciones')) || (x.ref && cuales.includes('referencia'))) : tomas;      // ?tomas=medio,cara: solo esas
   const lista = niveles.flatMap(q => elegidas.map(x => ({ ...x, q, nombre: `${q}_${x.n}` }))); let puesta = null;
   window.BANCO_FOTOS = {
     lista, listo: true, opacidadSombra: null, opacidadCruda: null,
@@ -159,7 +162,10 @@ async function fotosNiveles(B, { escena, cargas, params, msg, decir }) {
       if (puesta !== f.q) { decir(`compilando ${f.q}`); escena.setCalidad(PRESET[f.q]); await escena.precalentar(); puesta = f.q; }
       escena.arena.setDecision(f.luces); escena.camara(f.c);
       escena.setTope(escena.nativoMP * 1e6);
-      if (f.seg) { const G = tramo(escena.P, f.seg); escena.posar({ seg: G.nombre, s: G.i(f.fase), tau: G.t(f.fase), base: G.base, primero: false }, f.seg === 'snatch' ? 's' : 'c', 0); } else escena.bucle(f.t, 0);
+      escena.barbell.group.visible = !f.ref;
+      if (f.ref) { const G = tramo(escena.P, 'clean'); escena.posar({ seg: G.nombre, s: G.i('Parado'), tau: G.t('Parado'), base: G.base, primero: true }, 'c', 0); escena.activo.poseReferencia(f.ref); }
+      else if (f.seg) { const G = tramo(escena.P, f.seg); escena.posar({ seg: G.nombre, s: G.i(f.fase), tau: G.t(f.fase), base: G.base, primero: false }, f.seg === 'snatch' ? 's' : 'c', 0); } else escena.bucle(f.t, 0);
+      await escena.activo?.pielLista;      // skin con textura de piel (?skin=): la foto espera a que baje
       escena.sombra = 4;
       for (let k = 0; k < 4; k++) escena.cuadro(k ? .016 : 5, true);
       return f.nombre;
