@@ -157,7 +157,10 @@ export function tailorSinglet(body, lm, tall, textile, sleeves = false) {
     }
     return back.get(i);
   }
-  for (const [a, b] of border) index.push(a, b, rim(a), b, rim(b), rim(a));
+  // La pared de grosor del borde va solo en las rodilleras (neopreno grueso). En la malla quedaba de canto bajo la sisa: con el
+  // brazo arriba el cuerpo estira esa zona varias veces y la pared, del color oscuro del ribete, se veía como dientes de sierra.
+  // La tela fina va de una sola capa (el material es de dos caras).
+  if (sleeves) for (const [a, b] of border) index.push(a, b, rim(a), b, rim(b), rim(a));
   const g = new T.BufferGeometry();
   g.setIndex(index);
   function remap(attr) {
@@ -307,7 +310,13 @@ export function tailorSinglet(body, lm, tall, textile, sleeves = false) {
   const adjusted = g.attributes.normal;
   for (let i = 0; i < vertices.length; i++) {
     const v = vertices[i];
-    if (v.edge || v.wall) continue;
+    if (v.edge || v.wall) {
+      // El borde cortado y su pared de grosor conservan la normal del cuerpo (la de `norm`). computeVertexNormals les dejaba
+      // la de las caras de la pared, de canto: con el brazo arriba esos triángulos se estiran y se veían como dientes oscuros.
+      nv.fromBufferAttribute(norm, i).normalize();
+      adjusted.setXYZ(i, nv.x, nv.y, nv.z);
+      continue;
+    }
     nv.fromBufferAttribute(adjusted, i);
     const original = posVec.fromBufferAttribute(normal, v.a);
     if (nv.dot(original) < 0.8) nv.lerp(original, 0.75).normalize();

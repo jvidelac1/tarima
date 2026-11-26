@@ -2178,6 +2178,8 @@ window.JUEGO = {
     return o;
   },
   test: {
+    /** La escena 3D, para inspeccionar al pesista desde una prueba (docs/PESISTAS_3D.md). */
+    get escena() { return escena; },
     /** Detiene el reloj propio: desde acá el tiempo solo pasa con avanzar(). */
     manual() { if (reloj.manual === null) reloj.manual = reloj.ahora(); return reloj.manual; },
     real() { reloj.soltar(); ultimo = reloj.ahora(); },
