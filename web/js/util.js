@@ -37,14 +37,16 @@ export function normalFromHeight(heightCanvas, strength = 2, { wrap = true, anis
   const w = heightCanvas.width, h = heightCanvas.height;
   const src = heightCanvas.getContext('2d').getImageData(0, 0, w, h).data;
   const out = makeCanvas(w, h), g = out.getContext('2d'), img = g.createImageData(w, h), d = img.data;
-  const H = (x, y) => {
-    if (wrap) { x = (x + w) % w; y = (y + h) % h; } else { x = clamp(x, 0, w - 1); y = clamp(y, 0, h - 1); }
-    return src[(y * w + x) * 4] / 255;
-  };
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const dx = (H(x + 1, y) - H(x - 1, y)) * strength, dy = (H(x, y + 1) - H(x, y - 1)) * strength;
-    const l = 1 / Math.hypot(dx, dy, 1), i = (y * w + x) * 4;
-    d[i] = (-dx * l * .5 + .5) * 255; d[i + 1] = (dy * l * .5 + .5) * 255; d[i + 2] = (l * .5 + .5) * 255; d[i + 3] = 255;
+  // acceso directo a los píxeles, fila por fila (antes: una función con módulo o tope por cada una de las cuatro lecturas de
+  // cada píxel y Math.hypot; en un teléfono era la cuenta más cara del arranque). La misma fórmula.
+  const k = strength / 255;
+  for (let y = 0, i = 0; y < h; y++) {
+    const ya = (y ? y - 1 : wrap ? h - 1 : 0) * w, yb = (y < h - 1 ? y + 1 : wrap ? 0 : y) * w, yy = y * w;
+    for (let x = 0; x < w; x++, i += 4) {
+      const xa = x ? x - 1 : wrap ? w - 1 : 0, xb = x < w - 1 ? x + 1 : wrap ? 0 : x;
+      const dx = (src[(yy + xb) * 4] - src[(yy + xa) * 4]) * k, dy = (src[(yb + x) * 4] - src[(ya + x) * 4]) * k, l = 1 / Math.sqrt(dx * dx + dy * dy + 1);
+      d[i] = (-dx * l * .5 + .5) * 255; d[i + 1] = (dy * l * .5 + .5) * 255; d[i + 2] = (l * .5 + .5) * 255; d[i + 3] = 255;
+    }
   }
   g.putImageData(img, 0, 0);
   return canvasTexture(out, { srgb: false, repeat: wrap, aniso });

@@ -11,7 +11,15 @@ function shapeNormals(geometry, delta, reference) {
   const ix = geometry.index.array,
     limit = geometry.userData.lod?.full[1] ?? ix.length;
   const sums = new Float32Array(position.length);
+  // Cada forma mueve una zona chica del cuerpo: se marca qué vértices mueve y los triángulos que no tocan ninguno se saltean
+  // con tres lecturas, antes de calcular nada (da lo mismo: esos triángulos no cambiaban su normal).
+  let moved = null;
+  if (delta) {
+    moved = new Uint8Array(position.length / 3);
+    for (let j = 0, k = 0; j < delta.length; j += 3, k++) if (delta[j] || delta[j + 1] || delta[j + 2]) moved[k] = 1;
+  }
   for (let i = 0; i < limit; i += 3) {
+    if (moved && !(moved[ix[i]] | moved[ix[i + 1]] | moved[ix[i + 2]])) continue;
     const a = ix[i] * 3,
       b = ix[i + 1] * 3,
       c = ix[i + 2] * 3;
@@ -36,20 +44,21 @@ function shapeNormals(geometry, delta, reference) {
       ny = (uz + dz) * (vx + ex) - (ux + dx) * (vz + ez) - ny;
       nz = (ux + dx) * (vy + ey) - (uy + dy) * (vx + ex) - nz;
     }
-    for (const v of [a, b, c]) {
-      sums[v] += nx;
-      sums[v + 1] += ny;
-      sums[v + 2] += nz;
-    }
+    // sin armar un arreglo por triángulo (corre una vez por forma sobre toda la malla)
+    sums[a] += nx; sums[a + 1] += ny; sums[a + 2] += nz;
+    sums[b] += nx; sums[b + 1] += ny; sums[b + 2] += nz;
+    sums[c] += nx; sums[c + 1] += ny; sums[c + 2] += nz;
   }
   if (!delta) return sums;
   for (let j = 0; j < sums.length; j += 3) {
-    const area = Math.hypot(reference[j], reference[j + 1], reference[j + 2]);
+    // un vértice al que ningún triángulo le cambió el área conserva su normal (la diferencia es cero): no se calcula nada
+    if (!(sums[j] || sums[j + 1] || sums[j + 2])) continue;
+    const rx = reference[j], ry = reference[j + 1], rz = reference[j + 2], area = Math.sqrt(rx * rx + ry * ry + rz * rz);
     if (area < 1e-9) continue;
     const x = normal[j] + sums[j] / area,
       y = normal[j + 1] + sums[j + 1] / area,
       z = normal[j + 2] + sums[j + 2] / area;
-    const scale = 1 / Math.max(0.001, Math.hypot(x, y, z));
+    const scale = 1 / Math.max(0.001, Math.sqrt(x * x + y * y + z * z));
     sums[j] = x * scale - normal[j];
     sums[j + 1] = y * scale - normal[j + 1];
     sums[j + 2] = z * scale - normal[j + 2];

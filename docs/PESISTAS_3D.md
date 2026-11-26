@@ -42,12 +42,12 @@ El visor de anatomía donde nació el pesista nuevo (posturas A y T, secuencia s
 1. **Personajes ficticios.** Ninguna cara, nombre, tatuaje, bandera ni uniforme de una persona o un país reales. Las caras
    de hoy son provisorias (decisión de Juan del 26-nov) y se van a reemplazar. La malla no lleva banderas: toma el color
    del pesista con `setKit`.
-2. **Un solo esqueleto:** 52 huesos con nombres Mixamo más `Bar`. No se renombran.
-3. **Nada de descargas, compras ni cuentas sin permiso de Juan.** Las texturas tienen que ser CC0 y anotarse acá.
-4. **El núcleo no se toca desde gráficos** (`web/js/sim/`): el servidor rehace cada final con ese código. Lo que necesites
+1. **Un solo esqueleto:** 52 huesos con nombres Mixamo más `Bar`. No se renombran.
+2. **Nada de descargas, compras ni cuentas sin permiso de Juan.** Las texturas tienen que ser CC0 y anotarse acá.
+3. **El núcleo no se toca desde gráficos** (`web/js/sim/`): el servidor rehace cada final con ese código. Lo que necesites
    del núcleo se lee (por ejemplo `Intento#aviso`: riesgo de caída, de solo lectura).
-5. **El de siempre tiene que seguir andando**: es el respaldo si lo nuevo falla.
-6. **Merge y publicación solo con el OK de Juan**, por PR.
+4. **El de siempre tiene que seguir andando**: es el respaldo si lo nuevo falla.
+5. **Merge y publicación solo con el OK de Juan**, por PR.
 
 ## 4. Cómo se trabaja
 
@@ -87,6 +87,10 @@ siempre). El menú tarda 3,2 s en responder con cualquiera de los dos, porque an
 - **El banco de fotos fuerza el nivel simplificado** (`escena.lodFijo`): un defecto que solo se ve ahí puede ser del
   nivel de detalle y no de la malla.
 - **Las formas del cuerpo hay que copiarlas a la malla y al cinturón en cada cuadro** (`actuar`), o la piel atraviesa la tela.
+- **La malla fina va de una sola capa.** La pared de grosor del borde (solo queda en las rodilleras) se veía como dientes
+  de sierra oscuros bajo la sisa con el brazo arriba: no era la geometría (en color plano cubría perfecto) sino esos
+  triángulos de canto, estirados. Para diagnosticar algo así: `JUEGO.test.escena.activo.suit.material = new
+  MeshBasicMaterial(...)` y mirar si el defecto sigue.
 - **`fitBelt` busca por rayos**: los triángulos de la cintura van repartidos por sector de ángulo (`waistSurface`). Sin
   eso tardaba un segundo por pesista.
 - **`?pesista=` ya existe** (elige el pesista en el banco): por eso el interruptor se llama `?humano=`.
@@ -94,7 +98,6 @@ siempre). El menú tarda 3,2 s en responder con cualquiera de los dos, porque an
 
 ## 7. Defectos conocidos y lo que sigue
 
-1. Con los brazos arriba, el brazo atraviesa la sisa izquierda de la malla (también pasa, más chico, en el visor original).
 2. Todos los pesistas que comparten modelo comparten cara: falta una cara por pesista (y caras definitivas, ficticias).
 3. Solo Ventura y Brenner tienen pesista nuevo: los demás modelos del plantel necesitan sus `landmarks`, cara y pies.
 4. Manos: cuelgan rígidas en reposo (el visor tenía una pose de mano relajada en `performance.js`, sin portar).
