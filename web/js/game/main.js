@@ -848,7 +848,10 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
       if (E.modo === 'panel' && conf !== null) E.modo = propio ? 'intento' : 'tv';
       // pose y barra
       const pose = m.res && m.res.res === 'fallo' ? null : poseDe(m, yaAbajo && !m.res && !m.movs.length ? now + 6e4 : Math.min(now, m.res ? m.res.t : now), P), p = M?.pelea,  Tm = p ? p.T / 1e6 : m.temblor / 1e6;
-      if (pose) { escena.posar(pose, lev, dt, m.fase === 'freno' ? .55 : m.fase === 'pelea' || m.fase === 'traba' || m.fase === 'fijacion' ? Tm : 0, ahora / 1000); grab.push({ t: now, pose, y: escena.barY, z: escena.barZ }); }
+      // LIF-78: quieto con la barra (la barrita de atrapar o de pararse en Medio y Difícil, o esperando el envión), tiembla según el
+      // riesgo que avisa el núcleo (Intento#aviso): si se le va a caer, se ve venir antes de que la suelte
+      const riesgo = (m.fase === 'barra' || m.fase === 'hombros') && !reduceMotion ? (m.aviso?.riesgo || 0) / 1000 : 0; escena.riesgo = riesgo;
+      if (pose) { escena.posar(pose, lev, dt, m.fase === 'freno' ? .55 : m.fase === 'pelea' || m.fase === 'traba' || m.fase === 'fijacion' ? Tm : riesgo > .3 ? 2.5 * riesgo : 0, ahora / 1000); grab.push({ t: now, pose, y: escena.barY, z: escena.barZ }); }
       if (pose && m.tConf !== undefined && !m.res) { const mon = E.monitor; mon.cuadros++; mon.barraMin = Math.min(mon.barraMin, escena.barY); mon.alto[E.pantalla] = Math.max(mon.alto[E.pantalla] || 0, escena.barY); if (escena.barY > .26) mon.manosMax = Math.max(mon.manosMax, escena.manosBarra()); }
       // cámara: nunca hay corte con una ventana abierta
       if (m.fase !== visto.fase) {
