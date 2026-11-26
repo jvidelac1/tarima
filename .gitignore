@@ -16,3 +16,6 @@ worker/.wrangler/
 
 # Pesista nuevo: la lámina del uniforme de referencia no se usa en el juego y no se publica
 web/models/appearance/*-kit.jpg
+web/models/appearance/*.jpg
+web/models/barefoot/*.jpg
+web/models/barefoot/*.json
