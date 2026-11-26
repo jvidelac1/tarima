@@ -1930,7 +1930,7 @@ async function partida(cfg) {
   await escena.mostrar(cfg.id); escena.posar(poseParado(escena.P, 's'), 's'); escena.camara(camVista(false));
   if (DIBUJA) {
     if (E.reprecal) { E.reprecal = false; E.precal = escena.precalentar().catch(e => { console.warn('precalentar:', e); }); }      // los modelos llegaron recién con el reintento
-    E.sinDibujo = true; await E.precal; E.sinDibujo = false; await telefono.horizontal(); const c0 = performance.now(), primera = !E.cargaLista; E.cargaLista = true; await calibrar(); if (primera) ev('carga_lista', { ms: Math.round(performance.now()), calibracion_ms: Math.round(performance.now() - c0), calidad: C.nombre });
+    E.sinDibujo = true; await E.precal; await E.hzListo; E.sinDibujo = false; await telefono.horizontal(); const c0 = performance.now(), primera = !E.cargaLista; E.cargaLista = true; await calibrar(); if (primera) ev('carga_lista', { ms: Math.round(performance.now()), calibracion_ms: Math.round(performance.now() - c0), calidad: C.nombre });
     await revisarShaders();
   }
   cargaUI.ocultar(); E.forzar = true; E.verPesista = true;
@@ -2034,7 +2034,6 @@ function vigilarContexto(canvas) {
 }
 
 async function iniciar() {
-  const refresco = medirRefresco();
   pintarFijos(); telefono.instalar({ t }); telefono.avisoInstalar();      // en el iPhone, una vez: cómo jugar a pantalla completa
   cargaUI.titulo('carga.msg');
   alCambiarIdioma(() => { pintarFijos(); senalUI?.repintar(); barritaUI?.repintar(); if (E.sobre) pintarSobre(E.sobre.tipo); E.repintar?.(); if (TB.p && !TB.congelado) tablero(TB.p); else { PD.html = ''; pintarPedido(); } if (PR.S) { PR.html = ''; pintarProno(); } });
@@ -2062,7 +2061,11 @@ async function iniciar() {
     if (sk) { try { const [cat, pl] = await Promise.all([fetch('data/skins.json').then(r => { if (!r.ok) throw new Error('data/skins.json: ' + r.status); return r.json(); }), plantelJSON()]);
       if (cat.skins?.[sk]) E.skinDe = (id, f) => (escena.yo == null || id === escena.yo ? resolverSkin(cat.skins[sk], pl.pesistas?.[f.modelo] || {}) : null); else console.warn('skin: no existe', sk); } catch (e) { console.warn('skin:', e); } } }
   await Promise.all([`800 20px 'Saira Condensed'`, `700 20px 'Saira Condensed'`, `500 20px 'Saira Condensed'`].map(f => document.fonts.load(f).catch(() => null)));
-  Object.assign(C, calidadInicial(params.get('calidad') || params.get('q'), tactil())); fijarHz(await refresco);
+  Object.assign(C, calidadInicial(params.get('calidad') || params.get('q'), tactil()));
+  // La frecuencia de la pantalla ya no frena el arranque (medir 40 cuadros son 0,67 s a 60 Hz, en cualquier aparato): se arranca
+  // con 60 y la medida se aplica cuando llega (`E.hzListo`), siempre antes de la calibración y del banco. Se mide DESPUÉS de armar
+  // la escena: el constructor ocupa el hilo uno o dos segundos y la medida que venía de antes quedaba partida al medio.
+  fijarHz(60);
   if (C.auto) C.Q = { ...C.Q, dpr: 2 };      // en automático el tope de píxeles lo pone la calibración, no la densidad de cada calidad
   // LIF-33: sin WebGL (contexto que no se crea) el aviso del 3D y nunca la interfaz sin el pesista
   // un programa que no compila: se anota (three no lo dice de otra forma) y revisarShaders() decide antes de jugar. Va puesto
@@ -2073,6 +2076,7 @@ async function iniciar() {
     E.shaderMal = E.shaderMal || log || 'shader'; console.error('THREE: el programa no compila:', log);
   };
   try { escena = new Escena($('gl'), C.Q, { reduceMotion, alShader }); } catch (e) { cargaUI.ocultar(); return falloGrafico('webgl', e); }
+  E.hzListo = medirRefresco().then(hz => { fijarHz(hz); return hz; });
   escena.skinDe = E.skinDe || null;      // skin pedido con ?skin= (arriba): la escena todavía no existía
   // Pesista nuevo (character.js): prendido para todos; ?humano=0 lo apaga en este navegador (queda recordado) y ?humano=1 lo vuelve a prender.
   // Las caras son provisorias (personajes ficticios; se van a reemplazar por otras nuevas). Para prenderlo para todos:
@@ -2090,7 +2094,7 @@ async function iniciar() {
   // los modelos bajan mientras se mira el inicio; apenas están, se compila y se usa una vez todo lo que se va a dibujar
   const cargas = IDS.map(id => escena.cargar(id).catch(() => null));
   Promise.all(cargas).then(() => { E.msModelos = Math.round(performance.now()); });      // cuándo quedaron listos los pesistas (ms desde que abrió la página)
-  if (params.get('banco') === '1') { $('msg').textContent = 'Banco de medición…'; const { correrBanco } = await import('./banco.js'); correrBanco({ escena, cargas, hz: C.hz, params, msg: $('msg') }); return; }
+  if (params.get('banco') === '1') { await E.hzListo; $('msg').textContent = 'Banco de medición…'; const { correrBanco } = await import('./banco.js'); correrBanco({ escena, cargas, hz: C.hz, params, msg: $('msg') }); return; }
   E.precal = DIBUJA ? Promise.all(cargas).then(() => escena.precalentar()).catch(e => { console.warn('precalentar:', e); }) : Promise.resolve();
   ayudas = new Ayudas($('ayudas')); senalUI = new Senal($('senal'), tactil()); margenUI = new Margen($('margen'), { reduce: reduceMotion }); barritaUI = new Barrita($('barrita'), { reduce: reduceMotion }); boton = new Boton([$('escena'), $('zona')]);
   aprendeUI = new Aprende($('tv'), { ahora: () => reloj.ahora(), guardado, ev, pantalla: () => E.pantalla, panel: () => $('capa').querySelector('.panel.llamado') }); $('escena').tabIndex = -1;
