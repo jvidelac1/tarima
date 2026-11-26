@@ -13,3 +13,7 @@ worker/.wrangler/
 
 # Pages: estado local de `wrangler pages dev`
 /.wrangler/
+
+# Pesista nuevo: las caras y el uniforme de referencia no se publican hasta que sean de personas ficticias (AGENTS.md)
+web/models/appearance/*-face.jpg
+web/models/appearance/*-kit.jpg

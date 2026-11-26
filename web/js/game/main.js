@@ -47,6 +47,7 @@ const guardado = { get: k => { try { return localStorage.getItem(k); } catch { r
 const reduceMotion = matchMedia('(prefers-reduced-motion:reduce)').matches;
 const tactil = () => matchMedia('(pointer:coarse)').matches;
 const DIBUJA = params.get('dibujo') !== '0';
+const PESISTA_NUEVO_PUBLICADO = false;
 /** Versión del juego para las métricas (súper propiedad `version`). */
 const VERSION_JUEGO = 'mvp-2026-11-12';
 /** Solo para la prueba del gobernador (tools/check_fluidez.mjs --lastre): ms de espera por megapíxel dibujado, como si la placa fuera lenta. */
@@ -847,7 +848,10 @@ function correrIntento(ctx, { a, lev, env, gestos = null, conf0 = null, t0 = rel
       if (E.modo === 'panel' && conf !== null) E.modo = propio ? 'intento' : 'tv';
       // pose y barra
       const pose = m.res && m.res.res === 'fallo' ? null : poseDe(m, yaAbajo && !m.res && !m.movs.length ? now + 6e4 : Math.min(now, m.res ? m.res.t : now), P), p = M?.pelea,  Tm = p ? p.T / 1e6 : m.temblor / 1e6;
-      if (pose) { escena.posar(pose, lev, dt, m.fase === 'freno' ? .55 : m.fase === 'pelea' || m.fase === 'traba' || m.fase === 'fijacion' ? Tm : 0, ahora / 1000); grab.push({ t: now, pose, y: escena.barY, z: escena.barZ }); }
+      // LIF-78: quieto con la barra (la barrita de atrapar o de pararse en Medio y Difícil, o esperando el envión), tiembla según el
+      // riesgo que avisa el núcleo (Intento#aviso): si se le va a caer, se ve venir antes de que la suelte
+      const riesgo = (m.fase === 'barra' || m.fase === 'hombros') && !reduceMotion ? (m.aviso?.riesgo || 0) / 1000 : 0; escena.riesgo = riesgo;
+      if (pose) { escena.posar(pose, lev, dt, m.fase === 'freno' ? .55 : m.fase === 'pelea' || m.fase === 'traba' || m.fase === 'fijacion' ? Tm : riesgo > .3 ? 2.5 * riesgo : 0, ahora / 1000); grab.push({ t: now, pose, y: escena.barY, z: escena.barZ }); }
       if (pose && m.tConf !== undefined && !m.res) { const mon = E.monitor; mon.cuadros++; mon.barraMin = Math.min(mon.barraMin, escena.barY); mon.alto[E.pantalla] = Math.max(mon.alto[E.pantalla] || 0, escena.barY); if (escena.barY > .26) mon.manosMax = Math.max(mon.manosMax, escena.manosBarra()); }
       // cámara: nunca hay corte con una ventana abierta
       if (m.fase !== visto.fase) {
@@ -2063,6 +2067,11 @@ async function iniciar() {
     E.shaderMal = E.shaderMal || log || 'shader'; console.error('THREE: el programa no compila:', log);
   };
   try { escena = new Escena($('gl'), C.Q, { reduceMotion, alShader }); } catch (e) { cargaUI.ocultar(); return falloGrafico('webgl', e); }
+  // Pesista nuevo (character.js). Las caras (web/models/appearance/*-face.jpg) NO están en el repo: falta que sean de personas
+  // ficticias (AGENTS.md). Hasta entonces se prende solo a pedido, en una copia que las tenga: ?humano=1 (queda recordado
+  // en este navegador; ?humano=0 lo apaga). Para prenderlo para todos: PESISTA_NUEVO_PUBLICADO = true.
+  { const q = params.get('humano'); if (q === '1') guardado.set('tarima.pesista_nuevo', '1'); else if (q === '0') guardado.set('tarima.pesista_nuevo', '0');
+    const g = guardado.get('tarima.pesista_nuevo'); escena.humano = g === '1' ? 'si' : g === '0' ? false : PESISTA_NUEVO_PUBLICADO; }      // pesista nuevo (character.js) salvo que se pida el de siempre
   escena.setRecuadro(recuadroOn(), recuadroPedido());
   escena.poses = poses; nombrar(); orientacion();
   escena.renderer.debug.onShaderError = alShader;
@@ -2133,6 +2142,7 @@ function holgura(tb, enManos = 0) {
 // ---------- API para la prueba automática y la depuración ----------
 const ceder = () => new Promise(r => { const c = new MessageChannel(); c.port1.onmessage = () => r(); c.port2.postMessage(0); });
 window.JUEGO = {
+  get msPesista() { return escena?.msPesista || {}; },      // ms que tardó en armarse cada pesista nuevo (character.js)
   E, perf, reloj, toques, proximoCentro, eventos: EVENTOS, ganchos, t, idioma: l => (l ? cambiarIdioma(l) : idiomaActual()), get calidad() { return { nombre: C.nombre, auto: C.auto, clave: C.clave, sombras: C.sombras, hz: C.hz, meta: +metaDe(C.hz, C.pasoMin).toFixed(2), paso: C.paso, piso: +(C.piso || 0).toFixed(2), periodo: +(1000 / metaDe(C.hz, C.pasoMin)).toFixed(2), medido: C.medido, cambios: C.cambios, megapixeles: escena ? +escena.megapixeles.toFixed(2) : 0, nativo: escena ? +escena.nativoMP.toFixed(2) : 0, ventana: gov ? gov.ult : null, quieto: gov ? gov.quieto : false, gobernador: gov ? gov.estado : null, calibracion: C.calibracion }; }, pausa: abrirSobre, seguir: cerrarSobre, get escena() { return escena; }, get registro() { return E.registro; }, PLAN,
   /** Lo que la prueba necesita para jugar por la vía real de entrada: pantalla, y del intento en curso, fase y próximo objetivo. */
   estado() {

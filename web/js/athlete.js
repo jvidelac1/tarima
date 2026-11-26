@@ -131,12 +131,12 @@ const SKIN_MATERIAL = /* glsl */`
  * tamaño de la malla (LOD.error): por debajo de LOD.pxPerM píxeles por metro queda por debajo del píxel.
  */
 export const LOD = { minTris: 6000, ratio: .3, error: .0012, hairRatio: .45, hairError: .0015, pxLow: 430, pxHigh: 520 };
-function buildLod(mesh, hair) {
+export function buildLod(mesh, hair = false, borde = false) {      // `borde`: no mueve los bordes abiertos (una prenda: el escote y la sisa)
   const geo = mesh.geometry, ix = geo.index, pos = geo.attributes.position; if (!ix || !pos || ix.count / 3 < LOD.minTris || geo.userData.lod) return geo.userData.lod || null;
   let P = pos.array;
   if (pos.isInterleavedBufferAttribute || !(P instanceof Float32Array) || pos.itemSize !== 3 || pos.normalized) { P = new Float32Array(pos.count * 3); for (let i = 0; i < pos.count; i++) { P[i * 3] = pos.getX(i); P[i * 3 + 1] = pos.getY(i); P[i * 3 + 2] = pos.getZ(i); } }
   const full = ix.array instanceof Uint32Array ? ix.array : new Uint32Array(ix.array), target = Math.floor(full.length * (hair ? LOD.hairRatio : LOD.ratio) / 3) * 3;
-  let low; try { [low] = MeshoptSimplifier.simplify(full, P, 3, target, hair ? LOD.hairError : LOD.error); } catch { return null; }
+  let low; try { [low] = MeshoptSimplifier.simplify(full, P, 3, target, hair ? LOD.hairError : LOD.error, borde ? ['LockBorder'] : undefined); } catch { return null; }
   if (!low || low.length < 3 || low.length > full.length * .8) return null;      // no vale la pena un segundo nivel
   const both = new Uint32Array(full.length + low.length); both.set(full, 0); both.set(low, full.length);
   geo.setIndex(new THREE.BufferAttribute(both, 1)); geo.setDrawRange(0, full.length);
@@ -147,7 +147,7 @@ function buildLod(mesh, hair) {
  * Achica una textura al lado máximo pedido (la imagen original se suelta). La máscara de piel/tela/pelo solo reparte el
  * sombreado y no necesita más de 1024 px; en calidad baja todo el personaje va a 1024.
  */
-function fitTexture(tex, max) {
+export function fitTexture(tex, max) {
   const im = tex?.image; if (!im || !(Math.max(im.width, im.height) > max)) return tex;
   const k = max / Math.max(im.width, im.height), cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(im.width * k)); cv.height = Math.max(1, Math.round(im.height * k));
   const g = cv.getContext('2d'); g.imageSmoothingQuality = 'high';

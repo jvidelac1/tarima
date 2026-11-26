@@ -171,3 +171,17 @@ jugando. Revisarlo en PostHog (falta el acceso de lectura, LIF-24).
 2. Semana 2: A4, A5, A6, A7, B2, B3, B4.
 3. Semana 3–4: D1, D2, D3, E1.
 4. Después, con datos: D4, E2, E3.
+
+## Pesista nuevo en el juego (25-nov, rama pesista-nuevo)
+
+El pesista del visor (físico esculpido, retrato, malla cortada sobre el cuerpo, tela de foto, pies) entra al juego por
+`web/js/character.js`; `web/js/game/actuacion.js` mueve su anatomía por cuadro (hombro, axila, respiración, tela, sudor).
+- **Apagado por defecto.** Se prende con `?humano=1` (queda recordado; `?humano=0` lo apaga). Solo Ventura y Brenner.
+- **Las caras no están en el repo** (`web/models/appearance/*-face.jpg`, en `.gitignore`): las referencias con las que se
+  hicieron piden el parecido de atletas reales, y la regla es personajes ficticios (AGENTS.md). Sin la cara, vuelve solo
+  al pesista de siempre. La malla ya no lleva bandera: toma el color del pesista (`setKit`).
+- **Costo medido:** armarlo tarda 3 a 5 s en una Mac y 10 a 15 s con el procesador a un cuarto; por eso con texturas de
+  teléfono queda el de siempre. Un cuadro en Media: 12,6 ms a 1,47 MP en una M1 Pro.
+- **Probado:** partida completa por teclado (`check_game --only=teclado`) con el nuevo y con el de siempre.
+- **Defectos conocidos:** con los brazos arriba el brazo atraviesa la sisa izquierda; todos los rivales con el mismo
+  modelo comparten cara; falta medir en un teléfono real.
