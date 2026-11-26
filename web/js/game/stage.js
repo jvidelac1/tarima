@@ -608,7 +608,7 @@ export class Escena {
     this._temblor = 0;
     aplicarEsfuerzo(a, 0, 0, true); a.root.position.z += p.dz || 0; a.root.position.y += p.dy || 0;
     if (p.brazos) a.setParts(p, p.brazos); else a.setMix(p.i, p.j, p.u, p.k, p.w);
-    if (a.suit) { a._esf = (a._esf ?? .5) * .97; actuar(a, { t: p.t || 0, esfuerzo: a._esf, agitado: p.w || 0, altura: this.P?.h }); }      // pesista nuevo: después del intento respira agitado
+    if (a.suit) { a._esf = (a._esf ?? .5) * .97; const g = p.gesto; actuar(a, { t: p.t || 0, esfuerzo: a._esf, agitado: p.w || 0, alivio: g?.tipo === 'festejo' ? Math.max(g.w, g.despues > 0 ? .45 : 0) : 0, bronca: g?.tipo === 'bronca' ? g.w : 0, altura: this.P?.h }); }      // pesista nuevo: después del intento respira agitado
     // de pie después del intento no queda de estatua: respira agitado (el pecho cabecea alrededor del eje lateral del mundo,
     // RESPIRA.grados en cada hueso del tronco, a RESPIRA.hz), tanto más cuanto más cerca de «Parado». Nada con movimiento reducido.
     if (p.w > 0 && p.t !== undefined && !this.reduceMotion) {
