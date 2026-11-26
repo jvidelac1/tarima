@@ -17,6 +17,7 @@ import { Post, BOKEH } from '../post.js';
 import { Barbell } from '../barbell.js';
 import { CameraRig, CAMERAS, SHOTS } from '../cameras.js';
 import { BarTrace } from '../trace.js';
+import { actuar } from './actuacion.js';
 import { Athlete } from '../athlete.js';
 import { Timeline } from '../timeline.js';
 import { PLATE_R, PLATES, loadout, COLLAR_KG } from '../config.js';
@@ -262,6 +263,8 @@ export const RECUADRO = { ancho: .24, angosto: .27, alto: .62, x: .014, y: .13, 
 /** Fases en que el pesista recibe la barra (la cámara hace un dip chico): la primera que exista en el segmento. */
 const RECEPCIONES = ['Recepción', 'Envión · Tijera', 'Power jerk · Recepción', 'Squat jerk · Recepción'];
 
+/** Modelos que tienen pesista nuevo (web/js/character.js y web/models/appearance, barefoot). */
+export const HUMANOS = new Set(['ventura', 'brenner']);
 export class Escena {
   constructor(canvas, Q, { reduceMotion = false, alShader = null } = {}) {
     this.canvas = canvas; this.Q = Q; this.reduceMotion = reduceMotion;
@@ -511,7 +514,14 @@ export class Escena {
    */
   cargar(id) {
     const mod = PLANTEL[id].modelo;
-    return this.cargas[mod] ||= Athlete.load(mod, this.poses[mod], { aniso: Math.min(this.Q.aniso || 4, this.renderer.capabilities.getMaxAnisotropy()), maxTex: this.Q.tex, progreso: this.alProgreso })
+    const opt = { aniso: Math.min(this.Q.aniso || 4, this.renderer.capabilities.getMaxAnisotropy()), maxTex: this.Q.tex, progreso: this.alProgreso };
+    // Pesista nuevo (character.js: físico esculpido, retrato, malla cortada sobre el cuerpo, pies): solo para los modelos que lo
+    // tienen (HUMANOS) y si `this.humano` no lo apaga (main.js, ?humano=1). Si algo de lo nuevo no carga, el de siempre.
+    const clasico = () => Athlete.load(mod, this.poses[mod], opt);
+    // Armarlo cuesta (medido: 3 a 5 s en una Mac, 10 a 15 s con el procesador a un cuarto). Va también en teléfono (decisión de
+    // Juan del 26-nov); falta medirlo en uno real.
+    const nuevo = !!this.humano && HUMANOS.has(mod);
+    return this.cargas[mod] ||= (nuevo ? import('../character.js').then(m => { const t0 = performance.now(); return m.createDigitalHuman(mod, this.poses[mod], opt).then(h => { (this.msPesista ||= {})[mod] = h.msArmado || Math.round(performance.now() - t0); return h; }); }).catch(e => { console.warn('pesista nuevo:', e); return clasico(); }) : clasico())
       .then(a => { a.root.visible = false; a.root.traverse(o => { if (o.isMesh && o.castShadow) o.layers.enable(CAPA_SOMBRA); if (o.isMesh) [].concat(o.material).forEach(conBorde); }); this.scene.add(a.root); this.atletas[mod] = a; return a; })
       .catch(e => { delete this.cargas[mod]; throw e; });
   }
@@ -524,6 +534,7 @@ export class Escena {
     const tela = id === this.yo ? JUGADOR.tela : f.tela;
     { const asp = (id === this.yo ? JUGADOR.aspecto : null) || f.aspecto || {}; a.setAspecto({ ...asp, pelo: { ...(asp.pelo || {}), base: f.pelo || null }, tela: { ...(asp.tela || {}), plano: tela || null } }); }      // aspecto por parámetros (athlete.js, ASPECTO)
     a.setSkin(this.skinDe ? this.skinDe(id, f) : null);      // skin del pesista (game/skins.js; lo fija main.js con ?skin=): colores, sin bajar ni compilar nada
+    a.setKit?.(tela || f.color || null);      // pesista nuevo: la malla cortada toma el color del pesista (character.js)
     this.activo = a; this.id = id; this.P = this.poses[f.modelo]; this.rig.setAthleteHeight(this.P.h); this.sombra = 4;
   }
   setCarga(kg, lev) { if (kg !== this.kg) { this.kg = this.barbell.setLoad(kg); this._sombraBarra(); this.sombra = 4; } if (lev && this.P) this.barbell.setGrip(lev === 's' ? this.P.grip?.snatch : this.P.grip?.clean); }
@@ -568,6 +579,8 @@ export class Escena {
     this.barbell.setPosition(v); this.barY = v.y; this.barZ = v.z; this.rig.barY = v.y; this.rig.barAhead = v.y; this.rig.headY = a.boneWorld('Head', v2).y + .14;
     if (dt > 0 && dt < .1) { const acc = (v.y - 2 * this._py[0] + this._py[1]) / (dt * dt); this.barbell.step(dt, v.y, acc); } else this.barbell.settle(v.y);
     this._py[1] = dt > 0 ? this._py[0] : v.y; this._py[0] = v.y; this.sombra = 3;
+    // pesista nuevo: la anatomía sigue la pose y aprieta más con la barra en el aire y con el temblor (actuacion.js)
+    if (a.suit) { const meta = Math.min(1, .08 + .8 * Math.min(1, Math.max(0, (v.y - PLATE_R) / .25)) + temblor * .3 + (this.riesgo || 0) * .25); a._esf = dt > 0 && dt < .1 ? (a._esf ?? meta) + (meta - (a._esf ?? meta)) * Math.min(1, dt * 5) : meta; actuar(a, { t, esfuerzo: a._esf, altura: this.P?.h }); }
   }
   /**
    * Selección de pesista: el pesista y la barra giran juntos sobre el eje vertical (`ang` rad; 0 = como siempre, de frente al
@@ -596,6 +609,7 @@ export class Escena {
     this._temblor = 0;
     aplicarEsfuerzo(a, 0, 0, true); a.root.position.z += p.dz || 0; a.root.position.y += p.dy || 0;
     if (p.brazos) a.setParts(p, p.brazos); else a.setMix(p.i, p.j, p.u, p.k, p.w);
+    if (a.suit) { a._esf = (a._esf ?? .5) * .97; const g = p.gesto; actuar(a, { t: p.t || 0, esfuerzo: a._esf, agitado: p.w || 0, alivio: g?.tipo === 'festejo' ? Math.max(g.w, g.despues > 0 ? .45 : 0) : 0, bronca: g?.tipo === 'bronca' ? g.w : 0, altura: this.P?.h }); }      // pesista nuevo: después del intento respira agitado
     // de pie después del intento no queda de estatua: respira agitado (el pecho cabecea alrededor del eje lateral del mundo,
     // RESPIRA.grados en cada hueso del tronco, a RESPIRA.hz), tanto más cuanto más cerca de «Parado». Nada con movimiento reducido.
     if (p.w > 0 && p.t !== undefined && !this.reduceMotion) {

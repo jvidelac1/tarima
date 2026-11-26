@@ -51,7 +51,7 @@ export const EVENTOS = new Set([
   // LIF-52: las explicaciones de primera vez (ui/aprende.js): cuándo salen y cómo se cierran
   'explicacion_vista', 'explicacion_cerrada',
   // LIF-8, LIF-9, LIF-10, LIF-11, LIF-12, LIF-68: finales validadas, ranking, perfil y desafíos
-  'final_validada', 'ranking_visto', 'ranking_publico', 'perfil_visto', 'desafio_abierto', 'desafio_dejado',
+  'final_validada', 'ranking_visto', 'ranking_portada', 'ranking_publico', 'perfil_visto', 'desafio_abierto', 'desafio_dejado',
   // LIF-5: el plan de competencia
   'plan_elegido',
   // LIF-15: categoría de peso

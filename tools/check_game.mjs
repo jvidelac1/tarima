@@ -19,6 +19,7 @@
 //    abre sin foco en su botón principal; si un clic en el escenario agrega entradas; si la señal no se ve o se sale del
 //    escenario; si la barra queda bajo la tarima, separada de las manos o no sube en el tutorial; o si el registro
 //    exportado no recalcula a la misma tabla.
+//  - --humano: con el pesista nuevo (web/js/character.js; necesita las caras en web/models/appearance, que no están en el repo).
 // Uso: node tools/check_game.mjs [--headed] [--only=idioma|teclado|tactil|clasico|lento] [--semilla=N] [--dibujo]
 import http from 'node:http';
 import fs from 'node:fs';
@@ -41,7 +42,7 @@ const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright-core')); } catch { ({ chromium } = require('playwright')); }
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), WEB = path.join(ROOT, 'web'), OUT = path.join(ROOT, 'out', 'game');
 const arg = k => (process.argv.find(a => a.startsWith(`--${k}=`)) || '').split('=')[1];
-const ONLY = arg('only'), HEADED = process.argv.includes('--headed'), SEMILLA = +(arg('semilla') || 20261111), DIBUJO = process.argv.includes('--dibujo'), TRAZA = process.argv.includes('--traza');
+const ONLY = arg('only'), HEADED = process.argv.includes('--headed'), SEMILLA = +(arg('semilla') || 20261111), DIBUJO = process.argv.includes('--dibujo'), HUMANO = process.argv.includes('--humano'), TRAZA = process.argv.includes('--traza');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
 const datos = leerDatos(JSON.parse(fs.readFileSync(path.join(WEB, 'data/sim.json'), 'utf8')));
 
@@ -92,7 +93,7 @@ async function corrida(via) {
   // Primera vez (LIF-53): la bienvenida no ofrece elegir pesista; el que juega con el dedo y el lento usan a Brenner
   // (Largo), como siempre, guardado como si lo hubiera elegido en otra visita (sin jugadas: sigue siendo la primera vez)
   if (tactil || lento) await ctx.addInitScript(() => { try { if (!sessionStorage.getItem('__p')) { localStorage.setItem('tarima.pesista', 'brenner'); sessionStorage.setItem('__p', '1'); } } catch { /* sin almacenamiento */ } });
-  await page.goto(`${base}juego.html?lang=es&semilla=${SEMILLA}&q=${tactil ? 'movil&ritmo=completa' : 'baja'}${clasico ? '&ctl=c' : ''}${DIBUJO ? '' : '&dibujo=0'}`, { waitUntil: 'load' });
+  await page.goto(`${base}juego.html?lang=es&semilla=${SEMILLA}&q=${tactil ? 'movil&ritmo=completa' : 'baja'}${clasico ? '&ctl=c' : ''}${DIBUJO ? '' : '&dibujo=0'}${HUMANO ? '&humano=1' : ''}`, { waitUntil: 'load' });
   if (!await J(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
   const gl = await J(() => { const g = JUEGO.escena.renderer.getContext(), e = g.getExtension('WEBGL_debug_renderer_info'); return e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : '?'; });
   console.log(`${tag} ${gl}`);

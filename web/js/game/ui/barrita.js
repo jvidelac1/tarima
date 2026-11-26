@@ -4,7 +4,8 @@
 // misma función de tiempo con la que el núcleo juzga el toque.
 //   - El puntero se dibuja `adelanto` ms adelante del cuadro: lo que se ve cuando la pantalla lo muestra es dónde está el
 //     puntero para el núcleo en ese instante (compensa el atraso del cuadro).
-//   - Después del toque queda la marca de dónde pegaste y una palabra (¡PERFECTO!, REGULAR, LEJOS) hasta que la barrita se va.
+//   - Después del toque queda la marca de dónde pegaste y una palabra (¡PERFECTO! en la franja del centro, ¡BIEN!, REGULAR,
+//     LEJOS) hasta que la barrita se va. La franja perfecta (z.p) es la única que asegura la barra (rules.js → BARRA.perfecto).
 //   - `fantasma`: la práctica del primer arranque de la primera final, un aro con la tecla sobre el verde que se llena cuando
 //     el puntero pasa por el verde.
 // Sin animaciones si la persona pidió movimiento reducido (el puntero se mueve igual: es el juego).
@@ -12,7 +13,7 @@ import { t } from '../i18n/t.js';
 import { posBarra, reglasB } from '../../sim/rules.js';
 
 const HTML = `<div class="b-cab"><span class="b-nombre"></span><b class="b-verbo"></b><kbd class="tecla b-tecla"></kbd></div>
-<div class="b-pista"><i class="b-am"></i><i class="b-ve"></i><i class="b-marca"></i><i class="b-punt"></i><div class="b-fant"><i></i><kbd class="tecla"></kbd></div></div>
+<div class="b-pista"><i class="b-am"></i><i class="b-ve"></i><i class="b-pe"></i><i class="b-marca"></i><i class="b-punt"></i><div class="b-fant"><i></i><kbd class="tecla"></kbd></div></div>
 <div class="b-pal"></div>`;
 
 export class Barrita {
@@ -21,14 +22,15 @@ export class Barrita {
     this.el = el; this.reduce = !!o.reduce; this.tactil = false; this.clave = null; this.hasta = 0; this.zonaPintada = null; this.vistas = new Set(); this.R = reglasB();
     if (!el) return;
     el.innerHTML = HTML; const q = s => el.querySelector(s);
-    this.nombre = q('.b-nombre'); this.verbo = q('.b-verbo'); this.tecla = q('.b-tecla'); this.pista = q('.b-pista'); this.am = q('.b-am'); this.ve = q('.b-ve'); this.marca = q('.b-marca'); this.punt = q('.b-punt'); this.pal = q('.b-pal'); this.fant = q('.b-fant');
+    this.nombre = q('.b-nombre'); this.verbo = q('.b-verbo'); this.tecla = q('.b-tecla'); this.pista = q('.b-pista'); this.am = q('.b-am'); this.ve = q('.b-ve'); this.pe = q('.b-pe'); this.marca = q('.b-marca'); this.punt = q('.b-punt'); this.pal = q('.b-pal'); this.fant = q('.b-fant');
   }
   setTactil(v) { this.tactil = !!v; if (this.el) { this.nombre.dataset.lento = t('barra.lento'); this.tecla.textContent = t(v ? 'tecla.toca' : 'tecla.espacio'); this.fant.querySelector('kbd').textContent = this.tecla.textContent; this.tecla.hidden = !!v; } }
   repintar() { this.setTactil(this.tactil); this.clave = null; }
   /** Zonas de la barrita (v, a en milésimas alrededor del centro): el ancho del amarillo y del verde. */
   _zonas(z) {
-    const k = `${z.v}|${z.a}`; if (k === this.zonaPintada) return; this.zonaPintada = k;
+    const k = `${z.v}|${z.a}|${z.p}`; if (k === this.zonaPintada) return; this.zonaPintada = k;
     this.ve.style.left = `${(500 - z.v) / 10}%`; this.ve.style.width = `${z.v / 5}%`;
+    if (this.pe) { this.pe.hidden = !z.p; if (z.p) { this.pe.style.left = `${(500 - z.p) / 10}%`; this.pe.style.width = `${z.p / 5}%`; } }
     this.am.style.left = `${(500 - z.a) / 10}%`; this.am.style.width = `${z.a / 5}%`;
     this.fant.style.left = '50%';
   }
@@ -56,7 +58,7 @@ export class Barrita {
       this.verbo.textContent = b.zona ? '' : viva.verbo;      // PREPÁRATE / RESPIRA con la barrita quieta; TOCA EN EL VERDE cuando corre
       if (b.zona) {
         this.marca.hidden = false; this.marca.style.left = `${b.pos / 10}%`; this.marca.dataset.zona = b.zona;
-        this.pal.textContent = b.sola ? t('barra.sola') : t('barra.' + b.zona); this.pal.className = 'b-pal on ' + b.zona;
+        this.pal.textContent = b.sola ? t('barra.sola') : t(b.perf ? 'barra.perfecto' : 'barra.' + b.zona); this.pal.className = 'b-pal on ' + b.zona + (b.perf ? ' perfecto' : '');
         this._puntero(b.pos);
       } else { this.marca.hidden = true; this.pal.textContent = ''; this.pal.className = 'b-pal'; }
     }
@@ -69,11 +71,11 @@ export class Barrita {
     else { el.classList.remove('en-verde', 'lento'); this.fant.hidden = true; }
   }
   /** Marca el toque recién juzgado (lo llama el manejador del toque, sin esperar al cuadro). */
-  pega(i, zona, pos, ahora) {
+  pega(i, zona, pos, ahora, perf = false) {
     if (!this.el) return;
     this.vistas.add(i); this.hasta = ahora + 1400; this.clave = null;
     this.marca.hidden = false; this.marca.style.left = `${pos / 10}%`; this.marca.dataset.zona = zona; this._puntero(pos);
-    this.el.dataset.zona = zona; this.pal.textContent = t('barra.' + zona); this.pal.className = 'b-pal on ' + zona;
+    this.el.dataset.zona = zona; this.pal.textContent = t(perf ? 'barra.perfecto' : 'barra.' + zona); this.pal.className = 'b-pal on ' + zona + (perf ? ' perfecto' : '');
     if (!this.reduce) { this.el.classList.remove('golpe'); void this.el.offsetWidth; this.el.classList.add('golpe'); }
   }
   ocultar() { if (this.el && !this.el.hidden) { this.el.hidden = true; this.clave = null; this.el.classList.remove('golpe', 'en-verde', 'lento'); } }

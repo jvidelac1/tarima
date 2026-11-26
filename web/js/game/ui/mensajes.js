@@ -26,6 +26,16 @@ export function cuanto(e, l = idiomaActual(), pro = false) {
  * @param {'es'|'en'} [l]  idioma (por defecto, el actual)
  * @returns {string} '' si no hay nada que explicar (válido con tres blancas)
  */
+/**
+ * Nota del intento en la barrita (plan de gameplay, A7): qué tan bien se tocó, valga o no el levantamiento.
+ * S: todas las barritas en la franja perfecta · A: todas en el verde · B: alguna en el amarillo (o que salió sola) · C: alguna en el rojo.
+ * null si el intento no tuvo barritas (otro control, o no llegó a tocarse ninguna).
+ */
+export function notaBarra(res) {
+  const B = res?.uno?.barras; if (!B || !B.length) return null;
+  if (B.some(b => b.zona === 'rojo')) return 'C'; if (B.some(b => b.zona !== 'verde' || b.sola)) return 'B';
+  return B.every(b => b.perf) ? 'S' : 'A';
+}
 export function explicar(res, ctl = 'c', tactil = false, o = {}, l = idiomaActual()) {
   if (ctl === 'u') return lineaU(res, o || {}, l);
   if (ctl === 'b') return lineaB(res, o || {}, l);
@@ -117,7 +127,8 @@ function lineaU(res, o, l) {
 /**
  * Línea de 'b' (docs/JUEGO.md, Gameplay 3): dónde se quedó sin energía y, siempre, cada barrita que no salió verde y en qué
  * barrita fue: «173 kg es el 99 % y pegaste en el amarillo en el envión (−½): se quedó sin energía en el envión». Con todas
- * las barritas en verde la barra no se cae (rules.js, BARRA.verdeSalva), así que una caída siempre tiene un toque que nombrar.
+ * las barritas en la franja perfecta la barra no se cae (rules.js, BARRA.verdeSalva); con todo verde pero no perfecto, la
+ * línea dice eso (los kilos eran demasiados).
  * Válido: solo si quedó al límite.
  */
 function lineaB(res, o, l) {
@@ -130,8 +141,8 @@ function lineaB(res, o, l) {
   const larga = o.kg && o.pct;
   // el cansancio se nombra si sin él se paraba
   const cansado = u.fatiga && u.margen_fin + u.fatiga >= 0 ? tr(l, 'explica.b.cansado', { d: cuartos(u.fatiga) }) : '';
-  // no debería pasar (todo verde sube): la línea de 'u', sin toques
-  if (!B.length) return (larga ? tr(l, 'explica.u.cae', v) : tr(l, 'explica.u.cae_corta', v)) + cansado;
+  // todo verde pero no todo perfecto (desde la 2.0 solo la franja perfecta salva): los kilos eran demasiados
+  if (!B.length) return tr(l, larga ? 'explica.b.sin_perfecto' : 'explica.b.sin_perfecto_corta', v) + cansado;
   // «el amarillo en el envión», «el amarillo en la cargada y en el rojo en el envión»: cada toque que falló, en orden
   const toques = B.map(b => tr(l, 'explica.b.toque', { zona: tr(l, 'barra.z.' + b.zona), en: tr(l, `barra.en.${lev}${b.i}`) })).join(tr(l, 'explica.b.y'));
   return tr(l, larga ? 'explica.b.zona' : 'explica.b.zona_corta', { ...v, toques, d: cuartos(extra) }) + cansado;
