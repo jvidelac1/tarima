@@ -2067,9 +2067,9 @@ async function iniciar() {
     E.shaderMal = E.shaderMal || log || 'shader'; console.error('THREE: el programa no compila:', log);
   };
   try { escena = new Escena($('gl'), C.Q, { reduceMotion, alShader }); } catch (e) { cargaUI.ocultar(); return falloGrafico('webgl', e); }
-  // Pesista nuevo (character.js). Las caras (web/models/appearance/*-face.jpg) NO están en el repo: falta que sean de personas
-  // ficticias (AGENTS.md). Hasta entonces se prende solo a pedido, en una copia que las tenga: ?humano=1 (queda recordado
-  // en este navegador; ?humano=0 lo apaga). Para prenderlo para todos: PESISTA_NUEVO_PUBLICADO = true.
+  // Pesista nuevo (character.js): se prende a pedido con ?humano=1 (queda recordado en este navegador; ?humano=0 lo apaga).
+  // Las caras son provisorias (personajes ficticios; se van a reemplazar por otras nuevas). Para prenderlo para todos:
+  // PESISTA_NUEVO_PUBLICADO = true.
   { const q = params.get('humano'); if (q === '1') guardado.set('tarima.pesista_nuevo', '1'); else if (q === '0') guardado.set('tarima.pesista_nuevo', '0');
     const g = guardado.get('tarima.pesista_nuevo'); escena.humano = g === '1' ? 'si' : g === '0' ? false : PESISTA_NUEVO_PUBLICADO; }      // pesista nuevo (character.js) salvo que se pida el de siempre
   escena.setRecuadro(recuadroOn(), recuadroPedido());
