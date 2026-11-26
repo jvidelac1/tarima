@@ -2,6 +2,8 @@
 
 Leé primero `CONTEXTO.md` (qué es, estado, backlog en Linear, cómo trabaja el dueño, infraestructura y comandos) y después `HANDOFF.md` (historia detallada y pendientes).
 
+Si vas a trabajar sobre los pesistas dentro del juego (cuerpo, cara, ropa, animación), leé `docs/PESISTAS_3D.md`.
+
 ## Reglas de trabajo en este repo
 
 - **No ajustar poses a ojo.** Todo cambio en `blender/poses.py` se valida con `check()` (cero cuadros `BAD`) y con las hojas de control `out/<nombre>/sheet_<seg>_side.png` y `sheet_<seg>_front.png`. No aflojar `check()` ni excluir muestras para llegar a cero. Agregá la vista que necesites en `WANT`.
