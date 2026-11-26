@@ -17,7 +17,7 @@ import { Post, BOKEH } from '../post.js';
 import { Barbell } from '../barbell.js';
 import { CameraRig, CAMERAS, SHOTS } from '../cameras.js';
 import { BarTrace } from '../trace.js';
-import { actuar } from './actuacion.js';
+import { actuar, relajarManos } from './actuacion.js';
 import { Athlete } from '../athlete.js';
 import { Timeline } from '../timeline.js';
 import { PLATE_R, PLATES, loadout, COLLAR_KG } from '../config.js';
@@ -580,7 +580,8 @@ export class Escena {
     if (dt > 0 && dt < .1) { const acc = (v.y - 2 * this._py[0] + this._py[1]) / (dt * dt); this.barbell.step(dt, v.y, acc); } else this.barbell.settle(v.y);
     this._py[1] = dt > 0 ? this._py[0] : v.y; this._py[0] = v.y; this.sombra = 3;
     // pesista nuevo: la anatomía sigue la pose y aprieta más con la barra en el aire y con el temblor (actuacion.js)
-    if (a.suit) { const meta = Math.min(1, .08 + .8 * Math.min(1, Math.max(0, (v.y - PLATE_R) / .25)) + temblor * .3 + (this.riesgo || 0) * .25); a._esf = dt > 0 && dt < .1 ? (a._esf ?? meta) + (meta - (a._esf ?? meta)) * Math.min(1, dt * 5) : meta; actuar(a, { t, esfuerzo: a._esf, altura: this.P?.h }); }
+    if (a.suit) { const meta = Math.min(1, .08 + .8 * Math.min(1, Math.max(0, (v.y - PLATE_R) / .25)) + temblor * .3 + (this.riesgo || 0) * .25); a._esf = dt > 0 && dt < .1 ? (a._esf ?? meta) + (meta - (a._esf ?? meta)) * Math.min(1, dt * 5) : meta; actuar(a, { t, esfuerzo: a._esf, altura: this.P?.h });
+      if (pose.primero && pose.s < .5) relajarManos(a, 1 - pose.s * 2); }      // de pie antes de ir a la barra: las manos cuelgan sueltas
   }
   /**
    * Selección de pesista: el pesista y la barra giran juntos sobre el eje vertical (`ang` rad; 0 = como siempre, de frente al
