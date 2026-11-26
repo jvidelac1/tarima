@@ -47,7 +47,7 @@ const guardado = { get: k => { try { return localStorage.getItem(k); } catch { r
 const reduceMotion = matchMedia('(prefers-reduced-motion:reduce)').matches;
 const tactil = () => matchMedia('(pointer:coarse)').matches;
 const DIBUJA = params.get('dibujo') !== '0';
-const PESISTA_NUEVO_PUBLICADO = false;
+const PESISTA_NUEVO_PUBLICADO = true;      // prendido para todos, también en teléfono (decisión de Juan del 26-nov); ?humano=0 lo apaga
 /** Versión del juego para las métricas (súper propiedad `version`). */
 const VERSION_JUEGO = 'mvp-2026-11-12';
 /** Solo para la prueba del gobernador (tools/check_fluidez.mjs --lastre): ms de espera por megapíxel dibujado, como si la placa fuera lenta. */
@@ -2067,11 +2067,11 @@ async function iniciar() {
     E.shaderMal = E.shaderMal || log || 'shader'; console.error('THREE: el programa no compila:', log);
   };
   try { escena = new Escena($('gl'), C.Q, { reduceMotion, alShader }); } catch (e) { cargaUI.ocultar(); return falloGrafico('webgl', e); }
-  // Pesista nuevo (character.js): se prende a pedido con ?humano=1 (queda recordado en este navegador; ?humano=0 lo apaga).
+  // Pesista nuevo (character.js): prendido para todos; ?humano=0 lo apaga en este navegador (queda recordado) y ?humano=1 lo vuelve a prender.
   // Las caras son provisorias (personajes ficticios; se van a reemplazar por otras nuevas). Para prenderlo para todos:
   // PESISTA_NUEVO_PUBLICADO = true.
   { const q = params.get('humano'); if (q === '1') guardado.set('tarima.pesista_nuevo', '1'); else if (q === '0') guardado.set('tarima.pesista_nuevo', '0');
-    const g = guardado.get('tarima.pesista_nuevo'); escena.humano = g === '1' ? 'si' : g === '0' ? false : PESISTA_NUEVO_PUBLICADO; }      // pesista nuevo (character.js) salvo que se pida el de siempre
+    const g = guardado.get('tarima.pesista_nuevo'); escena.humano = g === '0' ? false : g === '1' || PESISTA_NUEVO_PUBLICADO; }      // pesista nuevo (character.js) salvo que se pida el de siempre
   escena.setRecuadro(recuadroOn(), recuadroPedido());
   escena.poses = poses; nombrar(); orientacion();
   escena.renderer.debug.onShaderError = alShader;

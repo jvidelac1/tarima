@@ -518,9 +518,9 @@ export class Escena {
     // Pesista nuevo (character.js: físico esculpido, retrato, malla cortada sobre el cuerpo, pies): solo para los modelos que lo
     // tienen (HUMANOS) y si `this.humano` no lo apaga (main.js, ?humano=1). Si algo de lo nuevo no carga, el de siempre.
     const clasico = () => Athlete.load(mod, this.poses[mod], opt);
-    // Armarlo cuesta (medido: 3 a 5 s en una Mac, 10 a 15 s con el procesador a un cuarto): con las texturas de teléfono
-    // (≤ 1024) queda el de siempre, salvo que se pida con ?humano=1 (`this.humano === 'si'`).
-    const nuevo = !!this.humano && HUMANOS.has(mod) && (this.humano === 'si' || opt.maxTex > 1024);
+    // Armarlo cuesta (medido: 3 a 5 s en una Mac, 10 a 15 s con el procesador a un cuarto). Va también en teléfono (decisión de
+    // Juan del 26-nov); falta medirlo en uno real.
+    const nuevo = !!this.humano && HUMANOS.has(mod);
     return this.cargas[mod] ||= (nuevo ? import('../character.js').then(m => { const t0 = performance.now(); return m.createDigitalHuman(mod, this.poses[mod], opt).then(h => { (this.msPesista ||= {})[mod] = Math.round(performance.now() - t0); return h; }); }).catch(e => { console.warn('pesista nuevo:', e); return clasico(); }) : clasico())
       .then(a => { a.root.visible = false; a.root.traverse(o => { if (o.isMesh && o.castShadow) o.layers.enable(CAPA_SOMBRA); if (o.isMesh) [].concat(o.material).forEach(conBorde); }); this.scene.add(a.root); this.atletas[mod] = a; return a; })
       .catch(e => { delete this.cargas[mod]; throw e; });
