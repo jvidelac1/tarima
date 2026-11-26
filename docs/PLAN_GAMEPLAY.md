@@ -158,6 +158,13 @@ jugando. Revisarlo en PostHog (falta el acceso de lectura, LIF-24).
 - A4 quedó cubierto con los números de arriba (se arranca con tranquilos, pero ya no se gana siempre). A5 (campeonato
   en Medio) queda en Fácil por ahora: en Medio el oro con parejos baja a 8 % y el ranking se vaciaría.
 
+- **B2, parte del núcleo (LIF-78, rama caidas-reales):** `Intento#aviso` de solo lectura (`riesgo` 0–1000, `tramo`, `causa`,
+  `tFallo`), lo que pidió la sesión de gráficos (`docs/GRAFICOS_PLAN.md`, sección 7). No cambia resultados ni huellas.
+  Medido (`tools/aviso_test.mjs`): 400 ms antes de cerrar «arriba», el 98 % de las caídas ya marca riesgo ≥ 500 (medio
+  973) y los válidos marcan 229 de media. No hizo falta demorar el cierre: la «pérdida» de G3 ya empieza al cerrar,
+  con la barra en las manos. Lo que queda firme es el arranque en Medio y Difícil mientras corre la barrita de atrapar;
+  eso lo resuelve G4 (temblor con este riesgo) en la rama de gráficos.
+
 ## Orden propuesto
 
 1. Semana 1: A1, A2, A3, B1, C1 (medir, endurecer la barrita, entender las caídas, ranking visible).

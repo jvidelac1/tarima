@@ -36,6 +36,8 @@ const PASO = k => idiv(k * 25, 3);           // ms del paso k de la pelea (120 p
  * @property {number} [fatiga]       ('b') cansancio de los intentos anteriores (energía que se resta al empezar; rules.js, fatigaDe)
  * @property {string} [dif]          ('b') nivel de dificultad: 'medio' o 'dificil' (rules.js, NIVELES_B); ausente, Fácil
  */
+/** LIF-78: escala del riesgo de Intento#aviso (lo que falta gastar sobre la energía que queda, en milésimas). Fuera de las huellas: solo presentación. */
+export const AVISO = { desde: 800, hasta: 1400 };
 export class Intento {
   /** @param {Ctx} c */
   constructor(c) {
@@ -50,6 +52,29 @@ export class Intento {
     this.B = c.ctl === 'b'; this.R = this.B ? reglasConTecnica(c.dif, c.tecnica) : null; this.U = c.ctl === 'u' || this.B ? this._uIni() : null;
   }
   get fin() { return this.res !== null; }
+  /**
+   * LIF-78 (docs/GRAFICOS_PLAN.md, sección 7): qué tan cerca está la barra de caerse, para que la presentación lo muestre
+   * ANTES de que se cierre el tramo (temblor, barra que se inclina, cara que aprieta). Solo lectura: no cambia el intento ni
+   * mira la suerte que todavía no salió, así que no cambia resultados ni huellas. Solo 'u' y 'b'; en el clásico, null.
+   * - `riesgo` (0..1000): lo que falta gastar sin suerte (con lo que ya costaron las barritas tocadas) contra la energía que
+   *   queda: 0 hasta el 80 % (AVISO.desde), 1000 desde el 140 % (AVISO.hasta), también en el FRENO (la garra) o si ya se cayó.
+   *   Medido (tools/aviso_test.mjs): 400 ms antes de cerrar «arriba», el 90 % de las caídas pasa el 140 %; los válidos, la
+   *   mitad no llega al 70 % y uno de cada cuatro pasa el 108 % (los salva la suerte, la garra o la franja perfecta).
+   * - `tramo`: el próximo tramo que cierra (o donde se cayó) y `causa`: la del fallo si se cae ahí.
+   * - `tFallo`: el instante del fallo si ya se decidió; null mientras no.
+   */
+  get aviso() {
+    const U = this.U; if (!U) return null;
+    if (this.res) { const f = this.res.res === 'fallo'; return { riesgo: f ? 1000 : 0, tramo: f ? U.caida : null, causa: f ? this.res.causa : null, tFallo: f ? this.res.t : null }; }
+    const c = this.c, orden = TRAMOS[c.lev];
+    if (U.freno) return { riesgo: 1000, tramo: U.freno.tramo, causa: this._causaTramo(U.freno.tramo), tFallo: null };
+    const i = orden.findIndex(x => !(x in U.gastos)); if (i < 0) return { riesgo: 0, tramo: null, causa: null, tFallo: null };
+    let falta = 0; for (const x of orden.slice(i)) falta += gastoTramo(x, c.I, c.lev, c.env, U.cuerpo) + Math.max(0, U.extra[x] || 0);
+    const riesgo = U.m <= 0 ? 1000 : Math.max(0, Math.min(1000, idiv((idiv(1000 * falta, U.m) - AVISO.desde) * 1000, AVISO.hasta - AVISO.desde)));
+    return { riesgo, tramo: orden[i], causa: this._causaTramo(orden[i]), tFallo: null };
+  }
+  /** La causa con que se cae la barra en `tramo` (la misma que pone _uCae). */
+  _causaTramo(tramo) { const lev = this.c.lev; return tramo === 'tiron' ? 'sin_altura' : tramo === 'arriba' ? (lev === 'c' ? 'codos' : 'atras') : lev === 's' ? 'fondo' : 'aplastado'; }
 
   // ---------- entradas ----------
   /** Confirmar en el panel del llamado: el pesista se agacha a la barra. */
