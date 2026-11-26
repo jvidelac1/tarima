@@ -262,6 +262,7 @@ export default {
   'veredicto.no_vale': 'NO VALE',
   'veredicto.cayo': 'SE CAYÓ',
   'veredicto.luces': '{b} de 3 jueces dijeron que sí',
+  'veredicto.nota': 'Nota {n}',
   'veredicto.primer_no_vale': 'Para que valga, 2 de los 3 jueces tienen que poner luz blanca.',
   'veredicto.repeticion': 'Repetición',
   'veredicto.camara_lenta': 'cámara lenta',

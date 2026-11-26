@@ -10,6 +10,7 @@
 //    anota si el veredicto con el motivo llegó a verse antes de que el machaque lo saltee;
 //  - por cada señal con círculo anota cuánto antes del cierre aparece, y cuándo abre la ventana;
 //  - capturas de cada momento en out/recorrido/ (un cuadro del 3D forzado antes de cada una).
+//    Para las capturas del README (docs/img, web/img): --camara=3/4 --calidad=alta (por defecto, la cámara del jugador y «Baja»).
 // Criterios (falla si no se cumplen, además de errores de consola o si el recorrido no avanza):
 //  - cuando entre un levantamiento propio y el próximo panel no hay nada de los rivales (el jugador se sigue a sí mismo),
 //    la espera sin tocar es de menos de 6 s;
@@ -56,7 +57,7 @@ const ctx = await browser.newContext({ viewport: { width: 1745, height: 845 }, d
 const page = await ctx.newPage();
 page.on('console', m => { if (m.type() === 'error') problemas.push(`console.error: ${m.text()}`); });
 page.on('pageerror', e => problemas.push(`pageerror: ${e.message}`));
-await page.goto(`${base}juego.html?lang=${LANG}&semilla=${SEMILLA}&q=baja&dibujo=0`, { waitUntil: 'load' });
+await page.goto(`${base}juego.html?lang=${LANG}&semilla=${SEMILLA}&q=${arg('calidad') || 'baja'}&dibujo=0${arg('camara') ? '&camara=' + encodeURIComponent(arg('camara')) : ''}`, { waitUntil: 'load' });
 if (!await page.evaluate(() => window.JUEGO.listo)) throw new Error('el juego no terminó de iniciar');
 const J = (fn, a) => page.evaluate(fn, a);
 await J(() => JUEGO.test.manual());

@@ -253,6 +253,7 @@ export default {
   'veredicto.no_vale': 'NO LIFT',
   'veredicto.cayo': 'DROPPED',
   'veredicto.luces': '{b} of 3 judges said yes',
+  'veredicto.nota': 'Grade {n}',
   'veredicto.primer_no_vale': 'To count, 2 of the 3 judges must show a white light.',
   'veredicto.repeticion': 'Replay',
   'veredicto.camara_lenta': 'slow motion',

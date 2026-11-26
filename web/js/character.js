@@ -7,6 +7,14 @@ import { tailorSinglet, cullCoveredSkin } from './singlet.js';
 import { landmarks } from './landmarks.js';
 import { Athlete, fitTexture, buildLod } from './athlete.js';
 
+/** Los pies en binario (tools/pies_bin.mjs escribe el formato y trae el mismo lector para comprobarlo). */
+const TIPOS = { f32: Float32Array, u16: Uint16Array, u8: Uint8Array, i16: Int16Array, u32: Uint32Array };
+function leerPies(buf) {
+  const dv = new DataView(buf), n = dv.getUint32(0, true), cab = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, n))), out = { names: cab.names };
+  let o = 4 + n;
+  for (const c of cab.campos) { const A = new TIPOS[c.tipo](buf, o, c.n); out[c.k] = c.escala === 1 ? Array.from(A) : Array.from(A, x => x / c.escala); o += Math.ceil(c.n * TIPOS[c.tipo].BYTES_PER_ELEMENT / 4) * 4; }
+  return out;
+}
 async function loadColor(file, options, flipY) {
   const url = new URL('../models/appearance/' + file, import.meta.url);
   const texture = await new T.TextureLoader().loadAsync(url.href);
@@ -22,7 +30,7 @@ function textileMaps(options) {
     const files = ['color', 'normal', 'roughness'];
     textilePromise = Promise.all(
       files.map(async (key) => {
-        const texture = await loadColor('stretch-' + key + '.jpg', options, false);
+        const texture = await loadColor('stretch-' + key + '.webp', options, false);
         if (key !== 'color') texture.colorSpace = T.NoColorSpace;
         texture.wrapS = texture.wrapT = T.RepeatWrapping;
         texture.repeat.set(7.1, 7.1);
@@ -38,16 +46,17 @@ function textileMaps(options) {
   return textilePromise;
 }
 export async function createDigitalHuman(name, meta, options) {
+  const T0 = performance.now(), ms = {}; let tA = T0; const paso = (k) => { const n = performance.now(); ms[k] = Math.round(n - tA); tA = n; };
   const [face, textile, feet, footSkin] = await Promise.all([
-    loadColor(name + '-face.jpg', options, true),
+    loadColor(name + '-face.webp', options, true),
     textileMaps(options),
-    fetch(new URL('../models/barefoot/'+name+'.json',import.meta.url)).then(r=>{
+    fetch(new URL('../models/barefoot/'+name+'.bin',import.meta.url)).then(r=>{
       if(!r.ok) throw Error('No se pudieron cargar los pies de '+name);
-      return r.json();
+      return r.arrayBuffer().then(leerPies);
     }),
-    new T.TextureLoader().loadAsync(new URL('../models/barefoot/'+name+'-skin.jpg',import.meta.url).href),
+    new T.TextureLoader().loadAsync(new URL('../models/barefoot/'+name+'-skin.webp',import.meta.url).href),
   ]);
-  const athlete = await Athlete.load(name, meta, options);
+  paso('texturas'); const athlete = await Athlete.load(name, meta, options); paso('modelo');
   const beltCenter = landmarks[name].hip[2] + 0.195 * meta.h / 1.69;
   let body, bareWaist;
   athlete.belt = [];
@@ -57,7 +66,7 @@ export async function createDigitalHuman(name, meta, options) {
     if (m.name === 'Body') {
       body = mesh;
       bareWaist = waistSurface(mesh.geometry, beltCenter);
-      sculptAthlete(mesh, landmarks[name]);
+      { const t = performance.now(); sculptAthlete(mesh, landmarks[name]); ms.esculpir = Math.round(performance.now() - t); }
       applyPortrait(m, face, name === 'brenner');
       m.userData.skin.portrait = { value: face };
       m.roughness = 0.77;
@@ -112,10 +121,10 @@ export async function createDigitalHuman(name, meta, options) {
     }
   });
   athlete.body = body;
-  athlete.suit = tailorSinglet(body, landmarks[name], name === 'brenner', textile);
-  athlete.sleeves = tailorSinglet(body, landmarks[name], name === 'brenner', textile, true);
+  paso('materiales'); athlete.suit = tailorSinglet(body, landmarks[name], name === 'brenner', textile); paso('malla');
+  athlete.sleeves = tailorSinglet(body, landmarks[name], name === 'brenner', textile, true); paso('rodilleras');
   const clothedWaist = waistSurface(athlete.suit.geometry, beltCenter);
-  for (const mesh of athlete.belt) fitBelt(mesh, bareWaist, clothedWaist, athlete.suit);
+  for (const mesh of athlete.belt) fitBelt(mesh, bareWaist, clothedWaist, athlete.suit); paso('cinturon');
   for (const garment of [athlete.suit, athlete.sleeves]) {
     athlete.meshes.push(garment);
     const lod = buildLod(garment, false, true);
@@ -126,10 +135,10 @@ export async function createDigitalHuman(name, meta, options) {
   /** Color del equipo en la malla (hex o color de three); null vuelve al del modelo. Lo usa el juego (stage.js, mostrar). */
   const kit0 = athlete.suit.material.userData.skin.kit.value.clone();
   athlete.setKit = (color) => { const k = athlete.suit.material.userData.skin.kit.value; if (color) k.set(color); else k.copy(kit0); };
-  cullCoveredSkin(athlete);
+  paso('lod'); cullCoveredSkin(athlete); paso('recorte');
   footSkin.colorSpace=T.SRGBColorSpace;
   footSkin.wrapS=footSkin.wrapT=T.RepeatWrapping;
-  fitFeet(athlete,feet,landmarks[name],footSkin);
+  fitFeet(athlete,feet,landmarks[name],footSkin); paso('pies');
   Object.values(textile).forEach((map) => athlete.shared.add(map));
   athlete.root.updateMatrixWorld(true);
   const bones = athlete._byName;
@@ -188,5 +197,6 @@ export async function createDigitalHuman(name, meta, options) {
     const stride = Math.max(1, Math.floor(list.length / (region === 'seat' ? 550 : 420)));
     athlete.contacts[region] = list.filter((_, i) => i % stride === 0);
   }
+  paso('contactos'); ms.total = Math.round(performance.now() - T0); athlete.msArmado = ms;      // en qué se fue el tiempo (ms por paso)
   return athlete;
 }

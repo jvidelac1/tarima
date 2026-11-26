@@ -176,12 +176,10 @@ jugando. Revisarlo en PostHog (falta el acceso de lectura, LIF-24).
 
 El pesista del visor (físico esculpido, retrato, malla cortada sobre el cuerpo, tela de foto, pies) entra al juego por
 `web/js/character.js`; `web/js/game/actuacion.js` mueve su anatomía por cuadro (hombro, axila, respiración, tela, sudor).
-- **Apagado por defecto.** Se prende con `?humano=1` (queda recordado; `?humano=0` lo apaga). Solo Ventura y Brenner.
-- **Las caras no están en el repo** (`web/models/appearance/*-face.jpg`, en `.gitignore`): las referencias con las que se
-  hicieron piden el parecido de atletas reales, y la regla es personajes ficticios (AGENTS.md). Sin la cara, vuelve solo
-  al pesista de siempre. La malla ya no lleva bandera: toma el color del pesista (`setKit`).
-- **Costo medido:** armarlo tarda 3 a 5 s en una Mac y 10 a 15 s con el procesador a un cuarto; por eso con texturas de
-  teléfono queda el de siempre. Un cuadro en Media: 12,6 ms a 1,47 MP en una M1 Pro.
+- **Prendido para todos** desde el 26-nov, también en teléfono (decisión de Juan). `?humano=0` lo apaga en ese navegador. Solo Ventura y Brenner.
+- **Caras:** provisorias, de personajes ficticios (decisión de Juan del 26-nov); se van a reemplazar por otras nuevas.
+  La malla no lleva bandera: toma el color del pesista (`setKit`).
+- **Costo medido:** armarlo tarda 3 a 5 s en una Mac y 10 a 15 s con el procesador a un cuarto; falta medirlo en un teléfono real. Un cuadro en Media: 12,6 ms a 1,47 MP en una M1 Pro.
 - **Probado:** partida completa por teclado (`check_game --only=teclado`) con el nuevo y con el de siempre.
 - **Defectos conocidos:** con los brazos arriba el brazo atraviesa la sisa izquierda; todos los rivales con el mismo
   modelo comparten cara; falta medir en un teléfono real.

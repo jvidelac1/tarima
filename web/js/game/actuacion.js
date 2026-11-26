@@ -15,9 +15,10 @@ const lee = (mesh, k) => { const i = mesh.morphTargetDictionary?.[k]; return i =
  * @param o.t        reloj en s (respiración)
  * @param o.esfuerzo 0..1: cuánto aprieta (hincha, traba el tronco, suda, enrojece)
  * @param o.agitado  0..1: recuperación después del intento (respira hondo y rápido, boca entreabierta)
+ * @param o.alivio   0..1: cara de alivio (el festejo del válido)   @param o.bronca 0..1: cara de decepción (la barra se cayó)
  * @param o.altura   estatura del pesista en m (para saber cuánto flexiona la cadera: la tela se comprime)
  */
-export function actuar(a, { t = 0, esfuerzo = 0, agitado = 0, altura = 1.7 } = {}) {
+export function actuar(a, { t = 0, esfuerzo = 0, agitado = 0, alivio = 0, bronca = 0, altura = 1.7 } = {}) {
   const cuerpo = a.body; if (!cuerpo || !a.suit) return;
   const b = a._byName; a.root.updateMatrixWorld(true);
   const columna = b.get('Neck').getWorldPosition(_a).sub(b.get('Hips').getWorldPosition(_b)).normalize();
@@ -33,7 +34,7 @@ export function actuar(a, { t = 0, esfuerzo = 0, agitado = 0, altura = 1.7 } = {
   const onda = Math.sin(t * (agitado > 0 ? 4 : 2.25) - .7), recupera = .5 - .5 * Math.cos(t * 3.85);
   let aire = .35 + .27 * onda * (1 - esfuerzo) + .33 * esfuerzo; aire += (.18 + .72 * recupera - aire) * agitado;
   pone(cuerpo, 'breath', aire); pone(cuerpo, 'pump', Math.min(1, .76 * esfuerzo + .2)); pone(cuerpo, 'brace', esfuerzo);
-  pone(cuerpo, 'openJaw', .19 * esfuerzo + agitado * (.27 + .42 * recupera)); pone(cuerpo, 'relief', 0); pone(cuerpo, 'disappointment', 0);
+  pone(cuerpo, 'openJaw', .19 * esfuerzo + agitado * (.27 + .42 * recupera)); pone(cuerpo, 'relief', alivio); pone(cuerpo, 'disappointment', bronca);
   // la tela: cae suelta en reposo, se pega con el esfuerzo y se comprime con la cadera flexionada; el resto lo copia del cuerpo
   const cadera = b.get('Hips').getWorldPosition(_a).y, dobla = 1 - Math.min(1, Math.max(0, (cadera / altura - .15) / .39));
   const tela = { drape: .22 + .52 * (1 - esfuerzo) + .17 * dobla, compression: dobla, settle: 0 };

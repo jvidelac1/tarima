@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = path.join(ROOT, 'node_modules', 'three');
@@ -19,7 +20,14 @@ const ADDONS = [
 
 fs.rmSync(DST, { recursive: true, force: true });
 const copy = (from, to) => { fs.mkdirSync(path.dirname(to), { recursive: true }); fs.copyFileSync(from, to); };
-for (const f of ['three.module.js', 'three.core.js']) copy(path.join(SRC, 'build', f), path.join(DST, 'build', f));
+// three se sirve minificado (2,1 MB → 0,8 MB: baja y se analiza antes en el teléfono), con los mismos nombres de archivo. Usa el
+// esbuild que trae wrangler (worker/node_modules); si no está instalado, copia el original y avisa.
+const ESBUILD = path.join(ROOT, 'worker', 'node_modules', '.bin', 'esbuild');
+for (const f of ['three.module.js', 'three.core.js']) {
+  const from = path.join(SRC, 'build', f), to = path.join(DST, 'build', f); fs.mkdirSync(path.dirname(to), { recursive: true });
+  if (fs.existsSync(ESBUILD)) execFileSync(ESBUILD, [from, '--minify', '--format=esm', '--legal-comments=inline', '--target=es2020', '--outfile=' + to], { stdio: 'inherit' });
+  else { console.warn(`sin esbuild (cd worker && npm ci): ${f} queda sin minificar`); copy(from, to); }
+}
 copy(path.join(SRC, 'LICENSE'), path.join(DST, 'LICENSE'));
 
 const seen = new Set();

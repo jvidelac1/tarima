@@ -176,7 +176,7 @@ Resumen: Ventura 18 ok, 26 ok con reservas, 1 mal. Brenner 22 ok, 23 ok con rese
 - La prueba avisa que el hueso `Bar` se mueve 1,1 a 1,2 mm entre «Parado» y «Salida» del arranque y queda 6 mm por encima del apoyo real de los discos; el visor fija la barra a la tarima mientras tanto.
 - Halo de puntos blancos alrededor de la barra, las manos y el borde de los discos (ruido de profundidad de campo u oclusión).
 - El visor muestreaba la animación un cuadro antes de cada clave; corregido el 11-nov en `web/js/athlete.js` (muestrea desde el primer tiempo de clave).
-- Archivos de trabajo para limpiar: `blender/ctl.py`, `blender/ctl2.py` (superados por `ctl3.py`), `tools/check_viewer_shot.mjs`, `tools/check_viewer_vendor.mjs`, `tools/check_viewer_perf.mjs`.
+- Archivos de trabajo: `blender/ctl.py`, `blender/ctl2.py` y `tools/check_viewer_shot.mjs` se borraron el 26-nov (los superó `ctl3.py`). `tools/check_viewer_vendor.mjs` (`npm run vendor`) y `tools/check_viewer_perf.mjs` se usan y quedan.
 
 ## Juego (etapa 1, rama `gameplay`)
 

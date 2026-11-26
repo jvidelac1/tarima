@@ -12,12 +12,21 @@ export function waistSurface(geometry, centerY) {
         ids.every(id => points.getY(id) > centerY + .09)) continue;
     triangles.push({ ids, vertices: ids.map(id => new T.Vector3().fromBufferAttribute(points, id)) });
   }
+  // El rayo es horizontal y sale del eje (0, y, .02): solo puede tocar los triángulos cuyo abanico de ángulos alrededor de ese
+  // eje contiene el suyo. Se reparten en sectores para no probar todos con cada vértice del cinturón (da el mismo contacto).
+  const SECTORES = 256, sector = (a) => Math.min(SECTORES - 1, Math.max(0, Math.floor((a + Math.PI) / (2 * Math.PI) * SECTORES)));
+  const porSector = Array.from({ length: SECTORES }, () => []);
+  for (const tri of triangles) {
+    const A = tri.vertices.map(v => Math.atan2(v.x, v.z - .02)), lo = Math.min(...A), hi = Math.max(...A);
+    const pone = (a, b) => { for (let k = Math.max(0, sector(a) - 1); k <= Math.min(SECTORES - 1, sector(b) + 1); k++) porSector[k].push(tri); };
+    if (hi - lo > Math.PI) { pone(hi, Math.PI); pone(-Math.PI, lo); } else pone(lo, hi);      // el abanico cruza por detrás (±π)
+  }
   const ray = new T.Ray(), hit = new T.Vector3();
   return (position) => {
     ray.origin.set(0, position.y, .02);
     ray.direction.copy(position).sub(ray.origin).normalize();
     let distance = Infinity, contact;
-    for (const { ids, vertices } of triangles) {
+    for (const { ids, vertices } of porSector[sector(Math.atan2(position.x, position.z - .02))]) {
       if (!ray.intersectTriangle(...vertices, false, hit)) continue;
       const d = ray.origin.distanceTo(hit);
       if (d >= distance) continue;

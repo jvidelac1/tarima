@@ -518,10 +518,10 @@ export class Escena {
     // Pesista nuevo (character.js: físico esculpido, retrato, malla cortada sobre el cuerpo, pies): solo para los modelos que lo
     // tienen (HUMANOS) y si `this.humano` no lo apaga (main.js, ?humano=1). Si algo de lo nuevo no carga, el de siempre.
     const clasico = () => Athlete.load(mod, this.poses[mod], opt);
-    // Armarlo cuesta (medido: 3 a 5 s en una Mac, 10 a 15 s con el procesador a un cuarto): con las texturas de teléfono
-    // (≤ 1024) queda el de siempre, salvo que se pida con ?humano=1 (`this.humano === 'si'`).
-    const nuevo = !!this.humano && HUMANOS.has(mod) && (this.humano === 'si' || opt.maxTex > 1024);
-    return this.cargas[mod] ||= (nuevo ? import('../character.js').then(m => { const t0 = performance.now(); return m.createDigitalHuman(mod, this.poses[mod], opt).then(h => { (this.msPesista ||= {})[mod] = Math.round(performance.now() - t0); return h; }); }).catch(e => { console.warn('pesista nuevo:', e); return clasico(); }) : clasico())
+    // Armarlo cuesta (medido: 3 a 5 s en una Mac, 10 a 15 s con el procesador a un cuarto). Va también en teléfono (decisión de
+    // Juan del 26-nov); falta medirlo en uno real.
+    const nuevo = !!this.humano && HUMANOS.has(mod);
+    return this.cargas[mod] ||= (nuevo ? import('../character.js').then(m => { const t0 = performance.now(); return m.createDigitalHuman(mod, this.poses[mod], opt).then(h => { (this.msPesista ||= {})[mod] = h.msArmado || Math.round(performance.now() - t0); return h; }); }).catch(e => { console.warn('pesista nuevo:', e); return clasico(); }) : clasico())
       .then(a => { a.root.visible = false; a.root.traverse(o => { if (o.isMesh && o.castShadow) o.layers.enable(CAPA_SOMBRA); if (o.isMesh) [].concat(o.material).forEach(conBorde); }); this.scene.add(a.root); this.atletas[mod] = a; return a; })
       .catch(e => { delete this.cargas[mod]; throw e; });
   }
@@ -608,7 +608,7 @@ export class Escena {
     this._temblor = 0;
     aplicarEsfuerzo(a, 0, 0, true); a.root.position.z += p.dz || 0; a.root.position.y += p.dy || 0;
     if (p.brazos) a.setParts(p, p.brazos); else a.setMix(p.i, p.j, p.u, p.k, p.w);
-    if (a.suit) { a._esf = (a._esf ?? .5) * .97; actuar(a, { t: p.t || 0, esfuerzo: a._esf, agitado: p.w || 0, altura: this.P?.h }); }      // pesista nuevo: después del intento respira agitado
+    if (a.suit) { a._esf = (a._esf ?? .5) * .97; const g = p.gesto; actuar(a, { t: p.t || 0, esfuerzo: a._esf, agitado: p.w || 0, alivio: g?.tipo === 'festejo' ? Math.max(g.w, g.despues > 0 ? .45 : 0) : 0, bronca: g?.tipo === 'bronca' ? g.w : 0, altura: this.P?.h }); }      // pesista nuevo: después del intento respira agitado
     // de pie después del intento no queda de estatua: respira agitado (el pecho cabecea alrededor del eje lateral del mundo,
     // RESPIRA.grados en cada hueso del tronco, a RESPIRA.hz), tanto más cuanto más cerca de «Parado». Nada con movimiento reducido.
     if (p.w > 0 && p.t !== undefined && !this.reduceMotion) {

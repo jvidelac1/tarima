@@ -14,6 +14,8 @@ worker/.wrangler/
 # Pages: estado local de `wrangler pages dev`
 /.wrangler/
 
-# Pesista nuevo: las caras y el uniforme de referencia no se publican hasta que sean de personas ficticias (AGENTS.md)
-web/models/appearance/*-face.jpg
+# Pesista nuevo: la lámina del uniforme de referencia no se usa en el juego y no se publica
 web/models/appearance/*-kit.jpg
+web/models/appearance/*.jpg
+web/models/barefoot/*.jpg
+web/models/barefoot/*.json

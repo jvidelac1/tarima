@@ -26,6 +26,16 @@ export function cuanto(e, l = idiomaActual(), pro = false) {
  * @param {'es'|'en'} [l]  idioma (por defecto, el actual)
  * @returns {string} '' si no hay nada que explicar (válido con tres blancas)
  */
+/**
+ * Nota del intento en la barrita (plan de gameplay, A7): qué tan bien se tocó, valga o no el levantamiento.
+ * S: todas las barritas en la franja perfecta · A: todas en el verde · B: alguna en el amarillo (o que salió sola) · C: alguna en el rojo.
+ * null si el intento no tuvo barritas (otro control, o no llegó a tocarse ninguna).
+ */
+export function notaBarra(res) {
+  const B = res?.uno?.barras; if (!B || !B.length) return null;
+  if (B.some(b => b.zona === 'rojo')) return 'C'; if (B.some(b => b.zona !== 'verde' || b.sola)) return 'B';
+  return B.every(b => b.perf) ? 'S' : 'A';
+}
 export function explicar(res, ctl = 'c', tactil = false, o = {}, l = idiomaActual()) {
   if (ctl === 'u') return lineaU(res, o || {}, l);
   if (ctl === 'b') return lineaB(res, o || {}, l);
