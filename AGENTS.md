@@ -2,7 +2,7 @@
 
 Leé primero `CONTEXTO.md` (qué es, estado, backlog en Linear, cómo trabaja el dueño, infraestructura y comandos) y después `HANDOFF.md` (historia detallada y pendientes).
 
-Si vas a trabajar sobre los pesistas dentro del juego (cuerpo, cara, ropa, animación), leé `docs/PESISTAS_3D.md`.
+Si vas a trabajar sobre los pesistas dentro del juego (cuerpo, cara, ropa, animación), leé `docs/AGENTE_GRAFICOS.md` (el encargo: qué hay que lograr) y `docs/PESISTAS_3D.md` (cómo está hecho).
 
 ## Reglas de trabajo en este repo
 
