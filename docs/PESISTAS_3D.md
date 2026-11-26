@@ -98,9 +98,9 @@ siempre). El menú tarda 3,2 s en responder con cualquiera de los dos, porque an
 
 ## 7. Defectos conocidos y lo que sigue
 
-2. Todos los pesistas que comparten modelo comparten cara: falta una cara por pesista (y caras definitivas, ficticias).
-3. Solo Ventura y Brenner tienen pesista nuevo: los demás modelos del plantel necesitan sus `landmarks`, cara y pies.
-4. Manos: cuelgan rígidas en reposo (el visor tenía una pose de mano relajada en `performance.js`, sin portar).
+1. Todos los pesistas que comparten modelo comparten cara: falta una cara por pesista (y caras definitivas, ficticias).
+2. Solo Ventura y Brenner tienen pesista nuevo: los demás modelos del plantel necesitan sus `landmarks`, cara y pies.
+3. Manos: de pie ya cuelgan sueltas (`relajarManos`, en `actuacion.js`); falta lo mismo después de soltar la barra y la
+   pose del brazo en reposo que tenía el visor (`performance.js`, sin portar).
+4. Entrada y salida de la tarima, y caídas del cuerpo (hoy solo se cae la barra): no existen.
 5. Medir carga y cuadros en un teléfono real.
-6. Pendiente de gráficos, en el PR #9 (`docs/GRAFICOS_PLAN.md`): la barra que «se le va» en las manos antes de caer,
-   pieles como datos, poses de referencia T y A.

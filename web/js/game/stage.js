@@ -17,7 +17,7 @@ import { Post, BOKEH } from '../post.js';
 import { Barbell } from '../barbell.js';
 import { CameraRig, CAMERAS, SHOTS } from '../cameras.js';
 import { BarTrace } from '../trace.js';
-import { actuar } from './actuacion.js';
+import { actuar, relajarManos } from './actuacion.js';
 import { Athlete } from '../athlete.js';
 import { Timeline } from '../timeline.js';
 import { PLATE_R, PLATES, loadout, COLLAR_KG } from '../config.js';
@@ -580,7 +580,8 @@ export class Escena {
     if (dt > 0 && dt < .1) { const acc = (v.y - 2 * this._py[0] + this._py[1]) / (dt * dt); this.barbell.step(dt, v.y, acc); } else this.barbell.settle(v.y);
     this._py[1] = dt > 0 ? this._py[0] : v.y; this._py[0] = v.y; this.sombra = 3;
     // pesista nuevo: la anatomía sigue la pose y aprieta más con la barra en el aire y con el temblor (actuacion.js)
-    if (a.suit) { const meta = Math.min(1, .08 + .8 * Math.min(1, Math.max(0, (v.y - PLATE_R) / .25)) + temblor * .3 + (this.riesgo || 0) * .25); a._esf = dt > 0 && dt < .1 ? (a._esf ?? meta) + (meta - (a._esf ?? meta)) * Math.min(1, dt * 5) : meta; actuar(a, { t, esfuerzo: a._esf, altura: this.P?.h }); }
+    if (a.suit) { const meta = Math.min(1, .08 + .8 * Math.min(1, Math.max(0, (v.y - PLATE_R) / .25)) + temblor * .3 + (this.riesgo || 0) * .25); a._esf = dt > 0 && dt < .1 ? (a._esf ?? meta) + (meta - (a._esf ?? meta)) * Math.min(1, dt * 5) : meta; actuar(a, { t, esfuerzo: a._esf, altura: this.P?.h });
+      if (pose.primero && pose.s < .5) relajarManos(a, 1 - pose.s * 2); }      // de pie antes de ir a la barra: las manos cuelgan sueltas
   }
   /**
    * Selección de pesista: el pesista y la barra giran juntos sobre el eje vertical (`ang` rad; 0 = como siempre, de frente al
@@ -609,7 +610,8 @@ export class Escena {
     this._temblor = 0;
     aplicarEsfuerzo(a, 0, 0, true); a.root.position.z += p.dz || 0; a.root.position.y += p.dy || 0;
     if (p.brazos) a.setParts(p, p.brazos); else a.setMix(p.i, p.j, p.u, p.k, p.w);
-    if (a.suit) { a._esf = (a._esf ?? .5) * .97; const g = p.gesto; actuar(a, { t: p.t || 0, esfuerzo: a._esf, agitado: p.w || 0, alivio: g?.tipo === 'festejo' ? Math.max(g.w, g.despues > 0 ? .45 : 0) : 0, bronca: g?.tipo === 'bronca' ? g.w : 0, altura: this.P?.h }); }      // pesista nuevo: después del intento respira agitado
+    if (a.suit) { a._esf = (a._esf ?? .5) * .97; const g = p.gesto; actuar(a, { t: p.t || 0, esfuerzo: a._esf, agitado: p.w || 0, alivio: g?.tipo === 'festejo' ? Math.max(g.w, g.despues > 0 ? .45 : 0) : 0, bronca: g?.tipo === 'bronca' ? g.w : 0, altura: this.P?.h });
+      if (g?.tipo !== 'festejo' && !p.mano) relajarManos(a, p.w || 0); }      // ya sin la barra (y sin festejo, que mueve los dedos): las manos se sueltan a medida que se para      // pesista nuevo: después del intento respira agitado
     // de pie después del intento no queda de estatua: respira agitado (el pecho cabecea alrededor del eje lateral del mundo,
     // RESPIRA.grados en cada hueso del tronco, a RESPIRA.hz), tanto más cuanto más cerca de «Parado». Nada con movimiento reducido.
     if (p.w > 0 && p.t !== undefined && !this.reduceMotion) {

@@ -43,3 +43,34 @@ export function actuar(a, { t = 0, esfuerzo = 0, agitado = 0, alivio = 0, bronca
   const cara = cuerpo.material.userData.portraitEffort; if (cara) cara.value = esfuerzo;
   if (a.skin?.uSweat) a.skin.uSweat.value = .12 + .31 * esfuerzo + .1 * agitado;
 }
+
+const _q = new T.Quaternion(), _q2 = new T.Quaternion(), _eje = new T.Vector3(), _ad = new T.Vector3(), _cruz = new T.Vector3();
+/** Gira un hueso `ang` rad alrededor de un eje del mundo y deja al día sus hijos. */
+function girarMundo(hueso, ang, eje) {
+  _q.setFromAxisAngle(eje, ang).multiply(hueso.getWorldQuaternion(_q2));
+  hueso.quaternion.copy(hueso.parent.getWorldQuaternion(_q2).invert().multiply(_q)); hueso.updateWorldMatrix(false, true);
+}
+/** Cuánto se cierra cada dedo de una mano que cuelga (rad en la primera falange; la tercera, un poco menos). */
+const CIERRE = { Index: .17, Middle: .23, Ring: .29, Pinky: .33 };
+/**
+ * Manos sueltas del pesista nuevo cuando no agarra nada (de pie antes de ir a la barra, o después de soltarla): los dedos
+ * vuelven a su pose de descanso del esqueleto y se cierran un poco, más el meñique que el índice, como cuelga una mano
+ * de verdad. `w` 0..1: cuánto (0 no toca nada). Viene del visor (performance.js, la parte de la mano en reposo).
+ * Hay que llamarla después de posar, con las matrices del mundo al día.
+ */
+export function relajarManos(a, w) {
+  if (!a.restHand || !(w > .001)) return;
+  const b = a._byName;
+  for (const [lado, k] of [['Left', 1], ['Right', -1]]) {
+    const mano = b.get(lado + 'Hand'), ante = b.get(lado + 'ForeArm'); if (!mano || !ante) continue;
+    // eje de la mano (del codo a la muñeca) y «adelante» perpendicular a él: alrededor de ese se cierran los dedos
+    _eje.copy(mano.getWorldPosition(_a)).sub(ante.getWorldPosition(_b)).normalize();
+    _ad.set(0, 0, 1).addScaledVector(_eje, -_eje.z); if (_ad.lengthSq() < 1e-6) continue; _ad.normalize();
+    for (const [dedo, reposo] of a.restHand) {
+      if (!dedo.name.includes(lado + 'Hand')) continue;
+      dedo.quaternion.slerp(reposo, w * .86); dedo.updateWorldMatrix(true, false);
+      const m = dedo.name.match(/(Index|Middle|Ring|Pinky)([123])$/);
+      if (m) girarMundo(dedo, -k * w * CIERRE[m[1]] * (m[2] === '3' ? .58 : 1), _cruz.copy(_ad));
+    }
+  }
+}
